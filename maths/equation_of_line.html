@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Equation of a Line (y = mx + c)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Import maps for Three.js -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+      }
+    }
+    </script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.75);
+            
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --border-glow: rgba(74, 222, 128, 0.5);
+
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+
+            /* Variable Colors */
+            --color-m: #8b5cf6;  /* Violet (Slope Y) */
+            --color-c: #22c55e;  /* Green (Intercept Y) */
+            --color-mz: #6366f1; /* Indigo (Slope Z) */
+            --color-cz: #14b8a6; /* Teal (Intercept Z) */
+            --color-x: #3b82f6;  /* Blue (X) */
+            --color-y: #fbbf24;  /* Amber (Y) */
+            --color-z: #ec4899;  /* Pink (Z) */
+            --color-line: #e5e7eb; /* Light Gray */
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --border-glow: rgba(22, 163, 74, 0.4);
+
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+
+            --grid-color: rgba(22, 163, 74, 0.04);
+            --vignette-color: transparent;
+            --color-line: #1f2937;
+        }
+
+        /* Base Styles */
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        /* Card Styles */
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .card-header {
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 1rem 1.5rem;
+            background: var(--input-bg);
+        }
+
+        /* Input Styling */
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: all 0.2s;
+        }
+        .viz-input:focus {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+            outline: none;
+        }
+        .viz-input:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .viz-input::-webkit-outer-spin-button,
+        .viz-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--color-x);
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border-subtle);
+            border-radius: 2px;
+        }
+
+        /* Button Styling */
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        .viz-btn-primary {
+            background: var(--accent-primary);
+            color: var(--bg-body);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        .viz-btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0 15px var(--accent-glow);
+            filter: brightness(1.1);
+        }
+        .viz-btn-secondary {
+            background: var(--input-bg);
+            color: var(--text-muted);
+            border: 1px solid var(--border-subtle);
+        }
+        .viz-btn-secondary:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--input-focus-bg);
+        }
+        .viz-btn-active {
+            background: var(--accent-primary);
+            color: var(--bg-body);
+            border-color: var(--accent-primary);
+        }
+
+        .metric-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+
+        /* Canvas Container */
+        #canvas-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 600px;
+            overflow: hidden;
+            border-radius: 0 0 12px 12px;
+        }
+        canvas { outline: none; }
+        
+        /* Floating Overlay Styles */
+        .floating-overlay {
+            background: rgba(10, 10, 10, 0.4);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            max-height: calc(100% - 2rem);
+        }
+        body.light-mode .floating-overlay {
+            background: rgba(255, 255, 255, 0.4);
+        }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .search-input-wrapper:focus-within {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .search-input-wrapper input {
+            color: var(--text-main);
+        }
+        .search-input-wrapper input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .search-input-wrapper i {
+            color: var(--accent-primary);
+            opacity: 0.7;
+        }
+
+        /* Dropdown Search */
+        .search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-dropdown-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .search-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-dropdown-item:hover {
+            background: var(--input-focus-bg);
+            padding-left: 20px;
+        }
+
+        .dropdown-item-title {
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .dropdown-item-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 12px;
+        }
+
+        .dropdown-item-icon {
+            color: var(--accent-primary);
+            margin-right: 8px;
+            font-size: 0.875rem;
+        }
+
+        .dropdown-no-results {
+            padding: 20px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <!-- Search -->
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search courses" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Theme Toggle + Back Button -->
+                <div class="flex items-center gap-3">
+                    <!-- Back to Hub Button -->
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    
+                    <!-- Theme Toggle -->
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+        
+        <!-- Breadcrumb / Title -->
+        <div class="mb-6 animate-fade-in">
+            <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
+                <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
+                <span>/</span>
+                <span>Algebra</span>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Equation of a Line <span class="text-xl ml-2 opacity-60 font-mono tracking-tight">(y = mx + c)</span></h1>
+            <p class="mt-2 max-w-3xl" style="color: var(--text-muted)">Visualize the slope-intercept form in fully interactive 2D or 3D space. Click points to reveal drag handles, or rotate the space freely to view from any angle. The graph area is maximized for best viewing.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in h-full">
+            
+            <!-- Controls Panel (Left, Span 3) -->
+            <div class="lg:col-span-3 space-y-6">
+                <div class="card-container h-full">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--accent-primary)">
+                            <i class="fas fa-sliders-h mr-2"></i> Parameters
+                        </h3>
+                    </div>
+                    <div class="p-5 space-y-5 overflow-y-auto">
+
+                        <!-- Dimensions Toggle -->
+                        <div class="space-y-2">
+                            <label class="block text-xs font-bold uppercase tracking-wider" style="color: var(--text-muted)">
+                                Dimensions
+                            </label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="setDimension(2)" id="btn-2d" class="viz-btn viz-btn-active py-2 text-xs">2D Space</button>
+                                <button onclick="setDimension(3)" id="btn-3d" class="viz-btn viz-btn-secondary py-2 text-xs">3D Space</button>
+                            </div>
+                        </div>
+
+                        <hr style="border-color: var(--border-subtle)">
+
+                        <!-- Y-Axis Parameters -->
+                        <div class="space-y-3">
+                            <label class="block text-xs font-bold uppercase tracking-wider" style="color: var(--color-y)">
+                                <i class="fas fa-arrows-alt-v mr-1"></i> Y-Axis Line
+                            </label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <span class="block text-[10px] text-center mb-1 opacity-60 font-mono">Slope (m)</span>
+                                    <input type="number" id="input-m" value="1" step="0.5" class="viz-input w-full rounded-md px-2 py-2 text-sm font-mono text-center font-bold" style="color: var(--color-m)">
+                                </div>
+                                <div>
+                                    <span class="block text-[10px] text-center mb-1 opacity-60 font-mono">Y-Int (c)</span>
+                                    <input type="number" id="input-c" value="0" step="0.5" class="viz-input w-full rounded-md px-2 py-2 text-sm font-mono text-center font-bold" style="color: var(--color-c)">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Z-Axis Parameters -->
+                        <div class="space-y-3" id="z-params-container" style="opacity: 0.3; pointer-events: none;">
+                            <label class="block text-xs font-bold uppercase tracking-wider" style="color: var(--color-z)">
+                                <i class="fas fa-arrows-alt-v mr-1" style="transform: rotate(45deg);"></i> Z-Axis Line
+                            </label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <span class="block text-[10px] text-center mb-1 opacity-60 font-mono">Slope (m<sub class="text-[8px]">z</sub>)</span>
+                                    <input type="number" id="input-mz" value="0" step="0.5" class="viz-input w-full rounded-md px-2 py-2 text-sm font-mono text-center font-bold" style="color: var(--color-mz)">
+                                </div>
+                                <div>
+                                    <span class="block text-[10px] text-center mb-1 opacity-60 font-mono">Z-Int (c<sub class="text-[8px]">z</sub>)</span>
+                                    <input type="number" id="input-cz" value="0" step="0.5" class="viz-input w-full rounded-md px-2 py-2 text-sm font-mono text-center font-bold" style="color: var(--color-cz)">
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr style="border-color: var(--border-subtle)">
+
+                        <!-- Current X -->
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <label class="block text-xs font-bold uppercase tracking-wider" style="color: var(--color-x)">
+                                    <i class="fas fa-arrows-alt-h mr-1"></i> X-Coordinate
+                                </label>
+                                <input type="number" id="input-x" value="2" step="0.5" class="viz-input w-16 rounded px-1 py-1 text-xs font-mono text-center" style="color: var(--color-x)">
+                            </div>
+                            <input type="range" id="slider-x" min="-10" max="10" step="0.5" value="2">
+                            <div class="flex justify-between text-[10px] opacity-40 font-mono">
+                                <span>-10</span>
+                                <span>0</span>
+                                <span>10</span>
+                            </div>
+                        </div>
+
+                        <!-- Presets -->
+                        <div class="pt-2">
+                            <p class="text-[10px] uppercase font-bold opacity-60 mb-2">Presets</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="setScenario(1, 0, 1, 0)" class="viz-btn viz-btn-secondary py-2 text-[10px] uppercase">Default</button>
+                                <button onclick="setScenario(0, 3, 0, -2)" class="viz-btn viz-btn-secondary py-2 text-[10px] uppercase">Horizontal</button>
+                                <button onclick="setScenario(-2, 5, -1, 3)" class="viz-btn viz-btn-secondary py-2 text-[10px] uppercase">Negative</button>
+                                <button onclick="setScenario(0.5, -2, -0.5, 1)" class="viz-btn viz-btn-secondary py-2 text-[10px] uppercase">Fractional</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Graph Area (Maximized, Span 9) -->
+            <div class="lg:col-span-9 h-[75vh] min-h-[600px]">
+                <div class="card-container h-full relative">
+                    <div class="card-header flex justify-between items-center z-20">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-main)">
+                            <i class="fas fa-border-all mr-2" style="color: var(--accent-primary)"></i> Graph Explorer
+                        </h3>
+                        <div class="flex gap-2">
+                            <span class="text-[10px] px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 mono-font">
+                                <i class="fas fa-mouse-pointer mr-1"></i> Click points & drag arrows
+                            </span>
+                            <button id="resetViewBtn" class="text-[10px] px-2 py-1 rounded bg-gray-500/10 text-gray-400 hover:text-white border border-gray-500/20 mono-font transition-colors">
+                                Reset View
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="canvas-wrapper" class="bg-black relative w-full h-full flex-1">
+                        <!-- Three.js Canvas generated here -->
+                        
+                        <!-- Floating Calculations Overlay -->
+                        <div class="floating-overlay absolute bottom-4 right-4 z-10 w-64 rounded-xl overflow-y-auto hidden md:block" style="color: var(--text-main)">
+                            <div class="p-3 space-y-3">
+                                <!-- Header -->
+                                <div class="flex items-center justify-between border-b pb-1.5" style="border-color: var(--border-subtle)">
+                                    <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--accent-primary)">
+                                        <i class="fas fa-calculator mr-1"></i> Live Calc
+                                    </h3>
+                                </div>
+
+                                <!-- Main Equation -->
+                                <div>
+                                    <span class="text-[9px] uppercase font-bold block mb-1.5" style="color: var(--text-muted)">General Form</span>
+                                    <div class="space-y-1">
+                                        <div class="mono-font text-xs flex items-center justify-center space-x-1.5 bg-black/20 p-1.5 rounded font-bold border border-gray-500/20">
+                                            <span style="color: var(--color-y)">y</span>
+                                            <span style="color: var(--text-main)">=</span>
+                                            <span style="color: var(--color-m)">m</span>
+                                            <span style="color: var(--color-x)">x</span>
+                                            <span style="color: var(--text-main)">+</span>
+                                            <span style="color: var(--color-c)">c</span>
+                                        </div>
+                                        <div id="gen-eq-z" class="mono-font text-xs flex items-center justify-center space-x-1.5 bg-black/20 p-1.5 rounded font-bold border border-gray-500/20 hidden">
+                                            <span style="color: var(--color-z)">z</span>
+                                            <span style="color: var(--text-main)">=</span>
+                                            <span style="color: var(--color-mz)">m<sub>z</sub></span>
+                                            <span style="color: var(--color-x)">x</span>
+                                            <span style="color: var(--text-main)">+</span>
+                                            <span style="color: var(--color-cz)">c<sub>z</sub></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Current Equation -->
+                                <div>
+                                    <span class="text-[9px] uppercase font-bold block mb-1.5" style="color: var(--text-muted)">Current Equation</span>
+                                    <div class="space-y-1">
+                                        <div id="current-equation" class="mono-font text-xs flex items-center justify-center space-x-1.5 bg-black/30 p-1.5 rounded border border-gray-500/10">
+                                            <!-- Injected by JS -->
+                                        </div>
+                                        <div id="current-equation-z" class="mono-font text-xs flex items-center justify-center space-x-1.5 bg-black/30 p-1.5 rounded border border-gray-500/10 hidden">
+                                            <!-- Injected by JS -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Step by Step Calculation -->
+                                <div>
+                                    <div class="flex justify-between items-start mb-1.5">
+                                        <span class="text-[9px] uppercase font-bold" style="color: var(--text-muted)">Evaluating Point X</span>
+                                    </div>
+                                    
+                                    <div class="space-y-1 text-[10px] mono-font opacity-90 p-1.5 border border-dashed border-gray-500/40 rounded bg-black/10">
+                                        <div class="text-center pb-1 border-b border-gray-500/30">
+                                            <span style="color: var(--color-x)">Let x = <span id="calc-x">2</span></span>
+                                        </div>
+                                        <div class="flex flex-col gap-0.5 font-bold pt-1 text-center">
+                                            <div id="calc-step-y" style="color: var(--color-y)">y = (1)(2) + 0 = 2</div>
+                                            <div id="calc-step-z" style="color: var(--color-z)" class="hidden">z = (0)(2) + 0 = 0</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-2 flex flex-col items-center">
+                                        <span class="text-[8px] uppercase opacity-50 tracking-wider mb-1">Resulting Coordinates</span>
+                                        <div class="text-sm font-bold mono-font px-3 py-1 bg-white/5 border border-white/10 rounded shadow-inner">
+                                            <span id="calc-point" style="color: var(--text-main)">( <span style="color: var(--color-x)">2</span>, <span style="color: var(--color-y)">2</span> )</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t py-8 mt-auto z-20 relative" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-4">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-instagram fa-lg"></i></a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2025 VIZLEARN // MODULE.LINEAR_EQUATIONS_3D</p>
+        </div>
+    </footer>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            updateSceneTheme(isLight);
+        });
+
+        // --- DOM Elements ---
+        const canvasContainer = document.getElementById('canvas-wrapper');
+        const inputs = {
+            m: document.getElementById('input-m'),
+            c: document.getElementById('input-c'),
+            mz: document.getElementById('input-mz'),
+            cz: document.getElementById('input-cz'),
+            xVal: document.getElementById('input-x'),
+            xSlider: document.getElementById('slider-x')
+        };
+        
+        const displays = {
+            eq: document.getElementById('current-equation'),
+            eqZ: document.getElementById('current-equation-z'),
+            genEqZ: document.getElementById('gen-eq-z'),
+            calcX: document.getElementById('calc-x'),
+            calcStepY: document.getElementById('calc-step-y'),
+            calcStepZ: document.getElementById('calc-step-z'),
+            point: document.getElementById('calc-point')
+        };
+
+        const buttons = {
+            btn2d: document.getElementById('btn-2d'),
+            btn3d: document.getElementById('btn-3d')
+        };
+        const zParamsContainer = document.getElementById('z-params-container');
+
+        // --- STATE ---
+        const state = {
+            dim: 2, // 2 or 3
+            m: 1, c: 0,
+            mz: 0, cz: 0,
+            x: 2
+        };
+
+        // --- THREE.JS LOGIC ---
+        let scene, camera, renderer, orbitControls, tControl;
+        let mainLine, xAxisLine, yAxisLine, zAxisLine, gridHelperXY, gridHelperXZ;
+        let interceptSphere, slopeSphere, targetSphere;
+        let slopeTriangle;
+        let interactiveObjects = [];
+        
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        // UI Colors
+        const COLOR_M = 0x8b5cf6; 
+        const COLOR_C = 0x22c55e; 
+        const COLOR_MZ = 0x6366f1;
+        const COLOR_CZ = 0x14b8a6;
+        const COLOR_X = 0x3b82f6; 
+        const COLOR_Y = 0xfbbf24; 
+        const COLOR_Z = 0xec4899;
+
+        function init() {
+            scene = new THREE.Scene();
+            const isLight = document.body.classList.contains('light-mode');
+            scene.background = new THREE.Color(isLight ? 0xffffff : 0x0a0a0a);
+
+            camera = new THREE.PerspectiveCamera(35, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            canvasContainer.appendChild(renderer.domElement);
+            
+            orbitControls = new OrbitControls(camera, renderer.domElement);
+            orbitControls.enableDamping = true;
+            orbitControls.dampingFactor = 0.05;
+            
+            createAxesAndGrid(isLight);
+            createSceneObjects();
+            
+            // Transform Controls for advanced interacting
+            tControl = new TransformControls(camera, renderer.domElement);
+            tControl.size = 0.8;
+            tControl.addEventListener('dragging-changed', function (event) {
+                orbitControls.enabled = !event.value;
+            });
+            tControl.addEventListener('change', function () {
+                if (!tControl.object) return;
+                const obj = tControl.object;
+                
+                if (obj.userData.type === 'C') {
+                    state.c = obj.position.y;
+                    if (state.dim === 3) state.cz = obj.position.z;
+                } 
+                else if (obj.userData.type === 'M') {
+                    state.m = (obj.position.y - state.c) / 4;
+                    if (state.dim === 3) state.mz = (obj.position.z - state.cz) / 4;
+                }
+                else if (obj.userData.type === 'X') {
+                    state.x = obj.position.x;
+                }
+                
+                updateInputs();
+                update3DObjects();
+                updateMetrics();
+            });
+            scene.add(tControl);
+            
+            setupInteractions();
+            
+            window.addEventListener('resize', handleResize);
+            new ResizeObserver(handleResize).observe(canvasContainer);
+
+            // Bind Inputs
+            inputs.m.addEventListener('input', () => { state.m = parseFloat(inputs.m.value) || 0; updateAll(); });
+            inputs.c.addEventListener('input', () => { state.c = parseFloat(inputs.c.value) || 0; updateAll(); });
+            inputs.mz.addEventListener('input', () => { state.mz = parseFloat(inputs.mz.value) || 0; updateAll(); });
+            inputs.cz.addEventListener('input', () => { state.cz = parseFloat(inputs.cz.value) || 0; updateAll(); });
+            
+            inputs.xVal.addEventListener('input', () => { 
+                state.x = parseFloat(inputs.xVal.value) || 0; 
+                inputs.xSlider.value = state.x;
+                updateAll(); 
+            });
+            inputs.xSlider.addEventListener('input', () => { 
+                state.x = parseFloat(inputs.xSlider.value) || 0; 
+                inputs.xVal.value = state.x;
+                updateAll(); 
+            });
+            
+            document.getElementById('resetViewBtn').addEventListener('click', () => {
+                applyCameraForDimension();
+                updateAll();
+            });
+
+            window.setScenario = function(m, c, mz, cz) {
+                state.m = m; state.c = c; state.mz = mz; state.cz = cz; state.x = 2;
+                updateAll();
+            };
+
+            window.setDimension = function(dim) {
+                state.dim = dim;
+                tControl.detach(); // Important: detach arrows when switching views
+
+                if (dim === 2) {
+                    buttons.btn2d.classList.add('viz-btn-active');
+                    buttons.btn2d.classList.remove('viz-btn-secondary');
+                    buttons.btn3d.classList.remove('viz-btn-active');
+                    buttons.btn3d.classList.add('viz-btn-secondary');
+                    
+                    zParamsContainer.style.opacity = '0.3';
+                    zParamsContainer.style.pointerEvents = 'none';
+                    
+                    displays.genEqZ.classList.add('hidden');
+                    displays.eqZ.classList.add('hidden');
+                    displays.calcStepZ.classList.add('hidden');
+                    
+                    state.mz = 0; state.cz = 0;
+                } else {
+                    buttons.btn3d.classList.add('viz-btn-active');
+                    buttons.btn3d.classList.remove('viz-btn-secondary');
+                    buttons.btn2d.classList.remove('viz-btn-active');
+                    buttons.btn2d.classList.add('viz-btn-secondary');
+                    
+                    zParamsContainer.style.opacity = '1';
+                    zParamsContainer.style.pointerEvents = 'auto';
+                    
+                    displays.genEqZ.classList.remove('hidden');
+                    displays.eqZ.classList.remove('hidden');
+                    displays.calcStepZ.classList.remove('hidden');
+                }
+                applyCameraForDimension();
+                updateAll();
+            }
+
+            applyCameraForDimension();
+            updateAll();
+            animate();
+        }
+
+        function createAxesAndGrid(isLight) {
+            const axisColor = isLight ? 0x000000 : 0xffffff;
+            const gridColorLight = isLight ? 0xcccccc : 0x333333;
+            const gridColorDark = isLight ? 0xeeeeee : 0x222222;
+
+            gridHelperXY = new THREE.GridHelper(40, 40, gridColorLight, gridColorDark);
+            gridHelperXY.rotation.x = Math.PI / 2;
+            scene.add(gridHelperXY);
+            
+            gridHelperXZ = new THREE.GridHelper(40, 40, gridColorLight, gridColorDark);
+            scene.add(gridHelperXZ);
+
+            const matX = new THREE.LineBasicMaterial({ color: COLOR_X, linewidth: 2 });
+            const matY = new THREE.LineBasicMaterial({ color: COLOR_Y, linewidth: 2 });
+            const matZ = new THREE.LineBasicMaterial({ color: COLOR_Z, linewidth: 2 });
+            
+            const geoX = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-20,0,0), new THREE.Vector3(20,0,0)]);
+            const geoY = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,-20,0), new THREE.Vector3(0,20,0)]);
+            const geoZ = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,-20), new THREE.Vector3(0,0,20)]);
+            
+            xAxisLine = new THREE.Line(geoX, matX);
+            yAxisLine = new THREE.Line(geoY, matY);
+            zAxisLine = new THREE.Line(geoZ, matZ);
+            
+            scene.add(xAxisLine);
+            scene.add(yAxisLine);
+            scene.add(zAxisLine);
+        }
+
+        function createSceneObjects() {
+            const lineMat = new THREE.LineBasicMaterial({ color: 0xe5e7eb, linewidth: 3 });
+            if(document.body.classList.contains('light-mode')) lineMat.color.setHex(0x1f2937);
+            const lineGeo = new THREE.BufferGeometry();
+            mainLine = new THREE.Line(lineGeo, lineMat);
+            scene.add(mainLine);
+
+            const sphereGeo = new THREE.SphereGeometry(0.6, 32, 32);
+            
+            const matC = new THREE.MeshBasicMaterial({ color: COLOR_C });
+            const matHoverC = new THREE.MeshBasicMaterial({ color: COLOR_C, transparent: true, opacity: 0.8 });
+            
+            const matM = new THREE.MeshBasicMaterial({ color: COLOR_M });
+            const matHoverM = new THREE.MeshBasicMaterial({ color: COLOR_M, transparent: true, opacity: 0.8 });
+
+            const matX = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const matHoverX = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+
+            interceptSphere = new THREE.Mesh(sphereGeo, matC);
+            interceptSphere.userData = { type: 'C', mat: matC, matHover: matHoverC };
+            scene.add(interceptSphere);
+
+            slopeSphere = new THREE.Mesh(sphereGeo, matM);
+            slopeSphere.userData = { type: 'M', mat: matM, matHover: matHoverM };
+            scene.add(slopeSphere);
+
+            targetSphere = new THREE.Mesh(sphereGeo, matX);
+            targetSphere.userData = { type: 'X', mat: matX, matHover: matHoverX };
+            scene.add(targetSphere);
+
+            const triMat = new THREE.LineDashedMaterial({ color: COLOR_M, dashSize: 0.2, gapSize: 0.1 });
+            const triGeo = new THREE.BufferGeometry();
+            slopeTriangle = new THREE.Line(triGeo, triMat);
+            scene.add(slopeTriangle);
+
+            interactiveObjects = [interceptSphere, slopeSphere, targetSphere];
+        }
+
+        function applyCameraForDimension() {
+            orbitControls.target.set(0,0,0);
+            orbitControls.enableRotate = true; // Free rotation enabled for both 2D and 3D
+            
+            if (state.dim === 2) {
+                camera.position.set(0, 0, 30);
+                gridHelperXY.visible = true;
+                gridHelperXZ.visible = false;
+                zAxisLine.visible = false;
+            } else {
+                camera.position.set(15, 10, 20);
+                gridHelperXY.visible = false;
+                gridHelperXZ.visible = true;
+                zAxisLine.visible = true;
+            }
+        }
+
+        function updateSceneTheme(isLight) {
+            scene.background.setHex(isLight ? 0xffffff : 0x0a0a0a);
+            scene.remove(gridHelperXY);
+            scene.remove(gridHelperXZ);
+            scene.remove(xAxisLine);
+            scene.remove(yAxisLine);
+            scene.remove(zAxisLine);
+            createAxesAndGrid(isLight);
+            
+            if (state.dim === 2) {
+                gridHelperXY.visible = true;
+                gridHelperXZ.visible = false;
+                zAxisLine.visible = false;
+            } else {
+                gridHelperXY.visible = false;
+                gridHelperXZ.visible = true;
+                zAxisLine.visible = true;
+            }
+            mainLine.material.color.setHex(isLight ? 0x1f2937 : 0xe5e7eb);
+        }
+
+        function updateAll() {
+            updateInputs();
+            update3DObjects();
+            updateMetrics();
+        }
+
+        function updateInputs() {
+            if(document.activeElement !== inputs.m) inputs.m.value = state.m.toFixed(2);
+            if(document.activeElement !== inputs.c) inputs.c.value = state.c.toFixed(2);
+            if(document.activeElement !== inputs.mz) inputs.mz.value = state.mz.toFixed(2);
+            if(document.activeElement !== inputs.cz) inputs.cz.value = state.cz.toFixed(2);
+            if(document.activeElement !== inputs.xVal) inputs.xVal.value = state.x.toFixed(2);
+            if(document.activeElement !== inputs.xSlider) inputs.xSlider.value = state.x;
+        }
+
+        function update3DObjects() {
+            const m = state.m, c = state.c, mz = state.mz, cz = state.cz, x = state.x;
+
+            const p1 = new THREE.Vector3(-50, m * -50 + c, mz * -50 + cz);
+            const p2 = new THREE.Vector3(50, m * 50 + c, mz * 50 + cz);
+            mainLine.geometry.setFromPoints([p1, p2]);
+
+            interceptSphere.position.set(0, c, cz);
+
+            const y = m * x + c;
+            const z = mz * x + cz;
+            targetSphere.position.set(x, y, z);
+
+            const slopeX = 4;
+            slopeSphere.position.set(slopeX, m * slopeX + c, mz * slopeX + cz);
+
+            const pts = [];
+            pts.push(new THREE.Vector3(0, c, cz));
+            pts.push(new THREE.Vector3(slopeX, c, cz)); 
+            pts.push(new THREE.Vector3(slopeX, m * slopeX + c, mz * slopeX + cz));
+            
+            slopeTriangle.geometry.setFromPoints(pts);
+            slopeTriangle.computeLineDistances();
+            
+            slopeTriangle.visible = state.dim === 2;
+        }
+
+        function buildEqHTML(vLabel, vColor, m, c, mColor, cColor) {
+            const cStr = c === 0 ? "" : (c > 0 ? ` + ${c.toFixed(2)}` : ` - ${Math.abs(c).toFixed(2)}`);
+            const mStr = m === 1 ? "x" : (m === -1 ? "-x" : `${m.toFixed(2)}x`);
+            let html = `
+                <span style="color: ${vColor}">${vLabel}</span>
+                <span style="color: var(--text-main)">=</span>
+                <span style="color: ${mColor}">${mStr}</span>
+                <span style="color: ${cColor}">${cStr}</span>
+            `;
+            if(m===0 && c===0) html = `<span style="color: ${vColor}">${vLabel}</span> <span style="color: var(--text-main)">=</span> <span style="color: ${cColor}">0</span>`;
+            return html;
+        }
+
+        function updateMetrics() {
+            const m = state.m, c = state.c, mz = state.mz, cz = state.cz, x = state.x;
+            const y = m * x + c;
+            const z = mz * x + cz;
+
+            displays.eq.innerHTML = buildEqHTML('y', 'var(--color-y)', m, c, 'var(--color-m)', 'var(--color-c)');
+            displays.eqZ.innerHTML = buildEqHTML('z', 'var(--color-z)', mz, cz, 'var(--color-mz)', 'var(--color-cz)');
+
+            displays.calcX.textContent = x.toFixed(2);
+
+            const cSign = c >= 0 ? '+' : '-';
+            displays.calcStepY.textContent = `y = (${m.toFixed(2)})(${x.toFixed(2)}) ${cSign} ${Math.abs(c).toFixed(2)} = ${y.toFixed(2)}`;
+            
+            const czSign = cz >= 0 ? '+' : '-';
+            displays.calcStepZ.textContent = `z = (${mz.toFixed(2)})(${x.toFixed(2)}) ${czSign} ${Math.abs(cz).toFixed(2)} = ${z.toFixed(2)}`;
+            
+            if (state.dim === 2) {
+                displays.point.innerHTML = `( <span style="color: var(--color-x)">${x.toFixed(2)}</span>, <span style="color: var(--color-y)">${y.toFixed(2)}</span> )`;
+            } else {
+                displays.point.innerHTML = `( <span style="color: var(--color-x)">${x.toFixed(2)}</span>, <span style="color: var(--color-y)">${y.toFixed(2)}</span>, <span style="color: var(--color-z)">${z.toFixed(2)}</span> )`;
+            }
+        }
+
+        function setupInteractions() {
+            // Handle clicking objects to attach TransformControls
+            renderer.domElement.addEventListener('pointerdown', (event) => {
+                if (tControl.axis !== null) return; // Ignore if user clicked on TransformControl arrows
+
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(interactiveObjects);
+
+                if (intersects.length > 0) {
+                    const object = intersects[0].object;
+                    tControl.attach(object);
+                    
+                    // Assign axis constraints based on the type of handle clicked
+                    if (object.userData.type === 'C' || object.userData.type === 'M') {
+                        tControl.showX = false;
+                        tControl.showY = true;
+                        tControl.showZ = (state.dim === 3); // Allow Z dragging only in 3D Mode
+                    } else if (object.userData.type === 'X') {
+                        tControl.showX = true;
+                        tControl.showY = false;
+                        tControl.showZ = false; // X point only slides along X axis
+                    }
+                } else {
+                    tControl.detach(); // Clicked background, detach controls
+                }
+            });
+
+            // Hover effects for the spheres
+            renderer.domElement.addEventListener('pointermove', (event) => {
+                if (tControl.dragging) return;
+                
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(interactiveObjects);
+                
+                // Reset all materials
+                interactiveObjects.forEach(obj => obj.material = obj.userData.mat);
+
+                if (intersects.length > 0) {
+                    document.body.style.cursor = 'pointer';
+                    intersects[0].object.material = intersects[0].object.userData.matHover;
+                } else {
+                    document.body.style.cursor = tControl.axis !== null ? 'pointer' : 'default';
+                }
+            });
+        }
+
+        function handleResize() {
+            if(!canvasContainer || !camera || !renderer) return;
+            const width = canvasContainer.clientWidth;
+            const height = canvasContainer.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            orbitControls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+    
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            // Machine Learning
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "../machine_learning/cosine_similarity.html", category: "ml", icon: "fa-brain" },
+            { title: "Cross Validation", path: "../machine_learning/cross_validation.html", category: "ml", icon: "fa-brain" },
+            { title: "Decision Tree", path: "../machine_learning/decision_tree.html", category: "ml", icon: "fa-brain" },
+            { title: "K-Means", path: "../machine_learning/k_means.html", category: "ml", icon: "fa-brain" },
+            { title: "KNN", path: "../machine_learning/knn.html", category: "ml", icon: "fa-brain" },
+            { title: "Label Encoding", path: "../machine_learning/label_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Naive Bayes", path: "../machine_learning/naive_bayes.html", category: "ml", icon: "fa-brain" },
+            { title: "One Hot Encoding", path: "../machine_learning/one_hot_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Sliding Window Time Series", path: "../machine_learning/sliding_window_for_timeseries_data.html", category: "ml", icon: "fa-brain" },
+            { title: "SVM", path: "../machine_learning/svm.html", category: "ml", icon: "fa-brain" },
+            { title: "Train Test Split", path: "../machine_learning/train_test_split.html", category: "ml", icon: "fa-brain" },
+            
+            // Deep Learning
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing in Neural Networks", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Dropout in Neural Networks", path: "../deep_learning/dropout_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Batch Processing", path: "../deep_learning/gradient_descent_batch_processing.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Linear Regression with Gradient Descent", path: "../deep_learning/linear_regression_with_gradient_descent.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            
+            // DSA
+            { title: "A* Algorithm", path: "../dsa/a_star.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Backtracking", path: "../dsa/backtracking.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Search", path: "../dsa/binary_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Breadth First Search", path: "../dsa/breadth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Bubble Sort", path: "../dsa/bubble_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Counting Sort", path: "../dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Depth First Search", path: "../dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dictionaries in Python", path: "../dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra's Algorithm", path: "../dsa/dijkstra's.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Fibonacci Search", path: "../dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Insertion Sort", path: "../dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Interpolation Search", path: "../dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Linear Search", path: "../dsa/linear_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Lists in Python", path: "../dsa/lists_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Merge Sort", path: "../dsa/merge_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Quick Sort", path: "../dsa/quick_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Selection Sort", path: "../dsa/selection_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Strings in Python", path: "../dsa/strings_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            
+            // Natural Language Processing
+            { title: "ASCII Codes", path: "../natural_language_processing/ascii_codes.html", category: "nlp", icon: "fa-comments" },
+            { title: "N-Gram", path: "../natural_language_processing/n_gram.html", category: "nlp", icon: "fa-comments" },
+            { title: "Stemming vs Lemmatization", path: "../natural_language_processing/stemming_vs_lemmatization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Text Normalization Pipeline", path: "../natural_language_processing/text_normalization_pipeline.html", category: "nlp", icon: "fa-comments" },
+            { title: "Tokenization", path: "../natural_language_processing/tokenization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Word Cloud", path: "../natural_language_processing/word_cloud.html", category: "nlp", icon: "fa-comments" },
+            
+            // Computer Vision
+            { title: "Downsampling in CNN", path: "../computer_vision/downsampling_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Edge Detection", path: "../computer_vision/edge_detection.html", category: "vision", icon: "fa-eye" },
+            { title: "Feature Map in CNN", path: "../computer_vision/feature_map_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Grayscale Image Processing", path: "../computer_vision/grayscale_image_processing.html", category: "vision", icon: "fa-eye" },
+            { title: "Image Data Augmentation", path: "../computer_vision/image_data_augmentation.html", category: "vision", icon: "fa-eye" },
+            { title: "RGB Image Processing", path: "../computer_vision/rgb_image_processing.html", category: "vision", icon: "fa-eye" },
+            
+            // Database
+            { title: "Groupby in SQL", path: "../database/groupby_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Joins in SQL", path: "../database/joins_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Window Functions in SQL", path: "../database/window_functions_in_sql.html", category: "db", icon: "fa-database" },
+            
+            // Gen AI
+            { title: "Casual Language Modeling", path: "../gen_ai/casual_language_modeling.html", category: "gen-ai", icon: "fa-wand-magic-sparkles" },
+            
+            // Maths
+            { title: "Equation of Line", path: "../maths/equation_of_line.html", category: "maths", icon: "fa-calculator" }
+        ];
+
+        // Initialize search functionality
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                // Filter courses
+                const filtered = allCourses.filter(course => 
+                    course.title.toLowerCase().includes(query) || 
+                    course.category.toLowerCase().includes(query)
+                );
+
+                // Render results
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>
+                    `).join('');
+                }
+
+                dropdown.classList.add('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            // Close dropdown on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>

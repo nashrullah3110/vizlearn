@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Gradient descent batch processing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 40s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'dark';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+        :root {
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.95);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.03);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            --chart-grid: rgba(74, 222, 128, 0.1);
+            --chart-text: #86efac;
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.95);
+            --border-subtle: rgba(22, 163, 74, 0.15);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.04);
+            --grid-color: rgba(22, 163, 74, 0.04);
+            --vignette-color: transparent;
+            --chart-grid: rgba(22, 163, 74, 0.1);
+            --chart-text: #374151;
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .glass-card {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 16px;
+            overflow: hidden;
+            backdrop-filter: blur(8px);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        .custom-range {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: var(--input-bg);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .custom-range::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--accent-glow);
+            transition: transform 0.2s;
+        }
+        
+        .custom-range::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .sampling-dot {
+            width: 100%;
+            padding-bottom: 100%;
+            border-radius: 2px;
+            background-color: var(--border-subtle);
+            transition: background-color 0.05s ease, transform 0.05s ease;
+            position: relative;
+        }
+        .sampling-dot::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: inherit;
+            border-radius: inherit;
+        }
+        
+        .dot-active-bgd { background-color: #facc15 !important; box-shadow: 0 0 15px #facc15; z-index: 10; transform: scale(1.1); }
+        .dot-active-sgd { background-color: #22d3ee !important; box-shadow: 0 0 15px #22d3ee; z-index: 10; transform: scale(1.1); }
+        .dot-active-mbgd { background-color: #4ade80 !important; box-shadow: 0 0 15px #4ade80; z-index: 10; transform: scale(1.1); }
+        
+        /* Reading state for MBGD accumulation */
+        .dot-reading-mbgd { background-color: rgba(74, 222, 128, 0.3); border: 1px solid #4ade80; }
+
+        .theme-toggle {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+        }
+
+        .theme-toggle:hover {
+            color: var(--accent-primary);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        /* Highly Transparent Floating HUD */
+        .floating-monitor {
+            position: fixed;
+            bottom: 6rem;
+            right: 2rem;
+            width: 320px;
+            height: 200px;
+            z-index: 40;
+            background: rgba(0, 0, 0, 0.1); /* 90% Transparency */
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            transition: opacity 0.3s;
+        }
+        
+        /* Bottom Control Panel */
+        .bottom-controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(10, 10, 10, 0.9);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--border-subtle);
+            z-index: 50;
+            padding: 1rem 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .floating-monitor {
+                display: none;
+            }
+            .bottom-controls {
+                padding: 1rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .search-input-wrapper:focus-within {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .search-input-wrapper input {
+            color: var(--text-main);
+        }
+        .search-input-wrapper input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .search-input-wrapper i {
+            color: var(--accent-primary);
+            opacity: 0.7;
+        }
+
+        /* Dropdown Search */
+        .search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-dropdown-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .search-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-dropdown-item:hover {
+            background: var(--input-focus-bg);
+            padding-left: 20px;
+        }
+
+        .dropdown-item-title {
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .dropdown-item-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 12px;
+        }
+
+        .dropdown-item-icon {
+            color: var(--accent-primary);
+            margin-right: 8px;
+            font-size: 0.875rem;
+        }
+
+        .dropdown-no-results {
+            padding: 20px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col min-h-screen overflow-x-hidden pb-32">
+
+    <!-- Sticky Navbar -->
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <!-- Search -->
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search courses" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Theme Toggle + Back Button -->
+                <div class="flex items-center gap-3">
+                    <!-- Back to Hub Button -->
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    
+                    <!-- Theme Toggle -->
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+
+    <main class="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto flex flex-col">
+        
+        <!-- Page Header Section -->
+        <div class="mb-8 animate-fade-in">
+            <div class="flex items-center gap-2 text-xs mono-font mb-2" style="color: var(--text-muted)">
+                <span class="opacity-50">Modules</span>
+                <span>/</span>
+                <span class="opacity-50">Optimization</span>
+                <span>/</span>
+                <span style="color: var(--accent-primary)">Gradient Descent</span>
+            </div>
+            <h1 class="text-4xl md:text-5xl font-bold brand-font mb-2" style="color: var(--text-main)">Gradient descent batch processing</h1>
+            <p class="text-sm max-w-3xl opacity-70" style="color: var(--text-muted)">
+                Visualize how different gradient descent strategies process data to update weights.
+            </p>
+        </div>
+
+        <!-- Algorithm Cards (Full Width) -->
+        <section class="w-full flex-1 flex flex-col animate-fade-in" style="animation-delay: 0.1s">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full flex-grow">
+                
+                <!-- Batch Processor -->
+                <div id="card-bgd" class="glass-card flex flex-col border-t-2 border-[#facc15]/40 h-full transition-colors duration-300">
+                    <div class="p-6 border-b border-white/5 flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xs font-bold uppercase tracking-[0.2em] text-[#facc15] mb-1">Batch</h3>
+                            <p class="text-[9px] opacity-40 mono-font uppercase">Update @ Epoch End</p>
+                        </div>
+                        <div id="bgdLoss" class="text-lg mono-font font-bold text-[#facc15]">0.0000</div>
+                    </div>
+                    <div class="p-6 flex-grow flex items-center justify-center">
+                        <div id="bgdGrid" class="grid grid-cols-10 gap-1.5 w-full aspect-square max-w-[320px]"></div>
+                    </div>
+                </div>
+                
+                <!-- Stochastic Node -->
+                <div id="card-sgd" class="glass-card flex flex-col border-t-2 border-[#22d3ee]/40 h-full transition-colors duration-100">
+                    <div class="p-6 border-b border-white/5 flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xs font-bold uppercase tracking-[0.2em] text-[#22d3ee] mb-1">Stochastic</h3>
+                            <p class="text-[9px] opacity-40 mono-font uppercase">Update Per Point</p>
+                        </div>
+                        <div id="sgdLoss" class="text-lg mono-font font-bold text-[#22d3ee]">0.0000</div>
+                    </div>
+                    <div class="p-6 flex-grow flex items-center justify-center">
+                        <div id="sgdGrid" class="grid grid-cols-10 gap-1.5 w-full aspect-square max-w-[320px]"></div>
+                    </div>
+                </div>
+
+                <!-- Mini-Batch Unit -->
+                <div id="card-mbgd" class="glass-card flex flex-col border-t-2 border-[#4ade80]/40 h-full transition-colors duration-200">
+                    <div class="p-6 border-b border-white/5 flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xs font-bold uppercase tracking-[0.2em] text-[#4ade80] mb-1">Mini-Batch</h3>
+                            <p class="text-[9px] opacity-40 mono-font uppercase">Update Per Batch</p>
+                        </div>
+                        <div id="mbgdLoss" class="text-lg mono-font font-bold text-[#4ade80]">0.0000</div>
+                    </div>
+                    <div class="p-6 flex-grow flex items-center justify-center">
+                        <div id="mbgdGrid" class="grid grid-cols-10 gap-1.5 w-full aspect-square max-w-[320px]"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="w-full py-8 mt-12 border-t" style="border-color: var(--border-subtle); opacity: 0.7;">
+            <div class="container mx-auto px-6 text-center">
+                <div class="flex justify-center items-center space-x-8 mb-6" style="color: var(--text-muted)">
+                    <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-linkedin fa-lg"></i></a>
+                    <a href="https://github.com/AshishJangra27" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-github fa-lg"></i></a>
+                    <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-kaggle fa-lg"></i></a>
+                    <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-instagram fa-lg"></i></a>
+                </div>
+                <p class="text-[10px] tracking-[0.3em] mono-font uppercase opacity-50" style="color: var(--text-main)">&copy; 2025 VIZLEARN // SYSTEM ONLINE</p>
+            </div>
+        </footer>
+
+    </main>
+
+    <!-- Floating Monitor (Transparent) -->
+    <div id="convergence-monitor" class="floating-monitor animate-fade-in">
+        <div class="px-4 py-3 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+            <span class="text-[9px] font-bold uppercase tracking-wider text-green-500/80 mono-font">Loss Convergence</span>
+            <div class="flex gap-1.5">
+                <div class="w-1.5 h-1.5 rounded-full bg-[#facc15] shadow-[0_0_5px_#facc15]"></div>
+                <div class="w-1.5 h-1.5 rounded-full bg-[#22d3ee] shadow-[0_0_5px_#22d3ee]"></div>
+                <div class="w-1.5 h-1.5 rounded-full bg-[#4ade80] shadow-[0_0_5px_#4ade80]"></div>
+            </div>
+        </div>
+        <div class="flex-grow p-3">
+            <canvas id="convergenceChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Bottom Controls Panel (Swapped Positions) -->
+    <div class="bottom-controls flex items-center justify-between">
+        
+        <!-- LEFT: Sliders -->
+        <div class="flex items-center gap-8 flex-1">
+            <div class="flex flex-col gap-1 w-48">
+                <div class="flex justify-between text-[10px] uppercase font-bold tracking-wider opacity-60">
+                    <span>Batch Size</span>
+                    <span id="batchSizeValue" class="text-green-400">10</span>
+                </div>
+                <input type="range" id="batchSizeSlider" min="2" max="50" value="10" class="custom-range">
+            </div>
+
+            <div class="flex flex-col gap-1 w-48">
+                <div class="flex justify-between text-[10px] uppercase font-bold tracking-wider opacity-60">
+                    <span>Learning Rate</span>
+                    <span id="learningRateValue" class="text-green-400">0.010</span>
+                </div>
+                <input type="range" id="learningRateSlider" min="0.001" max="0.1" step="0.001" value="0.01" class="custom-range">
+            </div>
+        </div>
+
+        <!-- RIGHT: Buttons & Status -->
+        <div class="flex items-center gap-4 flex-1 justify-end">
+            <span id="cycle-label" class="text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded bg-white/5 border border-white/10 text-gray-500 mono-font">
+                Idle
+            </span>
+            <span class="text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded bg-white/5 border border-white/10 text-gray-400 mono-font">
+                Epoch: <span id="currentEpochDisplay" class="text-white">0</span>
+            </span>
+            
+            <div class="h-8 w-px bg-white/10 mx-2"></div>
+
+            <button id="resetBtn" class="h-10 w-10 rounded-lg flex items-center justify-center bg-white/5 text-gray-400 border border-white/10 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30 transition-all">
+                <i class="fas fa-rotate-right text-[10px]"></i>
+            </button>
+            <button id="pauseBtn" class="h-10 w-10 rounded-lg flex items-center justify-center bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10 hover:text-white transition-all">
+                <i class="fas fa-pause text-[10px]"></i>
+            </button>
+            <button id="startBtn" class="h-10 px-6 rounded-lg text-xs font-bold uppercase tracking-wider bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500 hover:text-white transition-all active:scale-95 flex items-center gap-2">
+                <i class="fas fa-play text-[10px]"></i> <span>Start</span>
+            </button>
+        </div>
+        
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const chartCtx = document.getElementById('convergenceChart').getContext('2d');
+            const cycleLabel = document.getElementById('cycle-label');
+            let convergenceChart;
+            let isRunning = false;
+            let animationFrameId = null;
+
+            let batchSize = 10;
+            let learningRate = 0.01;
+            let currentEpoch = 0;
+            let currentStep = 0; // Granular step 0..99
+            const maxEpochs = 50; 
+            const datasetSize = 100;
+
+            let algorithms = {
+                bgd: { weights: [0.5, 0.3], loss: 0, accumulatedGradient: [0, 0] },
+                sgd: { weights: [0.5, 0.3], loss: 0 },
+                mbgd: { weights: [0.5, 0.3], loss: 0, batchAccumulator: [0,0], batchCount: 0 }
+            };
+
+            const colors = { bgd: '#facc15', sgd: '#22d3ee', mbgd: '#4ade80' };
+
+            const themeToggleBtn = document.getElementById('themeToggle');
+            const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+            const moonIcon = themeToggleBtn.querySelector('.light-icon');
+            let currentTheme = localStorage.getItem('theme') || 'dark';
+
+            function applyTheme(theme) {
+                if (theme === 'light') {
+                    document.body.classList.add('light-mode');
+                    moonIcon.classList.remove('hidden'); sunIcon.classList.add('hidden');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    sunIcon.classList.remove('hidden'); moonIcon.classList.add('hidden');
+                }
+                updateChartTheme();
+            }
+
+            function triggerGlow(type) {
+                const card = document.getElementById(`card-${type}`);
+                card.classList.remove(`flash-${type}`);
+                void card.offsetWidth; 
+                card.classList.add(`flash-${type}`);
+            }
+
+            function updateChartTheme() {
+                if (!convergenceChart) return;
+                const style = getComputedStyle(document.body);
+                const textCol = style.getPropertyValue('--chart-text').trim();
+                const gridCol = style.getPropertyValue('--chart-grid').trim();
+                convergenceChart.options.scales.x.grid.color = gridCol;
+                convergenceChart.options.scales.x.ticks.color = textCol;
+                convergenceChart.options.scales.y.grid.color = gridCol;
+                convergenceChart.options.scales.y.ticks.color = textCol;
+                convergenceChart.update('none');
+            }
+
+            function createGrids() {
+                ['bgd', 'sgd', 'mbgd'].forEach(type => {
+                    const grid = document.getElementById(`${type}Grid`);
+                    grid.innerHTML = '';
+                    for (let i = 0; i < datasetSize; i++) {
+                        const dot = document.createElement('div');
+                        dot.className = `sampling-dot dot-${type}-${i}`;
+                        grid.appendChild(dot);
+                    }
+                });
+            }
+
+            const dataset = Array.from({ length: datasetSize }, () => {
+                const x = Math.random() * 10 - 5;
+                const y = Math.random() * 10 - 5;
+                return { x, y, target: 1.2 * x + 0.8 * y + (Math.random() - 0.5) * 2 };
+            });
+
+            function calculateLoss(weights) {
+                let sum = 0;
+                dataset.forEach(p => {
+                    const pred = weights[0] * p.x + weights[1] * p.y;
+                    sum += Math.pow(pred - p.target, 2);
+                });
+                return sum / datasetSize;
+            }
+
+            function getGradient(weights, point) {
+                const error = (weights[0] * point.x + weights[1] * point.y) - point.target;
+                return [error * point.x, error * point.y];
+            }
+
+            // --- Granular Animation Loop (Runs 100 times per epoch) ---
+            async function runStep() {
+                if (!isRunning || currentEpoch >= maxEpochs) {
+                    isRunning = false;
+                    cycleLabel.textContent = "COMPLETE";
+                    cycleLabel.className = "text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 mono-font";
+                    return;
+                }
+
+                cycleLabel.textContent = "RUNNING";
+                cycleLabel.className = "text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded bg-green-500/10 border border-green-500/20 text-green-400 mono-font";
+
+                const point = dataset[currentStep];
+
+                // --- 1. STOCHASTIC GD (Updates every step) ---
+                const sgdGrad = getGradient(algorithms.sgd.weights, point);
+                algorithms.sgd.weights[0] -= learningRate * sgdGrad[0];
+                algorithms.sgd.weights[1] -= learningRate * sgdGrad[1];
+                algorithms.sgd.loss = calculateLoss(algorithms.sgd.weights);
+                
+                // Visuals: Active point moves like a snake
+                const sgdDots = document.querySelectorAll('#sgdGrid .sampling-dot');
+                if (currentStep > 0) sgdDots[currentStep - 1].classList.remove('dot-active-sgd');
+                if (currentStep === 0) sgdDots[datasetSize - 1].classList.remove('dot-active-sgd'); // clear last from prev epoch
+                sgdDots[currentStep].classList.add('dot-active-sgd');
+                document.getElementById('sgdLoss').textContent = algorithms.sgd.loss.toFixed(4);
+
+
+                // --- 2. MINI-BATCH GD (Updates every 'batchSize' steps) ---
+                const mbgdGrad = getGradient(algorithms.mbgd.weights, point);
+                algorithms.mbgd.batchAccumulator[0] += mbgdGrad[0];
+                algorithms.mbgd.batchAccumulator[1] += mbgdGrad[1];
+                algorithms.mbgd.batchCount++;
+                
+                // Visuals: Accumulate dots
+                const mbgdDots = document.querySelectorAll('#mbgdGrid .sampling-dot');
+                mbgdDots[currentStep].classList.add('dot-reading-mbgd');
+
+                if (algorithms.mbgd.batchCount === batchSize || currentStep === datasetSize - 1) {
+                    // Update Weights
+                    const count = algorithms.mbgd.batchCount;
+                    algorithms.mbgd.weights[0] -= learningRate * (algorithms.mbgd.batchAccumulator[0] / count);
+                    algorithms.mbgd.weights[1] -= learningRate * (algorithms.mbgd.batchAccumulator[1] / count);
+                    algorithms.mbgd.loss = calculateLoss(algorithms.mbgd.weights);
+                    
+                    // Reset Accumulator
+                    algorithms.mbgd.batchAccumulator = [0, 0];
+                    algorithms.mbgd.batchCount = 0;
+
+                    // UI Update
+                    document.getElementById('mbgdLoss').textContent = algorithms.mbgd.loss.toFixed(4);
+                    
+                    // Visual Flash
+                    // Highlight the batch we just processed
+                    const startBatch = currentStep - count + 1;
+                    for (let i = startBatch; i <= currentStep; i++) {
+                        mbgdDots[i].classList.remove('dot-reading-mbgd');
+                        mbgdDots[i].classList.add('dot-active-mbgd');
+                    }
+                    // Clear after brief delay visually, but in logic we move on
+                    setTimeout(() => {
+                        for (let i = startBatch; i <= currentStep; i++) {
+                            if(mbgdDots[i]) mbgdDots[i].classList.remove('dot-active-mbgd');
+                        }
+                    }, 100);
+                }
+
+
+                // --- 3. BATCH GD (Updates only at end of epoch) ---
+                // Accumulate gradients silently
+                const bgdGrad = getGradient(algorithms.bgd.weights, point);
+                algorithms.bgd.accumulatedGradient[0] += bgdGrad[0];
+                algorithms.bgd.accumulatedGradient[1] += bgdGrad[1];
+                // Visuals: Stay dormant until end
+
+
+                // --- LOOP CONTROL ---
+                currentStep++;
+
+                if (currentStep >= datasetSize) {
+                    // --- EPOCH END (Batch Update) ---
+                    // Batch GD Update
+                    algorithms.bgd.weights[0] -= learningRate * (algorithms.bgd.accumulatedGradient[0] / datasetSize);
+                    algorithms.bgd.weights[1] -= learningRate * (algorithms.bgd.accumulatedGradient[1] / datasetSize);
+                    algorithms.bgd.loss = calculateLoss(algorithms.bgd.weights);
+                    algorithms.bgd.accumulatedGradient = [0, 0];
+                    
+                    document.getElementById('bgdLoss').textContent = algorithms.bgd.loss.toFixed(4);
+
+                    // Batch Visual Flash (All at once)
+                    const bgdDots = document.querySelectorAll('#bgdGrid .sampling-dot');
+                    bgdDots.forEach(d => d.classList.add('dot-active-bgd'));
+                    setTimeout(() => bgdDots.forEach(d => d.classList.remove('dot-active-bgd')), 300);
+
+                    // Update Chart
+                    convergenceChart.data.labels.push(currentEpoch);
+                    convergenceChart.data.datasets[0].data.push(algorithms.bgd.loss);
+                    convergenceChart.data.datasets[1].data.push(algorithms.sgd.loss);
+                    convergenceChart.data.datasets[2].data.push(algorithms.mbgd.loss);
+                    convergenceChart.update('none');
+
+                    currentStep = 0;
+                    currentEpoch++;
+                    document.getElementById('currentEpochDisplay').textContent = currentEpoch;
+                }
+
+                // 20ms per step = 2 seconds per epoch (100 steps)
+                animationFrameId = setTimeout(runStep, 20); 
+            }
+
+            function initChart() {
+                convergenceChart = new Chart(chartCtx, {
+                    type: 'line',
+                    data: { labels: [], datasets: [
+                        { label: 'Batch', borderColor: colors.bgd, data: [], tension: 0.1, borderWidth: 2, pointRadius: 0 },
+                        { label: 'Stochastic', borderColor: colors.sgd, data: [], tension: 0.4, borderWidth: 1, pointRadius: 0 },
+                        { label: 'Mini-Batch', borderColor: colors.mbgd, data: [], tension: 0.2, borderWidth: 2, pointRadius: 0 }
+                    ]},
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        animation: { duration: 0 },
+                        scales: {
+                            x: { display: false, grid: { display: false } },
+                            y: { display: true, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#86efac', font: { size: 9 } }, beginAtZero: true }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+
+            document.getElementById('batchSizeSlider').addEventListener('input', (e) => {
+                batchSize = parseInt(e.target.value);
+                document.getElementById('batchSizeValue').textContent = batchSize;
+                reset(); 
+            });
+            document.getElementById('learningRateSlider').addEventListener('input', (e) => {
+                learningRate = parseFloat(e.target.value);
+                document.getElementById('learningRateValue').textContent = learningRate.toFixed(3);
+            });
+
+            document.getElementById('startBtn').addEventListener('click', () => { isRunning = true; runStep(); });
+            document.getElementById('pauseBtn').addEventListener('click', () => { 
+                isRunning = false; 
+                clearTimeout(animationFrameId); 
+                cycleLabel.textContent = "PAUSED";
+                cycleLabel.className = "text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 mono-font";
+            });
+            
+            function reset() {
+                isRunning = false; clearTimeout(animationFrameId);
+                currentEpoch = 0; currentStep = 0;
+                convergenceChart.data.labels = [];
+                convergenceChart.data.datasets.forEach(d => d.data = []);
+                convergenceChart.update();
+                createGrids();
+                cycleLabel.textContent = "IDLE";
+                cycleLabel.className = "text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded bg-white/5 border border-white/10 text-gray-500 mono-font";
+                algorithms.bgd.weights = [0.5, 0.3];
+                algorithms.sgd.weights = [0.5, 0.3];
+                algorithms.mbgd.weights = [0.5, 0.3];
+                algorithms.bgd.accumulatedGradient = [0, 0];
+                algorithms.mbgd.batchAccumulator = [0, 0];
+                algorithms.mbgd.batchCount = 0;
+                document.getElementById('currentEpochDisplay').textContent = "0";
+                
+                // Reset loss displays
+                document.getElementById('bgdLoss').textContent = "0.0000";
+                document.getElementById('sgdLoss').textContent = "0.0000";
+                document.getElementById('mbgdLoss').textContent = "0.0000";
+            }
+            
+            document.getElementById('resetBtn').addEventListener('click', reset);
+
+            themeToggleBtn.addEventListener('click', () => {
+                currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+                localStorage.setItem('theme', currentTheme);
+                applyTheme(currentTheme);
+            });
+
+            applyTheme(currentTheme);
+            initChart();
+            createGrids();
+        });
+    
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            // Machine Learning
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "../machine_learning/cosine_similarity.html", category: "ml", icon: "fa-brain" },
+            { title: "Cross Validation", path: "../machine_learning/cross_validation.html", category: "ml", icon: "fa-brain" },
+            { title: "Decision Tree", path: "../machine_learning/decision_tree.html", category: "ml", icon: "fa-brain" },
+            { title: "K-Means", path: "../machine_learning/k_means.html", category: "ml", icon: "fa-brain" },
+            { title: "KNN", path: "../machine_learning/knn.html", category: "ml", icon: "fa-brain" },
+            { title: "Label Encoding", path: "../machine_learning/label_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Naive Bayes", path: "../machine_learning/naive_bayes.html", category: "ml", icon: "fa-brain" },
+            { title: "One Hot Encoding", path: "../machine_learning/one_hot_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Sliding Window Time Series", path: "../machine_learning/sliding_window_for_timeseries_data.html", category: "ml", icon: "fa-brain" },
+            { title: "SVM", path: "../machine_learning/svm.html", category: "ml", icon: "fa-brain" },
+            { title: "Train Test Split", path: "../machine_learning/train_test_split.html", category: "ml", icon: "fa-brain" },
+            
+            // Deep Learning
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing in Neural Networks", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Dropout in Neural Networks", path: "../deep_learning/dropout_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Batch Processing", path: "../deep_learning/gradient_descent_batch_processing.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Linear Regression with Gradient Descent", path: "../deep_learning/linear_regression_with_gradient_descent.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            
+            // DSA
+            { title: "A* Algorithm", path: "../dsa/a_star.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Backtracking", path: "../dsa/backtracking.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Search", path: "../dsa/binary_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Breadth First Search", path: "../dsa/breadth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Bubble Sort", path: "../dsa/bubble_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Counting Sort", path: "../dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Depth First Search", path: "../dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dictionaries in Python", path: "../dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra's Algorithm", path: "../dsa/dijkstra's.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Fibonacci Search", path: "../dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Insertion Sort", path: "../dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Interpolation Search", path: "../dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Linear Search", path: "../dsa/linear_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Lists in Python", path: "../dsa/lists_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Merge Sort", path: "../dsa/merge_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Quick Sort", path: "../dsa/quick_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Selection Sort", path: "../dsa/selection_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Strings in Python", path: "../dsa/strings_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            
+            // Natural Language Processing
+            { title: "ASCII Codes", path: "../natural_language_processing/ascii_codes.html", category: "nlp", icon: "fa-comments" },
+            { title: "N-Gram", path: "../natural_language_processing/n_gram.html", category: "nlp", icon: "fa-comments" },
+            { title: "Stemming vs Lemmatization", path: "../natural_language_processing/stemming_vs_lemmatization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Text Normalization Pipeline", path: "../natural_language_processing/text_normalization_pipeline.html", category: "nlp", icon: "fa-comments" },
+            { title: "Tokenization", path: "../natural_language_processing/tokenization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Word Cloud", path: "../natural_language_processing/word_cloud.html", category: "nlp", icon: "fa-comments" },
+            
+            // Computer Vision
+            { title: "Downsampling in CNN", path: "../computer_vision/downsampling_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Edge Detection", path: "../computer_vision/edge_detection.html", category: "vision", icon: "fa-eye" },
+            { title: "Feature Map in CNN", path: "../computer_vision/feature_map_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Grayscale Image Processing", path: "../computer_vision/grayscale_image_processing.html", category: "vision", icon: "fa-eye" },
+            { title: "Image Data Augmentation", path: "../computer_vision/image_data_augmentation.html", category: "vision", icon: "fa-eye" },
+            { title: "RGB Image Processing", path: "../computer_vision/rgb_image_processing.html", category: "vision", icon: "fa-eye" },
+            
+            // Database
+            { title: "Groupby in SQL", path: "../database/groupby_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Joins in SQL", path: "../database/joins_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Window Functions in SQL", path: "../database/window_functions_in_sql.html", category: "db", icon: "fa-database" },
+            
+            // Gen AI
+            { title: "Casual Language Modeling", path: "../gen_ai/casual_language_modeling.html", category: "gen-ai", icon: "fa-wand-magic-sparkles" },
+            
+            // Maths
+            { title: "Equation of Line", path: "../maths/equation_of_line.html", category: "maths", icon: "fa-calculator" }
+        ];
+
+        // Initialize search functionality
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                // Filter courses
+                const filtered = allCourses.filter(course => 
+                    course.title.toLowerCase().includes(query) || 
+                    course.category.toLowerCase().includes(query)
+                );
+
+                // Render results
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>
+                    `).join('');
+                }
+
+                dropdown.classList.add('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            // Close dropdown on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>

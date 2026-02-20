@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Grayscale Image Processing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 40s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'dark';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --border-glow: rgba(74, 222, 128, 0.5);
+
+            --accent-primary: #4ade80; /* Neon Green */
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.03);
+            --input-focus-bg: rgba(74, 222, 128, 0.08);
+
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+        }
+
+        /* LIGHT MODE OVERRIDES */
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+
+            --border-subtle: rgba(22, 163, 74, 0.15);
+            --border-glow: rgba(22, 163, 74, 0.4);
+
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.04);
+            --input-focus-bg: rgba(22, 163, 74, 0.08);
+
+            --grid-color: rgba(22, 163, 74, 0.04);
+            --vignette-color: transparent;
+        }
+
+        /* Global Smooth Transition */
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            
+            /* Animated Grid Background */
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        h1, h2, h3, .brand-font {
+            font-family: 'Space Grotesk', sans-serif;
+            letter-spacing: -0.02em;
+        }
+
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Glassmorphism Header */
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        /* Futuristic Card */
+        .glass-card {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .glass-card:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        /* Function Buttons */
+        .func-btn {
+            width: 100%;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            color: var(--text-muted);
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+            background: transparent;
+        }
+
+        .func-btn:hover {
+            background: var(--input-bg);
+            color: var(--accent-primary);
+            padding-left: 1.25rem; /* Slide effect */
+        }
+
+        .func-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Inputs and Controls */
+        .custom-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        /* Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none; 
+            background: transparent; 
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            cursor: pointer;
+            margin-top: -6px; 
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border-subtle);
+            border-radius: 2px;
+        }
+
+        .action-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid transparent;
+        }
+        
+        .action-btn::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+            transform: translateX(-100%);
+            transition: 0.3s;
+        }
+        
+        .action-btn:hover::after {
+            transform: translateX(100%);
+        }
+
+        /* Toggle Button */
+        .theme-toggle {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+        }
+        .theme-toggle:hover {
+            color: var(--accent-primary);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        /* Canvas & Matrix Specifics */
+        #drawingCanvas {
+            image-rendering: pixelated;
+            touch-action: none;
+            aspect-ratio: 1;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        }
+        
+        #matrix-display {
+            display: grid;
+            grid-template-columns: repeat(28, 1fr); /* Force equal columns */
+            gap: 1px;
+            line-height: 1;
+            font-size: 10px; /* Slightly larger fixed size */
+            font-family: 'JetBrains Mono', monospace;
+            width: fit-content; /* Shrink to fit cells */
+            min-width: 600px; /* Ensure enough width for 3-digit numbers */
+            margin: 0 auto;
+        }
+        
+        #matrix-display > div {
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.1s, color 0.1s;
+            border-radius: 1px;
+            overflow: hidden; /* Prevent 3 digit numbers from breaking layout */
+        }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .search-input-wrapper:focus-within {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .search-input-wrapper input {
+            color: var(--text-main);
+        }
+        .search-input-wrapper input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .search-input-wrapper i {
+            color: var(--accent-primary);
+            opacity: 0.7;
+        }
+
+        /* Dropdown Search */
+        .search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-dropdown-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .search-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-dropdown-item:hover {
+            background: var(--input-focus-bg);
+            padding-left: 20px;
+        }
+
+        .dropdown-item-title {
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .dropdown-item-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 12px;
+        }
+
+        .dropdown-item-icon {
+            color: var(--accent-primary);
+            margin-right: 8px;
+            font-size: 0.875rem;
+        }
+
+        .dropdown-no-results {
+            padding: 20px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col min-h-screen overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <!-- Search -->
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search courses" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Theme Toggle + Back Button -->
+                <div class="flex items-center gap-3">
+                    <!-- Back to Hub Button -->
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    
+                    <!-- Theme Toggle -->
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto flex flex-col">
+        
+        <!-- Breadcrumb / Title -->
+        <div class="mb-8 animate-fade-in">
+            <div class="flex items-center gap-2 text-xs mono-font mb-2" style="color: var(--text-muted)">
+                <span class="opacity-50">Modules</span>
+                <span>/</span>
+                <span class="opacity-50">Computer Vision</span>
+                <span>/</span>
+                <span style="color: var(--accent-primary)">Grayscale Processing</span>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Grayscale Logic</h1>
+            <p class="mt-2 text-sm max-w-2xl" style="color: var(--text-muted)">
+                Draw on the canvas to understand how images are represented as matrices and apply basic filters.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full flex-1">
+            
+            <!-- Controls Sidebar -->
+            <aside class="lg:col-span-4 space-y-6 animate-fade-in" style="animation-delay: 0.1s">
+                
+                <!-- Canvas Area -->
+                <div class="glass-card p-6 flex flex-col items-center">
+                    <h2 class="text-xs font-bold uppercase tracking-widest mb-4 opacity-70 mono-font w-full" style="color: var(--text-muted)">Input Image (28x28)</h2>
+                    
+                    <canvas id="drawingCanvas" class="w-full max-w-[280px] rounded-lg bg-black border border-gray-700 mb-4"></canvas>
+                    
+                    <button id="clearBtn" class="action-btn w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors">
+                        <i class="fas fa-trash mr-2"></i>Clear Canvas
+                    </button>
+                </div>
+
+                <!-- Filters -->
+                <div class="glass-card p-4">
+                    <h2 class="text-xs font-bold uppercase tracking-widest mb-4 opacity-70 mono-font" style="color: var(--text-muted)">Filters</h2>
+                    <div class="space-y-2">
+                        <button id="invertBtn" class="func-btn"><i class="fas fa-adjust mr-2 opacity-50 text-xs"></i> Invert Colors</button>
+                        <button id="blurBtn" class="func-btn"><i class="fas fa-blur mr-2 opacity-50 text-xs"></i> Gaussian Blur</button>
+                        <button id="edgeBtn" class="func-btn"><i class="fas fa-border-style mr-2 opacity-50 text-xs"></i> Edge Detection</button>
+                    </div>
+
+                    <!-- Threshold Control -->
+                    <div class="mt-6 pt-4 border-t border-dashed" style="border-color: var(--border-subtle)">
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="thresholdSlider" class="text-xs font-bold uppercase tracking-wider opacity-80" style="color: var(--text-main)">Threshold</label>
+                            <span id="thresholdValue" class="mono-font text-sm font-bold" style="color: var(--accent-primary)">128</span>
+                        </div>
+                        <input id="thresholdSlider" type="range" min="0" max="255" value="128" class="w-full mb-3">
+                        
+                        <button id="applyThresholdBtn" class="action-btn w-full py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2" style="background: var(--input-bg); color: var(--text-main); border-color: var(--border-subtle)">
+                            Apply Threshold
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Visualization Area -->
+            <section class="lg:col-span-8 h-full min-h-[500px] animate-fade-in" style="animation-delay: 0.2s">
+                <div class="glass-card h-full w-full flex flex-col p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xs font-bold uppercase tracking-widest opacity-70 mono-font" style="color: var(--text-muted)">Pixel Matrix Values</h2>
+                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-green-500/10 text-green-500 border border-green-500/20 mono-font">LIVE DATA</span>
+                    </div>
+
+                    <!-- Matrix Display -->
+                    <div class="flex-grow overflow-auto bg-black/20 rounded-lg p-4 border border-dashed" style="border-color: var(--border-subtle)">
+                        <div id="matrix-display">
+                            <!-- Matrix cells generated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+        <div class="container mx-auto px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-4" style="color: var(--text-muted)">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-kaggle fa-lg"></i></a>
+                <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-instagram fa-lg"></i></a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-main)">&copy; 2025 VIZLEARN // SYSTEM ONLINE</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- THEME LOGIC (Matches Activation Fns) ---
+            const themeToggleBtn = document.getElementById('themeToggle');
+            const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+            const moonIcon = themeToggleBtn.querySelector('.light-icon');
+            let currentTheme = localStorage.getItem('theme') || 'dark';
+
+            function applyTheme(theme) {
+                if (theme === 'light') {
+                    document.body.classList.add('light-mode');
+                    moonIcon.classList.remove('hidden');
+                    sunIcon.classList.add('hidden');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    sunIcon.classList.remove('hidden');
+                    moonIcon.classList.add('hidden');
+                }
+                refreshDisplays(); // Re-render matrix to match theme colors
+            }
+
+            themeToggleBtn.addEventListener('click', () => {
+                currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+                localStorage.setItem('theme', currentTheme);
+                applyTheme(currentTheme);
+            });
+
+            // --- Configuration ---
+            const GRID_SIZE = 28;
+            const PIXEL_SIZE = 11; 
+            const CANVAS_WIDTH = GRID_SIZE * PIXEL_SIZE;
+            const CANVAS_HEIGHT = GRID_SIZE * PIXEL_SIZE;
+
+            // --- DOM Elements ---
+            const canvas = document.getElementById('drawingCanvas');
+            const ctx = canvas.getContext('2d');
+            const clearBtn = document.getElementById('clearBtn');
+            const matrixDisplay = document.getElementById('matrix-display');
+            const invertBtn = document.getElementById('invertBtn');
+            const blurBtn = document.getElementById('blurBtn');
+            const edgeBtn = document.getElementById('edgeBtn');
+            const thresholdSlider = document.getElementById('thresholdSlider');
+            const thresholdValue = document.getElementById('thresholdValue');
+            const applyThresholdBtn = document.getElementById('applyThresholdBtn');
+
+            // --- State ---
+            let isDrawing = false;
+            let grid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
+            let matrixCells = [];
+            
+            // --- Initialization ---
+            function initialize() {
+                canvas.width = CANVAS_WIDTH;
+                canvas.height = CANVAS_HEIGHT;
+                matrixDisplay.innerHTML = '';
+                for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+                    const cell = document.createElement('div');
+                    matrixCells.push(cell);
+                    matrixDisplay.appendChild(cell);
+                }
+                
+                // Initialize Theme and Canvas
+                applyTheme(currentTheme);
+                clearCanvas();
+            }
+            
+            // --- Update & Drawing Functions ---
+            function refreshDisplays() {
+                drawCanvas();
+                updateMatrixDisplay();
+            }
+
+            function drawCanvas() {
+                ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                // Background color for canvas (Always blackish to represent empty space)
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let x = 0; x < GRID_SIZE; x++) {
+                        const intensity = grid[y][x];
+                        if (intensity > 0) {
+                            ctx.fillStyle = `rgb(${intensity}, ${intensity}, ${intensity})`;
+                            ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+                        }
+                    }
+                }
+            }
+            
+            function updateMatrixDisplay() {
+                const isLightMode = document.body.classList.contains('light-mode');
+                
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let x = 0; x < GRID_SIZE; x++) {
+                        const index = y * GRID_SIZE + x;
+                        const cellValue = grid[y][x];
+                        const cellElement = matrixCells[index];
+                        cellElement.textContent = cellValue;
+                        
+                        if (cellValue > 0) {
+                            // Grayscale Visualization (0-255)
+                            // Strict Grayscale: Background reflects value, Text contrasts
+                            const intensity = cellValue;
+                            cellElement.style.backgroundColor = `rgb(${intensity}, ${intensity}, ${intensity})`;
+                            
+                            // Text contrast calculation
+                            cellElement.style.color = intensity > 128 ? '#000000' : '#ffffff';
+                            cellElement.style.fontWeight = '700';
+                        } else {
+                            // Empty cells (0)
+                            // Kept subtle to show grid structure without noise
+                            cellElement.style.backgroundColor = isLightMode ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)';
+                            cellElement.style.color = isLightMode ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'; 
+                            cellElement.style.fontWeight = '400';
+                        }
+                    }
+                }
+            }
+
+            function clearCanvas() {
+                grid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
+                refreshDisplays();
+            }
+
+            // --- Drawing Logic ---
+            function draw(event) {
+                if (!isDrawing) return;
+                event.preventDefault();
+                const rect = canvas.getBoundingClientRect();
+                
+                // Handle both touch and mouse
+                let clientX, clientY;
+                if(event.touches) {
+                    clientX = event.touches[0].clientX;
+                    clientY = event.touches[0].clientY;
+                } else {
+                    clientX = event.clientX;
+                    clientY = event.clientY;
+                }
+                
+                // Calculate Scale Factor (Canvas Display Size vs Actual Size)
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+
+                const canvasX = (clientX - rect.left) * scaleX;
+                const canvasY = (clientY - rect.top) * scaleY;
+                
+                const gridX = Math.floor(canvasX / PIXEL_SIZE);
+                const gridY = Math.floor(canvasY / PIXEL_SIZE);
+
+                // Brush settings
+                const brushKernel = [[80, 120, 80], [120, 255, 120], [80, 120, 80]];
+                const brushSize = 3;
+                const brushOffset = Math.floor(brushSize / 2);
+
+                for(let i = 0; i < brushSize; i++) {
+                    for(let j = 0; j < brushSize; j++) {
+                       const y = gridY + i - brushOffset;
+                       const x = gridX + j - brushOffset;
+                       if(y >= 0 && y < GRID_SIZE && x >= 0 && x < GRID_SIZE) {
+                           const currentVal = grid[y][x];
+                           const brushVal = brushKernel[i][j];
+                           grid[y][x] = Math.min(255, currentVal + brushVal);
+                       }
+                    }
+                }
+                refreshDisplays();
+            }
+
+            // --- Filter Functions ---
+            function invertImage() {
+                grid = grid.map(row => row.map(pixel => 255 - pixel));
+                refreshDisplays();
+            }
+
+            function applyThreshold() {
+                const threshold = parseInt(thresholdSlider.value, 10);
+                grid = grid.map(row => row.map(pixel => pixel > threshold ? 255 : 0));
+                refreshDisplays();
+            }
+
+            function applyBlur() {
+                const readGrid = JSON.parse(JSON.stringify(grid));
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let x = 0; x < GRID_SIZE; x++) {
+                        let total = 0, count = 0;
+                        for (let dy = -1; dy <= 1; dy++) {
+                            for (let dx = -1; dx <= 1; dx++) {
+                                const ny = y + dy, nx = x + dx;
+                                if (ny >= 0 && ny < GRID_SIZE && nx >= 0 && nx < GRID_SIZE) {
+                                    total += readGrid[ny][nx];
+                                    count++;
+                                }
+                            }
+                        }
+                        grid[y][x] = Math.round(total / count);
+                    }
+                }
+                refreshDisplays();
+            }
+
+            function applyEdgeDetection() {
+                const readGrid = JSON.parse(JSON.stringify(grid));
+                const newGrid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
+                const sobelX = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
+                const sobelY = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
+                for (let y = 1; y < GRID_SIZE - 1; y++) {
+                    for (let x = 1; x < GRID_SIZE - 1; x++) {
+                        let pixelX = 0, pixelY = 0;
+                        for (let dy = -1; dy <= 1; dy++) {
+                            for (let dx = -1; dx <= 1; dx++) {
+                                const pixel = readGrid[y + dy][x + dx];
+                                pixelX += pixel * sobelX[dy + 1][dx + 1];
+                                pixelY += pixel * sobelY[dy + 1][dx + 1];
+                            }
+                        }
+                        const magnitude = Math.round(Math.sqrt(pixelX * pixelX + pixelY * pixelY));
+                        newGrid[y][x] = Math.min(255, magnitude);
+                    }
+                }
+                grid = newGrid;
+                refreshDisplays();
+            }
+            
+            // --- Event Listeners ---
+            clearBtn.addEventListener('click', clearCanvas);
+
+            invertBtn.addEventListener('click', invertImage);
+            blurBtn.addEventListener('click', applyBlur);
+            edgeBtn.addEventListener('click', applyEdgeDetection);
+            applyThresholdBtn.addEventListener('click', applyThreshold);
+            thresholdSlider.addEventListener('input', () => { thresholdValue.textContent = thresholdSlider.value; });
+
+            canvas.addEventListener('mousedown', (e) => { isDrawing = true; draw(e); });
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', () => { isDrawing = false; });
+            canvas.addEventListener('mouseleave', () => { isDrawing = false; });
+            canvas.addEventListener('touchstart', (e) => { isDrawing = true; draw(e); });
+            canvas.addEventListener('touchmove', draw);
+            canvas.addEventListener('touchend', () => { isDrawing = false; });
+
+            // --- Run Initialization ---
+            initialize();
+        });
+    
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            // Machine Learning
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "../machine_learning/cosine_similarity.html", category: "ml", icon: "fa-brain" },
+            { title: "Cross Validation", path: "../machine_learning/cross_validation.html", category: "ml", icon: "fa-brain" },
+            { title: "Decision Tree", path: "../machine_learning/decision_tree.html", category: "ml", icon: "fa-brain" },
+            { title: "K-Means", path: "../machine_learning/k_means.html", category: "ml", icon: "fa-brain" },
+            { title: "KNN", path: "../machine_learning/knn.html", category: "ml", icon: "fa-brain" },
+            { title: "Label Encoding", path: "../machine_learning/label_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Naive Bayes", path: "../machine_learning/naive_bayes.html", category: "ml", icon: "fa-brain" },
+            { title: "One Hot Encoding", path: "../machine_learning/one_hot_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Sliding Window Time Series", path: "../machine_learning/sliding_window_for_timeseries_data.html", category: "ml", icon: "fa-brain" },
+            { title: "SVM", path: "../machine_learning/svm.html", category: "ml", icon: "fa-brain" },
+            { title: "Train Test Split", path: "../machine_learning/train_test_split.html", category: "ml", icon: "fa-brain" },
+            
+            // Deep Learning
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing in Neural Networks", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Dropout in Neural Networks", path: "../deep_learning/dropout_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Batch Processing", path: "../deep_learning/gradient_descent_batch_processing.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Linear Regression with Gradient Descent", path: "../deep_learning/linear_regression_with_gradient_descent.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            
+            // DSA
+            { title: "A* Algorithm", path: "../dsa/a_star.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Backtracking", path: "../dsa/backtracking.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Search", path: "../dsa/binary_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Breadth First Search", path: "../dsa/breadth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Bubble Sort", path: "../dsa/bubble_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Counting Sort", path: "../dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Depth First Search", path: "../dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dictionaries in Python", path: "../dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra's Algorithm", path: "../dsa/dijkstra's.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Fibonacci Search", path: "../dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Insertion Sort", path: "../dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Interpolation Search", path: "../dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Linear Search", path: "../dsa/linear_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Lists in Python", path: "../dsa/lists_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Merge Sort", path: "../dsa/merge_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Quick Sort", path: "../dsa/quick_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Selection Sort", path: "../dsa/selection_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Strings in Python", path: "../dsa/strings_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            
+            // Natural Language Processing
+            { title: "ASCII Codes", path: "../natural_language_processing/ascii_codes.html", category: "nlp", icon: "fa-comments" },
+            { title: "N-Gram", path: "../natural_language_processing/n_gram.html", category: "nlp", icon: "fa-comments" },
+            { title: "Stemming vs Lemmatization", path: "../natural_language_processing/stemming_vs_lemmatization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Text Normalization Pipeline", path: "../natural_language_processing/text_normalization_pipeline.html", category: "nlp", icon: "fa-comments" },
+            { title: "Tokenization", path: "../natural_language_processing/tokenization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Word Cloud", path: "../natural_language_processing/word_cloud.html", category: "nlp", icon: "fa-comments" },
+            
+            // Computer Vision
+            { title: "Downsampling in CNN", path: "../computer_vision/downsampling_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Edge Detection", path: "../computer_vision/edge_detection.html", category: "vision", icon: "fa-eye" },
+            { title: "Feature Map in CNN", path: "../computer_vision/feature_map_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Grayscale Image Processing", path: "../computer_vision/grayscale_image_processing.html", category: "vision", icon: "fa-eye" },
+            { title: "Image Data Augmentation", path: "../computer_vision/image_data_augmentation.html", category: "vision", icon: "fa-eye" },
+            { title: "RGB Image Processing", path: "../computer_vision/rgb_image_processing.html", category: "vision", icon: "fa-eye" },
+            
+            // Database
+            { title: "Groupby in SQL", path: "../database/groupby_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Joins in SQL", path: "../database/joins_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Window Functions in SQL", path: "../database/window_functions_in_sql.html", category: "db", icon: "fa-database" },
+            
+            // Gen AI
+            { title: "Casual Language Modeling", path: "../gen_ai/casual_language_modeling.html", category: "gen-ai", icon: "fa-wand-magic-sparkles" },
+            
+            // Maths
+            { title: "Equation of Line", path: "../maths/equation_of_line.html", category: "maths", icon: "fa-calculator" }
+        ];
+
+        // Initialize search functionality
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                // Filter courses
+                const filtered = allCourses.filter(course => 
+                    course.title.toLowerCase().includes(query) || 
+                    course.category.toLowerCase().includes(query)
+                );
+
+                // Render results
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>
+                    `).join('');
+                }
+
+                dropdown.classList.add('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            // Close dropdown on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>

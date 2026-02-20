@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Dijkstra’s Algorithm</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        const initTailwind = () => {
+            if (window.tailwind) {
+                tailwind.config = {
+                    darkMode: 'class',
+                    theme: {
+                        extend: {
+                            colors: {
+                                brand: {
+                                    50: '#f0fdf4',
+                                    100: '#dcfce7',
+                                    400: '#4ade80',
+                                    500: '#22c55e',
+                                    600: '#16a34a',
+                                    900: '#14532d',
+                                }
+                            },
+                            animation: {
+                                'fade-in': 'fadeIn 0.5s ease-out forwards',
+                                'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                            },
+                            keyframes: {
+                                fadeIn: {
+                                    '0%': { opacity: '0', transform: 'translateY(10px)' },
+                                    '100%': { opacity: '1', transform: 'translateY(0)' },
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                setTimeout(initTailwind, 50);
+            }
+        };
+        initTailwind();
+    </script>
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'dark';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+        :root {
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --node-unvisited: #1f2937;
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.15);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --grid-color: rgba(22, 163, 74, 0.04);
+            --node-unvisited: #e5e7eb;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card-header {
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 1rem 1.5rem;
+            background: var(--input-bg);
+        }
+
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            border-radius: 8px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); }
+        .viz-btn-secondary { background: var(--input-bg); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+        .viz-btn-secondary:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .viz-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .viz-input { background: var(--input-bg); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 8px; padding: 8px 12px; width: 100%; font-size: 0.875rem; }
+
+        /* Graph Elements */
+        .node { cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .node circle { fill: var(--node-unvisited); stroke: var(--border-subtle); stroke-width: 2; }
+        .node text { fill: var(--text-main); font-weight: 600; font-family: 'JetBrains Mono'; pointer-events: none; }
+        .node .dist-label { font-size: 9px; opacity: 0.6; fill: var(--text-muted); }
+        
+        .node.current circle { fill: #f59e0b; stroke: #fff; stroke-width: 3; filter: drop-shadow(0 0 8px #f59e0b); }
+        .node.visited circle { fill: #6366f1; stroke: #818cf8; opacity: 0.8; }
+        .node.exploring circle { fill: #fbbf24; animation: pulse 1s infinite; }
+        .node.in-pq circle { stroke: #6366f1; stroke-dasharray: 4; animation: rotate 10s linear infinite; }
+
+        .edge { stroke: var(--border-subtle); stroke-width: 2; transition: stroke 0.3s, stroke-width 0.3s; }
+        .edge.traversed { stroke: #6366f1; stroke-width: 3; }
+        .edge-text { font-size: 10px; font-weight: bold; fill: var(--text-muted); paint-order: stroke; stroke: var(--bg-body); stroke-width: 3px; }
+
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        @keyframes rotate { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 24; } }
+
+        .pq-item { background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .pq-item.front { border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); color: #fbbf24; }
+        .pq-item.front::after { content: 'MIN'; font-size: 8px; font-weight: 800; background: #f59e0b; color: #000; padding: 1px 4px; border-radius: 3px; }
+
+        footer i { transition: color 0.3s ease; }
+        footer a:hover i { color: var(--accent-primary); }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 10px; }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .search-input-wrapper:focus-within {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .search-input-wrapper input {
+            color: var(--text-main);
+        }
+        .search-input-wrapper input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .search-input-wrapper i {
+            color: var(--accent-primary);
+            opacity: 0.7;
+        }
+
+        /* Dropdown Search */
+        .search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-dropdown-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .search-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-dropdown-item:hover {
+            background: var(--input-focus-bg);
+            padding-left: 20px;
+        }
+
+        .dropdown-item-title {
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .dropdown-item-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 12px;
+        }
+
+        .dropdown-item-icon {
+            color: var(--accent-primary);
+            margin-right: 8px;
+            font-size: 0.875rem;
+        }
+
+        .dropdown-no-results {
+            padding: 20px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <!-- Search -->
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search courses" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Theme Toggle + Back Button -->
+                <div class="flex items-center gap-3">
+                    <!-- Back to Hub Button -->
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    
+                    <!-- Theme Toggle -->
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+
+    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div class="mb-8 animate-fade-in">
+            <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
+                <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
+                <span>/</span>
+                <span>Graph Theory</span>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Dijkstra’s Algorithm</h1>
+            <p class="mt-2 max-w-2xl" style="color: var(--text-muted)">Visualize how we find the absolute shortest path in a weighted network using a greedy approach.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
+            
+            <!-- Controls (Left) -->
+            <div class="lg:col-span-3 space-y-6">
+                <div class="card-container">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--accent-primary)">
+                            <i class="fas fa-project-diagram mr-2"></i> Graph Config
+                        </h3>
+                    </div>
+                    <div class="p-5 space-y-6">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase mb-2 opacity-60">Network Topology</label>
+                            <select id="graphType" class="viz-input">
+                                <option value="weighted_tree">Weighted Tree</option>
+                                <option value="mesh">Complex Mesh</option>
+                                <option value="random">Random Network</option>
+                            </select>
+                        </div>
+                        
+                        <div class="pt-4 border-t border-white/5 space-y-3">
+                            <button id="startBtn" class="viz-btn viz-btn-primary w-full py-3 text-xs uppercase tracking-widest font-bold">
+                                <i class="fas fa-play mr-2"></i> Start Solver
+                            </button>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button id="stepBtn" class="viz-btn viz-btn-secondary py-2 text-[10px] uppercase font-bold" disabled>
+                                    <i class="fas fa-step-forward mr-1"></i> Step
+                                </button>
+                                <button id="autoRunBtn" class="viz-btn viz-btn-secondary py-2 text-[10px] uppercase font-bold" disabled>
+                                    <i class="fas fa-bolt mr-1"></i> Auto
+                                </button>
+                            </div>
+                            <button id="resetBtn" class="viz-btn viz-btn-secondary w-full py-3 text-xs uppercase tracking-widest font-bold">
+                                <i class="fas fa-undo mr-2"></i> Reset Grid
+                            </button>
+                        </div>
+
+                        <div>
+                            <h4 class="text-[10px] font-bold uppercase mb-3 opacity-40">Search Speed</h4>
+                            <input type="range" id="speedSlider" min="1" max="10" value="7" class="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-green-400">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-container p-4 bg-black/20 border border-white/5">
+                    <h4 class="text-[10px] font-bold uppercase mb-4 opacity-40 tracking-wider">Search Statistics</h4>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-[10px] opacity-60 uppercase font-bold tracking-wider">Visited Nodes</span>
+                            <span id="nodesVisited" class="text-lg font-bold mono-font text-indigo-400">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-[10px] opacity-60 uppercase font-bold tracking-wider">Total Nodes</span>
+                            <span id="totalNodesCount" class="text-lg font-bold mono-font text-amber-500">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Graph Visualization (Center) -->
+            <div class="lg:col-span-6 flex flex-col">
+                <div class="card-container h-full flex flex-col">
+                    <div class="card-header flex justify-between items-center">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-main)">
+                            <i class="fas fa-route mr-2 text-indigo-400"></i> Weighted Exploration Map
+                        </h3>
+                        <span id="status-badge" class="mono-font text-[10px] px-2 py-1 rounded border border-green-500/20 text-green-400 bg-green-500/5">Ready</span>
+                    </div>
+                    <div class="flex-1 flex items-center justify-center p-4 bg-black/5 overflow-hidden">
+                        <svg id="graphSvg" viewBox="0 0 600 400" class="w-full h-full max-h-[500px]">
+                            <!-- Graph elements injected via JS -->
+                        </svg>
+                    </div>
+                    <div id="currentOperation" class="p-3 border-t border-white/5 bg-indigo-500/5 text-center text-[10px] uppercase font-bold text-indigo-400">
+                        Click a node to set as Source point • Default is 'A'
+                    </div>
+                </div>
+            </div>
+
+            <!-- Algorithm Details (Right) -->
+            <div class="lg:col-span-3 space-y-6">
+                <!-- Min Priority Queue -->
+                <div class="card-container">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--accent-primary)">
+                            <i class="fas fa-sort-amount-down mr-2"></i> Min Priority Queue
+                        </h3>
+                    </div>
+                    <div id="pqContainer" class="p-4 space-y-2 min-h-[160px] max-h-[300px] overflow-y-auto custom-scrollbar">
+                        <div class="text-[10px] text-center opacity-40 py-8 italic uppercase">PQ is empty</div>
+                    </div>
+                </div>
+
+                <!-- Traversal Order -->
+                <div class="card-container p-4">
+                    <h4 class="text-[10px] font-bold uppercase mb-2 opacity-40 tracking-wider">Exploration Path</h4>
+                    <div id="traversalPath" class="flex flex-wrap gap-1 min-h-[40px]">
+                        <!-- Traversal order badges -->
+                    </div>
+                </div>
+
+                <div class="card-container p-5 text-xs italic opacity-60 leading-relaxed">
+                    <i class="fas fa-info-circle mr-1 text-amber-500"></i> Dijkstra's always picks the node with the smallest <b>tentative distance</b>. It "relaxes" edges by checking if passing through the current node creates a shorter path to its neighbors.
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="border-t py-8 mt-auto" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center opacity-50">
+            <div class="flex justify-center items-center space-x-6 mb-4">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="hover:text-green-400 transition-colors"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-kaggle fa-lg"></i></a>
+                <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-instagram fa-lg"></i></a>
+            </div>
+            <p class="text-[10px] tracking-[0.3em] mono-font uppercase">&copy; 2025 VIZLEARN // MODULE.DIJKSTRA_EXPLORER</p>
+        </div>
+    </footer>
+
+    <script>
+        class DijkstraVisualizer {
+            constructor() {
+                this.svg = document.getElementById('graphSvg');
+                this.graphType = 'weighted_tree';
+                this.nodes = [];
+                this.edges = [];
+                this.visited = new Set();
+                this.pq = []; // Priority Queue: list of {id, dist}
+                this.distances = {}; // {id: number}
+                this.sourceNode = null;
+                this.isRunning = false;
+                this.autoRunning = false;
+                this.speed = 500;
+                this.adjacencyList = {};
+                this.traversalOrder = [];
+                
+                this.initializeGraph();
+                this.setupEventListeners();
+                this.updateTheme();
+            }
+
+            setupEventListeners() {
+                const themeToggleBtn = document.getElementById('themeToggle');
+                themeToggleBtn.addEventListener('click', () => {
+                    document.body.classList.toggle('light-mode');
+                    const isLight = document.body.classList.contains('light-mode');
+                    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+                    this.updateTheme();
+                });
+
+                if (localStorage.getItem('theme') === 'light') {
+                    document.body.classList.add('light-mode');
+                    this.updateTheme();
+                }
+
+                document.getElementById('graphType').addEventListener('change', (e) => {
+                    this.graphType = e.target.value;
+                    this.resetVisualization();
+                    this.initializeGraph();
+                });
+
+                document.getElementById('startBtn').addEventListener('click', () => this.startDijkstra());
+                document.getElementById('stepBtn').addEventListener('click', () => this.stepForward());
+                document.getElementById('resetBtn').addEventListener('click', () => this.resetVisualization());
+                document.getElementById('autoRunBtn').addEventListener('click', () => this.toggleAutoRun());
+                document.getElementById('speedSlider').addEventListener('input', (e) => {
+                    this.speed = 1050 - parseInt(e.target.value) * 100;
+                });
+            }
+
+            updateTheme() {
+                const isLight = document.body.classList.contains('light-mode');
+                const darkIcon = document.querySelector('.dark-icon');
+                const lightIcon = document.querySelector('.light-icon');
+                if (darkIcon) darkIcon.classList.toggle('hidden', isLight);
+                if (lightIcon) lightIcon.classList.toggle('hidden', !isLight);
+            }
+
+            initializeGraph() {
+                this.svg.innerHTML = '';
+                this.nodes = [];
+                this.edges = [];
+                this.adjacencyList = {};
+
+                if (this.graphType === 'weighted_tree') this.createWeightedTree();
+                else if (this.graphType === 'mesh') this.createMeshGraph();
+                else this.createRandomNetwork();
+
+                this.renderGraph();
+                document.getElementById('totalNodesCount').textContent = this.nodes.length;
+            }
+
+            createWeightedTree() {
+                this.nodes = [
+                    {id: 'A', x: 300, y: 50}, {id: 'B', x: 180, y: 120}, {id: 'C', x: 420, y: 120},
+                    {id: 'D', x: 120, y: 220}, {id: 'E', x: 240, y: 220}, {id: 'F', x: 360, y: 220},
+                    {id: 'G', x: 480, y: 220}
+                ];
+                this.edges = [
+                    {from: 'A', to: 'B', w: 4}, {from: 'A', to: 'C', w: 3}, {from: 'B', to: 'D', w: 10},
+                    {from: 'B', to: 'E', w: 2}, {from: 'C', to: 'F', w: 6}, {from: 'C', to: 'G', w: 7},
+                    {from: 'E', to: 'F', w: 1} // Cross-connection
+                ];
+                this.buildAdjacencyList();
+            }
+
+            createMeshGraph() {
+                const labels = "ABCDEFGHIJKLMNOPQRST".split("");
+                this.nodes = [
+                    {id: 'A', x: 80, y: 80}, {id: 'B', x: 250, y: 60}, {id: 'C', x: 450, y: 80},
+                    {id: 'D', x: 150, y: 200}, {id: 'E', x: 350, y: 200}, {id: 'F', x: 520, y: 200},
+                    {id: 'G', x: 100, y: 320}, {id: 'H', x: 300, y: 340}, {id: 'I', x: 500, y: 320}
+                ];
+                this.edges = [
+                    {from: 'A', to: 'B', w: 2}, {from: 'B', to: 'C', w: 5}, {from: 'A', to: 'D', w: 6},
+                    {from: 'B', to: 'E', w: 1}, {from: 'C', to: 'F', w: 3}, {from: 'D', to: 'E', w: 4},
+                    {from: 'E', to: 'F', w: 2}, {from: 'D', to: 'G', w: 1}, {from: 'G', to: 'H', w: 6},
+                    {from: 'E', to: 'H', w: 8}, {from: 'F', to: 'I', w: 4}, {from: 'H', to: 'I', w: 3}
+                ];
+                this.buildAdjacencyList();
+            }
+
+            createRandomNetwork() {
+                const labels = "ABCDEFGHIJ".split("");
+                for (let i = 0; i < 10; i++) {
+                    this.nodes.push({
+                        id: labels[i], 
+                        x: 100 + Math.random() * 400, 
+                        y: 50 + Math.random() * 300
+                    });
+                }
+                for (let i = 0; i < 10; i++) {
+                    for (let j = i + 1; j < 10; j++) {
+                        if (Math.random() < 0.25) {
+                            this.edges.push({from: labels[i], to: labels[j], w: Math.floor(Math.random() * 9) + 1});
+                        }
+                    }
+                }
+                this.buildAdjacencyList();
+            }
+
+            buildAdjacencyList() {
+                this.nodes.forEach(n => this.adjacencyList[n.id] = []);
+                this.edges.forEach(e => {
+                    this.adjacencyList[e.from].push({to: e.to, w: e.w});
+                    this.adjacencyList[e.to].push({to: e.from, w: e.w});
+                });
+            }
+
+            renderGraph() {
+                this.edges.forEach(edge => {
+                    const fromNode = this.nodes.find(n => n.id === edge.from);
+                    const toNode = this.nodes.find(n => n.id === edge.to);
+                    
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', fromNode.x); line.setAttribute('y1', fromNode.y);
+                    line.setAttribute('x2', toNode.x); line.setAttribute('y2', toNode.y);
+                    line.setAttribute('class', 'edge');
+                    line.setAttribute('id', `edge-${edge.from}-${edge.to}`);
+                    this.svg.appendChild(line);
+
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('x', (fromNode.x + toNode.x) / 2);
+                    text.setAttribute('y', (fromNode.y + toNode.y) / 2);
+                    text.setAttribute('class', 'edge-text');
+                    text.setAttribute('text-anchor', 'middle');
+                    text.textContent = edge.w;
+                    this.svg.appendChild(text);
+                });
+
+                this.nodes.forEach(node => {
+                    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    g.setAttribute('id', `node-${node.id}`);
+                    g.setAttribute('class', 'node');
+
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('cx', node.x); circle.setAttribute('cy', node.y); circle.setAttribute('r', 18);
+                    
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('x', node.x); text.setAttribute('y', node.y + 2);
+                    text.setAttribute('text-anchor', 'middle'); text.textContent = node.id;
+
+                    const distText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    distText.setAttribute('x', node.x); distText.setAttribute('y', node.y + 32);
+                    distText.setAttribute('text-anchor', 'middle'); 
+                    distText.setAttribute('class', 'dist-label');
+                    distText.setAttribute('id', `dist-${node.id}`);
+                    distText.textContent = "∞";
+
+                    g.appendChild(circle); g.appendChild(text); g.appendChild(distText);
+                    this.svg.appendChild(g);
+
+                    g.onclick = () => { if (!this.isRunning) this.setSourceNode(node.id); };
+                });
+            }
+
+            setSourceNode(nodeId) {
+                this.nodes.forEach(n => document.getElementById(`node-${n.id}`).classList.remove('current'));
+                const el = document.getElementById(`node-${nodeId}`);
+                if (el) el.classList.add('current');
+                this.sourceNode = nodeId;
+                document.getElementById('currentOperation').textContent = `SOURCE NODE SET TO ${nodeId}`;
+            }
+
+            startDijkstra() {
+                if (!this.sourceNode) this.setSourceNode(this.nodes[0].id);
+                this.isRunning = true;
+                this.visited.clear();
+                this.traversalOrder = [];
+                
+                this.distances = {};
+                this.nodes.forEach(n => {
+                    this.distances[n.id] = Infinity;
+                    const dLabel = document.getElementById(`dist-${n.id}`);
+                    if (dLabel) dLabel.textContent = "∞";
+                });
+                
+                this.distances[this.sourceNode] = 0;
+                document.getElementById(`dist-${this.sourceNode}`).textContent = "d=0";
+                
+                this.pq = [{id: this.sourceNode, dist: 0}];
+
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stepBtn').disabled = false;
+                document.getElementById('autoRunBtn').disabled = false;
+                document.getElementById('status-badge').textContent = 'Status: Active';
+
+                this.updatePQUI();
+                this.updateStats();
+                this.updatePathUI();
+            }
+
+            async stepForward() {
+                if (this.pq.length === 0) return this.finishDijkstra();
+
+                // Dijkstra pop: Node with smallest distance
+                this.pq.sort((a, b) => a.dist - b.dist);
+                const { id: u, dist: d } = this.pq.shift();
+                
+                if (this.visited.has(u)) return this.stepForward(); // Skip processed nodes
+
+                const el = document.getElementById(`node-${u}`);
+                if (el) el.classList.add('exploring');
+                document.getElementById('currentOperation').textContent = `EXTRACT MIN: NODE ${u} (Dist: ${d})`;
+                this.updatePQUI();
+
+                await new Promise(r => setTimeout(r, this.speed * 0.4));
+
+                this.visited.add(u);
+                this.traversalOrder.push(u);
+                if (el) {
+                    el.classList.remove('exploring');
+                    el.classList.add('visited');
+                }
+                
+                this.updatePathUI();
+                const neighbors = this.adjacencyList[u] || [];
+
+                for (const edgeInfo of neighbors) {
+                    const v = edgeInfo.to;
+                    const weight = edgeInfo.w;
+                    
+                    if (!this.visited.has(v)) {
+                        const newDist = d + weight;
+                        if (newDist < this.distances[v]) {
+                            this.distances[v] = newDist;
+                            const dLabel = document.getElementById(`dist-${v}`);
+                            if (dLabel) dLabel.textContent = `d=${newDist}`;
+                            
+                            this.pq.push({id: v, dist: newDist});
+                            const nEl = document.getElementById(`node-${v}`);
+                            if (nEl) nEl.classList.add('in-pq');
+
+                            const edgeEl = document.getElementById(`edge-${u}-${v}`) || document.getElementById(`edge-${v}-${u}`);
+                            if (edgeEl) edgeEl.classList.add('traversed');
+                        }
+                    }
+                }
+
+                this.updatePQUI();
+                this.updateStats();
+                
+                if (this.pq.length === 0 && this.autoRunning) this.finishDijkstra();
+            }
+
+            toggleAutoRun() {
+                if (this.autoRunning) {
+                    this.autoRunning = false;
+                    clearInterval(this.autoRunInterval);
+                    document.getElementById('autoRunBtn').innerHTML = '<i class="fas fa-play mr-1"></i> Auto';
+                } else {
+                    this.autoRunning = true;
+                    document.getElementById('autoRunBtn').innerHTML = '<i class="fas fa-stop mr-1"></i> Stop';
+                    this.autoRunInterval = setInterval(() => this.stepForward(), this.speed + 200);
+                }
+            }
+
+            finishDijkstra() {
+                this.isRunning = false;
+                this.autoRunning = false;
+                clearInterval(this.autoRunInterval);
+                document.getElementById('stepBtn').disabled = true;
+                document.getElementById('autoRunBtn').disabled = true;
+                document.getElementById('status-badge').textContent = 'Status: Complete';
+                document.getElementById('status-badge').className = "mono-font text-[10px] px-2 py-1 rounded border border-indigo-500/20 text-indigo-400 bg-indigo-500/5";
+                document.getElementById('currentOperation').textContent = `SHORTEST PATH TREE CALCULATED`;
+            }
+
+            resetVisualization() {
+                this.isRunning = false;
+                this.autoRunning = false;
+                if (this.autoRunInterval) clearInterval(this.autoRunInterval);
+                this.visited.clear();
+                this.pq = [];
+                this.traversalOrder = [];
+                this.distances = {};
+
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stepBtn').disabled = true;
+                document.getElementById('autoRunBtn').disabled = true;
+                document.getElementById('autoRunBtn').innerHTML = '<i class="fas fa-bolt mr-1"></i> Auto';
+                document.getElementById('status-badge').textContent = 'Status: Ready';
+                document.getElementById('status-badge').className = "mono-font text-[10px] px-2 py-1 rounded border border-green-500/20 text-green-400 bg-green-500/5";
+                
+                this.nodes.forEach(n => {
+                    const el = document.getElementById(`node-${n.id}`);
+                    if (el) el.setAttribute('class', 'node');
+                    const dLabel = document.getElementById(`dist-${n.id}`);
+                    if (dLabel) dLabel.textContent = "∞";
+                });
+                this.edges.forEach(e => {
+                    const el = document.getElementById(`edge-${e.from}-${e.to}`);
+                    if (el) el.setAttribute('class', 'edge');
+                });
+
+                this.updatePQUI();
+                this.updatePathUI();
+                this.updateStats();
+                this.sourceNode = null;
+            }
+
+            updatePQUI() {
+                const container = document.getElementById('pqContainer');
+                if (this.pq.length === 0) {
+                    container.innerHTML = '<div class="text-[10px] text-center opacity-40 py-8 italic uppercase">PQ is empty</div>';
+                    return;
+                }
+                // Show sorted PQ
+                const sorted = [...this.pq].sort((a, b) => a.dist - b.dist);
+                container.innerHTML = sorted.map((item, i) => `
+                    <div class="pq-item ${i === 0 ? 'front' : ''}">
+                        <span class="font-bold">${item.id}</span>
+                        <span class="mono-font text-xs opacity-60">Dist: ${item.dist}</span>
+                    </div>
+                `).join('');
+            }
+
+            updatePathUI() {
+                const container = document.getElementById('traversalPath');
+                container.innerHTML = this.traversalOrder.map(id => `
+                    <span class="px-2 py-1 bg-indigo-500/10 text-indigo-400 rounded text-[10px] font-bold border border-indigo-500/20">${id}</span>
+                `).join('<i class="fas fa-chevron-right text-[8px] opacity-20 mx-0.5"></i>');
+            }
+
+            updateStats() {
+                const visitedEl = document.getElementById('nodesVisited');
+                if (visitedEl) visitedEl.textContent = this.visited.size;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new DijkstraVisualizer();
+        });
+    
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            // Machine Learning
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "../machine_learning/cosine_similarity.html", category: "ml", icon: "fa-brain" },
+            { title: "Cross Validation", path: "../machine_learning/cross_validation.html", category: "ml", icon: "fa-brain" },
+            { title: "Decision Tree", path: "../machine_learning/decision_tree.html", category: "ml", icon: "fa-brain" },
+            { title: "K-Means", path: "../machine_learning/k_means.html", category: "ml", icon: "fa-brain" },
+            { title: "KNN", path: "../machine_learning/knn.html", category: "ml", icon: "fa-brain" },
+            { title: "Label Encoding", path: "../machine_learning/label_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Naive Bayes", path: "../machine_learning/naive_bayes.html", category: "ml", icon: "fa-brain" },
+            { title: "One Hot Encoding", path: "../machine_learning/one_hot_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Sliding Window Time Series", path: "../machine_learning/sliding_window_for_timeseries_data.html", category: "ml", icon: "fa-brain" },
+            { title: "SVM", path: "../machine_learning/svm.html", category: "ml", icon: "fa-brain" },
+            { title: "Train Test Split", path: "../machine_learning/train_test_split.html", category: "ml", icon: "fa-brain" },
+            
+            // Deep Learning
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing in Neural Networks", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Dropout in Neural Networks", path: "../deep_learning/dropout_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Batch Processing", path: "../deep_learning/gradient_descent_batch_processing.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Linear Regression with Gradient Descent", path: "../deep_learning/linear_regression_with_gradient_descent.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            
+            // DSA
+            { title: "A* Algorithm", path: "../dsa/a_star.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Backtracking", path: "../dsa/backtracking.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Search", path: "../dsa/binary_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Breadth First Search", path: "../dsa/breadth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Bubble Sort", path: "../dsa/bubble_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Counting Sort", path: "../dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Depth First Search", path: "../dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dictionaries in Python", path: "../dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra's Algorithm", path: "../dsa/dijkstra's.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Fibonacci Search", path: "../dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Insertion Sort", path: "../dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Interpolation Search", path: "../dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Linear Search", path: "../dsa/linear_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Lists in Python", path: "../dsa/lists_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Merge Sort", path: "../dsa/merge_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Quick Sort", path: "../dsa/quick_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Selection Sort", path: "../dsa/selection_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Strings in Python", path: "../dsa/strings_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            
+            // Natural Language Processing
+            { title: "ASCII Codes", path: "../natural_language_processing/ascii_codes.html", category: "nlp", icon: "fa-comments" },
+            { title: "N-Gram", path: "../natural_language_processing/n_gram.html", category: "nlp", icon: "fa-comments" },
+            { title: "Stemming vs Lemmatization", path: "../natural_language_processing/stemming_vs_lemmatization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Text Normalization Pipeline", path: "../natural_language_processing/text_normalization_pipeline.html", category: "nlp", icon: "fa-comments" },
+            { title: "Tokenization", path: "../natural_language_processing/tokenization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Word Cloud", path: "../natural_language_processing/word_cloud.html", category: "nlp", icon: "fa-comments" },
+            
+            // Computer Vision
+            { title: "Downsampling in CNN", path: "../computer_vision/downsampling_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Edge Detection", path: "../computer_vision/edge_detection.html", category: "vision", icon: "fa-eye" },
+            { title: "Feature Map in CNN", path: "../computer_vision/feature_map_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Grayscale Image Processing", path: "../computer_vision/grayscale_image_processing.html", category: "vision", icon: "fa-eye" },
+            { title: "Image Data Augmentation", path: "../computer_vision/image_data_augmentation.html", category: "vision", icon: "fa-eye" },
+            { title: "RGB Image Processing", path: "../computer_vision/rgb_image_processing.html", category: "vision", icon: "fa-eye" },
+            
+            // Database
+            { title: "Groupby in SQL", path: "../database/groupby_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Joins in SQL", path: "../database/joins_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Window Functions in SQL", path: "../database/window_functions_in_sql.html", category: "db", icon: "fa-database" },
+            
+            // Gen AI
+            { title: "Casual Language Modeling", path: "../gen_ai/casual_language_modeling.html", category: "gen-ai", icon: "fa-wand-magic-sparkles" },
+            
+            // Maths
+            { title: "Equation of Line", path: "../maths/equation_of_line.html", category: "maths", icon: "fa-calculator" }
+        ];
+
+        // Initialize search functionality
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                // Filter courses
+                const filtered = allCourses.filter(course => 
+                    course.title.toLowerCase().includes(query) || 
+                    course.category.toLowerCase().includes(query)
+                );
+
+                // Render results
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>
+                    `).join('');
+                }
+
+                dropdown.classList.add('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            // Close dropdown on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>

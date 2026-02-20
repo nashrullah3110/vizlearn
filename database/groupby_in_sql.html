@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - SQL GroupBy Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 40s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.03);
+            --input-focus-bg: rgba(74, 222, 128, 0.08);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            --stat-bg: rgba(0, 0, 0, 0.2);
+            --stat-border: rgba(255, 255, 255, 0.05);
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.95);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --accent-primary: #15803d; 
+            --accent-glow: rgba(21, 128, 61, 0.1);
+            --text-main: #111827; 
+            --text-muted: #374151;
+            --card-bg: #ffffff;
+            --input-bg: rgba(0, 0, 0, 0.03);
+            --input-focus-bg: rgba(0, 0, 0, 0.05);
+            --grid-color: rgba(0, 0, 0, 0.05);
+            --vignette-color: transparent;
+            --stat-bg: rgba(0, 0, 0, 0.04);
+            --stat-border: rgba(0, 0, 0, 0.1);
+        }
+
+        *, *::before, *::after {
+            transition: background-color 300ms, border-color 300ms, color 300ms, box-shadow 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        h1, h2, h3, .brand-font {
+            font-family: 'Space Grotesk', sans-serif;
+            letter-spacing: -0.02em;
+        }
+
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .glass-card {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .glass-card:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .action-btn {
+            background: rgba(21, 128, 61, 0.1);
+            border: 1px solid rgba(21, 128, 61, 0.2);
+            color: var(--accent-primary);
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            padding: 0.75rem;
+            border-radius: 8px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .action-btn:hover:not(:disabled) {
+            background: var(--accent-glow);
+        }
+        .action-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            background: rgba(100, 100, 100, 0.1);
+            border-color: rgba(100, 100, 100, 0.2);
+            color: var(--text-muted);
+        }
+
+        select.custom-select {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            width: 100%;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* Table Styles */
+        .table-container {
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+        }
+        
+        th {
+            background: var(--input-bg);
+            color: var(--text-muted);
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-subtle);
+            font-weight: 700;
+        }
+        
+        td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: background-color 0.3s;
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Animation Classes */
+        .highlight-row {
+            background-color: var(--accent-glow) !important;
+            color: var(--accent-primary) !important;
+            font-weight: bold;
+        }
+        
+        .fade-row {
+            opacity: 0.3;
+        }
+        
+        .converge-row {
+            transform: scale(0.95);
+            opacity: 0;
+            transition: all 0.5s ease;
+        }
+
+        /* SQL Syntax Highlighting */
+        .sql-keyword { color: #a78bfa; font-weight: bold; }
+        .sql-func { color: var(--accent-primary); font-weight: bold; }
+        .sql-col { color: var(--text-main); }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .search-input-wrapper:focus-within {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .search-input-wrapper input {
+            color: var(--text-main);
+        }
+        .search-input-wrapper input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .search-input-wrapper i {
+            color: var(--accent-primary);
+            opacity: 0.7;
+        }
+
+        /* Dropdown Search */
+        .search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-dropdown-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .search-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-dropdown-item:hover {
+            background: var(--input-focus-bg);
+            padding-left: 20px;
+        }
+
+        .dropdown-item-title {
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .dropdown-item-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 12px;
+        }
+
+        .dropdown-item-icon {
+            color: var(--accent-primary);
+            margin-right: 8px;
+            font-size: 0.875rem;
+        }
+
+        .dropdown-no-results {
+            padding: 20px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col min-h-screen overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <!-- Search -->
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search courses" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Theme Toggle + Back Button -->
+                <div class="flex items-center gap-3">
+                    <!-- Back to Hub Button -->
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    
+                    <!-- Theme Toggle -->
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+
+    <main class="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto flex flex-col">
+        
+        <div class="mb-8 animate-fade-in">
+            <div class="flex items-center gap-2 text-xs mono-font mb-2" style="color: var(--text-muted)">
+                <span class="opacity-50">Modules</span>
+                <span>/</span>
+                <span class="opacity-50">Database</span>
+                <span>/</span>
+                <span style="color: var(--accent-primary)">Query Visualization</span>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">SQL GroupBy Visualizer</h1>
+            <p class="mt-2 text-sm max-w-2xl" style="color: var(--text-muted)">
+                Interactively build and visualize how SQL aggregates data by grouping rows based on specific columns.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full flex-1">
+            
+            <!-- Left Sidebar: Controls (3 Cols) -->
+            <aside class="lg:col-span-3 space-y-6 animate-fade-in" style="animation-delay: 0.1s">
+                <div class="glass-card p-6 flex flex-col gap-6">
+                    <div>
+                        <label class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-2 block">1. Group By Column</label>
+                        <select id="groupByColumn" class="custom-select">
+                            <option value="">Select column...</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-2 block">2. Aggregate Function</label>
+                        <div class="flex flex-col gap-2 mb-3">
+                            <label class="flex items-center gap-2 text-sm cursor-pointer p-2 rounded hover:bg-white/5 transition-colors">
+                                <input type="radio" name="aggregateFunction" value="SUM" class="accent-green-500">
+                                <span style="color: var(--text-main)">SUM() - Total Value</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm cursor-pointer p-2 rounded hover:bg-white/5 transition-colors">
+                                <input type="radio" name="aggregateFunction" value="COUNT" class="accent-green-500">
+                                <span style="color: var(--text-main)">COUNT() - Number of Rows</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm cursor-pointer p-2 rounded hover:bg-white/5 transition-colors">
+                                <input type="radio" name="aggregateFunction" value="AVG" class="accent-green-500">
+                                <span style="color: var(--text-main)">AVG() - Average Value</span>
+                            </label>
+                        </div>
+                        
+                        <label class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-2 block">3. Target Column</label>
+                        <select id="aggregateColumn" class="custom-select" disabled>
+                            <option value="">Select column...</option>
+                        </select>
+                    </div>
+
+                    <div class="flex flex-col gap-3 pt-2">
+                        <button id="runQuery" class="action-btn" disabled>
+                            <i class="fas fa-play"></i> Run Query
+                        </button>
+                        <button id="resetQuery" class="action-btn bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center: Visualization (9 Cols) -->
+            <section class="lg:col-span-9 space-y-6 animate-fade-in" style="animation-delay: 0.2s">
+                <div class="glass-card p-6 flex flex-col h-full">
+                    
+                    <!-- Source Table -->
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">Source Table</h2>
+                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-brand-400/10 text-brand-400 border border-brand-400/20 mono-font">SALES_DATA</span>
+                    </div>
+                    
+                    <div class="table-container mb-6 overflow-auto max-h-96 w-full">
+                        <table id="sourceTable" class="w-full">
+                            <thead id="sourceTableHeader"></thead>
+                            <tbody id="sourceTableBody"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Generated SQL -->
+                    <div class="mb-6 p-4 bg-black/20 rounded-lg border border-dashed border-white/10 font-mono text-sm leading-relaxed overflow-x-auto">
+                         <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-2">Live Query</h2>
+                        <code id="sqlQuery">
+                            <span class="sql-keyword">SELECT</span> ... <span class="sql-keyword">FROM</span> SalesData;
+                        </code>
+                    </div>
+
+                    <!-- Result Table -->
+                    <div class="flex justify-between items-center mb-4 pt-4 border-t border-white/5">
+                        <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">Result Table</h2>
+                        <span id="resultStatus" class="text-[10px] font-bold px-2 py-1 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20 mono-font opacity-0">READY</span>
+                    </div>
+
+                    <div class="table-container overflow-auto max-h-64 w-full">
+                        <table id="resultTable" class="w-full">
+                            <thead id="resultTableHeader"></thead>
+                            <tbody id="resultTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <footer class="w-full py-6 mt-8 border-t border-brand-400/10">
+        <div class="container mx-auto px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-4" style="color: var(--text-muted)">
+                <a href="https://github.com/AshishJangra27" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-kaggle fa-lg"></i></a>
+                <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="hover:text-green-500 transition-colors"><i class="fab fa-instagram fa-lg"></i></a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60">&copy; 2025 VIZLEARN // DATA SYSTEMS LAB</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Theme Logic ---
+            const themeToggleBtn = document.getElementById('themeToggle');
+            const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+            const moonIcon = themeToggleBtn.querySelector('.light-icon');
+            let currentTheme = localStorage.getItem('theme') || 'dark';
+
+            function applyTheme(theme) {
+                if (theme === 'light') {
+                    document.body.classList.add('light-mode');
+                    moonIcon.classList.remove('hidden');
+                    sunIcon.classList.add('hidden');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    sunIcon.classList.remove('hidden');
+                    moonIcon.classList.add('hidden');
+                }
+            }
+            themeToggleBtn.addEventListener('click', () => {
+                currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+                localStorage.setItem('theme', currentTheme);
+                applyTheme(currentTheme);
+            });
+            applyTheme(currentTheme);
+
+            // --- SQL Logic ---
+            const sampleData = [
+                { Department: 'Sales', Region: 'North', Sales: 15000, Employees: 5 },
+                { Department: 'Sales', Region: 'South', Sales: 12000, Employees: 4 },
+                { Department: 'Marketing', Region: 'North', Sales: 8000, Employees: 3 },
+                { Department: 'Marketing', Region: 'South', Sales: 9500, Employees: 3 },
+                { Department: 'IT', Region: 'North', Sales: 20000, Employees: 8 },
+                { Department: 'IT', Region: 'South', Sales: 18000, Employees: 7 },
+                { Department: 'Sales', Region: 'East', Sales: 13500, Employees: 4 },
+                { Department: 'Marketing', Region: 'East', Sales: 7000, Employees: 2 },
+                { Department: 'IT', Region: 'East', Sales: 22000, Employees: 9 },
+                { Department: 'HR', Region: 'North', Sales: 5000, Employees: 2 },
+                { Department: 'HR', Region: 'South', Sales: 4500, Employees: 2 },
+                { Department: 'HR', Region: 'East', Sales: 5500, Employees: 3 }
+            ];
+
+            const groupByColumn = document.getElementById('groupByColumn');
+            const aggregateColumn = document.getElementById('aggregateColumn');
+            const runQueryBtn = document.getElementById('runQuery');
+            const resetQueryBtn = document.getElementById('resetQuery');
+            const sqlQuery = document.getElementById('sqlQuery');
+            const sourceTableHeader = document.getElementById('sourceTableHeader');
+            const sourceTableBody = document.getElementById('sourceTableBody');
+            const resultTableHeader = document.getElementById('resultTableHeader');
+            const resultTableBody = document.getElementById('resultTableBody');
+            const resultStatus = document.getElementById('resultStatus');
+
+            let currentAggregateFunction = null;
+            let isAnimating = false;
+
+            function init() {
+                populateDropdowns();
+                renderSourceTable();
+                setupListeners();
+                updateSQLQuery();
+            }
+
+            function populateDropdowns() {
+                const cols = Object.keys(sampleData[0]);
+                cols.forEach(col => {
+                    const opt1 = document.createElement('option');
+                    opt1.value = col;
+                    opt1.textContent = col;
+                    groupByColumn.appendChild(opt1);
+                    
+                    const opt2 = document.createElement('option');
+                    opt2.value = col;
+                    opt2.textContent = col;
+                    aggregateColumn.appendChild(opt2);
+                });
+            }
+
+            function renderSourceTable() {
+                const cols = Object.keys(sampleData[0]);
+                sourceTableHeader.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
+                
+                sourceTableBody.innerHTML = '';
+                sampleData.forEach((row, i) => {
+                    const tr = document.createElement('tr');
+                    tr.id = `row-${i}`;
+                    tr.innerHTML = cols.map(c => `<td>${row[c]}</td>`).join('');
+                    sourceTableBody.appendChild(tr);
+                });
+            }
+
+            function updateSQLQuery() {
+                const grp = groupByColumn.value || 'column';
+                const agg = currentAggregateFunction || 'FUNC';
+                const aggCol = currentAggregateFunction === 'COUNT' ? '*' : (aggregateColumn.value || 'column');
+                const alias = agg === 'COUNT' ? 'Count' : `${agg}_${aggCol}`;
+
+                sqlQuery.innerHTML = `
+<span class="sql-keyword">SELECT</span>
+  <span class="sql-col">${grp}</span>,
+  <span class="sql-func">${agg}</span>(<span class="sql-col">${aggCol}</span>) <span class="sql-keyword">AS</span> ${alias}
+<span class="sql-keyword">FROM</span> SalesData
+<span class="sql-keyword">GROUP BY</span>
+  <span class="sql-col">${grp}</span>;`;
+            }
+
+            function setupListeners() {
+                document.querySelectorAll('input[name="aggregateFunction"]').forEach(r => {
+                    r.addEventListener('change', (e) => {
+                        currentAggregateFunction = e.target.value;
+                        if (currentAggregateFunction === 'COUNT') {
+                            aggregateColumn.disabled = true;
+                            aggregateColumn.value = '';
+                        } else {
+                            aggregateColumn.disabled = false;
+                        }
+                        checkReady();
+                        updateSQLQuery();
+                    });
+                });
+
+                groupByColumn.addEventListener('change', () => { checkReady(); updateSQLQuery(); });
+                aggregateColumn.addEventListener('change', () => { checkReady(); updateSQLQuery(); });
+
+                runQueryBtn.addEventListener('click', runAnimation);
+                resetQueryBtn.addEventListener('click', reset);
+            }
+
+            function checkReady() {
+                const ready = groupByColumn.value && currentAggregateFunction && 
+                             (currentAggregateFunction === 'COUNT' || aggregateColumn.value);
+                runQueryBtn.disabled = !ready || isAnimating;
+            }
+
+            async function runAnimation() {
+                if(isAnimating) return;
+                isAnimating = true;
+                runQueryBtn.disabled = true;
+                resultTableBody.innerHTML = '';
+                resultStatus.style.opacity = '1';
+                resultStatus.textContent = 'PROCESSING...';
+                
+                const groupCol = groupByColumn.value;
+                const aggCol = aggregateColumn.value;
+                const func = currentAggregateFunction;
+
+                // Headers
+                const alias = func === 'COUNT' ? 'Count' : `${func}_${aggCol}`;
+                resultTableHeader.innerHTML = `<tr><th>${groupCol}</th><th>${alias}</th></tr>`;
+
+                // Group Data
+                const groups = {};
+                sampleData.forEach((row, idx) => {
+                    const key = row[groupCol];
+                    if(!groups[key]) groups[key] = [];
+                    groups[key].push({val: row, idx});
+                });
+
+                for (const [key, rows] of Object.entries(groups)) {
+                    // Highlight source rows
+                    rows.forEach(r => document.getElementById(`row-${r.idx}`).classList.add('highlight-row'));
+                    
+                    // Fade others
+                    sampleData.forEach((_, i) => {
+                        if(!rows.find(r => r.idx === i)) document.getElementById(`row-${i}`).classList.add('fade-row');
+                    });
+
+                    await new Promise(r => setTimeout(r, 800));
+
+                    // Calculate
+                    let resultVal = 0;
+                    if(func === 'COUNT') resultVal = rows.length;
+                    else if(func === 'SUM') resultVal = rows.reduce((s, r) => s + (r.val[aggCol]||0), 0);
+                    else if(func === 'AVG') resultVal = Math.round(rows.reduce((s, r) => s + (r.val[aggCol]||0), 0) / rows.length);
+
+                    // Add Result Row
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${key}</td><td class="font-mono font-bold text-green-400">${resultVal}</td>`;
+                    resultTableBody.appendChild(tr);
+
+                    // Converge effect
+                    rows.forEach(r => document.getElementById(`row-${r.idx}`).classList.add('converge-row'));
+                    
+                    await new Promise(r => setTimeout(r, 500));
+
+                    // Clean classes
+                    document.querySelectorAll('tr').forEach(r => {
+                        r.classList.remove('highlight-row', 'fade-row', 'converge-row');
+                    });
+                }
+
+                resultStatus.textContent = 'COMPLETE';
+                isAnimating = false;
+                checkReady();
+            }
+
+            function reset() {
+                groupByColumn.value = '';
+                aggregateColumn.value = '';
+                aggregateColumn.disabled = true;
+                currentAggregateFunction = null;
+                document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+                resultTableHeader.innerHTML = '';
+                resultTableBody.innerHTML = '';
+                resultStatus.style.opacity = '0';
+                checkReady();
+                updateSQLQuery();
+            }
+
+            init();
+        });
+    
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            // Machine Learning
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "../machine_learning/cosine_similarity.html", category: "ml", icon: "fa-brain" },
+            { title: "Cross Validation", path: "../machine_learning/cross_validation.html", category: "ml", icon: "fa-brain" },
+            { title: "Decision Tree", path: "../machine_learning/decision_tree.html", category: "ml", icon: "fa-brain" },
+            { title: "K-Means", path: "../machine_learning/k_means.html", category: "ml", icon: "fa-brain" },
+            { title: "KNN", path: "../machine_learning/knn.html", category: "ml", icon: "fa-brain" },
+            { title: "Label Encoding", path: "../machine_learning/label_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Naive Bayes", path: "../machine_learning/naive_bayes.html", category: "ml", icon: "fa-brain" },
+            { title: "One Hot Encoding", path: "../machine_learning/one_hot_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Sliding Window Time Series", path: "../machine_learning/sliding_window_for_timeseries_data.html", category: "ml", icon: "fa-brain" },
+            { title: "SVM", path: "../machine_learning/svm.html", category: "ml", icon: "fa-brain" },
+            { title: "Train Test Split", path: "../machine_learning/train_test_split.html", category: "ml", icon: "fa-brain" },
+            
+            // Deep Learning
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing in Neural Networks", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Dropout in Neural Networks", path: "../deep_learning/dropout_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Batch Processing", path: "../deep_learning/gradient_descent_batch_processing.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Linear Regression with Gradient Descent", path: "../deep_learning/linear_regression_with_gradient_descent.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            
+            // DSA
+            { title: "A* Algorithm", path: "../dsa/a_star.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Backtracking", path: "../dsa/backtracking.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Search", path: "../dsa/binary_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Breadth First Search", path: "../dsa/breadth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Bubble Sort", path: "../dsa/bubble_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Counting Sort", path: "../dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Depth First Search", path: "../dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dictionaries in Python", path: "../dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra's Algorithm", path: "../dsa/dijkstra's.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Fibonacci Search", path: "../dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Insertion Sort", path: "../dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Interpolation Search", path: "../dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Linear Search", path: "../dsa/linear_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Lists in Python", path: "../dsa/lists_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Merge Sort", path: "../dsa/merge_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Quick Sort", path: "../dsa/quick_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Selection Sort", path: "../dsa/selection_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Strings in Python", path: "../dsa/strings_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            
+            // Natural Language Processing
+            { title: "ASCII Codes", path: "../natural_language_processing/ascii_codes.html", category: "nlp", icon: "fa-comments" },
+            { title: "N-Gram", path: "../natural_language_processing/n_gram.html", category: "nlp", icon: "fa-comments" },
+            { title: "Stemming vs Lemmatization", path: "../natural_language_processing/stemming_vs_lemmatization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Text Normalization Pipeline", path: "../natural_language_processing/text_normalization_pipeline.html", category: "nlp", icon: "fa-comments" },
+            { title: "Tokenization", path: "../natural_language_processing/tokenization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Word Cloud", path: "../natural_language_processing/word_cloud.html", category: "nlp", icon: "fa-comments" },
+            
+            // Computer Vision
+            { title: "Downsampling in CNN", path: "../computer_vision/downsampling_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Edge Detection", path: "../computer_vision/edge_detection.html", category: "vision", icon: "fa-eye" },
+            { title: "Feature Map in CNN", path: "../computer_vision/feature_map_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Grayscale Image Processing", path: "../computer_vision/grayscale_image_processing.html", category: "vision", icon: "fa-eye" },
+            { title: "Image Data Augmentation", path: "../computer_vision/image_data_augmentation.html", category: "vision", icon: "fa-eye" },
+            { title: "RGB Image Processing", path: "../computer_vision/rgb_image_processing.html", category: "vision", icon: "fa-eye" },
+            
+            // Database
+            { title: "Groupby in SQL", path: "../database/groupby_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Joins in SQL", path: "../database/joins_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Window Functions in SQL", path: "../database/window_functions_in_sql.html", category: "db", icon: "fa-database" },
+            
+            // Gen AI
+            { title: "Casual Language Modeling", path: "../gen_ai/casual_language_modeling.html", category: "gen-ai", icon: "fa-wand-magic-sparkles" },
+            
+            // Maths
+            { title: "Equation of Line", path: "../maths/equation_of_line.html", category: "maths", icon: "fa-calculator" }
+        ];
+
+        // Initialize search functionality
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                // Filter courses
+                const filtered = allCourses.filter(course => 
+                    course.title.toLowerCase().includes(query) || 
+                    course.category.toLowerCase().includes(query)
+                );
+
+                // Render results
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>
+                    `).join('');
+                }
+
+                dropdown.classList.add('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            // Close dropdown on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>

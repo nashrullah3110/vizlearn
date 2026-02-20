@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Batch Processing in the Neural Network</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --border-glow: rgba(74, 222, 128, 0.5);
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            
+            /* Canvas Specifics - Dark */
+            --canvas-bg: #0a0a0a;
+            --neuron-fill: #111827;
+            --neuron-border: rgba(74, 222, 128, 0.5);
+            --connection-line: rgba(74, 222, 128, 0.2);
+            --dropout-neuron: rgba(255, 255, 255, 0.05);
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --border-glow: rgba(22, 163, 74, 0.4);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+
+            /* Canvas Specifics - Light Mode Contrast Fix */
+            --canvas-bg: #f8fafc;
+            --neuron-fill: #ffffff;
+            --neuron-border: #15803d; 
+            --connection-line: rgba(21, 128, 61, 0.4);
+            --dropout-neuron: rgba(0, 0, 0, 0.05);
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .toolbar-container {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.75rem 1.5rem;
+            z-index: 40;
+        }
+
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .floating-panel {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 260px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            z-index: 30;
+            opacity: 0.95;
+            transition: opacity 0.3s;
+        }
+        .floating-panel:hover { opacity: 1; }
+        
+        /* Input Styling */
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: all 0.2s;
+            border-radius: 0.375rem;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.875rem;
+        }
+        .viz-input:focus {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+            outline: none;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none; /* Hides the slider so that custom slider can be made */
+            background: transparent; /* Otherwise white in Chrome */
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+        }
+
+        input[type=range]:focus {
+            outline: none; /* Removes the blue border. You should probably do some kind of focus styling for accessibility reasons though. */
+        }
+
+        input[type=range]::-ms-track {
+            width: 100%;
+            cursor: pointer;
+            background: transparent; 
+            border-color: transparent;
+            color: transparent;
+        }
+
+        /* Thumb */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            border: 2px solid var(--bg-surface);
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            cursor: pointer;
+            margin-top: -5px; /* You need to specify a margin in Chrome, but in Firefox and IE it is automatic */
+            box-shadow: 0 0 10px var(--accent-glow);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Track */
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border-subtle);
+            border-radius: 2px;
+        }
+
+        /* Buttons */
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .viz-btn-primary {
+            background: var(--accent-primary);
+            color: var(--bg-body);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        .viz-btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 0 15px var(--accent-glow);
+            filter: brightness(1.1);
+        }
+        .viz-btn-secondary {
+            background: var(--input-bg);
+            color: var(--text-muted);
+            border: 1px solid var(--border-subtle);
+        }
+        .viz-btn-secondary:hover:not(:disabled) {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--input-focus-bg);
+        }
+        .viz-btn-animate.active {
+            background: #ef4444 !important;
+            color: white !important;
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important;
+        }
+
+        #canvas {
+            background-color: var(--canvas-bg);
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+            user-select: none;
+        }
+        #canvas.grabbing { cursor: grabbing; }
+
+        .metric-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+
+        #contextMenu {
+            display: none;
+            position: absolute;
+            z-index: 1000;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            border-radius: 0.5rem;
+            min-width: 160px;
+        }
+        
+        .ctx-item {
+            padding: 0.5rem 1rem;
+            color: var(--text-main);
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            text-align: left;
+            width: 100%;
+            border: none;
+            background: none;
+        }
+        .ctx-item:hover { background-color: var(--input-focus-bg); color: var(--accent-primary); }
+        .ctx-item.danger:hover { color: #ef4444; }
+        .ctx-separator { border-top: 1px solid var(--border-subtle); margin: 0.25rem 0; }
+
+        .modal {
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+        .modal-content {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 0 20px var(--accent-glow);
+            color: var(--text-main);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .search-input-wrapper:focus-within {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .search-input-wrapper input {
+            color: var(--text-main);
+        }
+        .search-input-wrapper input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .search-input-wrapper i {
+            color: var(--accent-primary);
+            opacity: 0.7;
+        }
+
+        /* Dropdown Search */
+        .search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-dropdown-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .search-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-dropdown-item:hover {
+            background: var(--input-focus-bg);
+            padding-left: 20px;
+        }
+
+        .dropdown-item-title {
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .dropdown-item-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 12px;
+        }
+
+        .dropdown-item-icon {
+            color: var(--accent-primary);
+            margin-right: 8px;
+            font-size: 0.875rem;
+        }
+
+        .dropdown-no-results {
+            padding: 20px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <!-- Navbar -->
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <!-- Search -->
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search courses" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Theme Toggle + Back Button -->
+                <div class="flex items-center gap-3">
+                    <!-- Back to Hub Button -->
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    
+                    <!-- Theme Toggle -->
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+
+    <!-- Title Section -->
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full">
+        <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
+            <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
+            <span>/</span>
+            <span>Deep Learning</span>
+        </div>
+        <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Batch Processing in the Neural Network</h1>
+        <p class="mt-2 text-sm md:text-base max-w-2xl opacity-80" style="color: var(--text-muted)">
+            Interactive architecture builder. Drag to pan, scroll to zoom, right-click to edit.
+        </p>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-4 justify-between">
+        <!-- Input Group -->
+        <div class="flex items-center gap-4 overflow-x-auto pb-1 md:pb-0 hide-scrollbar shrink-0">
+            <!-- Architecture Config -->
+            <div class="flex items-center gap-2">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Input</label>
+                <input type="number" id="inputFeatures" value="4" min="1" max="20" class="viz-input w-16 text-center">
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Hidden</label>
+                <input type="text" id="hiddenLayers" value="8,8,8" placeholder="8,8" class="viz-input w-28 text-center">
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Output</label>
+                <input type="number" id="outputClasses" value="3" min="1" max="20" class="viz-input w-16 text-center">
+            </div>
+
+            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <!-- Training Config -->
+            <div class="flex items-center gap-2">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Batch Size</label>
+                <input type="number" id="batchSize" value="5" min="1" max="100" class="viz-input w-16 text-center">
+            </div>
+
+            <div class="flex items-center gap-2">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Epochs</label>
+                <input type="number" id="epochs" value="10" min="1" max="100" class="viz-input w-16 text-center">
+            </div>
+
+            <div class="flex flex-col items-center">
+                <span class="text-[9px] font-bold uppercase tracking-wide opacity-50">Data Rows</span>
+                <span class="text-xs font-mono font-bold" style="color: var(--text-main)">100</span>
+            </div>
+        </div>
+
+        <!-- Dropout & Animation Controls (Fixed Layout) -->
+        <div class="flex items-center gap-6 shrink-0 md:border-l border-[var(--border-subtle)] md:pl-6 ml-auto">
+            
+            <!-- Dropout Control -->
+            <div class="flex flex-col justify-center gap-1 min-w-[120px]">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 cursor-help opacity-80 hover:opacity-100 transition-opacity" id="dropoutInfoBtn" title="Info: What is Dropout?">
+                        <i class="far fa-question-circle text-[10px]" style="color: var(--accent-primary)"></i>
+                        <label class="text-[10px] font-bold uppercase tracking-wide cursor-pointer select-none">Dropout</label>
+                    </div>
+                    <span id="dropoutValue" class="text-[10px] font-mono font-bold" style="color: var(--accent-primary)">0%</span>
+                </div>
+                <!-- Range Slider -->
+                <div class="relative h-4 flex items-center">
+                    <input type="range" id="dropoutSlider" min="0" max="90" value="0" step="5" class="w-full h-1 bg-[var(--border-subtle)] rounded-lg appearance-none cursor-pointer absolute z-10">
+                </div>
+            </div>
+            
+            <!-- Animate Button -->
+            <button id="animateBtn" class="viz-btn viz-btn-primary viz-btn-animate whitespace-nowrap py-2 px-4 shadow-[0_0_15px_rgba(74,222,128,0.15)]">
+                <i class="fas fa-play text-xs"></i> 
+                <span>Simulate Flow</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 relative overflow-hidden bg-[var(--canvas-bg)]">
+        <!-- Canvas -->
+        <canvas id="canvas" class="block w-full h-full"></canvas>
+
+        <!-- Floating Stats Panel -->
+        <div class="floating-panel p-4 flex flex-col gap-4 pointer-events-auto">
+             <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
+                 <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--accent-primary)">
+                    <i class="fas fa-chart-pie mr-2"></i> Analysis
+                </h3>
+             </div>
+             
+             <!-- Simulation Status (Visible only during animation) -->
+             <div id="simStatus" class="hidden metric-card p-3 border-l-2 border-[var(--accent-primary)] mb-2">
+                 <div class="flex justify-between text-[10px] uppercase font-bold opacity-70 mb-1">
+                     <span>Epoch</span>
+                     <span id="epochDisplay">1/10</span>
+                 </div>
+                 <div class="flex justify-between text-[10px] uppercase font-bold opacity-70">
+                     <span>Batch Progress</span>
+                     <span id="batchDisplay">0/5</span>
+                 </div>
+             </div>
+
+             <!-- Network Stats -->
+             <div class="grid grid-cols-2 gap-2">
+                 <div class="metric-card p-2 text-center">
+                     <span class="block text-[10px] uppercase opacity-60">Layers</span>
+                     <span id="totalLayers" class="font-bold mono-font text-sm" style="color: var(--text-main)">-</span>
+                 </div>
+                 <div class="metric-card p-2 text-center">
+                     <span class="block text-[10px] uppercase opacity-60">Neurons</span>
+                     <span id="totalNeurons" class="font-bold mono-font text-sm" style="color: var(--text-main)">-</span>
+                 </div>
+                 <div class="metric-card p-2 col-span-2 flex justify-between items-center px-3">
+                     <span class="text-[10px] uppercase opacity-60">Total Params</span>
+                     <span id="totalParameters" class="font-bold mono-font text-sm" style="color: var(--accent-primary)">-</span>
+                 </div>
+             </div>
+
+             <!-- Selected Info -->
+             <div>
+                 <h4 class="text-[10px] uppercase tracking-widest font-bold mb-2 opacity-50">Selection</h4>
+                 <div id="selectionInfo" class="metric-card p-3 text-xs leading-relaxed opacity-80 min-h-[40px] flex items-center">
+                     Hover over nodes for details.
+                 </div>
+             </div>
+             
+             <div class="text-[9px] text-center opacity-40">
+                 Right-click to edit | Scroll to Zoom
+             </div>
+        </div>
+        
+        <!-- Context Menu -->
+        <div id="contextMenu">
+            <button id="ctxAddNeuron" class="ctx-item hidden"><i class="fas fa-plus mr-2 text-xs"></i> Add Neuron</button>
+            <button id="ctxRemoveNeuron" class="ctx-item hidden danger"><i class="fas fa-minus mr-2 text-xs"></i> Remove Neuron</button>
+            <div id="ctxSeparator1" class="ctx-separator hidden"></div>
+            <button id="ctxEditFeatures" class="ctx-item hidden"><i class="fas fa-pen mr-2 text-xs"></i> Edit Features</button>
+            <button id="ctxEditLabels" class="ctx-item hidden"><i class="fas fa-pen mr-2 text-xs"></i> Edit Labels</button>
+            <button id="ctxAddLayer" class="ctx-item hidden"><i class="fas fa-layer-group mr-2 text-xs"></i> Add Layer After</button>
+            <button id="ctxRemoveLayer" class="ctx-item hidden danger"><i class="fas fa-trash mr-2 text-xs"></i> Remove Layer</button>
+            <button id="ctxEditNeurons" class="ctx-item hidden"><i class="fas fa-edit mr-2 text-xs"></i> Edit Count</button>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-3">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                 <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)">
+                    <i class="fab fa-instagram fa-lg"></i>
+                </a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2025 VIZLEARN // MODULE.NEURAL_NET</p>
+        </div>
+    </footer>
+
+    <!-- Modals -->
+    
+    <!-- Edit Neuron Modal -->
+    <div id="editNeuronModal" class="modal fixed inset-0 hidden items-center justify-center z-[1001]">
+        <div class="modal-content p-6 rounded-xl w-full max-w-sm m-4">
+            <h3 id="editModalTitle" class="text-lg font-bold mb-4" style="color: var(--accent-primary)">Edit</h3>
+            <label id="editModalLabel" for="edit-neuron-count" class="block text-xs font-bold uppercase mb-2 opacity-70">Value</label>
+            <input type="number" id="edit-neuron-count" class="viz-input mb-4" min="1" max="1000">
+            <p id="editNeuronError" class="text-red-500 text-xs mb-4 hidden"></p>
+            <div class="flex justify-end gap-3">
+                <button id="cancelEditBtn" class="viz-btn viz-btn-secondary px-4 py-2 text-xs">Cancel</button>
+                <button id="saveEditBtn" class="viz-btn viz-btn-primary px-4 py-2 text-xs">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calculation Modal -->
+    <div id="calculationResultModal" class="modal fixed inset-0 hidden items-center justify-center z-[1001]">
+        <div class="modal-content p-6 rounded-xl w-full max-w-4xl m-4 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-bold" style="color: var(--accent-primary)">Parameter Calculation</h3>
+                <button id="closeCalcModalBtn" class="text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="overflow-y-auto flex-1 mb-6 pr-2">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-[var(--border-subtle)]">
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">From</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">To</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">Weights</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">Biases</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="calc-table-body" class="text-sm mono-font">
+                        <!-- JS Injection -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-[var(--border-subtle)] pt-4">
+                <div class="metric-card p-3 text-center">
+                    <div class="text-[10px] uppercase font-bold opacity-60">Total Weights</div>
+                    <div id="totalWeightsResult" class="text-lg font-bold mt-1">0</div>
+                </div>
+                <div class="metric-card p-3 text-center">
+                    <div class="text-[10px] uppercase font-bold opacity-60">Total Biases</div>
+                    <div id="totalBiasesResult" class="text-lg font-bold mt-1">0</div>
+                </div>
+                <div class="metric-card p-3 text-center" style="border-color: var(--accent-primary)">
+                    <div class="text-[10px] uppercase font-bold opacity-60" style="color: var(--accent-primary)">Total Parameters</div>
+                    <div id="totalParamsResult" class="text-lg font-bold mt-1" style="color: var(--accent-primary)">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Dropout Info Modal -->
+    <div id="dropoutInfoModal" class="modal fixed inset-0 hidden items-center justify-center z-[1001]">
+        <div class="modal-content p-6 rounded-xl w-full max-w-lg m-4">
+            <div class="flex justify-between items-start mb-4">
+                <h3 class="text-lg font-bold flex items-center gap-2" style="color: var(--accent-primary)">
+                    <i class="fas fa-random"></i> What is Dropout?
+                </h3>
+                <button id="closeDropoutInfoBtn" class="text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="space-y-4 text-sm leading-relaxed opacity-90">
+                <p>
+                    <strong>Dropout</strong> is a regularization technique used to prevent overfitting in neural networks.
+                </p>
+                <p>
+                    During training, randomly selected neurons are <strong>ignored</strong> (dropped out). They are temporarily removed from the network, meaning they make no contribution to the activation of downstream neurons on the forward pass, and weight updates are not applied to the neuron on the backward pass.
+                </p>
+                <div class="metric-card p-3 border-l-4" style="border-left-color: var(--accent-primary)">
+                    <p class="italic text-xs">
+                        Use the <strong>slider</strong> to simulate dropout percentage. Notice how connections disappear as neurons are deactivated, forcing the network to learn more robust features that don't rely on specific neurons.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            if (typeof window.updateAndRedraw === 'function') window.updateAndRedraw();
+        });
+
+        // --- HELPER ---
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        // --- NEURAL NETWORK LOGIC ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Helper to safe select
+            const getEl = (id) => document.getElementById(id);
+            const addListener = (id, event, handler) => {
+                const el = getEl(id);
+                if (el) el.addEventListener(event, handler);
+            };
+
+            const canvas = getEl('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const inputFeaturesEl = getEl('inputFeatures');
+            const hiddenLayersEl = getEl('hiddenLayers');
+            const outputClassesEl = getEl('outputClasses');
+            const dropoutSlider = getEl('dropoutSlider');
+            const dropoutValueLabel = getEl('dropoutValue');
+            const batchSizeEl = getEl('batchSize');
+            const epochsEl = getEl('epochs');
+            
+            const totalLayersEl = getEl('totalLayers');
+            const totalNeuronsEl = getEl('totalNeurons');
+            const totalParametersEl = getEl('totalParameters');
+            const selectionInfoEl = getEl('selectionInfo');
+            
+            const simStatusEl = getEl('simStatus');
+            const epochDisplayEl = getEl('epochDisplay');
+            const batchDisplayEl = getEl('batchDisplay');
+
+            const contextMenu = getEl('contextMenu');
+            const ctxButtons = {
+                addNeuron: getEl('ctxAddNeuron'),
+                removeNeuron: getEl('ctxRemoveNeuron'),
+                separator: getEl('ctxSeparator1'),
+                editFeatures: getEl('ctxEditFeatures'),
+                editLabels: getEl('ctxEditLabels'),
+                addLayer: getEl('ctxAddLayer'),
+                removeLayer: getEl('ctxRemoveLayer'),
+                editNeurons: getEl('ctxEditNeurons')
+            };
+
+            // State
+            let numFeatures = 4;
+            let hiddenLayerNeuronCounts = [8, 8, 8];
+            let numLabels = 3;
+            let scale = 1;
+            let translateX = 0;
+            let translateY = 0;
+            let isDragging = false;
+            let lastX = 0;
+            let lastY = 0;
+            let selectedNeuron = null;
+            let hoveredNeuron = null;
+            let highlightedPathNeurons = new Map(); 
+            let neuronPositions = [];
+            let currentNeuronRadius = 35;
+            let contextMenuTarget = { layer: -1, neuron: -1 };
+            
+            // Simulation State
+            let dropoutRate = 0;
+            let batchSize = 5;
+            let epochs = 10;
+            let droppedNeurons = new Set();
+
+            let isAnimating = false;
+            let animationRequestId = null;
+            let currentEpoch = 0;
+            let currentBatchItem = 0; // 0 to batchSize
+            let animationPhase = 'forward'; // 'forward' or 'backward'
+            let activeLayerIndex = 0; 
+            let lastTime = 0;
+
+            // Theme Helpers
+            function getThemeColors() {
+                const isLight = document.body.classList.contains('light-mode');
+                const styles = getComputedStyle(document.body);
+                return {
+                    bg: styles.getPropertyValue('--canvas-bg').trim(),
+                    neuronFill: styles.getPropertyValue('--neuron-fill').trim(),
+                    neuronBorder: styles.getPropertyValue('--neuron-border').trim(),
+                    connection: styles.getPropertyValue('--connection-line').trim(),
+                    dropout: styles.getPropertyValue('--dropout-neuron').trim(),
+                    accent: styles.getPropertyValue('--accent-primary').trim(),
+                    text: styles.getPropertyValue('--text-main').trim(),
+                };
+            }
+
+            // Dropout Logic - EQUAL RATES (Deterministic Count)
+            function updateDropout() {
+                droppedNeurons.clear();
+                if (dropoutRate > 0) {
+                    
+                    // 1. Input Layer Dropout (Layer 0)
+                    const inputCount = numFeatures;
+                    const dropInputCount = Math.round(inputCount * (dropoutRate / 100));
+                    if (dropInputCount > 0 && dropInputCount < inputCount) {
+                        const inputIndices = Array.from({length: inputCount}, (_, i) => i);
+                        shuffleArray(inputIndices);
+                        for(let i=0; i<dropInputCount; i++) {
+                            droppedNeurons.add(`0_${inputIndices[i]}`);
+                        }
+                    } else if (dropInputCount === inputCount) {
+                         for(let i=0; i<inputCount; i++) droppedNeurons.add(`0_${i}`);
+                    }
+
+                    // 2. Hidden Layers Dropout
+                    hiddenLayerNeuronCounts.forEach((count, hIdx) => {
+                        const layerIdx = hIdx + 1; // Input is 0
+                        const dropCount = Math.round(count * (dropoutRate / 100));
+                        if (dropCount > 0) {
+                            const indices = Array.from({length: count}, (_, i) => i);
+                            shuffleArray(indices);
+                            for(let i=0; i<dropCount; i++) {
+                                droppedNeurons.add(`${layerIdx}_${indices[i]}`);
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Animation Logic
+            function startAnimation() {
+                if (isAnimating) return; // Already running
+                const btn = getEl('animateBtn');
+                isAnimating = true;
+                if(btn) {
+                    btn.innerHTML = '<i class="fas fa-stop text-xs"></i> <span>Stop Flow</span>';
+                    btn.classList.add('active');
+                }
+                if(simStatusEl) simStatusEl.classList.remove('hidden');
+                
+                // Reset Simulation counters
+                currentEpoch = 1;
+                currentBatchItem = 1;
+                activeLayerIndex = 0;
+                animationPhase = 'forward';
+                
+                // Initial update
+                if(batchSizeEl) batchSize = parseInt(batchSizeEl.value) || 1;
+                if(epochsEl) epochs = parseInt(epochsEl.value) || 1;
+                
+                updateDropout();
+                lastTime = performance.now();
+                animationLoop();
+            }
+
+            function stopAnimation() {
+                isAnimating = false;
+                const btn = getEl('animateBtn');
+                if(btn) {
+                    btn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Simulate Flow</span>';
+                    btn.classList.remove('active');
+                }
+                if(simStatusEl) simStatusEl.classList.add('hidden');
+                
+                if (animationRequestId) cancelAnimationFrame(animationRequestId);
+                activeLayerIndex = -1;
+                drawNetwork(); 
+            }
+
+            function animationLoop() {
+                if (!isAnimating) return;
+
+                const time = performance.now();
+                const stepDelay = 300; 
+                
+                if (time - lastTime > stepDelay) { 
+                    lastTime = time;
+                    
+                    if (animationPhase === 'forward') {
+                        activeLayerIndex++;
+                        if (activeLayerIndex >= neuronPositions.length) {
+                            activeLayerIndex = 0; 
+                            if (currentBatchItem < batchSize) {
+                                currentBatchItem++;
+                            } else {
+                                animationPhase = 'backward';
+                                activeLayerIndex = neuronPositions.length - 1; 
+                            }
+                        }
+                    } else if (animationPhase === 'backward') {
+                        activeLayerIndex--;
+                        if (activeLayerIndex < 0) { 
+                            animationPhase = 'forward';
+                            activeLayerIndex = 0;
+                            currentBatchItem = 1;
+                            updateDropout(); 
+                            
+                            if (Math.random() > 0.8) { 
+                               currentEpoch++;
+                               if (currentEpoch > epochs) currentEpoch = 1;
+                            }
+                        }
+                    }
+                    
+                    if(epochDisplayEl) epochDisplayEl.textContent = `${currentEpoch}/${epochs}`;
+                    if(batchDisplayEl) batchDisplayEl.textContent = `${animationPhase === 'forward' ? currentBatchItem : 'Backprop'}/${batchSize}`;
+                }
+
+                drawNetwork();
+                animationRequestId = requestAnimationFrame(animationLoop);
+            }
+
+            // Drawing
+            function drawNetwork() {
+                if (!ctx) return;
+                const colors = getThemeColors();
+                const dpr = window.devicePixelRatio || 1;
+                const rect = canvas.getBoundingClientRect();
+                
+                if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+                    canvas.width = rect.width * dpr;
+                    canvas.height = rect.height * dpr;
+                }
+                
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.scale(dpr, dpr);
+                ctx.fillStyle = colors.bg;
+                ctx.fillRect(0, 0, rect.width, rect.height);
+
+                ctx.save();
+                ctx.translate(translateX, translateY);
+                ctx.scale(scale, scale);
+
+                // Layout
+                const layers = [numFeatures, ...hiddenLayerNeuronCounts, numLabels];
+                const numLayers = layers.length;
+                const maxNeurons = Math.max(...layers, 1);
+                const NEURON_BASE_SPACING_FACTOR = 1.5;
+                const LAYER_SPACING_MULTIPLIER = 6;
+                
+                neuronPositions = [];
+                layers.forEach((count, layerIdx) => {
+                    const positions = [];
+                    const layerSpacing = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * LAYER_SPACING_MULTIPLIER;
+                    const neuronSpacingY = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * 2;
+                    const layerX = layerIdx * layerSpacing;
+                    const layerHeight = count * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                    const maxLayerHeight = maxNeurons * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                    const currentLayerHeight = count * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                    const yOff = (maxLayerHeight - currentLayerHeight) / 2;
+
+                    for(let i=0; i<count; i++) {
+                        positions.push({
+                            x: layerX + currentNeuronRadius,
+                            y: yOff + i * (2 * currentNeuronRadius + neuronSpacingY) + currentNeuronRadius
+                        });
+                    }
+                    neuronPositions.push(positions);
+                });
+
+                // Connections
+                ctx.lineWidth = 1 / scale;
+                for(let i=0; i<numLayers-1; i++) {
+                    let isAnimatingLayer = false;
+                    if (isAnimating) {
+                        if (animationPhase === 'forward' && activeLayerIndex === i) isAnimatingLayer = true;
+                        if (animationPhase === 'backward' && activeLayerIndex === i + 1) isAnimatingLayer = true;
+                    }
+                    
+                    neuronPositions[i].forEach((n1, idx1) => {
+                        const sourceDropped = droppedNeurons.has(`${i}_${idx1}`);
+                        
+                        neuronPositions[i+1].forEach((n2, idx2) => {
+                            const targetDropped = droppedNeurons.has(`${i+1}_${idx2}`);
+                            
+                            if (sourceDropped || targetDropped) {
+                                ctx.beginPath();
+                                ctx.strokeStyle = colors.connection;
+                                ctx.globalAlpha = 0.05; 
+                                ctx.moveTo(n1.x, n1.y);
+                                ctx.lineTo(n2.x, n2.y);
+                                ctx.stroke();
+                                ctx.globalAlpha = 1.0;
+                                return;
+                            }
+
+                            const nextKey = `${i+1}_${idx2}`;
+                            const isHighlightedPath = highlightedPathNeurons.has(nextKey);
+                            
+                            ctx.beginPath();
+                            
+                            if (isAnimatingLayer) {
+                                ctx.strokeStyle = animationPhase === 'forward' ? colors.accent : '#3b82f6';
+                                ctx.lineWidth = (3 / scale);
+                                ctx.globalAlpha = 0.8;
+                                const dashOffset = (performance.now() / 20) * (animationPhase === 'forward' ? -1 : 1);
+                                ctx.setLineDash([5, 5]);
+                                ctx.lineDashOffset = dashOffset;
+                            } else if (isHighlightedPath) {
+                                ctx.strokeStyle = colors.connection;
+                                ctx.lineWidth = 1 / scale;
+                                ctx.setLineDash([]);
+                            } else {
+                                ctx.strokeStyle = colors.connection;
+                                ctx.lineWidth = 1 / scale;
+                                ctx.setLineDash([]);
+                            }
+
+                            ctx.moveTo(n1.x, n1.y);
+                            ctx.lineTo(n2.x, n2.y);
+                            ctx.stroke();
+                            
+                            ctx.setLineDash([]);
+                            ctx.globalAlpha = 1.0;
+                            ctx.lineDashOffset = 0;
+                        });
+                    });
+                }
+
+                // Highlighted Paths (Static Selection)
+                if (highlightedPathNeurons.size > 0 && !isAnimating) {
+                    ctx.beginPath();
+                    ctx.lineWidth = 2 / scale;
+                    for(let i=0; i<numLayers-1; i++) {
+                        neuronPositions[i].forEach((n1, idx1) => {
+                            if (droppedNeurons.has(`${i}_${idx1}`)) return;
+                            neuronPositions[i+1].forEach((n2, idx2) => {
+                                if (droppedNeurons.has(`${i+1}_${idx2}`)) return;
+                                const nextKey = `${i+1}_${idx2}`;
+                                const dist = highlightedPathNeurons.get(nextKey);
+                                if (dist !== undefined) {
+                                    const alpha = Math.max(0.2, 0.8 - (dist / numLayers) * 0.6);
+                                    ctx.strokeStyle = colors.accent; 
+                                    ctx.globalAlpha = alpha;
+                                    ctx.moveTo(n1.x, n1.y);
+                                    ctx.lineTo(n2.x, n2.y);
+                                    ctx.stroke(); 
+                                    ctx.beginPath(); 
+                                }
+                            });
+                        });
+                    }
+                    ctx.globalAlpha = 1.0;
+                }
+
+                // Neurons
+                layers.forEach((count, lIdx) => {
+                    neuronPositions[lIdx].forEach((pos, nIdx) => {
+                        const key = `${lIdx}_${nIdx}`;
+                        const isDropped = droppedNeurons.has(key);
+                        const isSelected = selectedNeuron?.layer === lIdx && selectedNeuron?.neuron === nIdx;
+                        const isHovered = hoveredNeuron?.layer === lIdx && hoveredNeuron?.neuron === nIdx;
+                        const isPath = highlightedPathNeurons.has(key);
+                        
+                        let isActiveInAnim = false;
+                        if (isAnimating && !isDropped) {
+                            if (animationPhase === 'forward' && activeLayerIndex === lIdx) isActiveInAnim = true;
+                            if (animationPhase === 'backward' && activeLayerIndex === lIdx) isActiveInAnim = true;
+                        }
+
+                        ctx.beginPath();
+                        ctx.arc(pos.x, pos.y, currentNeuronRadius, 0, Math.PI*2);
+                        
+                        if (isDropped) {
+                            ctx.fillStyle = colors.dropout;
+                            ctx.setLineDash([4, 4]); 
+                            ctx.strokeStyle = colors.connection;
+                            ctx.lineWidth = 1 / scale;
+                        } else if (isActiveInAnim) {
+                            ctx.fillStyle = animationPhase === 'forward' ? colors.accent : '#3b82f6';
+                            ctx.shadowColor = animationPhase === 'forward' ? colors.accent : '#3b82f6';
+                            ctx.shadowBlur = 20;
+                            ctx.strokeStyle = colors.bg;
+                            ctx.lineWidth = 0;
+                        } else if (isSelected || isPath) {
+                            ctx.fillStyle = colors.accent;
+                            ctx.globalAlpha = isSelected ? 1 : 0.2;
+                            ctx.strokeStyle = colors.accent;
+                            ctx.lineWidth = (isSelected ? 2 : 1) / scale;
+                        } else {
+                            ctx.fillStyle = colors.neuronFill;
+                            ctx.strokeStyle = (isHovered) ? colors.accent : colors.neuronBorder;
+                            ctx.lineWidth = (isHovered ? 2 : 1) / scale;
+                        }
+
+                        ctx.fill();
+                        if (!isActiveInAnim) ctx.stroke();
+                        
+                        ctx.setLineDash([]);
+                        ctx.shadowBlur = 0;
+                        ctx.globalAlpha = 1;
+
+                        if (!isDropped) {
+                            ctx.fillStyle = (isSelected || isPath) && !document.body.classList.contains('light-mode') ? '#000' : colors.text;
+                            if (isActiveInAnim) ctx.fillStyle = '#000'; 
+                            
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            
+                            let label = lIdx === 0 ? `In ${nIdx+1}` : (lIdx === numLayers-1 ? `Out ${nIdx+1}` : `H${lIdx}_${nIdx+1}`);
+                            let fontSize = Math.max(8, currentNeuronRadius * 0.5);
+                            ctx.font = `${fontSize}px 'JetBrains Mono'`;
+                            ctx.fillText(label, pos.x, pos.y);
+                        } else {
+                            ctx.fillStyle = colors.connection;
+                            ctx.font = `${currentNeuronRadius}px sans-serif`;
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText('×', pos.x, pos.y);
+                        }
+                    });
+                });
+
+                ctx.restore();
+            }
+
+            function updateStats() {
+                const layers = [numFeatures, ...hiddenLayerNeuronCounts, numLabels];
+                if(totalLayersEl) totalLayersEl.textContent = layers.length;
+                if(totalNeuronsEl) totalNeuronsEl.textContent = layers.reduce((a,b)=>a+b, 0);
+                
+                let activeNeuronsPerLayer = layers.map((count, lIdx) => {
+                    let active = 0;
+                    for(let i=0; i<count; i++) {
+                        if(!droppedNeurons.has(`${lIdx}_${i}`)) active++;
+                    }
+                    return active;
+                });
+
+                let params = 0;
+                for(let i=0; i<layers.length-1; i++) {
+                    params += (activeNeuronsPerLayer[i] * activeNeuronsPerLayer[i+1]) + activeNeuronsPerLayer[i+1];
+                }
+                if(totalParametersEl) totalParametersEl.textContent = params.toLocaleString();
+            }
+
+            window.updateAndRedraw = function() {
+                updateNeuronRadius();
+                drawNetwork();
+                updateStats();
+            };
+
+            function updateNeuronRadius() {
+                const layers = [numFeatures, ...hiddenLayerNeuronCounts, numLabels];
+                const maxN = Math.max(...layers, 1);
+                currentNeuronRadius = Math.max(15, 35 / (1 + (Math.sqrt(maxN * layers.length) / 8) * 0.4));
+            }
+
+            function resetView() {
+                updateNeuronRadius();
+                const layers = [numFeatures, ...hiddenLayerNeuronCounts, numLabels];
+                const width = (layers.length - 1) * (currentNeuronRadius * 1.5 * 6) + currentNeuronRadius*2;
+                const height = Math.max(...layers) * (currentNeuronRadius * 3) + currentNeuronRadius*2;
+                
+                const rect = canvas.getBoundingClientRect();
+                const sX = (rect.width - 60) / width;
+                const sY = (rect.height - 60) / height;
+                scale = Math.min(sX, sY, 1.5);
+                
+                translateX = (rect.width - width * scale) / 2;
+                translateY = (rect.height - height * scale) / 2;
+                
+                if(scale < 0.1) scale = 0.1;
+                
+                drawNetwork();
+            }
+
+            function getCanvasPos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const cx = e.clientX || (e.touches && e.touches[0].clientX);
+                const cy = e.clientY || (e.touches && e.touches[0].clientY);
+                return {
+                    x: (cx - rect.left - translateX) / scale,
+                    y: (cy - rect.top - translateY) / scale,
+                };
+            }
+
+            function hitTest(x, y) {
+                for(let l=0; l<neuronPositions.length; l++) {
+                    for(let n=0; n<neuronPositions[l].length; n++) {
+                        const pos = neuronPositions[l][n];
+                        const dist = Math.sqrt((x-pos.x)**2 + (y-pos.y)**2);
+                        if(dist <= currentNeuronRadius) return { layer: l, neuron: n };
+                    }
+                }
+                return null;
+            }
+
+            if(canvas) {
+                canvas.addEventListener('mousedown', e => {
+                    isDragging = true;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                    canvas.classList.add('grabbing');
+                    if(contextMenu) contextMenu.style.display = 'none';
+                });
+
+                window.addEventListener('mousemove', e => {
+                    if(isDragging) {
+                        const dx = e.clientX - lastX;
+                        const dy = e.clientY - lastY;
+                        translateX += dx;
+                        translateY += dy;
+                        lastX = e.clientX;
+                        lastY = e.clientY;
+                        drawNetwork();
+                    } else if(e.target === canvas) {
+                        const pos = getCanvasPos(e);
+                        const hit = hitTest(pos.x, pos.y);
+                        if(JSON.stringify(hit) !== JSON.stringify(hoveredNeuron)) {
+                            hoveredNeuron = hit;
+                            canvas.style.cursor = hit ? 'pointer' : 'grab';
+                            if(!isAnimating) drawNetwork();
+                            
+                            if (hit && selectionInfoEl) {
+                                selectionInfoEl.textContent = `Layer ${hit.layer} (${hit.layer===0?'Input':(hit.layer===neuronPositions.length-1?'Output':'Hidden')}), Neuron ${hit.neuron+1}`;
+                                if(droppedNeurons.has(`${hit.layer}_${hit.neuron}`)) {
+                                    selectionInfoEl.textContent += " [DROPPED]";
+                                }
+                            } else if (!selectedNeuron && selectionInfoEl) {
+                                selectionInfoEl.textContent = "Hover over nodes for details.";
+                            }
+                        }
+                    }
+                });
+
+                window.addEventListener('mouseup', () => {
+                    isDragging = false;
+                    canvas.classList.remove('grabbing');
+                });
+
+                canvas.addEventListener('wheel', e => {
+                    e.preventDefault();
+                    const zoom = 1.1;
+                    const dir = e.deltaY < 0 ? 1 : -1;
+                    const factor = dir > 0 ? zoom : 1/zoom;
+                    
+                    const rect = canvas.getBoundingClientRect();
+                    const mx = e.clientX - rect.left;
+                    const my = e.clientY - rect.top;
+                    
+                    const newScale = Math.max(0.1, Math.min(5, scale * factor));
+                    
+                    translateX = mx - (mx - translateX) * (newScale / scale);
+                    translateY = my - (my - translateY) * (newScale / scale);
+                    scale = newScale;
+                    drawNetwork();
+                });
+
+                canvas.addEventListener('click', e => {
+                    if(isDragging && (Math.abs(e.clientX - lastX) > 5 || Math.abs(e.clientY - lastY) > 5)) return;
+                    const pos = getCanvasPos(e);
+                    const hit = hitTest(pos.x, pos.y);
+                    if (hit) {
+                        if(droppedNeurons.has(`${hit.layer}_${hit.neuron}`)) return;
+                        selectedNeuron = (selectedNeuron?.layer === hit.layer && selectedNeuron?.neuron === hit.neuron) ? null : hit;
+                        highlightedPathNeurons.clear();
+                        if(selectedNeuron) {
+                            highlightedPathNeurons.set(`${selectedNeuron.layer}_${selectedNeuron.neuron}`, 0);
+                            let q = [{l: selectedNeuron.layer, n: selectedNeuron.neuron, d: 0}];
+                            let visited = new Set();
+                            while(q.length) {
+                                let curr = q.shift();
+                                let k = `${curr.l}_${curr.n}`;
+                                if(visited.has(k)) continue;
+                                visited.add(k);
+                                highlightedPathNeurons.set(k, curr.d);
+                                if(curr.l > 0) {
+                                    let prevL = curr.l - 1;
+                                    for(let i=0; i<neuronPositions[prevL].length; i++) {
+                                        q.push({l: prevL, n: i, d: curr.d + 1});
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        selectedNeuron = null;
+                        highlightedPathNeurons.clear();
+                    }
+                    drawNetwork();
+                });
+
+                canvas.addEventListener('contextmenu', e => {
+                    e.preventDefault();
+                    const pos = getCanvasPos(e);
+                    const hit = hitTest(pos.x, pos.y);
+                    const layers = [numFeatures, ...hiddenLayerNeuronCounts, numLabels];
+
+                    Object.values(ctxButtons).forEach(b => { if(b) b.classList.add('hidden') });
+
+                    if(hit) {
+                        contextMenuTarget = hit;
+                        if(ctxButtons.addNeuron) ctxButtons.addNeuron.classList.remove('hidden');
+                        if(ctxButtons.separator) ctxButtons.separator.classList.remove('hidden');
+                        if (layers[hit.layer] > 1 && ctxButtons.removeNeuron) ctxButtons.removeNeuron.classList.remove('hidden');
+                    } else {
+                        const layerSpacing = currentNeuronRadius * 1.5 * 6;
+                        let clickedL = -1;
+                        for(let i=0; i<layers.length; i++) {
+                            const lx = i * layerSpacing;
+                            if (pos.x >= lx - layerSpacing/3 && pos.x <= lx + layerSpacing/3) {
+                                clickedL = i;
+                                break;
+                            }
+                        }
+                        
+                        if(clickedL !== -1) {
+                            contextMenuTarget = { layer: clickedL };
+                            if(ctxButtons.addNeuron) ctxButtons.addNeuron.classList.remove('hidden');
+                            if(ctxButtons.separator) ctxButtons.separator.classList.remove('hidden');
+                            
+                            if(clickedL === 0) {
+                                if(ctxButtons.editFeatures) ctxButtons.editFeatures.classList.remove('hidden');
+                                if(ctxButtons.addLayer) ctxButtons.addLayer.classList.remove('hidden');
+                            } else if(clickedL === layers.length-1) {
+                                if(ctxButtons.editLabels) ctxButtons.editLabels.classList.remove('hidden');
+                            } else {
+                                if(ctxButtons.editNeurons) ctxButtons.editNeurons.classList.remove('hidden');
+                                if(ctxButtons.addLayer) ctxButtons.addLayer.classList.remove('hidden');
+                                if(ctxButtons.removeLayer) ctxButtons.removeLayer.classList.remove('hidden');
+                            }
+                        } else {
+                            return;
+                        }
+                    }
+
+                    const menuWidth = contextMenu.offsetWidth || 160;
+                    const menuHeight = contextMenu.offsetHeight || 200;
+                    let left = e.clientX;
+                    let top = e.clientY;
+                    if (left + menuWidth > window.innerWidth) left -= menuWidth;
+                    if (top + menuHeight > window.innerHeight) top -= menuHeight;
+
+                    contextMenu.style.left = `${left}px`;
+                    contextMenu.style.top = `${top}px`;
+                    contextMenu.style.display = 'block';
+                });
+            }
+
+            document.addEventListener('click', e => {
+                if(contextMenu && !contextMenu.contains(e.target)) contextMenu.style.display = 'none';
+            });
+
+            function updateFromInputs() {
+                try {
+                    const f = parseInt(inputFeaturesEl.value);
+                    const l = parseInt(outputClassesEl.value);
+                    const hStr = hiddenLayersEl.value.trim();
+                    const h = hStr ? hStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0) : [];
+                    
+                    if(f>0 && l>0) {
+                        numFeatures = Math.min(f, 20);
+                        numLabels = Math.min(l, 20);
+                        hiddenLayerNeuronCounts = h;
+                        updateDropout(); 
+                        updateAndRedraw();
+                    }
+                } catch(e) {}
+            }
+
+            addListener('inputFeatures', 'input', updateFromInputs);
+            addListener('outputClasses', 'input', updateFromInputs);
+            addListener('hiddenLayers', 'input', updateFromInputs);
+            
+            // Added Listeners for Batch Size and Epochs
+            addListener('batchSize', 'input', () => {
+                if(batchSizeEl) batchSize = parseInt(batchSizeEl.value) || 1;
+            });
+            addListener('epochs', 'input', () => {
+                if(epochsEl) epochs = parseInt(epochsEl.value) || 1;
+            });
+
+            addListener('dropoutSlider', 'input', (e) => {
+                dropoutRate = parseInt(e.target.value);
+                if(dropoutValueLabel) dropoutValueLabel.textContent = `${dropoutRate}%`;
+                updateDropout();
+                updateAndRedraw();
+            });
+
+            addListener('dropoutInfoBtn', 'click', () => {
+                const m = getEl('dropoutInfoModal');
+                if(m) { m.style.display = 'flex'; m.classList.remove('hidden'); }
+            });
+            addListener('closeDropoutInfoBtn', 'click', () => {
+                const m = getEl('dropoutInfoModal');
+                if(m) { m.style.display = 'none'; m.classList.add('hidden'); }
+            });
+
+            addListener('animateBtn', 'click', () => {
+                if(isAnimating) stopAnimation();
+                else startAnimation();
+            });
+
+            addListener('resetNetworkBtn', 'click', () => {
+                numFeatures = 4;
+                hiddenLayerNeuronCounts = [8,8,8];
+                numLabels = 3;
+                dropoutRate = 0;
+                batchSize = 5;
+                epochs = 10;
+                
+                if(inputFeaturesEl) inputFeaturesEl.value = 4;
+                if(hiddenLayersEl) hiddenLayersEl.value = '8,8,8';
+                if(outputClassesEl) outputClassesEl.value = 3;
+                if(dropoutSlider) dropoutSlider.value = 0;
+                if(dropoutValueLabel) dropoutValueLabel.textContent = '0%';
+                if(batchSizeEl) batchSizeEl.value = 5;
+                if(epochsEl) epochsEl.value = 10;
+                
+                updateDropout();
+                stopAnimation();
+                updateAndRedraw();
+                resetView();
+            });
+            addListener('centerCanvasBtn', 'click', resetView);
+
+            const refreshInputs = () => {
+                if(inputFeaturesEl) inputFeaturesEl.value = numFeatures;
+                if(hiddenLayersEl) hiddenLayersEl.value = hiddenLayerNeuronCounts.join(',');
+                if(outputClassesEl) outputClassesEl.value = numLabels;
+            };
+
+            const safeUpdate = () => {
+                updateDropout();
+                refreshInputs(); 
+                updateAndRedraw();
+            };
+
+            if(ctxButtons.addNeuron) ctxButtons.addNeuron.addEventListener('click', () => {
+                const l = contextMenuTarget.layer;
+                if(l===0) numFeatures++;
+                else if(l === hiddenLayerNeuronCounts.length + 1) numLabels++;
+                else hiddenLayerNeuronCounts[l-1]++;
+                safeUpdate();
+            });
+            
+            if(ctxButtons.removeNeuron) ctxButtons.removeNeuron.addEventListener('click', () => {
+                const l = contextMenuTarget.layer;
+                if(l===0 && numFeatures > 1) numFeatures--;
+                else if(l === hiddenLayerNeuronCounts.length + 1 && numLabels > 1) numLabels--;
+                else if(l > 0 && hiddenLayerNeuronCounts[l-1] > 1) hiddenLayerNeuronCounts[l-1]--;
+                safeUpdate();
+            });
+
+            if(ctxButtons.addLayer) ctxButtons.addLayer.addEventListener('click', () => {
+                const idx = contextMenuTarget.layer; 
+                if (idx >= 0) hiddenLayerNeuronCounts.splice(idx, 0, 4);
+                safeUpdate();
+            });
+
+            if(ctxButtons.removeLayer) ctxButtons.removeLayer.addEventListener('click', () => {
+                const idx = contextMenuTarget.layer - 1; 
+                if(idx >= 0 && idx < hiddenLayerNeuronCounts.length) {
+                    hiddenLayerNeuronCounts.splice(idx, 1);
+                    safeUpdate();
+                }
+            });
+
+            // Edit Modal
+            const showEdit = (type) => {
+                const l = contextMenuTarget.layer;
+                const modal = getEl('editNeuronModal');
+                const title = getEl('editModalTitle');
+                const input = getEl('edit-neuron-count');
+                const saveBtn = getEl('saveEditBtn');
+                const cancelBtn = getEl('cancelEditBtn');
+                
+                if(input) input.value = (type === 'features') ? numFeatures : ((type === 'labels') ? numLabels : hiddenLayerNeuronCounts[l-1]);
+                if(title) title.textContent = type === 'features' ? 'Edit Input Features' : (type === 'labels' ? 'Edit Output Labels' : 'Edit Neuron Count');
+                
+                if(modal) {
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                }
+                
+                const save = () => {
+                    const v = parseInt(input.value);
+                    if(v>0 && v<=1000) {
+                        if(type==='features') numFeatures = v;
+                        else if(type==='labels') numLabels = v;
+                        else hiddenLayerNeuronCounts[l-1] = v;
+                        safeUpdate();
+                        close();
+                    }
+                };
+                
+                const close = () => {
+                    if(modal) {
+                        modal.classList.add('hidden');
+                        modal.classList.remove('flex');
+                    }
+                    if(saveBtn) saveBtn.onclick = null; // Clean up
+                };
+                
+                if(saveBtn) saveBtn.onclick = save;
+                if(cancelBtn) cancelBtn.onclick = close;
+            };
+
+            if(ctxButtons.editFeatures) ctxButtons.editFeatures.addEventListener('click', () => showEdit('features'));
+            if(ctxButtons.editLabels) ctxButtons.editLabels.addEventListener('click', () => showEdit('labels'));
+            if(ctxButtons.editNeurons) ctxButtons.editNeurons.addEventListener('click', () => showEdit('neurons'));
+
+            addListener('calculateBtn', 'click', () => {
+                const modal = getEl('calculationResultModal');
+                const tbody = getEl('calc-table-body');
+                const totalW = getEl('totalWeightsResult');
+                const totalB = getEl('totalBiasesResult');
+                const totalP = getEl('totalParamsResult');
+
+                const layers = [numFeatures, ...hiddenLayerNeuronCounts, numLabels];
+                
+                let html = '';
+                let tW = 0, tB = 0;
+                
+                let activeNeuronsPerLayer = layers.map((count, lIdx) => {
+                    let active = 0;
+                    for(let i=0; i<count; i++) {
+                        if(!droppedNeurons.has(`${lIdx}_${i}`)) active++;
+                    }
+                    return active;
+                });
+
+                for(let i=0; i<layers.length-1; i++) {
+                    const n1 = activeNeuronsPerLayer[i];
+                    const n2 = activeNeuronsPerLayer[i+1];
+                    const w = n1*n2;
+                    const b = n2;
+                    tW += w; tB += b;
+                    
+                    const origN1 = layers[i];
+                    const origN2 = layers[i+1];
+                    
+                    html += `
+                        <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
+                            <td class="p-3">${i===0?'Input':`Hidden ${i}`} (${n1} <span class="text-xs opacity-50">/ ${origN1}</span>)</td>
+                            <td class="p-3">${i===layers.length-2?'Output':`Hidden ${i+1}`} (${n2} <span class="text-xs opacity-50">/ ${origN2}</span>)</td>
+                            <td class="p-3">${n2} × ${n1} = ${w}</td>
+                            <td class="p-3">${b}</td>
+                            <td class="p-3 text-right font-bold text-[var(--accent-primary)]">${w+b}</td>
+                        </tr>
+                    `;
+                }
+                
+                if(tbody) tbody.innerHTML = html;
+                if(totalW) totalW.textContent = tW.toLocaleString();
+                if(totalB) totalB.textContent = tB.toLocaleString();
+                if(totalP) totalP.textContent = (tW+tB).toLocaleString();
+                
+                if(modal) {
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                }
+            });
+
+            addListener('closeCalcModalBtn', 'click', () => {
+                const m = getEl('calculationResultModal');
+                if(m) {
+                    m.classList.add('hidden');
+                    m.classList.remove('flex');
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                drawNetwork();
+                resetView();
+            });
+            updateDropout(); 
+            updateAndRedraw();
+            setTimeout(resetView, 100); 
+        });
+    
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            // Machine Learning
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "../machine_learning/cosine_similarity.html", category: "ml", icon: "fa-brain" },
+            { title: "Cross Validation", path: "../machine_learning/cross_validation.html", category: "ml", icon: "fa-brain" },
+            { title: "Decision Tree", path: "../machine_learning/decision_tree.html", category: "ml", icon: "fa-brain" },
+            { title: "K-Means", path: "../machine_learning/k_means.html", category: "ml", icon: "fa-brain" },
+            { title: "KNN", path: "../machine_learning/knn.html", category: "ml", icon: "fa-brain" },
+            { title: "Label Encoding", path: "../machine_learning/label_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Naive Bayes", path: "../machine_learning/naive_bayes.html", category: "ml", icon: "fa-brain" },
+            { title: "One Hot Encoding", path: "../machine_learning/one_hot_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Sliding Window Time Series", path: "../machine_learning/sliding_window_for_timeseries_data.html", category: "ml", icon: "fa-brain" },
+            { title: "SVM", path: "../machine_learning/svm.html", category: "ml", icon: "fa-brain" },
+            { title: "Train Test Split", path: "../machine_learning/train_test_split.html", category: "ml", icon: "fa-brain" },
+            
+            // Deep Learning
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing in Neural Networks", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Dropout in Neural Networks", path: "../deep_learning/dropout_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Batch Processing", path: "../deep_learning/gradient_descent_batch_processing.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Linear Regression with Gradient Descent", path: "../deep_learning/linear_regression_with_gradient_descent.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            
+            // DSA
+            { title: "A* Algorithm", path: "../dsa/a_star.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Backtracking", path: "../dsa/backtracking.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Search", path: "../dsa/binary_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Breadth First Search", path: "../dsa/breadth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Bubble Sort", path: "../dsa/bubble_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Counting Sort", path: "../dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Depth First Search", path: "../dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dictionaries in Python", path: "../dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra's Algorithm", path: "../dsa/dijkstra's.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Fibonacci Search", path: "../dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Insertion Sort", path: "../dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Interpolation Search", path: "../dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Linear Search", path: "../dsa/linear_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Lists in Python", path: "../dsa/lists_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Merge Sort", path: "../dsa/merge_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Quick Sort", path: "../dsa/quick_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Selection Sort", path: "../dsa/selection_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Strings in Python", path: "../dsa/strings_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            
+            // Natural Language Processing
+            { title: "ASCII Codes", path: "../natural_language_processing/ascii_codes.html", category: "nlp", icon: "fa-comments" },
+            { title: "N-Gram", path: "../natural_language_processing/n_gram.html", category: "nlp", icon: "fa-comments" },
+            { title: "Stemming vs Lemmatization", path: "../natural_language_processing/stemming_vs_lemmatization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Text Normalization Pipeline", path: "../natural_language_processing/text_normalization_pipeline.html", category: "nlp", icon: "fa-comments" },
+            { title: "Tokenization", path: "../natural_language_processing/tokenization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Word Cloud", path: "../natural_language_processing/word_cloud.html", category: "nlp", icon: "fa-comments" },
+            
+            // Computer Vision
+            { title: "Downsampling in CNN", path: "../computer_vision/downsampling_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Edge Detection", path: "../computer_vision/edge_detection.html", category: "vision", icon: "fa-eye" },
+            { title: "Feature Map in CNN", path: "../computer_vision/feature_map_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Grayscale Image Processing", path: "../computer_vision/grayscale_image_processing.html", category: "vision", icon: "fa-eye" },
+            { title: "Image Data Augmentation", path: "../computer_vision/image_data_augmentation.html", category: "vision", icon: "fa-eye" },
+            { title: "RGB Image Processing", path: "../computer_vision/rgb_image_processing.html", category: "vision", icon: "fa-eye" },
+            
+            // Database
+            { title: "Groupby in SQL", path: "../database/groupby_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Joins in SQL", path: "../database/joins_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Window Functions in SQL", path: "../database/window_functions_in_sql.html", category: "db", icon: "fa-database" },
+            
+            // Gen AI
+            { title: "Casual Language Modeling", path: "../gen_ai/casual_language_modeling.html", category: "gen-ai", icon: "fa-wand-magic-sparkles" },
+            
+            // Maths
+            { title: "Equation of Line", path: "../maths/equation_of_line.html", category: "maths", icon: "fa-calculator" }
+        ];
+
+        // Initialize search functionality
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                // Filter courses
+                const filtered = allCourses.filter(course => 
+                    course.title.toLowerCase().includes(query) || 
+                    course.category.toLowerCase().includes(query)
+                );
+
+                // Render results
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>
+                    `).join('');
+                }
+
+                dropdown.classList.add('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            // Close dropdown on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
