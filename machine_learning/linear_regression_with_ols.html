@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Linear Regression</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Import maps for Three.js -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+      }
+    }
+    </script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.75);
+            
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --border-glow: rgba(74, 222, 128, 0.5);
+
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+
+            /* Variable Colors */
+            --color-m: #8b5cf6;    /* Violet (Slope) */
+            --color-c: #22c55e;    /* Green (Intercept) */
+            --color-data: #3b82f6; /* Blue (Data Points) */
+            --color-error: #ef4444; /* Red (Residuals) */
+            --color-best: #f59e0b; /* Amber (Best Fit Line) */
+            --color-line: #e5e7eb; /* Light Gray */
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --border-glow: rgba(22, 163, 74, 0.4);
+
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+
+            --grid-color: rgba(22, 163, 74, 0.04);
+            --vignette-color: transparent;
+            --color-line: #1f2937;
+        }
+
+        /* Base Styles */
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        /* Card Styles */
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .card-header {
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 1rem 1.5rem;
+            background: var(--input-bg);
+        }
+
+        /* Input Styling */
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: all 0.2s;
+        }
+        .viz-input:focus {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+            outline: none;
+        }
+        .viz-input:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .viz-input::-webkit-outer-spin-button,
+        .viz-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Button Styling */
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            cursor: pointer;
+        }
+        .viz-btn-primary {
+            background: var(--accent-primary);
+            color: var(--bg-body);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        .viz-btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0 15px var(--accent-glow);
+            filter: brightness(1.1);
+        }
+        .viz-btn-secondary {
+            background: var(--input-bg);
+            color: var(--text-muted);
+            border: 1px solid var(--border-subtle);
+        }
+        .viz-btn-secondary:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--input-focus-bg);
+        }
+        .viz-btn-active {
+            background: var(--accent-primary);
+            color: var(--bg-body);
+            border-color: var(--accent-primary);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+
+        /* Canvas Container */
+        #canvas-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 600px;
+            overflow: hidden;
+            border-radius: 0 0 12px 12px;
+        }
+        canvas { outline: none; }
+        
+        /* Floating Overlay Styles */
+        .floating-overlay {
+            background: rgba(10, 10, 10, 0.4);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            max-height: calc(100% - 2rem);
+        }
+        body.light-mode .floating-overlay {
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        .math-frac {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            vertical-align: middle;
+            margin: 0 4px;
+        }
+        .math-frac span:first-child {
+            border-bottom: 1px solid var(--text-main);
+            padding: 0 2px;
+        }
+        .math-frac span:last-child {
+            padding: 0 2px;
+        }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .search-input-wrapper:focus-within {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .search-input-wrapper input {
+            color: var(--text-main);
+        }
+        .search-input-wrapper input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .search-input-wrapper i {
+            color: var(--accent-primary);
+            opacity: 0.7;
+        }
+
+        /* Dropdown Search */
+        .search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-dropdown-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .search-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-dropdown-item:hover {
+            background: var(--input-focus-bg);
+            padding-left: 20px;
+        }
+
+        .dropdown-item-title {
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .dropdown-item-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 12px;
+        }
+
+        .dropdown-item-icon {
+            color: var(--accent-primary);
+            margin-right: 8px;
+            font-size: 0.875rem;
+        }
+
+        .dropdown-no-results {
+            padding: 20px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <!-- Search -->
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search courses" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Theme Toggle + Back Button -->
+                <div class="flex items-center gap-3">
+                    <!-- Back to Hub Button -->
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    
+                    <!-- Theme Toggle -->
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+        
+        <!-- Breadcrumb / Title -->
+        <div class="mb-6 animate-fade-in">
+            <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
+                <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
+                <span>/</span>
+                <span>Machine Learning</span>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Linear Regression <span class="text-xl ml-2 opacity-60 font-mono tracking-tight">(OLS)</span></h1>
+            <p class="mt-2 max-w-3xl" style="color: var(--text-muted)">Fit a line to a dataset by minimizing the Mean Squared Error (MSE). Drag the regression line manually to see how the residuals (red lines) change, or compute the exact best fit.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in h-full">
+            
+            <!-- Controls Panel (Left, Span 3) -->
+            <div class="lg:col-span-3 space-y-6">
+                <div class="card-container h-full">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--accent-primary)">
+                            <i class="fas fa-sliders-h mr-2"></i> Controls
+                        </h3>
+                    </div>
+                    <div class="p-5 space-y-5 overflow-y-auto">
+
+                        <!-- Data Generation -->
+                        <div class="space-y-3">
+                            <label class="block text-xs font-bold uppercase tracking-wider" style="color: var(--color-data)">
+                                <i class="fas fa-database mr-1"></i> Data Points
+                            </label>
+                            <div class="grid grid-cols-1 gap-2">
+                                <button id="btn-generate" class="viz-btn viz-btn-secondary py-2 text-xs">
+                                    <i class="fas fa-sync-alt mr-1"></i> Generate New Data
+                                </button>
+                            </div>
+                        </div>
+
+                        <hr style="border-color: var(--border-subtle)">
+
+                        <!-- Line Parameters -->
+                        <div class="space-y-3">
+                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-400">
+                                <i class="fas fa-grip-lines mr-1"></i> Hypothesis Line
+                            </label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <span class="block text-[10px] text-center mb-1 opacity-60 font-mono">Slope (m)</span>
+                                    <input type="number" id="input-m" value="1" step="0.1" class="viz-input w-full rounded-md px-2 py-2 text-sm font-mono text-center font-bold" style="color: var(--color-m)">
+                                </div>
+                                <div>
+                                    <span class="block text-[10px] text-center mb-1 opacity-60 font-mono">Intercept (c)</span>
+                                    <input type="number" id="input-c" value="0" step="0.5" class="viz-input w-full rounded-md px-2 py-2 text-sm font-mono text-center font-bold" style="color: var(--color-c)">
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr style="border-color: var(--border-subtle)">
+
+                        <!-- Actions -->
+                        <div class="space-y-3">
+                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-400">
+                                <i class="fas fa-bolt mr-1"></i> Optimization
+                            </label>
+                            
+                            <button id="btn-snap" class="viz-btn viz-btn-primary w-full py-3 text-sm font-bold shadow-lg shadow-green-500/20">
+                                Snap to Best Fit
+                            </button>
+
+                            <div class="flex items-center mt-3 p-2 bg-black/20 rounded border border-gray-500/20">
+                                <input type="checkbox" id="toggle-best-fit" class="mr-2 accent-amber-500 w-4 h-4 cursor-pointer">
+                                <label for="toggle-best-fit" class="text-xs font-mono cursor-pointer" style="color: var(--color-best)">Show Optimal Line</label>
+                            </div>
+                        </div>
+                        
+                        <!-- NEW: Loss Function Calculation Sidebar Area -->
+                        <div class="space-y-3 pt-4 border-t border-gray-500/20">
+                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-400">
+                                <i class="fas fa-chart-bar mr-1"></i> Live Loss (MSE)
+                            </label>
+                            <div class="bg-black/20 p-3 rounded-lg border border-gray-500/20 space-y-2 shadow-inner">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-[10px] uppercase opacity-70">Current Loss</span>
+                                    <span id="side-current-mse" class="mono-font text-sm font-bold" style="color: var(--color-error)">0.00</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-[10px] uppercase opacity-70">Optimal Loss</span>
+                                    <span id="side-best-mse" class="mono-font text-sm font-bold" style="color: var(--color-best)">0.00</span>
+                                </div>
+                                
+                                <!-- Distance Indicator -->
+                                <div class="mt-2 pt-2 border-t border-gray-500/20">
+                                    <div class="flex justify-between text-[9px] uppercase opacity-50 mb-1">
+                                        <span>Distance to Optimal</span>
+                                        <span id="side-delta-text">0.00</span>
+                                    </div>
+                                    <div class="h-1.5 w-full bg-gray-700/50 rounded-full overflow-hidden">
+                                        <div id="side-loss-bar" class="h-full bg-red-500 transition-all duration-300" style="width: 100%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mini Guide -->
+                        <div class="pt-2 text-[10px] text-gray-400 opacity-70 leading-relaxed border-t border-gray-500/20 mt-4">
+                            <strong>Tip:</strong> You can click and drag individual blue data points, or drag the line handles to manually adjust the fit. Drag the background to pan the view.
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Graph Area (Maximized, Span 9) -->
+            <div class="lg:col-span-9 h-[75vh] min-h-[600px]">
+                <div class="card-container h-full relative">
+                    <div class="card-header flex justify-between items-center z-20">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-main)">
+                            <i class="fas fa-chart-scatter mr-2" style="color: var(--accent-primary)"></i> Visualization
+                        </h3>
+                        <div class="flex gap-2">
+                            <span class="text-[10px] px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 mono-font">
+                                <i class="fas fa-mouse-pointer mr-1"></i> Drag to pan & edit points
+                            </span>
+                            <button id="resetViewBtn" class="text-[10px] px-2 py-1 rounded bg-gray-500/10 text-gray-400 hover:text-white border border-gray-500/20 mono-font transition-colors">
+                                Reset View
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="canvas-wrapper" class="bg-black relative w-full h-full flex-1">
+                        <!-- Three.js Canvas generated here -->
+                        
+                        <!-- Floating Calculations Overlay -->
+                        <div class="floating-overlay absolute bottom-4 right-4 z-10 w-72 rounded-xl overflow-hidden hidden md:block" style="color: var(--text-main)">
+                            <div class="p-4 space-y-4">
+                                <!-- Header -->
+                                <div class="flex items-center justify-between border-b pb-2" style="border-color: var(--border-subtle)">
+                                    <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--accent-primary)">
+                                        <i class="fas fa-calculator mr-1"></i> Loss Function
+                                    </h3>
+                                </div>
+
+                                <!-- MSE Formula -->
+                                <div class="text-center">
+                                    <span class="text-[10px] uppercase font-bold block mb-1" style="color: var(--text-muted)">Mean Squared Error</span>
+                                    <div class="mono-font text-xs flex items-center justify-center space-x-2 p-1">
+                                        <span>MSE =</span>
+                                        <div class="math-frac">
+                                            <span>1</span>
+                                            <span>n</span>
+                                        </div>
+                                        <span>&sum; (y<sub>i</sub> - &ycirc;<sub>i</sub>)&sup2;</span>
+                                    </div>
+                                </div>
+
+                                <hr style="border-color: var(--border-subtle); opacity: 0.5;">
+
+                                <!-- Current Equation -->
+                                <div>
+                                    <div class="flex justify-between items-end mb-1">
+                                        <span class="text-[9px] uppercase font-bold" style="color: var(--text-muted)">Current Hypothesis</span>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <div class="mono-font text-xs flex items-center justify-between bg-black/30 px-3 py-2 rounded border border-gray-500/10">
+                                            <span id="current-equation">y = 1.00x + 0.00</span>
+                                            <span class="text-xs font-bold" style="color: var(--color-error)">MSE: <span id="current-mse">0.00</span></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Best Fit Compare -->
+                                <div id="best-fit-panel" class="opacity-50 transition-opacity duration-300">
+                                    <div class="flex justify-between items-end mb-1">
+                                        <span class="text-[9px] uppercase font-bold" style="color: var(--color-best)">Optimal Best Fit</span>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <div class="mono-font text-xs flex items-center justify-between bg-amber-500/10 px-3 py-2 rounded border border-amber-500/20">
+                                            <span id="best-equation" style="color: var(--color-best)">y = 1.00x + 0.00</span>
+                                            <span class="text-xs font-bold text-amber-500">MSE: <span id="best-mse">0.00</span></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t py-8 mt-auto z-20 relative" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-4">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-instagram fa-lg"></i></a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2025 VIZLEARN // MODULE.LINEAR_REGRESSION</p>
+        </div>
+    </footer>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            updateSceneTheme(isLight);
+        });
+
+        // --- DOM Elements ---
+        const canvasContainer = document.getElementById('canvas-wrapper');
+        const inputs = {
+            m: document.getElementById('input-m'),
+            c: document.getElementById('input-c')
+        };
+        const buttons = {
+            generate: document.getElementById('btn-generate'),
+            snap: document.getElementById('btn-snap'),
+            toggleBestFit: document.getElementById('toggle-best-fit')
+        };
+        const displays = {
+            eq: document.getElementById('current-equation'),
+            mse: document.getElementById('current-mse'),
+            bestEq: document.getElementById('best-equation'),
+            bestMse: document.getElementById('best-mse'),
+            bestFitPanel: document.getElementById('best-fit-panel'),
+            sideCurrentMse: document.getElementById('side-current-mse'),
+            sideBestMse: document.getElementById('side-best-mse'),
+            sideDeltaText: document.getElementById('side-delta-text'),
+            sideLossBar: document.getElementById('side-loss-bar')
+        };
+
+        // --- STATE ---
+        const state = {
+            m: 1, c: 0,
+            bestM: 1, bestC: 0,
+            dataPoints: [] // Array of {x, y, mesh}
+        };
+
+        const NUM_POINTS = 10;
+
+        // --- THREE.JS LOGIC ---
+        let scene, camera, renderer, orbitControls, tControl;
+        let mainLine, bestFitLine, xAxisLine, yAxisLine, gridHelperXY;
+        let interceptSphere, slopeSphere;
+        let residualsGroup = new THREE.Group();
+        let dataPointsGroup = new THREE.Group();
+        let interactiveObjects = [];
+        
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        // UI Colors
+        const COLOR_M = 0x8b5cf6; 
+        const COLOR_C = 0x22c55e; 
+        const COLOR_DATA = 0x3b82f6; 
+        const COLOR_ERROR = 0xef4444; 
+        const COLOR_BEST = 0xf59e0b;
+
+        function init() {
+            scene = new THREE.Scene();
+            const isLight = document.body.classList.contains('light-mode');
+            scene.background = new THREE.Color(isLight ? 0xffffff : 0x0a0a0a);
+
+            // Orthographic-like perspective for 2D feel
+            camera = new THREE.PerspectiveCamera(35, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 1000);
+            camera.position.set(0, 0, 45);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            canvasContainer.appendChild(renderer.domElement);
+            
+            // Lock orbit to panning/zooming only (Strict 2D)
+            orbitControls = new OrbitControls(camera, renderer.domElement);
+            orbitControls.enableRotate = false;
+            orbitControls.enableDamping = true;
+            orbitControls.dampingFactor = 0.05;
+
+            // Enable intuitive panning with left click and single-finger touch
+            orbitControls.mouseButtons = {
+                LEFT: THREE.MOUSE.PAN,
+                MIDDLE: THREE.MOUSE.DOLLY,
+                RIGHT: THREE.MOUSE.PAN
+            };
+            orbitControls.touches = {
+                ONE: THREE.TOUCH.PAN,
+                TWO: THREE.TOUCH.DOLLY_PAN
+            };
+            
+            scene.add(residualsGroup);
+            scene.add(dataPointsGroup);
+
+            createAxesAndGrid(isLight);
+            createSceneObjects();
+            
+            // Transform Controls
+            tControl = new TransformControls(camera, renderer.domElement);
+            tControl.size = 0.8;
+            tControl.showZ = false; // Strictly 2D dragging
+            
+            tControl.addEventListener('dragging-changed', function (event) {
+                orbitControls.enabled = !event.value;
+            });
+            
+            tControl.addEventListener('change', function () {
+                if (!tControl.object) return;
+                const obj = tControl.object;
+                
+                if (obj.userData.type === 'C') {
+                    state.c = obj.position.y;
+                } 
+                else if (obj.userData.type === 'M') {
+                    // slope handle is at x=8 relative to origin for easier pulling
+                    state.m = (obj.position.y - state.c) / 8;
+                }
+                else if (obj.userData.type === 'DATA') {
+                    // Update the underlying data point
+                    obj.userData.dataRef.x = obj.position.x;
+                    obj.userData.dataRef.y = obj.position.y;
+                    calculateBestFit(); // Recompute math
+                }
+                
+                updateInputs();
+                updateVisuals();
+            });
+            scene.add(tControl);
+            
+            setupInteractions();
+            
+            window.addEventListener('resize', handleResize);
+            new ResizeObserver(handleResize).observe(canvasContainer);
+
+            // Button Listeners
+            inputs.m.addEventListener('input', () => { state.m = parseFloat(inputs.m.value) || 0; updateVisuals(); });
+            inputs.c.addEventListener('input', () => { state.c = parseFloat(inputs.c.value) || 0; updateVisuals(); });
+            
+            buttons.generate.addEventListener('click', () => {
+                generateData();
+                calculateBestFit();
+                updateVisuals();
+            });
+            
+            buttons.snap.addEventListener('click', () => {
+                state.m = state.bestM;
+                state.c = state.bestC;
+                updateInputs();
+                updateVisuals();
+            });
+
+            buttons.toggleBestFit.addEventListener('change', (e) => {
+                bestFitLine.visible = e.target.checked;
+                displays.bestFitPanel.style.opacity = e.target.checked ? '1' : '0.5';
+            });
+
+            document.getElementById('resetViewBtn').addEventListener('click', () => {
+                camera.position.set(0, 0, 45);
+                orbitControls.target.set(0,0,0);
+            });
+
+            // Initialize
+            generateData();
+            calculateBestFit();
+            // Start the user off a bit 'wrong' so they see the value
+            state.m = state.bestM - 0.5; 
+            state.c = state.bestC + 2;
+            
+            updateInputs();
+            updateVisuals();
+            animate();
+        }
+
+        function createAxesAndGrid(isLight) {
+            const axisColor = isLight ? 0x000000 : 0xffffff;
+            const gridColorLight = isLight ? 0xcccccc : 0x333333;
+            const gridColorDark = isLight ? 0xeeeeee : 0x222222;
+
+            gridHelperXY = new THREE.GridHelper(60, 60, gridColorLight, gridColorDark);
+            gridHelperXY.rotation.x = Math.PI / 2;
+            scene.add(gridHelperXY);
+
+            const matAxis = new THREE.LineBasicMaterial({ color: axisColor, linewidth: 2, transparent: true, opacity: 0.5 });
+            
+            const geoX = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-30,0,0), new THREE.Vector3(30,0,0)]);
+            const geoY = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,-30,0), new THREE.Vector3(0,30,0)]);
+            
+            xAxisLine = new THREE.Line(geoX, matAxis);
+            yAxisLine = new THREE.Line(geoY, matAxis);
+            
+            scene.add(xAxisLine);
+            scene.add(yAxisLine);
+        }
+
+        function createSceneObjects() {
+            // Main Hypothesis Line
+            const lineMat = new THREE.LineBasicMaterial({ color: 0xe5e7eb, linewidth: 4 });
+            if(document.body.classList.contains('light-mode')) lineMat.color.setHex(0x1f2937);
+            const lineGeo = new THREE.BufferGeometry();
+            mainLine = new THREE.Line(lineGeo, lineMat);
+            scene.add(mainLine);
+
+            // Best Fit Line (Dashed)
+            const bestMat = new THREE.LineDashedMaterial({ color: COLOR_BEST, linewidth: 2, dashSize: 0.5, gapSize: 0.5 });
+            const bestGeo = new THREE.BufferGeometry();
+            bestFitLine = new THREE.Line(bestGeo, bestMat);
+            bestFitLine.visible = false;
+            scene.add(bestFitLine);
+
+            // Handles for the main line
+            const sphereGeo = new THREE.SphereGeometry(0.6, 32, 32);
+            const matC = new THREE.MeshBasicMaterial({ color: COLOR_C });
+            const matHoverC = new THREE.MeshBasicMaterial({ color: COLOR_C, transparent: true, opacity: 0.8 });
+            
+            const matM = new THREE.MeshBasicMaterial({ color: COLOR_M });
+            const matHoverM = new THREE.MeshBasicMaterial({ color: COLOR_M, transparent: true, opacity: 0.8 });
+
+            interceptSphere = new THREE.Mesh(sphereGeo, matC);
+            interceptSphere.userData = { type: 'C', mat: matC, matHover: matHoverC };
+            scene.add(interceptSphere);
+
+            slopeSphere = new THREE.Mesh(sphereGeo, matM);
+            slopeSphere.userData = { type: 'M', mat: matM, matHover: matHoverM };
+            scene.add(slopeSphere);
+
+            interactiveObjects = [interceptSphere, slopeSphere];
+        }
+
+        function generateData() {
+            // Clear existing
+            while(dataPointsGroup.children.length > 0){ 
+                dataPointsGroup.remove(dataPointsGroup.children[0]); 
+            }
+            interactiveObjects = [interceptSphere, slopeSphere];
+            state.dataPoints = [];
+
+            // Random underlying true slope and intercept
+            const trueM = (Math.random() * 2) - 1; // -1 to 1
+            const trueC = (Math.random() * 10) - 5; // -5 to 5
+
+            const pointGeo = new THREE.SphereGeometry(0.4, 16, 16);
+            const pointMat = new THREE.MeshBasicMaterial({ color: COLOR_DATA });
+            const pointHoverMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+            for (let i = 0; i < NUM_POINTS; i++) {
+                // X from -10 to 10 roughly
+                const x = (Math.random() * 24) - 12; 
+                // Y = mx + c + noise
+                const noise = (Math.random() * 8) - 4; 
+                const y = trueM * x + trueC + noise;
+
+                const mesh = new THREE.Mesh(pointGeo, pointMat.clone());
+                mesh.position.set(x, y, 0);
+                
+                const dataObj = { x, y, mesh };
+                mesh.userData = { type: 'DATA', dataRef: dataObj, mat: pointMat, matHover: pointHoverMat };
+                
+                dataPointsGroup.add(mesh);
+                interactiveObjects.push(mesh);
+                state.dataPoints.push(dataObj);
+            }
+        }
+
+        // Ordinary Least Squares (OLS) Formula
+        function calculateBestFit() {
+            let n = state.dataPoints.length;
+            if (n === 0) return;
+
+            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+            for (let p of state.dataPoints) {
+                sumX += p.x;
+                sumY += p.y;
+                sumXY += (p.x * p.y);
+                sumXX += (p.x * p.x);
+            }
+
+            const denominator = (n * sumXX - sumX * sumX);
+            if (denominator !== 0) {
+                state.bestM = (n * sumXY - sumX * sumY) / denominator;
+                state.bestC = (sumY - state.bestM * sumX) / n;
+            } else {
+                state.bestM = 0;
+                state.bestC = sumY / n;
+            }
+        }
+
+        function calculateMSE(m, c) {
+            let errorSum = 0;
+            for (let p of state.dataPoints) {
+                const predictedY = m * p.x + c;
+                errorSum += Math.pow(p.y - predictedY, 2);
+            }
+            return state.dataPoints.length > 0 ? (errorSum / state.dataPoints.length) : 0;
+        }
+
+        function updateSceneTheme(isLight) {
+            scene.background.setHex(isLight ? 0xffffff : 0x0a0a0a);
+            scene.remove(gridHelperXY);
+            scene.remove(xAxisLine);
+            scene.remove(yAxisLine);
+            createAxesAndGrid(isLight);
+            mainLine.material.color.setHex(isLight ? 0x1f2937 : 0xe5e7eb);
+        }
+
+        function updateInputs() {
+            if(document.activeElement !== inputs.m) inputs.m.value = state.m.toFixed(2);
+            if(document.activeElement !== inputs.c) inputs.c.value = state.c.toFixed(2);
+        }
+
+        function updateVisuals() {
+            const m = state.m, c = state.c;
+
+            // 1. Update Main Line
+            const p1 = new THREE.Vector3(-40, m * -40 + c, 0);
+            const p2 = new THREE.Vector3(40, m * 40 + c, 0);
+            mainLine.geometry.setFromPoints([p1, p2]);
+
+            // 2. Update Best Fit Line
+            const bp1 = new THREE.Vector3(-40, state.bestM * -40 + state.bestC, 0);
+            const bp2 = new THREE.Vector3(40, state.bestM * 40 + state.bestC, 0);
+            bestFitLine.geometry.setFromPoints([bp1, bp2]);
+            bestFitLine.computeLineDistances();
+
+            // 3. Update Handles
+            interceptSphere.position.set(0, c, 0);
+            const slopeX = 8;
+            slopeSphere.position.set(slopeX, m * slopeX + c, 0);
+
+            // 4. Update Residuals (Red Lines)
+            while(residualsGroup.children.length > 0){ 
+                residualsGroup.remove(residualsGroup.children[0]); 
+            }
+            
+            const resMat = new THREE.LineDashedMaterial({ color: COLOR_ERROR, dashSize: 0.2, gapSize: 0.2 });
+            
+            for (let p of state.dataPoints) {
+                const predictedY = m * p.x + c;
+                
+                const geo = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(p.x, p.y, 0),
+                    new THREE.Vector3(p.x, predictedY, 0)
+                ]);
+                const line = new THREE.Line(geo, resMat);
+                line.computeLineDistances();
+                residualsGroup.add(line);
+            }
+
+            updateMetricsUI();
+        }
+
+        function buildEqString(m, c) {
+            const cStr = c === 0 ? "" : (c > 0 ? ` + ${c.toFixed(2)}` : ` - ${Math.abs(c).toFixed(2)}`);
+            const mStr = m === 1 ? "x" : (m === -1 ? "-x" : `${m.toFixed(2)}x`);
+            return `y = ${mStr}${cStr}`;
+        }
+
+        function updateMetricsUI() {
+            const currentMSE = calculateMSE(state.m, state.c);
+            const bestMSE = calculateMSE(state.bestM, state.bestC);
+
+            displays.eq.innerHTML = `
+                <span style="color: var(--text-main)">y = </span>
+                <span style="color: var(--color-m)">${state.m.toFixed(2)}x</span>
+                <span style="color: var(--color-c)">${state.c >= 0 ? '+' : '-'} ${Math.abs(state.c).toFixed(2)}</span>
+            `;
+            displays.mse.textContent = currentMSE.toFixed(2);
+
+            displays.bestEq.textContent = buildEqString(state.bestM, state.bestC);
+            displays.bestMse.textContent = bestMSE.toFixed(2);
+            
+            // Update the sidebar loss calculation panel
+            const delta = Math.max(0, currentMSE - bestMSE);
+            displays.sideCurrentMse.textContent = currentMSE.toFixed(2);
+            displays.sideBestMse.textContent = bestMSE.toFixed(2);
+            displays.sideDeltaText.textContent = "+" + delta.toFixed(2);
+            
+            // Map the delta to a percentage for the progress bar (capping visual max at delta=25 for better sensitivity)
+            const barWidth = Math.min(100, (delta / 25) * 100);
+            displays.sideLossBar.style.width = barWidth + '%';
+
+            // Visual feedback if matching
+            if (delta < 0.05) {
+                displays.mse.style.color = 'var(--color-best)';
+                displays.sideCurrentMse.style.color = 'var(--color-best)';
+                displays.sideLossBar.style.backgroundColor = 'var(--color-best)';
+            } else {
+                displays.mse.style.color = 'var(--color-error)';
+                displays.sideCurrentMse.style.color = 'var(--color-error)';
+                displays.sideLossBar.style.backgroundColor = 'var(--color-error)';
+            }
+        }
+
+        function setupInteractions() {
+            // Attach TransformControls on click
+            renderer.domElement.addEventListener('pointerdown', (event) => {
+                if (tControl.axis !== null) return; 
+
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(interactiveObjects);
+
+                if (intersects.length > 0) {
+                    const object = intersects[0].object;
+                    tControl.attach(object);
+                    
+                    if (object.userData.type === 'C' || object.userData.type === 'M') {
+                        tControl.showX = false;
+                        tControl.showY = true; // only drag up/down
+                    } else if (object.userData.type === 'DATA') {
+                        tControl.showX = true;
+                        tControl.showY = true; // free move
+                    }
+                } else {
+                    tControl.detach();
+                }
+            });
+
+            // Hover effects
+            renderer.domElement.addEventListener('pointermove', (event) => {
+                if (tControl.dragging) return;
+                
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(interactiveObjects);
+                
+                // Reset materials
+                interactiveObjects.forEach(obj => {
+                    // special handling for DATA points
+                    if(obj.userData.type === 'DATA') {
+                        obj.material.color.setHex(COLOR_DATA);
+                    } else {
+                        obj.material = obj.userData.mat;
+                    }
+                });
+
+                if (intersects.length > 0) {
+                    document.body.style.cursor = 'pointer';
+                    const obj = intersects[0].object;
+                    if(obj.userData.type === 'DATA') {
+                        obj.material.color.setHex(0xffffff);
+                    } else {
+                        obj.material = obj.userData.matHover;
+                    }
+                } else {
+                    document.body.style.cursor = tControl.axis !== null ? 'pointer' : 'default';
+                }
+            });
+        }
+
+        function handleResize() {
+            if(!canvasContainer || !camera || !renderer) return;
+            const width = canvasContainer.clientWidth;
+            const height = canvasContainer.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            orbitControls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+    
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            // Machine Learning
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "../machine_learning/cosine_similarity.html", category: "ml", icon: "fa-brain" },
+            { title: "Cross Validation", path: "../machine_learning/cross_validation.html", category: "ml", icon: "fa-brain" },
+            { title: "Decision Tree", path: "../machine_learning/decision_tree.html", category: "ml", icon: "fa-brain" },
+            { title: "K-Means", path: "../machine_learning/k_means.html", category: "ml", icon: "fa-brain" },
+            { title: "KNN", path: "../machine_learning/knn.html", category: "ml", icon: "fa-brain" },
+            { title: "Label Encoding", path: "../machine_learning/label_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Naive Bayes", path: "../machine_learning/naive_bayes.html", category: "ml", icon: "fa-brain" },
+            { title: "One Hot Encoding", path: "../machine_learning/one_hot_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Sliding Window Time Series", path: "../machine_learning/sliding_window_for_timeseries_data.html", category: "ml", icon: "fa-brain" },
+            { title: "SVM", path: "../machine_learning/svm.html", category: "ml", icon: "fa-brain" },
+            { title: "Train Test Split", path: "../machine_learning/train_test_split.html", category: "ml", icon: "fa-brain" },
+            
+            // Deep Learning
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing in Neural Networks", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Dropout in Neural Networks", path: "../deep_learning/dropout_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Batch Processing", path: "../deep_learning/gradient_descent_batch_processing.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Linear Regression with Gradient Descent", path: "../deep_learning/linear_regression_with_gradient_descent.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            
+            // DSA
+            { title: "A* Algorithm", path: "../dsa/a_star.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Backtracking", path: "../dsa/backtracking.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Search", path: "../dsa/binary_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Breadth First Search", path: "../dsa/breadth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Bubble Sort", path: "../dsa/bubble_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Counting Sort", path: "../dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Depth First Search", path: "../dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dictionaries in Python", path: "../dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra's Algorithm", path: "../dsa/dijkstra's.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Fibonacci Search", path: "../dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Insertion Sort", path: "../dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Interpolation Search", path: "../dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Linear Search", path: "../dsa/linear_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Lists in Python", path: "../dsa/lists_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Merge Sort", path: "../dsa/merge_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Quick Sort", path: "../dsa/quick_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Selection Sort", path: "../dsa/selection_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Strings in Python", path: "../dsa/strings_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            
+            // Natural Language Processing
+            { title: "ASCII Codes", path: "../natural_language_processing/ascii_codes.html", category: "nlp", icon: "fa-comments" },
+            { title: "N-Gram", path: "../natural_language_processing/n_gram.html", category: "nlp", icon: "fa-comments" },
+            { title: "Stemming vs Lemmatization", path: "../natural_language_processing/stemming_vs_lemmatization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Text Normalization Pipeline", path: "../natural_language_processing/text_normalization_pipeline.html", category: "nlp", icon: "fa-comments" },
+            { title: "Tokenization", path: "../natural_language_processing/tokenization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Word Cloud", path: "../natural_language_processing/word_cloud.html", category: "nlp", icon: "fa-comments" },
+            
+            // Computer Vision
+            { title: "Downsampling in CNN", path: "../computer_vision/downsampling_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Edge Detection", path: "../computer_vision/edge_detection.html", category: "vision", icon: "fa-eye" },
+            { title: "Feature Map in CNN", path: "../computer_vision/feature_map_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Grayscale Image Processing", path: "../computer_vision/grayscale_image_processing.html", category: "vision", icon: "fa-eye" },
+            { title: "Image Data Augmentation", path: "../computer_vision/image_data_augmentation.html", category: "vision", icon: "fa-eye" },
+            { title: "RGB Image Processing", path: "../computer_vision/rgb_image_processing.html", category: "vision", icon: "fa-eye" },
+            
+            // Database
+            { title: "Groupby in SQL", path: "../database/groupby_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Joins in SQL", path: "../database/joins_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Window Functions in SQL", path: "../database/window_functions_in_sql.html", category: "db", icon: "fa-database" },
+            
+            // Gen AI
+            { title: "Casual Language Modeling", path: "../gen_ai/casual_language_modeling.html", category: "gen-ai", icon: "fa-wand-magic-sparkles" },
+            
+            // Maths
+            { title: "Equation of Line", path: "../maths/equation_of_line.html", category: "maths", icon: "fa-calculator" }
+        ];
+
+        // Initialize search functionality
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                // Filter courses
+                const filtered = allCourses.filter(course => 
+                    course.title.toLowerCase().includes(query) || 
+                    course.category.toLowerCase().includes(query)
+                );
+
+                // Render results
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>
+                    `).join('');
+                }
+
+                dropdown.classList.add('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            // Close dropdown on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>

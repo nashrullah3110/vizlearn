@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Naive Bayes Classifier</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        // Fix for potential race condition where 'tailwind' object isn't available immediately
+        const initTailwind = () => {
+            if (window.tailwind) {
+                tailwind.config = {
+                    darkMode: 'class',
+                    theme: {
+                        extend: {
+                            colors: {
+                                brand: {
+                                    50: '#f0fdf4',
+                                    100: '#dcfce7',
+                                    400: '#4ade80',
+                                    500: '#22c55e',
+                                    600: '#16a34a',
+                                    900: '#14532d',
+                                }
+                            },
+                            animation: {
+                                'fade-in': 'fadeIn 0.5s ease-out forwards',
+                                'slide-up': 'slideUp 0.4s ease-out forwards',
+                            },
+                            keyframes: {
+                                fadeIn: {
+                                    '0%': { opacity: '0', transform: 'translateY(10px)' },
+                                    '100%': { opacity: '1', transform: 'translateY(0)' },
+                                },
+                                slideUp: {
+                                    '0%': { opacity: '0', transform: 'translateY(20px)' },
+                                    '100%': { opacity: '1', transform: 'translateY(0)' },
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                setTimeout(initTailwind, 50);
+            }
+        };
+        initTailwind();
+    </script>
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'dark';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+        :root {
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --grid-color: rgba(74, 222, 128, 0.05);
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.15);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --grid-color: rgba(22, 163, 74, 0.04);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card-header {
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 1rem 1.5rem;
+            background: var(--input-bg);
+        }
+
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            border-radius: 8px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .viz-btn-primary {
+            background: var(--accent-primary);
+            color: var(--bg-body);
+        }
+
+        .viz-btn-secondary {
+            background: var(--input-bg);
+            color: var(--text-muted);
+            border: 1px solid var(--border-subtle);
+        }
+        .viz-btn-secondary:hover:not(:disabled) {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+        .viz-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* Table Highlighting */
+        .highlight-header { background-color: var(--accent-primary) !important; color: var(--bg-body) !important; }
+        .highlight-indigo { background-color: rgba(99, 102, 241, 0.15) !important; color: #818cf8 !important; border: 1px solid rgba(99, 102, 241, 0.3); }
+        .highlight-amber { background-color: rgba(245, 158, 11, 0.15) !important; color: #fbbf24 !important; border: 1px solid rgba(245, 158, 11, 0.3); }
+
+        /* Calculation Cards */
+        .story-step {
+            border: 1px solid var(--border-subtle);
+            background: var(--input-bg);
+            animation: slideUp 0.4s ease-out forwards;
+        }
+        .story-step.faded { opacity: 0.4; filter: blur(0.5px); }
+
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            border-radius: 8px;
+            padding: 8px 12px;
+            width: 100%;
+            font-size: 0.875rem;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 10px; }
+
+        footer i { transition: color 0.3s ease; }
+        footer a:hover i { color: var(--accent-primary); }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .search-input-wrapper:focus-within {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .search-input-wrapper input {
+            color: var(--text-main);
+        }
+        .search-input-wrapper input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .search-input-wrapper i {
+            color: var(--accent-primary);
+            opacity: 0.7;
+        }
+
+        /* Dropdown Search */
+        .search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-dropdown-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .search-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-dropdown-item:hover {
+            background: var(--input-focus-bg);
+            padding-left: 20px;
+        }
+
+        .dropdown-item-title {
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .dropdown-item-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 12px;
+        }
+
+        .dropdown-item-icon {
+            color: var(--accent-primary);
+            margin-right: 8px;
+            font-size: 0.875rem;
+        }
+
+        .dropdown-no-results {
+            padding: 20px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <!-- Search -->
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search courses" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Theme Toggle + Back Button -->
+                <div class="flex items-center gap-3">
+                    <!-- Back to Hub Button -->
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    
+                    <!-- Theme Toggle -->
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+
+    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div class="mb-8 animate-fade-in">
+            <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
+                <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
+                <span>/</span>
+                <span>Machine Learning</span>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Naive Bayes Classifier</h1>
+            <p class="mt-2 max-w-2xl" style="color: var(--text-muted)">Uncover the probability logic behind weather-based predictions.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
+            
+            <!-- Controls (Left) -->
+            <div class="lg:col-span-3 space-y-6">
+                <div class="card-container">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--accent-primary)">
+                            <i class="fas fa-sliders-h mr-2"></i> Inference Engine
+                        </h3>
+                    </div>
+                    <div class="p-5 space-y-6">
+                        <div id="feature-inputs" class="space-y-4">
+                            <!-- JS Generated Inputs -->
+                        </div>
+                        
+                        <div class="pt-4 border-t border-white/5 space-y-3">
+                            <button id="next-step-btn" class="viz-btn viz-btn-primary w-full py-3 text-xs uppercase tracking-widest font-bold">
+                                <i class="fas fa-step-forward mr-2"></i> Next Step
+                            </button>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button id="prev-step-btn" class="viz-btn viz-btn-secondary py-2 text-[10px] uppercase font-bold">
+                                    <i class="fas fa-step-backward mr-1"></i> Prev
+                                </button>
+                                <button id="auto-play-btn" class="viz-btn viz-btn-secondary py-2 text-[10px] uppercase font-bold">
+                                    <i class="fas fa-play mr-1"></i> Auto
+                                </button>
+                            </div>
+                            <button id="reset-btn" class="viz-btn viz-btn-secondary w-full py-3 text-xs uppercase tracking-widest font-bold">
+                                <i class="fas fa-undo mr-2"></i> Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualization (Center) -->
+            <div class="lg:col-span-5">
+                <div class="card-container h-full flex flex-col">
+                    <div class="card-header flex justify-between items-center">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-main)">
+                            <i class="fas fa-scroll mr-2 text-indigo-400"></i> Calculation Story
+                        </h3>
+                        <span id="step-count" class="mono-font text-[10px] px-2 py-1 rounded border border-green-500/20 text-green-400 bg-green-500/5">Ready</span>
+                    </div>
+                    <div id="story-container" class="flex-1 p-6 space-y-4 overflow-y-auto custom-scrollbar bg-black/5" style="max-height: 500px;">
+                        <div id="empty-story" class="flex flex-col items-center justify-center h-full text-center opacity-40">
+                            <i class="fas fa-calculator text-4xl mb-4"></i>
+                            <p class="text-sm">Adjust inputs and click 'Next Step' to start the mathematical breakdown.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Knowledge Base (Right) -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="card-container">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--accent-primary)">
+                            <i class="fas fa-database mr-2"></i> Knowledge Base
+                        </h3>
+                    </div>
+                    <div class="overflow-x-auto custom-scrollbar" style="max-height: 300px;">
+                        <table id="data-table" class="w-full text-[10px] text-left">
+                            <!-- JS Generated Table -->
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card-container">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--accent-primary)">
+                            <i class="fas fa-chart-pie mr-2"></i> Results
+                        </h3>
+                    </div>
+                    <div id="results-panel" class="p-5 space-y-4">
+                        <div class="metric-card p-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-[9px] uppercase font-bold opacity-50">Probability Play = Yes</span>
+                                <span id="prob-yes" class="mono-font text-sm text-indigo-400">0%</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                <div id="bar-yes" class="h-full bg-indigo-500 transition-all duration-700" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="metric-card p-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-[9px] uppercase font-bold opacity-50">Probability Play = No</span>
+                                <span id="prob-no" class="mono-font text-sm text-amber-500">0%</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                <div id="bar-no" class="h-full bg-amber-500 transition-all duration-700" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div id="final-decision" class="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-center text-xs font-bold uppercase tracking-wider hidden">
+                            Prediction: YES
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="border-t py-8 mt-auto" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-4">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="text-gray-400 hover:text-green-500 transition-colors"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="text-gray-400 hover:text-green-500 transition-colors"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="text-gray-400 hover:text-green-500 transition-colors"><i class="fab fa-kaggle fa-lg"></i></a>
+                <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="text-gray-400 hover:text-green-500 transition-colors"><i class="fab fa-instagram fa-lg"></i></a>
+            </div>
+            <p class="text-[10px] tracking-[0.3em] mono-font uppercase opacity-50" style="color: var(--text-muted)">&copy; 2025 VIZLEARN // MODULE.NAIVE_BAYES</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE & DATA ---
+            const dataset = [
+                {outlook:'Sunny',temp:'Hot',wind:'Weak',play:'No'},
+                {outlook:'Sunny',temp:'Hot',wind:'Strong',play:'No'},
+                {outlook:'Overcast',temp:'Hot',wind:'Weak',play:'Yes'},
+                {outlook:'Rain',temp:'Mild',wind:'Weak',play:'Yes'},
+                {outlook:'Rain',temp:'Cool',wind:'Weak',play:'Yes'},
+                {outlook:'Rain',temp:'Cool',wind:'Strong',play:'No'},
+                {outlook:'Overcast',temp:'Cool',wind:'Strong',play:'Yes'},
+                {outlook:'Sunny',temp:'Mild',wind:'Weak',play:'No'},
+                {outlook:'Sunny',temp:'Cool',wind:'Weak',play:'Yes'},
+                {outlook:'Rain',temp:'Mild',wind:'Weak',play:'Yes'},
+                {outlook:'Sunny',temp:'Mild',wind:'Strong',play:'Yes'},
+                {outlook:'Overcast',temp:'Mild',wind:'Strong',play:'Yes'},
+                {outlook:'Overcast',temp:'Hot',wind:'Weak',play:'Yes'},
+                {outlook:'Rain',temp:'Mild',wind:'Strong',play:'No'}
+            ];
+
+            const headers = ['outlook', 'temp', 'wind', 'play'];
+            const features = ['outlook', 'temp', 'wind'];
+            const target = 'play';
+
+            const state = {
+                currentStep: 0,
+                totalSteps: features.length + 3, // Priors + Features + Score + Prediction
+                isCalculating: false,
+                userInputs: {},
+                calculations: {},
+                autoPlayInterval: null
+            };
+
+            // --- DOM ---
+            const storyContainer = document.getElementById('story-container');
+            const dataTable = document.getElementById('data-table');
+            const featureInputs = document.getElementById('feature-inputs');
+            const stepCountBadge = document.getElementById('step-count');
+            
+            const nextBtn = document.getElementById('next-step-btn');
+            const prevBtn = document.getElementById('prev-step-btn');
+            const autoBtn = document.getElementById('auto-play-btn');
+            const resetBtn = document.getElementById('reset-btn');
+
+            const themeToggleBtn = document.getElementById('themeToggle');
+            const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+            const moonIcon = themeToggleBtn.querySelector('.light-icon');
+
+            // --- THEME ---
+            const updateThemeIcon = (isLight) => {
+                sunIcon.classList.toggle('hidden', isLight);
+                moonIcon.classList.toggle('hidden', !isLight);
+            };
+
+            themeToggleBtn.addEventListener('click', () => {
+                const isLight = document.body.classList.toggle('light-mode');
+                localStorage.setItem('theme', isLight ? 'light' : 'dark');
+                updateThemeIcon(isLight);
+            });
+            if (localStorage.getItem('theme') === 'light') {
+                document.body.classList.add('light-mode');
+                updateThemeIcon(true);
+            } else { updateThemeIcon(false); }
+
+            // --- RENDERERS ---
+            function renderTable() {
+                let html = `<thead><tr class="bg-white/5 uppercase tracking-widest">`;
+                headers.forEach(h => html += `<th class="px-3 py-2 border-b border-white/5">${h}</th>`);
+                html += `</tr></thead><tbody>`;
+                dataset.forEach((row, idx) => {
+                    html += `<tr class="border-b border-white/5 hover:bg-white/5 transition-colors" data-row="${idx}">`;
+                    headers.forEach(h => html += `<td class="px-3 py-2" data-col="${h}">${row[h]}</td>`);
+                    html += `</tr>`;
+                });
+                html += `</tbody>`;
+                dataTable.innerHTML = html;
+            }
+
+            function renderInputs() {
+                let html = '';
+                features.forEach(f => {
+                    const unique = [...new Set(dataset.map(d => d[f]))];
+                    html += `<div>
+                        <label class="block text-[10px] font-bold uppercase mb-2 opacity-60">${f}</label>
+                        <select id="in-${f}" class="viz-input">
+                            ${unique.map(u => `<option value="${u}">${u}</option>`).join('')}
+                        </select>
+                    </div>`;
+                });
+                featureInputs.innerHTML = html;
+            }
+
+            // --- CORE LOGIC ---
+            function prepareCalculations() {
+                state.userInputs = {};
+                features.forEach(f => state.userInputs[f] = document.getElementById(`in-${f}`).value);
+                
+                const classes = ['Yes', 'No'];
+                const total = dataset.length;
+
+                classes.forEach(c => {
+                    const subset = dataset.filter(d => d[target] === c);
+                    const classCount = subset.length;
+                    const prior = classCount / total;
+                    
+                    const likelihoods = {};
+                    let product = 1;
+                    features.forEach(f => {
+                        const uniqueCount = [...new Set(dataset.map(d => d[f]))].length;
+                        const matchCount = subset.filter(d => d[f] === state.userInputs[f]).length;
+                        // Laplace Smoothing
+                        const prob = (matchCount + 1) / (classCount + uniqueCount);
+                        likelihoods[f] = { matchCount, total: classCount, uniqueCount, prob };
+                        product *= prob;
+                    });
+                    
+                    state.calculations[c] = { classCount, prior, likelihoods, rawScore: prior * product };
+                });
+
+                const sum = (state.calculations.Yes.rawScore + state.calculations.No.rawScore) || 1e-9;
+                state.calculations.Yes.norm = (state.calculations.Yes.rawScore / sum) * 100;
+                state.calculations.No.norm = (state.calculations.No.rawScore / sum) * 100;
+            }
+
+            function clearHighlights() {
+                document.querySelectorAll('th, td').forEach(el => el.classList.remove('highlight-header', 'highlight-indigo', 'highlight-amber'));
+            }
+
+            function highlight(cols, outcome = null) {
+                clearHighlights();
+                cols.forEach(c => {
+                    const th = dataTable.querySelector(`th:nth-child(${headers.indexOf(c) + 1})`);
+                    if(th) th.classList.add('highlight-header');
+                    
+                    dataset.forEach((row, idx) => {
+                        if(outcome && row[target] !== outcome) return;
+                        const td = dataTable.querySelector(`tr[data-row="${idx}"] td[data-col="${c}"]`);
+                        if(td) td.classList.add(row[target] === 'Yes' ? 'highlight-indigo' : 'highlight-amber');
+                    });
+                });
+            }
+
+            function addCard(title, content) {
+                if(state.currentStep === 1) document.getElementById('empty-story').style.display = 'none';
+                
+                const cards = storyContainer.querySelectorAll('.story-step');
+                cards.forEach(c => c.classList.add('faded'));
+
+                const div = document.createElement('div');
+                div.className = 'story-step p-4 rounded-xl';
+                div.innerHTML = `<h4 class="text-[10px] font-bold uppercase mb-2 text-indigo-400">${title}</h4><div class="text-xs leading-relaxed opacity-90">${content}</div>`;
+                storyContainer.appendChild(div);
+                storyContainer.scrollTop = storyContainer.scrollHeight;
+            }
+
+            function updateResults() {
+                const s = state.calculations;
+                
+                if (state.currentStep >= state.totalSteps - 1) {
+                    document.getElementById('prob-yes').innerText = s.Yes.norm.toFixed(1) + '%';
+                    document.getElementById('prob-no').innerText = s.No.norm.toFixed(1) + '%';
+                    document.getElementById('bar-yes').style.width = s.Yes.norm + '%';
+                    document.getElementById('bar-no').style.width = s.No.norm + '%';
+                }
+
+                if (state.currentStep === state.totalSteps) {
+                    const decision = document.getElementById('final-decision');
+                    decision.classList.remove('hidden');
+                    decision.innerText = `Prediction: Play = ${s.Yes.norm > s.No.norm ? 'YES' : 'NO'}`;
+                    decision.className = s.Yes.norm > s.No.norm ? 
+                        'p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-center text-xs font-bold uppercase tracking-wider block text-indigo-400' :
+                        'p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center text-xs font-bold uppercase tracking-wider block text-amber-500';
+                }
+            }
+
+            function nextStep() {
+                if (state.currentStep >= state.totalSteps) { stopAuto(); return; }
+                if (state.currentStep === 0) prepareCalculations();
+
+                state.currentStep++;
+                stepCountBadge.innerText = `Step ${state.currentStep} of ${state.totalSteps}`;
+                
+                const s = state.calculations;
+                
+                if (state.currentStep === 1) {
+                    highlight(['play']);
+                    addCard('1. Prior Probabilities', `
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>P(Yes) = ${s.Yes.classCount}/${dataset.length} = <b>${s.Yes.prior.toFixed(3)}</b></div>
+                            <div>P(No) = ${s.No.classCount}/${dataset.length} = <b>${s.No.prior.toFixed(3)}</b></div>
+                        </div>
+                    `);
+                } else if (state.currentStep <= features.length + 1) {
+                    const f = features[state.currentStep - 2];
+                    const val = state.userInputs[f];
+                    highlight([f, 'play']);
+                    addCard(`${state.currentStep}. Likelihood: ${f}`, `
+                        <p class="mb-2">Probability of <b>${val}</b> given Play outcome:</p>
+                        <div class="space-y-1 font-mono text-[10px]">
+                            <div>P(${val}|Yes) = (${s.Yes.likelihoods[f].matchCount}+1)/(${s.Yes.likelihoods[f].total}+${s.Yes.likelihoods[f].uniqueCount}) = <b>${s.Yes.likelihoods[f].prob.toFixed(3)}</b></div>
+                            <div>P(${val}|No) = (${s.No.likelihoods[f].matchCount}+1)/(${s.No.likelihoods[f].total}+${s.No.likelihoods[f].uniqueCount}) = <b>${s.No.likelihoods[f].prob.toFixed(3)}</b></div>
+                        </div>
+                    `);
+                } else if (state.currentStep === state.totalSteps - 1) {
+                    highlight(['play']);
+                    addCard(`${state.currentStep}. Combined Scores`, `
+                        <p>Multiplying Priors by all Likelihoods:</p>
+                        <div class="mt-2 space-y-1 font-mono">
+                            <div>Score(Yes) = ${s.Yes.rawScore.toExponential(4)}</div>
+                            <div>Score(No) = ${s.No.rawScore.toExponential(4)}</div>
+                        </div>
+                    `);
+                } else if (state.currentStep === state.totalSteps) {
+                    addCard(`${state.currentStep}. Final Probability`, `
+                        <p>Normalizing scores to sum to 100%:</p>
+                        <div class="mt-2 text-lg font-bold text-center">
+                            ${s.Yes.norm > s.No.norm ? 'Play = YES' : 'Play = NO'}
+                        </div>
+                    `);
+                }
+                updateResults();
+            }
+
+            function prevStep() {
+                if (state.currentStep <= 0) return;
+                stopAuto();
+                state.currentStep--;
+                if (storyContainer.lastElementChild) {
+                    storyContainer.lastElementChild.remove();
+                }
+                if(storyContainer.children.length <= 1) {
+                    const empty = document.getElementById('empty-story');
+                    if (empty) empty.style.display = 'flex';
+                }
+                
+                const last = storyContainer.lastElementChild;
+                if(last) last.classList.remove('faded');
+                
+                stepCountBadge.innerText = state.currentStep === 0 ? 'Ready' : `Step ${state.currentStep} of ${state.totalSteps}`;
+                
+                if(state.currentStep < state.totalSteps - 1) {
+                    document.getElementById('prob-yes').innerText = '0%';
+                    document.getElementById('prob-no').innerText = '0%';
+                    document.getElementById('bar-yes').style.width = '0%';
+                    document.getElementById('bar-no').style.width = '0%';
+                    document.getElementById('final-decision').classList.add('hidden');
+                }
+                clearHighlights();
+            }
+
+            function stopAuto() {
+                clearInterval(state.autoPlayInterval);
+                state.autoPlayInterval = null;
+                autoBtn.innerHTML = '<i class="fas fa-play mr-1"></i> Auto';
+            }
+
+            function startAuto() {
+                if(state.currentStep >= state.totalSteps) return;
+                autoBtn.innerHTML = '<i class="fas fa-stop mr-1"></i> Stop';
+                state.autoPlayInterval = setInterval(nextStep, 1500);
+            }
+
+            // --- LISTENERS ---
+            nextBtn.onclick = () => { stopAuto(); nextStep(); };
+            prevBtn.onclick = prevStep;
+            autoBtn.onclick = () => state.autoPlayInterval ? stopAuto() : startAuto();
+            resetBtn.onclick = () => {
+                stopAuto();
+                state.currentStep = 0;
+                state.calculations = {};
+                storyContainer.innerHTML = `<div id="empty-story" class="flex flex-col items-center justify-center h-full text-center opacity-40"><i class="fas fa-calculator text-4xl mb-4"></i><p class="text-sm">Adjust inputs and click 'Next Step' to start the mathematical breakdown.</p></div>`;
+                document.getElementById('prob-yes').innerText = '0%';
+                document.getElementById('prob-no').innerText = '0%';
+                document.getElementById('bar-yes').style.width = '0%';
+                document.getElementById('bar-no').style.width = '0%';
+                document.getElementById('final-decision').classList.add('hidden');
+                stepCountBadge.innerText = 'Ready';
+                clearHighlights();
+            };
+
+            renderTable();
+            renderInputs();
+        });
+    
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            // Machine Learning
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "../machine_learning/cosine_similarity.html", category: "ml", icon: "fa-brain" },
+            { title: "Cross Validation", path: "../machine_learning/cross_validation.html", category: "ml", icon: "fa-brain" },
+            { title: "Decision Tree", path: "../machine_learning/decision_tree.html", category: "ml", icon: "fa-brain" },
+            { title: "K-Means", path: "../machine_learning/k_means.html", category: "ml", icon: "fa-brain" },
+            { title: "KNN", path: "../machine_learning/knn.html", category: "ml", icon: "fa-brain" },
+            { title: "Label Encoding", path: "../machine_learning/label_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Naive Bayes", path: "../machine_learning/naive_bayes.html", category: "ml", icon: "fa-brain" },
+            { title: "One Hot Encoding", path: "../machine_learning/one_hot_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Sliding Window Time Series", path: "../machine_learning/sliding_window_for_timeseries_data.html", category: "ml", icon: "fa-brain" },
+            { title: "SVM", path: "../machine_learning/svm.html", category: "ml", icon: "fa-brain" },
+            { title: "Train Test Split", path: "../machine_learning/train_test_split.html", category: "ml", icon: "fa-brain" },
+            
+            // Deep Learning
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing in Neural Networks", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Dropout in Neural Networks", path: "../deep_learning/dropout_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Batch Processing", path: "../deep_learning/gradient_descent_batch_processing.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Linear Regression with Gradient Descent", path: "../deep_learning/linear_regression_with_gradient_descent.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            
+            // DSA
+            { title: "A* Algorithm", path: "../dsa/a_star.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Backtracking", path: "../dsa/backtracking.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Search", path: "../dsa/binary_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Breadth First Search", path: "../dsa/breadth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Bubble Sort", path: "../dsa/bubble_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Counting Sort", path: "../dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Depth First Search", path: "../dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dictionaries in Python", path: "../dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra's Algorithm", path: "../dsa/dijkstra's.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Fibonacci Search", path: "../dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Insertion Sort", path: "../dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Interpolation Search", path: "../dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Linear Search", path: "../dsa/linear_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Lists in Python", path: "../dsa/lists_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Merge Sort", path: "../dsa/merge_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Quick Sort", path: "../dsa/quick_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Selection Sort", path: "../dsa/selection_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Strings in Python", path: "../dsa/strings_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            
+            // Natural Language Processing
+            { title: "ASCII Codes", path: "../natural_language_processing/ascii_codes.html", category: "nlp", icon: "fa-comments" },
+            { title: "N-Gram", path: "../natural_language_processing/n_gram.html", category: "nlp", icon: "fa-comments" },
+            { title: "Stemming vs Lemmatization", path: "../natural_language_processing/stemming_vs_lemmatization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Text Normalization Pipeline", path: "../natural_language_processing/text_normalization_pipeline.html", category: "nlp", icon: "fa-comments" },
+            { title: "Tokenization", path: "../natural_language_processing/tokenization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Word Cloud", path: "../natural_language_processing/word_cloud.html", category: "nlp", icon: "fa-comments" },
+            
+            // Computer Vision
+            { title: "Downsampling in CNN", path: "../computer_vision/downsampling_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Edge Detection", path: "../computer_vision/edge_detection.html", category: "vision", icon: "fa-eye" },
+            { title: "Feature Map in CNN", path: "../computer_vision/feature_map_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Grayscale Image Processing", path: "../computer_vision/grayscale_image_processing.html", category: "vision", icon: "fa-eye" },
+            { title: "Image Data Augmentation", path: "../computer_vision/image_data_augmentation.html", category: "vision", icon: "fa-eye" },
+            { title: "RGB Image Processing", path: "../computer_vision/rgb_image_processing.html", category: "vision", icon: "fa-eye" },
+            
+            // Database
+            { title: "Groupby in SQL", path: "../database/groupby_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Joins in SQL", path: "../database/joins_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Window Functions in SQL", path: "../database/window_functions_in_sql.html", category: "db", icon: "fa-database" },
+            
+            // Gen AI
+            { title: "Casual Language Modeling", path: "../gen_ai/casual_language_modeling.html", category: "gen-ai", icon: "fa-wand-magic-sparkles" },
+            
+            // Maths
+            { title: "Equation of Line", path: "../maths/equation_of_line.html", category: "maths", icon: "fa-calculator" }
+        ];
+
+        // Initialize search functionality
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                // Filter courses
+                const filtered = allCourses.filter(course => 
+                    course.title.toLowerCase().includes(query) || 
+                    course.category.toLowerCase().includes(query)
+                );
+
+                // Render results
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>
+                    `).join('');
+                }
+
+                dropdown.classList.add('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            // Close dropdown on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
