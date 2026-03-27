@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Feature Scaling & Weight Bias</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --accent-danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.4);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            
+            /* Canvas Specifics - Dark */
+            --canvas-bg: #0a0a0a;
+            --neuron-fill: #111827;
+            --neuron-border: rgba(74, 222, 128, 0.5);
+            --connection-line: rgba(74, 222, 128, 0.3);
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --accent-danger: #dc2626;
+            --danger-glow: rgba(220, 38, 38, 0.3);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+
+            --canvas-bg: #f8fafc;
+            --neuron-fill: #ffffff;
+            --neuron-border: #15803d; 
+            --connection-line: rgba(21, 128, 61, 0.4);
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .toolbar-container {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.75rem 1.5rem;
+            z-index: 40;
+        }
+
+        .floating-panel {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 320px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            z-index: 30;
+            opacity: 0.95;
+            transition: opacity 0.3s;
+        }
+        
+        /* Input Styling */
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: all 0.2s;
+            border-radius: 0.375rem;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.875rem;
+        }
+        .viz-input:focus {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+            outline: none;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+            width: 100%;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            border: 2px solid var(--bg-surface);
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            cursor: pointer;
+            margin-top: -5px;
+            box-shadow: 0 0 10px var(--accent-glow);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border-subtle);
+            border-radius: 2px;
+        }
+
+        /* Buttons */
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        .viz-btn-primary {
+            background: var(--accent-primary);
+            color: var(--bg-body);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        .viz-btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0 15px var(--accent-glow);
+            filter: brightness(1.1);
+        }
+        .viz-btn-secondary {
+            background: var(--input-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+        }
+        .viz-btn-secondary:hover {
+            border-color: var(--accent-primary);
+            background: var(--input-focus-bg);
+        }
+        .viz-btn-danger {
+            background: transparent;
+            color: var(--accent-danger);
+            border: 1px solid var(--accent-danger);
+        }
+        .viz-btn-danger:hover {
+            background: var(--accent-danger);
+            color: #fff;
+            box-shadow: 0 0 15px var(--danger-glow);
+        }
+
+        #canvas {
+            background-color: var(--canvas-bg);
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+            user-select: none;
+        }
+        #canvas.grabbing { cursor: grabbing; }
+
+        .metric-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+
+        .exploding-text {
+            color: var(--accent-danger) !important;
+            text-shadow: 0 0 10px var(--danger-glow);
+            font-weight: 700 !important;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <div class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span style="color: var(--text-main)">viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </div>
+                
+                <!-- Theme Toggle -->
+                <div class="flex items-center gap-3">
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Title Section -->
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full">
+        <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Feature Scaling & Weight Bias</h1>
+        <p class="mt-2 text-sm md:text-base max-w-3xl opacity-80" style="color: var(--text-muted)">
+            Adjust the sliders below to pass different values. Notice how raw, unscaled inputs (like Salary = 80,000) cause massive color shifts in the connections, leading to an imbalanced network. Use the scaler to normalize the data and stabilize training.
+        </p>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-6 justify-between overflow-x-auto">
+        
+        <!-- Controls -->
+        <div class="flex items-center gap-6 flex-1 min-w-max">
+            
+            <!-- Age Slider -->
+            <div class="flex flex-col gap-1 w-32">
+                <div class="flex justify-between items-center">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70">Age Input</label>
+                    <span id="ageValDisplay" class="text-[10px] font-bold mono-font text-[var(--accent-primary)]">35</span>
+                </div>
+                <input type="range" id="ageSlider" min="18" max="80" value="35">
+            </div>
+
+            <!-- Salary Slider -->
+            <div class="flex flex-col gap-1 w-32">
+                <div class="flex justify-between items-center">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70">Salary Input</label>
+                    <span id="salValDisplay" class="text-[10px] font-bold mono-font text-[var(--accent-primary)]">75k</span>
+                </div>
+                <input type="range" id="salarySlider" min="20000" max="200000" step="1000" value="75000">
+            </div>
+
+            <div class="w-px h-8 bg-[var(--border-subtle)] hidden md:block mx-2"></div>
+
+            <div class="flex flex-col gap-1">
+                <label class="text-[10px] text-red-500 uppercase tracking-wide opacity-90">Data Normalization Method</label>
+                <select id="scalerType" class="viz-input w-56 cursor-pointer font-medium">
+                    <option value="none">None (Raw Imbalanced Data)</option>
+                    <option value="minmax">Min-Max Scaler (0 to 1)</option>
+                    <option value="standard">Standard Scaler (Z-Score)</option>
+                </select>
+            </div>
+            
+            <div class="flex flex-col gap-1">
+                <label class="text-[10px] text-red-500 uppercase tracking-wide opacity-90">Learning Rate</label>
+                <select id="learningRate" class="viz-input w-24">
+                    <option value="0.0001">0.0001</option>
+                    <option value="0.001" selected>0.001</option>
+                    <option value="0.01">0.01</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-3 shrink-0">
+            <button id="resetBtn" class="viz-btn viz-btn-secondary">
+                <i class="fas fa-undo text-xs"></i> Reset Weights
+            </button>
+            <button id="animateBtn" class="viz-btn viz-btn-primary shadow-[0_0_15px_rgba(74,222,128,0.15)] w-40">
+                <i class="fas fa-play text-xs"></i> <span>Start Training</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 relative overflow-hidden bg-[var(--canvas-bg)]">
+        <!-- Canvas -->
+        <canvas id="canvas" class="block w-full h-full"></canvas>
+
+        <!-- Floating Stats Panel -->
+        <div class="floating-panel p-4 flex flex-col gap-4 pointer-events-auto">
+             <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
+                 <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--accent-primary)">
+                    <i class="fas fa-microscope mr-2"></i> Network Analysis
+                </h3>
+             </div>
+             
+             <!-- Network Health -->
+             <div class="metric-card p-3 text-center border-l-4" id="healthCard" style="border-left-color: var(--accent-primary)">
+                 <div class="text-[10px] uppercase font-bold opacity-70 mb-1">Network Status</div>
+                 <div id="netHealth" class="font-bold text-sm tracking-wide" style="color: var(--accent-primary)">STABLE</div>
+                 <div id="healthDesc" class="text-[9px] mt-1 opacity-60">Weights are updating evenly.</div>
+             </div>
+
+             <!-- Current Data Passed -->
+             <div>
+                <h4 class="text-[10px] uppercase tracking-widest font-bold mb-2 opacity-50">Current Input Data Passed</h4>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="metric-card p-2">
+                        <span class="block text-[10px] uppercase opacity-60 mb-1">Age (Node 1)</span>
+                        <div class="flex justify-between items-baseline">
+                            <span class="text-[8px] opacity-40">Raw: <span id="rawAge">0</span></span>
+                            <span id="passAge" class="font-bold mono-font text-sm" style="color: var(--text-main)">0.0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card p-2">
+                        <span class="block text-[10px] uppercase opacity-60 mb-1">Salary (Node 2)</span>
+                        <div class="flex justify-between items-baseline">
+                            <span class="text-[8px] opacity-40">Raw: <span id="rawSal">0</span></span>
+                            <span id="passSal" class="font-bold mono-font text-sm" style="color: var(--text-main)">0.0</span>
+                        </div>
+                    </div>
+                </div>
+             </div>
+
+             <!-- Weight Magnitudes -->
+             <div>
+                <h4 class="text-[10px] uppercase tracking-widest font-bold mb-2 opacity-50">Avg Weight Magnitudes</h4>
+                <div class="metric-card p-3 flex flex-col gap-2">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs">Age Weights (W1)</span>
+                        <span id="avgAgeW" class="font-bold mono-font text-sm">0.100</span>
+                    </div>
+                    <div class="w-full bg-[var(--bg-body)] rounded-full h-1.5 mb-1">
+                        <div id="barAgeW" class="bg-[var(--accent-primary)] h-1.5 rounded-full" style="width: 2%"></div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center mt-2">
+                        <span class="text-xs">Salary Weights (W2)</span>
+                        <span id="avgSalW" class="font-bold mono-font text-sm">0.100</span>
+                    </div>
+                    <div class="w-full bg-[var(--bg-body)] rounded-full h-1.5">
+                        <div id="barSalW" class="bg-[var(--accent-primary)] h-1.5 rounded-full" style="width: 2%"></div>
+                    </div>
+                </div>
+             </div>
+             
+             <div class="text-[9px] text-center opacity-40">
+                 Drag to Pan | Scroll to Zoom
+             </div>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-3">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                 <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)">
+                    <i class="fab fa-instagram fa-lg"></i>
+                </a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2026 VIZLEARN // MODULE.SCALING</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            if (typeof window.updateAndRedraw === 'function') window.updateAndRedraw();
+        });
+
+        // --- DATASET & SCALING LOGIC ---
+        // Precomputed stats for scaling formulas
+        const stats = {
+            age: { min: 18, max: 80, mean: 40, std: 15 },
+            salary: { min: 20000, max: 200000, mean: 80000, std: 40000 }
+        };
+
+        function getCurrentData(scaler) {
+            let rawAge = parseFloat(document.getElementById('ageSlider').value);
+            let rawSal = parseFloat(document.getElementById('salarySlider').value);
+            
+            if(scaler === 'none') {
+                return { age: rawAge, salary: rawSal, rawAge: rawAge, rawSal: rawSal };
+            }
+            if(scaler === 'minmax') {
+                return {
+                    age: (rawAge - stats.age.min) / (stats.age.max - stats.age.min),
+                    salary: (rawSal - stats.salary.min) / (stats.salary.max - stats.salary.min),
+                    rawAge: rawAge, rawSal: rawSal
+                };
+            }
+            if(scaler === 'standard') {
+                return {
+                    age: (rawAge - stats.age.mean) / stats.age.std,
+                    salary: (rawSal - stats.salary.mean) / stats.salary.std,
+                    rawAge: rawAge, rawSal: rawSal
+                };
+            }
+        }
+
+        // SLIDER EVENTS
+        document.getElementById('ageSlider').addEventListener('input', (e) => {
+            document.getElementById('ageValDisplay').textContent = e.target.value;
+            if(!isAnimating) updatePanel();
+        });
+
+        document.getElementById('salarySlider').addEventListener('input', (e) => {
+            let val = parseInt(e.target.value);
+            document.getElementById('salValDisplay').textContent = (val/1000) + 'k';
+            if(!isAnimating) updatePanel();
+        });
+
+
+        // --- NEURAL NETWORK STATE ---
+        // Architecture: 2 Input -> 4 Hidden -> 1 Output
+        const layers = [2, 4, 1];
+        
+        let inputWeights = [];
+        
+        function initWeights() {
+            inputWeights = [
+                [0.12, -0.05, 0.08, -0.11], // Age initial weights
+                [-0.08, 0.15, -0.04, 0.09]  // Salary initial weights
+            ];
+        }
+        initWeights();
+
+        let isAnimating = false;
+        let animationRequestId = null;
+        let animationPhase = 'forward'; // 'forward' -> 'backward' -> 'update'
+        let activeLayerIndex = 0; 
+        let lastTime = 0;
+
+        // Canvas State
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let scale = 1;
+        let translateX = 0;
+        let translateY = 0;
+        let isDragging = false;
+        let lastX = 0, lastY = 0;
+        let neuronPositions = [];
+        let currentNeuronRadius = 35;
+
+        function getThemeColors() {
+            const styles = getComputedStyle(document.body);
+            return {
+                bg: styles.getPropertyValue('--canvas-bg').trim(),
+                neuronFill: styles.getPropertyValue('--neuron-fill').trim(),
+                neuronBorder: styles.getPropertyValue('--neuron-border').trim(),
+                connection: styles.getPropertyValue('--connection-line').trim(),
+                accent: styles.getPropertyValue('--accent-primary').trim(),
+                danger: styles.getPropertyValue('--accent-danger').trim(),
+                text: styles.getPropertyValue('--text-main').trim(),
+            };
+        }
+
+        // --- SIMULATION LOGIC ---
+        function updateWeights() {
+            const scaler = document.getElementById('scalerType').value;
+            const lr = parseFloat(document.getElementById('learningRate').value);
+            const data = getCurrentData(scaler);
+            
+            // Mock Gradient Update: W = W - learning_rate * error * input
+            for(let i=0; i<4; i++) {
+                let randDir = (i % 2 === 0) ? 1 : -1; 
+                inputWeights[0][i] += lr * data.age * randDir * 0.5;
+                inputWeights[1][i] += lr * data.salary * randDir * 0.5;
+            }
+            
+            updatePanel(data);
+        }
+
+        function updatePanel(data) {
+            if(!data) data = getCurrentData(document.getElementById('scalerType').value);
+            
+            // Format numbers
+            const formatNum = (num) => {
+                if(Math.abs(num) > 1000) return num.toLocaleString(undefined, {maximumFractionDigits: 0});
+                if(Math.abs(num) > 100) return num.toFixed(1);
+                return num.toFixed(3);
+            };
+
+            // Calculate Averages
+            let avgAgeW = inputWeights[0].reduce((sum, val) => sum + Math.abs(val), 0) / 4;
+            let avgSalW = inputWeights[1].reduce((sum, val) => sum + Math.abs(val), 0) / 4;
+
+            // Update DOM Elements
+            document.getElementById('rawAge').textContent = data.rawAge;
+            document.getElementById('rawSal').textContent = '$' + data.rawSal.toLocaleString();
+            document.getElementById('passAge').textContent = formatNum(data.age);
+            document.getElementById('passSal').textContent = formatNum(data.salary);
+
+            const ageWElem = document.getElementById('avgAgeW');
+            const salWElem = document.getElementById('avgSalW');
+            ageWElem.textContent = formatNum(avgAgeW);
+            salWElem.textContent = formatNum(avgSalW);
+
+            // Exploding gradient check
+            const healthCard = document.getElementById('healthCard');
+            const netHealth = document.getElementById('netHealth');
+            const healthDesc = document.getElementById('healthDesc');
+            const barAgeW = document.getElementById('barAgeW');
+            const barSalW = document.getElementById('barSalW');
+
+            // Bar visualizer (max out at 100 for visual sake)
+            let maxVisual = Math.max(1, avgAgeW, avgSalW, 5); 
+            barAgeW.style.width = `${Math.min(100, (avgAgeW / maxVisual) * 100)}%`;
+            barSalW.style.width = `${Math.min(100, (avgSalW / maxVisual) * 100)}%`;
+
+            if (avgSalW > 20 || avgAgeW > 20) {
+                // Network is exploding
+                healthCard.style.borderLeftColor = 'var(--accent-danger)';
+                netHealth.textContent = "BIASED / EXPLODING";
+                netHealth.classList.add('exploding-text');
+                healthDesc.textContent = "Large input values are causing massive weight swings. The model is highly unstable.";
+                
+                salWElem.classList.add('exploding-text');
+                barSalW.style.backgroundColor = 'var(--accent-danger)';
+            } else {
+                // Stable
+                healthCard.style.borderLeftColor = 'var(--accent-primary)';
+                netHealth.textContent = "STABLE";
+                netHealth.classList.remove('exploding-text');
+                healthDesc.textContent = "Weights are updating evenly. Model parameters are healthy.";
+                
+                salWElem.classList.remove('exploding-text');
+                barSalW.style.backgroundColor = 'var(--accent-primary)';
+                barAgeW.style.backgroundColor = 'var(--accent-primary)';
+            }
+        }
+
+        // --- ANIMATION CONTROLS ---
+        function toggleAnimation() {
+            const btn = document.getElementById('animateBtn');
+            if (isAnimating) {
+                isAnimating = false;
+                btn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Start Training</span>';
+                btn.classList.remove('viz-btn-danger');
+                btn.classList.add('viz-btn-primary');
+                if (animationRequestId) cancelAnimationFrame(animationRequestId);
+                activeLayerIndex = -1;
+                drawNetwork(); 
+            } else {
+                isAnimating = true;
+                btn.innerHTML = '<i class="fas fa-stop text-xs"></i> <span>Stop Training</span>';
+                btn.classList.remove('viz-btn-primary');
+                btn.classList.add('viz-btn-danger');
+                animationPhase = 'forward';
+                activeLayerIndex = 0;
+                lastTime = performance.now();
+                animationLoop();
+            }
+        }
+
+        document.getElementById('animateBtn').addEventListener('click', toggleAnimation);
+        
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            initWeights();
+            updatePanel();
+            drawNetwork();
+        });
+
+        document.getElementById('scalerType').addEventListener('change', () => {
+            // Automatically reset weights when changing scaler to show the fresh effect
+            initWeights();
+            updatePanel();
+            drawNetwork();
+        });
+
+        function animationLoop() {
+            if (!isAnimating) return;
+            const time = performance.now();
+            const stepDelay = 200; // ms per step
+            
+            if (time - lastTime > stepDelay) { 
+                lastTime = time;
+                
+                if (animationPhase === 'forward') {
+                    activeLayerIndex++;
+                    if (activeLayerIndex >= layers.length) {
+                        animationPhase = 'backward';
+                        activeLayerIndex = layers.length - 1; 
+                    }
+                } else if (animationPhase === 'backward') {
+                    activeLayerIndex--;
+                    if (activeLayerIndex < 0) { 
+                        updateWeights(); 
+                        animationPhase = 'forward';
+                        activeLayerIndex = 0;
+                    }
+                }
+            }
+
+            drawNetwork();
+            animationRequestId = requestAnimationFrame(animationLoop);
+        }
+
+        // --- CANVAS DRAWING ---
+        function calculateLayout() {
+            const NEURON_BASE_SPACING_FACTOR = 1.5;
+            const LAYER_SPACING_MULTIPLIER = 8;
+            const maxNeurons = Math.max(...layers);
+            
+            neuronPositions = [];
+            layers.forEach((count, layerIdx) => {
+                const positions = [];
+                const layerSpacing = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * LAYER_SPACING_MULTIPLIER;
+                const neuronSpacingY = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * 2.5;
+                const layerX = layerIdx * layerSpacing;
+                const maxLayerHeight = maxNeurons * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                const currentLayerHeight = count * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                const yOff = (maxLayerHeight - currentLayerHeight) / 2;
+
+                for(let i=0; i<count; i++) {
+                    positions.push({
+                        x: layerX + currentNeuronRadius,
+                        y: yOff + i * (2 * currentNeuronRadius + neuronSpacingY) + currentNeuronRadius
+                    });
+                }
+                neuronPositions.push(positions);
+            });
+        }
+
+        function drawNetwork() {
+            if (!ctx) return;
+            const colors = getThemeColors();
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            
+            if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+            }
+            
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, rect.width, rect.height);
+
+            ctx.save();
+            ctx.translate(translateX, translateY);
+            ctx.scale(scale, scale);
+
+            // Connections
+            for(let l=0; l<layers.length-1; l++) {
+                let isAnimatingLayer = false;
+                if (isAnimating) {
+                    if (animationPhase === 'forward' && activeLayerIndex === l) isAnimatingLayer = true;
+                    if (animationPhase === 'backward' && activeLayerIndex === l + 1) isAnimatingLayer = true;
+                }
+                
+                neuronPositions[l].forEach((n1, idx1) => {
+                    neuronPositions[l+1].forEach((n2, idx2) => {
+                        ctx.beginPath();
+                        
+                        let strokeColor = colors.connection;
+                        let lineThickness = 2; // Fixed thickness to avoid overwhelming lines
+                        let alpha = 0.5;
+
+                        // Specifically visualize the weights between Input (Layer 0) and Hidden (Layer 1)
+                        if (l === 0) {
+                            const weightValue = inputWeights[idx1][idx2];
+                            const absW = Math.abs(weightValue);
+                            
+                            alpha = Math.min(0.9, 0.4 + absW * 0.05);
+
+                            if (absW > 10) {
+                                strokeColor = colors.danger; // Exploding! Turn RED.
+                                ctx.shadowColor = colors.danger;
+                                ctx.shadowBlur = 10;
+                            } else if (absW > 2) {
+                                strokeColor = colors.accent; // Growing moderately. Turn GREEN.
+                                ctx.shadowColor = colors.accent;
+                                ctx.shadowBlur = 5;
+                            } else {
+                                strokeColor = colors.connection;
+                                ctx.shadowBlur = 0;
+                            }
+                        }
+
+                        if (isAnimatingLayer) {
+                            strokeColor = animationPhase === 'forward' ? colors.accent : '#3b82f6';
+                            lineThickness = 3; // slightly thicker just for the running pulse
+                            alpha = 1.0;
+                            const dashOffset = (performance.now() / 20) * (animationPhase === 'forward' ? -1 : 1);
+                            ctx.setLineDash([8, 8]);
+                            ctx.lineDashOffset = dashOffset;
+                            ctx.shadowBlur = 0; // turn off weight glow during pulse
+                        } else {
+                            ctx.setLineDash([]);
+                        }
+
+                        ctx.strokeStyle = strokeColor;
+                        ctx.lineWidth = lineThickness / scale;
+                        ctx.globalAlpha = alpha;
+
+                        ctx.moveTo(n1.x, n1.y);
+                        ctx.lineTo(n2.x, n2.y);
+                        ctx.stroke();
+                        
+                        ctx.setLineDash([]);
+                        ctx.shadowBlur = 0;
+                        ctx.globalAlpha = 1.0;
+                    });
+                });
+            }
+
+            // Neurons
+            layers.forEach((count, lIdx) => {
+                neuronPositions[lIdx].forEach((pos, nIdx) => {
+                    
+                    let isActiveInAnim = false;
+                    if (isAnimating) {
+                        if (animationPhase === 'forward' && activeLayerIndex === lIdx) isActiveInAnim = true;
+                        if (animationPhase === 'backward' && activeLayerIndex === lIdx) isActiveInAnim = true;
+                    }
+
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, currentNeuronRadius, 0, Math.PI*2);
+                    
+                    if (isActiveInAnim) {
+                        ctx.fillStyle = animationPhase === 'forward' ? colors.accent : '#3b82f6';
+                        ctx.shadowColor = animationPhase === 'forward' ? colors.accent : '#3b82f6';
+                        ctx.shadowBlur = 20;
+                        ctx.strokeStyle = colors.bg;
+                        ctx.lineWidth = 0;
+                    } else {
+                        ctx.fillStyle = colors.neuronFill;
+                        ctx.strokeStyle = colors.neuronBorder;
+                        ctx.lineWidth = 2 / scale;
+                    }
+
+                    ctx.fill();
+                    if (!isActiveInAnim) ctx.stroke();
+                    ctx.shadowBlur = 0;
+
+                    // Text Labels
+                    ctx.fillStyle = isActiveInAnim && !document.body.classList.contains('light-mode') ? '#000' : colors.text;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    let label = '';
+                    if (lIdx === 0) {
+                        label = nIdx === 0 ? "Age" : "Salary";
+                    } else if (lIdx === layers.length - 1) {
+                        label = "Pred";
+                    } else {
+                        label = `H_${nIdx+1}`;
+                    }
+
+                    let fontSize = Math.max(10, currentNeuronRadius * 0.35);
+                    ctx.font = `bold ${fontSize}px 'Space Grotesk'`;
+                    ctx.fillText(label, pos.x, pos.y);
+                });
+            });
+
+            ctx.restore();
+        }
+
+        window.updateAndRedraw = function() {
+            calculateLayout();
+            drawNetwork();
+        };
+
+        function resetView() {
+            calculateLayout();
+            const width = (layers.length - 1) * (currentNeuronRadius * 1.5 * 8) + currentNeuronRadius*2;
+            const height = Math.max(...layers) * (currentNeuronRadius * 2.5) + currentNeuronRadius*2;
+            
+            const rect = canvas.getBoundingClientRect();
+            // Offset view slightly to the left to account for the floating panel on the right
+            const panelOffset = window.innerWidth > 768 ? 160 : 0; 
+
+            const sX = (rect.width - 100) / width;
+            const sY = (rect.height - 100) / height;
+            scale = Math.min(sX, sY, 1.2);
+            
+            translateX = (rect.width - width * scale) / 2 - panelOffset;
+            translateY = (rect.height - height * scale) / 2;
+            
+            if(scale < 0.1) scale = 0.1;
+            drawNetwork();
+        }
+
+        // --- MOUSE CONTROLS ---
+        canvas.addEventListener('mousedown', e => {
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            canvas.classList.add('grabbing');
+        });
+
+        window.addEventListener('mousemove', e => {
+            if(isDragging) {
+                const dx = e.clientX - lastX;
+                const dy = e.clientY - lastY;
+                translateX += dx;
+                translateY += dy;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                drawNetwork();
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+            canvas.classList.remove('grabbing');
+        });
+
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            const zoom = 1.1;
+            const dir = e.deltaY < 0 ? 1 : -1;
+            const factor = dir > 0 ? zoom : 1/zoom;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            
+            const newScale = Math.max(0.1, Math.min(5, scale * factor));
+            
+            translateX = mx - (mx - translateX) * (newScale / scale);
+            translateY = my - (my - translateY) * (newScale / scale);
+            scale = newScale;
+            drawNetwork();
+        });
+
+        window.addEventListener('resize', () => {
+            drawNetwork();
+            resetView();
+        });
+
+        // Initialize
+        updatePanel();
+        setTimeout(resetView, 100); 
+
+    </script>
+</body>
+</html>

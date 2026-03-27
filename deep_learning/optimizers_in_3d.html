@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Optimizers</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Three.js for 3D Rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- Add MathJax for rendering LaTeX formulas -->
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            startup: {
+                typeset: true
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'dark';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --border-glow: rgba(74, 222, 128, 0.5);
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            
+            /* Canvas Specifics - Dark */
+            --canvas-bg: #0a0a0a;
+            --contour-line: #111827;
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --border-glow: rgba(22, 163, 74, 0.4);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+
+            /* Canvas Specifics - Light Mode */
+            --canvas-bg: #f8fafc;
+            --contour-line: #f1f5f9; 
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .toolbar-container {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.75rem 1.5rem;
+            z-index: 40;
+        }
+
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .calc-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .floating-panel {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 280px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            z-index: 30;
+            opacity: 0.95;
+            transition: opacity 0.3s;
+        }
+        .floating-panel:hover { opacity: 1; }
+        
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: all 0.2s;
+            border-radius: 0.375rem;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.875rem;
+        }
+        .viz-input:focus {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+            outline: none;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            border: 2px solid var(--bg-surface);
+            height: 14px; width: 14px; border-radius: 50%;
+            background: var(--accent-primary); cursor: pointer;
+            margin-top: -5px; box-shadow: 0 0 10px var(--accent-glow); transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: var(--border-subtle); border-radius: 2px; }
+
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); box-shadow: 0 0 10px var(--accent-glow); }
+        .viz-btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 15px var(--accent-glow); filter: brightness(1.1); }
+        .viz-btn-secondary { background: var(--input-bg); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+        .viz-btn-secondary:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); background: var(--input-focus-bg); }
+        .viz-btn-animate.active { background: #ef4444 !important; color: white !important; border-color: #ef4444 !important; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important; }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: grab;
+        }
+        #canvas:active { cursor: grabbing; }
+
+        .metric-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper { background: var(--input-bg); border: 1px solid var(--border-subtle); position: relative; }
+        .search-input-wrapper:focus-within { background: var(--input-focus-bg); border-color: var(--accent-primary); box-shadow: 0 0 15px var(--accent-glow); }
+        .search-input-wrapper input { color: var(--text-main); }
+        .search-input-wrapper input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .search-input-wrapper i { color: var(--accent-primary); opacity: 0.7; }
+        .search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--card-bg); border: 1px solid var(--border-subtle); border-top: none; border-radius: 0 0 12px 12px; max-height: 400px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3); }
+        .search-dropdown.show { display: block; animation: slideDown 0.2s ease-out; }
+        .search-dropdown-item { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: space-between; color: inherit; text-decoration: none; }
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        .dropdown-item-title { font-weight: 500; color: var(--text-main); }
+        .dropdown-item-path { font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; }
+        .dropdown-item-icon { color: var(--accent-primary); margin-right: 8px; font-size: 0.875rem; }
+        .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
+
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+    </style>
+</head>
+<body class="flex flex-col min-h-screen overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50 shrink-0">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search modules" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Title Section -->
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full animate-fade-in">
+        <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
+            <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
+            <span>/</span>
+            <span>Deep Learning</span>
+        </div>
+        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Optimizers & The 3D Loss Landscape</h1>
+        <p class="mt-2 text-sm md:text-base max-w-2xl opacity-80" style="color: var(--text-muted)">
+            Visualize how different optimization algorithms navigate complex terrain, escape local minima, and find the global minimum. Run multiple in parallel to observe realistic relative speeds!
+        </p>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-4 justify-between animate-fade-in z-40 relative shadow-md">
+        <!-- Configuration Group -->
+        <div class="flex items-center gap-6 overflow-x-auto pb-1 md:pb-0 hide-scrollbar shrink-0">
+            
+            <div class="flex items-center gap-2">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Optimizer</label>
+                <select id="optimizerSelect" class="viz-input text-center w-36 border-accent-primary">
+                    <option value="sgd" selected>SGD (Red)</option>
+                    <option value="momentum">Momentum (Blue)</option>
+                    <option value="rmsprop">RMSprop (Purple)</option>
+                    <option value="adam">Adam (Green)</option>
+                    <option value="all" class="font-bold" style="background: var(--bg-surface)">All (Compare)</option>
+                </select>
+            </div>
+            
+            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <div class="flex items-center gap-2">
+                <label class="text-[10px] font-bold uppercase tracking-wide text-orange-400 whitespace-nowrap">Learning Rate</label>
+                <input type="number" id="learningRate" value="0.3" min="0.01" max="2.0" step="0.01" class="viz-input w-20 text-center border-orange-500/50">
+            </div>
+
+            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide text-blue-400 whitespace-nowrap">Sim Speed</label>
+                <input type="range" id="simSpeed" min="0.1" max="5.0" step="0.1" value="0.1" class="w-24" title="Adjust animation speed">
+                <span id="speedValue" class="text-[10px] mono-font w-8 text-blue-400">0.1x</span>
+            </div>
+
+        </div>
+
+        <!-- Animation Controls -->
+        <div class="flex items-center gap-2 shrink-0 md:border-l border-[var(--border-subtle)] md:pl-6 ml-auto">
+            <span class="text-[10px] font-bold uppercase tracking-wide opacity-50 mr-2 hidden md:inline-block">
+                <i class="fas fa-mouse"></i> Drag to Rotate 3D
+            </span>
+            <button id="pauseBtn" class="viz-btn viz-btn-secondary hidden whitespace-nowrap py-2 px-4 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+                <i class="fas fa-pause text-xs"></i> <span>Pause</span>
+            </button>
+            <button id="resetPathBtn" class="viz-btn viz-btn-secondary" title="Clear Path">
+                <i class="fas fa-eraser"></i>
+            </button>
+            <button id="animateBtn" class="viz-btn viz-btn-primary viz-btn-animate whitespace-nowrap py-2 px-4 shadow-[0_0_15px_rgba(74,222,128,0.15)]">
+                <i class="fas fa-play text-xs"></i> 
+                <span>Start Training</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Canvas Area -->
+    <div class="relative w-full h-[65vh] min-h-[500px] border-b shrink-0 overflow-hidden animate-fade-in" style="border-color: var(--border-subtle); background: var(--canvas-bg);">
+        <!-- 3D Canvas -->
+        <canvas id="canvas"></canvas>
+
+        <!-- Floating Stats Panel -->
+        <div class="floating-panel p-4 flex flex-col gap-4 pointer-events-auto">
+             <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
+                 <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--accent-primary)">
+                    <i class="fas fa-compass mr-2"></i> Optimization State
+                </h3>
+             </div>
+             
+             <!-- Training Tracker (Dynamic) -->
+             <div id="statsPanel" class="metric-card p-4 border-l-4" style="border-left-color: var(--accent-primary)">
+                 <!-- Injected dynamically by JS based on selection -->
+             </div>
+             
+             <div class="text-[10px] text-center opacity-80 mt-1 flex flex-col gap-1">
+                 <span class="font-bold text-orange-400">Global Minimum is at (0, 0)</span>
+                 <span class="italic opacity-60"><i class="fas fa-exclamation-triangle"></i> Watch out for Local Minima!</span>
+             </div>
+        </div>
+    </div>
+
+    <!-- Comprehensive Article Section -->
+    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div class="mt-8 mb-12 card-container animate-fade-in" style="animation-delay: 0.2s">
+            <div class="border-b px-6 py-5 md:px-8 md:py-6" style="border-color: var(--border-subtle)">
+                <h2 class="text-xl md:text-2xl font-bold flex items-center gap-3 brand-font" style="color: var(--text-main)">
+                    <i class="fas fa-mountain" style="color: var(--accent-primary)"></i>
+                    Local Minima and Non-Convexity
+                </h2>
+            </div>
+            
+            <div class="p-6 md:p-8 space-y-12" style="color: var(--text-muted)">
+                
+                <!-- Intro Section -->
+                <section>
+                    <p class="leading-relaxed mb-4">
+                        When we train a deep neural network, our ultimate goal is to find the perfect combination of Weights and Biases that results in the lowest possible Loss (Error). You can visualize this as a hiker trying to walk down a foggy mountain range to reach the lowest possible valley. The mountain is the <strong>Loss Landscape</strong>, and the mathematical algorithm deciding which step to take next is the <strong>Optimizer</strong>.
+                    </p>
+                    <p class="leading-relaxed">
+                        In the interactive 3D visualization above, the generated mountain range represents a highly complex, <strong>non-convex</strong> problem. It has a deep global minimum at $(0,0)$, but it is surrounded by ridges, hills, and most importantly, <strong>Local Minima</strong> (false valleys). The goal of the optimizer is to start from a high point on the ridge and navigate over the bumps to reach the absolute bottom.
+                    </p>
+                </section>
+
+                <!-- SGD Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">1. Stochastic Gradient Descent (SGD)</h3>
+                    <p class="leading-relaxed mb-6 text-sm">
+                        SGD is the "blindfolded hiker" approach. At any given point, it calculates the slope (gradient) directly under its feet and takes a step in the exact opposite direction (downhill). The size of the step is controlled entirely by the <strong>Learning Rate ($\eta$)</strong>.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                        <div class="calc-card border-l-4" style="border-color: #ef4444">
+                            <h4 class="font-bold text-sm mb-2 text-red-400">The "Local Minima" Trap</h4>
+                            <p class="text-sm leading-relaxed mb-3">Select <strong>SGD</strong> in the visualizer and hit Play. Notice how it slides down the initial slope but quickly gets permanently <strong>stuck</strong> in a shallow crater high up on the mountain.</p>
+                            <p class="text-sm leading-relaxed">Because SGD only looks at the immediate slope, when it reaches the bottom of a small crater, the slope becomes $0$. The algorithm believes it has finished training, completely unaware that a much deeper valley exists just over the next ridge.</p>
+                        </div>
+                        <div class="p-4 rounded-xl text-center" style="background: var(--bg-surface); border: 1px solid var(--border-subtle);">
+                            <span class="text-[10px] uppercase font-bold tracking-wider opacity-50 mb-2 block" style="color: var(--text-main)">SGD Update Rule</span>
+                            <div class="mono-font text-lg overflow-x-auto text-red-400">
+                                $$w = w - \eta \cdot dw$$
+                            </div>
+                            <p class="text-[11px] opacity-70 mt-2">Where $dw$ is the current steepness (gradient). If $dw = 0$, movement completely stops.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Momentum Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">2. Adding Momentum</h3>
+                    <p class="leading-relaxed mb-6 text-sm">
+                        How do we escape the traps? We simulate physics. If you roll a heavy boulder down a large hill, it builds up speed (momentum). If it hits a small crater, it has enough energy to roll right back up the other side and escape.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                        <div class="calc-card border-l-4" style="border-color: #3b82f6">
+                            <h4 class="font-bold text-sm mb-2 text-blue-400">The Rolling Boulder</h4>
+                            <p class="text-sm leading-relaxed mb-3">Select <strong>Momentum</strong> and hit Play. Instead of just using the current gradient, it maintains a "velocity" ($v$).</p>
+                            <p class="text-sm leading-relaxed">Notice how it successfully powers through the local minima that trapped SGD. It accumulates speed on the long descents, allowing it to easily punch through ridges and find the true center valley.</p>
+                        </div>
+                        <div class="p-4 rounded-xl text-center" style="background: var(--bg-surface); border: 1px solid var(--border-subtle);">
+                            <span class="text-[10px] uppercase font-bold tracking-wider opacity-50 mb-2 block" style="color: var(--text-main)">Momentum Update Rule</span>
+                            <div class="mono-font text-sm overflow-x-auto text-blue-400">
+                                $$v = \beta \cdot v + (1-\beta) \cdot dw$$
+                                $$w = w - \eta \cdot v$$
+                            </div>
+                            <p class="text-[11px] opacity-70 mt-2">Where $\beta \approx 0.9$ controls the "friction" of the landscape.</p>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- RMSprop Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">3. RMSprop (Adaptive Learning Rates)</h3>
+                    <p class="leading-relaxed mb-6 text-sm">
+                        What if, instead of relying on velocity, we just forced the algorithm to automatically adapt its step size based on the ruggedness of the terrain?
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                        <div class="calc-card border-l-4" style="border-color: #a855f7">
+                            <h4 class="font-bold text-sm mb-2 text-purple-400">The Adaptive Hiker</h4>
+                            <p class="text-sm leading-relaxed mb-3">Select <strong>RMSprop</strong>. This optimizer keeps a running average of the <em>squared</em> gradients ($S$).</p>
+                            <p class="text-sm leading-relaxed">If a dimension has steep, violent drops, $S$ becomes large, and RMSprop automatically shrinks the step size to avoid blowing up. If a dimension is flat, it boosts the step size. It adapts to the landscape dynamically, avoiding the massive overcorrections SGD suffers from.</p>
+                        </div>
+                        <div class="p-4 rounded-xl text-center" style="background: var(--bg-surface); border: 1px solid var(--border-subtle);">
+                            <span class="text-[10px] uppercase font-bold tracking-wider opacity-50 mb-2 block" style="color: var(--text-main)">RMSprop Update Rule</span>
+                            <div class="mono-font text-sm overflow-x-auto text-purple-400">
+                                $$S = \gamma \cdot S + (1-\gamma) \cdot dw^2$$
+                                $$w = w - \frac{\eta}{\sqrt{S} + \epsilon} \cdot dw$$
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Adam Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">4. Adam (Adaptive Moment Estimation)</h3>
+                    <p class="leading-relaxed mb-6 text-sm">
+                        Adam is the modern gold standard. It simply combines the best of both worlds: it uses <strong>Velocity (Momentum)</strong> to easily escape local minima, AND it uses the <strong>Squared Gradients (RMSprop)</strong> to adapt the learning rate dynamically.
+                    </p>
+
+                    <div class="calc-card border-l-4 mb-6" style="border-color: var(--accent-primary)">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="font-bold text-sm text-green-400">The Ultimate Explorer</h4>
+                            <span class="bg-green-500/20 text-green-400 text-[10px] uppercase font-bold px-2 py-1 rounded">Industry Standard</span>
+                        </div>
+                        <p class="text-sm leading-relaxed mb-3">Select <strong>All (Compare)</strong> in the dropdown and hit Play. You will see exactly why Adam is the default choice for Deep Learning today. Watch the Leaderboard as Adam gracefully combines momentum to punch through the ridges, while using adaptive learning rates to flawlessly spiral down into the exact global minimum.</p>
+                    </div>
+
+                    <div class="p-6 rounded-xl text-center" style="background: var(--bg-surface); border: 1px solid var(--border-subtle);">
+                        <span class="text-[10px] uppercase font-bold tracking-wider opacity-50 mb-4 block" style="color: var(--text-main)">Adam Complete Update Rule</span>
+                        <div class="mono-font text-sm overflow-x-auto text-green-400 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <span class="block text-[10px] opacity-70 mb-1" style="color: var(--text-main)">Momentum (1st Moment)</span>
+                                $$v = \beta_1 v + (1-\beta_1) dw$$
+                            </div>
+                            <div>
+                                <span class="block text-[10px] opacity-70 mb-1" style="color: var(--text-main)">RMSprop (2nd Moment)</span>
+                                $$S = \beta_2 S + (1-\beta_2) dw^2$$
+                            </div>
+                        </div>
+                        <div class="mt-4 border-t border-white/5 pt-4 mono-font text-sm text-green-400">
+                            <span class="block text-[10px] opacity-70 mb-1" style="color: var(--text-main)">Final Update (Simplified)</span>
+                            $$w = w - \frac{\eta}{\sqrt{S} + \epsilon} \cdot v$$
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-3">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                 <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)">
+                    <i class="fab fa-instagram fa-lg"></i>
+                </a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2026 VIZLEARN // MODULE.OPTIMIZERS</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            if (typeof window.updateAndRedraw === 'function') window.updateAndRedraw();
+        });
+
+        // --- OPTIMIZER VISUALIZATION LOGIC (THREE.JS) ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('canvas');
+            
+            const optimizerSelect = document.getElementById('optimizerSelect');
+            const lrInput = document.getElementById('learningRate');
+            const speedInput = document.getElementById('simSpeed');
+            const speedValue = document.getElementById('speedValue');
+            
+            const animateBtn = document.getElementById('animateBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+            const resetPathBtn = document.getElementById('resetPathBtn');
+            const statsPanel = document.getElementById('statsPanel');
+
+            // --- COMPLEX NON-CONVEX MATHEMATICAL LANDSCAPE ---
+            // Scaled Rastrigin-like function with deep center and ridges
+            const f = (x, y) => 0.08 * (x * x + y * y) - 1.0 * (Math.cos(1.2 * x) + Math.cos(1.2 * y)) + 2.0;
+            // Analytical Gradients
+            const gradX = (x, y) => 0.16 * x + 1.2 * Math.sin(1.2 * x);
+            const gradY = (x, y) => 0.16 * y + 1.2 * Math.sin(1.2 * y);
+
+            // Optimization State
+            let isAnimating = false;
+            let isPaused = false;
+            let simAccumulator = 0; 
+            let globalStepCount = 0;
+            // Default start high up on a ridge over many local minima
+            let startPos = { x: -16, y: -12 }; 
+            
+            const ALL_OPTIMIZERS = {
+                'sgd': { name: 'SGD', color: 0xef4444 }, // Red
+                'momentum': { name: 'Momentum', color: 0x3b82f6 }, // Blue
+                'rmsprop': { name: 'RMSprop', color: 0xa855f7 }, // Purple
+                'adam': { name: 'Adam', color: 0x4ade80 } // Green
+            };
+
+            let activeOptimizers = []; // Array to hold states and 3D meshes
+
+            // Hyperparameters
+            let beta1 = 0.9;
+            let beta2 = 0.999;
+            let epsilon = 1e-8;
+
+            // --- THREE.JS SETUP ---
+            let scene, camera, renderer, controls;
+            let surfaceMesh, wireframeMesh;
+            
+            function init3D() {
+                scene = new THREE.Scene();
+                
+                const isLight = document.body.classList.contains('light-mode');
+                scene.background = new THREE.Color(isLight ? '#f8fafc' : '#0a0a0a');
+
+                const rect = canvas.parentNode.getBoundingClientRect();
+                camera = new THREE.PerspectiveCamera(45, rect.width / rect.height, 0.1, 1000);
+                camera.position.set(0, 35, 45); // Look down at an angle
+
+                renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+                renderer.setSize(rect.width, rect.height);
+                renderer.setPixelRatio(window.devicePixelRatio);
+
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                controls.target.set(0, 0, 0);
+                controls.maxPolarAngle = Math.PI / 2 - 0.1; // Prevent going fully below ground
+                controls.autoRotate = true; // Cinematic feel
+                controls.autoRotateSpeed = 1.0;
+                
+                // Allow manual rotation to stop auto-rotate
+                controls.addEventListener('start', () => { controls.autoRotate = false; });
+
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0xffffff, isLight ? 0.9 : 0.6);
+                scene.add(ambientLight);
+                
+                const dirLight = new THREE.DirectionalLight(0xffffff, isLight ? 0.6 : 0.8);
+                dirLight.position.set(20, 40, 20);
+                dirLight.castShadow = true;
+                scene.add(dirLight);
+
+                buildLandscape();
+                
+                // Start Render Loop
+                requestAnimationFrame(renderLoop);
+            }
+
+            function buildLandscape() {
+                // High resolution mesh for smooth mountains
+                const geometry = new THREE.PlaneGeometry(40, 40, 200, 200);
+                geometry.rotateX(-Math.PI / 2); // Lay flat
+
+                const pos = geometry.attributes.position;
+                const colors = [];
+                const color = new THREE.Color();
+
+                for (let i = 0; i < pos.count; i++) {
+                    const x = pos.getX(i);
+                    const z = pos.getZ(i); // Z maps to mathematical Y
+                    const loss = f(x, z);
+                    
+                    // Visually scale the height so it fits on screen nicely
+                    const visualHeight = loss * 0.4;
+                    pos.setY(i, visualHeight);
+
+                    // Topographical Colormap based on Loss (Height)
+                    if (loss < 0.5) color.setHex(0x2563eb).lerp(new THREE.Color(0x3b82f6), loss/0.5); // Deep to light blue
+                    else if (loss < 4) color.setHex(0x3b82f6).lerp(new THREE.Color(0x10b981), (loss-0.5)/3.5); // Blue to green
+                    else if (loss < 10) color.setHex(0x10b981).lerp(new THREE.Color(0xfacc15), (loss-4)/6); // Green to yellow
+                    else if (loss < 20) color.setHex(0xfacc15).lerp(new THREE.Color(0xef4444), (loss-10)/10); // Yellow to red
+                    else color.setHex(0xef4444).lerp(new THREE.Color(0xffffff), Math.min(1, (loss-20)/20)); // Red to white
+                    
+                    colors.push(color.r, color.g, color.b);
+                }
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                geometry.computeVertexNormals();
+
+                const isLight = document.body.classList.contains('light-mode');
+
+                const material = new THREE.MeshStandardMaterial({
+                    vertexColors: true,
+                    side: THREE.DoubleSide,
+                    roughness: 0.9,
+                    metalness: 0.1,
+                    flatShading: false
+                });
+
+                surfaceMesh = new THREE.Mesh(geometry, material);
+                scene.add(surfaceMesh);
+
+                // Add wireframe for that techy grid look
+                const wireframeGeo = new THREE.WireframeGeometry(geometry);
+                const wireframeMat = new THREE.LineBasicMaterial({ 
+                    color: isLight ? 0x000000 : 0xffffff, 
+                    transparent: true, 
+                    opacity: 0.05 
+                });
+                wireframeMesh = new THREE.LineSegments(wireframeGeo, wireframeMat);
+                scene.add(wireframeMesh);
+                
+                // Target Minimum Marker (Global Min)
+                const markerGeo = new THREE.SphereGeometry(0.4, 16, 16);
+                const markerMat = new THREE.MeshBasicMaterial({ color: isLight ? 0x000000 : 0xffffff });
+                const marker = new THREE.Mesh(markerGeo, markerMat);
+                marker.position.set(0, f(0,0)*0.4, 0);
+                scene.add(marker);
+            }
+
+            // Expose a function to handle theme toggles for the 3D scene
+            window.updateAndRedraw = function() {
+                const isLight = document.body.classList.contains('light-mode');
+                if(scene) scene.background = new THREE.Color(isLight ? '#f8fafc' : '#0a0a0a');
+                if(wireframeMesh) wireframeMesh.material.color.setHex(isLight ? 0x000000 : 0xffffff);
+                updateStats(); // Update HTML colors
+            };
+
+            function resize() {
+                if(!camera || !renderer) return;
+                const rect = canvas.parentNode.getBoundingClientRect();
+                camera.aspect = rect.width / rect.height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(rect.width, rect.height);
+            }
+
+            window.addEventListener('resize', resize);
+
+            // --- OPTIMIZER LOGIC & 3D INTEGRATION ---
+
+            function resetOptimizers() {
+                const sel = optimizerSelect.value;
+                const keysToRun = sel === 'all' ? Object.keys(ALL_OPTIMIZERS) : [sel];
+                
+                globalStepCount = 0;
+                simAccumulator = 0;
+                
+                // Cleanup old meshes
+                activeOptimizers.forEach(opt => {
+                    if (opt.lineMesh) scene.remove(opt.lineMesh);
+                    if (opt.headMesh) scene.remove(opt.headMesh);
+                });
+                
+                activeOptimizers = keysToRun.map(key => {
+                    // Create Line Mesh
+                    const mat = new THREE.LineBasicMaterial({ color: ALL_OPTIMIZERS[key].color, linewidth: 2 });
+                    const geo = new THREE.BufferGeometry();
+                    const line = new THREE.Line(geo, mat);
+                    scene.add(line);
+
+                    // Create Glowing Head Mesh
+                    const sMat = new THREE.MeshBasicMaterial({ color: ALL_OPTIMIZERS[key].color });
+                    const sGeo = new THREE.SphereGeometry(0.8, 16, 16);
+                    const head = new THREE.Mesh(sGeo, sMat);
+                    
+                    // Attach dynamic light to illuminate terrain below optimizer
+                    const pointLight = new THREE.PointLight(ALL_OPTIMIZERS[key].color, 1.5, 15);
+                    head.add(pointLight);
+                    
+                    scene.add(head);
+
+                    return {
+                        id: key,
+                        name: ALL_OPTIMIZERS[key].name,
+                        colorHex: ALL_OPTIMIZERS[key].color,
+                        colorStr: '#' + ALL_OPTIMIZERS[key].color.toString(16).padStart(6, '0'),
+                        pos: { ...startPos },
+                        path: [{ ...startPos }],
+                        v: { x: 0, y: 0 },
+                        s: { x: 0, y: 0 },
+                        done: false,
+                        loss: f(startPos.x, startPos.y),
+                        lineMesh: line,
+                        headMesh: head
+                    }
+                });
+
+                updateStats();
+                update3DPaths();
+            }
+
+            function updateStats() {
+                let html = '';
+                
+                if (activeOptimizers.length === 1) {
+                    const opt = activeOptimizers[0];
+                    html = `
+                        <div class="flex justify-between text-[10px] uppercase font-bold opacity-70 mb-1" style="color: var(--text-main)">
+                            <span>Optimizer</span>
+                            <span class="mono-font" style="color: ${opt.colorStr}">${opt.name}</span>
+                        </div>
+                        <div class="flex justify-between text-[10px] uppercase font-bold opacity-70 mb-3" style="color: var(--text-main)">
+                            <span>Iteration Step</span>
+                            <span class="mono-font text-blue-500">${globalStepCount}</span>
+                        </div>
+                        <div class="h-px w-full mb-3" style="background: var(--border-subtle)"></div>
+                        <div class="flex justify-between items-center text-[10px] uppercase font-bold text-indigo-500 mb-1">
+                            <span>Weight 1 (X)</span>
+                            <span class="mono-font" style="color: var(--text-main)">${opt.pos.x.toFixed(3)}</span>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px] uppercase font-bold text-purple-500 mb-3">
+                            <span>Weight 2 (Y)</span>
+                            <span class="mono-font" style="color: var(--text-main)">${opt.pos.y.toFixed(3)}</span>
+                        </div>
+                        <div class="h-px w-full mb-3" style="background: var(--border-subtle)"></div>
+                        <div class="flex justify-between items-center text-[10px] uppercase font-bold text-orange-500">
+                            <span>Current Loss</span>
+                            <span class="mono-font text-sm font-bold px-1 rounded" style="background: rgba(249, 115, 22, 0.1); color: #f97316;">${opt.loss.toFixed(4)}</span>
+                        </div>
+                    `;
+                } else {
+                    // Leaderboard Mode
+                    html = `
+                        <div class="flex justify-between text-[10px] uppercase font-bold opacity-70 mb-3" style="color: var(--text-main)">
+                            <span>Iteration Step</span>
+                            <span class="mono-font text-blue-500">${globalStepCount}</span>
+                        </div>
+                        <div class="space-y-2">
+                    `;
+                    // Sort by loss ascending
+                    let sortedOps = [...activeOptimizers].sort((a,b) => a.loss - b.loss);
+                    sortedOps.forEach(opt => {
+                        let isWinner = opt.loss < 0.2;
+                        html += `
+                            <div class="flex justify-between items-center p-2 rounded" style="background: var(--input-bg); border: 1px solid var(--border-subtle);">
+                                <span class="text-xs font-bold" style="color: ${opt.colorStr}">${opt.name}</span>
+                                <div class="flex items-center gap-2">
+                                    ${isWinner ? '<i class="fas fa-crown text-yellow-500 text-[10px]"></i>' : ''}
+                                    <span class="mono-font text-xs font-bold ${isWinner ? 'text-green-500' : 'opacity-70'}" style="${!isWinner ? 'color: var(--text-main)' : ''}">${opt.loss.toFixed(4)}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
+                }
+                
+                statsPanel.innerHTML = html;
+            }
+
+            function update3DPaths() {
+                activeOptimizers.forEach(opt => {
+                    if (opt.path.length === 0) return;
+                    
+                    // Update Line
+                    const points = opt.path.map(p => {
+                        // Offset line height slightly so it doesn't clip into mountain
+                        return new THREE.Vector3(p.x, f(p.x, p.y) * 0.4 + 0.3, p.y); 
+                    });
+                    opt.lineMesh.geometry.setFromPoints(points);
+
+                    // Update Head Sphere
+                    const current = opt.path[opt.path.length - 1];
+                    opt.headMesh.position.set(current.x, f(current.x, current.y) * 0.4 + 0.6, current.y);
+                });
+            }
+
+            function mathStep(opt, lr) {
+                if (opt.done) return;
+                
+                const gx = gradX(opt.pos.x, opt.pos.y);
+                const gy = gradY(opt.pos.x, opt.pos.y);
+
+                if (opt.id === 'sgd') {
+                    opt.pos.x -= lr * gx;
+                    opt.pos.y -= lr * gy;
+                } 
+                else if (opt.id === 'momentum') {
+                    opt.v.x = beta1 * opt.v.x + (1 - beta1) * gx;
+                    opt.v.y = beta1 * opt.v.y + (1 - beta1) * gy;
+                    opt.pos.x -= lr * opt.v.x;
+                    opt.pos.y -= lr * opt.v.y;
+                }
+                else if (opt.id === 'rmsprop') {
+                    opt.s.x = beta2 * opt.s.x + (1 - beta2) * (gx * gx);
+                    opt.s.y = beta2 * opt.s.y + (1 - beta2) * (gy * gy);
+                    opt.pos.x -= (lr / (Math.sqrt(opt.s.x) + epsilon)) * gx;
+                    opt.pos.y -= (lr / (Math.sqrt(opt.s.y) + epsilon)) * gy;
+                }
+                else if (opt.id === 'adam') {
+                    opt.v.x = beta1 * opt.v.x + (1 - beta1) * gx;
+                    opt.v.y = beta1 * opt.v.y + (1 - beta1) * gy;
+                    
+                    opt.s.x = beta2 * opt.s.x + (1 - beta2) * (gx * gx);
+                    opt.s.y = beta2 * opt.s.y + (1 - beta2) * (gy * gy);
+                    
+                    let t = globalStepCount + 1;
+                    let v_hat_x = opt.v.x / (1 - Math.pow(beta1, t));
+                    let v_hat_y = opt.v.y / (1 - Math.pow(beta1, t));
+                    let s_hat_x = opt.s.x / (1 - Math.pow(beta2, t));
+                    let s_hat_y = opt.s.y / (1 - Math.pow(beta2, t));
+
+                    opt.pos.x -= (lr / (Math.sqrt(s_hat_x) + epsilon)) * v_hat_x;
+                    opt.pos.y -= (lr / (Math.sqrt(s_hat_y) + epsilon)) * v_hat_y;
+                }
+
+                opt.loss = f(opt.pos.x, opt.pos.y);
+                opt.path.push({ ...opt.pos });
+
+                // Bounds / Convergence
+                if (Math.abs(opt.pos.x) > 20 || Math.abs(opt.pos.y) > 20) opt.done = true; // Blew out of mountain bounds
+                if (opt.loss < 0.1) opt.done = true; // Reached global minimum area
+                
+                // Detection for getting permanently trapped in a local minima (Stagnation)
+                if (opt.path.length > 50) {
+                    const oldPos = opt.path[opt.path.length-50];
+                    const dist = Math.sqrt((oldPos.x - opt.pos.x)**2 + (oldPos.y - opt.pos.y)**2);
+                    if (dist < 0.05 && opt.loss > 0.5) {
+                        opt.done = true; // Fully stuck in a local minimum
+                    }
+                }
+            }
+
+            function stepAll() {
+                const lr = parseFloat(lrInput.value);
+                let allDone = true;
+                
+                activeOptimizers.forEach(opt => {
+                    mathStep(opt, lr);
+                    if (!opt.done) allDone = false;
+                });
+                
+                globalStepCount++;
+                
+                // Stop system if everyone is done or we went too long
+                if (allDone || globalStepCount > 2000) {
+                    stopAnimation();
+                }
+            }
+
+            // Engine loop separates Math processing from ThreeJS rendering
+            function logicLoop() {
+                if (!isAnimating) return;
+                
+                if (!isPaused) {
+                    const speed = parseFloat(speedInput.value);
+                    simAccumulator += speed;
+                    
+                    while(simAccumulator >= 1 && !isPaused) {
+                        stepAll();
+                        simAccumulator -= 1;
+                    }
+                    updateStats();
+                    update3DPaths();
+                }
+                
+                if (isAnimating) {
+                    setTimeout(logicLoop, 16); // ~60fps target for math
+                }
+            }
+
+            // Continuous WebGL Render Loop
+            function renderLoop() {
+                if(controls) controls.update();
+                if(renderer && scene && camera) renderer.render(scene, camera);
+                requestAnimationFrame(renderLoop);
+            }
+
+            function startAnimation() {
+                if (isAnimating && !isPaused) return;
+                
+                // If everything finished, reset automatically
+                if (activeOptimizers.every(o => o.done)) resetOptimizers();
+
+                isAnimating = true;
+                isPaused = false;
+                animateBtn.innerHTML = '<i class="fas fa-stop text-xs"></i> <span>Stop Training</span>';
+                animateBtn.classList.add('active');
+                pauseBtn.classList.remove('hidden');
+                pauseBtn.innerHTML = '<i class="fas fa-pause text-xs"></i> <span>Pause</span>';
+                
+                // Disable autorotate so user can see clearly
+                controls.autoRotate = false;
+                
+                logicLoop();
+            }
+
+            function stopAnimation() {
+                isAnimating = false;
+                isPaused = false;
+                animateBtn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Start Training</span>';
+                animateBtn.classList.remove('active');
+                pauseBtn.classList.add('hidden');
+                updateStats();
+                update3DPaths();
+            }
+
+            // Raycaster for clicking the 3D mountain to set start position
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            canvas.addEventListener('dblclick', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                mouse.x = ( (e.clientX - rect.left) / rect.width ) * 2 - 1;
+                mouse.y = - ( (e.clientY - rect.top) / rect.height ) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObject(surfaceMesh);
+
+                if (intersects.length > 0) {
+                    const hit = intersects[0].point;
+                    startPos = {
+                        x: hit.x,
+                        y: hit.z // Z in ThreeJS is Y in our math equation
+                    };
+                    stopAnimation();
+                    resetOptimizers();
+                }
+            });
+
+            // UI Listeners
+            animateBtn.addEventListener('click', () => {
+                if (isAnimating) stopAnimation();
+                else startAnimation();
+            });
+
+            pauseBtn.addEventListener('click', () => {
+                isPaused = !isPaused;
+                if (isPaused) {
+                    pauseBtn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Resume</span>';
+                } else {
+                    pauseBtn.innerHTML = '<i class="fas fa-pause text-xs"></i> <span>Pause</span>';
+                }
+            });
+
+            resetPathBtn.addEventListener('click', () => {
+                stopAnimation();
+                resetOptimizers();
+                controls.autoRotate = true; // re-enable fancy spin on reset
+            });
+
+            optimizerSelect.addEventListener('change', () => {
+                const isAll = optimizerSelect.value === 'all';
+                optimizerSelect.classList.toggle('font-bold', isAll);
+                if (isAll) {
+                    optimizerSelect.style.background = 'var(--bg-surface)';
+                } else {
+                    optimizerSelect.style.background = '';
+                }
+                
+                stopAnimation();
+                resetOptimizers();
+            });
+            
+            lrInput.addEventListener('change', () => {
+                stopAnimation();
+                resetOptimizers();
+            });
+
+            speedInput.addEventListener('input', (e) => {
+                speedValue.textContent = parseFloat(e.target.value).toFixed(1) + 'x';
+            });
+
+            // Init System
+            init3D();
+            resetOptimizers();
+        });
+
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "../machine_learning/cosine_similarity.html", category: "ml", icon: "fa-brain" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing & Loss", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Optimizers", path: "../deep_learning/optimizers.html", category: "dl", icon: "fa-network-wired" }
+        ];
+
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                if (query.length === 0) { dropdown.classList.remove('show'); return; }
+                const filtered = allCourses.filter(c => c.title.toLowerCase().includes(query) || c.category.toLowerCase().includes(query));
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div><div class="dropdown-item-title">${course.title}</div><div class="dropdown-item-path">${course.category.toUpperCase()}</div></div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>`).join('');
+                }
+                dropdown.classList.add('show');
+            });
+            document.addEventListener('click', (e) => { if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show'); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dropdown.classList.remove('show'); });
+        }
+    </script>
+</body>
+</html>
