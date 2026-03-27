@@ -3,10 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VizLearn - Dropout in Neural Networks</title>
+    <title>VizLearn - Neural Network for Unsupervised Learning</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Add MathJax for rendering LaTeX formulas -->
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            startup: {
+                typeset: true
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -63,7 +78,6 @@
             --neuron-fill: #111827;
             --neuron-border: rgba(74, 222, 128, 0.5);
             --connection-line: rgba(74, 222, 128, 0.2);
-            --dropout-neuron: rgba(255, 255, 255, 0.05);
         }
 
         body.light-mode {
@@ -85,9 +99,8 @@
             /* Canvas Specifics - Light Mode Contrast Fix */
             --canvas-bg: #f8fafc;
             --neuron-fill: #ffffff;
-            --neuron-border: #15803d; 
-            --connection-line: rgba(21, 128, 61, 0.4);
-            --dropout-neuron: rgba(0, 0, 0, 0.05);
+            --neuron-border: #15803d; /* Dark green border for visibility */
+            --connection-line: rgba(21, 128, 61, 0.4); /* Darker, visible lines */
         }
 
         *, *::before, *::after {
@@ -137,6 +150,13 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
+        .calc-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
         .floating-panel {
             position: absolute;
             top: 1rem;
@@ -169,54 +189,6 @@
             outline: none;
         }
 
-        /* Custom Range Slider */
-        input[type=range] {
-            -webkit-appearance: none; /* Hides the slider so that custom slider can be made */
-            background: transparent; /* Otherwise white in Chrome */
-        }
-
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-        }
-
-        input[type=range]:focus {
-            outline: none; /* Removes the blue border. You should probably do some kind of focus styling for accessibility reasons though. */
-        }
-
-        input[type=range]::-ms-track {
-            width: 100%;
-            cursor: pointer;
-            background: transparent; 
-            border-color: transparent;
-            color: transparent;
-        }
-
-        /* Thumb */
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            border: 2px solid var(--bg-surface);
-            height: 14px;
-            width: 14px;
-            border-radius: 50%;
-            background: var(--accent-primary);
-            cursor: pointer;
-            margin-top: -5px; /* You need to specify a margin in Chrome, but in Firefox and IE it is automatic */
-            box-shadow: 0 0 10px var(--accent-glow);
-            transition: transform 0.1s;
-        }
-        input[type=range]::-webkit-slider-thumb:hover {
-            transform: scale(1.2);
-        }
-
-        /* Track */
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 4px;
-            cursor: pointer;
-            background: var(--border-subtle);
-            border-radius: 2px;
-        }
-
         /* Buttons */
         .viz-btn {
             font-family: 'Space Grotesk', sans-serif;
@@ -228,10 +200,6 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
             padding: 0.5rem 1rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
         }
         .viz-btn-primary {
             background: var(--accent-primary);
@@ -252,12 +220,6 @@
             border-color: var(--accent-primary);
             color: var(--accent-primary);
             background: var(--input-focus-bg);
-        }
-        .viz-btn-animate.active {
-            background: #ef4444 !important;
-            color: white !important;
-            border-color: #ef4444 !important;
-            box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important;
         }
 
         #canvas {
@@ -421,11 +383,10 @@
 
     </style>
 </head>
-<body class="flex flex-col h-screen overflow-hidden">
+<body class="flex flex-col min-h-screen overflow-x-hidden">
 
-    <!-- Navbar -->
     <!-- Header -->
-    <header class="glass-header sticky top-0 z-50">
+    <header class="glass-header sticky top-0 z-50 shrink-0">
         <div class="flex justify-center py-3 px-4 md:px-8">
             <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
                 <!-- Logo -->
@@ -460,69 +421,41 @@
         </div>
     </header>
 
-
     <!-- Title Section -->
-    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full">
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full animate-fade-in">
         <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
             <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
             <span>/</span>
             <span>Deep Learning</span>
         </div>
-        <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Dropout in Neural Networks</h1>
+        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Neural Network for Unsupervised Learning</h1>
         <p class="mt-2 text-sm md:text-base max-w-2xl opacity-80" style="color: var(--text-muted)">
-            Interactive architecture builder. Drag to pan, scroll to zoom, right-click to edit.
+            Build and understand deep learning architectures designed to find hidden patterns in data without human labels.
         </p>
     </div>
 
     <!-- Toolbar -->
-    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-4 justify-between">
+    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-4 justify-between animate-fade-in">
         <!-- Input Group -->
-        <div class="flex items-center gap-3 overflow-x-auto pb-1 md:pb-0 hide-scrollbar shrink-0">
+        <div class="flex items-center gap-3 overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
             <div class="flex items-center gap-2">
-                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Input</label>
-                <input type="number" id="inputFeatures" value="4" min="1" max="20" class="viz-input w-14 text-center">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Input Features</label>
+                <input type="number" id="inputFeatures" value="6" min="1" max="20" class="viz-input w-16 text-center">
             </div>
             
             <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
             
             <div class="flex items-center gap-2">
-                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Hidden</label>
-                <input type="text" id="hiddenLayers" value="8,8,8" placeholder="e.g. 8,16,8" class="viz-input w-28 text-center">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Hidden Layers</label>
+                <input type="text" id="hiddenLayers" value="4,2,4" placeholder="e.g. 4,2,4" class="viz-input w-36 text-center">
             </div>
             
             <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
             
-            <div class="flex items-center gap-2">
-                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Output</label>
-                <input type="number" id="outputClasses" value="3" min="1" max="20" class="viz-input w-14 text-center">
+            <div class="flex items-center gap-2" title="For autoencoders, this matches the Input Features">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-amber-500">Reconstruction Output</label>
+                <input type="number" id="outputNeurons" value="6" min="1" max="20" class="viz-input w-16 text-center border-amber-500/50">
             </div>
-        </div>
-
-        <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
-
-        <!-- Dropout & Animation Controls (Fixed Layout) -->
-        <div class="flex items-center gap-6 shrink-0 md:border-l border-[var(--border-subtle)] md:pl-6">
-            
-            <!-- Dropout Control -->
-            <div class="flex flex-col justify-center gap-1 min-w-[120px]">
-                <div class="flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-1.5 cursor-help opacity-80 hover:opacity-100 transition-opacity" id="dropoutInfoBtn" title="Info: What is Dropout?">
-                        <i class="far fa-question-circle text-[10px]" style="color: var(--accent-primary)"></i>
-                        <label class="text-[10px] font-bold uppercase tracking-wide cursor-pointer select-none">Dropout</label>
-                    </div>
-                    <span id="dropoutValue" class="text-[10px] font-mono font-bold" style="color: var(--accent-primary)">0%</span>
-                </div>
-                <!-- Range Slider -->
-                <div class="relative h-4 flex items-center">
-                    <input type="range" id="dropoutSlider" min="0" max="90" value="0" step="5" class="w-full h-1 bg-[var(--border-subtle)] rounded-lg appearance-none cursor-pointer absolute z-10">
-                </div>
-            </div>
-            
-            <!-- Animate Button -->
-            <button id="animateBtn" class="viz-btn viz-btn-primary viz-btn-animate whitespace-nowrap py-2 px-4 shadow-[0_0_15px_rgba(74,222,128,0.15)]">
-                <i class="fas fa-play text-xs"></i> 
-                <span>Simulate Flow</span>
-            </button>
         </div>
 
         <!-- Action Group -->
@@ -533,14 +466,14 @@
             <button id="resetNetworkBtn" class="viz-btn viz-btn-secondary" title="Reset">
                 <i class="fas fa-undo"></i>
             </button>
-            <button id="calculateBtn" class="viz-btn viz-btn-secondary">
-                <i class="fas fa-calculator"></i> Params
+            <button id="calculateBtn" class="viz-btn viz-btn-primary">
+                <i class="fas fa-calculator mr-2"></i> Parameters
             </button>
         </div>
     </div>
 
-    <!-- Main Content Area -->
-    <main class="flex-1 relative overflow-hidden bg-[var(--canvas-bg)]">
+    <!-- Canvas Area -->
+    <div class="relative w-full h-[60vh] min-h-[500px] border-b shrink-0 overflow-hidden animate-fade-in" style="border-color: var(--border-subtle); background: var(--canvas-bg);">
         <!-- Canvas -->
         <canvas id="canvas" class="block w-full h-full"></canvas>
 
@@ -575,10 +508,6 @@
                      Hover over nodes for details.
                  </div>
              </div>
-             
-             <div class="text-[9px] text-center opacity-40">
-                 Right-click to edit | Scroll to Zoom
-             </div>
         </div>
         
         <!-- Context Menu -->
@@ -587,10 +516,157 @@
             <button id="ctxRemoveNeuron" class="ctx-item hidden danger"><i class="fas fa-minus mr-2 text-xs"></i> Remove Neuron</button>
             <div id="ctxSeparator1" class="ctx-separator hidden"></div>
             <button id="ctxEditFeatures" class="ctx-item hidden"><i class="fas fa-pen mr-2 text-xs"></i> Edit Features</button>
-            <button id="ctxEditLabels" class="ctx-item hidden"><i class="fas fa-pen mr-2 text-xs"></i> Edit Labels</button>
+            <button id="ctxEditLabels" class="ctx-item hidden"><i class="fas fa-pen mr-2 text-xs"></i> Edit Outputs</button>
             <button id="ctxAddLayer" class="ctx-item hidden"><i class="fas fa-layer-group mr-2 text-xs"></i> Add Layer After</button>
             <button id="ctxRemoveLayer" class="ctx-item hidden danger"><i class="fas fa-trash mr-2 text-xs"></i> Remove Layer</button>
             <button id="ctxEditNeurons" class="ctx-item hidden"><i class="fas fa-edit mr-2 text-xs"></i> Edit Count</button>
+        </div>
+    </div>
+
+    <!-- Comprehensive Article Section (Unsupervised Focused) -->
+    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div class="mt-8 mb-12 card-container animate-fade-in" style="animation-delay: 0.2s">
+            <div class="border-b px-6 py-5 md:px-8 md:py-6" style="border-color: var(--border-subtle)">
+                <h2 class="text-xl md:text-2xl font-bold flex items-center gap-3 brand-font" style="color: var(--text-main)">
+                    <i class="fas fa-eye-slash" style="color: var(--accent-primary)"></i>
+                    Unsupervised Learning & Autoencoders
+                </h2>
+            </div>
+            
+            <div class="p-6 md:p-8 space-y-12" style="color: var(--text-muted)">
+                
+                <!-- Intro Section -->
+                <section>
+                    <p class="leading-relaxed mb-4">
+                        In supervised learning, we give an AI a set of inputs and tell it exactly what the correct output should be (like teaching a child with flashcards). But what happens when we don't have the answers? What if we have millions of data points and we just want the AI to <strong>find the hidden patterns</strong> on its own?
+                    </p>
+                    <p class="leading-relaxed">
+                        This is <strong>Unsupervised Learning</strong>. To do this with a neural network, we construct a specific architecture called an <strong>Autoencoder</strong>. If you look at the visualizer above, you'll notice it forms an "hourglass" shape. The network is forced to compress the data down to a tiny size, and then expand it back out to recreate the original input.
+                    </p>
+                </section>
+
+                <!-- Architecture Adjustments Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">1. The Autoencoder Architecture</h3>
+                    <p class="leading-relaxed mb-6 text-sm">
+                        An Autoencoder is mathematically split into three distinct phases. By forcing the data through a bottleneck, the network is forced to ignore noise and keep only the most vital, structural information.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="calc-card flex flex-col">
+                            <h4 class="font-bold text-sm mb-2 flex items-center gap-2" style="color: var(--text-main)"><i class="fas fa-compress-arrows-alt text-blue-400"></i> The Encoder</h4>
+                            <p class="text-sm leading-relaxed opacity-80 mb-3">The first half of the network. It takes the high-dimensional input (e.g., a 6-pixel image) and applies weights and biases to gradually squish it into fewer and fewer neurons.</p>
+                        </div>
+                        <div class="calc-card flex flex-col" style="border-color: var(--accent-primary); box-shadow: inset 0 0 20px var(--accent-glow);">
+                            <h4 class="font-bold text-sm mb-2 flex items-center gap-2" style="color: var(--accent-primary)"><i class="fas fa-filter"></i> The Bottleneck (Latent Space)</h4>
+                            <p class="text-sm leading-relaxed opacity-80 mb-3">The smallest layer in the exact center (in our default, 2 neurons). This is the compressed, highly-dense representation of the data, often called the <em>Latent Representation</em>. If the AI learns well, these 2 neurons capture the entire essence of the original 6 inputs.</p>
+                        </div>
+                        <div class="calc-card flex flex-col">
+                            <h4 class="font-bold text-sm mb-2 flex items-center gap-2" style="color: var(--text-main)"><i class="fas fa-expand-arrows-alt text-amber-500"></i> The Decoder</h4>
+                            <p class="text-sm leading-relaxed opacity-80 mb-3">The second half of the network. It takes the tiny Latent Space and attempts to blow it back up to reconstruct the original input perfectly. The final layer must have the <em>exact same number of neurons</em> as the input layer.</p>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Sample Scenario Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">2. Real-World Scenarios</h3>
+                    <p class="leading-relaxed mb-4 text-sm">
+                        Why would we train a massive network just to output exactly what we put into it? The secret lies in the Bottleneck.
+                    </p>
+                    
+                    <div class="p-4 rounded-xl mb-6" style="background: var(--bg-body); border: 1px solid var(--border-subtle);">
+                        <ul class="space-y-4 text-sm">
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-compress mt-1 text-blue-400"></i>
+                                <div>
+                                    <strong style="color: var(--text-main)">Data Compression & Denoising:</strong> 
+                                    If you train an autoencoder on thousands of images of faces, it learns the fundamental rules of a human face. If you then input a blurry or noisy face, the bottleneck will strip out the noise (because noise isn't an essential feature), and the Decoder will output a clean, crisp face.
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-exclamation-triangle mt-1 text-accent-primary" style="color: var(--accent-primary)"></i>
+                                <div>
+                                    <strong style="color: var(--text-main)">Anomaly Detection (e.g., Credit Card Fraud):</strong> 
+                                    Train an autoencoder entirely on "normal" transactions. It will learn to reconstruct normal transactions perfectly. If a fraudulent transaction occurs, the pattern will be bizarre. When the data hits the bottleneck, the network won't know how to handle it, and the reconstruction will fail horribly. We flag transactions that fail to reconstruct as anomalies!
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- Loss Function Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">3. How It Learns: Reconstruction Loss</h3>
+                    <p class="leading-relaxed mb-4 text-sm">
+                        Since we have no human-provided labels ($y$), the network uses the original Input data ($\mathbf{X}$) as its own target. It predicts a reconstruction ($\mathbf{\hat{X}}$) and compares it to the original input using Mean Squared Error (MSE).
+                    </p>
+                    
+                    <div class="calc-card grid grid-cols-1 md:grid-cols-2 gap-8 items-center border-l-4" style="border-left-color: #ef4444">
+                        <div>
+                            <p class="text-sm leading-relaxed mb-3">The network calculates the pixel-by-pixel (or feature-by-feature) difference between the original input and the final output.</p>
+                            <p class="text-sm leading-relaxed mb-3">It squares these differences and averages them. It then uses Backpropagation to update the weights of the Encoder and Decoder simultaneously to make this error as close to 0 as possible.</p>
+                        </div>
+                        <div class="p-4 rounded-xl text-center bg-black/20" style="border: 1px solid var(--border-subtle);">
+                            <div class="mono-font text-lg overflow-x-auto" style="color: #ef4444;">
+                                $$ \mathcal{L}_{Recon} = \frac{1}{n} \sum_{i=1}^{n} (\mathbf{X}_i - \mathbf{\hat{X}}_i)^2 $$
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Parameter Calculation Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">4. Parameter Calculation Trace</h3>
+                    <p class="leading-relaxed mb-6 text-sm">
+                        Let's trace the learnable parameters for our default Autoencoder configuration: <strong>Input (6) $\rightarrow$ Encoder (4) $\rightarrow$ Bottleneck (2) $\rightarrow$ Decoder (4) $\rightarrow$ Output (6)</strong>.
+                    </p>
+
+                    <div class="overflow-x-auto rounded-lg border mb-6" style="border-color: var(--border-subtle)">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr style="background: var(--input-bg); color: var(--text-main)">
+                                    <th class="p-4 border-b border-r" style="border-color: var(--border-subtle)">Layer Transition</th>
+                                    <th class="p-4 border-b border-r" style="border-color: var(--border-subtle)">Weights ($N_{in} \times N_{out}$)</th>
+                                    <th class="p-4 border-b border-r" style="border-color: var(--border-subtle)">Biases ($N_{out}$)</th>
+                                    <th class="p-4 border-b text-right font-bold" style="border-color: var(--border-subtle)">Total Parameters</th>
+                                </tr>
+                            </thead>
+                            <tbody class="mono-font text-xs">
+                                <tr class="transition-colors hover:bg-white/5">
+                                    <td class="p-3 border-b border-r font-sans font-bold" style="border-color: var(--border-subtle); color: var(--text-main)">Input (6) $\rightarrow$ Encoder (4)</td>
+                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$6 \times 4 = 24$</td>
+                                    <td class="p-3 border-b border-r text-amber-500" style="border-color: var(--border-subtle)">4</td>
+                                    <td class="p-3 border-b text-right text-green-400 font-bold bg-green-500/5" style="border-color: var(--border-subtle)">28</td>
+                                </tr>
+                                <tr class="transition-colors hover:bg-white/5">
+                                    <td class="p-3 border-b border-r font-sans font-bold" style="border-color: var(--border-subtle); color: var(--text-main)">Encoder (4) $\rightarrow$ Bottleneck (2)</td>
+                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$4 \times 2 = 8$</td>
+                                    <td class="p-3 border-b border-r text-amber-500" style="border-color: var(--border-subtle)">2</td>
+                                    <td class="p-3 border-b text-right text-green-400 font-bold bg-green-500/5" style="border-color: var(--border-subtle)">10</td>
+                                </tr>
+                                <tr class="transition-colors hover:bg-white/5">
+                                    <td class="p-3 border-b border-r font-sans font-bold" style="border-color: var(--border-subtle); color: var(--text-main)">Bottleneck (2) $\rightarrow$ Decoder (4)</td>
+                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$2 \times 4 = 8$</td>
+                                    <td class="p-3 border-b border-r text-amber-500" style="border-color: var(--border-subtle)">4</td>
+                                    <td class="p-3 border-b text-right text-green-400 font-bold bg-green-500/5" style="border-color: var(--border-subtle)">12</td>
+                                </tr>
+                                <tr class="transition-colors hover:bg-white/5">
+                                    <td class="p-3 border-b border-r font-sans font-bold" style="border-color: var(--border-subtle); color: var(--text-main)">Decoder (4) $\rightarrow$ Reconstruction (6)</td>
+                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$4 \times 6 = 24$</td>
+                                    <td class="p-3 border-b border-r text-amber-500" style="border-color: var(--border-subtle)">6</td>
+                                    <td class="p-3 border-b text-right text-green-400 font-bold bg-green-500/5" style="border-color: var(--border-subtle)">30</td>
+                                </tr>
+                                <tr style="background: var(--bg-surface)">
+                                    <td colspan="3" class="p-4 text-right font-sans font-bold uppercase tracking-wider text-xs" style="color: var(--text-main)">Entire Autoencoder's Parameters</td>
+                                    <td class="p-4 text-right font-bold text-lg text-green-400">80</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+            </div>
         </div>
     </main>
     
@@ -605,7 +681,7 @@
                     <i class="fab fa-instagram fa-lg"></i>
                 </a>
             </div>
-            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2025 VIZLEARN // MODULE.NEURAL_NET</p>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2026 VIZLEARN // MODULE.NEURAL_NET_UNSUPERVISED</p>
         </div>
     </footer>
 
@@ -666,31 +742,6 @@
             </div>
         </div>
     </div>
-    
-    <!-- Dropout Info Modal -->
-    <div id="dropoutInfoModal" class="modal fixed inset-0 hidden items-center justify-center z-[1001]">
-        <div class="modal-content p-6 rounded-xl w-full max-w-lg m-4">
-            <div class="flex justify-between items-start mb-4">
-                <h3 class="text-lg font-bold flex items-center gap-2" style="color: var(--accent-primary)">
-                    <i class="fas fa-random"></i> What is Dropout?
-                </h3>
-                <button id="closeDropoutInfoBtn" class="text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="space-y-4 text-sm leading-relaxed opacity-90">
-                <p>
-                    <strong>Dropout</strong> is a regularization technique used to prevent overfitting in neural networks.
-                </p>
-                <p>
-                    During training, randomly selected neurons are <strong>ignored</strong> (dropped out). They are temporarily removed from the network, meaning they make no contribution to the activation of downstream neurons on the forward pass, and weight updates are not applied to the neuron on the backward pass.
-                </p>
-                <div class="metric-card p-3 border-l-4" style="border-left-color: var(--accent-primary)">
-                    <p class="italic text-xs">
-                        Use the <strong>slider</strong> to simulate dropout percentage. Notice how connections disappear as neurons are deactivated, forcing the network to learn more robust features that don't rely on specific neurons.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <script>
         // --- THEME LOGIC ---
@@ -721,14 +772,6 @@
             if (typeof window.updateAndRedraw === 'function') window.updateAndRedraw();
         });
 
-        // --- HELPER ---
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-        }
-
         // --- NEURAL NETWORK LOGIC ---
         document.addEventListener('DOMContentLoaded', () => {
             const canvas = document.getElementById('canvas');
@@ -736,16 +779,9 @@
             const centerCanvasBtn = document.getElementById('centerCanvasBtn');
             const calculateBtn = document.getElementById('calculateBtn');
             const resetNetworkBtn = document.getElementById('resetNetworkBtn');
-            const animateBtn = document.getElementById('animateBtn');
-            
             const inputFeaturesEl = document.getElementById('inputFeatures');
             const hiddenLayersEl = document.getElementById('hiddenLayers');
-            const outputClassesEl = document.getElementById('outputClasses');
-            const dropoutSlider = document.getElementById('dropoutSlider');
-            const dropoutValueLabel = document.getElementById('dropoutValue');
-            const dropoutInfoBtn = document.getElementById('dropoutInfoBtn');
-            const dropoutInfoModal = document.getElementById('dropoutInfoModal');
-            const closeDropoutInfoBtn = document.getElementById('closeDropoutInfoBtn');
+            const outputNeuronsEl = document.getElementById('outputNeurons');
 
             const totalLayersEl = document.getElementById('totalLayers');
             const totalNeuronsEl = document.getElementById('totalNeurons');
@@ -764,10 +800,10 @@
                 editNeurons: document.getElementById('ctxEditNeurons')
             };
 
-            // State
-            let numFeatures = 4;
-            let hiddenLayerNeuronCounts = [8, 8, 8];
-            let numLabels = 3;
+            // State (Defaulted to Unsupervised / Autoencoder)
+            let numFeatures = 6;
+            let hiddenLayerNeuronCounts = [4, 2, 4];
+            let numLabels = 6; 
             let scale = 1;
             let translateX = 0;
             let translateY = 0;
@@ -780,17 +816,6 @@
             let neuronPositions = [];
             let currentNeuronRadius = 35;
             let contextMenuTarget = { layer: -1, neuron: -1 };
-            
-            // Dropout State
-            let dropoutRate = 0;
-            let droppedNeurons = new Set(); // Stores strings "layerIdx_neuronIdx"
-
-            // Animation State
-            let isAnimating = false;
-            let animationParticles = []; // {layer, progress, direction, sourceIndex, targetIndex}
-            let animationRequestId = null;
-            let animationPhase = 'forward'; // 'forward' or 'backward'
-            let activeLayerIndex = -1; // Which layer is currently "firing"
 
             // Theme Helpers
             function getThemeColors() {
@@ -801,108 +826,9 @@
                     neuronFill: styles.getPropertyValue('--neuron-fill').trim(),
                     neuronBorder: styles.getPropertyValue('--neuron-border').trim(),
                     connection: styles.getPropertyValue('--connection-line').trim(),
-                    dropout: styles.getPropertyValue('--dropout-neuron').trim(),
                     accent: styles.getPropertyValue('--accent-primary').trim(),
                     text: styles.getPropertyValue('--text-main').trim(),
                 };
-            }
-
-            // Dropout Logic - EQUAL RATES (Deterministic Count)
-            function updateDropout() {
-                droppedNeurons.clear();
-                if (dropoutRate > 0) {
-                    
-                    // 1. Input Layer Dropout (Layer 0)
-                    const inputCount = numFeatures;
-                    // Calculate exact count to drop
-                    const dropInputCount = Math.round(inputCount * (dropoutRate / 100));
-                    if (dropInputCount > 0 && dropInputCount < inputCount) {
-                        const inputIndices = Array.from({length: inputCount}, (_, i) => i);
-                        shuffleArray(inputIndices);
-                        for(let i=0; i<dropInputCount; i++) {
-                            droppedNeurons.add(`0_${inputIndices[i]}`);
-                        }
-                    } else if (dropInputCount === inputCount) {
-                         // Avoid dropping ALL inputs usually, but user asked for equal rate. 
-                         // If 100%, we drop all.
-                         for(let i=0; i<inputCount; i++) droppedNeurons.add(`0_${i}`);
-                    }
-
-                    // 2. Hidden Layers Dropout
-                    hiddenLayerNeuronCounts.forEach((count, hIdx) => {
-                        const layerIdx = hIdx + 1; // Input is 0
-                        
-                        const dropCount = Math.round(count * (dropoutRate / 100));
-                        
-                        if (dropCount > 0) {
-                            const indices = Array.from({length: count}, (_, i) => i);
-                            shuffleArray(indices);
-                            for(let i=0; i<dropCount; i++) {
-                                droppedNeurons.add(`${layerIdx}_${indices[i]}`);
-                            }
-                        }
-                    });
-                }
-            }
-
-            // Animation Logic
-            function startAnimation() {
-                if (isAnimating) return; // Already running
-                isAnimating = true;
-                animateBtn.innerHTML = '<i class="fas fa-stop text-xs"></i> <span>Stop Flow</span>';
-                animateBtn.classList.add('active');
-                
-                // Regenerate dropout mask on start to ensure visual changes if user adjusted slider
-                updateDropout();
-                
-                animationParticles = [];
-                activeLayerIndex = 0;
-                animationPhase = 'forward';
-                
-                lastTime = performance.now();
-                animationLoop();
-            }
-
-            function stopAnimation() {
-                isAnimating = false;
-                animateBtn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Simulate Flow</span>';
-                animateBtn.classList.remove('active');
-                if (animationRequestId) cancelAnimationFrame(animationRequestId);
-                activeLayerIndex = -1;
-                animationParticles = [];
-                drawNetwork(); // Clean redraw
-            }
-
-            let lastTime = 0;
-            const PARTICLE_SPEED = 0.02; // Progress per frame
-
-            function animationLoop() {
-                if (!isAnimating) return;
-
-                // Simple logic: Highlight connections layer by layer
-                // Instead of individual particles, we pulse the connections
-                const time = performance.now();
-                if (time - lastTime > 400) { // Change layer every 400ms
-                    lastTime = time;
-                    
-                    if (animationPhase === 'forward') {
-                        activeLayerIndex++;
-                        if (activeLayerIndex >= neuronPositions.length - 1) {
-                            animationPhase = 'backward';
-                        }
-                    } else {
-                        activeLayerIndex--;
-                        if (activeLayerIndex < 0) { // Cycle complete (Backward pass finished)
-                            animationPhase = 'forward';
-                            activeLayerIndex = 0;
-                            // Regenerate dropout mask for the next "batch" - KEY REQUIREMENT
-                            updateDropout(); 
-                        }
-                    }
-                }
-
-                drawNetwork();
-                animationRequestId = requestAnimationFrame(animationLoop);
             }
 
             // Drawing
@@ -953,80 +879,29 @@
                 });
 
                 // Connections
+                ctx.beginPath();
+                ctx.strokeStyle = colors.connection;
                 ctx.lineWidth = 1 / scale;
                 for(let i=0; i<numLayers-1; i++) {
-                    const isAnimatingLayer = isAnimating && 
-                        ((animationPhase === 'forward' && activeLayerIndex === i) || 
-                         (animationPhase === 'backward' && activeLayerIndex === i));
-                    
-                    neuronPositions[i].forEach((n1, idx1) => {
-                        const sourceDropped = droppedNeurons.has(`${i}_${idx1}`);
-                        
-                        neuronPositions[i+1].forEach((n2, idx2) => {
-                            const targetDropped = droppedNeurons.has(`${i+1}_${idx2}`);
-                            
-                            // Don't draw if dropped
-                            if (sourceDropped || targetDropped) {
-                                ctx.beginPath();
-                                ctx.strokeStyle = colors.connection;
-                                ctx.globalAlpha = 0.05; // Very faint
+                    neuronPositions[i].forEach(n1 => {
+                        neuronPositions[i+1].forEach(n2 => {
+                            const nextKey = `${i+1}_${neuronPositions[i+1].indexOf(n2)}`;
+                            if (!highlightedPathNeurons.has(nextKey)) {
                                 ctx.moveTo(n1.x, n1.y);
                                 ctx.lineTo(n2.x, n2.y);
-                                ctx.stroke();
-                                ctx.globalAlpha = 1.0;
-                                return;
                             }
-
-                            const nextKey = `${i+1}_${idx2}`;
-                            const isHighlightedPath = highlightedPathNeurons.has(nextKey);
-                            
-                            ctx.beginPath();
-                            
-                            if (isAnimatingLayer) {
-                                // Animation Style
-                                ctx.strokeStyle = animationPhase === 'forward' ? colors.accent : '#3b82f6'; // Green for forward, Blue for back
-                                ctx.lineWidth = (3 / scale);
-                                ctx.globalAlpha = 0.8;
-                                // Simple dash animation effect
-                                const dashOffset = (performance.now() / 20) * (animationPhase === 'forward' ? -1 : 1);
-                                ctx.setLineDash([5, 5]);
-                                ctx.lineDashOffset = dashOffset;
-                            } else if (isHighlightedPath) {
-                                // Selection Style handled later, draw basic line first
-                                ctx.strokeStyle = colors.connection;
-                                ctx.lineWidth = 1 / scale;
-                                ctx.setLineDash([]);
-                            } else {
-                                // Normal Style
-                                ctx.strokeStyle = colors.connection;
-                                ctx.lineWidth = 1 / scale;
-                                ctx.setLineDash([]);
-                            }
-
-                            ctx.moveTo(n1.x, n1.y);
-                            ctx.lineTo(n2.x, n2.y);
-                            ctx.stroke();
-                            
-                            // Reset context
-                            ctx.setLineDash([]);
-                            ctx.globalAlpha = 1.0;
-                            ctx.lineDashOffset = 0;
                         });
                     });
                 }
+                ctx.stroke();
 
-                // Highlighted Paths (Static Selection) - Draw on top if not animating
-                if (highlightedPathNeurons.size > 0 && !isAnimating) {
+                // Highlighted Paths
+                if (highlightedPathNeurons.size > 0) {
                     ctx.beginPath();
                     ctx.lineWidth = 2 / scale;
                     for(let i=0; i<numLayers-1; i++) {
                         neuronPositions[i].forEach((n1, idx1) => {
-                            // Skip dropped in path highlighting too
-                            if (droppedNeurons.has(`${i}_${idx1}`)) return;
-                            
                             neuronPositions[i+1].forEach((n2, idx2) => {
-                                if (droppedNeurons.has(`${i+1}_${idx2}`)) return;
-
                                 const nextKey = `${i+1}_${idx2}`;
                                 const dist = highlightedPathNeurons.get(nextKey);
                                 if (dist !== undefined) {
@@ -1047,67 +922,41 @@
                 // Neurons
                 layers.forEach((count, lIdx) => {
                     neuronPositions[lIdx].forEach((pos, nIdx) => {
-                        const key = `${lIdx}_${nIdx}`;
-                        const isDropped = droppedNeurons.has(key);
                         const isSelected = selectedNeuron?.layer === lIdx && selectedNeuron?.neuron === nIdx;
                         const isHovered = hoveredNeuron?.layer === lIdx && hoveredNeuron?.neuron === nIdx;
+                        const key = `${lIdx}_${nIdx}`;
                         const isPath = highlightedPathNeurons.has(key);
-                        const isActiveInAnim = isAnimating && activeLayerIndex === lIdx && !isDropped;
 
                         ctx.beginPath();
                         ctx.arc(pos.x, pos.y, currentNeuronRadius, 0, Math.PI*2);
                         
-                        // Fill & Stroke
-                        if (isDropped) {
-                            ctx.fillStyle = colors.dropout;
-                            ctx.setLineDash([4, 4]); // Dashed border for dropout
-                            ctx.strokeStyle = colors.connection;
-                            ctx.lineWidth = 1 / scale;
-                        } else if (isActiveInAnim) {
-                            ctx.fillStyle = animationPhase === 'forward' ? colors.accent : '#3b82f6';
-                            ctx.shadowColor = animationPhase === 'forward' ? colors.accent : '#3b82f6';
-                            ctx.shadowBlur = 20;
-                            ctx.strokeStyle = colors.bg;
-                            ctx.lineWidth = 0;
-                        } else if (isSelected || isPath) {
+                        // Fill
+                        if (isSelected || isPath) {
                             ctx.fillStyle = colors.accent;
                             ctx.globalAlpha = isSelected ? 1 : 0.2;
-                            ctx.strokeStyle = colors.accent;
-                            ctx.lineWidth = (isSelected ? 2 : 1) / scale;
                         } else {
                             ctx.fillStyle = colors.neuronFill;
-                            ctx.strokeStyle = (isHovered) ? colors.accent : colors.neuronBorder;
-                            ctx.lineWidth = (isHovered ? 2 : 1) / scale;
+                            ctx.globalAlpha = 1;
                         }
-
                         ctx.fill();
-                        if (!isActiveInAnim) ctx.stroke();
-                        
-                        // Cleanup
-                        ctx.setLineDash([]);
-                        ctx.shadowBlur = 0;
                         ctx.globalAlpha = 1;
 
+                        // Stroke
+                        ctx.strokeStyle = (isSelected || isHovered || isPath) ? colors.accent : colors.neuronBorder;
+                        if(lIdx === numLayers-1) ctx.strokeStyle = '#f59e0b'; // Amber for output
+                        
+                        ctx.lineWidth = (isSelected || isHovered ? 2 : 1) / scale;
+                        ctx.stroke();
+
                         // Label
-                        if (!isDropped) {
-                            ctx.fillStyle = (isSelected || isPath) && !document.body.classList.contains('light-mode') ? '#000' : colors.text;
-                            if (isActiveInAnim) ctx.fillStyle = '#000'; // Text contrast during pulse
-                            
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            
-                            let label = lIdx === 0 ? `In ${nIdx+1}` : (lIdx === numLayers-1 ? `Out ${nIdx+1}` : `H${lIdx}_${nIdx+1}`);
-                            let fontSize = Math.max(8, currentNeuronRadius * 0.5);
-                            ctx.font = `${fontSize}px 'JetBrains Mono'`;
-                            ctx.fillText(label, pos.x, pos.y);
-                        } else {
-                            // X mark for dropped
-                            ctx.fillStyle = colors.connection;
-                            ctx.font = `${currentNeuronRadius}px sans-serif`;
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            ctx.fillText('×', pos.x, pos.y);
-                        }
+                        ctx.fillStyle = colors.text;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        
+                        let label = lIdx === 0 ? `In ${nIdx+1}` : (lIdx === numLayers-1 ? `Out ${nIdx+1}` : `H${lIdx}_${nIdx+1}`);
+                        let fontSize = Math.max(8, currentNeuronRadius * 0.5);
+                        ctx.font = `${fontSize}px 'JetBrains Mono'`;
+                        ctx.fillText(label, pos.x, pos.y);
                     });
                 });
 
@@ -1119,19 +968,9 @@
                 totalLayersEl.textContent = layers.length;
                 totalNeuronsEl.textContent = layers.reduce((a,b)=>a+b, 0);
                 
-                // Calculate effective params based on dropout
-                // This is an estimation for visualization
-                let activeNeuronsPerLayer = layers.map((count, lIdx) => {
-                    let active = 0;
-                    for(let i=0; i<count; i++) {
-                        if(!droppedNeurons.has(`${lIdx}_${i}`)) active++;
-                    }
-                    return active;
-                });
-
                 let params = 0;
                 for(let i=0; i<layers.length-1; i++) {
-                    params += (activeNeuronsPerLayer[i] * activeNeuronsPerLayer[i+1]) + activeNeuronsPerLayer[i+1];
+                    params += (layers[i] * layers[i+1]) + layers[i+1];
                 }
                 totalParametersEl.textContent = params.toLocaleString();
             }
@@ -1215,16 +1054,12 @@
                     if(JSON.stringify(hit) !== JSON.stringify(hoveredNeuron)) {
                         hoveredNeuron = hit;
                         canvas.style.cursor = hit ? 'pointer' : 'grab';
-                        // Only redraw if not animating to save perf
-                        if(!isAnimating) drawNetwork();
+                        drawNetwork();
                         
                         if (hit) {
-                            selectionInfoEl.textContent = `Layer ${hit.layer} (${hit.layer===0?'Input':(hit.layer===neuronPositions.length-1?'Output':'Hidden')}), Neuron ${hit.neuron+1}`;
-                            if(droppedNeurons.has(`${hit.layer}_${hit.neuron}`)) {
-                                selectionInfoEl.textContent += " [DROPPED]";
-                            }
+                            selectionInfoEl.textContent = `Layer ${hit.layer} (${hit.layer===0?'Input':(hit.layer===neuronPositions.length-1?'Reconstruction Output':'Hidden')}), Neuron ${hit.neuron+1}`;
                         } else if (!selectedNeuron) {
-                            selectionInfoEl.textContent = "Hover over nodes for details.";
+                            selectionInfoEl.textContent = "Hover over neurons to see details. Click to highlight connections.";
                         }
                     }
                 }
@@ -1261,9 +1096,6 @@
                 const hit = hitTest(pos.x, pos.y);
                 
                 if (hit) {
-                    // Don't select dropped neurons
-                    if(droppedNeurons.has(`${hit.layer}_${hit.neuron}`)) return;
-
                     selectedNeuron = (selectedNeuron?.layer === hit.layer && selectedNeuron?.neuron === hit.neuron) ? null : hit;
                     
                     highlightedPathNeurons.clear();
@@ -1337,12 +1169,15 @@
                     }
                 }
 
+                const rect = canvas.getBoundingClientRect();
                 const menuWidth = contextMenu.offsetWidth || 160;
                 const menuHeight = contextMenu.offsetHeight || 200;
-                let left = e.clientX;
-                let top = e.clientY;
-                if (left + menuWidth > window.innerWidth) left -= menuWidth;
-                if (top + menuHeight > window.innerHeight) top -= menuHeight;
+                
+                let left = e.clientX - rect.left;
+                let top = e.clientY - rect.top;
+                
+                if (left + menuWidth > rect.width) left -= menuWidth;
+                if (top + menuHeight > rect.height) top -= menuHeight;
 
                 contextMenu.style.left = `${left}px`;
                 contextMenu.style.top = `${top}px`;
@@ -1356,7 +1191,7 @@
             function updateFromInputs() {
                 try {
                     const f = parseInt(inputFeaturesEl.value);
-                    const l = parseInt(outputClassesEl.value);
+                    const l = parseInt(outputNeuronsEl.value);
                     const hStr = hiddenLayersEl.value.trim();
                     const h = hStr ? hStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0) : [];
                     
@@ -1364,70 +1199,33 @@
                         numFeatures = Math.min(f, 20);
                         numLabels = Math.min(l, 20);
                         hiddenLayerNeuronCounts = h;
-                        updateDropout(); // Re-apply dropout on structure change
                         updateAndRedraw();
                     }
                 } catch(e) {}
             }
 
-            // Listeners
+            // Real-time Event Listeners
             inputFeaturesEl.addEventListener('input', updateFromInputs);
-            outputClassesEl.addEventListener('input', updateFromInputs);
+            outputNeuronsEl.addEventListener('input', updateFromInputs);
             hiddenLayersEl.addEventListener('input', updateFromInputs);
 
-            // Dropout Listeners
-            dropoutSlider.addEventListener('input', (e) => {
-                dropoutRate = parseInt(e.target.value);
-                dropoutValueLabel.textContent = `${dropoutRate}%`;
-                updateDropout();
-                updateAndRedraw();
-            });
-
-            dropoutInfoBtn.addEventListener('click', () => {
-                dropoutInfoModal.style.display = 'flex';
-                dropoutInfoModal.classList.remove('hidden');
-            });
-            closeDropoutInfoBtn.addEventListener('click', () => {
-                dropoutInfoModal.style.display = 'none';
-                dropoutInfoModal.classList.add('hidden');
-            });
-
-            // Animate Listener
-            animateBtn.addEventListener('click', () => {
-                if(isAnimating) stopAnimation();
-                else startAnimation();
-            });
-
             resetNetworkBtn.addEventListener('click', () => {
-                numFeatures = 4;
-                hiddenLayerNeuronCounts = [8,8,8];
-                numLabels = 3;
-                dropoutRate = 0;
-                
-                inputFeaturesEl.value = 4;
-                hiddenLayersEl.value = '8,8,8';
-                outputClassesEl.value = 3;
-                dropoutSlider.value = 0;
-                dropoutValueLabel.textContent = '0%';
-                
-                updateDropout();
-                stopAnimation();
+                numFeatures = 6;
+                hiddenLayerNeuronCounts = [4,2,4];
+                numLabels = 6;
+                inputFeaturesEl.value = 6;
+                hiddenLayersEl.value = '4,2,4';
+                outputNeuronsEl.value = 6;
                 updateAndRedraw();
                 resetView();
             });
             centerCanvasBtn.addEventListener('click', resetView);
 
-            // Context Actions
+            // Context Actions need to refresh inputs
             const refreshInputs = () => {
                 inputFeaturesEl.value = numFeatures;
                 hiddenLayersEl.value = hiddenLayerNeuronCounts.join(',');
-                outputClassesEl.value = numLabels;
-            };
-
-            const safeUpdate = () => {
-                updateDropout();
-                refreshInputs(); 
-                updateAndRedraw();
+                outputNeuronsEl.value = numLabels;
             };
 
             ctxButtons.addNeuron.addEventListener('click', () => {
@@ -1435,7 +1233,7 @@
                 if(l===0) numFeatures++;
                 else if(l === hiddenLayerNeuronCounts.length + 1) numLabels++;
                 else hiddenLayerNeuronCounts[l-1]++;
-                safeUpdate();
+                refreshInputs(); updateAndRedraw();
             });
             
             ctxButtons.removeNeuron.addEventListener('click', () => {
@@ -1443,20 +1241,20 @@
                 if(l===0 && numFeatures > 1) numFeatures--;
                 else if(l === hiddenLayerNeuronCounts.length + 1 && numLabels > 1) numLabels--;
                 else if(l > 0 && hiddenLayerNeuronCounts[l-1] > 1) hiddenLayerNeuronCounts[l-1]--;
-                safeUpdate();
+                refreshInputs(); updateAndRedraw();
             });
 
             ctxButtons.addLayer.addEventListener('click', () => {
                 const idx = contextMenuTarget.layer; 
                 if (idx >= 0) hiddenLayerNeuronCounts.splice(idx, 0, 4);
-                safeUpdate();
+                refreshInputs(); updateAndRedraw();
             });
 
             ctxButtons.removeLayer.addEventListener('click', () => {
                 const idx = contextMenuTarget.layer - 1; 
                 if(idx >= 0 && idx < hiddenLayerNeuronCounts.length) {
                     hiddenLayerNeuronCounts.splice(idx, 1);
-                    safeUpdate();
+                    refreshInputs(); updateAndRedraw();
                 }
             });
 
@@ -1468,7 +1266,7 @@
                 const input = document.getElementById('edit-neuron-count');
                 
                 input.value = (type === 'features') ? numFeatures : ((type === 'labels') ? numLabels : hiddenLayerNeuronCounts[l-1]);
-                title.textContent = type === 'features' ? 'Edit Input Features' : (type === 'labels' ? 'Edit Output Labels' : 'Edit Neuron Count');
+                title.textContent = type === 'features' ? 'Edit Input Features' : (type === 'labels' ? 'Edit Output Neurons' : 'Edit Neuron Count');
                 
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
@@ -1479,7 +1277,7 @@
                         if(type==='features') numFeatures = v;
                         else if(type==='labels') numLabels = v;
                         else hiddenLayerNeuronCounts[l-1] = v;
-                        safeUpdate();
+                        refreshInputs(); updateAndRedraw();
                         close();
                     }
                 };
@@ -1506,32 +1304,18 @@
                 let html = '';
                 let tW = 0, tB = 0;
                 
-                // Effective Params Calculation for Modal
-                let activeNeuronsPerLayer = layers.map((count, lIdx) => {
-                    let active = 0;
-                    for(let i=0; i<count; i++) {
-                        if(!droppedNeurons.has(`${lIdx}_${i}`)) active++;
-                    }
-                    return active;
-                });
-
                 for(let i=0; i<layers.length-1; i++) {
-                    const n1 = activeNeuronsPerLayer[i];
-                    const n2 = activeNeuronsPerLayer[i+1];
+                    const n1 = layers[i];
+                    const n2 = layers[i+1];
                     const w = n1*n2;
                     const b = n2;
                     tW += w; tB += b;
                     
-                    const origN1 = layers[i];
-                    const origN2 = layers[i+1];
-                    const dropped1 = origN1 - n1;
-                    const dropped2 = origN2 - n2;
-                    
                     html += `
                         <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
-                            <td class="p-3">${i===0?'Input':`Hidden ${i}`} (${n1} <span class="text-xs opacity-50">/ ${origN1}</span>)</td>
-                            <td class="p-3">${i===layers.length-2?'Output':`Hidden ${i+1}`} (${n2} <span class="text-xs opacity-50">/ ${origN2}</span>)</td>
-                            <td class="p-3">${n2} × ${n1} = ${w}</td>
+                            <td class="p-3">${i===0?'Input':`Hidden ${i}`} (${n1})</td>
+                            <td class="p-3">${i===layers.length-2?'Reconstruction Output':`Hidden ${i+1}`} (${n2})</td>
+                            <td class="p-3">${n2} &times; ${n1} = ${w}</td>
                             <td class="p-3">${b}</td>
                             <td class="p-3 text-right font-bold text-[var(--accent-primary)]">${w+b}</td>
                         </tr>
@@ -1556,7 +1340,6 @@
                 drawNetwork();
                 resetView();
             });
-            updateDropout(); // Init dropout state
             updateAndRedraw();
             setTimeout(resetView, 100); 
         });

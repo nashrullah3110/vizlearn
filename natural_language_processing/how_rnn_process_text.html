@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - How RNN Processes Text</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Add MathJax for rendering LaTeX formulas -->
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            startup: {
+                typeset: true
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'bounce-slight': 'bounceSlight 2s infinite',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        bounceSlight: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-5px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --border-glow: rgba(74, 222, 128, 0.5);
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            
+            /* Canvas Specifics - Dark */
+            --canvas-bg: #0a0a0a;
+            --neuron-fill: #111827;
+            --neuron-border: rgba(74, 222, 128, 0.5);
+            --connection-line: rgba(74, 222, 128, 0.4);
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --border-glow: rgba(22, 163, 74, 0.4);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+
+            /* Canvas Specifics - Light Mode Contrast Fix */
+            --canvas-bg: #f8fafc;
+            --neuron-fill: #ffffff;
+            --neuron-border: #15803d; 
+            --connection-line: rgba(21, 128, 61, 0.5); 
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .toolbar-container {
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.75rem 1.5rem;
+            z-index: 40;
+        }
+
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .calc-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .floating-panel {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 260px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            z-index: 30;
+            opacity: 0.95;
+            transition: opacity 0.3s;
+        }
+        .floating-panel:hover { opacity: 1; }
+        
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: all 0.2s;
+            border-radius: 0.375rem;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.875rem;
+        }
+        .viz-input:focus {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+            outline: none;
+        }
+
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+        }
+        .viz-btn-primary {
+            background: var(--accent-primary);
+            color: var(--bg-body);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        .viz-btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 0 15px var(--accent-glow);
+            filter: brightness(1.1);
+        }
+        .viz-btn-secondary {
+            background: var(--input-bg);
+            color: var(--text-muted);
+            border: 1px solid var(--border-subtle);
+        }
+        .viz-btn-secondary:hover:not(:disabled) {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--input-focus-bg);
+        }
+        .viz-btn-danger {
+            background: #ef4444;
+            color: white;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+        }
+        .viz-btn-danger:hover:not(:disabled) {
+            filter: brightness(1.1);
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+        }
+
+        #canvas {
+            background-color: var(--canvas-bg);
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+            user-select: none;
+        }
+        #canvas.grabbing { cursor: grabbing; }
+
+        .metric-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal {
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+        .modal-content {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 0 20px var(--accent-glow);
+            color: var(--text-main);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+
+        /* Search Dropdown Styles */
+        .search-input-wrapper { background: var(--input-bg); border: 1px solid var(--border-subtle); position: relative; }
+        .search-input-wrapper:focus-within { background: var(--input-focus-bg); border-color: var(--accent-primary); box-shadow: 0 0 15px var(--accent-glow); }
+        .search-input-wrapper input { color: var(--text-main); }
+        .search-input-wrapper input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .search-input-wrapper i { color: var(--accent-primary); opacity: 0.7; }
+        .search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--card-bg); border: 1px solid var(--border-subtle); border-top: none; border-radius: 0 0 12px 12px; max-height: 400px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3); }
+        .search-dropdown.show { display: block; animation: slideDown 0.2s ease-out; }
+        .search-dropdown-item { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: space-between; color: inherit; text-decoration: none; }
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        .dropdown-item-title { font-weight: 500; color: var(--text-main); }
+        .dropdown-item-path { font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; }
+        .dropdown-item-icon { color: var(--accent-primary); margin-right: 8px; font-size: 0.875rem; }
+        .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
+
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50 shrink-0">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search modules" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Title Section -->
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full animate-fade-in">
+        <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
+            <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
+            <span>/</span>
+            <span>Deep Learning</span>
+        </div>
+        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">How RNN Processes Text</h1>
+        <p class="mt-2 text-sm md:text-base max-w-2xl opacity-80" style="color: var(--text-muted)">
+            Visualize how memory is passed forward to perform Sentiment Analysis (a Sequence-to-Vector task).
+        </p>
+    </div>
+
+    <!-- Main Toolbars -->
+    <div class="shrink-0 animate-fade-in z-40 relative shadow-md">
+        <!-- Architecture Toolbar -->
+        <div class="toolbar-container flex flex-wrap items-center gap-4 justify-between border-t border-[var(--border-subtle)]">
+            <div class="flex items-center gap-3 overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
+                <div class="flex items-center gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Architecture</label>
+                    <select id="rnnType" class="viz-input text-center">
+                        <option value="many-to-one">Many-to-One</option>
+                        <option value="many-to-many">Many-to-Many</option>
+                    </select>
+                </div>
+                <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
+                <div class="flex items-center gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Seq Length (Time)</label>
+                    <input type="number" id="seqLength" value="6" min="1" max="15" class="viz-input w-16 text-center border-indigo-500/50">
+                </div>
+                <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
+                <div class="flex items-center gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Input Size (X)</label>
+                    <input type="number" id="inputSize" value="3" min="1" max="50" class="viz-input w-16 text-center">
+                </div>
+                <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
+                <div class="flex items-center gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-accent-primary" style="color: var(--accent-primary)">Hidden State (H)</label>
+                    <input type="number" id="hiddenSize" value="8" min="1" max="50" class="viz-input w-16 text-center border-green-500/50">
+                </div>
+                <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
+                <div class="flex items-center gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-amber-500" title="2 Outputs = [Prob Positive, Prob Negative]">Output Size (Y)</label>
+                    <input type="number" id="outputSize" value="2" min="1" max="50" class="viz-input w-16 text-center border-amber-500/50">
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 ml-auto">
+                <button id="centerCanvasBtn" class="viz-btn viz-btn-secondary" title="Center View"><i class="fas fa-crosshairs"></i></button>
+                <button id="resetNetworkBtn" class="viz-btn viz-btn-secondary" title="Reset"><i class="fas fa-undo"></i></button>
+                <button id="calculateBtn" class="viz-btn viz-btn-primary"><i class="fas fa-calculator mr-2"></i> Parameters</button>
+            </div>
+        </div>
+
+        <!-- Data Simulation Toolbar -->
+        <div class="toolbar-container flex flex-wrap items-center gap-4 bg-black/10">
+            <div class="flex items-center gap-3 flex-1 min-w-[250px]">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap"><i class="fas fa-comment-dots mr-1"></i> Sentiment Text</label>
+                <input type="text" id="simDataInput" value="I love learning about Artificial Intelligence" class="viz-input flex-1 font-mono text-sm border-indigo-500/30 focus:border-indigo-500" placeholder="Type a sentence to analyze sentiment...">
+            </div>
+            <button id="simPlayBtn" class="viz-btn viz-btn-primary bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_10px_rgba(79,70,229,0.4)] flex items-center gap-2 whitespace-nowrap">
+                <i class="fas fa-play" id="simPlayIcon"></i> <span id="simPlayText">Simulate Flow</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Canvas Area -->
+    <div class="relative w-full h-[60vh] min-h-[500px] border-b shrink-0 overflow-hidden animate-fade-in" style="border-color: var(--border-subtle); background: var(--canvas-bg);">
+        <!-- Canvas -->
+        <canvas id="canvas" class="block w-full h-full"></canvas>
+
+        <!-- Floating Stats Panel -->
+        <div class="floating-panel p-4 flex flex-col gap-4 pointer-events-auto">
+             <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
+                 <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--accent-primary)">
+                    <i class="fas fa-history mr-2"></i> RNN Analysis
+                </h3>
+             </div>
+             
+             <!-- Network Stats -->
+             <div class="grid grid-cols-2 gap-2">
+                 <div class="metric-card p-2 text-center border-indigo-500/30">
+                     <span class="block text-[10px] uppercase opacity-60 text-indigo-400">Time Steps</span>
+                     <span id="totalSteps" class="font-bold mono-font text-sm text-indigo-400">-</span>
+                 </div>
+                 <div class="metric-card p-2 text-center" style="border-color: var(--border-subtle)">
+                     <span class="block text-[10px] uppercase opacity-60">Hidden Size</span>
+                     <span id="stateSize" class="font-bold mono-font text-sm" style="color: var(--text-main)">-</span>
+                 </div>
+                 <div class="metric-card p-2 col-span-2 flex justify-between items-center px-3" style="border-color: var(--accent-primary)">
+                     <span class="text-[10px] uppercase opacity-80" style="color: var(--accent-primary)">Shared Parameters</span>
+                     <span id="totalParameters" class="font-bold mono-font text-sm" style="color: var(--accent-primary)">-</span>
+                 </div>
+             </div>
+
+             <!-- Task Info -->
+             <div>
+                 <h4 id="taskTitle" class="text-[10px] uppercase tracking-widest font-bold mb-2 opacity-50">Task: Sequence Classification</h4>
+                 <div id="taskDesc" class="metric-card p-3 text-xs leading-relaxed opacity-80 min-h-[40px] flex items-center">
+                     <ul class="list-disc pl-3 opacity-90 text-[10px]">
+                         <li><strong>Many-to-One:</strong> We only care about the final prediction at the end of the sentence.</li>
+                         <li><strong>Shared Weights:</strong> The same matrices calculate memory at every step.</li>
+                     </ul>
+                 </div>
+             </div>
+        </div>
+    </div>
+
+    <!-- Comprehensive Article Section -->
+    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div class="mt-8 mb-12 card-container animate-fade-in" style="animation-delay: 0.2s">
+            <div class="border-b px-6 py-5 md:px-8 md:py-6" style="border-color: var(--border-subtle)">
+                <h2 class="text-xl md:text-2xl font-bold flex items-center gap-3 brand-font" style="color: var(--text-main)">
+                    <i class="fas fa-comment-dots" style="color: var(--accent-primary)"></i>
+                    Decoding the Output: Sentiment Analysis
+                </h2>
+            </div>
+            
+            <div class="p-6 md:p-8 space-y-12" style="color: var(--text-muted)">
+                
+                <!-- Intro Section -->
+                <section>
+                    <p class="leading-relaxed mb-4">
+                        Standard neural networks process data instantly. But to understand language, an AI needs to read a sentence exactly like a human does: word by word, updating its understanding as it goes.
+                    </p>
+                    <p class="leading-relaxed mb-4">
+                        In the simulation above, type a sentence (e.g., <em>"I absolutely hate this terrible movie"</em>) and run it. You'll see the <strong>Hidden Memory ($H_t$)</strong> accumulate context from left to right. But how does this sequence of moving arrays actually give us a readable answer?
+                    </p>
+                </section>
+
+                <!-- Architecture Adjustments Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">1. Where is the Output? (Many-to-One vs Many-to-Many)</h3>
+                    <p class="leading-relaxed mb-6 text-sm">
+                        While the visualizer can show an output block ($Y_t$) sprouting from <em>every</em> time step, not all tasks use them. Try changing the <strong>Architecture</strong> dropdown in the toolbar above to see how the network adapts:
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="calc-card flex flex-col border-b-4" style="border-color: #3b82f6; box-shadow: inset 0 0 20px rgba(59, 130, 246, 0.1);">
+                            <h4 class="font-bold text-sm mb-2 flex items-center gap-2 text-blue-400"><i class="fas fa-language"></i> Many-to-Many (Translation / Tagging)</h4>
+                            <p class="text-sm leading-relaxed mb-3">In tasks like translating English to Spanish, or tagging each word in a sentence with its part of speech, the network outputs a prediction at <strong>every single time step</strong> ($Y_t$). The architecture connects the Hidden State to an Output block constantly.</p>
+                        </div>
+                        <div class="calc-card flex flex-col border-b-4" style="border-color: var(--accent-primary); box-shadow: inset 0 0 20px var(--accent-glow);">
+                            <h4 class="font-bold text-sm mb-2 flex items-center gap-2" style="color: var(--accent-primary)"><i class="fas fa-star-half-alt"></i> Many-to-One (Sentiment)</h4>
+                            <p class="text-sm leading-relaxed mb-3">If we just want to know if a sentence is Positive or Negative, we don't need an answer after the first word "I". We wait until the network reads the entire sentence. <strong>We throw away $Y_0$ through $Y_{T-1}$ and only extract the Final Output ($Y_{last}$)</strong>.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Core Math Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">2. Encoding the Output Array</h3>
+                    <p class="leading-relaxed mb-4 text-sm">
+                        Look at the final prediction popping up at the end of the simulation. If your Output Size is `2`, the network calculates an array containing two raw numbers (Logits). How do we read them?
+                    </p>
+                    
+                    <div class="calc-card grid grid-cols-1 md:grid-cols-2 gap-8 items-center border-l-4" style="border-left-color: var(--accent-primary)">
+                        <div>
+                            <p class="text-sm leading-relaxed mb-3">To classify Sentiment, we dedicate one neuron to "Positive" and one neuron to "Negative".</p>
+                            <p class="text-sm leading-relaxed mb-3">We pass these two raw numbers through a <strong>Softmax Activation Function</strong>. Softmax mathematically squashes the array so that both numbers become percentages, and they perfectly add up to $1.0$ ($100\%$).</p>
+                        </div>
+                        <div class="p-4 rounded-xl text-center bg-black/20" style="border: 1px solid var(--border-subtle);">
+                            <span class="text-[10px] uppercase font-bold tracking-wider opacity-50 mb-2 block" style="color: var(--text-main)">Softmax Translation</span>
+                            <div class="mono-font text-sm overflow-x-auto" style="color: var(--accent-primary);">
+                                $$Y_{raw} = [2.5, -1.2]$$
+                                $$\text{Softmax}(Y) \rightarrow \mathbf{[0.97, 0.03]}$$
+                            </div>
+                            <div class="text-[11px] font-bold mt-2 text-amber-400">"97% Positive, 3% Negative"</div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Parameter Calculation Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">3. Parameter Calculation Trace</h3>
+                    <p class="leading-relaxed mb-6 text-sm">
+                        Because of <strong>Weight Sharing</strong>, the length of your sentence does not change the size of the neural network. The exact same weight matrices ($\mathbf{W}_{hx}, \mathbf{W}_{hh}, \mathbf{W}_{yh}$) are used on word 1 as word 100. Let's trace the total parameters based on your current configuration.
+                    </p>
+
+                    <div id="dynamic-article-calc" class="overflow-x-auto rounded-lg border mb-6" style="border-color: var(--border-subtle)">
+                        <!-- Dynamically filled by JS based on inputs -->
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-3">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                 <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)">
+                    <i class="fab fa-instagram fa-lg"></i>
+                </a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2026 VIZLEARN // MODULE.RNN_SENTIMENT</p>
+        </div>
+    </footer>
+
+    <!-- Calculation Modal -->
+    <div id="calculationResultModal" class="modal fixed inset-0 hidden items-center justify-center z-[1001]">
+        <div class="modal-content p-6 rounded-xl w-full max-w-4xl m-4 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-bold" style="color: var(--accent-primary)">RNN Shared Parameter Calculation</h3>
+                <button id="closeCalcModalBtn" class="text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="overflow-y-auto flex-1 mb-6 pr-2">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-[var(--border-subtle)]">
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">Matrix</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">Description</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">Formula</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70 text-right">Params</th>
+                        </tr>
+                    </thead>
+                    <tbody id="calc-table-body" class="text-sm mono-font">
+                        <!-- JS Injection -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-1 gap-4 border-t border-[var(--border-subtle)] pt-4">
+                <div class="metric-card p-4 text-center" style="border-color: var(--accent-primary); background: var(--accent-glow)">
+                    <div class="text-xs uppercase font-bold opacity-80" style="color: var(--accent-primary)">Total Shared Parameters</div>
+                    <div id="totalParamsResult" class="text-2xl font-bold mt-1" style="color: var(--accent-primary)">0</div>
+                    <div class="text-[10px] mt-1 opacity-70 font-sans">Used across all Time Steps</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            if (typeof window.updateAndRedraw === 'function') window.updateAndRedraw();
+        });
+
+        // --- MOCK OUTPUT GENERATOR ---
+        function getDeterministicRandom(str, index) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) hash = Math.imul(31, hash) + str.charCodeAt(i) | 0;
+            let seed = hash + index * 12345;
+            let x = Math.sin(seed++) * 10000;
+            return x - Math.floor(x);
+        }
+        function generateMockOutput(word, size) {
+            let out = [];
+            for(let i=0; i<size; i++) {
+                out.push(getDeterministicRandom(word, i) * 2 - 1); // -1.0 to +1.0
+            }
+            return out;
+        }
+
+        // --- SENTIMENT MOCK GENERATOR ---
+        function calculateSentimentProbabilities(text) {
+            const lower = text.toLowerCase();
+            let score = 0; 
+            
+            if (lower.includes('love') || lower.includes('great') || lower.includes('good') || 
+                lower.includes('best') || lower.includes('awesome') || lower.includes('artificial intelligence') || 
+                lower.includes('learning')) {
+                score += 1.5;
+            }
+            if (lower.includes('hate') || lower.includes('bad') || lower.includes('terrible') || 
+                lower.includes('worst') || lower.includes('awful')) {
+                score -= 1.5;
+            }
+
+            let posProb = Math.max(0.01, Math.min(0.99, 0.5 + score / 3));
+            let negProb = 1 - posProb;
+            
+            return [posProb, negProb];
+        }
+
+        // --- RNN VISUALIZATION LOGIC ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const centerCanvasBtn = document.getElementById('centerCanvasBtn');
+            const calculateBtn = document.getElementById('calculateBtn');
+            const resetNetworkBtn = document.getElementById('resetNetworkBtn');
+            
+            const seqLengthEl = document.getElementById('seqLength');
+            const inputSizeEl = document.getElementById('inputSize');
+            const hiddenSizeEl = document.getElementById('hiddenSize');
+            const outputSizeEl = document.getElementById('outputSize');
+            const rnnTypeEl = document.getElementById('rnnType');
+
+            const simDataInput = document.getElementById('simDataInput');
+            const simPlayBtn = document.getElementById('simPlayBtn');
+            const simPlayIcon = document.getElementById('simPlayIcon');
+            const simPlayText = document.getElementById('simPlayText');
+
+            const totalStepsEl = document.getElementById('totalSteps');
+            const stateSizeEl = document.getElementById('stateSize');
+            const totalParametersEl = document.getElementById('totalParameters');
+
+            // RNN State
+            let seqLength = 6;
+            let inputSize = 3;
+            let hiddenSize = 8;
+            let outputSize = 2; // Default 2 for [Pos, Neg]
+            let rnnType = 'many-to-one';
+            
+            let scale = 1;
+            let translateX = 0;
+            let translateY = 0;
+            let isDragging = false;
+            let lastX = 0;
+            let lastY = 0;
+
+            // Simulation State
+            let simWords = ["I", "love", "learning", "about", "Artificial", "Intelligence"];
+            let simOutputs = [];
+            let finalSentimentArray = [0.85, 0.15]; 
+            let isSimulating = false;
+            let simProgress = 0;
+            let lastSimTime = 0;
+
+            function syncOutputs() {
+                simOutputs = simWords.map(w => generateMockOutput(w, outputSize));
+            }
+
+            // Sync Input Text with Seq Length
+            function syncData() {
+                let words = simDataInput.value.trim().split(/\s+/).filter(w => w.length > 0);
+                if (words.length === 0) {
+                    words = ["data"];
+                    simDataInput.value = "data";
+                }
+                if (words.length > 15) {
+                    words = words.slice(0, 15);
+                    simDataInput.value = words.join(" ");
+                }
+                simWords = words;
+                seqLength = words.length;
+                seqLengthEl.value = seqLength;
+
+                // Calculate final sentiment array based on the full sentence
+                finalSentimentArray = calculateSentimentProbabilities(simDataInput.value);
+
+                syncOutputs();
+                updateAndRedraw();
+                resetView();
+            }
+
+            function syncTextFromSeqLength() {
+                let words = simDataInput.value.trim().split(/\s+/).filter(w => w.length > 0);
+                const targetLen = parseInt(seqLengthEl.value) || 1;
+                
+                if (words.length > targetLen) {
+                    simDataInput.value = words.slice(0, targetLen).join(" ");
+                } else if (words.length < targetLen) {
+                    let diff = targetLen - words.length;
+                    for(let i=0; i<diff; i++) words.push(`w_${words.length+1}`);
+                    simDataInput.value = words.join(" ");
+                }
+                simWords = simDataInput.value.trim().split(/\s+/);
+                seqLength = targetLen;
+
+                finalSentimentArray = calculateSentimentProbabilities(simDataInput.value);
+
+                syncOutputs();
+                updateAndRedraw();
+                resetView();
+            }
+
+            simDataInput.addEventListener('change', () => {
+                if(isSimulating) stopSimulation();
+                syncData();
+            });
+            
+            simDataInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    if(isSimulating) stopSimulation();
+                    syncData();
+                    e.target.blur();
+                }
+            });
+
+            // Theme Helpers
+            function getThemeColors() {
+                const isLight = document.body.classList.contains('light-mode');
+                const styles = getComputedStyle(document.body);
+                return {
+                    bg: styles.getPropertyValue('--canvas-bg').trim(),
+                    neuronFill: styles.getPropertyValue('--neuron-fill').trim(),
+                    neuronBorder: styles.getPropertyValue('--neuron-border').trim(),
+                    connection: styles.getPropertyValue('--connection-line').trim(),
+                    accent: styles.getPropertyValue('--accent-primary').trim(),
+                    text: styles.getPropertyValue('--text-main').trim(),
+                };
+            }
+
+            // Draw Unrolled RNN
+            function drawNetwork() {
+                if (!ctx) return;
+                const colors = getThemeColors();
+                const dpr = window.devicePixelRatio || 1;
+                const rect = canvas.getBoundingClientRect();
+                
+                if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+                    canvas.width = rect.width * dpr;
+                    canvas.height = rect.height * dpr;
+                }
+                
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.scale(dpr, dpr);
+                ctx.fillStyle = colors.bg;
+                ctx.fillRect(0, 0, rect.width, rect.height);
+
+                ctx.save();
+                ctx.translate(translateX, translateY);
+                ctx.scale(scale, scale);
+
+                // Setup Virtual Layout
+                const blockWidth = 90;
+                const blockHeight = 40;
+                
+                const hiddenBlockWidth = 100;
+                const hiddenBlockHeight = 60; 
+
+                const spacingX = 150;
+                const yTop = 130;    
+                const yMid = 280;    
+                const yBot = 430;    
+                const startX = 120;
+
+                const activeT = isSimulating ? Math.floor(simProgress) : -1;
+                const phase = isSimulating ? (simProgress - activeT) : 0; // 0.0 to 1.0
+                const isFinalStep = isSimulating && activeT === seqLength - 1 && phase >= 0.8;
+                const simComplete = !isSimulating && simProgress >= seqLength;
+
+                // Helpers for Animation
+                const getLineAlpha = (t) => {
+                    if (!isSimulating && !simComplete) return 1.0;
+                    if (simComplete) return 0.5; // Dim paths when done
+                    if (t < activeT) return 0.4;
+                    if (t === activeT) return 0.8;
+                    return 0.15; // Future
+                };
+
+                // 1. Draw Connections (Lines)
+                ctx.lineWidth = 2 / scale;
+
+                for (let t = 0; t < seqLength; t++) {
+                    let centerX = startX + t * spacingX;
+                    ctx.strokeStyle = colors.connection;
+                    ctx.globalAlpha = getLineAlpha(t);
+                    
+                    // X to H
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, yBot - blockHeight/2);
+                    ctx.lineTo(centerX, yMid + hiddenBlockHeight/2);
+                    ctx.stroke();
+                    drawArrow(ctx, centerX, yMid + hiddenBlockHeight/2 + 5, -Math.PI/2, colors.connection);
+
+                    // H to Y (Fade out non-final Y connections for Many-to-One visualization)
+                    let showY = rnnType === 'many-to-many' || t === seqLength - 1 || (!isSimulating && !simComplete);
+                    if(showY) {
+                        ctx.beginPath();
+                        ctx.moveTo(centerX, yMid - hiddenBlockHeight/2);
+                        ctx.lineTo(centerX, yTop + blockHeight/2);
+                        ctx.stroke();
+                        drawArrow(ctx, centerX, yTop + blockHeight/2 + 5, -Math.PI/2, colors.connection);
+                    }
+
+                    // Recurrence
+                    if (t < seqLength - 1) {
+                        ctx.beginPath();
+                        ctx.moveTo(centerX + hiddenBlockWidth/2, yMid);
+                        ctx.lineTo(centerX + spacingX - hiddenBlockWidth/2, yMid);
+                        ctx.stroke();
+                        drawArrow(ctx, centerX + spacingX - hiddenBlockWidth/2 - 5, yMid, 0, colors.connection);
+                    }
+                }
+
+                // Initial Hidden State Arrow
+                ctx.globalAlpha = getLineAlpha(0);
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(startX - spacingX + hiddenBlockWidth/2, yMid);
+                ctx.lineTo(startX - hiddenBlockWidth/2, yMid);
+                ctx.stroke();
+                drawArrow(ctx, startX - hiddenBlockWidth/2 - 5, yMid, 0, colors.connection);
+                ctx.setLineDash([]);
+                ctx.fillStyle = colors.text;
+                ctx.font = `12px 'Space Grotesk'`;
+                ctx.textAlign = 'right';
+                ctx.fillText('H_init', startX - spacingX + hiddenBlockWidth/2 - 10, yMid + 4);
+                
+                ctx.globalAlpha = 1.0;
+
+                // 2. Draw Moving Simulation Dots
+                if (isSimulating && activeT >= 0 && activeT < seqLength) {
+                    let centerX = startX + activeT * spacingX;
+                    if (phase < 0.4) {
+                        let p = phase / 0.4;
+                        drawMovingDot(ctx, centerX, yBot - blockHeight/2, centerX, yMid + hiddenBlockHeight/2, p, '#3b82f6');
+                        if (activeT > 0) {
+                            drawMovingDot(ctx, centerX - spacingX + hiddenBlockWidth/2, yMid, centerX - hiddenBlockWidth/2, yMid, p, colors.accent);
+                        } else {
+                            drawMovingDot(ctx, startX - spacingX + hiddenBlockWidth/2, yMid, startX - hiddenBlockWidth/2, yMid, p, colors.accent);
+                        }
+                    }
+                    if (phase >= 0.4 && phase < 0.8) { 
+                        let showYDot = rnnType === 'many-to-many' || activeT === seqLength - 1;
+                        if (showYDot) {
+                            let p = (phase - 0.4) / 0.4;
+                            drawMovingDot(ctx, centerX, yMid - hiddenBlockHeight/2, centerX, yTop + blockHeight/2, p, '#f59e0b');
+                        }
+                    }
+                    if (phase >= 0.8 && activeT < seqLength - 1) {
+                        let p = (phase - 0.8) / 0.2;
+                        drawMovingDot(ctx, centerX + hiddenBlockWidth/2, yMid, centerX + spacingX - hiddenBlockWidth/2, yMid, p, colors.accent);
+                    }
+                }
+
+                // 3. Draw Nodes (Vector Blocks & RNN Cells)
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                for (let t = 0; t < seqLength; t++) {
+                    let centerX = startX + t * spacingX;
+
+                    let isXActive = isSimulating && t === activeT && phase < 0.4;
+                    let isHActive = isSimulating && t === activeT && phase >= 0.4;
+                    let isYActive = isSimulating && t === activeT && phase >= 0.4 && phase < 0.8;
+                    
+                    let blockAlpha = isSimulating ? (t > activeT ? 0.3 : (t === activeT ? 1.0 : 0.7)) : 1.0;
+                    if (simComplete) blockAlpha = 0.5; // Dim everything when done
+                    
+                    // Input Block
+                    ctx.globalAlpha = blockAlpha;
+                    drawBlock(ctx, centerX, yBot, blockWidth, blockHeight, isXActive ? '#3b82f6' : colors.neuronFill, '#3b82f6', `X_${t} (${inputSize})`, isXActive ? '#fff' : colors.text, isXActive);
+                    
+                    // Hidden Cell
+                    drawHiddenCell(ctx, centerX, yMid, hiddenBlockWidth, hiddenBlockHeight, isHActive ? colors.accent : colors.neuronFill, colors.accent, `H_${t} (${hiddenSize})`, isHActive ? '#000' : colors.text, isHActive);
+                    
+                    // Output Block (Dim non-final blocks entirely if Many-to-One simulation is active)
+                    let drawYBlock = rnnType === 'many-to-many' || t === seqLength - 1 || (!isSimulating && !simComplete);
+                    if (drawYBlock) {
+                        let highlightY = isYActive || (simComplete && (rnnType === 'many-to-many' || t === seqLength - 1));
+                        ctx.globalAlpha = highlightY ? 1.0 : blockAlpha;
+                        drawBlock(ctx, centerX, yTop, blockWidth, blockHeight, isYActive ? '#f59e0b' : colors.neuronFill, '#f59e0b', `Y_${t} (${outputSize})`, isYActive ? '#000' : colors.text, highlightY);
+                    }
+                    
+                    ctx.globalAlpha = 1.0;
+
+                    // Data Word mapped to Input
+                    if (simWords && simWords[t]) {
+                        ctx.fillStyle = colors.text;
+                        ctx.font = `italic 13px 'Space Grotesk'`;
+                        let wordAlpha = isSimulating ? (t > activeT ? 0.2 : (t === activeT ? 1.0 : 0.5)) : 0.8;
+                        if (isSimulating && t === activeT) {
+                            ctx.fillStyle = '#4ade80';
+                            ctx.font = `bold italic 14px 'Space Grotesk'`;
+                        }
+                        ctx.globalAlpha = wordAlpha;
+                        ctx.fillText(`"${simWords[t]}"`, centerX, yBot + blockHeight + 20);
+                        ctx.globalAlpha = 1.0;
+                    }
+
+                    // Time Label
+                    ctx.fillStyle = colors.text;
+                    ctx.globalAlpha = 0.4;
+                    ctx.font = `11px 'JetBrains Mono'`;
+                    ctx.fillText(`t=${t}`, centerX, yTop - blockHeight - 20);
+                    ctx.globalAlpha = 1.0;
+                }
+
+                // 4. DRAW FINAL PREDICTION BADGE(S)
+                if (rnnType === 'many-to-many') {
+                    for (let t = 0; t < seqLength; t++) {
+                        let isOutReady = (!isSimulating && simComplete) || (isSimulating && (t < activeT || (t === activeT && phase >= 0.8)));
+                        if (isOutReady && simOutputs && simOutputs[t]) {
+                            let centerX = startX + t * spacingX;
+                            let badgeY = yTop - blockHeight - 20;
+                            let arr = simOutputs[t];
+                            
+                            let isPos = arr[0] > arr[1];
+                            let outStr = outputSize === 2 ? (isPos ? 'POS' : 'NEG') : `Out_${t}`;
+                            let badgeColor = outputSize === 2 ? (isPos ? '#4ade80' : '#ef4444') : '#f59e0b';
+                            
+                            ctx.fillStyle = colors.text;
+                            ctx.font = `10px 'JetBrains Mono'`;
+                            let numStr = outputSize <= 3 ? `[${arr.map(v=>v.toFixed(1)).join(",")}]` : `[${arr[0].toFixed(1)},...]`;
+                            ctx.fillText(numStr, centerX, badgeY + 15);
+                            
+                            ctx.beginPath();
+                            ctx.roundRect(centerX - 25, badgeY - 10, 50, 16, 4);
+                            ctx.fillStyle = badgeColor + '20';
+                            ctx.fill();
+                            ctx.strokeStyle = badgeColor;
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                            
+                            ctx.fillStyle = badgeColor;
+                            ctx.font = `bold 10px 'Space Grotesk'`;
+                            ctx.fillText(outStr, centerX, badgeY - 2);
+                        }
+                    }
+                } else if ((isFinalStep || simComplete) && outputSize === 2) {
+                    let lastX = startX + (seqLength - 1) * spacingX;
+                    let badgeY = yTop - blockHeight - 35;
+                    
+                    let posVal = finalSentimentArray[0];
+                    let negVal = finalSentimentArray[1];
+                    let isPos = posVal > negVal;
+                    
+                    let badgeColor = isPos ? '#4ade80' : '#ef4444';
+                    let badgeText = isPos ? `Positive (${Math.round(posVal*100)}%)` : `Negative (${Math.round(negVal*100)}%)`;
+
+                    // Output Array
+                    ctx.fillStyle = colors.text;
+                    ctx.font = `bold 12px 'JetBrains Mono'`;
+                    ctx.fillText(`[ ${posVal.toFixed(2)}, ${negVal.toFixed(2)} ]`, lastX, badgeY + 25);
+
+                    // Badge Box
+                    ctx.beginPath();
+                    ctx.roundRect(lastX - 70, badgeY - 20, 140, 30, 6);
+                    ctx.fillStyle = badgeColor + '20';
+                    ctx.fill();
+                    ctx.strokeStyle = badgeColor;
+                    ctx.lineWidth = 2 / scale;
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = badgeColor;
+                    ctx.font = `bold 13px 'Space Grotesk'`;
+                    ctx.fillText(badgeText, lastX, badgeY - 5);
+                } else if ((isFinalStep || simComplete) && outputSize !== 2) {
+                    // Fallback array generation for non-sentiment output sizes
+                    let lastX = startX + (seqLength - 1) * spacingX;
+                    let badgeY = yTop - blockHeight - 30;
+                    let mockArr = generateMockOutput("final", outputSize);
+                    let outStr = mockArr.length <= 3 ? `[ ${mockArr.map(v=>v.toFixed(2)).join(", ")} ]` : `[ ${mockArr[0].toFixed(2)}, ..., ${mockArr[mockArr.length-1].toFixed(2)} ]`;
+                    
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.font = `bold 12px 'JetBrains Mono'`;
+                    ctx.fillText(outStr, lastX, badgeY);
+                }
+
+                ctx.restore();
+            }
+
+            function drawBlock(ctx, x, y, w, h, fill, stroke, text, textColor, isGlow) {
+                ctx.beginPath();
+                ctx.roundRect(x - w/2, y - h/2, w, h, 8); 
+                
+                if (isGlow) {
+                    ctx.shadowColor = stroke;
+                    ctx.shadowBlur = 15;
+                }
+                
+                ctx.fillStyle = fill;
+                ctx.fill();
+                
+                ctx.shadowBlur = 0; // reset
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = 2 / scale;
+                ctx.stroke();
+                
+                // Text
+                ctx.fillStyle = textColor;
+                ctx.font = `bold 14px 'JetBrains Mono'`;
+                ctx.fillText(text, x, y);
+            }
+
+            function drawHiddenCell(ctx, x, y, w, h, fill, stroke, text, textColor, isGlow) {
+                ctx.beginPath();
+                ctx.roundRect(x - w/2, y - h/2, w, h, 8); 
+                
+                if (isGlow) {
+                    ctx.shadowColor = stroke;
+                    ctx.shadowBlur = 20;
+                }
+                
+                ctx.fillStyle = fill;
+                ctx.fill();
+                
+                ctx.shadowBlur = 0; // reset
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = 2 / scale;
+                ctx.stroke();
+                
+                // The internal "tanh" operation visual
+                ctx.fillStyle = isGlow ? stroke : 'rgba(255,255,255,0.05)';
+                ctx.beginPath();
+                ctx.roundRect(x - 22, y + 8, 44, 16, 4);
+                ctx.fill();
+                
+                ctx.fillStyle = isGlow ? '#000' : stroke;
+                ctx.font = `bold 10px 'JetBrains Mono'`;
+                ctx.fillText('tanh', x, y + 16);
+                
+                // Text
+                ctx.fillStyle = textColor;
+                ctx.font = `bold 14px 'JetBrains Mono'`;
+                ctx.fillText(text, x, y - 8);
+            }
+
+            function drawArrow(ctx, x, y, angle, color) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(angle);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(-8, -4);
+                ctx.lineTo(-8, 4);
+                ctx.closePath();
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            function drawMovingDot(ctx, x1, y1, x2, y2, p, color) {
+                const cx = x1 + (x2 - x1) * p;
+                const cy = y1 + (y2 - y1) * p;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 6 / scale, 0, Math.PI*2);
+                ctx.fillStyle = color;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // SIMULATION ENGINE
+            function simLoop(timestamp) {
+                if (!isSimulating) return;
+                if (!lastSimTime) lastSimTime = timestamp;
+                const dt = timestamp - lastSimTime;
+                lastSimTime = timestamp;
+
+                simProgress += dt / 1200; // Speed control
+
+                if (simProgress >= seqLength) {
+                    stopSimulation();
+                    simProgress = seqLength; // Keep at end state
+                    drawNetwork();
+                    return;
+                }
+
+                drawNetwork();
+                requestAnimationFrame(simLoop);
+            }
+
+            function stopSimulation() {
+                isSimulating = false;
+                lastSimTime = 0;
+                simPlayIcon.className = "fas fa-play";
+                simPlayText.textContent = "Re-run Flow";
+                simPlayBtn.classList.remove('viz-btn-danger', 'bg-red-600', 'hover:bg-red-500');
+                simPlayBtn.classList.add('viz-btn-primary', 'bg-indigo-600', 'hover:bg-indigo-500');
+            }
+
+            function startSimulation() {
+                isSimulating = true;
+                simProgress = 0;
+                lastSimTime = 0;
+                simPlayIcon.className = "fas fa-stop";
+                simPlayText.textContent = "Stop Flow";
+                simPlayBtn.classList.remove('viz-btn-primary', 'bg-indigo-600', 'hover:bg-indigo-500');
+                simPlayBtn.classList.add('viz-btn-danger', 'bg-red-600', 'hover:bg-red-500');
+                requestAnimationFrame(simLoop);
+            }
+
+            simPlayBtn.addEventListener('click', () => {
+                if (isSimulating) {
+                    stopSimulation();
+                    simProgress = 0;
+                    drawNetwork();
+                }
+                else startSimulation();
+            });
+
+            // Parameters Math
+            function calculateParams() {
+                const whx = inputSize * hiddenSize;
+                const whh = hiddenSize * hiddenSize;
+                const bh = hiddenSize;
+                const wyh = hiddenSize * outputSize;
+                const by = outputSize;
+                return { whx, whh, bh, wyh, by, total: whx + whh + bh + wyh + by };
+            }
+
+            function updateStatsAndArticle() {
+                totalStepsEl.textContent = seqLength;
+                stateSizeEl.textContent = hiddenSize;
+                
+                const params = calculateParams();
+                totalParametersEl.textContent = params.total.toLocaleString();
+
+                const taskTitle = document.getElementById('taskTitle');
+                const taskDesc = document.getElementById('taskDesc');
+                if (rnnType === 'many-to-one') {
+                    taskTitle.innerHTML = "Task: Sequence Classification";
+                    taskDesc.innerHTML = `
+                        <ul class="list-disc pl-3 opacity-90 text-[10px]">
+                            <li><strong>Many-to-One:</strong> We only care about the final prediction at the end of the sequence.</li>
+                            <li><strong>Shared Weights:</strong> The same matrices calculate memory at every step.</li>
+                        </ul>`;
+                } else {
+                    taskTitle.innerHTML = "Task: Sequence-to-Sequence";
+                    taskDesc.innerHTML = `
+                        <ul class="list-disc pl-3 opacity-90 text-[10px]">
+                            <li><strong>Many-to-Many:</strong> A prediction ($Y_t$) is made at every single time step.</li>
+                            <li><strong>Shared Weights:</strong> The same matrices calculate memory and output at every step.</li>
+                        </ul>`;
+                }
+
+                // Update Article Dynamic Table
+                const dynArticle = document.getElementById('dynamic-article-calc');
+                if(dynArticle) {
+                    dynArticle.innerHTML = `
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr style="background: var(--input-bg); color: var(--text-main)">
+                                    <th class="p-4 border-b border-r" style="border-color: var(--border-subtle)">Matrix</th>
+                                    <th class="p-4 border-b border-r" style="border-color: var(--border-subtle)">Description</th>
+                                    <th class="p-4 border-b border-r" style="border-color: var(--border-subtle)">Math</th>
+                                    <th class="p-4 border-b text-right font-bold" style="border-color: var(--border-subtle)">Parameters</th>
+                                </tr>
+                            </thead>
+                            <tbody class="mono-font text-xs">
+                                <tr class="transition-colors hover:bg-white/5">
+                                    <td class="p-3 border-b border-r font-sans font-bold text-blue-400" style="border-color: var(--border-subtle)">$W_{hx}$</td>
+                                    <td class="p-3 border-b border-r font-sans" style="border-color: var(--border-subtle)">Input to Hidden</td>
+                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$${inputSize} \\times ${hiddenSize}$</td>
+                                    <td class="p-3 border-b text-right font-bold" style="border-color: var(--border-subtle)">${params.whx}</td>
+                                </tr>
+                                <tr class="transition-colors hover:bg-white/5">
+                                    <td class="p-3 border-b border-r font-sans font-bold text-green-400" style="border-color: var(--border-subtle)">$W_{hh}$</td>
+                                    <td class="p-3 border-b border-r font-sans" style="border-color: var(--border-subtle)">Hidden to Hidden (Recurrent)</td>
+                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$${hiddenSize} \\times ${hiddenSize}$</td>
+                                    <td class="p-3 border-b text-right font-bold" style="border-color: var(--border-subtle)">${params.whh}</td>
+                                </tr>
+                                <tr class="transition-colors hover:bg-white/5">
+                                    <td class="p-3 border-b border-r font-sans font-bold text-gray-400" style="border-color: var(--border-subtle)">$b_h$</td>
+                                    <td class="p-3 border-b border-r font-sans" style="border-color: var(--border-subtle)">Hidden Bias</td>
+                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$${hiddenSize}$</td>
+                                    <td class="p-3 border-b text-right font-bold" style="border-color: var(--border-subtle)">${params.bh}</td>
+                                </tr>
+                                <tr class="transition-colors hover:bg-white/5">
+                                    <td class="p-3 border-b border-r font-sans font-bold text-amber-500" style="border-color: var(--border-subtle)">$W_{yh}$</td>
+                                    <td class="p-3 border-b border-r font-sans" style="border-color: var(--border-subtle)">Hidden to Output</td>
+                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$${hiddenSize} \\times ${outputSize}$</td>
+                                    <td class="p-3 border-b text-right font-bold" style="border-color: var(--border-subtle)">${params.wyh}</td>
+                                </tr>
+                                <tr class="transition-colors hover:bg-white/5">
+                                    <td class="p-3 border-b border-r font-sans font-bold text-gray-400" style="border-color: var(--border-subtle)">$b_y$</td>
+                                    <td class="p-3 border-b border-r font-sans" style="border-color: var(--border-subtle)">Output Bias</td>
+                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$${outputSize}$</td>
+                                    <td class="p-3 border-b text-right font-bold" style="border-color: var(--border-subtle)">${params.by}</td>
+                                </tr>
+                                <tr style="background: var(--bg-surface)">
+                                    <td colspan="3" class="p-4 text-right font-sans font-bold uppercase tracking-wider text-xs" style="color: var(--accent-primary)">Total Shared Network Parameters</td>
+                                    <td class="p-4 text-right font-bold text-lg" style="color: var(--accent-primary)">${params.total}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    `;
+                    // Retypeset mathjax dynamically
+                    if (window.MathJax && window.MathJax.typesetPromise) {
+                        window.MathJax.typesetPromise([dynArticle]).catch(()=>console.log('MathJax Error'));
+                    }
+                }
+            }
+
+            // Global redraw
+            window.updateAndRedraw = function() {
+                drawNetwork();
+                updateStatsAndArticle();
+            };
+
+            function resetView() {
+                const width = seqLength * 150 + 200; // rough width estimation
+                const height = 500; // fixed virt height
+                
+                const rect = canvas.getBoundingClientRect();
+                const sX = (rect.width - 40) / width;
+                const sY = (rect.height - 40) / height;
+                scale = Math.min(sX, sY, 1.2);
+                
+                translateX = (rect.width - width * scale) / 2 + (100*scale); // offset left padding
+                translateY = (rect.height - height * scale) / 2 + 20;
+                
+                if(scale < 0.1) scale = 0.1;
+                drawNetwork();
+            }
+
+            // Interaction Panning/Zooming
+            canvas.addEventListener('mousedown', e => {
+                isDragging = true;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                canvas.classList.add('grabbing');
+            });
+
+            window.addEventListener('mousemove', e => {
+                if(isDragging) {
+                    const dx = e.clientX - lastX;
+                    const dy = e.clientY - lastY;
+                    translateX += dx;
+                    translateY += dy;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                    drawNetwork();
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+                canvas.classList.remove('grabbing');
+            });
+
+            canvas.addEventListener('wheel', e => {
+                e.preventDefault();
+                const zoom = 1.1;
+                const dir = e.deltaY < 0 ? 1 : -1;
+                const factor = dir > 0 ? zoom : 1/zoom;
+                
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                
+                const newScale = Math.max(0.1, Math.min(5, scale * factor));
+                
+                translateX = mx - (mx - translateX) * (newScale / scale);
+                translateY = my - (my - translateY) * (newScale / scale);
+                scale = newScale;
+                
+                drawNetwork();
+            });
+
+            function updateFromInputs() {
+                if(isSimulating) stopSimulation();
+                simProgress = 0;
+                try {
+                    const seq = parseInt(seqLengthEl.value);
+                    const inp = parseInt(inputSizeEl.value);
+                    const hid = parseInt(hiddenSizeEl.value);
+                    const out = parseInt(outputSizeEl.value);
+                    
+                    if(seq>0 && inp>0 && hid>0 && out>0) {
+                        seqLength = Math.min(seq, 20);
+                        inputSize = Math.min(inp, 100);
+                        hiddenSize = Math.min(hid, 100);
+                        outputSize = Math.min(out, 100);
+                        syncTextFromSeqLength(); // This calls updateAndRedraw()
+                    }
+                } catch(e) {}
+            }
+
+            // Real-time Event Listeners
+            rnnTypeEl.addEventListener('change', (e) => {
+                rnnType = e.target.value;
+                if(isSimulating) stopSimulation();
+                updateAndRedraw();
+                resetView();
+            });
+            seqLengthEl.addEventListener('change', updateFromInputs);
+            inputSizeEl.addEventListener('input', updateFromInputs);
+            hiddenSizeEl.addEventListener('input', updateFromInputs);
+            outputSizeEl.addEventListener('input', updateFromInputs);
+
+            resetNetworkBtn.addEventListener('click', () => {
+                if(isSimulating) stopSimulation();
+                simProgress = 0;
+                seqLengthEl.value = 6;
+                inputSizeEl.value = 3;
+                hiddenSizeEl.value = 8;
+                outputSizeEl.value = 2;
+                rnnTypeEl.value = 'many-to-one';
+                rnnType = 'many-to-one';
+                simDataInput.value = "I love learning about Artificial Intelligence";
+                updateFromInputs();
+                resetView();
+            });
+            centerCanvasBtn.addEventListener('click', resetView);
+
+            calculateBtn.addEventListener('click', () => {
+                const modal = document.getElementById('calculationResultModal');
+                const tbody = document.getElementById('calc-table-body');
+                const params = calculateParams();
+                
+                tbody.innerHTML = `
+                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
+                        <td class="p-3 font-bold text-blue-400">W_hx</td>
+                        <td class="p-3">Input $\\to$ Hidden</td>
+                        <td class="p-3">${inputSize} &times; ${hiddenSize}</td>
+                        <td class="p-3 text-right font-bold text-blue-400">${params.whx}</td>
+                    </tr>
+                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
+                        <td class="p-3 font-bold text-green-400">W_hh</td>
+                        <td class="p-3">Hidden $\\to$ Hidden</td>
+                        <td class="p-3">${hiddenSize} &times; ${hiddenSize}</td>
+                        <td class="p-3 text-right font-bold text-green-400">${params.whh}</td>
+                    </tr>
+                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
+                        <td class="p-3 font-bold text-gray-400">b_h</td>
+                        <td class="p-3">Hidden Bias</td>
+                        <td class="p-3">${hiddenSize}</td>
+                        <td class="p-3 text-right font-bold text-gray-400">${params.bh}</td>
+                    </tr>
+                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
+                        <td class="p-3 font-bold text-amber-500">W_yh</td>
+                        <td class="p-3">Hidden $\\to$ Output</td>
+                        <td class="p-3">${hiddenSize} &times; ${outputSize}</td>
+                        <td class="p-3 text-right font-bold text-amber-500">${params.wyh}</td>
+                    </tr>
+                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
+                        <td class="p-3 font-bold text-gray-400">b_y</td>
+                        <td class="p-3">Output Bias</td>
+                        <td class="p-3">${outputSize}</td>
+                        <td class="p-3 text-right font-bold text-gray-400">${params.by}</td>
+                    </tr>
+                `;
+                
+                document.getElementById('totalParamsResult').textContent = params.total.toLocaleString();
+                
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+
+                if (window.MathJax && window.MathJax.typesetPromise) {
+                    window.MathJax.typesetPromise([tbody]).catch(()=>console.log('MathJax Error'));
+                }
+            });
+
+            document.getElementById('closeCalcModalBtn').addEventListener('click', () => {
+                document.getElementById('calculationResultModal').classList.add('hidden');
+                document.getElementById('calculationResultModal').classList.remove('flex');
+            });
+
+            window.addEventListener('resize', () => {
+                drawNetwork();
+                resetView();
+            });
+            
+            // Initialization
+            syncData();
+            setTimeout(resetView, 100); 
+        });
+    
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            // Machine Learning
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "../machine_learning/cosine_similarity.html", category: "ml", icon: "fa-brain" },
+            { title: "Cross Validation", path: "../machine_learning/cross_validation.html", category: "ml", icon: "fa-brain" },
+            { title: "Decision Tree", path: "../machine_learning/decision_tree.html", category: "ml", icon: "fa-brain" },
+            { title: "K-Means", path: "../machine_learning/k_means.html", category: "ml", icon: "fa-brain" },
+            { title: "KNN", path: "../machine_learning/knn.html", category: "ml", icon: "fa-brain" },
+            { title: "Label Encoding", path: "../machine_learning/label_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Naive Bayes", path: "../machine_learning/naive_bayes.html", category: "ml", icon: "fa-brain" },
+            { title: "One Hot Encoding", path: "../machine_learning/one_hot_encoding.html", category: "ml", icon: "fa-brain" },
+            { title: "Sliding Window Time Series", path: "../machine_learning/sliding_window_for_timeseries_data.html", category: "ml", icon: "fa-brain" },
+            { title: "SVM", path: "../machine_learning/svm.html", category: "ml", icon: "fa-brain" },
+            { title: "Train Test Split", path: "../machine_learning/train_test_split.html", category: "ml", icon: "fa-brain" },
+            
+            // Deep Learning
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing in Neural Networks", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Dropout in Neural Networks", path: "../deep_learning/dropout_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Batch Processing", path: "../deep_learning/gradient_descent_batch_processing.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Linear Regression with Gradient Descent", path: "../deep_learning/linear_regression_with_gradient_descent.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            
+            // DSA
+            { title: "A* Algorithm", path: "../dsa/a_star.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Backtracking", path: "../dsa/backtracking.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Search", path: "../dsa/binary_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Breadth First Search", path: "../dsa/breadth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Bubble Sort", path: "../dsa/bubble_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Counting Sort", path: "../dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Depth First Search", path: "../dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dictionaries in Python", path: "../dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra's Algorithm", path: "../dsa/dijkstra's.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Fibonacci Search", path: "../dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Insertion Sort", path: "../dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Interpolation Search", path: "../dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Linear Search", path: "../dsa/linear_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Lists in Python", path: "../dsa/lists_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Merge Sort", path: "../dsa/merge_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Quick Sort", path: "../dsa/quick_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Selection Sort", path: "../dsa/selection_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Strings in Python", path: "../dsa/strings_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            
+            // Natural Language Processing
+            { title: "ASCII Codes", path: "../natural_language_processing/ascii_codes.html", category: "nlp", icon: "fa-comments" },
+            { title: "N-Gram", path: "../natural_language_processing/n_gram.html", category: "nlp", icon: "fa-comments" },
+            { title: "Stemming vs Lemmatization", path: "../natural_language_processing/stemming_vs_lemmatization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Text Normalization Pipeline", path: "../natural_language_processing/text_normalization_pipeline.html", category: "nlp", icon: "fa-comments" },
+            { title: "Tokenization", path: "../natural_language_processing/tokenization.html", category: "nlp", icon: "fa-comments" },
+            { title: "Word Cloud", path: "../natural_language_processing/word_cloud.html", category: "nlp", icon: "fa-comments" },
+            
+            // Computer Vision
+            { title: "Downsampling in CNN", path: "../computer_vision/downsampling_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Edge Detection", path: "../computer_vision/edge_detection.html", category: "vision", icon: "fa-eye" },
+            { title: "Feature Map in CNN", path: "../computer_vision/feature_map_in_cnn.html", category: "vision", icon: "fa-eye" },
+            { title: "Grayscale Image Processing", path: "../computer_vision/grayscale_image_processing.html", category: "vision", icon: "fa-eye" },
+            { title: "Image Data Augmentation", path: "../computer_vision/image_data_augmentation.html", category: "vision", icon: "fa-eye" },
+            { title: "RGB Image Processing", path: "../computer_vision/rgb_image_processing.html", category: "vision", icon: "fa-eye" },
+            
+            // Database
+            { title: "Groupby in SQL", path: "../database/groupby_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Joins in SQL", path: "../database/joins_in_sql.html", category: "db", icon: "fa-database" },
+            { title: "Window Functions in SQL", path: "../database/window_functions_in_sql.html", category: "db", icon: "fa-database" },
+            
+            // Gen AI
+            { title: "Casual Language Modeling", path: "../gen_ai/casual_language_modeling.html", category: "gen-ai", icon: "fa-wand-magic-sparkles" },
+            
+            // Maths
+            { title: "Equation of Line", path: "../maths/equation_of_line.html", category: "maths", icon: "fa-calculator" }
+        ];
+
+        // Initialize search functionality
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                // Filter courses
+                const filtered = allCourses.filter(course => 
+                    course.title.toLowerCase().includes(query) || 
+                    course.category.toLowerCase().includes(query)
+                );
+
+                // Render results
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>
+                    `).join('');
+                }
+
+                dropdown.classList.add('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            // Close dropdown on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
