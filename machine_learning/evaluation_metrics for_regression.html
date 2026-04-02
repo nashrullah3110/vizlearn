@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Regression Metrics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Add MathJax for rendering LaTeX formulas -->
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            startup: {
+                typeset: true
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'dark';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --border-glow: rgba(74, 222, 128, 0.5);
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            
+            /* Canvas Specifics - Dark */
+            --canvas-bg: #0a0a0a;
+            --point-color: #4ade80;
+            --line-color: #f59e0b;
+            --residual-color: #ef4444;
+            --axis-color: rgba(255, 255, 255, 0.2);
+            --axis-text: rgba(255, 255, 255, 0.5);
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --border-glow: rgba(22, 163, 74, 0.4);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+
+            /* Canvas Specifics - Light Mode */
+            --canvas-bg: #f8fafc;
+            --point-color: #15803d; 
+            --line-color: #d97706; 
+            --residual-color: #dc2626;
+            --axis-color: rgba(0, 0, 0, 0.2);
+            --axis-text: rgba(0, 0, 0, 0.5);
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .toolbar-container {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.75rem 1.5rem;
+            z-index: 40;
+        }
+
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .calc-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: all 0.2s;
+            border-radius: 0.375rem;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.875rem;
+        }
+        .viz-input:focus {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+            outline: none;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; border: 2px solid var(--bg-surface);
+            height: 14px; width: 14px; border-radius: 50%;
+            background: var(--accent-primary); cursor: pointer;
+            margin-top: -5px; box-shadow: 0 0 10px var(--accent-glow); transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: var(--border-subtle); border-radius: 2px; }
+
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); box-shadow: 0 0 10px var(--accent-glow); }
+        .viz-btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 15px var(--accent-glow); filter: brightness(1.1); }
+        .viz-btn-secondary { background: var(--input-bg); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+        .viz-btn-secondary:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); background: var(--input-focus-bg); }
+
+        #canvas {
+            background-color: var(--canvas-bg);
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none; /* Prevent browser scrolling on canvas drag */
+        }
+        #canvas.grabbing { cursor: grabbing !important; }
+        #canvas.pointer { cursor: pointer; }
+        #canvas.move { cursor: move; }
+
+        .metric-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 4px; height: 100%;
+            background-color: var(--metric-color, var(--accent-primary));
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper { background: var(--input-bg); border: 1px solid var(--border-subtle); position: relative; }
+        .search-input-wrapper:focus-within { background: var(--input-focus-bg); border-color: var(--accent-primary); box-shadow: 0 0 15px var(--accent-glow); }
+        .search-input-wrapper input { color: var(--text-main); }
+        .search-input-wrapper input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .search-input-wrapper i { color: var(--accent-primary); opacity: 0.7; }
+        .search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--card-bg); border: 1px solid var(--border-subtle); border-top: none; border-radius: 0 0 12px 12px; max-height: 400px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3); }
+        .search-dropdown.show { display: block; animation: slideDown 0.2s ease-out; }
+        .search-dropdown-item { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: space-between; color: inherit; text-decoration: none; }
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        .dropdown-item-title { font-weight: 500; color: var(--text-main); }
+        .dropdown-item-path { font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; }
+        .dropdown-item-icon { color: var(--accent-primary); margin-right: 8px; font-size: 0.875rem; }
+        .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
+
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50 shrink-0">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search modules" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Title Section -->
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full animate-fade-in">
+        <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
+            <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
+            <span>/</span>
+            <span>Machine Learning</span>
+        </div>
+        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Evaluation Metrics for Regression</h1>
+        <p class="mt-2 text-sm md:text-base max-w-2xl opacity-80" style="color: var(--text-muted)">
+            Interact with the line and data points to see how MAE, MSE, RMSE, and $R^2$ quantify model performance in real-time.
+        </p>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-4 justify-between animate-fade-in z-40 relative shadow-md">
+        <!-- Configuration Group -->
+        <div class="flex items-center gap-6 overflow-x-auto pb-1 md:pb-0 hide-scrollbar shrink-0">
+            
+            <div class="flex items-center gap-2">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Initial Dataset</label>
+                <select id="fitType" class="viz-input text-center border-accent-primary">
+                    <option value="good" selected>Good Linear Fit</option>
+                    <option value="perfect">Perfect Fit (Overfitting)</option>
+                    <option value="poor">Poor Fit (High Bias)</option>
+                    <option value="nonlinear">Non-linear Data</option>
+                </select>
+            </div>
+            
+            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide text-orange-400 whitespace-nowrap">Noise Level</label>
+                <input type="range" id="noiseLevel" min="0" max="10" step="0.5" value="2.5" class="w-24" title="Adjust data noise">
+                <span id="noiseValue" class="text-[10px] mono-font w-8 text-orange-400">2.5</span>
+            </div>
+
+            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide text-blue-400 whitespace-nowrap">Data Points</label>
+                <input type="range" id="dataPoints" min="10" max="100" step="5" value="30" class="w-24" title="Number of points">
+                <span id="pointsValue" class="text-[10px] mono-font w-8 text-blue-400">30</span>
+            </div>
+
+        </div>
+
+        <!-- Action Controls -->
+        <div class="flex items-center gap-2 shrink-0 md:border-l border-[var(--border-subtle)] md:pl-6 ml-auto">
+            <span class="text-[10px] font-bold uppercase tracking-wide opacity-50 mr-2 hidden md:inline-block">
+                <i class="fas fa-hand-pointer"></i> Fully Interactive
+            </span>
+            <button id="regenerateBtn" class="viz-btn viz-btn-primary whitespace-nowrap">
+                <i class="fas fa-sync-alt text-xs"></i> 
+                <span>Reset Data</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Layout (Canvas + Metrics) -->
+    <div class="max-w-7xl mx-auto w-full px-4 md:px-8 py-6 flex-1 flex flex-col lg:flex-row gap-6 animate-fade-in">
+        
+        <!-- Canvas Area -->
+        <div class="lg:w-2/3 flex flex-col h-[50vh] lg:h-auto min-h-[400px]">
+            <div class="card-container flex-1 relative flex flex-col">
+                <div class="border-b px-4 py-3 flex justify-between items-center" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <div class="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style="color: var(--text-main)">
+                        <i class="fas fa-chart-scatter" style="color: var(--accent-primary)"></i>
+                        Interactive Plot
+                    </div>
+                    <div class="flex gap-4 text-[10px] mono-font opacity-80">
+                        <div class="hidden sm:flex items-center gap-1"><i class="fas fa-mouse"></i> Scroll: Zoom</div>
+                        <div class="hidden sm:flex items-center gap-1"><i class="fas fa-arrows-alt"></i> Drag: Pan</div>
+                    </div>
+                </div>
+                
+                <!-- Live Line Equation Badge -->
+                <div class="absolute top-16 left-4 z-10 pointer-events-none p-2 rounded-lg bg-black/60 border border-[var(--border-subtle)] backdrop-blur-sm">
+                    <div class="text-[10px] uppercase font-bold text-amber-500 mb-1 tracking-wider">Regression Line</div>
+                    <div class="mono-font text-sm font-bold text-white flex items-center gap-2">
+                        <span>$y_{pred} =$</span>
+                        <span id="lineEqM">1.20</span>$x$
+                        <span id="lineEqSign">+</span>
+                        <span id="lineEqB">2.00</span>
+                    </div>
+                </div>
+
+                <div class="flex-1 relative">
+                    <canvas id="canvas"></canvas>
+                    
+                    <!-- Hover Tooltip -->
+                    <div id="tooltip" class="absolute pointer-events-none hidden bg-black/90 border border-[var(--border-subtle)] p-2 rounded text-[10px] mono-font z-50 transform -translate-x-1/2 -translate-y-full mt-[-10px] shadow-lg">
+                        <div class="text-gray-400 mb-1">Data Point <span id="tt-idx">0</span></div>
+                        <div class="text-green-400">$y_{true}$: <span id="tt-true">0.00</span></div>
+                        <div class="text-amber-400">$\hat{y}_{pred}$: <span id="tt-pred">0.00</span></div>
+                        <div class="border-t border-white/10 my-1"></div>
+                        <div class="text-red-400">Error: <span id="tt-err">0.00</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics Dashboard -->
+        <div class="lg:w-1/3 flex flex-col gap-4">
+            <!-- MAE -->
+            <div class="metric-card" style="--metric-color: #3b82f6;">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-widest text-blue-400">Mean Absolute Error</h4>
+                        <span class="text-[10px] mono-font opacity-60">MAE</span>
+                    </div>
+                    <span id="valMAE" class="text-2xl font-bold mono-font text-blue-400">0.000</span>
+                </div>
+                <div class="text-[10px] opacity-70 leading-relaxed">Average of absolute differences. Treats all errors equally.</div>
+            </div>
+
+            <!-- MSE -->
+            <div class="metric-card" style="--metric-color: #ef4444;">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-widest text-red-400">Mean Squared Error</h4>
+                        <span class="text-[10px] mono-font opacity-60">MSE</span>
+                    </div>
+                    <span id="valMSE" class="text-2xl font-bold mono-font text-red-400">0.000</span>
+                </div>
+                <div class="text-[10px] opacity-70 leading-relaxed">Average of squared differences. Heavily punishes large errors (outliers).</div>
+            </div>
+
+            <!-- RMSE -->
+            <div class="metric-card" style="--metric-color: #a855f7;">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-widest text-purple-400">Root Mean Sq. Error</h4>
+                        <span class="text-[10px] mono-font opacity-60">RMSE</span>
+                    </div>
+                    <span id="valRMSE" class="text-2xl font-bold mono-font text-purple-400">0.000</span>
+                </div>
+                <div class="text-[10px] opacity-70 leading-relaxed">Square root of MSE. Returns error metric to original units.</div>
+            </div>
+
+            <!-- R-Squared -->
+            <div class="metric-card" style="--metric-color: #10b981;">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-widest text-green-400">R-Squared Score</h4>
+                        <span class="text-[10px] mono-font opacity-60">$R^2$ (Coeff. of Det.)</span>
+                    </div>
+                    <span id="valR2" class="text-2xl font-bold mono-font text-green-400">0.000</span>
+                </div>
+                <div class="text-[10px] opacity-70 leading-relaxed">Proportion of variance explained by the model. 1.0 is perfect, <0 is worse than mean.</div>
+                
+                <div class="w-full bg-black/20 rounded-full h-1.5 mt-3 overflow-hidden">
+                    <div id="barR2" class="h-full rounded-full bg-green-500 transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Comprehensive Article Section -->
+    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div class="mb-12 card-container animate-fade-in" style="animation-delay: 0.2s">
+            <div class="border-b px-6 py-5 md:px-8 md:py-6" style="border-color: var(--border-subtle)">
+                <h2 class="text-xl md:text-2xl font-bold flex items-center gap-3 brand-font" style="color: var(--text-main)">
+                    <i class="fas fa-ruler-combined" style="color: var(--accent-primary)"></i>
+                    Evaluating Regression Models
+                </h2>
+            </div>
+            
+            <div class="p-6 md:p-8 space-y-12" style="color: var(--text-muted)">
+                
+                <!-- Intro Section -->
+                <section>
+                    <p class="leading-relaxed mb-4">
+                        In Classification (e.g., Cat vs. Dog), evaluating a model is straightforward: you count how many predictions were right and calculate <em>Accuracy</em>. However, in <strong>Regression</strong>, models predict continuous numbers (e.g., predicting a house price of $\$402,150$). It is almost impossible for a model to guess the exact number down to the decimal.
+                    </p>
+                    <p class="leading-relaxed">
+                        Therefore, we don't ask "Was it perfectly right?" We ask <strong>"How far off was it on average?"</strong>. To measure this, we calculate the distance between the True Value ($y$) and the Predicted Value ($\hat{y}$). These vertical distances are called <strong>Residuals</strong> or <strong>Errors</strong>, visualized as the red vertical dashed lines in the interactive plot above.
+                    </p>
+
+                    <div class="p-4 mt-6 rounded-lg bg-blue-500/10 border border-blue-500/20 text-center">
+                        <p class="text-sm font-medium text-blue-400">
+                            <i class="fas fa-hand-pointer mr-2"></i>
+                            <strong>Try it yourself:</strong> Drag the amber nodes on the line to change the Slope. Drag the line itself to change the Intercept. Drag any green data point to create an Outlier, and watch how MSE explodes compared to MAE!
+                        </p>
+                    </div>
+                </section>
+
+                <!-- MAE & MSE Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">1. Measuring the Average Error</h3>
+                    <p class="leading-relaxed mb-6 text-sm">
+                        If we simply add up all the raw errors, positive errors ($+10$) and negative errors ($-10$) would cancel each other out to zero, falsely implying a perfect model. To fix this, we have two primary methods to make all errors positive before averaging them: Absolute Values and Squares.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                        <div class="calc-card border-l-4" style="border-color: #3b82f6">
+                            <h4 class="font-bold text-sm mb-2 text-blue-400">Mean Absolute Error (MAE)</h4>
+                            <p class="text-sm leading-relaxed mb-3">MAE takes the absolute value of each error ($|y - \hat{y}|$) so negatives become positive, and then averages them.</p>
+                            <div class="p-3 rounded-xl text-center bg-black/20 mb-3" style="border: 1px solid var(--border-subtle);">
+                                <div class="mono-font text-sm overflow-x-auto text-blue-400">
+                                    $$\text{MAE} = \frac{1}{n} \sum_{i=1}^{n} |y_i - \hat{y}_i|$$
+                                </div>
+                            </div>
+                            <p class="text-[11px] opacity-80"><strong>Intuition:</strong> It is highly interpretable. If your MAE is 5.2, your model is off by 5.2 units on average. It treats all errors proportionally; an error of 10 is exactly twice as bad as an error of 5.</p>
+                        </div>
+
+                        <div class="calc-card border-l-4" style="border-color: #ef4444">
+                            <h4 class="font-bold text-sm mb-2 text-red-400">Mean Squared Error (MSE)</h4>
+                            <p class="text-sm leading-relaxed mb-3">MSE <em>squares</em> the errors before averaging them. Squaring a negative number makes it positive, solving the cancellation problem.</p>
+                            <div class="p-3 rounded-xl text-center bg-black/20 mb-3" style="border: 1px solid var(--border-subtle);">
+                                <div class="mono-font text-sm overflow-x-auto text-red-400">
+                                    $$\text{MSE} = \frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2$$
+                                </div>
+                            </div>
+                            <p class="text-[11px] opacity-80"><strong>Intuition:</strong> Because it squares the error, a small error of 2 becomes 4, but a large error of 10 blows up to 100! Therefore, MSE <strong>heavily punishes large errors and outliers</strong>. If predicting one value very wrong is catastrophic for your business, optimize for MSE.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- RMSE & R2 Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">2. Returning to Scale & The Ultimate Score</h3>
+                    
+                    <div class="space-y-6">
+                        <div class="flex flex-col md:flex-row gap-6 items-center">
+                            <div class="flex-1">
+                                <h4 class="font-bold text-sm mb-2 text-purple-400">Root Mean Squared Error (RMSE)</h4>
+                                <p class="text-sm leading-relaxed mb-3">The major problem with MSE is that the unit is squared. If you are predicting House Prices in Dollars, MSE gives you an error in "Squared Dollars", which makes no intuitive sense to humans. <strong>RMSE simply takes the square root of the MSE</strong> to bring the error metric back to the original units.</p>
+                            </div>
+                            <div class="p-4 rounded-xl text-center bg-black/20 shrink-0 w-full md:w-1/3" style="border: 1px solid var(--border-subtle);">
+                                <div class="mono-font text-sm overflow-x-auto text-purple-400">
+                                    $$\text{RMSE} = \sqrt{\text{MSE}}$$
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="h-px w-full bg-white/5"></div>
+
+                        <div class="flex flex-col md:flex-row gap-6 items-center">
+                            <div class="flex-1">
+                                <h4 class="font-bold text-sm mb-2 text-green-400">R-Squared ($R^2$) - Coefficient of Determination</h4>
+                                <p class="text-sm leading-relaxed mb-3">MAE, MSE, and RMSE are <em>absolute</em> metrics—they range from 0 to infinity, so it's hard to know if a score of "500" is good or bad without knowing the dataset. $R^2$ is a <em>relative</em> metric.</p>
+                                <p class="text-sm leading-relaxed mb-3">It compares your model's errors against a "baseline" model (a horizontal line that just predicts the average of all $y$ values). It represents the <strong>percentage of variance explained by your model</strong>.</p>
+                                <ul class="text-[11px] opacity-80 list-disc pl-4 space-y-1">
+                                    <li><strong>1.0 (100%):</strong> Perfect predictions. No error.</li>
+                                    <li><strong>0.0 (0%):</strong> Your model is exactly as good as just guessing the average every time.</li>
+                                    <li><strong>Negative:</strong> Your model is actively worse than just guessing a flat average.</li>
+                                </ul>
+                            </div>
+                            <div class="p-4 rounded-xl text-center bg-black/20 shrink-0 w-full md:w-1/3" style="border: 1px solid var(--border-subtle);">
+                                <div class="mono-font text-sm overflow-x-auto text-green-400">
+                                    $$R^2 = 1 - \frac{\sum (y_i - \hat{y}_i)^2}{\sum (y_i - \bar{y})^2}$$
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-3">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                 <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)">
+                    <i class="fab fa-instagram fa-lg"></i>
+                </a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2026 VIZLEARN // MODULE.REGRESSION_METRICS</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            if (typeof window.updateAndRedraw === 'function') window.updateAndRedraw();
+        });
+
+        // --- REGRESSION METRICS LOGIC (Fully Interactive) ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const fitTypeEl = document.getElementById('fitType');
+            const noiseLevelEl = document.getElementById('noiseLevel');
+            const noiseValueEl = document.getElementById('noiseValue');
+            const dataPointsEl = document.getElementById('dataPoints');
+            const pointsValueEl = document.getElementById('pointsValue');
+            const regenerateBtn = document.getElementById('regenerateBtn');
+
+            const valMAE = document.getElementById('valMAE');
+            const valMSE = document.getElementById('valMSE');
+            const valRMSE = document.getElementById('valRMSE');
+            const valR2 = document.getElementById('valR2');
+            const barR2 = document.getElementById('barR2');
+
+            const tooltip = document.getElementById('tooltip');
+            const ttIdx = document.getElementById('tt-idx');
+            const ttTrue = document.getElementById('tt-true');
+            const ttPred = document.getElementById('tt-pred');
+            const ttErr = document.getElementById('tt-err');
+
+            const eqM = document.getElementById('lineEqM');
+            const eqSign = document.getElementById('lineEqSign');
+            const eqB = document.getElementById('lineEqB');
+
+            let dpr = window.devicePixelRatio || 1;
+            let width, height, plotWidth, plotHeight;
+            
+            const PAD_L = 50;
+            const PAD_R = 20;
+            const PAD_T = 20;
+            const PAD_B = 40;
+
+            let dataset = []; // {x, y_true, y_pred}
+            
+            // Viewport State
+            let vXMin = -2, vXMax = 12;
+            let vYMin = -2, vYMax = 18;
+
+            // Interactive Line State
+            let lineP1 = {x: 2, y: 4.4};
+            let lineP2 = {x: 8, y: 11.6};
+
+            // Drag State
+            let isDragging = false;
+            let dragType = 'none'; // 'p1', 'p2', 'line', 'point', 'pan'
+            let dragIndex = -1;
+            let dragStartMouse = {x: 0, y: 0};
+            let dragStartLine = {p1: {x:0, y:0}, p2: {x:0, y:0}};
+            let dragStartViewport = {xMin: 0, xMax: 0, yMin: 0, yMax: 0};
+            let hoveredIndex = -1;
+
+            function getThemeColors() {
+                const isLight = document.body.classList.contains('light-mode');
+                const styles = getComputedStyle(document.body);
+                return {
+                    bg: styles.getPropertyValue('--canvas-bg').trim(),
+                    axis: styles.getPropertyValue('--axis-color').trim(),
+                    axisText: styles.getPropertyValue('--axis-text').trim(),
+                    point: styles.getPropertyValue('--point-color').trim(),
+                    line: styles.getPropertyValue('--line-color').trim(),
+                    residual: styles.getPropertyValue('--residual-color').trim(),
+                    text: styles.getPropertyValue('--text-main').trim(),
+                    grid: styles.getPropertyValue('--grid-color').trim(),
+                };
+            }
+
+            function getLineEquation() {
+                const dx = lineP2.x - lineP1.x;
+                const m = dx === 0 ? 99999 : (lineP2.y - lineP1.y) / dx;
+                const b = lineP1.y - m * lineP1.x;
+                return { m, b };
+            }
+
+            function generateData() {
+                const fitType = fitTypeEl.value;
+                const noise = parseFloat(noiseLevelEl.value);
+                const n = parseInt(dataPointsEl.value);
+                
+                dataset = [];
+                vXMin = -2; vXMax = 12;
+                vYMin = -2; vYMax = 18;
+                
+                let targetSlope = 1.2;
+                let targetIntercept = 2;
+
+                if (fitType === 'perfect') {
+                    // Line follows points exactly (mostly)
+                    lineP1 = {x: 1, y: targetSlope * 1 + targetIntercept};
+                    lineP2 = {x: 9, y: targetSlope * 9 + targetIntercept};
+                } else if (fitType === 'good') {
+                    lineP1 = {x: 1, y: targetSlope * 1 + targetIntercept};
+                    lineP2 = {x: 9, y: targetSlope * 9 + targetIntercept};
+                } else if (fitType === 'poor') {
+                    // Line is way off
+                    lineP1 = {x: 1, y: -0.5 * 1 + 12};
+                    lineP2 = {x: 9, y: -0.5 * 9 + 12};
+                } else if (fitType === 'nonlinear') {
+                    // Line tries to fit curve
+                    lineP1 = {x: 1, y: 4.8};
+                    lineP2 = {x: 9, y: 11.2};
+                }
+
+                for(let i=0; i<n; i++) {
+                    let x = 0.5 + Math.random() * 9.0;
+                    
+                    let r1 = Math.random(); let r2 = Math.random();
+                    let nVal = Math.sqrt(-2.0 * Math.log(r1)) * Math.cos(2.0 * Math.PI * r2);
+                    let noiseApplied = nVal * (noise / 2);
+
+                    let y_true;
+
+                    if (fitType === 'perfect') {
+                        y_true = targetSlope * x + targetIntercept; // No noise
+                    } else if (fitType === 'nonlinear') {
+                        y_true = Math.sin(x * 1.2) * 4 + 0.5 * x + 5 + noiseApplied;
+                    } else {
+                        y_true = targetSlope * x + targetIntercept + noiseApplied;
+                    }
+                    
+                    dataset.push({x, y_true});
+                }
+
+                calculateMetrics();
+                draw();
+            }
+
+            function calculateMetrics() {
+                const n = dataset.length;
+                if (n === 0) return;
+
+                const { m, b } = getLineEquation();
+
+                // Update UI Equation
+                if(eqM) eqM.textContent = m.toFixed(2);
+                if(eqSign) eqSign.textContent = b >= 0 ? '+' : '-';
+                if(eqB) eqB.textContent = Math.abs(b).toFixed(2);
+
+                let sumAbsErr = 0;
+                let sumSqErr = 0;
+                let sumY = 0;
+
+                dataset.forEach(d => {
+                    d.y_pred = m * d.x + b;
+                    let err = d.y_true - d.y_pred;
+                    sumAbsErr += Math.abs(err);
+                    sumSqErr += err * err;
+                    sumY += d.y_true;
+                });
+
+                const meanY = sumY / n;
+                let totalVariance = 0;
+                dataset.forEach(d => {
+                    let diff = d.y_true - meanY;
+                    totalVariance += diff * diff;
+                });
+
+                const mae = sumAbsErr / n;
+                const mse = sumSqErr / n;
+                const rmse = Math.sqrt(mse);
+                let r2 = totalVariance === 0 ? 0 : 1 - (sumSqErr / totalVariance);
+
+                // Update UI
+                if(valMAE) valMAE.textContent = mae.toFixed(2);
+                if(valMSE) valMSE.textContent = mse.toFixed(2);
+                if(valRMSE) valRMSE.textContent = rmse.toFixed(2);
+                if(valR2) valR2.textContent = r2.toFixed(3);
+                
+                if(valR2 && barR2) {
+                    if (r2 < 0) {
+                        valR2.className = "text-2xl font-bold mono-font text-red-500";
+                        barR2.style.width = "0%";
+                        barR2.className = "h-full rounded-full bg-red-500 transition-all duration-300";
+                    } else {
+                        valR2.className = "text-2xl font-bold mono-font text-green-400";
+                        barR2.style.width = `${Math.min(100, r2 * 100)}%`;
+                        barR2.className = "h-full rounded-full bg-green-500 transition-all duration-300";
+                    }
+                }
+
+                // Update tooltip if active
+                if (hoveredIndex !== -1 && !isDragging && tooltip) {
+                    const d = dataset[hoveredIndex];
+                    if (ttIdx) ttIdx.textContent = hoveredIndex + 1;
+                    if (ttTrue) ttTrue.textContent = d.y_true.toFixed(2);
+                    if (ttPred) ttPred.textContent = d.y_pred.toFixed(2);
+                    if (ttErr) ttErr.textContent = Math.abs(d.y_true - d.y_pred).toFixed(2);
+                    tooltip.style.top = `${mapY(d.y_true)}px`;
+                }
+            }
+
+            // Mappers (Math <-> Screen)
+            const mapX = (x) => PAD_L + ((x - vXMin) / (vXMax - vXMin)) * plotWidth;
+            const mapY = (y) => height - PAD_B - ((y - vYMin) / (vYMax - vYMin)) * plotHeight;
+            const unmapX = (cx) => vXMin + ((cx - PAD_L) / plotWidth) * (vXMax - vXMin);
+            const unmapY = (cy) => vYMin + ((height - PAD_B - cy) / plotHeight) * (vYMax - vYMin);
+            const dist = (x1,y1, x2,y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2);
+
+            function distToLine(px, py, x1, y1, x2, y2) {
+                const num = Math.abs((y2 - y1)*px - (x2 - x1)*py + x2*y1 - y2*x1);
+                const den = Math.sqrt((y2 - y1)**2 + (x2 - x1)**2);
+                return den === 0 ? 9999 : num / den;
+            }
+
+            function draw() {
+                const rect = canvas.parentNode.getBoundingClientRect();
+                width = rect.width;
+                height = rect.height;
+                plotWidth = width - PAD_L - PAD_R;
+                plotHeight = height - PAD_T - PAD_B;
+                
+                canvas.width = width * dpr;
+                canvas.height = height * dpr;
+                
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.scale(dpr, dpr);
+                
+                const c = getThemeColors();
+                
+                // Clear
+                ctx.clearRect(0, 0, width, height);
+
+                // Grid & Axes
+                ctx.lineWidth = 1;
+                ctx.font = "10px Inter";
+                ctx.textBaseline = "middle";
+
+                // Dynamic Grid Intervals
+                const spanX = vXMax - vXMin;
+                const spanY = vYMax - vYMin;
+                const stepX = spanX > 50 ? 10 : spanX > 20 ? 5 : spanX > 5 ? 1 : 0.5;
+                const stepY = spanY > 50 ? 10 : spanY > 20 ? 5 : spanY > 5 ? 1 : 0.5;
+
+                // X Grid & Labels
+                ctx.textAlign = "center";
+                ctx.textBaseline = "top";
+                let startX = Math.ceil(vXMin / stepX) * stepX;
+                for(let x = startX; x <= vXMax; x += stepX) {
+                    let cx = mapX(x);
+                    if (cx >= PAD_L && cx <= width - PAD_R) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = c.grid;
+                        ctx.moveTo(cx, PAD_T); ctx.lineTo(cx, height - PAD_B);
+                        ctx.stroke();
+                        ctx.fillStyle = c.axisText;
+                        ctx.fillText(Number.isInteger(x) ? x : x.toFixed(1), cx, height - PAD_B + 8);
+                    }
+                }
+
+                // Y Grid & Labels
+                ctx.textAlign = "right";
+                ctx.textBaseline = "middle";
+                let startY = Math.ceil(vYMin / stepY) * stepY;
+                for(let y = startY; y <= vYMax; y += stepY) {
+                    let cy = mapY(y);
+                    if (cy >= PAD_T && cy <= height - PAD_B) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = c.grid;
+                        ctx.moveTo(PAD_L, cy); ctx.lineTo(width - PAD_R, cy);
+                        ctx.stroke();
+                        ctx.fillStyle = c.axisText;
+                        ctx.fillText(Number.isInteger(y) ? y : y.toFixed(1), PAD_L - 8, cy);
+                    }
+                }
+
+                // Zero Axes
+                ctx.strokeStyle = c.axis;
+                ctx.lineWidth = 2;
+                let zeroX = mapX(0);
+                if (zeroX >= PAD_L && zeroX <= width - PAD_R) {
+                    ctx.beginPath(); ctx.moveTo(zeroX, PAD_T); ctx.lineTo(zeroX, height - PAD_B); ctx.stroke();
+                }
+                let zeroY = mapY(0);
+                if (zeroY >= PAD_T && zeroY <= height - PAD_B) {
+                    ctx.beginPath(); ctx.moveTo(PAD_L, zeroY); ctx.lineTo(width - PAD_R, zeroY); ctx.stroke();
+                }
+
+                // Bounding Box
+                ctx.strokeStyle = c.axis;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(PAD_L, PAD_T, plotWidth, plotHeight);
+
+                // Clip to plotting area
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(PAD_L, PAD_T, plotWidth, plotHeight);
+                ctx.clip();
+
+                if (dataset.length > 0) {
+                    // 1. Draw Residuals (Errors)
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 4]);
+                    dataset.forEach(d => {
+                        const cx = mapX(d.x);
+                        const cyT = mapY(d.y_true);
+                        const cyP = mapY(d.y_pred);
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(cx, cyT);
+                        ctx.lineTo(cx, cyP);
+                        
+                        let err = Math.abs(d.y_true - d.y_pred);
+                        ctx.strokeStyle = c.residual;
+                        ctx.globalAlpha = Math.min(1.0, 0.2 + err * 0.15); 
+                        ctx.stroke();
+                    });
+                    ctx.setLineDash([]);
+                    ctx.globalAlpha = 1.0;
+
+                    // 2. Draw Regression Line (Infinite)
+                    const { m, b } = getLineEquation();
+                    let endY1 = m * vXMin + b;
+                    let endY2 = m * vXMax + b;
+                    
+                    ctx.strokeStyle = c.line;
+                    ctx.lineWidth = 3;
+                    if (dragType === 'line') {
+                        ctx.shadowColor = c.line; ctx.shadowBlur = 10;
+                    }
+                    ctx.beginPath();
+                    ctx.moveTo(mapX(vXMin), mapY(endY1));
+                    ctx.lineTo(mapX(vXMax), mapY(endY2));
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+
+                    // 3. Draw Line Handles
+                    const drawHandle = (p, isDragging) => {
+                        const hx = mapX(p.x);
+                        const hy = mapY(p.y);
+                        ctx.beginPath();
+                        ctx.arc(hx, hy, isDragging ? 8 : 6, 0, 2*Math.PI);
+                        ctx.fillStyle = c.line;
+                        if(isDragging) { ctx.shadowColor = c.line; ctx.shadowBlur = 10; }
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    };
+                    drawHandle(lineP1, dragType === 'p1');
+                    drawHandle(lineP2, dragType === 'p2');
+
+                    // 4. Draw True Points (y_true)
+                    dataset.forEach((d, i) => {
+                        const cx = mapX(d.x);
+                        const cy = mapY(d.y_true);
+                        const isHover = hoveredIndex === i || dragIndex === i;
+                        
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, isHover ? 6 : 4, 0, 2*Math.PI);
+                        ctx.fillStyle = c.point;
+                        if(isHover) {
+                            ctx.shadowColor = c.point;
+                            ctx.shadowBlur = 10;
+                        }
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    });
+                }
+                
+                ctx.restore(); // Remove clip
+            }
+
+            window.updateAndRedraw = draw;
+
+            // --- INTERACTIONS ---
+            const HIT_RADIUS = 15;
+
+            canvas.addEventListener('mousedown', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                
+                if (mx < PAD_L || mx > width - PAD_R || my < PAD_T || my > height - PAD_B) {
+                    dragType = 'pan'; // Clicked outside plot area, pan viewport
+                } else {
+                    // Hit testing order: Handles -> Points -> Line Body -> Pan
+                    if (dist(mx, my, mapX(lineP1.x), mapY(lineP1.y)) < HIT_RADIUS) {
+                        dragType = 'p1';
+                    } else if (dist(mx, my, mapX(lineP2.x), mapY(lineP2.y)) < HIT_RADIUS) {
+                        dragType = 'p2';
+                    } else {
+                        let hitPt = -1;
+                        let minDist = HIT_RADIUS;
+                        dataset.forEach((d, i) => {
+                            let dpx = dist(mx, my, mapX(d.x), mapY(d.y_true));
+                            if (dpx < minDist) { minDist = dpx; hitPt = i; }
+                        });
+                        
+                        if (hitPt !== -1) {
+                            dragType = 'point';
+                            dragIndex = hitPt;
+                        } else if (distToLine(mx, my, mapX(vXMin), mapY(getLineEquation().m * vXMin + getLineEquation().b), mapX(vXMax), mapY(getLineEquation().m * vXMax + getLineEquation().b)) < HIT_RADIUS) {
+                            dragType = 'line';
+                            dragStartLine.p1 = {...lineP1};
+                            dragStartLine.p2 = {...lineP2};
+                        } else {
+                            dragType = 'pan';
+                        }
+                    }
+                }
+                
+                dragStartMouse = {x: mx, y: my};
+                dragStartViewport = {xMin: vXMin, xMax: vXMax, yMin: vYMin, yMax: vYMax};
+                isDragging = true;
+                
+                canvas.className = dragType === 'pan' ? 'block w-full h-full grabbing' : 'block w-full h-full grabbing pointer';
+                draw();
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+
+                if (!isDragging) {
+                    // Hover Detection
+                    let cursor = 'default';
+                    let hitPt = -1;
+                    
+                    if (mx >= PAD_L && mx <= width - PAD_R && my >= PAD_T && my <= height - PAD_B) {
+                        // Check Handles
+                        if (dist(mx, my, mapX(lineP1.x), mapY(lineP1.y)) < HIT_RADIUS || dist(mx, my, mapX(lineP2.x), mapY(lineP2.y)) < HIT_RADIUS) {
+                            cursor = 'pointer';
+                        } else {
+                            // Check Points
+                            let minDist = HIT_RADIUS;
+                            dataset.forEach((d, i) => {
+                                let dpx = dist(mx, my, mapX(d.x), mapY(d.y_true));
+                                if (dpx < minDist) { minDist = dpx; hitPt = i; }
+                            });
+                            
+                            if (hitPt !== -1) {
+                                cursor = 'pointer';
+                            } else if (distToLine(mx, my, mapX(vXMin), mapY(getLineEquation().m * vXMin + getLineEquation().b), mapX(vXMax), mapY(getLineEquation().m * vXMax + getLineEquation().b)) < HIT_RADIUS) {
+                                cursor = 'move';
+                            }
+                        }
+                    }
+                    
+                    if (hitPt !== hoveredIndex) {
+                        hoveredIndex = hitPt;
+                        if (hitPt !== -1) {
+                            const d = dataset[hitPt];
+                            if (ttIdx) ttIdx.textContent = hitPt + 1;
+                            if (ttTrue) ttTrue.textContent = d.y_true.toFixed(2);
+                            if (ttPred) ttPred.textContent = d.y_pred.toFixed(2);
+                            if (ttErr) ttErr.textContent = Math.abs(d.y_true - d.y_pred).toFixed(2);
+                            
+                            if (tooltip) {
+                                tooltip.style.left = `${mapX(d.x)}px`;
+                                tooltip.style.top = `${mapY(d.y_true)}px`;
+                                tooltip.classList.remove('hidden');
+                            }
+                        } else {
+                            if (tooltip) tooltip.classList.add('hidden');
+                        }
+                        draw();
+                    }
+                    canvas.className = `block w-full h-full ${cursor}`;
+                    return;
+                }
+
+                // Handle Dragging
+                if(tooltip) tooltip.classList.add('hidden'); // Hide tooltip while dragging
+                
+                const mathX = unmapX(mx);
+                const mathY = unmapY(my);
+                const dx_pixel = mx - dragStartMouse.x;
+                const dy_pixel = my - dragStartMouse.y;
+                const dx_math = (dx_pixel / plotWidth) * (dragStartViewport.xMax - dragStartViewport.xMin);
+                const dy_math = -(dy_pixel / plotHeight) * (dragStartViewport.yMax - dragStartViewport.yMin);
+
+                if (dragType === 'p1') { 
+                    lineP1.x = mathX; lineP1.y = mathY; 
+                } else if (dragType === 'p2') { 
+                    lineP2.x = mathX; lineP2.y = mathY; 
+                } else if (dragType === 'point') { 
+                    dataset[dragIndex].x = mathX; 
+                    dataset[dragIndex].y_true = mathY; 
+                } else if (dragType === 'line') {
+                    lineP1.x = dragStartLine.p1.x + dx_math;
+                    lineP1.y = dragStartLine.p1.y + dy_math;
+                    lineP2.x = dragStartLine.p2.x + dx_math;
+                    lineP2.y = dragStartLine.p2.y + dy_math;
+                } else if (dragType === 'pan') {
+                    vXMin = dragStartViewport.xMin - dx_math;
+                    vXMax = dragStartViewport.xMax - dx_math;
+                    vYMin = dragStartViewport.yMin - dy_math;
+                    vYMax = dragStartViewport.yMax - dy_math;
+                }
+                
+                calculateMetrics();
+                draw();
+            });
+
+            canvas.addEventListener('mouseup', () => {
+                isDragging = false;
+                dragType = 'none';
+                dragIndex = -1;
+                canvas.className = 'block w-full h-full';
+                draw();
+            });
+
+            canvas.addEventListener('mouseleave', () => {
+                isDragging = false;
+                dragType = 'none';
+                hoveredIndex = -1;
+                if(tooltip) tooltip.classList.add('hidden');
+                canvas.className = 'block w-full h-full';
+                draw();
+            });
+
+            canvas.addEventListener('wheel', e => {
+                e.preventDefault();
+                const zoom = e.deltaY > 0 ? 1.1 : 1/1.1;
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                
+                // Only zoom if mouse is in plot area
+                if (mx < PAD_L || mx > width - PAD_R || my < PAD_T || my > height - PAD_B) return;
+
+                const mathX = unmapX(mx);
+                const mathY = unmapY(my);
+                
+                // Clamp zoom to prevent math blowups
+                if ((vXMax - vXMin) * zoom < 0.1 || (vXMax - vXMin) * zoom > 500) return;
+
+                vXMin = mathX - (mathX - vXMin) * zoom;
+                vXMax = mathX + (vXMax - mathX) * zoom;
+                vYMin = mathY - (mathY - vYMin) * zoom;
+                vYMax = mathY + (vYMax - mathY) * zoom;
+                
+                draw();
+            });
+
+            window.addEventListener('resize', draw);
+
+            // UI Listeners
+            if(noiseLevelEl) noiseLevelEl.addEventListener('input', (e) => {
+                if(noiseValueEl) noiseValueEl.textContent = e.target.value;
+                generateData();
+            });
+            
+            if(dataPointsEl) dataPointsEl.addEventListener('input', (e) => {
+                if(pointsValueEl) pointsValueEl.textContent = e.target.value;
+                generateData();
+            });
+
+            if(fitTypeEl) fitTypeEl.addEventListener('change', generateData);
+            if(regenerateBtn) regenerateBtn.addEventListener('click', generateData);
+
+            // Initial Generation
+            generateData();
+        });
+
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Regression Metrics", path: "../machine_learning/regression_metrics.html", category: "ml", icon: "fa-ruler-combined" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing & Loss", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Optimizers", path: "../deep_learning/optimizers.html", category: "dl", icon: "fa-network-wired" }
+        ];
+
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                if (query.length === 0) { dropdown.classList.remove('show'); return; }
+                const filtered = allCourses.filter(c => c.title.toLowerCase().includes(query) || c.category.toLowerCase().includes(query));
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div><div class="dropdown-item-title">${course.title}</div><div class="dropdown-item-path">${course.category.toUpperCase()}</div></div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>`).join('');
+                }
+                dropdown.classList.add('show');
+            });
+            document.addEventListener('click', (e) => { if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show'); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dropdown.classList.remove('show'); });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Bias-Variance Tradeoff</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Add MathJax for rendering LaTeX formulas -->
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            startup: {
+                typeset: true
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'dark';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --border-glow: rgba(74, 222, 128, 0.5);
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            
+            /* Chart Specifics */
+            --chart-grid: rgba(255, 255, 255, 0.1);
+            --chart-text: rgba(255, 255, 255, 0.6);
+            --train-color: #3b82f6; /* Blue */
+            --val-color: #f59e0b; /* Amber */
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --border-glow: rgba(22, 163, 74, 0.4);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+
+            /* Chart Specifics - Light Mode */
+            --chart-grid: rgba(0, 0, 0, 0.1);
+            --chart-text: rgba(0, 0, 0, 0.6);
+            --train-color: #2563eb; 
+            --val-color: #d97706; 
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .toolbar-container {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.75rem 1.5rem;
+            z-index: 40;
+        }
+
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .calc-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: all 0.2s;
+            border-radius: 0.375rem;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.875rem;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; border: 2px solid var(--bg-surface);
+            height: 16px; width: 16px; border-radius: 50%;
+            background: var(--accent-primary); cursor: pointer;
+            margin-top: -6px; box-shadow: 0 0 10px var(--accent-glow); transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: var(--border-subtle); border-radius: 2px; }
+
+        /* Custom Colors for specific sliders */
+        input[type=range].bias-slider::-webkit-slider-thumb { background: #facc15; box-shadow: 0 0 10px rgba(250,204,21,0.5); }
+        input[type=range].variance-slider::-webkit-slider-thumb { background: #ef4444; box-shadow: 0 0 10px rgba(239,68,68,0.5); }
+
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); box-shadow: 0 0 10px var(--accent-glow); }
+        .viz-btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 15px var(--accent-glow); filter: brightness(1.1); }
+        .viz-btn-secondary { background: var(--input-bg); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+        .viz-btn-secondary:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); background: var(--input-focus-bg); }
+
+        .metric-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper { background: var(--input-bg); border: 1px solid var(--border-subtle); position: relative; }
+        .search-input-wrapper:focus-within { background: var(--input-focus-bg); border-color: var(--accent-primary); box-shadow: 0 0 15px var(--accent-glow); }
+        .search-input-wrapper input { color: var(--text-main); }
+        .search-input-wrapper input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .search-input-wrapper i { color: var(--accent-primary); opacity: 0.7; }
+        .search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--card-bg); border: 1px solid var(--border-subtle); border-top: none; border-radius: 0 0 12px 12px; max-height: 400px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3); }
+        .search-dropdown.show { display: block; animation: slideDown 0.2s ease-out; }
+        .search-dropdown-item { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: space-between; color: inherit; text-decoration: none; }
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        .dropdown-item-title { font-weight: 500; color: var(--text-main); }
+        .dropdown-item-path { font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; }
+        .dropdown-item-icon { color: var(--accent-primary); margin-right: 8px; font-size: 0.875rem; }
+        .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
+
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50 shrink-0">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <!-- Search -->
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search courses" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <!-- Theme Toggle + Back Button -->
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Title Section -->
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full animate-fade-in">
+        <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
+            <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
+            <span>/</span>
+            <span>Machine Learning</span>
+        </div>
+        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">The Bias-Variance Tradeoff</h1>
+        <p class="mt-2 text-sm md:text-base max-w-2xl opacity-80" style="color: var(--text-muted)">
+            Explicitly control Bias and Variance to understand how models generalize. Use the <strong>Resample</strong> button to visualize the instability of High Variance models!
+        </p>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-4 justify-between animate-fade-in z-40 relative shadow-md">
+        <!-- Configuration Group -->
+        <div class="flex items-center gap-6 overflow-x-auto pb-1 md:pb-0 hide-scrollbar shrink-0">
+            
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-yellow-400">Bias</label>
+                <input type="range" id="biasSlider" min="0" max="1" step="0.05" value="0.8" class="w-32 bias-slider" title="Model Bias (Rigidity)">
+                <span id="biasValue" class="text-sm font-bold mono-font w-10 text-yellow-400">80%</span>
+            </div>
+
+            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide text-red-400 whitespace-nowrap">Variance</label>
+                <input type="range" id="varianceSlider" min="0" max="1" step="0.05" value="0.1" class="w-32 variance-slider" title="Model Variance (Sensitivity)">
+                <span id="varianceValue" class="text-sm font-bold mono-font w-10 text-red-400">10%</span>
+            </div>
+            
+            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Data Noise</label>
+                <input type="range" id="noiseSlider" min="0.0" max="1.5" step="0.1" value="0.8" class="w-24" title="Data Variance">
+            </div>
+
+        </div>
+
+        <!-- Action Controls -->
+        <div class="flex items-center gap-2 shrink-0 md:border-l border-[var(--border-subtle)] md:pl-6 ml-auto">
+            <button id="clearHistoryBtn" class="viz-btn viz-btn-secondary whitespace-nowrap py-2 px-3 shadow-[0_0_15px_rgba(255,255,255,0.05)]" title="Clear previous curves">
+                <i class="fas fa-eraser text-xs"></i> <span>Clear Trails</span>
+            </button>
+            <button id="regenerateBtn" class="viz-btn viz-btn-primary whitespace-nowrap py-2 px-4 shadow-[0_0_15px_rgba(74,222,128,0.15)]">
+                <i class="fas fa-random text-xs"></i> 
+                <span>Resample Data</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Layout (Chart + Live Metrics) -->
+    <div class="max-w-7xl mx-auto w-full px-4 md:px-8 py-6 flex-1 flex flex-col gap-6 animate-fade-in">
+        
+        <!-- Live Dashboard Strip -->
+        <div id="diagnosisPanel" class="metric-card w-full flex flex-col md:flex-row items-center justify-between border-l-4 border-green-500 mb-2 p-4 transition-colors duration-500">
+            <div class="flex items-center gap-3">
+                <i id="diagIcon" class="fas fa-check-circle text-2xl text-green-400"></i>
+                <div class="text-left">
+                    <span class="text-[10px] uppercase font-bold opacity-60">System Diagnosis</span>
+                    <h3 id="diagTitle" class="text-lg font-bold brand-font text-green-400">IDEAL BALANCE</h3>
+                </div>
+            </div>
+            <div id="diagMsg" class="text-sm opacity-80 text-right mt-2 md:mt-0 max-w-md">
+                Model accurately captures the trend without memorizing the noise.
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[500px]">
+            
+            <!-- Chart Area (Takes up 2 cols on large screens) -->
+            <div class="lg:col-span-2 card-container flex flex-col h-full relative">
+                <div class="border-b px-4 py-3 flex justify-between items-center" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <div class="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style="color: var(--text-main)">
+                        <i class="fas fa-chart-scatter" style="color: var(--accent-primary)"></i> Live Fit View
+                    </div>
+                    <div class="flex gap-4 text-[10px] mono-font opacity-80 flex-wrap justify-end">
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full" style="background: var(--train-color)"></span> Train Data</div>
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full" style="background: var(--val-color)"></span> Val Data</div>
+                        <div class="flex items-center gap-1"><span class="w-4 h-1" style="background: var(--accent-primary)"></span> Model Prediction</div>
+                        <div class="flex items-center gap-1"><span class="w-4 h-1 bg-white/20 border-t border-dashed border-white/50"></span> True Function</div>
+                    </div>
+                </div>
+                <div class="flex-1 p-4">
+                    <div class="relative w-full h-full">
+                        <canvas id="polyChart"></canvas>
+                        <!-- Instruction Overlay -->
+                        <div id="resampleOverlay" class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300 z-10">
+                            <div class="bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/10 text-white font-bold tracking-widest uppercase text-xs">
+                                Click "Resample Data" repeatedly to visualize Variance!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metrics Dashboard -->
+            <div class="lg:col-span-1 flex flex-col gap-4">
+                
+                <div class="metric-card border-l-4" style="border-left-color: var(--train-color)">
+                    <h4 class="text-xs font-bold uppercase tracking-widest text-blue-400 mb-1">Training Error (MSE)</h4>
+                    <span class="text-[10px] opacity-60 block mb-3">Error on the blue dots. High Error indicates High Bias (Underfitting).</span>
+                    <span id="trainMseVal" class="text-3xl font-bold mono-font text-blue-400">0.000</span>
+                </div>
+                
+                <div class="metric-card border-l-4" style="border-left-color: var(--accent-primary)">
+                    <h4 class="text-xs font-bold uppercase tracking-widest mb-1" style="color: var(--accent-primary)">Variance Gap</h4>
+                    <span class="text-[10px] opacity-60 block mb-3">Difference between Val and Train. High Gap indicates High Variance (Overfitting).</span>
+                    <span id="varianceGapVal" class="text-3xl font-bold mono-font" style="color: var(--accent-primary)">0.000</span>
+                </div>
+
+                <div class="metric-card border-l-4" style="border-left-color: var(--val-color)">
+                    <h4 class="text-xs font-bold uppercase tracking-widest text-amber-500 mb-1">Total Error (Val MSE)</h4>
+                    <span class="text-[10px] opacity-60 block mb-3">Overall performance on unseen orange dots. The ultimate metric.</span>
+                    <span id="valMseVal" class="text-3xl font-bold mono-font text-amber-500">0.000</span>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Comprehensive Article Section -->
+    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div class="mb-12 card-container animate-fade-in" style="animation-delay: 0.2s">
+            <div class="border-b px-6 py-5 md:px-8 md:py-6" style="border-color: var(--border-subtle)">
+                <h2 class="text-xl md:text-2xl font-bold flex items-center gap-3 brand-font" style="color: var(--text-main)">
+                    <i class="fas fa-balance-scale" style="color: var(--accent-primary)"></i>
+                    The Bias-Variance Tradeoff
+                </h2>
+            </div>
+            
+            <div class="p-6 md:p-8 space-y-12" style="color: var(--text-muted)">
+                
+                <!-- Intro Section -->
+                <section>
+                    <p class="leading-relaxed mb-4">
+                        In Machine Learning, the goal isn't just to memorize the data you have; it's to uncover the hidden mathematical rule (the "True Function") that generated the data so you can make accurate predictions on data you haven't seen yet. 
+                    </p>
+                    <p class="leading-relaxed">
+                        To do this, we must balance two major sources of error: <strong>Bias</strong> and <strong>Variance</strong>. If a model is too simple, it has high bias. If it is too complex, it has high variance. This delicate balancing act is the core of predictive modeling.
+                    </p>
+                    <div class="p-3 mt-4 rounded text-sm bg-blue-500/10 border border-blue-500/20">
+                        <i class="fas fa-info-circle text-blue-400 mr-2"></i><strong>Note:</strong> In real algorithms, decreasing Bias almost always naturally increases Variance. For educational purposes, this tool <em>mathematically decouples</em> them so you can independently control the sliders and study their isolated visual effects.
+                    </div>
+                </section>
+
+                <!-- Bias Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">1. What is Bias?</h3>
+                    <div class="calc-card border-l-4" style="border-color: #facc15">
+                        <p class="text-sm leading-relaxed mb-3">
+                            <strong>Bias</strong> is the error introduced by approximating a highly complex real-world problem with a simplified model. It represents the model's "stubbornness" or inability to bend to capture the true underlying pattern.
+                        </p>
+                        <p class="text-sm leading-relaxed mb-3">
+                            <strong>Try this:</strong> The model currently starts with <strong class="text-yellow-400">High Bias (80%)</strong>. Notice how the prediction curve is almost a rigid, straight line. Even though the data is clearly wavy, the high-bias model stubbornly refuses to bend. This is classic <strong>Underfitting</strong>.
+                        </p>
+                        <p class="text-[11px] opacity-80 border-l-2 border-yellow-500 pl-2">
+                            <strong>Visualizing Low Variance:</strong> While leaving Bias high, click the <strong>"Resample Data"</strong> button rapidly. Notice how the line barely changes position across entirely different datasets. High bias models are very stable, they are just consistently wrong!
+                        </p>
+                    </div>
+                </section>
+
+                <!-- Variance Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">2. What is Variance?</h3>
+                    <div class="calc-card border-l-4" style="border-color: #ef4444">
+                        <p class="text-sm leading-relaxed mb-3">
+                            <strong>Variance</strong> is the error introduced by the model's extreme sensitivity to small fluctuations (noise) in the training data. A high variance model effectively memorizes the random noise instead of learning the true signal.
+                        </p>
+                        <p class="text-sm leading-relaxed mb-3">
+                            <strong>Try this:</strong> Set Bias to 0% and push the <strong class="text-red-400">Variance Slider to 100%</strong>. Notice how the prediction curve violently twists to perfectly hit almost every single blue training dot. It completely ignores the dashed true function, resulting in massive errors on the orange validation dots. This is classic <strong>Overfitting</strong>.
+                        </p>
+                        <p class="text-[11px] opacity-80 mb-3 border-l-2 border-red-500 pl-2">
+                            <strong>Visualizing High Variance:</strong> While leaving Variance at 100%, click the <strong>"Resample Data"</strong> button rapidly. Look at the faint "ghost" trails left behind. The curves jump wildly all over the screen like a spiderweb! The model changes drastically every time it sees slightly different data.
+                        </p>
+                    </div>
+                </section>
+
+                <!-- The Tradeoff -->
+                <section>
+                    <div class="flex flex-col md:flex-row gap-8 items-center bg-black/20 p-6 rounded-xl border" style="border-color: var(--border-subtle)">
+                        <div class="flex-1 space-y-4">
+                            <h3 class="text-lg font-bold brand-font" style="color: var(--text-main)">3. The Optimal Balance</h3>
+                            <p class="text-sm leading-relaxed">
+                                You cannot easily reduce both Bias and Variance at the same time. Increasing model complexity decreases bias but increases variance. Decreasing complexity decreases variance but increases bias. 
+                            </p>
+                            <p class="text-sm leading-relaxed">
+                                <strong>Try this:</strong> Set both Bias and Variance to <strong>0%</strong>. The green model line now represents an optimally balanced generalized model. It captures the essence of the wave without twisting to hit every single noisy dot. 
+                            </p>
+                            <p class="text-sm leading-relaxed">
+                                Now, rapidly click "Resample Data". The resulting cluster of ghost curves will tightly hug the true function without flying off the screen. This is the sweet spot: low enough Bias to capture the real trend, and low enough Variance that it doesn't get distracted by noise. <strong>This is where Total Validation Error is minimized.</strong>
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- High Bias AND High Variance -->
+                <section>
+                    <div class="calc-card border-l-4" style="border-color: #a855f7">
+                        <h3 class="text-md font-bold mb-2 brand-font" style="color: var(--text-main)">What happens if both are high?</h3>
+                        <p class="text-sm leading-relaxed">
+                            Set both <strong>Bias to 100%</strong> and <strong>Variance to 100%</strong>. The model attempts to draw a straight line (high bias) but is also highly sensitive to the noise (high variance), resulting in a violently wiggly straight line. This is the worst of both worlds, resulting in the highest possible Total Error!
+                        </p>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-3">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                 <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)">
+                    <i class="fab fa-instagram fa-lg"></i>
+                </a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2026 VIZLEARN // MODULE.BIAS_VARIANCE</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            updateChartTheme();
+        });
+
+        // --- MATH UTILS FOR POLYNOMIAL REGRESSION ---
+        
+        // Gauss-Jordan Elimination to solve linear systems (Ax = b)
+        function solve(A, b) {
+            let n = A.length;
+            for (let i = 0; i < n; i++) {
+                let maxEl = Math.abs(A[i][i]), maxRow = i;
+                for (let k = i + 1; k < n; k++) {
+                    if (Math.abs(A[k][i]) > maxEl) { maxEl = Math.abs(A[k][i]); maxRow = k; }
+                }
+                // Swap rows
+                for (let k = i; k < n; k++) { let tmp = A[maxRow][k]; A[maxRow][k] = A[i][k]; A[i][k] = tmp; }
+                let tmp = b[maxRow]; b[maxRow] = b[i]; b[i] = tmp;
+                
+                // Eliminate below
+                for (let k = i + 1; k < n; k++) {
+                    let c = -A[k][i] / A[i][i];
+                    for (let j = i; j < n; j++) { if (i === j) A[k][j] = 0; else A[k][j] += c * A[i][j]; }
+                    b[k] += c * b[i];
+                }
+            }
+            // Back substitution
+            let x = new Array(n).fill(0);
+            for (let i = n - 1; i >= 0; i--) {
+                x[i] = b[i] / A[i][i];
+                for (let k = i - 1; k >= 0; k--) { b[k] -= A[k][i] * x[i]; }
+            }
+            return x;
+        }
+
+        // Fit polynomial of given degree
+        function polyFit(x_arr, y_arr, degree, lambda = 1e-8) {
+            let n = x_arr.length;
+            let X_mat = []; let Y_vec = [];
+            
+            for (let i = 0; i <= degree; i++) {
+                X_mat[i] = [];
+                for (let j = 0; j <= degree; j++) {
+                    let sum = 0; 
+                    for (let k = 0; k < n; k++) sum += Math.pow(x_arr[k], i + j);
+                    X_mat[i].push(sum);
+                }
+                let sumY = 0; 
+                for (let k = 0; k < n; k++) sumY += Math.pow(x_arr[k], i) * y_arr[k];
+                Y_vec.push(sumY);
+            }
+            
+            // Regularization for numerical stability
+            for (let i = 0; i <= degree; i++) {
+                X_mat[i][i] += lambda;
+            }
+
+            return solve(X_mat, Y_vec);
+        }
+
+        function evaluatePoly(weights, x) {
+            let sum = 0;
+            for(let i=0; i<weights.length; i++) {
+                sum += weights[i] * Math.pow(x, i);
+            }
+            return sum;
+        }
+
+        // --- CHART & SIMULATION LOGIC ---
+        
+        // UI Elements
+        const biasSlider = document.getElementById('biasSlider');
+        const varianceSlider = document.getElementById('varianceSlider');
+        const noiseSlider = document.getElementById('noiseSlider');
+        
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+        const regenerateBtn = document.getElementById('regenerateBtn');
+
+        const trainMseVal = document.getElementById('trainMseVal');
+        const valMseVal = document.getElementById('valMseVal');
+        const varianceGapVal = document.getElementById('varianceGapVal');
+
+        let polyChart;
+        
+        // Data State
+        let rawTrainX = [], rawTrainY = [];
+        let rawValX = [], rawValY = [];
+        const NUM_POINTS = 16; 
+        const MIN_X = 0, MAX_X = 6;
+        
+        let curveHistory = []; // Array to store previous curveData arrays to visualize Variance
+        let resampleClickCount = 0;
+
+        // Model Weights cached for performance
+        let weightsUnderfit = []; // High Bias (Degree 1)
+        let weightsIdeal = [];    // Low Bias, Low Variance (Degree 4)
+        let weightsOverfit = [];  // High Variance (Degree 12)
+
+        // Scaling functions for numerical stability [-1, 1]
+        const scaleX = x => ((x - MIN_X) / (MAX_X - MIN_X)) * 2 - 1;
+
+        // True underlying function: y = sin(x) + 0.3x
+        const trueFunction = (x) => Math.sin(x*1.5) * 1.5 + 0.3 * x;
+
+        // Colors
+        function getColors() {
+            const style = getComputedStyle(document.body);
+            return {
+                grid: style.getPropertyValue('--chart-grid').trim(),
+                text: style.getPropertyValue('--chart-text').trim(),
+                train: style.getPropertyValue('--train-color').trim(),
+                val: style.getPropertyValue('--val-color').trim(),
+                accent: style.getPropertyValue('--accent-primary').trim(),
+                accentFaded: style.getPropertyValue('--accent-primary').trim() + '40', // 25% opacity
+            };
+        }
+
+        // Initialize Chart.js
+        function initCharts() {
+            const ctxPoly = document.getElementById('polyChart').getContext('2d');
+            const colors = getColors();
+
+            Chart.defaults.font.family = "'JetBrains Mono', monospace";
+            Chart.defaults.color = colors.text;
+
+            let datasets = [
+                { label: 'Train Data', data: [], backgroundColor: colors.train, pointRadius: 6, pointHoverRadius: 8, order: 1 },
+                { label: 'Validation Data', data: [], backgroundColor: colors.val, pointRadius: 6, pointHoverRadius: 8, order: 2 },
+                { label: 'Model Prediction', data: [], type: 'line', borderColor: colors.accent, backgroundColor: 'transparent', borderWidth: 3, pointRadius: 0, tension: 0.4, order: 3 },
+                { label: 'True Function', data: [], type: 'line', borderColor: 'rgba(255,255,255,0.3)', backgroundColor: 'transparent', borderWidth: 2, borderDash: [5,5], pointRadius: 0, tension: 0.4, order: 4 }
+            ];
+
+            // Add 10 history datasets for the spiderweb effect
+            for(let i=0; i<10; i++) {
+                datasets.push({
+                    label: `History ${i}`, data: [], type: 'line', 
+                    borderColor: colors.accentFaded, backgroundColor: 'transparent', 
+                    borderWidth: 1.5, pointRadius: 0, tension: 0.4, order: 5
+                });
+            }
+
+            polyChart = new Chart(ctxPoly, {
+                type: 'scatter',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 0 }, // Instant update for smooth sliders
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                            filter: function(tooltipItem) {
+                                // Don't show tooltip for history lines
+                                return !tooltipItem.dataset.label.includes('History');
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            min: MIN_X - 0.5, max: MAX_X + 0.5,
+                            grid: { color: colors.grid, drawBorder: false },
+                            ticks: { color: colors.text, maxTicksLimit: 8 }
+                        },
+                        y: {
+                            min: -3.0, max: 4.0, // Fixed bounds
+                            grid: { color: colors.grid, drawBorder: false },
+                            ticks: { color: colors.text }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChartTheme() {
+            if (!polyChart) return;
+            const colors = getColors();
+
+            polyChart.options.scales.x.grid.color = colors.grid;
+            polyChart.options.scales.x.ticks.color = colors.text;
+            polyChart.options.scales.y.grid.color = colors.grid;
+            polyChart.options.scales.y.ticks.color = colors.text;
+            
+            polyChart.data.datasets[0].backgroundColor = colors.train;
+            polyChart.data.datasets[1].backgroundColor = colors.val;
+            polyChart.data.datasets[2].borderColor = colors.accent;
+            const isLight = document.body.classList.contains('light-mode');
+            polyChart.data.datasets[3].borderColor = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)';
+            
+            for(let i=4; i<14; i++) {
+                polyChart.data.datasets[i].borderColor = colors.accentFaded;
+            }
+            
+            polyChart.update('none');
+        }
+
+        function generateRawData() {
+            rawTrainX = []; rawTrainY = [];
+            rawValX = []; rawValY = [];
+            
+            const noiseLevel = parseFloat(noiseSlider.value);
+            
+            for(let i=0; i<NUM_POINTS; i++) {
+                // Train
+                let tx = MIN_X + (MAX_X - MIN_X) * (i / (NUM_POINTS - 1));
+                tx += (Math.random() - 0.5) * 0.3; // Jitter
+                let ty = trueFunction(tx) + (Math.random() - 0.5) * noiseLevel * 2;
+                
+                rawTrainX.push(tx);
+                rawTrainY.push(ty);
+
+                // Val
+                let vx = MIN_X + (MAX_X - MIN_X) * ((i + 0.5) / (NUM_POINTS - 1)); 
+                vx += (Math.random() - 0.5) * 0.3;
+                let vy = trueFunction(vx) + (Math.random() - 0.5) * noiseLevel * 2;
+                
+                rawValX.push(vx);
+                rawValY.push(vy);
+            }
+
+            // Pre-calculate boundary models based on new data
+            const scaledTrainX = rawTrainX.map(scaleX);
+            weightsUnderfit = polyFit(scaledTrainX, rawTrainY, 1, 1e-5);  // High Bias (Line)
+            weightsIdeal = polyFit(scaledTrainX, rawTrainY, 4, 1e-4);     // Generalized Fit (Degree 4)
+            weightsOverfit = polyFit(scaledTrainX, rawTrainY, 14, 1e-8);  // High Variance (Wiggly)
+        }
+
+        function fitAndPlot() {
+            const B = parseFloat(biasSlider.value);
+            const V = parseFloat(varianceSlider.value);
+            
+            // Mathematical Blending of Models based on Bias and Variance sliders
+            const curveData = [];
+            const trueData = [];
+            for(let x = MIN_X - 0.5; x <= MAX_X + 0.5; x += 0.1) {
+                const sx = scaleX(x);
+                const y_ideal_fit = evaluatePoly(weightsIdeal, sx);
+                const y_under = evaluatePoly(weightsUnderfit, sx);
+                const y_over = evaluatePoly(weightsOverfit, sx);
+                
+                let y_pred = y_ideal_fit + (B * (y_under - y_ideal_fit)) + (V * (y_over - y_ideal_fit));
+                
+                // Hard clamp for visual sanity
+                if (y_pred > 10) y_pred = 10; 
+                if (y_pred < -10) y_pred = -10;
+
+                curveData.push({ x: x, y: y_pred });
+                trueData.push({ x: x, y: trueFunction(x) });
+            }
+
+            // Update Datasets
+            polyChart.data.datasets[0].data = rawTrainX.map((x,i) => ({x: x, y: rawTrainY[i]}));
+            polyChart.data.datasets[1].data = rawValX.map((x,i) => ({x: x, y: rawValY[i]}));
+            polyChart.data.datasets[2].data = curveData;
+            polyChart.data.datasets[3].data = trueData;
+            
+            // Draw History
+            for(let i=0; i<10; i++) {
+                polyChart.data.datasets[4+i].data = curveHistory[i] || [];
+            }
+            
+            polyChart.update('none');
+
+            // Calculate Metrics
+            let tMse = 0, vMse = 0;
+            for(let i=0; i<NUM_POINTS; i++) {
+                // Train Point Error
+                const stx = scaleX(rawTrainX[i]);
+                const ty_ideal = evaluatePoly(weightsIdeal, stx);
+                const ty_under = evaluatePoly(weightsUnderfit, stx);
+                const ty_over = evaluatePoly(weightsOverfit, stx);
+                const ty_pred = ty_ideal + (B * (ty_under - ty_ideal)) + (V * (ty_over - ty_ideal));
+                tMse += Math.pow(ty_pred - rawTrainY[i], 2);
+                
+                // Val Point Error
+                const svx = scaleX(rawValX[i]);
+                const vy_ideal = evaluatePoly(weightsIdeal, svx);
+                const vy_under = evaluatePoly(weightsUnderfit, svx);
+                const vy_over = evaluatePoly(weightsOverfit, svx);
+                const vy_pred = vy_ideal + (B * (vy_under - vy_ideal)) + (V * (vy_over - vy_ideal));
+                vMse += Math.pow(vy_pred - rawValY[i], 2);
+            }
+            tMse /= NUM_POINTS;
+            vMse /= NUM_POINTS;
+
+            // Cap display values
+            if(tMse > 99) tMse = 99.999;
+            if(vMse > 99) vMse = 99.999;
+
+            let vGap = vMse - tMse;
+            if (vGap < 0) vGap = 0; 
+
+            trainMseVal.textContent = tMse.toFixed(3);
+            varianceGapVal.textContent = vGap.toFixed(3);
+            valMseVal.textContent = vMse.toFixed(3);
+
+            updateDiagnosis(B, V);
+        }
+
+        // --- DIAGNOSIS LOGIC ---
+        function updateDiagnosis(B, V) {
+            let diagnosis = "OPTIMAL BALANCE";
+            let colorClass = "text-green-400";
+            let bgClass = "border-green-500";
+            let icon = "fa-check-circle";
+            let message = "Model accurately captures the trend without memorizing the noise.";
+
+            if (B > 0.6 && V > 0.6) {
+                diagnosis = "HIGH BIAS & HIGH VARIANCE";
+                colorClass = "text-purple-400";
+                bgClass = "border-purple-500";
+                icon = "fa-exclamation-triangle";
+                message = "The worst of both worlds. It ignores the real pattern AND is wildly unstable to noise.";
+            } else if (B >= 0.4 && V < 0.4) {
+                diagnosis = "HIGH BIAS (Underfitting)";
+                colorClass = "text-yellow-400";
+                bgClass = "border-yellow-500";
+                icon = "fa-battery-quarter";
+                message = "Model is too rigid. It ignores the true complexity of the data.";
+            } else if (V >= 0.4 && B < 0.4) {
+                diagnosis = "HIGH VARIANCE (Overfitting)";
+                colorClass = "text-red-400";
+                bgClass = "border-red-500";
+                icon = "fa-brain";
+                message = "Model is too flexible. It wildly oscillates to memorize the specific noise of the train data.";
+            }
+
+            const panel = document.getElementById('diagnosisPanel');
+            panel.className = `metric-card w-full flex flex-col md:flex-row items-center justify-between border-l-4 ${bgClass} mb-2 p-4 transition-colors duration-300`;
+            
+            document.getElementById('diagIcon').className = `fas ${icon} text-2xl ${colorClass}`;
+            document.getElementById('diagTitle').className = `text-lg font-bold brand-font ${colorClass}`;
+            document.getElementById('diagTitle').textContent = diagnosis;
+            document.getElementById('diagMsg').textContent = message;
+        }
+
+        // --- EVENT LISTENERS ---
+        biasSlider.addEventListener('input', (e) => {
+            document.getElementById('biasValue').textContent = Math.round(e.target.value * 100) + '%';
+            curveHistory = []; // Reset history when fundamental params change
+            resampleClickCount = 0;
+            fitAndPlot();
+        });
+
+        varianceSlider.addEventListener('input', (e) => {
+            document.getElementById('varianceValue').textContent = Math.round(e.target.value * 100) + '%';
+            curveHistory = [];
+            resampleClickCount = 0;
+            fitAndPlot();
+        });
+        
+        noiseSlider.addEventListener('change', () => {
+            curveHistory = [];
+            resampleClickCount = 0;
+            generateRawData();
+            fitAndPlot();
+        });
+
+        clearHistoryBtn.addEventListener('click', () => {
+            curveHistory = [];
+            resampleClickCount = 0;
+            document.getElementById('resampleOverlay').classList.add('opacity-0');
+            fitAndPlot();
+        });
+
+        regenerateBtn.addEventListener('click', () => {
+            resampleClickCount++;
+            
+            // Hide the hint overlay after first click
+            if (resampleClickCount > 0) {
+                document.getElementById('resampleOverlay').classList.add('opacity-0');
+            }
+            
+            // Push current prediction line to history
+            const currentLine = polyChart.data.datasets[2].data;
+            if(currentLine && currentLine.length > 0) {
+                curveHistory.push([...currentLine]);
+                if (curveHistory.length > 10) curveHistory.shift(); // Keep max 10
+            }
+            
+            generateRawData();
+            fitAndPlot();
+        });
+
+        // Show instruction overlay initially
+        setTimeout(() => {
+            if (resampleClickCount === 0) {
+                document.getElementById('resampleOverlay').classList.remove('opacity-0');
+                // Hide it after a few seconds anyway
+                setTimeout(() => {
+                    document.getElementById('resampleOverlay').classList.add('opacity-0');
+                }, 5000);
+            }
+        }, 1000);
+
+        // Init
+        initCharts();
+        generateRawData();
+        fitAndPlot();
+        updateChartTheme();
+
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Regression Metrics", path: "../machine_learning/regression_metrics.html", category: "ml", icon: "fa-ruler-combined" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing & Loss", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Bias-Variance Tradeoff", path: "../deep_learning/overfitting_vs_underfitting.html", category: "dl", icon: "fa-chart-line" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Optimizers", path: "../deep_learning/optimizers.html", category: "dl", icon: "fa-network-wired" }
+        ];
+
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                if (query.length === 0) { dropdown.classList.remove('show'); return; }
+                const filtered = allCourses.filter(c => c.title.toLowerCase().includes(query) || c.category.toLowerCase().includes(query));
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div><div class="dropdown-item-title">${course.title}</div><div class="dropdown-item-path">${course.category.toUpperCase()}</div></div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>`).join('');
+                }
+                dropdown.classList.add('show');
+            });
+            document.addEventListener('click', (e) => { if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show'); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dropdown.classList.remove('show'); });
+        }
+    </script>
+</body>
+</html>

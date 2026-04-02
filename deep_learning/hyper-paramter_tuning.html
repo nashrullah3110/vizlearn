@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Hyperparameter Tuning</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --accent-primary: #22c55e;
+            --accent-glow: rgba(34, 197, 94, 0.25);
+            --accent-danger: #ef4444;
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            --neuron-fill: #111827;
+            --connection-idle: rgba(255, 255, 255, 0.15);
+        }
+
+        body.light-mode {
+            --bg-body: #f8fafc;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(15, 23, 42, 0.1);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --accent-danger: #dc2626;
+            --text-main: #020617; /* Darker slate for readability */
+            --text-muted: #334155; /* Sharp slate gray */
+            --card-bg: #ffffff;
+            --input-bg: rgba(15, 23, 42, 0.03);
+            --input-focus-bg: rgba(21, 128, 61, 0.08);
+            --grid-color: rgba(15, 23, 42, 0.08);
+            --vignette-color: transparent;
+            --neuron-fill: #ffffff;
+            --connection-idle: rgba(15, 23, 42, 0.2); /* Darker idle connections */
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .toolbar-container {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.75rem 1.5rem;
+            z-index: 40;
+        }
+
+        .floating-panel {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 380px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            z-index: 30;
+            opacity: 0.98;
+        }
+
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: all 0.2s;
+            border-radius: 0.375rem;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+            width: 100%;
+        }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            border: 2px solid var(--bg-surface);
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            cursor: pointer;
+            margin-top: -5px;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border-subtle);
+            border-radius: 2px;
+        }
+
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); box-shadow: 0 0 10px var(--accent-glow); }
+        .viz-btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .viz-btn-secondary { background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-subtle); }
+        .viz-btn-secondary:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+
+        #canvas { background-color: transparent; width: 100%; height: 100%; cursor: grab; user-select: none; }
+        #canvas.grabbing { cursor: grabbing; }
+
+        .metric-card { background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: 6px; margin-bottom: 0.5rem; }
+
+        .history-table {
+            width: 100%;
+            font-size: 10px;
+            border-collapse: collapse;
+        }
+        .history-table th {
+            text-align: left;
+            padding: 4px 8px;
+            opacity: 0.5;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .history-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 2px; }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <div class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(34,197,94,0.8)] animate-pulse"></div>
+                    <span style="color: var(--text-main)">viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </div>
+                <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)">
+                    <i class="fas fa-sun dark-icon"></i>
+                    <i class="fas fa-moon light-icon" style="display: none;"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full">
+        <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Hyperparameter Tuning</h1>
+        <p class="mt-2 text-sm md:text-base max-w-4xl opacity-80" style="color: var(--text-muted)">
+            Experiment with automated search strategies. Use <b>Grid Search</b> to systematically scan parameters or <b>Random Search</b> to find high-performance zones efficiently.
+        </p>
+    </div>
+
+    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-6 justify-between overflow-x-auto">
+        <div class="flex items-center gap-6 flex-1 min-w-max">
+            
+            <div class="flex flex-col gap-1 w-36">
+                <div class="flex justify-between items-center">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70">Search Strategy</label>
+                </div>
+                <select id="strategySelect" class="viz-input font-bold">
+                    <option value="manual" selected>Manual Tuning</option>
+                    <option value="grid">Grid Search</option>
+                    <option value="random">Random Search</option>
+                </select>
+            </div>
+
+            <div class="flex flex-col gap-1 w-32" id="lrControl">
+                <div class="flex justify-between items-center">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70">Learning Rate</label>
+                    <span id="lrValDisplay" class="text-[10px] font-bold mono-font" style="color: var(--accent-primary)">0.03</span>
+                </div>
+                <input type="range" id="lrSlider" min="0.001" max="0.3" step="0.001" value="0.03">
+            </div>
+
+            <div class="flex flex-col gap-1 w-24" id="hiddenControl">
+                <div class="flex justify-between items-center">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70">Neurons/Layer</label>
+                    <span id="hiddenValDisplay" class="text-[10px] font-bold mono-font" style="color: var(--accent-primary)">4</span>
+                </div>
+                <input type="range" id="hiddenSlider" min="1" max="8" step="1" value="4">
+            </div>
+
+            <div class="flex flex-col gap-1 w-24 hidden" id="trialsControl">
+                <div class="flex justify-between items-center">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70">N Trials</label>
+                    <span id="trialsValDisplay" class="text-[10px] font-bold mono-font" style="color: var(--accent-primary)">10</span>
+                </div>
+                <input type="range" id="trialsSlider" min="2" max="20" step="1" value="10">
+            </div>
+
+            <div class="w-px h-8 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <div class="flex items-center gap-3">
+                <button id="resetSearchBtn" class="viz-btn viz-btn-secondary">
+                    <i class="fas fa-trash-alt text-xs"></i> <span>Reset Search</span>
+                </button>
+                <button id="runTrialBtn" class="viz-btn viz-btn-primary w-44 shadow-[0_0_20px_rgba(34,197,94,0.2)]">
+                    <i class="fas fa-play-circle text-xs"></i> <span>Run Trial</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main class="flex-1 relative overflow-hidden">
+        <canvas id="canvas" class="block w-full h-full"></canvas>
+
+        <div class="floating-panel p-4 flex flex-col gap-4 pointer-events-auto">
+             <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
+                 <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--text-main)">
+                    Tuning Dashboard
+                </h3>
+                <span id="statusBadge" class="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-bold border border-blue-500/20 uppercase">READY</span>
+             </div>
+             
+             <div class="grid grid-cols-2 gap-2">
+                 <div class="metric-card p-3">
+                     <div class="text-[10px] uppercase font-bold opacity-60 mb-1">Trial Status</div>
+                     <div class="font-bold text-base mono-font" id="trialProgressDisplay">-- / --</div>
+                 </div>
+                 <div class="metric-card p-3">
+                     <div class="text-[10px] uppercase font-bold opacity-60 mb-1">Best Accuracy</div>
+                     <div class="font-bold text-base mono-font" id="accuracyDisplay" style="color: var(--accent-primary)">0.0%</div>
+                 </div>
+             </div>
+
+             <div class="flex-1 overflow-hidden flex flex-col">
+                 <h4 class="text-[10px] uppercase tracking-widest font-bold mb-2 opacity-50">Search History</h4>
+                 <div class="metric-card flex-1 overflow-y-auto max-h-[220px]">
+                     <table class="history-table">
+                         <thead>
+                             <tr>
+                                 <th>#</th>
+                                 <th>LR</th>
+                                 <th>Nodes</th>
+                                 <th>Accuracy</th>
+                             </tr>
+                         </thead>
+                         <tbody id="historyBody">
+                             <tr id="emptyRow"><td colspan="4" class="text-center opacity-30 py-4 italic">Start a search to see trials.</td></tr>
+                         </tbody>
+                     </table>
+                 </div>
+             </div>
+
+             <div class="text-[9px] text-center opacity-40">
+                 Drag to Pan | Scroll to Zoom
+             </div>
+        </div>
+    </main>
+
+    <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-3">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                 <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)">
+                    <i class="fab fa-instagram fa-lg"></i>
+                </a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2026 VIZLEARN // MODULE.TUNING</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- GLOBAL VARIABLES ---
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let scale = 1, translateX = 0, translateY = 0;
+        let isDragging = false, lastX = 0, lastY = 0;
+        let neuronPositions = [];
+        
+        let globalSeed = 42;
+        let layerConfig = [2, 4, 1];
+        let W = [], B = [], V = [], M = [];
+        let trialIndex = 0;
+        let isTuning = false;
+        let currentEpoch = 0;
+        let trainAcc = 0;
+        const EPOCHS_PER_TRIAL = 100;
+        let bestAccuracy = 0;
+        let animationPhase = 0;
+        let tuningQueue = [];
+        let totalTrialsInQueue = 0;
+        let thisRunTrialProgress = 0;
+
+        // --- PSEUDO-RANDOM DETERMINISM ---
+        function seededRandom() {
+            let x = Math.sin(globalSeed++) * 10000;
+            return x - Math.floor(x);
+        }
+
+        // --- THEME ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+
+        function updateThemeUI() {
+            const isL = document.body.classList.contains('light-mode');
+            if (isL) {
+                sunIcon.style.display = 'none';
+                moonIcon.style.display = 'block';
+            } else {
+                sunIcon.style.display = 'block';
+                moonIcon.style.display = 'none';
+            }
+            if (ctx) drawNetwork();
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            localStorage.setItem('theme', document.body.classList.contains('light-mode') ? 'light' : 'dark');
+            updateThemeUI();
+        });
+
+        if (localStorage.getItem('theme') === 'light') {
+            document.body.classList.add('light-mode');
+        }
+
+        // --- UI BINDINGS ---
+        const lrSlider = document.getElementById('lrSlider');
+        const hiddenSlider = document.getElementById('hiddenSlider');
+        const strategySelect = document.getElementById('strategySelect');
+        const trialsSlider = document.getElementById('trialsSlider');
+        const runBtn = document.getElementById('runTrialBtn');
+        const resetBtn = document.getElementById('resetSearchBtn');
+
+        strategySelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            document.getElementById('lrControl').classList.toggle('hidden', val !== 'manual');
+            document.getElementById('hiddenControl').classList.toggle('hidden', val !== 'manual');
+            document.getElementById('trialsControl').classList.toggle('hidden', val !== 'random');
+            
+            if(val === 'manual') runBtn.querySelector('span').textContent = 'Run Trial';
+            if(val === 'grid') runBtn.querySelector('span').textContent = 'Run Grid Search';
+            if(val === 'random') runBtn.querySelector('span').textContent = 'Run Random Search';
+        });
+
+        lrSlider.addEventListener('input', (e) => document.getElementById('lrValDisplay').textContent = e.target.value);
+        hiddenSlider.addEventListener('input', (e) => {
+            document.getElementById('hiddenValDisplay').textContent = e.target.value;
+            if(!isTuning) {
+                layerConfig[1] = parseInt(e.target.value);
+                initWeights(true);
+                calculateLayout();
+                drawNetwork();
+            }
+        });
+        trialsSlider.addEventListener('input', (e) => document.getElementById('trialsValDisplay').textContent = e.target.value);
+
+        function initWeights(isStatic = false) {
+            if (!isStatic) {
+                globalSeed = trialIndex * 100 + layerConfig[1] * 5;
+            } else {
+                globalSeed = 42;
+            }
+            
+            W = []; B = []; V = []; M = [];
+            for(let l=0; l<layerConfig.length-1; l++) {
+                let wLayer = []; let vLayer = []; let mLayer = [];
+                for(let i=0; i<layerConfig[l]; i++) {
+                    let wNode = []; let vNode = []; let mNode = [];
+                    for(let j=0; j<layerConfig[l+1]; j++) {
+                        wNode.push((seededRandom() * 2 - 1) * Math.sqrt(2/layerConfig[l]));
+                        vNode.push(0); mNode.push(0);
+                    }
+                    wLayer.push(wNode); vLayer.push(vNode); mLayer.push(mNode);
+                }
+                W.push(wLayer); V.push(vLayer); M.push(mLayer);
+                B.push(Array(layerConfig[l+1]).fill(0.0));
+            }
+            currentEpoch = 0;
+            trainAcc = 0;
+        }
+
+        async function startTuning() {
+            if(isTuning) return;
+            isTuning = true;
+            tuningQueue = [];
+            const strategy = strategySelect.value;
+            
+            if(strategy === 'manual') {
+                tuningQueue.push({ lr: parseFloat(lrSlider.value), nodes: parseInt(hiddenSlider.value) });
+            } else if(strategy === 'grid') {
+                const lrs = [0.01, 0.1, 0.2];
+                const nodelist = [2, 4, 8];
+                for(let l of lrs) for(let n of nodelist) tuningQueue.push({ lr: l, nodes: n });
+            } else if(strategy === 'random') {
+                const n = parseInt(trialsSlider.value);
+                for(let i=0; i<n; i++) {
+                    tuningQueue.push({ 
+                        lr: 0.001 + Math.random() * 0.299, 
+                        nodes: Math.floor(Math.random() * 8) + 1 
+                    });
+                }
+            }
+
+            totalTrialsInQueue = tuningQueue.length;
+            runBtn.disabled = true;
+            runBtn.style.opacity = 0.5;
+            document.getElementById('statusBadge').textContent = "SEARCHING...";
+            document.getElementById('statusBadge').className = "text-[9px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 font-bold border border-green-500/20";
+            
+            thisRunTrialProgress = 0;
+            processNextTrial();
+        }
+
+        function processNextTrial() {
+            if(tuningQueue.length === 0) {
+                finishTuning();
+                return;
+            }
+
+            const trial = tuningQueue.shift();
+            thisRunTrialProgress++;
+            trialIndex++;
+            layerConfig[1] = trial.nodes;
+            const lr = trial.lr;
+
+            initWeights();
+            calculateLayout();
+            document.getElementById('trialProgressDisplay').textContent = `${thisRunTrialProgress} / ${totalTrialsInQueue}`;
+
+            function loop() {
+                if(currentEpoch >= EPOCHS_PER_TRIAL) {
+                    recordTrial(lr, trial.nodes, trainAcc);
+                    processNextTrial();
+                    return;
+                }
+
+                for(let b=0; b<10; b++) {
+                    const x = [seededRandom()*2-1, seededRandom()*2-1];
+                    const y = (x[0] > 0 !== x[1] > 0) ? 1 : 0; 
+                    trainAcc = trainAcc * 0.9 + trainStep(x, y, lr) * 0.1;
+                }
+
+                currentEpoch++;
+                animationPhase = (animationPhase + 0.1) % (Math.PI * 2);
+                drawNetwork();
+                if(isTuning) requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        function trainStep(x, y_true, lr) {
+            let a = [x], z = [[]];
+            for(let l=0; l<layerConfig.length-1; l++) {
+                let lZ = [], lA = [];
+                for(let j=0; j<layerConfig[l+1]; j++) {
+                    let sum = B[l][j];
+                    for(let i=0; i<layerConfig[l]; i++) sum += a[l][i] * W[l][i][j];
+                    lZ.push(sum);
+                    lA.push(l === layerConfig.length-2 ? 1/(1+Math.exp(-sum)) : Math.max(0, sum));
+                }
+                z.push(lZ); a.push(lA);
+            }
+
+            let pred = a[layerConfig.length-1][0];
+            let dz = [pred - y_true];
+            for(let l=layerConfig.length-2; l>=0; l--) {
+                let nextDz = [];
+                for(let i=0; i<layerConfig[l]; i++) {
+                    let sum = 0;
+                    for(let j=0; j<layerConfig[l+1]; j++) {
+                        let grad = dz[j] * a[l][i];
+                        sum += dz[j] * W[l][i][j];
+                        M[l][i][j] = 0.9 * M[l][i][j] + 0.1 * grad;
+                        V[l][i][j] = 0.999 * V[l][i][j] + 0.001 * grad * grad;
+                        W[l][i][j] -= lr * M[l][i][j] / (Math.sqrt(V[l][i][j]) + 1e-8);
+                        B[l][j] -= lr * dz[j];
+                    }
+                    nextDz.push(sum * (z[l][i] > 0 ? 1 : 0));
+                }
+                dz = nextDz;
+            }
+            return (pred > 0.5 ? 1 : 0) === y_true ? 1 : 0;
+        }
+
+        function recordTrial(lr, nodes, acc) {
+            if(acc > bestAccuracy) {
+                bestAccuracy = acc;
+                document.getElementById('accuracyDisplay').textContent = (bestAccuracy * 100).toFixed(1) + "%";
+            }
+
+            const empty = document.getElementById('emptyRow');
+            if(empty) empty.remove();
+            
+            const row = document.createElement('tr');
+            row.className = "border-l-2 " + (acc > 0.8 ? "border-green-500 bg-green-500/5" : "border-transparent");
+            row.innerHTML = `
+                <td class="opacity-40">#${trialIndex}</td>
+                <td class="mono-font">${lr.toFixed(3)}</td>
+                <td class="mono-font">${nodes}</td>
+                <td class="font-bold ${acc > 0.8 ? 'text-green-500' : 'text-muted'}">${(acc*100).toFixed(1)}%</td>
+            `;
+            document.getElementById('historyBody').prepend(row);
+        }
+
+        function finishTuning() {
+            isTuning = false;
+            runBtn.disabled = false;
+            runBtn.style.opacity = 1;
+            document.getElementById('statusBadge').textContent = "DONE";
+            document.getElementById('statusBadge').className = "text-[9px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-bold border border-blue-500/20";
+        }
+
+        function resetHistory() {
+            if(isTuning) return;
+            trialIndex = 0;
+            bestAccuracy = 0;
+            document.getElementById('accuracyDisplay').textContent = "0.0%";
+            document.getElementById('trialProgressDisplay').textContent = "-- / --";
+            document.getElementById('historyBody').innerHTML = '<tr id="emptyRow"><td colspan="4" class="text-center opacity-30 py-4 italic">Start a search to see trials.</td></tr>';
+        }
+
+        runBtn.addEventListener('click', startTuning);
+        resetBtn.addEventListener('click', resetHistory);
+
+        // --- CANVAS RENDERING ---
+        function calculateLayout() {
+            neuronPositions = [];
+            const LAYER_SPACING = 240;
+            const NEURON_SPACING = 70;
+            layerConfig.forEach((count, lIdx) => {
+                const positions = [];
+                const layerX = lIdx * LAYER_SPACING;
+                const totalHeight = (count - 1) * NEURON_SPACING;
+                const offsetY = -totalHeight / 2;
+                for(let i=0; i<count; i++) positions.push({ x: layerX, y: offsetY + i * NEURON_SPACING });
+                neuronPositions.push(positions);
+            });
+        }
+
+        function drawNetwork() {
+            if (!ctx || neuronPositions.length === 0) return;
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            if (canvas.width !== Math.floor(rect.width * dpr)) {
+                canvas.width = Math.floor(rect.width * dpr); 
+                canvas.height = Math.floor(rect.height * dpr);
+            }
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
+            ctx.clearRect(0, 0, rect.width, rect.height);
+            ctx.save();
+            // MOVE TO LEFT: Using width/3 instead of width/2 to clear the dashboard area
+            ctx.translate(rect.width/4 + translateX, rect.height/2 + translateY);
+            ctx.scale(scale, scale);
+
+            const isL = document.body.classList.contains('light-mode');
+            const colors = {
+                neuron: isL ? '#fff' : '#111827',
+                border: isL ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.15)',
+                accent: isL ? '#15803d' : '#22c55e',
+                pulse: isL ? '#16a34a' : '#4ade80',
+                connection: isL ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.15)'
+            };
+
+            for(let l=0; l<layerConfig.length-1; l++) {
+                if (!W[l] || !neuronPositions[l] || !neuronPositions[l+1]) continue;
+                neuronPositions[l].forEach((p1, i) => {
+                    neuronPositions[l+1].forEach((p2, j) => {
+                        const w = W[l][i][j];
+                        ctx.beginPath();
+                        ctx.strokeStyle = w > 0 ? colors.accent : colors.connection;
+                        ctx.globalAlpha = isTuning ? 0.8 : 0.5;
+                        ctx.lineWidth = Math.abs(w) * 1.5 + 1.2;
+                        ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+                        ctx.stroke();
+
+                        if (isTuning && Math.abs(w) > 0.3) {
+                            const t = (animationPhase + l) % 1;
+                            ctx.beginPath();
+                            ctx.fillStyle = colors.pulse;
+                            ctx.arc(p1.x + (p2.x - p1.x) * t, p1.y + (p2.y - p1.y) * t, 3, 0, Math.PI*2);
+                            ctx.fill();
+                        }
+                    });
+                });
+            }
+
+            neuronPositions.forEach((layer, lIdx) => {
+                layer.forEach((pos, nIdx) => {
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, 18, 0, Math.PI*2);
+                    ctx.fillStyle = colors.neuron;
+                    ctx.strokeStyle = colors.border;
+                    ctx.lineWidth = 2.5;
+                    ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = isL ? '#020617' : '#fff';
+                    ctx.font = "bold 9px 'JetBrains Mono'";
+                    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                    ctx.fillText(lIdx === 0 ? "X" : (lIdx === layerConfig.length-1 ? "Y" : "H"), pos.x, pos.y);
+                });
+            });
+
+            ctx.restore();
+        }
+
+        canvas.addEventListener('mousedown', e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; canvas.classList.add('grabbing'); });
+        window.addEventListener('mousemove', e => {
+            if(!isDragging) return;
+            translateX += (e.clientX - lastX); translateY += (e.clientY - lastY);
+            lastX = e.clientX; lastY = e.clientY; drawNetwork();
+        });
+        window.addEventListener('mouseup', () => { isDragging = false; canvas.classList.remove('grabbing'); });
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            scale = Math.max(0.2, Math.min(3, scale * (e.deltaY > 0 ? 0.9 : 1.1)));
+            drawNetwork();
+        });
+
+        window.addEventListener('resize', () => { calculateLayout(); drawNetwork(); });
+        
+        calculateLayout();
+        initWeights(true);
+        updateThemeUI();
+    </script>
+</body>
+</html>

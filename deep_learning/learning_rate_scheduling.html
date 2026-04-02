@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Learning Rate Scheduling</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Add MathJax for rendering LaTeX formulas -->
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            startup: {
+                typeset: true
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'dark';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --border-glow: rgba(74, 222, 128, 0.5);
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            
+            /* App Specifics */
+            --chart-grid: rgba(255, 255, 255, 0.1);
+            --chart-text: rgba(255, 255, 255, 0.6);
+            --fixed-color: #ef4444; /* Red */
+            --step-color: #3b82f6; /* Blue */
+            --exp-color: #4ade80; /* Green */
+            --canvas-bg: #0a0a0a;
+            --data-train: #3b82f6;
+            --data-test: #f59e0b;
+            --axis-color: rgba(255, 255, 255, 0.2);
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --border-glow: rgba(22, 163, 74, 0.4);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+
+            /* App Specifics - Light Mode */
+            --chart-grid: rgba(0, 0, 0, 0.1);
+            --chart-text: rgba(0, 0, 0, 0.6);
+            --fixed-color: #dc2626; 
+            --step-color: #2563eb;
+            --exp-color: #16a34a; 
+            --canvas-bg: #f8fafc;
+            --data-train: #2563eb;
+            --data-test: #d97706;
+            --axis-color: rgba(0, 0, 0, 0.2);
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .toolbar-container {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.75rem 1.5rem;
+            z-index: 40;
+        }
+
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .calc-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: all 0.2s;
+            border-radius: 0.375rem;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.875rem;
+        }
+        .viz-input:focus {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+            outline: none;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; border: 2px solid var(--bg-surface);
+            height: 16px; width: 16px; border-radius: 50%;
+            background: var(--accent-primary); cursor: pointer;
+            margin-top: -6px; box-shadow: 0 0 10px var(--accent-glow); transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: var(--border-subtle); border-radius: 2px; }
+
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); box-shadow: 0 0 10px var(--accent-glow); }
+        .viz-btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 15px var(--accent-glow); filter: brightness(1.1); }
+        .viz-btn-secondary { background: var(--input-bg); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+        .viz-btn-secondary:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); background: var(--input-focus-bg); }
+
+        .metric-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        #canvas {
+            background-color: var(--canvas-bg);
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper { background: var(--input-bg); border: 1px solid var(--border-subtle); position: relative; }
+        .search-input-wrapper:focus-within { background: var(--input-focus-bg); border-color: var(--accent-primary); box-shadow: 0 0 15px var(--accent-glow); }
+        .search-input-wrapper input { color: var(--text-main); }
+        .search-input-wrapper input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .search-input-wrapper i { color: var(--accent-primary); opacity: 0.7; }
+        .search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--card-bg); border: 1px solid var(--border-subtle); border-top: none; border-radius: 0 0 12px 12px; max-height: 400px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3); }
+        .search-dropdown.show { display: block; animation: slideDown 0.2s ease-out; }
+        .search-dropdown-item { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: space-between; color: inherit; text-decoration: none; }
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        .dropdown-item-title { font-weight: 500; color: var(--text-main); }
+        .dropdown-item-path { font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; }
+        .dropdown-item-icon { color: var(--accent-primary); margin-right: 8px; font-size: 0.875rem; }
+        .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
+
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50 shrink-0">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <!-- Search -->
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search courses" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <!-- Theme Toggle + Back Button -->
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Title Section -->
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full animate-fade-in">
+        <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
+            <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
+            <span>/</span>
+            <span>Deep Learning</span>
+        </div>
+        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Learning Rate Scheduling</h1>
+        <p class="mt-2 text-sm md:text-base max-w-2xl opacity-80" style="color: var(--text-muted)">
+            Adjust Complexity and Epochs to watch Polynomial Regression overfit the training data. See how Scheduled Learning Rates succeed where Fixed Learning Rates bounce and fail.
+        </p>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-4 justify-between animate-fade-in z-40 relative shadow-md">
+        <!-- Configuration Group -->
+        <div class="flex items-center gap-6 overflow-x-auto pb-1 md:pb-0 hide-scrollbar shrink-0">
+            
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap" style="color: var(--text-main)">Complexity (Degree)</label>
+                <input type="range" id="complexitySlider" min="1" max="8" step="1" value="8" class="w-24" title="Polynomial Degree">
+                <span id="complexityValue" class="text-sm font-bold mono-font w-4" style="color: var(--text-main)">8</span>
+            </div>
+
+            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-blue-400">Initial LR ($\eta_0$)</label>
+                <input type="range" id="lrSlider" min="0.05" max="1.50" step="0.05" value="0.80" class="w-24" title="Starting Learning Rate">
+                <span id="lrValue" class="text-sm font-bold mono-font w-10 text-blue-400">0.80</span>
+            </div>
+
+            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Target Epochs</label>
+                <input type="range" id="epochsSlider" min="100" max="10000" step="100" value="3000" class="w-24" title="Max Epochs">
+                <span id="epochsValue" class="text-sm font-bold mono-font w-12">3000</span>
+            </div>
+            
+            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-orange-400">Sim Speed</label>
+                <input type="range" id="speedSlider" min="0.5" max="10.0" step="0.5" value="5.0" class="w-20" title="Animation Speed">
+                <span id="speedValue" class="text-[10px] mono-font w-8 text-orange-400">5.0x</span>
+            </div>
+
+        </div>
+
+        <!-- Action Controls -->
+        <div class="flex items-center gap-2 shrink-0 md:border-l border-[var(--border-subtle)] md:pl-6 ml-auto">
+            <button id="regenerateBtn" class="viz-btn viz-btn-secondary whitespace-nowrap py-2 px-3 shadow-[0_0_15px_rgba(255,255,255,0.05)]" title="Randomize Data">
+                <i class="fas fa-random text-xs"></i> <span>Data</span>
+            </button>
+            <button id="resetModelBtn" class="viz-btn viz-btn-secondary whitespace-nowrap py-2 px-3 shadow-[0_0_15px_rgba(255,255,255,0.05)]" title="Reset Weights">
+                <i class="fas fa-undo text-xs"></i> <span>Reset</span>
+            </button>
+            <button id="animateBtn" class="viz-btn viz-btn-primary whitespace-nowrap py-2 px-4 shadow-[0_0_15px_rgba(74,222,128,0.15)]">
+                <i class="fas fa-play text-xs"></i> 
+                <span>Start Training</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Layout (Chart + Live Metrics) -->
+    <div class="max-w-7xl mx-auto w-full px-4 md:px-8 py-6 flex-1 flex flex-col gap-6 animate-fade-in">
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[550px]">
+            
+            <!-- Left: Data & Regression Lines -->
+            <div class="card-container flex flex-col h-full relative">
+                <div class="border-b px-4 py-3 flex justify-between items-center" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <div class="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style="color: var(--text-main)">
+                        <i class="fas fa-chart-scatter" style="color: var(--accent-primary)"></i> Live Model Fitting
+                    </div>
+                    <div class="flex gap-4 text-[10px] mono-font font-bold opacity-80 flex-wrap justify-end">
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full" style="background: var(--data-train)"></span> Train Data</div>
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full border-2" style="border-color: var(--data-test); background: transparent"></span> Test Data</div>
+                    </div>
+                </div>
+                <div class="flex-1 p-4 relative">
+                    <canvas id="canvas" class="w-full h-full rounded-lg" style="background: var(--canvas-bg)"></canvas>
+                    <div class="absolute bottom-6 right-6 text-[10px] uppercase font-bold opacity-50 bg-black/40 px-2 py-1 rounded flex items-center gap-2">
+                        Watch curves pass through solid dots!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Real-time Stats & Charts -->
+            <div class="flex flex-col gap-6 h-full">
+                
+                <!-- Live Metrics Dashboards -->
+                <div class="grid grid-cols-3 gap-4">
+                    <!-- Fixed Model Stats -->
+                    <div class="metric-card border-t-4 relative overflow-hidden flex flex-col" style="border-top-color: var(--fixed-color); padding: 12px;">
+                        <h4 class="text-[10px] font-bold uppercase tracking-widest text-center mb-3" style="color: var(--fixed-color)">1. Fixed LR</h4>
+                        <div class="flex-1 flex flex-col justify-center gap-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-[9px] uppercase opacity-60">Train MSE</span>
+                                <span id="fixedTrainLoss" class="text-sm font-bold mono-font" style="color: var(--text-main)">0.000</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-[9px] uppercase opacity-60">Test MSE</span>
+                                <span id="fixedTestLoss" class="text-sm font-bold mono-font" style="color: var(--data-test)">0.000</span>
+                            </div>
+                            <div class="flex justify-between items-center mt-1 pt-1 border-t border-white/5">
+                                <span class="text-[9px] uppercase opacity-60">Cur. LR</span>
+                                <span id="fixedLrVal" class="text-xs font-bold mono-font" style="color: var(--fixed-color)">0.000</span>
+                            </div>
+                        </div>
+                        <div id="fixedStatus" class="absolute top-0 left-0 w-full text-center text-[9px] font-bold uppercase py-0.5 bg-red-500 text-white hidden">Bouncing!</div>
+                    </div>
+
+                    <!-- Step Model Stats -->
+                    <div class="metric-card border-t-4 relative overflow-hidden flex flex-col" style="border-top-color: var(--step-color); padding: 12px;">
+                        <h4 class="text-[10px] font-bold uppercase tracking-widest text-center mb-3" style="color: var(--step-color)">2. Half Decay</h4>
+                        <div class="flex-1 flex flex-col justify-center gap-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-[9px] uppercase opacity-60">Train MSE</span>
+                                <span id="stepTrainLoss" class="text-sm font-bold mono-font" style="color: var(--text-main)">0.000</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-[9px] uppercase opacity-60">Test MSE</span>
+                                <span id="stepTestLoss" class="text-sm font-bold mono-font" style="color: var(--data-test)">0.000</span>
+                            </div>
+                            <div class="flex justify-between items-center mt-1 pt-1 border-t border-white/5">
+                                <span class="text-[9px] uppercase opacity-60">Cur. LR</span>
+                                <span id="stepLrVal" class="text-xs font-bold mono-font" style="color: var(--step-color)">0.000</span>
+                            </div>
+                        </div>
+                        <div id="stepStatus" class="absolute top-0 left-0 w-full text-center text-[9px] font-bold uppercase py-0.5 bg-blue-500 text-white hidden">Learning...</div>
+                    </div>
+
+                    <!-- Exponential Model Stats -->
+                    <div class="metric-card border-t-4 relative overflow-hidden flex flex-col" style="border-top-color: var(--exp-color); padding: 12px;">
+                        <h4 class="text-[10px] font-bold uppercase tracking-widest text-center mb-3" style="color: var(--exp-color)">3. Exp Decay</h4>
+                        <div class="flex-1 flex flex-col justify-center gap-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-[9px] uppercase opacity-60">Train MSE</span>
+                                <span id="expTrainLoss" class="text-sm font-bold mono-font" style="color: var(--text-main)">0.000</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-[9px] uppercase opacity-60">Test MSE</span>
+                                <span id="expTestLoss" class="text-sm font-bold mono-font" style="color: var(--data-test)">0.000</span>
+                            </div>
+                            <div class="flex justify-between items-center mt-1 pt-1 border-t border-white/5">
+                                <span class="text-[9px] uppercase opacity-60">Cur. LR</span>
+                                <span id="expLrVal" class="text-xs font-bold mono-font" style="color: var(--exp-color)">0.000</span>
+                            </div>
+                        </div>
+                        <div id="expStatus" class="absolute top-0 left-0 w-full text-center text-[9px] font-bold uppercase py-0.5 bg-green-500 text-white hidden">Learning...</div>
+                    </div>
+                </div>
+
+                <!-- Loss Curve Chart -->
+                <div class="card-container flex-1 flex flex-col min-h-[250px]">
+                    <div class="border-b px-4 py-2 flex justify-between items-center" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                        <div class="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style="color: var(--text-main)">
+                            <i class="fas fa-chart-line text-blue-400"></i> Train Loss (MSE) Over Time
+                        </div>
+                        <span class="text-[10px] uppercase opacity-50 font-bold">Epoch <span class="liveEpoch text-blue-400">0</span></span>
+                    </div>
+                    <div class="flex-1 p-4">
+                        <div class="relative w-full h-full">
+                            <canvas id="lossChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Comprehensive Article Section -->
+    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div class="mb-12 card-container animate-fade-in" style="animation-delay: 0.2s">
+            <div class="border-b px-6 py-5 md:px-8 md:py-6" style="border-color: var(--border-subtle)">
+                <h2 class="text-xl md:text-2xl font-bold flex items-center gap-3 brand-font" style="color: var(--text-main)">
+                    <i class="fas fa-project-diagram" style="color: var(--accent-primary)"></i>
+                    Connecting Learning Rates to Overfitting
+                </h2>
+            </div>
+            
+            <div class="p-6 md:p-8 space-y-12" style="color: var(--text-muted)">
+                
+                <!-- Intro Section -->
+                <section>
+                    <p class="leading-relaxed mb-4">
+                        We know that a highly complex model (like an 8th-degree polynomial) has the mathematical flexibility to twist and bend until it perfectly hits every single training data point. This is called <strong>Overfitting</strong>. 
+                    </p>
+                    <p class="leading-relaxed">
+                        However, having the <em>capacity</em> to overfit doesn't guarantee the model will actually <em>achieve</em> it during training. Finding the exact, microscopic parameter values required to bend a complex curve perfectly through 8 noisy points is incredibly difficult. This is where <strong>Learning Rate Scheduling</strong> becomes strictly necessary.
+                    </p>
+                </section>
+
+                <section>
+                    <div class="flex flex-col md:flex-row gap-8 items-center bg-black/20 p-6 rounded-xl border" style="border-color: var(--border-subtle)">
+                        <div class="flex-1 space-y-4">
+                            <h3 class="text-lg font-bold brand-font" style="color: var(--text-main)">Visualizing the Bouncing Effect</h3>
+                            <p class="text-sm leading-relaxed">
+                                <strong>Try this:</strong> Set Complexity to 8, Epochs to 5000, Initial LR to 0.80, and hit <strong>Start Training</strong>. 
+                            </p>
+                            <p class="text-sm leading-relaxed">
+                                The <span class="text-red-400 font-bold">Red Line (Fixed LR)</span> attempts to twist through the points. However, because its learning rate never shrinks, its mathematical updates are permanently too aggressive. It violently bounces above and below the points, completely unable to settle into the perfect Overfit.
+                            </p>
+                            <p class="text-sm leading-relaxed">
+                                Meanwhile, the <span class="text-green-400 font-bold">Green Line (Exp Decay)</span> starts with the same speed, but automatically decays its step size. This forces the model to take microscopic, precise steps as it gets closer. Watch carefully as the green line slowly and elegantly wiggles its way to perfectly intersect every single solid blue dot, driving Train MSE to zero while entirely missing the hollow Test dots!
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">Generalization: The Alternative</h3>
+                    <p class="leading-relaxed mb-6 text-sm">
+                        Overfitting is usually bad because the model performs terribly on unseen Test data (look at how high the Test MSE gets for the Green model!).
+                    </p>
+
+                    <div class="calc-card border-l-4" style="border-color: #facc15">
+                        <h4 class="font-bold text-sm mb-2 text-yellow-400">Finding the Generalized Fit</h4>
+                        <p class="text-sm leading-relaxed mb-3">
+                            To fix this, stop the simulation, drop the <strong>Complexity to 3</strong>, and hit Train again. 
+                        </p>
+                        <p class="text-sm leading-relaxed">
+                            Because the model is simpler, it cannot mathematically wiggle through every point. Instead, it draws a smooth, elegant curve that passes evenly through the center of <em>both</em> the Train and Test data distributions. Notice that both the Train MSE and Test MSE end up very low. By restricting the model complexity, we achieved a generalized fit!
+                        </p>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-3">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                 <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)">
+                    <i class="fab fa-instagram fa-lg"></i>
+                </a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2026 VIZLEARN // MODULE.LR_SCHEDULING</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            if (typeof window.updateChartTheme === 'function') window.updateChartTheme();
+            if (typeof window.drawRegression === 'function') window.drawRegression();
+        });
+
+        // --- SIMULATION & VISUALIZATION LOGIC ---
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- UI Elements ---
+            const complexitySlider = document.getElementById('complexitySlider');
+            const lrSlider = document.getElementById('lrSlider');
+            const epochsSlider = document.getElementById('epochsSlider');
+            const speedSlider = document.getElementById('speedSlider');
+            
+            const animateBtn = document.getElementById('animateBtn');
+            const resetModelBtn = document.getElementById('resetModelBtn');
+            const regenerateBtn = document.getElementById('regenerateBtn');
+
+            const liveEpochs = document.querySelectorAll('.liveEpoch');
+            
+            const fixedTrainLoss = document.getElementById('fixedTrainLoss');
+            const fixedTestLoss = document.getElementById('fixedTestLoss');
+            const fixedLrVal = document.getElementById('fixedLrVal');
+            const fixedStatus = document.getElementById('fixedStatus');
+            
+            const stepTrainLoss = document.getElementById('stepTrainLoss');
+            const stepTestLoss = document.getElementById('stepTestLoss');
+            const stepLrVal = document.getElementById('stepLrVal');
+            const stepStatus = document.getElementById('stepStatus');
+            
+            const expTrainLoss = document.getElementById('expTrainLoss');
+            const expTestLoss = document.getElementById('expTestLoss');
+            const expLrVal = document.getElementById('expLrVal');
+            const expStatus = document.getElementById('expStatus');
+
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+
+            // --- Data Generation ---
+            let trainX = [], trainY = [];
+            let testX = [], testY = [];
+            const N_POINTS = 8;
+            const X_MIN = 0, X_MAX = 5;
+            
+            function generateData() {
+                trainX = []; trainY = [];
+                testX = []; testY = [];
+                
+                for(let i=0; i<N_POINTS; i++) {
+                    // Train points (blue)
+                    let tx = 0.5 + i * (4.0 / (N_POINTS-1)) + (Math.random()-0.5)*0.2;
+                    let ty = Math.sin(tx * 1.5) * 1.5 + 0.5 * tx + (Math.random()-0.5)*1.0;
+                    trainX.push(tx); trainY.push(ty);
+
+                    // Test points (orange)
+                    let vx = 0.5 + (i+0.5) * (4.0 / (N_POINTS-1)) + (Math.random()-0.5)*0.2;
+                    let vy = Math.sin(vx * 1.5) * 1.5 + 0.5 * vx + (Math.random()-0.5)*1.0;
+                    if(vx <= X_MAX) { testX.push(vx); testY.push(vy); }
+                }
+            }
+
+            generateData();
+
+            // --- Math Helpers ---
+            // We MUST normalize X to [-1, 1] internally so high degree polynomials don't explode gradients
+            const normX = (x) => ((x - X_MIN) / (X_MAX - X_MIN)) * 2 - 1;
+
+            function predict(w, nx) {
+                let p = 0;
+                for(let j=0; j<w.length; j++) p += w[j] * Math.pow(nx, j);
+                return p;
+            }
+
+            function getGradients(w, tX, tY) {
+                let C = w.length - 1;
+                let N = tX.length;
+                let dw = new Array(C+1).fill(0);
+                let loss = 0;
+
+                for(let i=0; i<N; i++) {
+                    let nx = normX(tX[i]);
+                    let pred = predict(w, nx);
+                    let err = pred - tY[i];
+                    loss += err * err;
+                    
+                    for(let j=0; j<=C; j++) {
+                        dw[j] += err * Math.pow(nx, j);
+                    }
+                }
+                
+                loss /= N;
+                for(let j=0; j<=C; j++) dw[j] = (2/N) * dw[j];
+                
+                return { dw, loss };
+            }
+
+            function getTestLoss(w) {
+                let loss = 0;
+                for(let i=0; i<testX.length; i++) {
+                    let err = predict(w, normX(testX[i])) - testY[i];
+                    loss += err*err;
+                }
+                return loss / Math.max(1, testX.length);
+            }
+
+            // --- State ---
+            let isAnimating = false;
+            let animationFrameId = null;
+            let simAccumulator = 0;
+            
+            let currentEpoch = 0;
+            let targetEpochs = parseInt(epochsSlider.value);
+            let initialLR = parseFloat(lrSlider.value);
+            let currentComplexity = parseInt(complexitySlider.value);
+
+            let fixedModel = { w: [], loss: 0, testLoss: 0, lr: initialLR, status: '' };
+            let stepModel  = { w: [], loss: 0, testLoss: 0, lr: initialLR, status: '' };
+            let expModel   = { w: [], loss: 0, testLoss: 0, lr: initialLR, status: '' };
+
+            let lossChart;
+
+            // Viewport
+            let dpr = window.devicePixelRatio || 1;
+            let width, height, plotWidth, plotHeight;
+            const PAD_L = 40, PAD_R = 20, PAD_T = 20, PAD_B = 30;
+
+            const mapX = (x) => PAD_L + (x / X_MAX) * plotWidth;
+            // Map Y dynamically slightly
+            const mapY = (y) => height - PAD_B - ((y + 2) / 8) * plotHeight; 
+
+            function getThemeColors() {
+                const isLight = document.body.classList.contains('light-mode');
+                const styles = getComputedStyle(document.body);
+                return {
+                    bg: styles.getPropertyValue('--canvas-bg').trim(),
+                    fixed: styles.getPropertyValue('--fixed-color').trim(),
+                    step: styles.getPropertyValue('--step-color').trim(),
+                    exp: styles.getPropertyValue('--exp-color').trim(),
+                    grid: styles.getPropertyValue('--chart-grid').trim(),
+                    text: styles.getPropertyValue('--chart-text').trim(),
+                    dataTrain: styles.getPropertyValue('--data-train').trim(),
+                    dataTest: styles.getPropertyValue('--data-test').trim(),
+                    axis: styles.getPropertyValue('--axis-color').trim()
+                };
+            }
+
+            // --- Chart.js Setup ---
+            function initChart() {
+                const ctxChart = document.getElementById('lossChart').getContext('2d');
+                const colors = getThemeColors();
+
+                Chart.defaults.font.family = "'JetBrains Mono', monospace";
+                Chart.defaults.color = colors.text;
+
+                lossChart = new Chart(ctxChart, {
+                    type: 'line',
+                    data: {
+                        labels: [0],
+                        datasets: [
+                            { label: 'Fixed LR', data: [0], borderColor: colors.fixed, backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+                            { label: 'Half Decay', data: [0], borderColor: colors.step, backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+                            { label: 'Exp Decay', data: [0], borderColor: colors.exp, backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.1 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 0 },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { mode: 'index', intersect: false }
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: colors.grid },
+                                ticks: { color: colors.text, maxTicksLimit: 8 }
+                            },
+                            y: {
+                                type: 'logarithmic',
+                                min: 0.01, max: 100, 
+                                grid: { color: colors.grid },
+                                ticks: { 
+                                    color: colors.text, 
+                                    callback: function(value) { 
+                                        const log10 = Math.log10(value);
+                                        if (Number.isInteger(log10)) {
+                                            return "10^" + log10;
+                                        }
+                                        return '';
+                                    } 
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            window.updateChartTheme = function() {
+                if (!lossChart) return;
+                const colors = getThemeColors();
+                lossChart.options.scales.x.grid.color = colors.grid;
+                lossChart.options.scales.x.ticks.color = colors.text;
+                lossChart.options.scales.y.grid.color = colors.grid;
+                lossChart.options.scales.y.ticks.color = colors.text;
+                lossChart.data.datasets[0].borderColor = colors.fixed;
+                lossChart.data.datasets[1].borderColor = colors.step;
+                lossChart.data.datasets[2].borderColor = colors.exp;
+                lossChart.update('none');
+                drawRegression();
+            };
+
+            // --- Canvas Rendering ---
+            function resizeCanvas() {
+                const rect = canvas.parentNode.getBoundingClientRect();
+                width = rect.width;
+                height = rect.height;
+                plotWidth = width - PAD_L - PAD_R;
+                plotHeight = height - PAD_T - PAD_B;
+                
+                canvas.width = width * dpr;
+                canvas.height = height * dpr;
+                
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.scale(dpr, dpr);
+                
+                drawRegression();
+            }
+
+            window.addEventListener('resize', resizeCanvas);
+
+            function drawLine(w, color, lineWidth, opacity) {
+                if(!w || w.length === 0) return;
+                
+                ctx.strokeStyle = color;
+                ctx.lineWidth = lineWidth;
+                ctx.globalAlpha = opacity;
+                
+                ctx.beginPath();
+                for(let px = 0; px <= plotWidth; px += 2) {
+                    let cx = PAD_L + px;
+                    let mathX = (px / plotWidth) * X_MAX;
+                    let nx = normX(mathX);
+                    let mathY = predict(w, nx);
+                    
+                    // Clamp visual Y heavily to prevent massive screen tearing during divergence
+                    if(mathY > 15) mathY = 15;
+                    if(mathY < -5) mathY = -5;
+
+                    if (px === 0) ctx.moveTo(cx, mapY(mathY));
+                    else ctx.lineTo(cx, mapY(mathY));
+                }
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+            }
+
+            window.drawRegression = function() {
+                const colors = getThemeColors();
+                ctx.clearRect(0, 0, width, height);
+                
+                // Axes
+                ctx.strokeStyle = colors.axis;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(PAD_L, PAD_T); ctx.lineTo(PAD_L, height - PAD_B);
+                ctx.moveTo(PAD_L, height - PAD_B); ctx.lineTo(width - PAD_R, height - PAD_B);
+                ctx.stroke();
+
+                // Axis Labels
+                ctx.fillStyle = colors.text;
+                ctx.font = "10px Inter";
+                ctx.textAlign = "right"; ctx.textBaseline = "middle";
+                ctx.fillText("-2", PAD_L - 8, mapY(-2));
+                ctx.fillText("6", PAD_L - 8, mapY(6));
+                ctx.textAlign = "center"; ctx.textBaseline = "top";
+                ctx.fillText("0", mapX(0), height - PAD_B + 8);
+                ctx.fillText("5", mapX(X_MAX), height - PAD_B + 8);
+
+                // Clip to drawing area
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(PAD_L, PAD_T, plotWidth, plotHeight);
+                ctx.clip();
+
+                // Lines
+                if (fixedModel.status !== 'diverged') drawLine(fixedModel.w, colors.fixed, 2.0, 0.8);
+                if (stepModel.status !== 'diverged') drawLine(stepModel.w, colors.step, 2.5, 0.9);
+                if (expModel.status !== 'diverged') drawLine(expModel.w, colors.exp, 3.0, 1.0);
+
+                // Train Points
+                trainX.forEach((x, i) => {
+                    ctx.beginPath();
+                    ctx.arc(mapX(x), mapY(trainY[i]), 5, 0, Math.PI * 2);
+                    ctx.fillStyle = colors.dataTrain;
+                    ctx.fill();
+                });
+
+                // Test Points
+                testX.forEach((x, i) => {
+                    ctx.beginPath();
+                    ctx.arc(mapX(x), mapY(testY[i]), 5, 0, Math.PI * 2);
+                    ctx.strokeStyle = colors.dataTest;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                });
+
+                ctx.restore();
+            };
+
+            // --- Simulation Math ---
+            function getScheduledLR(epoch, type) {
+                const minLR = 0.0001;
+                if (type === 'step') {
+                    // Drop by half every 25% of total epochs
+                    const dropFreq = Math.max(1, Math.floor(targetEpochs / 4));
+                    return Math.max(minLR, initialLR * Math.pow(0.5, Math.floor(epoch / dropFreq)));
+                } else if (type === 'exponential') {
+                    return Math.max(minLR, initialLR * Math.exp(-5.0 * (epoch / targetEpochs)));
+                }
+                return initialLR;
+            }
+
+            function applyGradient(model, lr) {
+                if (model.status === 'diverged') return;
+
+                model.lr = lr;
+                const { dw, loss } = getGradients(model.w, trainX, trainY);
+                
+                for(let j=0; j<model.w.length; j++) {
+                    model.w[j] -= model.lr * dw[j];
+                }
+                
+                model.loss = loss;
+                model.testLoss = getTestLoss(model.w);
+
+                if (model.loss > 100 || isNaN(model.loss)) {
+                    model.status = 'diverged';
+                    model.loss = 100; // clamp for chart
+                }
+            }
+
+            function mathStep() {
+                if (currentEpoch >= targetEpochs) return;
+                
+                applyGradient(fixedModel, initialLR);
+                applyGradient(stepModel, getScheduledLR(currentEpoch, 'step'));
+                applyGradient(expModel, getScheduledLR(currentEpoch, 'exponential'));
+
+                currentEpoch++;
+
+                // Update Chart Data Arrays periodically to save memory
+                if(currentEpoch % 2 === 0 || currentEpoch === targetEpochs) {
+                    lossChart.data.labels.push(currentEpoch);
+                    lossChart.data.datasets[0].data.push(fixedModel.loss);
+                    lossChart.data.datasets[1].data.push(stepModel.loss);
+                    lossChart.data.datasets[2].data.push(expModel.loss);
+                }
+            }
+
+            function updateUI() {
+                liveEpochs.forEach(el => el.textContent = currentEpoch);
+                
+                fixedTrainLoss.textContent = fixedModel.status === 'diverged' ? "HIGH" : fixedModel.loss.toFixed(3);
+                fixedTestLoss.textContent = fixedModel.status === 'diverged' ? "HIGH" : fixedModel.testLoss.toFixed(3);
+                fixedLrVal.textContent = fixedModel.lr.toFixed(3);
+                
+                stepTrainLoss.textContent = stepModel.status === 'diverged' ? "HIGH" : stepModel.loss.toFixed(3);
+                stepTestLoss.textContent = stepModel.status === 'diverged' ? "HIGH" : stepModel.testLoss.toFixed(3);
+                stepLrVal.textContent = stepModel.lr.toFixed(3);
+
+                expTrainLoss.textContent = expModel.status === 'diverged' ? "HIGH" : expModel.loss.toFixed(3);
+                expTestLoss.textContent = expModel.status === 'diverged' ? "HIGH" : expModel.testLoss.toFixed(3);
+                expLrVal.textContent = expModel.lr.toFixed(3);
+
+                // Detection logic for bouncing vs settled
+                const handleStatus = (model, el) => {
+                    if (model.status === 'diverged') {
+                        el.classList.remove('hidden');
+                        el.textContent = 'Diverged (LR too high)';
+                        el.className = "absolute top-0 left-0 w-full text-center text-[9px] font-bold uppercase py-0.5 bg-red-500 text-white";
+                    } else if (currentEpoch > 50 && model.loss > 1.5) {
+                        el.classList.remove('hidden');
+                        el.textContent = 'Bouncing - Stuck!';
+                        el.className = "absolute top-0 left-0 w-full text-center text-[9px] font-bold uppercase py-0.5 bg-red-500 text-white";
+                    } else if (currentEpoch > 50 && model.loss < 0.1) {
+                        el.classList.remove('hidden');
+                        el.textContent = 'Converging...';
+                        el.className = "absolute top-0 left-0 w-full text-center text-[9px] font-bold uppercase py-0.5 bg-green-500 text-white";
+                    } else {
+                        el.classList.add('hidden');
+                    }
+                };
+
+                handleStatus(fixedModel, fixedStatus);
+                handleStatus(stepModel, stepStatus);
+                handleStatus(expModel, expStatus);
+            }
+
+            function resetSimulation() {
+                stopAnimation();
+                currentEpoch = 0;
+                targetEpochs = parseInt(epochsSlider.value);
+                initialLR = parseFloat(lrSlider.value);
+                currentComplexity = parseInt(complexitySlider.value);
+                simAccumulator = 0;
+
+                // Initialize weights (straight horizontal line approx y=1.0)
+                let startW = new Array(currentComplexity+1).fill(0);
+                startW[0] = 1.0; 
+
+                fixedModel = { w: [...startW], loss: 0, testLoss: 0, lr: initialLR, status: '' };
+                stepModel  = { w: [...startW], loss: 0, testLoss: 0, lr: initialLR, status: '' };
+                expModel   = { w: [...startW], loss: 0, testLoss: 0, lr: initialLR, status: '' };
+                
+                const initLoss = getGradients(startW, trainX, trainY).loss;
+                const initTest = getTestLoss(startW);
+
+                fixedModel.loss = initLoss; fixedModel.testLoss = initTest;
+                stepModel.loss = initLoss; stepModel.testLoss = initTest;
+                expModel.loss = initLoss; expModel.testLoss = initTest;
+
+                lossChart.data.labels = [0];
+                lossChart.data.datasets[0].data = [fixedModel.loss];
+                lossChart.data.datasets[1].data = [stepModel.loss];
+                lossChart.data.datasets[2].data = [expModel.loss];
+                lossChart.options.scales.x.max = targetEpochs;
+                lossChart.update('none');
+
+                updateUI();
+                drawRegression();
+            }
+
+            function logicLoop() {
+                if (!isAnimating) return;
+                
+                const speed = parseFloat(document.getElementById('speedSlider').value);
+                // Boost speed significantly so high epochs finish quickly
+                const stepsPerFrame = Math.max(1, Math.floor((targetEpochs / 500) * speed * 2));
+                
+                simAccumulator += stepsPerFrame;
+                
+                let stepsTaken = 0;
+                while(simAccumulator >= 1 && currentEpoch < targetEpochs) {
+                    mathStep();
+                    simAccumulator -= 1;
+                    stepsTaken++;
+                }
+                
+                if (stepsTaken > 0) {
+                    lossChart.update('none');
+                    updateUI();
+                    drawRegression();
+                }
+
+                if (currentEpoch >= targetEpochs) {
+                    stopAnimation();
+                } else {
+                    animationFrameId = requestAnimationFrame(logicLoop);
+                }
+            }
+
+            function startAnimation() {
+                if (isAnimating) return;
+                
+                if (currentEpoch >= targetEpochs) {
+                    resetSimulation();
+                }
+
+                isAnimating = true;
+                animateBtn.innerHTML = '<i class="fas fa-stop text-xs"></i> <span>Stop Training</span>';
+                animateBtn.classList.add('bg-red-500', 'border-red-500');
+                animateBtn.classList.remove('viz-btn-primary');
+
+                logicLoop();
+            }
+
+            function stopAnimation() {
+                if (!isAnimating) return;
+                isAnimating = false;
+                cancelAnimationFrame(animationFrameId);
+                
+                animateBtn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Start Training</span>';
+                animateBtn.classList.remove('bg-red-500', 'border-red-500');
+                animateBtn.classList.add('viz-btn-primary');
+            }
+
+            // --- Event Listeners ---
+            complexitySlider.addEventListener('input', (e) => {
+                document.getElementById('complexityValue').textContent = e.target.value;
+                resetSimulation();
+            });
+
+            lrSlider.addEventListener('input', (e) => {
+                document.getElementById('lrValue').textContent = parseFloat(e.target.value).toFixed(2);
+                resetSimulation();
+            });
+
+            epochsSlider.addEventListener('input', (e) => {
+                document.getElementById('epochsValue').textContent = e.target.value;
+                resetSimulation();
+            });
+            
+            document.getElementById('speedSlider').addEventListener('input', (e) => {
+                document.getElementById('speedValue').textContent = parseFloat(e.target.value).toFixed(1) + 'x';
+            });
+
+            regenerateBtn.addEventListener('click', () => {
+                generateData();
+                resetSimulation();
+            });
+
+            resetModelBtn.addEventListener('click', resetSimulation);
+
+            animateBtn.addEventListener('click', () => {
+                if (isAnimating) stopAnimation();
+                else startAnimation();
+            });
+
+            // Initialize
+            initChart();
+            resizeCanvas();
+            resetSimulation();
+        });
+
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Regression Metrics", path: "../machine_learning/regression_metrics.html", category: "ml", icon: "fa-ruler-combined" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing & Loss", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Bias-Variance Tradeoff", path: "../deep_learning/bias_variance_tradeoff.html", category: "dl", icon: "fa-chart-line" },
+            { title: "Overfitting vs Underfitting", path: "../deep_learning/overfitting_vs_underfitting.html", category: "dl", icon: "fa-chart-line" },
+            { title: "Learning Rate Scheduling", path: "../deep_learning/lr_scheduling.html", category: "dl", icon: "fa-hourglass-half" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Optimizers", path: "../deep_learning/optimizers.html", category: "dl", icon: "fa-network-wired" }
+        ];
+
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                if (query.length === 0) { dropdown.classList.remove('show'); return; }
+                const filtered = allCourses.filter(c => c.title.toLowerCase().includes(query) || c.category.toLowerCase().includes(query));
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div><div class="dropdown-item-title">${course.title}</div><div class="dropdown-item-path">${course.category.toUpperCase()}</div></div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>`).join('');
+                }
+                dropdown.classList.add('show');
+            });
+            document.addEventListener('click', (e) => { if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show'); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dropdown.classList.remove('show'); });
+        }
+    </script>
+</body>
+</html>

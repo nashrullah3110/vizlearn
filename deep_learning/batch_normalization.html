@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Batch Normalization in Deep Networks</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --accent-primary: #22c55e;
+            --accent-glow: rgba(34, 197, 94, 0.25);
+            --accent-danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.4);
+            --accent-blue: #3b82f6;
+            --blue-glow: rgba(59, 130, 246, 0.4);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            
+            /* Canvas Specifics - Dark */
+            --canvas-bg: #0a0a0a;
+            --neuron-fill: #111827;
+            --neuron-border: rgba(74, 222, 128, 0.5);
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --accent-danger: #dc2626;
+            --danger-glow: rgba(220, 38, 38, 0.3);
+            --accent-blue: #2563eb;
+            --blue-glow: rgba(37, 99, 235, 0.3);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+
+            --canvas-bg: #f8fafc;
+            --neuron-fill: #ffffff;
+            --neuron-border: #15803d; 
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .toolbar-container {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.75rem 1.5rem;
+            z-index: 40;
+        }
+
+        .floating-panel {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 340px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            z-index: 30;
+            opacity: 0.95;
+            transition: opacity 0.3s;
+        }
+        
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+            width: 100%;
+        }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            border: 2px solid var(--bg-surface);
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            cursor: pointer;
+            margin-top: -5px;
+            box-shadow: 0 0 10px var(--accent-glow);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border-subtle);
+            border-radius: 2px;
+        }
+
+        /* Toggles */
+        input:checked ~ .dot { transform: translateX(100%); background-color: var(--accent-primary); }
+        input:checked ~ .box-bg { background-color: var(--input-focus-bg); border-color: var(--accent-primary); }
+        .box-bg { transition: all 0.3s; border: 1px solid var(--border-subtle); background: var(--bg-body); }
+
+        /* Buttons */
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); box-shadow: 0 0 10px var(--accent-glow); }
+        .viz-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 0 15px var(--accent-glow); filter: brightness(1.1); }
+        .viz-btn-secondary { background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-subtle); }
+        .viz-btn-secondary:hover { border-color: var(--accent-primary); background: var(--input-focus-bg); }
+        .viz-btn-danger { background: transparent; color: var(--accent-danger); border: 1px solid var(--accent-danger); }
+        .viz-btn-danger:hover { background: var(--accent-danger); color: #fff; box-shadow: 0 0 15px var(--danger-glow); }
+
+        #canvas { background-color: var(--canvas-bg); width: 100%; height: 100%; cursor: grab; user-select: none; }
+        #canvas.grabbing { cursor: grabbing; }
+
+        .metric-card { background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: 6px; margin-bottom: 0.5rem; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <div class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(34,197,94,0.8)] animate-pulse"></div>
+                    <span style="color: var(--text-main)">viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </div>
+                
+                <!-- Theme Toggle -->
+                <div class="flex items-center gap-3">
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Title Section -->
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full">
+        <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Batch Normalization in Deep Networks</h1>
+        <p class="mt-2 text-sm md:text-base max-w-4xl opacity-80" style="color: var(--text-muted)">
+            Watch the training flow! Unscaled data causes first-layer weights to <span style="color: var(--accent-danger); font-weight:bold;">explode (Red)</span>, while subsequent deep layers <span style="color: var(--accent-blue); font-weight:bold;">vanish (Blue)</span>. Toggle <b>Batch Normalization</b> to dynamically rescale intermediate outputs, locking the deep gradients into <span style="color: var(--accent-primary); font-weight:bold;">stability (Green)</span>.
+        </p>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-6 justify-between overflow-x-auto">
+        
+        <!-- Controls -->
+        <div class="flex items-center gap-6 flex-1 min-w-max">
+            
+            <!-- Input Sliders -->
+            <div class="flex flex-col gap-1 w-32">
+                <div class="flex justify-between items-center">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70">Age</label>
+                    <span id="ageValDisplay" class="text-[10px] font-bold mono-font" style="color: var(--accent-primary)">35</span>
+                </div>
+                <input type="range" id="ageSlider" min="18" max="80" value="35">
+            </div>
+
+            <div class="flex flex-col gap-1 w-32">
+                <div class="flex justify-between items-center">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70">Salary</label>
+                    <span id="salValDisplay" class="text-[10px] font-bold mono-font" style="color: var(--accent-primary)">80k</span>
+                </div>
+                <input type="range" id="salarySlider" min="20000" max="200000" step="1000" value="80000">
+            </div>
+
+            <!-- Toggles (Multi-select Fixes) -->
+            <div class="flex flex-col gap-2">
+                <!-- Normalize Inputs -->
+                <label class="flex items-center cursor-pointer gap-2 group" title="Normalizes Raw Inputs Only">
+                    <div class="relative w-8 h-4">
+                        <input type="checkbox" id="toggleNorm" class="sr-only">
+                        <div class="block box-bg w-8 h-4 rounded-full"></div>
+                        <div class="dot absolute left-0.5 top-0.5 bg-gray-400 w-3 h-3 rounded-full transition transform group-hover:bg-white"></div>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-wide opacity-80 group-hover:opacity-100">Normalize Raw Inputs</span>
+                </label>
+                
+                <!-- Batch Normalization -->
+                <label class="flex items-center cursor-pointer gap-2 group" title="Normalizes Deep Layer Activations">
+                    <div class="relative w-8 h-4">
+                        <input type="checkbox" id="toggleBatchNorm" class="sr-only">
+                        <div class="block box-bg w-8 h-4 rounded-full"></div>
+                        <div class="dot absolute left-0.5 top-0.5 bg-gray-400 w-3 h-3 rounded-full transition transform group-hover:bg-white"></div>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-wide text-[var(--accent-primary)] group-hover:brightness-110">Enable Batch Norm</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-3 shrink-0">
+            <button id="resetBtn" class="viz-btn viz-btn-secondary">
+                <i class="fas fa-undo text-xs"></i> Reset
+            </button>
+            <button id="animateBtn" class="viz-btn viz-btn-primary shadow-[0_0_15px_rgba(34,197,94,0.15)] w-40">
+                <i class="fas fa-play text-xs"></i> <span>Train Network</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 relative overflow-hidden bg-[var(--canvas-bg)]">
+        <canvas id="canvas" class="block w-full h-full"></canvas>
+
+        <!-- Floating Stats Panel -->
+        <div class="floating-panel p-4 flex flex-col gap-4 pointer-events-auto">
+             <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
+                 <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--text-main)">
+                    <i class="fas fa-layer-group mr-2"></i> Gradient Health
+                </h3>
+             </div>
+             
+             <!-- Network Health -->
+             <div class="metric-card p-3 border-l-4" id="healthCard" style="border-left-color: var(--accent-primary)">
+                 <div class="text-[10px] uppercase font-bold opacity-70 mb-1">Global Status</div>
+                 <div id="netHealth" class="font-bold text-[12px] tracking-wide" style="color: var(--accent-primary)">STABLE</div>
+                 <div id="healthDesc" class="text-[9px] mt-1 opacity-60 leading-relaxed">Waiting to start...</div>
+             </div>
+
+             <!-- Layer Tracking -->
+             <div>
+                <h4 class="text-[10px] uppercase tracking-widest font-bold mb-2 opacity-50">Average Weight Magnitude</h4>
+                
+                <div class="space-y-3">
+                    <!-- Layer 1 (Exploding Risk) -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] font-bold opacity-80">W1 (Input → H1)</span>
+                            <span id="valW1" class="font-bold mono-font text-xs">1.000</span>
+                        </div>
+                        <div class="w-full bg-[var(--bg-body)] rounded-full h-1.5 border border-[var(--border-subtle)]">
+                            <div id="barW1" class="h-1.5 rounded-full transition-all duration-300" style="width: 20%; background-color: var(--accent-primary)"></div>
+                        </div>
+                    </div>
+
+                    <!-- Deep Layers (Vanishing Risk) -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] font-bold opacity-80">W3 (H2 → H3)</span>
+                            <span id="valW3" class="font-bold mono-font text-xs">1.000</span>
+                        </div>
+                        <div class="w-full bg-[var(--bg-body)] rounded-full h-1.5 border border-[var(--border-subtle)]">
+                            <div id="barW3" class="h-1.5 rounded-full transition-all duration-300" style="width: 20%; background-color: var(--accent-primary)"></div>
+                        </div>
+                    </div>
+                </div>
+             </div>
+
+             <!-- Color Legend -->
+             <div class="metric-card p-3 mt-1">
+                 <h4 class="text-[9px] uppercase tracking-widest font-bold mb-2 opacity-50 text-center">Color Legend</h4>
+                 <div class="flex justify-between text-[10px] font-bold">
+                     <span style="color: var(--accent-blue)">Vanish (~0)</span>
+                     <span style="color: var(--accent-primary)">Stable (~1)</span>
+                     <span style="color: var(--accent-danger)">Explode (>2)</span>
+                 </div>
+             </div>
+             
+             <div class="text-[9px] text-center opacity-40">
+                 Drag to Pan | Scroll to Zoom
+             </div>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-3">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                 <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)">
+                    <i class="fab fa-instagram fa-lg"></i>
+                </a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2026 VIZLEARN // MODULE.BATCH_NORM</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            if (typeof window.updateAndRedraw === 'function') window.updateAndRedraw();
+        });
+
+        // SLIDER EVENTS
+        document.getElementById('ageSlider').addEventListener('input', (e) => {
+            document.getElementById('ageValDisplay').textContent = e.target.value;
+        });
+
+        document.getElementById('salarySlider').addEventListener('input', (e) => {
+            let val = parseInt(e.target.value);
+            document.getElementById('salValDisplay').textContent = (val/1000) + 'k';
+        });
+
+        // --- NEURAL NETWORK STATE ---
+        // Deep Architecture: Input(2) -> H1(4) -> H2(4) -> H3(4) -> Out(1)
+        const layers = [2, 4, 4, 4, 1];
+        let weights = []; // weights[layerIdx][fromNode][toNode]
+        
+        function initWeights() {
+            weights = [];
+            for (let l = 0; l < layers.length - 1; l++) {
+                let layerWeights = [];
+                for (let i = 0; i < layers[l]; i++) {
+                    let nodeWeights = [];
+                    for (let j = 0; j < layers[l+1]; j++) {
+                        // Initialize all weights around 1.0 (Green/Stable)
+                        nodeWeights.push(0.9 + Math.random() * 0.2); 
+                    }
+                    layerWeights.push(nodeWeights);
+                }
+                weights.push(layerWeights);
+            }
+        }
+        initWeights();
+
+        let isAnimating = false;
+        let animationRequestId = null;
+        let animationPhase = 'forward'; // 'forward' or 'backward'
+        let activeLayerIndex = 0; 
+        let lastTime = 0;
+
+        // Canvas State
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let scale = 1;
+        let translateX = 0;
+        let translateY = 0;
+        let isDragging = false;
+        let lastX = 0, lastY = 0;
+        let neuronPositions = [];
+        let currentNeuronRadius = 25; // Slightly smaller for deep net
+
+        function getThemeColors() {
+            const styles = getComputedStyle(document.body);
+            return {
+                bg: styles.getPropertyValue('--canvas-bg').trim(),
+                neuronFill: styles.getPropertyValue('--neuron-fill').trim(),
+                neuronBorder: styles.getPropertyValue('--neuron-border').trim(),
+                text: styles.getPropertyValue('--text-main').trim(),
+            };
+        }
+
+        // Color mapping based on weight value
+        function getWeightStyle(w) {
+            let r, g, b;
+            
+            if (document.body.classList.contains('light-mode')) {
+                if (w < 0.5) { // Vanishing -> Blue
+                    let t = Math.max(0, w / 0.5);
+                    r = Math.round(37 + t * (21 - 37)); g = Math.round(99 + t * (128 - 99)); b = Math.round(235 + t * (61 - 235));
+                } else if (w > 1.5) { // Exploding -> Red
+                    let t = Math.min((w - 1.5) / 3.0, 1.0);
+                    r = Math.round(21 + t * (220 - 21)); g = Math.round(128 + t * (38 - 128)); b = Math.round(61 + t * (38 - 61));
+                } else { // Stable -> Green
+                    r = 21; g = 128; b = 61;
+                }
+            } else {
+                if (w < 0.5) { // Vanishing -> Blue
+                    let t = Math.max(0, w / 0.5);
+                    r = Math.round(59 + t * (34 - 59)); g = Math.round(130 + t * (197 - 130)); b = Math.round(246 + t * (94 - 246));
+                } else if (w > 1.5) { // Exploding -> Red
+                    let t = Math.min((w - 1.5) / 3.0, 1.0);
+                    r = Math.round(34 + t * (239 - 34)); g = Math.round(197 + t * (68 - 197)); b = Math.round(94 + t * (68 - 94));
+                } else { // Stable -> Green
+                    r = 34; g = 197; b = 94; 
+                }
+            }
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        // --- SIMULATION LOGIC ---
+        function updateWeightsForLayer(l) {
+            let isNorm = document.getElementById('toggleNorm').checked;
+            let isBatchNorm = document.getElementById('toggleBatchNorm').checked;
+            
+            let ageInput = parseFloat(document.getElementById('ageSlider').value);
+            let salInput = parseFloat(document.getElementById('salarySlider').value);
+            
+            // Exploding multipliers based on user slider input
+            let explodeFactorSal = 1.0 + (salInput / 200000) * 0.2; 
+            let explodeFactorAge = 1.0 + (ageInput / 80) * 0.05;
+
+            for (let i = 0; i < weights[l].length; i++) {
+                for (let j = 0; j < weights[l][i].length; j++) {
+                    let w = weights[l][i][j];
+                    
+                    if (l === 0) {
+                        if (!isNorm && !isBatchNorm) {
+                            // Raw input without BN explodes fast
+                            if (i === 1) w *= explodeFactorSal; // Salary Node
+                            else w *= explodeFactorAge; // Age Node
+                        } 
+                        else if (!isNorm && isBatchNorm) {
+                            // BN strongly mitigates front layer explosion by normalizing the entire forward/backward pass, smoothing the landscape
+                            w += (1.0 - w) * 0.1 + (Math.random() - 0.5) * 0.04; 
+                        }
+                        else {
+                            // Input normalizer fixes layer 1
+                            w += (1.0 - w) * 0.1 + (Math.random() - 0.5) * 0.02;
+                        }
+                    } 
+                    else if (l >= 1) {
+                        if (!isBatchNorm) {
+                            // Deep hidden layers without Batch Norm (Vanishing Gradient)
+                            w *= 0.82; // Shrink towards 0 rapidly
+                        } 
+                        else {
+                            // Batch Norm beautifully stabilizes deep layers to ~1.0
+                            w += (1.0 - w) * 0.15 + (Math.random() - 0.5) * 0.02;
+                        }
+                    }
+                    
+                    // Hard clamps for visualization safety
+                    w = Math.max(0.001, Math.min(w, 20.0));
+                    weights[l][i][j] = w;
+                }
+            }
+            
+            updatePanelMetrics();
+        }
+
+        function updatePanelMetrics() {
+            // Calculate Averages for Layer 1 (W0) and Layer 3 (W2)
+            let sumW1 = 0, countW1 = 0;
+            for(let i=0; i<weights[0].length; i++) {
+                for(let j=0; j<weights[0][i].length; j++) { sumW1 += weights[0][i][j]; countW1++; }
+            }
+            let avgW1 = sumW1 / countW1;
+
+            let sumW3 = 0, countW3 = 0;
+            for(let i=0; i<weights[2].length; i++) {
+                for(let j=0; j<weights[2][i].length; j++) { sumW3 += weights[2][i][j]; countW3++; }
+            }
+            let avgW3 = sumW3 / countW3;
+
+            // Update Text
+            document.getElementById('valW1').textContent = avgW1.toFixed(3);
+            document.getElementById('valW3').textContent = avgW3.toFixed(3);
+
+            // Update Bars (Max visual scale 5)
+            let barW1 = document.getElementById('barW1');
+            let barW3 = document.getElementById('barW3');
+            
+            barW1.style.width = `${Math.min(100, (avgW1 / 5) * 100)}%`;
+            barW1.style.backgroundColor = getWeightStyle(avgW1);
+            
+            barW3.style.width = `${Math.min(100, (avgW3 / 5) * 100)}%`;
+            barW3.style.backgroundColor = getWeightStyle(avgW3);
+
+            // Health Status Logic
+            let isExploding = avgW1 > 2.5;
+            let isVanishing = avgW3 < 0.3;
+            
+            const netHealth = document.getElementById('netHealth');
+            const healthDesc = document.getElementById('healthDesc');
+            const healthCard = document.getElementById('healthCard');
+            let isBatchNormOn = document.getElementById('toggleBatchNorm').checked;
+
+            if (isExploding && isVanishing) {
+                netHealth.textContent = "UNSTABLE (EXPLODING & VANISHING)";
+                netHealth.style.color = "var(--accent-danger)";
+                healthCard.style.borderLeftColor = "var(--accent-danger)";
+                healthDesc.textContent = "Front layers explode (large raw inputs). Deep layers vanish (no Batch Normalization).";
+            } else if (isExploding) {
+                netHealth.textContent = "EXPLODING GRADIENTS";
+                netHealth.style.color = "var(--accent-danger)";
+                healthCard.style.borderLeftColor = "var(--accent-danger)";
+                healthDesc.textContent = "Large unscaled inputs cause massive weight swings. Batch Norm is off.";
+            } else if (isVanishing) {
+                netHealth.textContent = "VANISHING GRADIENTS";
+                let blue = document.body.classList.contains('light-mode') ? "var(--accent-blue)" : "var(--accent-blue)";
+                netHealth.style.color = blue;
+                healthCard.style.borderLeftColor = blue;
+                healthDesc.textContent = "Deep layer gradients vanish without Batch Normalization to rescale intermediate activations.";
+            } else {
+                netHealth.style.color = "var(--accent-primary)";
+                healthCard.style.borderLeftColor = "var(--accent-primary)";
+                
+                if (isBatchNormOn) {
+                    netHealth.textContent = "STABLE (BATCH NORM ACTIVE)";
+                    healthDesc.innerHTML = "Batch Norm maintains a <b>zero-mean and unit-variance</b> in deep layers, keeping gradients perfectly stable.";
+                } else {
+                    netHealth.textContent = "STABLE";
+                    healthDesc.textContent = "Weights are healthy (~1.0). Network is learning efficiently.";
+                }
+            }
+        }
+
+        // --- ANIMATION CONTROLS ---
+        function toggleAnimation() {
+            const btn = document.getElementById('animateBtn');
+            if (isAnimating) {
+                isAnimating = false;
+                btn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Train Network</span>';
+                btn.classList.remove('viz-btn-danger');
+                btn.classList.add('viz-btn-primary');
+                if (animationRequestId) cancelAnimationFrame(animationRequestId);
+                activeLayerIndex = -1;
+                drawNetwork(); 
+            } else {
+                isAnimating = true;
+                btn.innerHTML = '<i class="fas fa-stop text-xs"></i> <span>Stop Training</span>';
+                btn.classList.remove('viz-btn-primary');
+                btn.classList.add('viz-btn-danger');
+                
+                // Reset state to start forward pass
+                animationPhase = 'forward';
+                activeLayerIndex = 0;
+                lastTime = performance.now();
+                
+                animationLoop();
+            }
+        }
+
+        document.getElementById('animateBtn').addEventListener('click', toggleAnimation);
+        
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            initWeights();
+            updatePanelMetrics();
+            drawNetwork();
+        });
+
+        // Listeners for multi-select updates
+        document.getElementById('toggleNorm').addEventListener('change', () => { if(!isAnimating) updatePanelMetrics(); drawNetwork(); });
+        document.getElementById('toggleBatchNorm').addEventListener('change', () => { if(!isAnimating) updatePanelMetrics(); drawNetwork(); });
+
+        function animationLoop() {
+            if (!isAnimating) return;
+            
+            const time = performance.now();
+            const stepDelay = 200; // ms per layer jump
+            
+            if (time - lastTime > stepDelay) {
+                lastTime = time;
+                
+                if (animationPhase === 'forward') {
+                    activeLayerIndex++;
+                    if (activeLayerIndex >= layers.length - 1) {
+                        animationPhase = 'backward';
+                        activeLayerIndex = layers.length - 2; // Start backprop from last weight layer
+                    }
+                } else if (animationPhase === 'backward') {
+                    // Update weights exactly when backprop hits this layer
+                    updateWeightsForLayer(activeLayerIndex);
+                    
+                    activeLayerIndex--;
+                    if (activeLayerIndex < 0) {
+                        animationPhase = 'forward';
+                        activeLayerIndex = 0;
+                    }
+                }
+            }
+
+            drawNetwork();
+            animationRequestId = requestAnimationFrame(animationLoop);
+        }
+
+        // --- CANVAS DRAWING ---
+        function calculateLayout() {
+            const NEURON_BASE_SPACING_FACTOR = 2.0;
+            const LAYER_SPACING_MULTIPLIER = 5;
+            const maxNeurons = Math.max(...layers);
+            
+            neuronPositions = [];
+            layers.forEach((count, layerIdx) => {
+                const positions = [];
+                const layerSpacing = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * LAYER_SPACING_MULTIPLIER;
+                const neuronSpacingY = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * 1.5;
+                const layerX = layerIdx * layerSpacing;
+                const maxLayerHeight = maxNeurons * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                const currentLayerHeight = count * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                const yOff = (maxLayerHeight - currentLayerHeight) / 2;
+
+                for(let i=0; i<count; i++) {
+                    positions.push({
+                        x: layerX + currentNeuronRadius,
+                        y: yOff + i * (2 * currentNeuronRadius + neuronSpacingY) + currentNeuronRadius
+                    });
+                }
+                neuronPositions.push(positions);
+            });
+        }
+
+        function drawNetwork() {
+            if (!ctx) return;
+            const colors = getThemeColors();
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            
+            if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+            }
+            
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, rect.width, rect.height);
+
+            ctx.save();
+            ctx.translate(translateX, translateY);
+            ctx.scale(scale, scale);
+
+            let isBatchNormOn = document.getElementById('toggleBatchNorm').checked;
+
+            // BN Badges (Draw above hidden layers if active)
+            if (isBatchNormOn) {
+                layers.forEach((count, lIdx) => {
+                    if (lIdx > 0 && lIdx < layers.length - 1) { // Hidden layers only
+                        let topNode = neuronPositions[lIdx][0];
+                        ctx.fillStyle = 'var(--accent-primary)';
+                        ctx.font = `bold 10px 'Space Grotesk'`;
+                        ctx.textAlign = 'center';
+                        ctx.fillText("BN ACTIVE", topNode.x, topNode.y - currentNeuronRadius - 20);
+                        
+                        // Subtle visual bracket behind layer
+                        ctx.strokeStyle = 'var(--accent-primary)';
+                        ctx.globalAlpha = 0.2;
+                        ctx.lineWidth = 2 / scale;
+                        ctx.beginPath();
+                        ctx.moveTo(topNode.x - currentNeuronRadius - 10, topNode.y - currentNeuronRadius - 5);
+                        ctx.lineTo(topNode.x - currentNeuronRadius - 10, neuronPositions[lIdx][count-1].y + currentNeuronRadius + 5);
+                        ctx.stroke();
+                        ctx.globalAlpha = 1.0;
+                    }
+                });
+            }
+
+            // Connections
+            for(let l=0; l<layers.length-1; l++) {
+                
+                // Determine if this specific layer is currently animating
+                let isAnimatingLayer = false;
+                if (isAnimating) {
+                    if (animationPhase === 'forward' && activeLayerIndex === l) isAnimatingLayer = true;
+                    if (animationPhase === 'backward' && activeLayerIndex === l) isAnimatingLayer = true;
+                }
+                
+                neuronPositions[l].forEach((n1, idx1) => {
+                    neuronPositions[l+1].forEach((n2, idx2) => {
+                        ctx.beginPath();
+                        
+                        let w = weights[l][idx1][idx2];
+                        let strokeColor = getWeightStyle(w);
+                        let globalAlpha = 0.85;
+                        
+                        // Constant width
+                        ctx.lineWidth = 1.5 / scale; 
+
+                        // Flow animation effects
+                        if (isAnimatingLayer) {
+                            strokeColor = animationPhase === 'forward' ? 'var(--accent-primary)' : '#3b82f6';
+                            ctx.setLineDash([8, 8]);
+                            ctx.lineDashOffset = (performance.now() / 20) * (animationPhase === 'forward' ? -1 : 1);
+                            globalAlpha = 1.0;
+                            ctx.lineWidth = 2.5 / scale; // Slightly thicker just for the running pulse
+                        } else {
+                            ctx.setLineDash([]);
+                        }
+
+                        ctx.strokeStyle = strokeColor;
+                        ctx.globalAlpha = globalAlpha;
+
+                        ctx.moveTo(n1.x, n1.y);
+                        ctx.lineTo(n2.x, n2.y);
+                        ctx.stroke();
+                        
+                        ctx.setLineDash([]);
+                        ctx.globalAlpha = 1.0;
+                    });
+                });
+            }
+
+            // Neurons
+            layers.forEach((count, lIdx) => {
+                
+                let isActiveInAnim = false;
+                if (isAnimating) {
+                    if (animationPhase === 'forward' && activeLayerIndex === lIdx) isActiveInAnim = true;
+                    if (animationPhase === 'backward' && (activeLayerIndex === lIdx || activeLayerIndex + 1 === lIdx)) isActiveInAnim = true;
+                }
+
+                neuronPositions[lIdx].forEach((pos, nIdx) => {
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, currentNeuronRadius, 0, Math.PI*2);
+                    
+                    if (isActiveInAnim) {
+                        ctx.fillStyle = animationPhase === 'forward' ? 'var(--accent-primary)' : '#3b82f6';
+                        ctx.shadowColor = animationPhase === 'forward' ? 'var(--accent-primary)' : '#3b82f6';
+                        ctx.shadowBlur = 15;
+                        ctx.strokeStyle = colors.bg;
+                        ctx.lineWidth = 0;
+                    } else {
+                        // If BN is on, give hidden neurons a subtle green tint border
+                        if (isBatchNormOn && lIdx > 0 && lIdx < layers.length - 1) {
+                            ctx.fillStyle = colors.neuronFill;
+                            ctx.strokeStyle = 'var(--accent-primary)';
+                            ctx.lineWidth = 2.5 / scale;
+                        } else {
+                            ctx.fillStyle = colors.neuronFill;
+                            ctx.strokeStyle = colors.neuronBorder;
+                            ctx.lineWidth = 1.5 / scale;
+                        }
+                    }
+
+                    ctx.fill();
+                    if (!isActiveInAnim) ctx.stroke();
+                    ctx.shadowBlur = 0; // reset shadow
+
+                    // Text Labels
+                    ctx.fillStyle = isActiveInAnim && !document.body.classList.contains('light-mode') ? '#000' : colors.text;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    let label = '';
+                    if (lIdx === 0) { label = nIdx === 0 ? "Age" : "Sal"; } 
+                    else if (lIdx === layers.length - 1) { label = "Out"; } 
+                    else { label = `H${lIdx}_${nIdx+1}`; }
+
+                    let fontSize = Math.max(9, currentNeuronRadius * 0.4);
+                    ctx.font = `bold ${fontSize}px 'Space Grotesk'`;
+                    ctx.fillText(label, pos.x, pos.y);
+                });
+            });
+
+            ctx.restore();
+        }
+
+        window.updateAndRedraw = function() {
+            calculateLayout();
+            drawNetwork();
+        };
+
+        function resetView() {
+            calculateLayout();
+            const width = (layers.length - 1) * (currentNeuronRadius * 2.0 * 5) + currentNeuronRadius*2;
+            const height = Math.max(...layers) * (currentNeuronRadius * 3.5) + currentNeuronRadius*2;
+            
+            const rect = canvas.getBoundingClientRect();
+            const panelOffset = window.innerWidth > 768 ? 170 : 0; 
+
+            const sX = (rect.width - 60) / width;
+            const sY = (rect.height - 60) / height;
+            scale = Math.min(sX, sY, 1.3);
+            
+            translateX = (rect.width - width * scale) / 2 - panelOffset;
+            translateY = (rect.height - height * scale) / 2;
+            
+            if(scale < 0.1) scale = 0.1;
+            drawNetwork();
+        }
+
+        // --- MOUSE CONTROLS ---
+        canvas.addEventListener('mousedown', e => {
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            canvas.classList.add('grabbing');
+        });
+
+        window.addEventListener('mousemove', e => {
+            if(isDragging) {
+                const dx = e.clientX - lastX;
+                const dy = e.clientY - lastY;
+                translateX += dx;
+                translateY += dy;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                drawNetwork();
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+            canvas.classList.remove('grabbing');
+        });
+
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            const zoom = 1.1;
+            const dir = e.deltaY < 0 ? 1 : -1;
+            const factor = dir > 0 ? zoom : 1/zoom;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            
+            const newScale = Math.max(0.1, Math.min(5, scale * factor));
+            
+            translateX = mx - (mx - translateX) * (newScale / scale);
+            translateY = my - (my - translateY) * (newScale / scale);
+            scale = newScale;
+            drawNetwork();
+        });
+
+        window.addEventListener('resize', () => {
+            drawNetwork();
+            resetView();
+        });
+
+        // Initialize
+        updatePanelMetrics();
+        setTimeout(resetView, 100); 
+
+    </script>
+</body>
+</html>

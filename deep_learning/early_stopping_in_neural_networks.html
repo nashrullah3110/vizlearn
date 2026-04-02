@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Early Stopping</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --accent-primary: #22c55e;
+            --accent-glow: rgba(34, 197, 94, 0.25);
+            --accent-danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.4);
+            --accent-blue: #3b82f6;
+            --blue-glow: rgba(59, 130, 246, 0.4);
+            --accent-warning: #f59e0b;
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            
+            /* Canvas Specifics - Dark */
+            --canvas-bg: #0a0a0a;
+            --neuron-fill: #111827;
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --accent-danger: #dc2626;
+            --danger-glow: rgba(220, 38, 38, 0.3);
+            --accent-blue: #2563eb;
+            --blue-glow: rgba(37, 99, 235, 0.3);
+            --accent-warning: #d97706;
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+
+            --canvas-bg: #f8fafc;
+            --neuron-fill: #ffffff;
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .toolbar-container {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.75rem 1.5rem;
+            z-index: 40;
+        }
+
+        .floating-panel {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 360px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            z-index: 30;
+            opacity: 0.95;
+            transition: opacity 0.3s;
+        }
+
+        /* Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+            width: 100%;
+        }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            border: 2px solid var(--bg-surface);
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            cursor: pointer;
+            margin-top: -5px;
+            box-shadow: 0 0 10px var(--accent-glow);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border-subtle);
+            border-radius: 2px;
+        }
+
+        /* Buttons */
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); box-shadow: 0 0 10px var(--accent-glow); }
+        .viz-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 0 15px var(--accent-glow); filter: brightness(1.1); }
+        .viz-btn-secondary { background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-subtle); }
+        .viz-btn-secondary:hover { border-color: var(--accent-primary); background: var(--input-focus-bg); }
+        .viz-btn-danger { background: transparent; color: var(--accent-danger); border: 1px solid var(--accent-danger); }
+        .viz-btn-danger:hover { background: var(--accent-danger); color: #fff; box-shadow: 0 0 15px var(--danger-glow); }
+
+        #canvas { background-color: var(--canvas-bg); width: 100%; height: 100%; cursor: grab; user-select: none; }
+        #canvas.grabbing { cursor: grabbing; }
+
+        .metric-card { background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: 6px; margin-bottom: 0.5rem; }
+
+        #chartCanvas {
+            width: 100%;
+            height: 140px;
+            border-radius: 4px;
+            background: var(--bg-body);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .pulse-warning {
+            animation: pulse-warn 2s infinite;
+        }
+        @keyframes pulse-warn {
+            0% { box-shadow: 0 0 0 0 var(--danger-glow); }
+            70% { box-shadow: 0 0 0 10px transparent; }
+            100% { box-shadow: 0 0 0 0 transparent; }
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <div class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(34,197,94,0.8)] animate-pulse"></div>
+                    <span style="color: var(--text-main)">viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </div>
+                
+                <!-- Theme Toggle -->
+                <div class="flex items-center gap-3">
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Title Section -->
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full">
+        <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Early Stopping</h1>
+        <p class="mt-2 text-sm md:text-base max-w-4xl opacity-80" style="color: var(--text-muted)">
+            Prevent overfitting by halting training when the model stops generalizing! The network monitors <span style="color: var(--accent-danger); font-weight:bold;">Validation Loss</span>. If it fails to improve for a set number of epochs (Patience), training stops and the weights are restored to the <span style="color: var(--accent-warning); font-weight:bold;">Best Epoch</span>.
+        </p>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-6 justify-between overflow-x-auto">
+        
+        <!-- Controls -->
+        <div class="flex items-center gap-6 flex-1 min-w-max">
+            
+            <div class="flex flex-col gap-1 w-64">
+                <div class="flex justify-between items-center">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70">Patience (Epochs)</label>
+                    <span id="patienceValDisplay" class="text-[10px] font-bold mono-font" style="color: var(--accent-primary)">20</span>
+                </div>
+                <input type="range" id="patienceSlider" min="5" max="60" step="1" value="20">
+                <div class="text-[9px] opacity-50 mt-1">Number of epochs to wait for improvement before stopping.</div>
+            </div>
+
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-3 shrink-0">
+            <button id="resetBtn" class="viz-btn viz-btn-secondary">
+                <i class="fas fa-undo text-xs"></i> Reset Model
+            </button>
+            <button id="animateBtn" class="viz-btn viz-btn-primary shadow-[0_0_15px_rgba(34,197,94,0.15)] w-48">
+                <i class="fas fa-play text-xs"></i> <span>Start Training</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 relative overflow-hidden bg-[var(--canvas-bg)]">
+        <canvas id="canvas" class="block w-full h-full"></canvas>
+
+        <!-- Floating Stats Panel -->
+        <div class="floating-panel p-4 flex flex-col gap-4 pointer-events-auto">
+             <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
+                 <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--text-main)">
+                    <i class="fas fa-chart-line mr-2"></i> Training Metrics
+                </h3>
+             </div>
+             
+             <!-- Network Health / Status -->
+             <div class="metric-card p-3 border-l-4 transition-colors duration-300" id="healthCard" style="border-left-color: var(--text-muted)">
+                 <div class="text-[10px] uppercase font-bold opacity-70 mb-1">Status</div>
+                 <div id="netHealth" class="font-bold text-[13px] tracking-wide" style="color: var(--text-main)">READY</div>
+                 <div id="healthDesc" class="text-[10px] mt-1 opacity-70 leading-relaxed font-medium">Click Start to begin training simulation.</div>
+             </div>
+
+             <!-- Loss Tracking -->
+             <div class="grid grid-cols-2 gap-2">
+                 <div class="metric-card p-3">
+                     <div class="text-[9px] uppercase font-bold opacity-60 mb-1" style="color: var(--accent-primary)">Train Loss</div>
+                     <div class="font-bold text-base mono-font tracking-wide" id="trainLossDisplay">
+                        --
+                     </div>
+                 </div>
+                 <div class="metric-card p-3">
+                     <div class="text-[9px] uppercase font-bold opacity-60 mb-1" style="color: var(--accent-danger)">Val Loss</div>
+                     <div class="font-bold text-base mono-font tracking-wide" id="valLossDisplay">
+                        --
+                     </div>
+                 </div>
+             </div>
+
+             <!-- Epoch Info -->
+             <div class="flex justify-between items-center px-1">
+                 <div class="text-xs font-bold opacity-80">Epoch: <span id="epochDisplay" class="mono-font text-[var(--text-main)]">0</span></div>
+                 <div class="text-xs font-bold" style="color: var(--accent-warning)">Best Epoch: <span id="bestEpochDisplay" class="mono-font">0</span></div>
+             </div>
+
+             <!-- Loss Curves Chart -->
+             <div class="relative">
+                <canvas id="chartCanvas"></canvas>
+                <!-- Chart Legend -->
+                <div class="absolute top-2 right-2 flex flex-col gap-1 text-[9px] font-bold bg-[var(--bg-glass)] p-1.5 rounded border border-[var(--border-subtle)]">
+                    <div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full" style="background: var(--accent-primary)"></div> Train</div>
+                    <div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full" style="background: var(--accent-danger)"></div> Val</div>
+                    <div class="flex items-center gap-1"><div class="w-0.5 h-2" style="background: var(--accent-warning)"></div> Best</div>
+                </div>
+             </div>
+             
+             <div class="text-[9px] text-center opacity-40">
+                 Drag to Pan | Scroll to Zoom
+             </div>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-3">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                 <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)">
+                    <i class="fab fa-instagram fa-lg"></i>
+                </a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2026 VIZLEARN // MODULE.EARLY_STOPPING</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            if (typeof window.updateAndRedraw === 'function') window.updateAndRedraw();
+        });
+
+        // --- SIMULATION STATE ---
+        const layers = [4, 6, 6, 1]; // Network Architecture
+        let weights = [];       
+        let totalParams = 0;
+
+        let epoch = 0;
+        let isTraining = false;
+        let hasStopped = false;
+        let trainingRequestId = null;
+        let lastFrameTime = 0;
+
+        // Loss Tracking
+        let trainLoss = 2.5;
+        let valLoss = 2.5;
+        let history = []; // [{epoch, trainLoss, valLoss}]
+        let bestValLoss = Infinity;
+        let bestEpoch = 0;
+        let epochsSinceBest = 0;
+        
+        // Randomization for curves
+        let noiseOffsetTrain = Math.random() * 100;
+        let noiseOffsetVal = Math.random() * 100;
+
+        // Canvas State
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const chartCanvas = document.getElementById('chartCanvas');
+        const chartCtx = chartCanvas.getContext('2d');
+        
+        let scale = 1;
+        let translateX = 0;
+        let translateY = 0;
+        let isDragging = false;
+        let lastX = 0, lastY = 0;
+        let neuronPositions = [];
+        let currentNeuronRadius = 25; 
+
+        // --- UI BINDINGS ---
+        document.getElementById('patienceSlider').addEventListener('input', (e) => {
+            document.getElementById('patienceValDisplay').textContent = e.target.value;
+            // Update UI immediately if we are actively tracking patience
+            if (isTraining && !hasStopped) {
+                updateMetricsUI();
+            }
+        });
+
+        // Simple pseudo-random noise function
+        function noise(t) {
+            return Math.sin(t * 1.5) * Math.cos(t * 2.7) * 0.05 + (Math.random() - 0.5) * 0.02;
+        }
+
+        // Initialize Base Network
+        function initWeights() {
+            weights = [];
+            totalParams = 0;
+            
+            for (let l = 0; l < layers.length - 1; l++) {
+                let layerWeights = [];
+                for (let i = 0; i < layers[l]; i++) {
+                    let nodeWeights = [];
+                    for (let j = 0; j < layers[l+1]; j++) {
+                        let w = (Math.random() * 2.0) - 1.0; // Start small
+                        nodeWeights.push(w);
+                        totalParams++;
+                    }
+                    layerWeights.push(nodeWeights);
+                }
+                weights.push(layerWeights);
+            }
+        }
+
+        function resetTraining() {
+            isTraining = false;
+            hasStopped = false;
+            if (trainingRequestId) cancelAnimationFrame(trainingRequestId);
+            
+            initWeights(); 
+            epoch = 0;
+            trainLoss = 2.5;
+            valLoss = 2.5;
+            history = [];
+            bestValLoss = Infinity;
+            bestEpoch = 0;
+            epochsSinceBest = 0;
+            
+            // Randomize curves slightly
+            noiseOffsetTrain = Math.random() * 100;
+            noiseOffsetVal = Math.random() * 100;
+
+            const btn = document.getElementById('animateBtn');
+            btn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Start Training</span>';
+            btn.classList.remove('viz-btn-danger');
+            btn.classList.add('viz-btn-primary');
+            btn.disabled = false;
+            btn.style.opacity = 1;
+            
+            document.getElementById('healthCard').classList.remove('pulse-warning');
+            
+            updateMetricsUI();
+            drawChart();
+            drawNetwork();
+        }
+
+        // --- CORE MATH ---
+        function stepTrainingEpoch() {
+            if (hasStopped) return;
+
+            epoch++;
+            let patienceLimit = parseInt(document.getElementById('patienceSlider').value);
+
+            // Simulate Training Loss: Exponential decay + noise
+            let baseTrainLoss = 2.2 * Math.exp(-epoch / 30) + 0.15;
+            trainLoss = baseTrainLoss + noise(epoch * 0.1 + noiseOffsetTrain);
+            trainLoss = Math.max(0.01, trainLoss);
+
+            // Simulate Validation Loss: Decays initially, then quadratically increases (overfitting)
+            let baseValLoss = 2.2 * Math.exp(-epoch / 30) + 0.25;
+            let overfitFactor = 0;
+            if (epoch > 40) {
+                // After epoch 40, model starts memorizing noise
+                overfitFactor = Math.pow((epoch - 40) / 40, 2) * 0.4;
+            }
+            valLoss = baseValLoss + overfitFactor + noise(epoch * 0.15 + noiseOffsetVal);
+            valLoss = Math.max(0.01, valLoss);
+
+            // Save history
+            history.push({ epoch, trainLoss, valLoss });
+
+            // Early Stopping Logic
+            if (valLoss < bestValLoss) {
+                bestValLoss = valLoss;
+                bestEpoch = epoch;
+                epochsSinceBest = 0;
+            } else {
+                epochsSinceBest++;
+            }
+
+            // Visually drift weights to represent training/overfitting
+            // As overfitFactor increases, weights grow larger (more chaotic)
+            for (let l = 0; l < weights.length; l++) {
+                for (let i = 0; i < weights[l].length; i++) {
+                    for (let j = 0; j < weights[l][i].length; j++) {
+                        let w = weights[l][i][j];
+                        // Drift towards larger values if overfitting
+                        w += (Math.random() - 0.5) * 0.1;
+                        if (overfitFactor > 0) {
+                            w *= 1.002; // Slowly expand weights
+                        }
+                        weights[l][i][j] = Math.max(-5, Math.min(w, 5));
+                    }
+                }
+            }
+
+            // Check trigger
+            if (epochsSinceBest >= patienceLimit) {
+                triggerEarlyStopping();
+            } else {
+                updateMetricsUI();
+            }
+        }
+
+        function triggerEarlyStopping() {
+            hasStopped = true;
+            isTraining = false;
+            
+            const btn = document.getElementById('animateBtn');
+            btn.innerHTML = '<i class="fas fa-stop text-xs"></i> <span>Training Halted</span>';
+            btn.classList.remove('viz-btn-primary', 'viz-btn-danger');
+            btn.classList.add('viz-btn-secondary');
+            btn.disabled = true;
+            btn.style.opacity = 0.5;
+
+            // Pulse effect to draw attention
+            document.getElementById('healthCard').classList.add('pulse-warning');
+            
+            updateMetricsUI();
+        }
+
+        function updateMetricsUI() {
+            document.getElementById('epochDisplay').textContent = epoch;
+            document.getElementById('trainLossDisplay').textContent = history.length > 0 ? trainLoss.toFixed(4) : '--';
+            document.getElementById('valLossDisplay').textContent = history.length > 0 ? valLoss.toFixed(4) : '--';
+            document.getElementById('bestEpochDisplay').textContent = bestEpoch;
+
+            const netHealth = document.getElementById('netHealth');
+            const healthDesc = document.getElementById('healthDesc');
+            const healthCard = document.getElementById('healthCard');
+            let patienceLimit = parseInt(document.getElementById('patienceSlider').value);
+
+            if (hasStopped) {
+                netHealth.textContent = "STOPPED (OVERFITTING)";
+                netHealth.style.color = "var(--accent-danger)";
+                healthCard.style.borderLeftColor = "var(--accent-danger)";
+                healthDesc.innerHTML = `Validation loss did not improve for <b>${patienceLimit}</b> epochs. Weights restored to Epoch <b>${bestEpoch}</b>.`;
+            } else if (isTraining) {
+                if (epochsSinceBest > 0) {
+                    netHealth.textContent = `WARNING (PATIENCE: ${epochsSinceBest}/${patienceLimit})`;
+                    netHealth.style.color = "var(--accent-warning)";
+                    healthCard.style.borderLeftColor = "var(--accent-warning)";
+                    healthDesc.textContent = "Validation loss is rising. Monitoring for potential early stop...";
+                } else {
+                    netHealth.textContent = "TRAINING (IMPROVING)";
+                    netHealth.style.color = "var(--accent-primary)";
+                    healthCard.style.borderLeftColor = "var(--accent-primary)";
+                    healthDesc.textContent = "Model is successfully minimizing validation loss.";
+                }
+            } else {
+                netHealth.textContent = "READY";
+                netHealth.style.color = "var(--text-main)";
+                healthCard.style.borderLeftColor = "var(--text-muted)";
+                healthDesc.textContent = "Click Start to begin training simulation.";
+            }
+        }
+
+        // --- CHART DRAWING ---
+        function drawChart() {
+            const width = chartCanvas.width = chartCanvas.clientWidth * (window.devicePixelRatio || 1);
+            const height = chartCanvas.height = chartCanvas.clientHeight * (window.devicePixelRatio || 1);
+            
+            chartCtx.clearRect(0, 0, width, height);
+            
+            if (history.length === 0) return;
+
+            let maxEpoch = Math.max(100, epoch); // Autoscale X, min 100
+            let maxLoss = 3.0; // Fixed Y scale for consistency
+
+            // Draw grid lines
+            chartCtx.strokeStyle = 'rgba(150, 150, 150, 0.1)';
+            chartCtx.lineWidth = 1;
+            chartCtx.beginPath();
+            for(let i=1; i<4; i++) {
+                let y = height * (i/4);
+                chartCtx.moveTo(0, y);
+                chartCtx.lineTo(width, y);
+            }
+            chartCtx.stroke();
+
+            const drawLine = (key, colorClass, thickness) => {
+                chartCtx.beginPath();
+                chartCtx.strokeStyle = getComputedStyle(document.body).getPropertyValue(colorClass).trim();
+                chartCtx.lineWidth = thickness;
+                chartCtx.lineJoin = 'round';
+
+                for (let i = 0; i < history.length; i++) {
+                    let h = history[i];
+                    let x = (h.epoch / maxEpoch) * width;
+                    // Y axis is 0 at bottom, maxLoss at top
+                    let y = height - (Math.min(h[key], maxLoss) / maxLoss) * height;
+
+                    if (i === 0) chartCtx.moveTo(x, y);
+                    else chartCtx.lineTo(x, y);
+                }
+                chartCtx.stroke();
+            };
+
+            // Draw Train Loss
+            drawLine('trainLoss', '--accent-primary', 2.5);
+            // Draw Val Loss
+            drawLine('valLoss', '--accent-danger', 2.5);
+
+            // Draw Best Epoch Marker
+            if (bestEpoch > 0) {
+                let bx = (bestEpoch / maxEpoch) * width;
+                chartCtx.beginPath();
+                chartCtx.setLineDash([5, 5]);
+                chartCtx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--accent-warning').trim();
+                chartCtx.lineWidth = 2;
+                chartCtx.moveTo(bx, 0);
+                chartCtx.lineTo(bx, height);
+                chartCtx.stroke();
+                chartCtx.setLineDash([]);
+            }
+            
+            // Draw Stop Marker
+            if (hasStopped) {
+                let sx = (epoch / maxEpoch) * width;
+                chartCtx.beginPath();
+                chartCtx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--accent-danger').trim();
+                chartCtx.lineWidth = 2;
+                chartCtx.moveTo(sx, 0);
+                chartCtx.lineTo(sx, height);
+                chartCtx.stroke();
+                
+                // Add "Stopped" text
+                chartCtx.fillStyle = getComputedStyle(document.body).getPropertyValue('--accent-danger').trim();
+                chartCtx.font = "bold 12px Inter";
+                chartCtx.textAlign = "right";
+                chartCtx.fillText("STOPPED", sx - 5, 20);
+            }
+        }
+
+        // --- ANIMATION CONTROLS ---
+        function toggleTraining() {
+            if (hasStopped) return; // Cannot resume if early stopped
+
+            if (isTraining) {
+                isTraining = false;
+                if (trainingRequestId) cancelAnimationFrame(trainingRequestId);
+                const btn = document.getElementById('animateBtn');
+                btn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Resume Training</span>';
+                btn.classList.remove('viz-btn-danger');
+                btn.classList.add('viz-btn-primary');
+            } else {
+                isTraining = true;
+                const btn = document.getElementById('animateBtn');
+                btn.innerHTML = '<i class="fas fa-pause text-xs"></i> <span>Pause Training</span>';
+                btn.classList.remove('viz-btn-primary');
+                btn.classList.add('viz-btn-danger');
+                
+                lastFrameTime = performance.now();
+                trainingLoop();
+            }
+        }
+
+        document.getElementById('animateBtn').addEventListener('click', toggleTraining);
+        document.getElementById('resetBtn').addEventListener('click', resetTraining);
+
+        function trainingLoop() {
+            if (!isTraining || hasStopped) return;
+            
+            const time = performance.now();
+            if (time - lastFrameTime > 60) { // Slightly slower frame rate for clearer chart progression
+                lastFrameTime = time;
+                stepTrainingEpoch();
+            }
+
+            drawNetwork();
+            drawChart();
+            
+            if (isTraining && !hasStopped) {
+                trainingRequestId = requestAnimationFrame(trainingLoop);
+            }
+        }
+
+        // --- CANVAS DRAWING ---
+        function getThemeColors() {
+            const styles = getComputedStyle(document.body);
+            return {
+                bg: styles.getPropertyValue('--canvas-bg').trim(),
+                neuronFill: styles.getPropertyValue('--neuron-fill').trim(),
+                text: styles.getPropertyValue('--text-main').trim(),
+            };
+        }
+
+        function getWeightStyle(w) {
+            let r, g, b;
+            let absW = Math.abs(w);
+            let alpha = 1.0;
+            
+            if (document.body.classList.contains('light-mode')) {
+                if (w < 0) { 
+                    r = 37; g = 99; b = 235; // Blue
+                } else { 
+                    r = 21; g = 128; b = 61; // Green
+                }
+                if (absW > 2.0) { r = 220; g = 38; b = 38; } // Overfit Red
+            } else {
+                if (w < 0) { 
+                    r = 59; g = 130; b = 246; // Blue
+                } else { 
+                    r = 34; g = 197; b = 94; // Green
+                }
+                if (absW > 2.0) { r = 239; g = 68; b = 68; } // Overfit Red
+            }
+            
+            alpha = Math.max(0.15, Math.min(1.0, absW * 0.8));
+            
+            // If stopped, gray out the network to show it's inactive
+            if (hasStopped) {
+                r = 150; g = 150; b = 150;
+                alpha = 0.3;
+            }
+            
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function calculateLayout() {
+            const NEURON_BASE_SPACING_FACTOR = 2.0;
+            const LAYER_SPACING_MULTIPLIER = 5;
+            const maxNeurons = Math.max(...layers);
+            
+            neuronPositions = [];
+            layers.forEach((count, layerIdx) => {
+                const positions = [];
+                const layerSpacing = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * LAYER_SPACING_MULTIPLIER;
+                const neuronSpacingY = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * 1.5;
+                const layerX = layerIdx * layerSpacing;
+                const maxLayerHeight = maxNeurons * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                const currentLayerHeight = count * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                const yOff = (maxLayerHeight - currentLayerHeight) / 2;
+
+                for(let i=0; i<count; i++) {
+                    positions.push({
+                        x: layerX + currentNeuronRadius,
+                        y: yOff + i * (2 * currentNeuronRadius + neuronSpacingY) + currentNeuronRadius
+                    });
+                }
+                neuronPositions.push(positions);
+            });
+        }
+
+        function drawNetwork() {
+            if (!ctx || !neuronPositions || neuronPositions.length === 0) return;
+            
+            const colors = getThemeColors();
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            
+            if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+            }
+            
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, rect.width, rect.height);
+
+            ctx.save();
+            ctx.translate(translateX, translateY);
+            ctx.scale(scale, scale);
+
+            // Connections
+            for(let l=0; l<layers.length-1; l++) {
+                if(!neuronPositions[l] || !neuronPositions[l+1]) continue;
+
+                neuronPositions[l].forEach((n1, idx1) => {
+                    neuronPositions[l+1].forEach((n2, idx2) => {
+                        let w = weights[l][idx1][idx2];
+                        let absW = Math.abs(w);
+                        
+                        ctx.beginPath();
+                        let strokeColor = getWeightStyle(w);
+                        ctx.lineWidth = Math.min(6, (0.5 + absW)) / scale; 
+                        ctx.strokeStyle = strokeColor;
+                        ctx.moveTo(n1.x, n1.y);
+                        ctx.lineTo(n2.x, n2.y);
+                        ctx.stroke();
+                    });
+                });
+            }
+
+            // Neurons
+            layers.forEach((count, lIdx) => {
+                if(!neuronPositions[lIdx]) return;
+
+                neuronPositions[lIdx].forEach((pos, nIdx) => {
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, currentNeuronRadius, 0, Math.PI*2);
+                    
+                    ctx.fillStyle = colors.neuronFill;
+                    ctx.strokeStyle = document.body.classList.contains('light-mode') ? '#cbd5e1' : '#334155';
+                    if (hasStopped) ctx.strokeStyle = 'rgba(150,150,150,0.3)';
+                    ctx.lineWidth = 2.5 / scale;
+
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Text Labels
+                    ctx.fillStyle = hasStopped ? 'rgba(150,150,150,0.5)' : colors.text;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    let label = '';
+                    if (lIdx === 0) label = `In_${nIdx+1}`; 
+                    else if (lIdx === layers.length - 1) label = "Out";
+                    else label = `H_${lIdx}_${nIdx+1}`; 
+
+                    let fontSize = Math.max(10, currentNeuronRadius * 0.4);
+                    ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
+                    ctx.fillText(label, pos.x, pos.y);
+                });
+            });
+
+            ctx.restore();
+        }
+
+        window.updateAndRedraw = function() {
+            calculateLayout();
+            drawChart();
+            drawNetwork();
+        };
+
+        function resetView() {
+            calculateLayout();
+            const width = (layers.length - 1) * (currentNeuronRadius * 2.0 * 5) + currentNeuronRadius*2;
+            const height = Math.max(...layers) * (currentNeuronRadius * 3.5) + currentNeuronRadius*2;
+            
+            const rect = canvas.getBoundingClientRect();
+            const panelOffset = window.innerWidth > 768 ? 170 : 0; 
+
+            const sX = (rect.width - 60) / width;
+            const sY = (rect.height - 60) / height;
+            scale = Math.min(sX, sY, 1.2);
+            
+            translateX = (rect.width - width * scale) / 2 - panelOffset;
+            translateY = (rect.height - height * scale) / 2;
+            
+            if(scale < 0.1) scale = 0.1;
+            drawNetwork();
+            drawChart();
+        }
+
+        // --- MOUSE CONTROLS ---
+        canvas.addEventListener('mousedown', e => {
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            canvas.classList.add('grabbing');
+        });
+
+        window.addEventListener('mousemove', e => {
+            if(isDragging) {
+                const dx = e.clientX - lastX;
+                const dy = e.clientY - lastY;
+                translateX += dx;
+                translateY += dy;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                drawNetwork();
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+            canvas.classList.remove('grabbing');
+        });
+
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            const zoom = 1.1;
+            const dir = e.deltaY < 0 ? 1 : -1;
+            const factor = dir > 0 ? zoom : 1/zoom;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            
+            const newScale = Math.max(0.1, Math.min(5, scale * factor));
+            
+            translateX = mx - (mx - translateX) * (newScale / scale);
+            translateY = my - (my - translateY) * (newScale / scale);
+            scale = newScale;
+            drawNetwork();
+        });
+
+        window.addEventListener('resize', () => {
+            drawNetwork();
+            drawChart();
+            resetView();
+        });
+
+        // Initialize Layout correctly first
+        calculateLayout();
+        resetTraining();
+        setTimeout(resetView, 100); 
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Overfitting vs Underfitting</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Add MathJax for rendering LaTeX formulas -->
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            startup: {
+                typeset: true
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'dark';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --border-glow: rgba(74, 222, 128, 0.5);
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            
+            /* Chart Specifics */
+            --chart-grid: rgba(255, 255, 255, 0.1);
+            --chart-text: rgba(255, 255, 255, 0.6);
+            --train-color: #3b82f6; /* Blue */
+            --val-color: #f59e0b; /* Amber */
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --border-glow: rgba(22, 163, 74, 0.4);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+
+            /* Chart Specifics - Light Mode */
+            --chart-grid: rgba(0, 0, 0, 0.1);
+            --chart-text: rgba(0, 0, 0, 0.6);
+            --train-color: #2563eb; 
+            --val-color: #d97706; 
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .toolbar-container {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.75rem 1.5rem;
+            z-index: 40;
+        }
+
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .calc-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: all 0.2s;
+            border-radius: 0.375rem;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.875rem;
+        }
+        .viz-input:focus {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+            outline: none;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; border: 2px solid var(--bg-surface);
+            height: 16px; width: 16px; border-radius: 50%;
+            background: var(--accent-primary); cursor: pointer;
+            margin-top: -6px; box-shadow: 0 0 10px var(--accent-glow); transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: var(--border-subtle); border-radius: 2px; }
+
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); box-shadow: 0 0 10px var(--accent-glow); }
+        .viz-btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 15px var(--accent-glow); filter: brightness(1.1); }
+        .viz-btn-secondary { background: var(--input-bg); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+        .viz-btn-secondary:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); background: var(--input-focus-bg); }
+
+        .metric-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper { background: var(--input-bg); border: 1px solid var(--border-subtle); position: relative; }
+        .search-input-wrapper:focus-within { background: var(--input-focus-bg); border-color: var(--accent-primary); box-shadow: 0 0 15px var(--accent-glow); }
+        .search-input-wrapper input { color: var(--text-main); }
+        .search-input-wrapper input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .search-input-wrapper i { color: var(--accent-primary); opacity: 0.7; }
+        .search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--card-bg); border: 1px solid var(--border-subtle); border-top: none; border-radius: 0 0 12px 12px; max-height: 400px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3); }
+        .search-dropdown.show { display: block; animation: slideDown 0.2s ease-out; }
+        .search-dropdown-item { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: space-between; color: inherit; text-decoration: none; }
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        .dropdown-item-title { font-weight: 500; color: var(--text-main); }
+        .dropdown-item-path { font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; }
+        .dropdown-item-icon { color: var(--accent-primary); margin-right: 8px; font-size: 0.875rem; }
+        .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
+
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50 shrink-0">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search modules" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Title Section -->
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full animate-fade-in">
+        <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
+            <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
+            <span>/</span>
+            <span>Deep Learning</span>
+        </div>
+        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Overfitting vs. Underfitting</h1>
+        <p class="mt-2 text-sm md:text-base max-w-2xl opacity-80" style="color: var(--text-muted)">
+            Adjust the Model Complexity and train the model for thousands of Epochs to see how it learns to memorize the training data.
+        </p>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-4 justify-between animate-fade-in z-40 relative shadow-md">
+        <!-- Configuration Group -->
+        <div class="flex items-center gap-6 overflow-x-auto pb-1 md:pb-0 hide-scrollbar shrink-0">
+            
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap" style="color: var(--accent-primary)">Model Complexity</label>
+                <input type="range" id="complexitySlider" min="1" max="12" step="1" value="3" class="w-32" title="Polynomial Degree">
+                <span id="complexityValue" class="text-sm font-bold mono-font w-4" style="color: var(--accent-primary)">3</span>
+            </div>
+            
+            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide text-blue-400 whitespace-nowrap">Target Epochs</label>
+                <input type="range" id="epochsSlider" min="100" max="6000" step="100" value="4000" class="w-24" title="Number of training epochs">
+                <span id="epochsValue" class="text-[10px] mono-font w-8 text-blue-400">4000</span>
+            </div>
+
+            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide text-orange-400 whitespace-nowrap">Sim Speed</label>
+                <input type="range" id="speedSlider" min="0.5" max="10.0" step="0.5" value="2.0" class="w-20" title="Animation Speed">
+                <span id="speedValue" class="text-[10px] mono-font w-8 text-orange-400">2.0x</span>
+            </div>
+
+            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
+
+            <div class="flex items-center gap-3">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Data Noise</label>
+                <input type="range" id="noiseSlider" min="0.0" max="1.5" step="0.1" value="0.8" class="w-20" title="Data Variance">
+            </div>
+
+        </div>
+
+        <!-- Action Controls -->
+        <div class="flex items-center gap-2 shrink-0 md:border-l border-[var(--border-subtle)] md:pl-6 ml-auto">
+            <button id="resetModelBtn" class="viz-btn viz-btn-secondary whitespace-nowrap py-2 px-3 shadow-[0_0_15px_rgba(255,255,255,0.05)]" title="Reset Model (Epoch 0)">
+                <i class="fas fa-undo text-xs"></i> <span>Reset</span>
+            </button>
+            <button id="regenerateBtn" class="viz-btn viz-btn-secondary whitespace-nowrap py-2 px-3 shadow-[0_0_15px_rgba(255,255,255,0.05)]" title="Generate New Data">
+                <i class="fas fa-sync-alt text-xs"></i> <span>Data</span>
+            </button>
+            <button id="animateBtn" class="viz-btn viz-btn-primary whitespace-nowrap py-2 px-4 shadow-[0_0_15px_rgba(74,222,128,0.15)]">
+                <i class="fas fa-play text-xs"></i> 
+                <span>Train Model</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Layout (Chart + Live Metrics) -->
+    <div class="max-w-7xl mx-auto w-full px-4 md:px-8 py-6 flex-1 flex flex-col gap-6 animate-fade-in">
+        
+        <!-- Live Dashboard Strip -->
+        <div id="diagnosisPanel" class="metric-card w-full flex flex-col md:flex-row items-center justify-between border-l-4 border-yellow-500 mb-2 p-4 transition-colors duration-500">
+            <div class="flex items-center gap-3">
+                <i id="diagIcon" class="fas fa-battery-quarter text-2xl text-yellow-400"></i>
+                <div class="text-left">
+                    <span class="text-[10px] uppercase font-bold opacity-60">System Diagnosis</span>
+                    <h3 id="diagTitle" class="text-lg font-bold brand-font text-yellow-400">UNDERFITTING</h3>
+                </div>
+            </div>
+            <div id="diagMsg" class="text-sm opacity-80 text-right mt-2 md:mt-0 max-w-md">
+                Model is too simple to capture the curve of the data.
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[500px]">
+            
+            <!-- Chart Area (Takes up 2 cols on large screens) -->
+            <div class="lg:col-span-2 card-container flex flex-col h-full relative">
+                <div class="border-b px-4 py-3 flex justify-between items-center" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <div class="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style="color: var(--text-main)">
+                        <i class="fas fa-chart-scatter" style="color: var(--accent-primary)"></i> Live Training View
+                    </div>
+                    <div class="flex gap-4 text-[10px] mono-font opacity-80">
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full" style="background: var(--train-color)"></span> Train Data</div>
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full" style="background: var(--val-color)"></span> Val Data</div>
+                        <div class="flex items-center gap-1"><span class="w-4 h-1" style="background: var(--accent-primary)"></span> Model Prediction</div>
+                        <div class="flex items-center gap-1"><span class="w-4 h-1 bg-white/20 border-t border-dashed border-white/50"></span> True Function</div>
+                    </div>
+                </div>
+                <div class="flex-1 p-4">
+                    <div class="relative w-full h-full">
+                        <canvas id="polyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metrics Dashboard -->
+            <div class="lg:col-span-1 flex flex-col gap-4">
+                
+                <div class="metric-card border-l-4 flex flex-col justify-center items-center py-6" style="border-left-color: var(--text-main)">
+                    <span class="text-[10px] uppercase font-bold opacity-60">Current Epoch</span>
+                    <span id="liveEpoch" class="text-4xl font-bold mono-font" style="color: var(--text-main)">0</span>
+                </div>
+
+                <div class="metric-card border-l-4" style="border-left-color: var(--train-color)">
+                    <h4 class="text-xs font-bold uppercase tracking-widest text-blue-400 mb-1">Train Error (MSE)</h4>
+                    <span class="text-[10px] opacity-60 block mb-3">Error measured against blue dots.</span>
+                    <span id="trainMseVal" class="text-3xl font-bold mono-font text-blue-400">0.000</span>
+                </div>
+                
+                <div class="metric-card border-l-4" style="border-left-color: var(--val-color)">
+                    <h4 class="text-xs font-bold uppercase tracking-widest text-amber-500 mb-1">Validation Error (MSE)</h4>
+                    <span class="text-[10px] opacity-60 block mb-3">Error measured against orange dots.</span>
+                    <span id="valMseVal" class="text-3xl font-bold mono-font text-amber-500">0.000</span>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Comprehensive Article Section -->
+    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div class="mb-12 card-container animate-fade-in" style="animation-delay: 0.2s">
+            <div class="border-b px-6 py-5 md:px-8 md:py-6" style="border-color: var(--border-subtle)">
+                <h2 class="text-xl md:text-2xl font-bold flex items-center gap-3 brand-font" style="color: var(--text-main)">
+                    <i class="fas fa-balance-scale" style="color: var(--accent-primary)"></i>
+                    Overfitting vs. Underfitting
+                </h2>
+            </div>
+            
+            <div class="p-6 md:p-8 space-y-12" style="color: var(--text-muted)">
+                
+                <!-- Intro Section -->
+                <section>
+                    <p class="leading-relaxed mb-4">
+                        In Machine Learning, the goal isn't just to memorize the data you have; it's to uncover the hidden mathematical rule (the "True Function") that generated the data so you can make accurate predictions on data you haven't seen yet. 
+                    </p>
+                    <p class="leading-relaxed">
+                        To do this, we must configure our model and determine how long to train it. If the model is too simple, it can't learn the pattern. If it is too complex and trained for too long, it learns the pattern <em>and</em> the random noise, completely destroying its ability to generalize. Let's break down these three primary states of learning.
+                    </p>
+                </section>
+
+                <!-- Scenarios Section -->
+                <section>
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2 brand-font" style="color: var(--text-main); border-color: var(--border-subtle)">1. The Three States of Learning</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        
+                        <div class="calc-card border-t-4" style="border-color: #facc15">
+                            <h4 class="font-bold text-sm mb-2 text-yellow-400"><i class="fas fa-battery-quarter mr-2"></i> Underfitting</h4>
+                            <p class="text-sm leading-relaxed mb-3">Set the <strong>Complexity to 1 or 2</strong> and hit Train. The model draws a straight line (or simple curve) through data that is clearly wavy. It is making a strong, incorrect assumption about the shape of the data.</p>
+                            <ul class="text-[11px] opacity-80 list-disc pl-4 space-y-1">
+                                <li><strong>Train Error:</strong> Very High</li>
+                                <li><strong>Val Error:</strong> Very High</li>
+                            </ul>
+                        </div>
+
+                        <div class="calc-card border-t-4" style="border-color: #4ade80">
+                            <h4 class="font-bold text-sm mb-2 text-green-400"><i class="fas fa-check-circle mr-2"></i> Generalized Fit</h4>
+                            <p class="text-sm leading-relaxed mb-3">Set the <strong>Complexity to 4</strong> and hit Train. The green model line almost perfectly overlaps the dashed white "True Function" line. It captures the essence of the wave without twisting to hit every single noisy dot.</p>
+                            <ul class="text-[11px] opacity-80 list-disc pl-4 space-y-1">
+                                <li><strong>Train Error:</strong> Low</li>
+                                <li><strong>Val Error:</strong> Low (Matches Train)</li>
+                            </ul>
+                        </div>
+
+                        <div class="calc-card border-t-4" style="border-color: #ef4444">
+                            <h4 class="font-bold text-sm mb-2 text-red-400"><i class="fas fa-brain mr-2"></i> Overfitting</h4>
+                            <p class="text-sm leading-relaxed mb-3">Push the <strong>Complexity to 10 or 12</strong>, set <strong>Epochs to 5000</strong> and hit Train. The model slowly contorts to hit almost every blue training dot perfectly. But look at what happens between the dots: the line shoots off into infinity, completely missing the validation data!</p>
+                            <ul class="text-[11px] opacity-80 list-disc pl-4 space-y-1">
+                                <li><strong>Train Error:</strong> Almost Zero</li>
+                                <li><strong>Val Error:</strong> Explosively High</li>
+                            </ul>
+                        </div>
+
+                    </div>
+                </section>
+
+                <section>
+                    <div class="flex flex-col md:flex-row gap-8 items-center bg-black/20 p-6 rounded-xl border" style="border-color: var(--border-subtle)">
+                        <div class="flex-1 space-y-4">
+                            <h3 class="text-lg font-bold brand-font" style="color: var(--text-main)">2. The Role of Training Time (Epochs)</h3>
+                            <p class="text-sm leading-relaxed">
+                                Notice what happens when you train a highly complex model (Complexity 12). In the first few hundred epochs, the model looks like a generalized fit. It learns the easiest, broadest patterns first. 
+                            </p>
+                            <p class="text-sm leading-relaxed">
+                                However, as you force it to keep training towards 5000 epochs, it exhausts all the real patterns and starts dedicating its mathematical power to <strong>memorizing the noise</strong>. This perfectly illustrates why techniques like <strong>Early Stopping</strong> are essential in Neural Networks: stopping the training process <em>before</em> the model has a chance to memorize the noise prevents Overfitting, even if the model is overly complex.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-3">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                 <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)">
+                    <i class="fab fa-instagram fa-lg"></i>
+                </a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2026 VIZLEARN // MODULE.OVERFITTING_UNDERFITTING</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            updateChartTheme();
+        });
+
+        // --- MATH UTILS FOR POLYNOMIAL REGRESSION ---
+        
+        // Gauss-Jordan Elimination to solve linear systems (Ax = b)
+        function solve(A, b) {
+            let n = A.length;
+            for (let i = 0; i < n; i++) {
+                let maxEl = Math.abs(A[i][i]), maxRow = i;
+                for (let k = i + 1; k < n; k++) {
+                    if (Math.abs(A[k][i]) > maxEl) { maxEl = Math.abs(A[k][i]); maxRow = k; }
+                }
+                // Swap rows
+                for (let k = i; k < n; k++) { let tmp = A[maxRow][k]; A[maxRow][k] = A[i][k]; A[i][k] = tmp; }
+                let tmp = b[maxRow]; b[maxRow] = b[i]; b[i] = tmp;
+                
+                // Eliminate below
+                for (let k = i + 1; k < n; k++) {
+                    let c = -A[k][i] / A[i][i];
+                    for (let j = i; j < n; j++) { if (i === j) A[k][j] = 0; else A[k][j] += c * A[i][j]; }
+                    b[k] += c * b[i];
+                }
+            }
+            // Back substitution
+            let x = new Array(n).fill(0);
+            for (let i = n - 1; i >= 0; i--) {
+                x[i] = b[i] / A[i][i];
+                for (let k = i - 1; k >= 0; k--) { b[k] -= A[k][i] * x[i]; }
+            }
+            return x;
+        }
+
+        // Fit polynomial of given degree with L2 Regularization (Ridge)
+        // Inputs must be scaled to [-1, 1] internally for numerical stability
+        function polyFit(x_arr, y_arr, degree, lambda) {
+            let n = x_arr.length;
+            let X_mat = []; let Y_vec = [];
+            
+            // Build normal equations matrix (X^T * X)
+            for (let i = 0; i <= degree; i++) {
+                X_mat[i] = [];
+                for (let j = 0; j <= degree; j++) {
+                    let sum = 0; 
+                    for (let k = 0; k < n; k++) sum += Math.pow(x_arr[k], i + j);
+                    X_mat[i].push(sum);
+                }
+                let sumY = 0; 
+                for (let k = 0; k < n; k++) sumY += Math.pow(x_arr[k], i) * y_arr[k];
+                Y_vec.push(sumY);
+            }
+            
+            // Add Lambda to the diagonal for regularization (simulate learning over epochs)
+            for (let i = 0; i <= degree; i++) {
+                X_mat[i][i] += lambda;
+            }
+
+            return solve(X_mat, Y_vec);
+        }
+
+        function evaluatePoly(weights, x) {
+            let sum = 0;
+            for(let i=0; i<weights.length; i++) {
+                sum += weights[i] * Math.pow(x, i);
+            }
+            return sum;
+        }
+
+        // --- CHART & SIMULATION LOGIC ---
+        
+        // UI Elements
+        const complexitySlider = document.getElementById('complexitySlider');
+        const epochsSlider = document.getElementById('epochsSlider');
+        const speedSlider = document.getElementById('speedSlider');
+        const noiseSlider = document.getElementById('noiseSlider');
+        
+        const resetModelBtn = document.getElementById('resetModelBtn');
+        const regenerateBtn = document.getElementById('regenerateBtn');
+        const animateBtn = document.getElementById('animateBtn');
+
+        const trainMseVal = document.getElementById('trainMseVal');
+        const valMseVal = document.getElementById('valMseVal');
+        const liveEpoch = document.getElementById('liveEpoch');
+
+        let polyChart;
+        
+        // Data State
+        let rawTrainX = [], rawTrainY = [];
+        let rawValX = [], rawValY = [];
+        const NUM_POINTS = 14; 
+        const MIN_X = 0, MAX_X = 6;
+        
+        // Scaling functions for numerical stability [-1, 1]
+        const scaleX = x => ((x - MIN_X) / (MAX_X - MIN_X)) * 2 - 1;
+
+        // True underlying function: y = sin(x) + 0.3x
+        const trueFunction = (x) => Math.sin(x*1.5) * 1.5 + 0.3 * x;
+
+        // Animation State
+        let currentEpoch = 0;
+        let isAnimating = false;
+        let animationFrameId = null;
+
+        // Colors
+        function getColors() {
+            const style = getComputedStyle(document.body);
+            return {
+                grid: style.getPropertyValue('--chart-grid').trim(),
+                text: style.getPropertyValue('--chart-text').trim(),
+                train: style.getPropertyValue('--train-color').trim(),
+                val: style.getPropertyValue('--val-color').trim(),
+                accent: style.getPropertyValue('--accent-primary').trim(),
+            };
+        }
+
+        // Initialize Chart.js
+        function initCharts() {
+            const ctxPoly = document.getElementById('polyChart').getContext('2d');
+            const colors = getColors();
+
+            Chart.defaults.font.family = "'JetBrains Mono', monospace";
+            Chart.defaults.color = colors.text;
+
+            polyChart = new Chart(ctxPoly, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        { label: 'Train Data', data: [], backgroundColor: colors.train, pointRadius: 6, pointHoverRadius: 8, order: 1 },
+                        { label: 'Validation Data', data: [], backgroundColor: colors.val, pointRadius: 6, pointHoverRadius: 8, order: 2 },
+                        { label: 'Model Prediction', data: [], type: 'line', borderColor: colors.accent, backgroundColor: 'transparent', borderWidth: 3, pointRadius: 0, tension: 0.4, order: 3 },
+                        { label: 'True Function', data: [], type: 'line', borderColor: 'rgba(255,255,255,0.3)', backgroundColor: 'transparent', borderWidth: 2, borderDash: [5,5], pointRadius: 0, tension: 0.4, order: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 0 }, // Handled by our loop
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            min: MIN_X - 0.5, max: MAX_X + 0.5,
+                            grid: { color: colors.grid, drawBorder: false },
+                            ticks: { color: colors.text, maxTicksLimit: 8 }
+                        },
+                        y: {
+                            min: -3.0, max: 4.0, // Fixed bounds
+                            grid: { color: colors.grid, drawBorder: false },
+                            ticks: { color: colors.text }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChartTheme() {
+            if (!polyChart) return;
+            const colors = getColors();
+
+            polyChart.options.scales.x.grid.color = colors.grid;
+            polyChart.options.scales.x.ticks.color = colors.text;
+            polyChart.options.scales.y.grid.color = colors.grid;
+            polyChart.options.scales.y.ticks.color = colors.text;
+            
+            polyChart.data.datasets[0].backgroundColor = colors.train;
+            polyChart.data.datasets[1].backgroundColor = colors.val;
+            polyChart.data.datasets[2].borderColor = colors.accent;
+            const isLight = document.body.classList.contains('light-mode');
+            polyChart.data.datasets[3].borderColor = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)';
+            
+            polyChart.update('none');
+        }
+
+        function generateRawData() {
+            rawTrainX = []; rawTrainY = [];
+            rawValX = []; rawValY = [];
+            
+            const noiseLevel = parseFloat(noiseSlider.value);
+            
+            for(let i=0; i<NUM_POINTS; i++) {
+                // Train
+                let tx = MIN_X + (MAX_X - MIN_X) * (i / (NUM_POINTS - 1));
+                tx += (Math.random() - 0.5) * 0.3; // Jitter
+                let ty = trueFunction(tx) + (Math.random() - 0.5) * noiseLevel * 2;
+                
+                rawTrainX.push(tx);
+                rawTrainY.push(ty);
+
+                // Val
+                let vx = MIN_X + (MAX_X - MIN_X) * ((i + 0.5) / (NUM_POINTS - 1)); 
+                vx += (Math.random() - 0.5) * 0.3;
+                let vy = trueFunction(vx) + (Math.random() - 0.5) * noiseLevel * 2;
+                
+                rawValX.push(vx);
+                rawValY.push(vy);
+            }
+        }
+
+        function fitAndPlot(epoch) {
+            const degree = parseInt(complexitySlider.value);
+            
+            // Lambda decreases as epochs increase. This simulates learning.
+            // Epoch 0 -> Lambda = 10 (flat line). Epoch 5000 -> Lambda ~ 0 (overfit).
+            let lambda = 10 * Math.pow(0.997, epoch);
+            if (lambda < 1e-9) lambda = 1e-9; // numerical stability floor
+            
+            const scaledTrainX = rawTrainX.map(scaleX);
+            const weights = polyFit(scaledTrainX, rawTrainY, degree, lambda);
+            
+            // Evaluate curves
+            const curveData = [];
+            const trueData = [];
+            for(let x = MIN_X - 0.5; x <= MAX_X + 0.5; x += 0.1) {
+                curveData.push({ x: x, y: evaluatePoly(weights, scaleX(x)) });
+                trueData.push({ x: x, y: trueFunction(x) });
+            }
+
+            // Update Datasets
+            polyChart.data.datasets[0].data = rawTrainX.map((x,i) => ({x: x, y: rawTrainY[i]}));
+            polyChart.data.datasets[1].data = rawValX.map((x,i) => ({x: x, y: rawValY[i]}));
+            polyChart.data.datasets[2].data = curveData;
+            polyChart.data.datasets[3].data = trueData;
+            polyChart.update('none'); // Fast update
+
+            // Calculate MSE
+            let tMse = 0, vMse = 0;
+            for(let i=0; i<NUM_POINTS; i++) {
+                let pTrain = evaluatePoly(weights, scaleX(rawTrainX[i]));
+                tMse += Math.pow(pTrain - rawTrainY[i], 2);
+                
+                let pVal = evaluatePoly(weights, scaleX(rawValX[i]));
+                vMse += Math.pow(pVal - rawValY[i], 2);
+            }
+            tMse /= NUM_POINTS;
+            vMse /= NUM_POINTS;
+
+            trainMseVal.textContent = tMse.toFixed(4);
+            valMseVal.textContent = vMse.toFixed(4);
+            liveEpoch.textContent = Math.floor(epoch);
+
+            updateDiagnosis(degree, tMse, vMse, epoch);
+        }
+
+        // --- DIAGNOSIS LOGIC ---
+        function updateDiagnosis(degree, tMse, vMse, epoch) {
+            let diagnosis = "ANALYZING...";
+            let colorClass = "text-blue-400";
+            let bgClass = "border-blue-500";
+            let icon = "fa-spinner fa-spin";
+            let message = "Training model to observe data patterns...";
+
+            if (tMse > 0.5) {
+                diagnosis = "UNDERFITTING";
+                colorClass = "text-yellow-400";
+                bgClass = "border-yellow-500";
+                icon = "fa-battery-quarter";
+                message = "The model is too simple, or hasn't trained long enough, to capture the curve of the data.";
+            } else if (tMse <= 0.5 && vMse <= 0.8) {
+                diagnosis = "GENERALIZED FIT";
+                colorClass = "text-green-400";
+                bgClass = "border-green-500";
+                icon = "fa-check-circle";
+                message = "The model captures the underlying pattern perfectly without memorizing the noise.";
+            } else if (tMse < 0.25 && vMse > 1.0) {
+                diagnosis = "OVERFITTING";
+                colorClass = "text-red-400";
+                bgClass = "border-red-500";
+                icon = "fa-brain";
+                message = "The model has memorized the training dots but shoots wildly off-course on the validation dots.";
+            }
+
+            const panel = document.getElementById('diagnosisPanel');
+            panel.className = `metric-card w-full flex flex-col md:flex-row items-center justify-between border-l-4 ${bgClass} mb-2 p-4 transition-colors duration-500`;
+            
+            document.getElementById('diagIcon').className = `fas ${icon} text-2xl ${colorClass}`;
+            document.getElementById('diagTitle').className = `text-lg font-bold brand-font ${colorClass}`;
+            document.getElementById('diagTitle').textContent = diagnosis;
+            document.getElementById('diagMsg').textContent = message;
+        }
+
+        // --- ANIMATION LOGIC ---
+        function animationLoop() {
+            if (!isAnimating) return;
+            
+            let speed = parseFloat(speedSlider.value);
+            let targetEpochs = parseInt(epochsSlider.value);
+            
+            currentEpoch += (5 * speed); 
+            
+            if (currentEpoch >= targetEpochs) {
+                currentEpoch = targetEpochs;
+                stopAnimation();
+            }
+            
+            fitAndPlot(currentEpoch);
+            
+            if (isAnimating) {
+                animationFrameId = requestAnimationFrame(animationLoop);
+            }
+        }
+
+        function startAnimation() {
+            if (isAnimating) return;
+            
+            const targetEpochs = parseInt(epochsSlider.value);
+            if (currentEpoch >= targetEpochs) {
+                currentEpoch = 0; // Auto-reset if playing from the end
+            }
+
+            isAnimating = true;
+            animateBtn.innerHTML = '<i class="fas fa-stop text-xs"></i> <span>Stop Training</span>';
+            animateBtn.classList.add('bg-red-500', 'border-red-500');
+            animateBtn.classList.remove('viz-btn-primary');
+
+            animationLoop();
+        }
+
+        function stopAnimation() {
+            if (!isAnimating) return;
+            isAnimating = false;
+            cancelAnimationFrame(animationFrameId);
+            
+            animateBtn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Train Model</span>';
+            animateBtn.classList.remove('bg-red-500', 'border-red-500');
+            animateBtn.classList.add('viz-btn-primary');
+        }
+
+        // --- EVENT LISTENERS ---
+        complexitySlider.addEventListener('input', (e) => {
+            document.getElementById('complexityValue').textContent = e.target.value;
+            currentEpoch = 0; // Reset learning when complexity changes
+            if (!isAnimating) fitAndPlot(currentEpoch);
+        });
+
+        epochsSlider.addEventListener('input', (e) => {
+            document.getElementById('epochsValue').textContent = e.target.value;
+            const targetEpochs = parseInt(e.target.value);
+            if (currentEpoch > targetEpochs) {
+                currentEpoch = targetEpochs;
+                if (!isAnimating) fitAndPlot(currentEpoch);
+            }
+        });
+        
+        speedSlider.addEventListener('input', (e) => {
+            document.getElementById('speedValue').textContent = parseFloat(e.target.value).toFixed(1) + 'x';
+        });
+
+        noiseSlider.addEventListener('change', () => {
+            generateRawData();
+            currentEpoch = 0;
+            if (!isAnimating) fitAndPlot(currentEpoch);
+        });
+
+        resetModelBtn.addEventListener('click', () => {
+            stopAnimation();
+            currentEpoch = 0;
+            fitAndPlot(currentEpoch);
+        });
+
+        regenerateBtn.addEventListener('click', () => {
+            generateRawData();
+            currentEpoch = 0;
+            if (!isAnimating) fitAndPlot(currentEpoch);
+        });
+
+        animateBtn.addEventListener('click', () => {
+            if (isAnimating) stopAnimation();
+            else startAnimation();
+        });
+
+        // Init
+        initCharts();
+        generateRawData();
+        fitAndPlot(currentEpoch);
+        updateChartTheme();
+
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            { title: "Confusion Matrix", path: "../machine_learning/confusion_matrix.html", category: "ml", icon: "fa-brain" },
+            { title: "Regression Metrics", path: "../machine_learning/regression_metrics.html", category: "ml", icon: "fa-ruler-combined" },
+            { title: "Linear Regression OLS", path: "../machine_learning/linear_regression_with_ols.html", category: "ml", icon: "fa-brain" },
+            { title: "Activation Functions", path: "../deep_learning/activation_functions.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Batch Processing & Loss", path: "../deep_learning/batch_processing_in_neural_networks.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Overfitting vs Underfitting", path: "../deep_learning/learning_curves.html", category: "dl", icon: "fa-chart-line" },
+            { title: "Gradient Descent Training", path: "../deep_learning/gradient_descent_training.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Neural Network", path: "../deep_learning/neural_network.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Perceptron", path: "../deep_learning/perceptron.html", category: "dl", icon: "fa-network-wired" },
+            { title: "Optimizers", path: "../deep_learning/optimizers.html", category: "dl", icon: "fa-network-wired" }
+        ];
+
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                if (query.length === 0) { dropdown.classList.remove('show'); return; }
+                const filtered = allCourses.filter(c => c.title.toLowerCase().includes(query) || c.category.toLowerCase().includes(query));
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div><div class="dropdown-item-title">${course.title}</div><div class="dropdown-item-path">${course.category.toUpperCase()}</div></div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>`).join('');
+                }
+                dropdown.classList.add('show');
+            });
+            document.addEventListener('click', (e) => { if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show'); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dropdown.classList.remove('show'); });
+        }
+    </script>
+</body>
+</html>

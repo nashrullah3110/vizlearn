@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Reproducibility of Model</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --accent-primary: #22c55e;
+            --accent-glow: rgba(34, 197, 94, 0.25);
+            --accent-danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.4);
+            --accent-blue: #3b82f6;
+            --blue-glow: rgba(59, 130, 246, 0.4);
+            --accent-warning: #f59e0b;
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            
+            /* Canvas Specifics - Dark */
+            --neuron-fill: #111827;
+        }
+
+        body.light-mode {
+            --bg-body: #f8fafc;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --accent-danger: #dc2626;
+            --danger-glow: rgba(220, 38, 38, 0.3);
+            --accent-blue: #2563eb;
+            --blue-glow: rgba(37, 99, 235, 0.3);
+            --accent-warning: #d97706;
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+
+            --neuron-fill: #ffffff;
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .toolbar-container {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.75rem 1.5rem;
+            z-index: 40;
+        }
+
+        .floating-panel {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 360px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            z-index: 30;
+            opacity: 0.95;
+            transition: opacity 0.3s;
+        }
+
+        /* Number Input */
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: all 0.2s;
+            border-radius: 0.375rem;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+        }
+        .viz-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
+        
+        /* Remove arrows from number input */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        /* Buttons */
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); box-shadow: 0 0 10px var(--accent-glow); }
+        .viz-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 0 15px var(--accent-glow); filter: brightness(1.1); }
+        .viz-btn-secondary { background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-subtle); }
+        .viz-btn-secondary:hover { border-color: var(--accent-primary); background: var(--input-focus-bg); }
+        .viz-btn-danger { background: transparent; color: var(--accent-danger); border: 1px solid var(--accent-danger); }
+        .viz-btn-danger:hover { background: var(--accent-danger); color: #fff; box-shadow: 0 0 15px var(--danger-glow); }
+
+        #canvas { background-color: transparent; width: 100%; height: 100%; cursor: grab; user-select: none; }
+        #canvas.grabbing { cursor: grabbing; }
+
+        .metric-card { background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: 6px; margin-bottom: 0.5rem; }
+
+        .pulse-active {
+            animation: pulse-act 2s infinite;
+        }
+        @keyframes pulse-act {
+            0% { box-shadow: 0 0 0 0 var(--accent-glow); }
+            70% { box-shadow: 0 0 0 10px transparent; }
+            100% { box-shadow: 0 0 0 0 transparent; }
+        }
+
+        .data-box {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            font-size: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .data-box.active {
+            background-color: var(--accent-primary);
+            color: var(--bg-body);
+            box-shadow: 0 0 10px var(--accent-glow);
+            transform: scale(1.1);
+        }
+        .data-box.inactive {
+            background-color: var(--bg-body);
+            color: var(--text-muted);
+            border: 1px solid var(--border-subtle);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <div class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(34,197,94,0.8)] animate-pulse"></div>
+                    <span style="color: var(--text-main)">viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </div>
+                
+                <!-- Theme Toggle -->
+                <div class="flex items-center gap-3">
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Title Section -->
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full">
+        <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Reproducibility of Model</h1>
+        <p class="mt-2 text-sm md:text-base max-w-4xl opacity-80" style="color: var(--text-muted)">
+            True reproducibility means fixing the <span style="color: var(--accent-primary); font-weight:bold;">Random Seed</span> controls <b>both</b> the initial network weights and the <b>order in which data is shuffled</b> during training. Change the seed to see the data sequence entirely rearrange, then switch back to Seed 42 to verify identical structural recovery!
+        </p>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-6 justify-between overflow-x-auto">
+        
+        <!-- Controls -->
+        <div class="flex items-center gap-6 flex-1 min-w-max">
+            
+            <div class="flex flex-col gap-1 w-48">
+                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70">Set Random Seed</label>
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-hashtag opacity-50" style="color: var(--accent-primary)"></i>
+                    <input type="number" id="seedInput" value="42" class="viz-input w-full" placeholder="e.g. 42">
+                </div>
+            </div>
+
+            <div class="w-px h-8 bg-[var(--border-subtle)] hidden md:block mx-2"></div>
+
+            <button id="initBtn" class="viz-btn viz-btn-secondary">
+                <i class="fas fa-sync-alt text-xs"></i> Apply Seed & Init
+            </button>
+
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-3 shrink-0">
+            <button id="nextBtn" class="viz-btn viz-btn-secondary">
+                <i class="fas fa-step-forward text-xs"></i> Next Sample
+            </button>
+            <button id="animateBtn" class="viz-btn viz-btn-primary shadow-[0_0_15px_rgba(34,197,94,0.15)] w-48">
+                <i class="fas fa-play text-xs"></i> <span>Auto Stream</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 relative overflow-hidden">
+        <canvas id="canvas" class="block w-full h-full"></canvas>
+
+        <!-- Floating Stats Panel -->
+        <div class="floating-panel p-4 flex flex-col gap-4 pointer-events-auto">
+             <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
+                 <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--text-main)">
+                    <i class="fas fa-fingerprint mr-2"></i> Determinism Checks
+                </h3>
+             </div>
+             
+             <!-- State -->
+             <div class="metric-card p-3 border-l-4 transition-colors duration-300" id="healthCard" style="border-left-color: var(--accent-primary)">
+                 <div class="text-[10px] uppercase font-bold opacity-70 mb-1">Active Seed Environment</div>
+                 <div id="currentSeedDisplay" class="font-bold text-[16px] tracking-wide mono-font" style="color: var(--accent-primary)">SEED: 42</div>
+             </div>
+
+             <!-- Data Shuffling Component -->
+             <div class="metric-card p-3">
+                 <div class="flex justify-between items-center mb-2">
+                     <div class="text-[9px] uppercase font-bold opacity-60">Determinized Data Pipeline</div>
+                     <div class="text-[9px] font-bold opacity-50">Sample #<span id="sampleCountDisplay">0</span></div>
+                 </div>
+                 <div class="text-[8px] opacity-50 mb-2">The Seed controls the random shuffle order.</div>
+                 <!-- Grid for data items -->
+                 <div id="dataQueueContainer" class="flex flex-wrap gap-1.5 justify-start">
+                     <!-- Populated by JS -->
+                 </div>
+             </div>
+
+             <!-- Proof Tracking -->
+             <div class="grid grid-cols-2 gap-2">
+                 <!-- Checksums -->
+                 <div class="metric-card p-3">
+                     <div class="text-[9px] uppercase font-bold opacity-60 mb-1">Weight Hash</div>
+                     <div class="font-bold text-[11px] mono-font tracking-wider text-[var(--text-main)]" id="weightSigDisplay">--</div>
+                     <div class="text-[7px] opacity-50 mt-0.5">Sum of pseudo-random weights.</div>
+                 </div>
+                 
+                 <div class="metric-card p-3">
+                     <div class="text-[9px] uppercase font-bold opacity-60 mb-1">Activation Hash</div>
+                     <div class="font-bold text-[11px] mono-font tracking-wider text-[var(--accent-primary)] transition-colors duration-300" id="actSigDisplay">--</div>
+                     <div class="text-[7px] opacity-50 mt-0.5">Dependent on specific data sample.</div>
+                 </div>
+             </div>
+
+             <!-- Tip -->
+             <div class="text-[9px] text-center opacity-60 leading-tight bg-[var(--input-bg)] p-2 rounded">
+                 <b>PRO TIP:</b> Memorize the exact data order (D1..D12) for Seed 42. Change the seed to scramble the order, then change it back to verify identical shuffling!
+             </div>
+             
+             <div class="text-[9px] text-center opacity-40 mt-2">
+                 Drag to Pan | Scroll to Zoom
+             </div>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-3">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                 <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)">
+                    <i class="fab fa-instagram fa-lg"></i>
+                </a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2026 VIZLEARN // MODULE.REPRODUCIBILITY</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            if (typeof window.updateAndRedraw === 'function') window.updateAndRedraw();
+        });
+
+        // --- PSEUDO RANDOM NUMBER GENERATOR (PRNG) ---
+        // A deterministic Multiply-With-Carry (MWC) PRNG
+        let m_w = 123456789;
+        let m_z = 987654321;
+        let mask = 0xffffffff;
+
+        function seedPRNG(seed) {
+            // Re-initialize generator state based on the seed
+            m_w = (123456789 + seed) & mask;
+            m_z = (987654321 - seed) & mask;
+        }
+
+        function seededRandom() {
+            m_z = (36969 * (m_z & 65535) + (m_z >> 16)) & mask;
+            m_w = (18000 * (m_w & 65535) + (m_w >> 16)) & mask;
+            let result = ((m_z << 16) + (m_w & 65535)) >>> 0;
+            // Return float between 0 and 1
+            return result / 4294967296;
+        }
+
+        // --- SIMULATION STATE ---
+        const layers = [6, 8, 8, 4]; // Architecture
+        const NUM_SAMPLES = 12;      // Fixed dataset size for shuffling
+
+        let globalDataset = [];      // The underlying fixed database of raw inputs
+        let shuffledIndices = [];    // Order dictated by the seed
+        
+        let weights = [];       
+        let targetActivations = []; 
+        let visualActivations = []; 
+        
+        let sampleCount = 0;
+        let currentSeed = 42;
+
+        let isStreaming = false;
+        let animationRequestId = null;
+        let lastSampleTime = 0;
+
+        // Canvas State
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let scale = 1;
+        let translateX = 0;
+        let translateY = 0;
+        let isDragging = false;
+        let lastX = 0, lastY = 0;
+        let neuronPositions = [];
+        let currentNeuronRadius = 18; 
+
+        // --- CORE MATH ---
+        function generateFixedDataset() {
+            // This is completely independent of the selected seed.
+            // It represents the raw, unshuffled real-world dataset.
+            globalDataset = [];
+            for(let i=0; i<NUM_SAMPLES; i++) {
+                let features = [];
+                for(let j=0; j<layers[0]; j++) {
+                    // Use a completely isolated pseudo-random equation so values never change across re-seeds
+                    let val = Math.abs(Math.sin((i+1) * (j+1) * 12.345)); 
+                    features.push(val);
+                }
+                globalDataset.push(features);
+            }
+        }
+
+        function calculateWeightSignature() {
+            let sum = 0;
+            for (let l = 0; l < weights.length; l++) {
+                for (let i = 0; i < weights[l].length; i++) {
+                    for (let j = 0; j < weights[l][i].length; j++) {
+                        // Use a non-linear combination so changing order or signs matters
+                        sum += Math.abs(weights[l][i][j]) * (i + 1) * (j + 1);
+                    }
+                }
+            }
+            return sum.toFixed(5);
+        }
+
+        function calculateActivationSignature() {
+            let sum = 0;
+            for (let l = 0; l < targetActivations.length; l++) {
+                for (let i = 0; i < targetActivations[l].length; i++) {
+                    sum += targetActivations[l][i] * (l + 1) * (i + 1);
+                }
+            }
+            return sum.toFixed(5);
+        }
+
+        // Initialize Network deterministically
+        function initNetwork() {
+            // 1. Setup PRNG
+            currentSeed = parseInt(document.getElementById('seedInput').value) || 0;
+            seedPRNG(currentSeed);
+            
+            // 2. Init Weights deterministically
+            weights = [];
+            for (let l = 0; l < layers.length - 1; l++) {
+                let layerWeights = [];
+                for (let i = 0; i < layers[l]; i++) {
+                    let nodeWeights = [];
+                    for (let j = 0; j < layers[l+1]; j++) {
+                        let w = (seededRandom() * 2.0) - 1.0; 
+                        nodeWeights.push(w);
+                    }
+                    layerWeights.push(nodeWeights);
+                }
+                weights.push(layerWeights);
+            }
+            
+            // 3. Shuffle Dataset Indices deterministically
+            shuffledIndices = Array.from({length: NUM_SAMPLES}, (_, i) => i);
+            // Fisher-Yates shuffle using the seeded PRNG
+            for (let i = shuffledIndices.length - 1; i > 0; i--) {
+                const j = Math.floor(seededRandom() * (i + 1));
+                [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]];
+            }
+
+            // Reset execution state
+            sampleCount = 0;
+            targetActivations = layers.map(count => Array(count).fill(0));
+            visualActivations = layers.map(count => Array(count).fill(0));
+
+            // Update UI
+            document.getElementById('currentSeedDisplay').textContent = `SEED: ${currentSeed}`;
+            document.getElementById('weightSigDisplay').textContent = calculateWeightSignature();
+            document.getElementById('actSigDisplay').textContent = "0.00000";
+            document.getElementById('sampleCountDisplay').textContent = sampleCount;
+            
+            document.getElementById('healthCard').classList.add('pulse-active');
+            setTimeout(() => document.getElementById('healthCard').classList.remove('pulse-active'), 500);
+
+            renderDataQueueUI(-1); // -1 means no active sample yet
+        }
+
+        function renderDataQueueUI(activeQueueIndex) {
+            const container = document.getElementById('dataQueueContainer');
+            container.innerHTML = '';
+            
+            shuffledIndices.forEach((dataIndex, queueIndex) => {
+                const box = document.createElement('div');
+                
+                if (queueIndex === activeQueueIndex) {
+                    box.className = 'data-box active';
+                } else {
+                    box.className = 'data-box inactive';
+                }
+                
+                // Show D1, D2, etc. (Adding 1 so it's 1-indexed for humans)
+                box.textContent = `D${dataIndex + 1}`;
+                container.appendChild(box);
+            });
+        }
+
+        function pushNextSample() {
+            // Determine which sample in the queue we are processing
+            let queueIndex = sampleCount % NUM_SAMPLES;
+            let dataIndex = shuffledIndices[queueIndex];
+
+            // 1. Feed Input Layer from the globally fixed dataset
+            for (let i = 0; i < layers[0]; i++) {
+                targetActivations[0][i] = globalDataset[dataIndex][i]; 
+            }
+
+            // 2. Forward Pass through Hidden Layers
+            for (let l = 0; l < layers.length - 1; l++) {
+                for (let j = 0; j < layers[l+1]; j++) {
+                    let sum = 0;
+                    for (let i = 0; i < layers[l]; i++) {
+                        sum += targetActivations[l][i] * weights[l][i][j];
+                    }
+                    // Apply ReLU Activation
+                    targetActivations[l+1][j] = Math.max(0, sum);
+                }
+            }
+
+            // Increment & Update UI
+            sampleCount++;
+            renderDataQueueUI(queueIndex);
+
+            // Flash signature UI
+            const actSigElem = document.getElementById('actSigDisplay');
+            actSigElem.textContent = calculateActivationSignature();
+            document.getElementById('sampleCountDisplay').textContent = sampleCount;
+            
+            actSigElem.style.color = "var(--bg-body)";
+            actSigElem.style.backgroundColor = "var(--accent-primary)";
+            setTimeout(() => {
+                actSigElem.style.color = "var(--accent-primary)";
+                actSigElem.style.backgroundColor = "transparent";
+            }, 150);
+        }
+
+        // --- UI BINDINGS ---
+        document.getElementById('initBtn').addEventListener('click', () => {
+            initNetwork();
+            if (!animationRequestId) renderLoop(); // Start render if paused
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            if (isStreaming) toggleStreaming(); // Pause auto-stream if running
+            pushNextSample();
+            if (!animationRequestId) renderLoop(); // Start interpolating
+        });
+
+        function toggleStreaming() {
+            const btn = document.getElementById('animateBtn');
+            if (isStreaming) {
+                isStreaming = false;
+                btn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Auto Stream</span>';
+                btn.classList.remove('viz-btn-danger');
+                btn.classList.add('viz-btn-primary');
+            } else {
+                isStreaming = true;
+                btn.innerHTML = '<i class="fas fa-pause text-xs"></i> <span>Pause Stream</span>';
+                btn.classList.remove('viz-btn-primary');
+                btn.classList.add('viz-btn-danger');
+                
+                lastSampleTime = performance.now();
+                pushNextSample();
+                
+                if (!animationRequestId) {
+                    renderLoop();
+                }
+            }
+        }
+
+        document.getElementById('animateBtn').addEventListener('click', toggleStreaming);
+
+        // The master rendering loop handles smooth interpolation
+        function renderLoop() {
+            const time = performance.now();
+            
+            // Generate a new sample every 1000ms if streaming
+            if (isStreaming && (time - lastSampleTime > 1000)) {
+                lastSampleTime = time;
+                pushNextSample();
+            }
+
+            // Interpolate Visual Activations for smooth glowing
+            let isAnimating = false;
+            for (let l = 0; l < layers.length; l++) {
+                for (let i = 0; i < layers[l]; i++) {
+                    let diff = targetActivations[l][i] - visualActivations[l][i];
+                    if (Math.abs(diff) > 0.01) {
+                        visualActivations[l][i] += diff * 0.15; // Ease factor
+                        isAnimating = true;
+                    } else {
+                        visualActivations[l][i] = targetActivations[l][i];
+                    }
+                }
+            }
+
+            drawNetwork();
+
+            if (isStreaming || isAnimating) {
+                animationRequestId = requestAnimationFrame(renderLoop);
+            } else {
+                animationRequestId = null;
+            }
+        }
+
+        // --- CANVAS DRAWING ---
+        function getThemeColors() {
+            const styles = getComputedStyle(document.body);
+            return {
+                neuronFill: styles.getPropertyValue('--neuron-fill').trim(),
+                textMain: styles.getPropertyValue('--text-main').trim(),
+            };
+        }
+
+        function calculateLayout() {
+            const NEURON_BASE_SPACING_FACTOR = 1.8;
+            const LAYER_SPACING_MULTIPLIER = 6;
+            const maxNeurons = Math.max(...layers);
+            
+            neuronPositions = [];
+            layers.forEach((count, layerIdx) => {
+                const positions = [];
+                const layerSpacing = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * LAYER_SPACING_MULTIPLIER;
+                const neuronSpacingY = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * 1.2;
+                const layerX = layerIdx * layerSpacing;
+                const maxLayerHeight = maxNeurons * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                const currentLayerHeight = count * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                const yOff = (maxLayerHeight - currentLayerHeight) / 2;
+
+                for(let i=0; i<count; i++) {
+                    positions.push({
+                        x: layerX + currentNeuronRadius,
+                        y: yOff + i * (2 * currentNeuronRadius + neuronSpacingY) + currentNeuronRadius
+                    });
+                }
+                neuronPositions.push(positions);
+            });
+        }
+
+        function drawNetwork() {
+            if (!ctx || !neuronPositions || neuronPositions.length === 0) return;
+            
+            const colors = getThemeColors();
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            
+            if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+            }
+            
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
+            ctx.clearRect(0, 0, rect.width, rect.height);
+
+            ctx.save();
+            ctx.translate(translateX, translateY);
+            ctx.scale(scale, scale);
+
+            let isLight = document.body.classList.contains('light-mode');
+            let defaultNeuronBorder = isLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.15)';
+
+            // Draw Connections
+            for(let l=0; l<layers.length-1; l++) {
+                if(!neuronPositions[l] || !neuronPositions[l+1]) continue;
+
+                neuronPositions[l].forEach((n1, idx1) => {
+                    let sourceAct = visualActivations[l][idx1]; 
+                    
+                    neuronPositions[l+1].forEach((n2, idx2) => {
+                        let w = weights[l][idx1][idx2];
+                        let absW = Math.abs(w);
+                        
+                        ctx.beginPath();
+                        ctx.lineWidth = Math.min(3.5, 0.5 + absW * 2) / scale; 
+                        
+                        // Color edges based on weight sign
+                        let r, g, b;
+                        if (w < 0) { 
+                            r = isLight ? 37 : 59; g = isLight ? 99 : 130; b = isLight ? 235 : 246; 
+                        } else {
+                            r = isLight ? 21 : 34; g = isLight ? 128 : 197; b = isLight ? 61 : 94; 
+                        }
+
+                        // Base opacity derived from weight, boosted by flowing activation
+                        let baseAlpha = 0.15 + (absW * 0.2);
+                        let flowAlpha = sourceAct * 0.6; 
+                        let finalAlpha = Math.min(0.9, baseAlpha + flowAlpha);
+
+                        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${finalAlpha})`;
+                        ctx.moveTo(n1.x, n1.y);
+                        ctx.lineTo(n2.x, n2.y);
+                        ctx.stroke();
+                    });
+                });
+            }
+
+            // Draw Neurons
+            layers.forEach((count, lIdx) => {
+                if(!neuronPositions[lIdx]) return;
+
+                neuronPositions[lIdx].forEach((pos, nIdx) => {
+                    let act = visualActivations[lIdx][nIdx];
+
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, currentNeuronRadius, 0, Math.PI*2);
+                    
+                    ctx.fillStyle = colors.neuronFill;
+
+                    if (act < 0.05) {
+                        ctx.strokeStyle = defaultNeuronBorder;
+                        ctx.lineWidth = 1.5 / scale;
+                        ctx.shadowBlur = 0;
+                    } else {
+                        // Glow based on activation
+                        let alpha = Math.min(1.0, act);
+                        let r = isLight ? 21 : 34;
+                        let g = isLight ? 128 : 197;
+                        let b = isLight ? 61 : 94;
+                        
+                        ctx.fillStyle = isLight ? `rgba(${r}, ${g}, ${b}, 0.08)` : `rgba(${r}, ${g}, ${b}, 0.15)`; 
+                        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${Math.max(0.3, alpha)})`;
+                        ctx.lineWidth = 2.5 / scale;
+                        
+                        ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${alpha * 0.6})`;
+                        ctx.shadowBlur = 10;
+                    }
+
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.shadowBlur = 0; 
+
+                    // Node Label (Activation Value)
+                    ctx.fillStyle = act > 0.05 ? (isLight ? '#064e3b' : '#f0fdf4') : (isLight ? '#9ca3af' : '#475569');
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    let fontSize = Math.max(8, currentNeuronRadius * 0.4);
+                    ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
+                    ctx.fillText(act.toFixed(2), pos.x, pos.y);
+                });
+            });
+
+            ctx.restore();
+        }
+
+        window.updateAndRedraw = function() {
+            calculateLayout();
+            drawNetwork();
+        };
+
+        function resetView() {
+            calculateLayout();
+            const width = (layers.length - 1) * (currentNeuronRadius * 1.8 * 6) + currentNeuronRadius*2;
+            const height = Math.max(...layers) * (currentNeuronRadius * 2.7) + currentNeuronRadius*2;
+            
+            const rect = canvas.getBoundingClientRect();
+            const panelOffset = window.innerWidth > 768 ? 180 : 0; 
+
+            const sX = (rect.width - 60) / width;
+            const sY = (rect.height - 60) / height;
+            scale = Math.min(sX, sY, 1.2);
+            
+            translateX = (rect.width - width * scale) / 2 - panelOffset;
+            translateY = (rect.height - height * scale) / 2;
+            
+            if(scale < 0.1) scale = 0.1;
+            drawNetwork();
+        }
+
+        // --- MOUSE CONTROLS ---
+        canvas.addEventListener('mousedown', e => {
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            canvas.classList.add('grabbing');
+        });
+
+        window.addEventListener('mousemove', e => {
+            if(isDragging) {
+                const dx = e.clientX - lastX;
+                const dy = e.clientY - lastY;
+                translateX += dx;
+                translateY += dy;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                if(!animationRequestId) drawNetwork();
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+            canvas.classList.remove('grabbing');
+        });
+
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            const zoom = 1.1;
+            const dir = e.deltaY < 0 ? 1 : -1;
+            const factor = dir > 0 ? zoom : 1/zoom;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            
+            const newScale = Math.max(0.1, Math.min(5, scale * factor));
+            
+            translateX = mx - (mx - translateX) * (newScale / scale);
+            translateY = my - (my - translateY) * (newScale / scale);
+            scale = newScale;
+            if(!animationRequestId) drawNetwork();
+        });
+
+        window.addEventListener('resize', () => {
+            resetView();
+        });
+
+        // Initialize App
+        generateFixedDataset(); // Always create the fixed base dataset first
+        initNetwork();          // Init weights and seed shuffle
+        calculateLayout();
+        setTimeout(() => {
+            resetView();
+            renderLoop(); // Start interpolating
+        }, 100); 
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Regularization Techniques</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 20s linear infinite',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --accent-primary: #22c55e;
+            --accent-glow: rgba(34, 197, 94, 0.25);
+            --accent-danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.4);
+            --accent-blue: #3b82f6;
+            --blue-glow: rgba(59, 130, 246, 0.4);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+            
+            /* Canvas Specifics - Dark */
+            --canvas-bg: #0a0a0a;
+            --neuron-fill: #111827;
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --accent-danger: #dc2626;
+            --danger-glow: rgba(220, 38, 38, 0.3);
+            --accent-blue: #2563eb;
+            --blue-glow: rgba(37, 99, 235, 0.3);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+
+            --canvas-bg: #f8fafc;
+            --neuron-fill: #ffffff;
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .toolbar-container {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.75rem 1.5rem;
+            z-index: 40;
+        }
+
+        .floating-panel {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 340px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            z-index: 30;
+            opacity: 0.95;
+            transition: opacity 0.3s;
+        }
+
+        /* Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+            width: 100%;
+        }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            border: 2px solid var(--bg-surface);
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            cursor: pointer;
+            margin-top: -5px;
+            box-shadow: 0 0 10px var(--accent-glow);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border-subtle);
+            border-radius: 2px;
+        }
+
+        /* Toggles */
+        input:checked ~ .dot { transform: translateX(100%); background-color: var(--accent-primary); }
+        input:checked ~ .box-bg { background-color: var(--input-focus-bg); border-color: var(--accent-primary); }
+        .box-bg { transition: all 0.3s; border: 1px solid var(--border-subtle); background: var(--bg-body); }
+
+        /* Buttons */
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); box-shadow: 0 0 10px var(--accent-glow); }
+        .viz-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 0 15px var(--accent-glow); filter: brightness(1.1); }
+        .viz-btn-secondary { background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-subtle); }
+        .viz-btn-secondary:hover { border-color: var(--accent-primary); background: var(--input-focus-bg); }
+        .viz-btn-danger { background: transparent; color: var(--accent-danger); border: 1px solid var(--accent-danger); }
+        .viz-btn-danger:hover { background: var(--accent-danger); color: #fff; box-shadow: 0 0 15px var(--danger-glow); }
+
+        #canvas { background-color: var(--canvas-bg); width: 100%; height: 100%; cursor: grab; user-select: none; }
+        #canvas.grabbing { cursor: grabbing; }
+
+        .metric-card { background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: 6px; margin-bottom: 0.5rem; }
+
+        #chartCanvas {
+            width: 100%;
+            height: 100px;
+            border-radius: 4px;
+            background: var(--bg-body);
+            border: 1px solid var(--border-subtle);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <div class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(34,197,94,0.8)] animate-pulse"></div>
+                    <span style="color: var(--text-main)">viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </div>
+                
+                <!-- Theme Toggle -->
+                <div class="flex items-center gap-3">
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Title Section -->
+    <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full">
+        <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Regularization Techniques</h1>
+        <p class="mt-2 text-sm md:text-base max-w-4xl opacity-80" style="color: var(--text-muted)">
+            Watch how penalties affect the network parameters! 
+            <span style="color: var(--accent-blue); font-weight:bold;">Ridge (L2)</span> smoothly shrinks weights toward zero to prevent overfitting. 
+            <span style="color: var(--accent-danger); font-weight:bold;">Lasso (L1)</span> drops useless connections EXACTLY to zero (Sparsity). Select both for <span style="color: var(--accent-primary); font-weight:bold;">Elastic Net</span>.
+        </p>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-6 justify-between overflow-x-auto">
+        
+        <!-- Controls -->
+        <div class="flex items-center gap-6 flex-1 min-w-max">
+            
+            <div class="flex flex-col gap-1 w-48">
+                <div class="flex justify-between items-center">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70">Penalty Strength (λ)</label>
+                    <span id="lambdaValDisplay" class="text-[10px] font-bold mono-font" style="color: var(--accent-primary)">0.20</span>
+                </div>
+                <input type="range" id="lambdaSlider" min="0.01" max="0.8" step="0.01" value="0.2">
+            </div>
+
+            <div class="w-px h-8 bg-[var(--border-subtle)] hidden md:block mx-2"></div>
+
+            <!-- Toggles (Multi-select) -->
+            <div class="flex flex-col gap-2">
+                <!-- Lasso L1 -->
+                <label class="flex items-center cursor-pointer gap-2 group" title="Lasso forces weights to exactly zero (Sparsity)">
+                    <div class="relative w-8 h-4">
+                        <input type="checkbox" id="toggleL1" class="sr-only">
+                        <div class="block box-bg w-8 h-4 rounded-full"></div>
+                        <div class="dot absolute left-0.5 top-0.5 bg-gray-400 w-3 h-3 rounded-full transition transform group-hover:bg-white"></div>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-wide opacity-80 group-hover:opacity-100">Lasso (L1) Penalty</span>
+                </label>
+                
+                <!-- Ridge L2 -->
+                <label class="flex items-center cursor-pointer gap-2 group" title="Ridge smoothly shrinks weights to prevent overfitting">
+                    <div class="relative w-8 h-4">
+                        <input type="checkbox" id="toggleL2" class="sr-only">
+                        <div class="block box-bg w-8 h-4 rounded-full"></div>
+                        <div class="dot absolute left-0.5 top-0.5 bg-gray-400 w-3 h-3 rounded-full transition transform group-hover:bg-white"></div>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-wide opacity-80 group-hover:opacity-100">Ridge (L2) Penalty</span>
+                </label>
+            </div>
+
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-3 shrink-0">
+            <button id="resetBtn" class="viz-btn viz-btn-secondary">
+                <i class="fas fa-undo text-xs"></i> Reset & Randomize Targets
+            </button>
+            <button id="animateBtn" class="viz-btn viz-btn-primary shadow-[0_0_15px_rgba(34,197,94,0.15)] w-48">
+                <i class="fas fa-play text-xs"></i> <span>Train Network</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 relative overflow-hidden bg-[var(--canvas-bg)]">
+        <canvas id="canvas" class="block w-full h-full"></canvas>
+
+        <!-- Floating Stats Panel -->
+        <div class="floating-panel p-4 flex flex-col gap-4 pointer-events-auto">
+             <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
+                 <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--text-main)">
+                    <i class="fas fa-filter mr-2"></i> Model Parameters
+                </h3>
+             </div>
+             
+             <!-- Network Health -->
+             <div class="metric-card p-3 border-l-4" id="healthCard" style="border-left-color: var(--text-muted)">
+                 <div class="text-[10px] uppercase font-bold opacity-70 mb-1">Regularization Mode</div>
+                 <div id="netHealth" class="font-bold text-[12px] tracking-wide" style="color: var(--text-main)">UNREGULARIZED</div>
+                 <div id="healthDesc" class="text-[9px] mt-1 opacity-60 leading-relaxed">No penalties. The model is likely to overfit and keep noise parameters.</div>
+             </div>
+
+             <!-- Parameter Tracking -->
+             <div class="grid grid-cols-2 gap-2">
+                 <div class="metric-card p-3">
+                     <div class="text-[9px] uppercase font-bold opacity-60 mb-1">Active Params</div>
+                     <div class="font-bold text-sm mono-font tracking-wide">
+                        <span id="activeParamsDisplay" style="color: var(--accent-primary)">72</span> / <span id="totalParamsDisplay">72</span>
+                     </div>
+                 </div>
+                 <div class="metric-card p-3">
+                     <div class="text-[9px] uppercase font-bold opacity-60 mb-1">Avg Magnitude</div>
+                     <div class="font-bold text-sm mono-font tracking-wide" id="avgMagDisplay" style="color: var(--accent-blue)">
+                        2.150
+                     </div>
+                 </div>
+             </div>
+
+             <!-- Active Parameters Chart -->
+             <div>
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-[10px] uppercase font-bold opacity-80">Parameter Sparsity (% Active)</span>
+                    <span id="sparsityDisplay" class="font-bold mono-font text-xs" style="color: var(--accent-primary)">100%</span>
+                </div>
+                <canvas id="chartCanvas"></canvas>
+             </div>
+
+             <!-- Color Legend -->
+             <div class="metric-card p-3 mt-1">
+                 <h4 class="text-[9px] uppercase tracking-widest font-bold mb-2 opacity-50 text-center">Visual Legend</h4>
+                 <div class="flex justify-between text-[10px] font-bold">
+                     <span style="color: var(--text-muted); opacity: 0.5;">Dropped (0.0)</span>
+                     <span style="color: var(--accent-primary)">Stable (~1.0)</span>
+                     <span style="color: var(--accent-danger)">Large (>2.5)</span>
+                 </div>
+             </div>
+             
+             <div class="text-[9px] text-center opacity-40">
+                 Drag to Pan | Scroll to Zoom
+             </div>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+        <div class="w-full flex flex-col items-center justify-center px-6 text-center">
+            <div class="flex justify-center items-center space-x-6 mb-3">
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://github.com/AshishJangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)"><i class="fab fa-kaggle fa-lg"></i></a>
+                 <a href="https://www.instagram.com/ashish_zangra/" target="_blank" class="transition-colors hover:text-green-500" style="color: var(--text-muted)">
+                    <i class="fab fa-instagram fa-lg"></i>
+                </a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-60" style="color: var(--text-muted)">&copy; 2026 VIZLEARN // MODULE.REGULARIZATION</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- THEME LOGIC ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+        const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        if (currentTheme === 'light') {
+            document.body.classList.add('light-mode');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+            if (typeof window.updateAndRedraw === 'function') window.updateAndRedraw();
+        });
+
+        // --- SIMULATION STATE ---
+        const layers = [4, 6, 6, 1]; // 4 Inputs, deep network
+        let weights = [];       // Current running weights: weights[layerIdx][fromNode][toNode]
+        let targetWeights = []; // The "underlying true pattern". Some are 0.0, some are strong.
+        
+        let totalEpochs = 0;
+        let sparsityHistory = []; // Track active params percentage
+        let isTraining = false;
+        let trainingRequestId = null;
+        let lastFrameTime = 0;
+        let totalParams = 0;
+
+        // Canvas State
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const chartCanvas = document.getElementById('chartCanvas');
+        const chartCtx = chartCanvas.getContext('2d');
+        
+        let scale = 1;
+        let translateX = 0;
+        let translateY = 0;
+        let isDragging = false;
+        let lastX = 0, lastY = 0;
+        let neuronPositions = [];
+        let currentNeuronRadius = 25; 
+
+        // --- UI BINDINGS ---
+        document.getElementById('lambdaSlider').addEventListener('input', (e) => {
+            document.getElementById('lambdaValDisplay').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+
+        document.getElementById('toggleL1').addEventListener('change', updateMetricsUI);
+        document.getElementById('toggleL2').addEventListener('change', updateMetricsUI);
+
+        // Initialize Weights and Target Patterns
+        function initWeights() {
+            weights = [];
+            targetWeights = [];
+            totalParams = 0;
+            
+            for (let l = 0; l < layers.length - 1; l++) {
+                let layerWeights = [];
+                let layerTargets = [];
+                for (let i = 0; i < layers[l]; i++) {
+                    let nodeWeights = [];
+                    let nodeTargets = [];
+                    for (let j = 0; j < layers[l+1]; j++) {
+                        // Current Weight: Random initialization between -3.0 and +3.0 (overfitted/noisy start)
+                        let w = (Math.random() * 6.0) - 3.0; 
+                        nodeWeights.push(w);
+                        
+                        // Structural Target: The 'true' importance of this connection
+                        // 40% chance the connection is fundamentally useless (target = 0.0)
+                        // 60% chance it is a strong signal (target = randomly ~1.5 or -1.5)
+                        let target = 0.0;
+                        if (Math.random() > 0.40) {
+                            let sign = Math.random() > 0.5 ? 1 : -1;
+                            target = sign * (1.0 + Math.random() * 1.5);
+                        }
+                        nodeTargets.push(target);
+
+                        totalParams++;
+                    }
+                    layerWeights.push(nodeWeights);
+                    layerTargets.push(nodeTargets);
+                }
+                weights.push(layerWeights);
+                targetWeights.push(layerTargets);
+            }
+            document.getElementById('totalParamsDisplay').textContent = totalParams;
+        }
+
+        function resetTraining() {
+            isTraining = false;
+            if (trainingRequestId) cancelAnimationFrame(trainingRequestId);
+            
+            initWeights(); // Completely randomizes which weights are 'useless'
+            totalEpochs = 0;
+            sparsityHistory = [];
+            
+            const btn = document.getElementById('animateBtn');
+            btn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Train Network</span>';
+            btn.classList.remove('viz-btn-danger');
+            btn.classList.add('viz-btn-primary');
+            
+            updateMetricsUI();
+            drawChart();
+            drawNetwork();
+        }
+
+        // --- CORE MATH ---
+        function stepTrainingEpoch() {
+            let useL1 = document.getElementById('toggleL1').checked;
+            let useL2 = document.getElementById('toggleL2').checked;
+            let lambda = parseFloat(document.getElementById('lambdaSlider').value); // 0.01 to 0.8
+            let lr = 0.05; // Learning rate
+
+            let activeCount = 0;
+            let sumMag = 0;
+
+            for (let l = 0; l < weights.length; l++) {
+                for (let i = 0; i < weights[l].length; i++) {
+                    for (let j = 0; j < weights[l][i].length; j++) {
+                        let w = weights[l][i][j];
+                        let target = targetWeights[l][i][j];
+
+                        // Gradient towards the "true" target
+                        let gradient = (w - target); 
+                        
+                        // Add persistent chaotic noise (simulates stochasticity / overfitting)
+                        gradient += (Math.random() - 0.5) * 1.8;
+
+                        // Apply base Gradient Descent
+                        w = w - lr * gradient;
+
+                        // Apply L2 Regularization (Ridge) -> Proportional weight decay
+                        if (useL2) {
+                            w = w - lr * lambda * w; 
+                        }
+
+                        // Apply L1 Regularization (Lasso) -> Proximal Operator (Soft Thresholding)
+                        if (useL1) {
+                            let threshold = lr * lambda; 
+                            if (w > threshold) {
+                                w -= threshold;
+                            } else if (w < -threshold) {
+                                w += threshold;
+                            } else {
+                                w = 0.0; // Hard zero! Feature selection.
+                            }
+                        }
+
+                        // Hard clamp for safety and visualization boundaries
+                        w = Math.max(-4.0, Math.min(w, 4.0));
+                        weights[l][i][j] = w;
+
+                        // Track Metrics
+                        if (Math.abs(w) > 0.001) {
+                            activeCount++;
+                        }
+                        sumMag += Math.abs(w);
+                    }
+                }
+            }
+
+            totalEpochs++;
+            let sparsityPct = (activeCount / totalParams) * 100;
+            
+            // Only keep last 100 points for the chart
+            sparsityHistory.push(sparsityPct);
+            if (sparsityHistory.length > 100) sparsityHistory.shift();
+            
+            document.getElementById('activeParamsDisplay').textContent = activeCount;
+            document.getElementById('avgMagDisplay').textContent = (sumMag / totalParams).toFixed(3);
+            document.getElementById('sparsityDisplay').textContent = sparsityPct.toFixed(1) + '%';
+        }
+
+        function updateMetricsUI() {
+            let useL1 = document.getElementById('toggleL1').checked;
+            let useL2 = document.getElementById('toggleL2').checked;
+            
+            const netHealth = document.getElementById('netHealth');
+            const healthDesc = document.getElementById('healthDesc');
+            const healthCard = document.getElementById('healthCard');
+
+            if (useL1 && useL2) {
+                netHealth.textContent = "ELASTIC NET (L1 + L2)";
+                netHealth.style.color = "var(--accent-primary)";
+                healthCard.style.borderLeftColor = "var(--accent-primary)";
+                healthDesc.textContent = "Combines feature selection (L1 dropping noise to exactly 0) with smooth proportional shrinkage (L2).";
+            } else if (useL1) {
+                netHealth.textContent = "LASSO (L1) REGULARIZATION";
+                netHealth.style.color = "var(--accent-danger)";
+                healthCard.style.borderLeftColor = "var(--accent-danger)";
+                healthDesc.textContent = "Aggressive absolute penalty. Forces unimportant weights directly to EXACTLY 0.0, performing feature selection.";
+            } else if (useL2) {
+                netHealth.textContent = "RIDGE (L2) REGULARIZATION";
+                netHealth.style.color = "var(--accent-blue)";
+                healthCard.style.borderLeftColor = "var(--accent-blue)";
+                healthDesc.textContent = "Squared penalty smoothly shrinks ALL weights proportionally to prevent overfitting, but rarely forces them to exactly zero.";
+            } else {
+                netHealth.textContent = "UNREGULARIZED";
+                netHealth.style.color = "var(--text-main)";
+                healthCard.style.borderLeftColor = "var(--text-muted)";
+                healthDesc.textContent = "No penalties applied. Model retains massively large random weights and noisy overfitted connections.";
+            }
+        }
+
+        // --- CHART DRAWING ---
+        function drawChart() {
+            const width = chartCanvas.width = chartCanvas.clientWidth * (window.devicePixelRatio || 1);
+            const height = chartCanvas.height = chartCanvas.clientHeight * (window.devicePixelRatio || 1);
+            
+            chartCtx.clearRect(0, 0, width, height);
+            
+            if (sparsityHistory.length === 0) return;
+
+            // Draw grid lines
+            chartCtx.strokeStyle = 'rgba(150, 150, 150, 0.1)';
+            chartCtx.lineWidth = 1;
+            chartCtx.beginPath();
+            for(let i=1; i<4; i++) {
+                let y = height * (i/4);
+                chartCtx.moveTo(0, y);
+                chartCtx.lineTo(width, y);
+            }
+            chartCtx.stroke();
+
+            chartCtx.beginPath();
+            chartCtx.strokeStyle = document.body.classList.contains('light-mode') ? '#15803d' : '#22c55e';
+            chartCtx.lineWidth = 3;
+            chartCtx.lineJoin = 'round';
+
+            for (let i = 0; i < sparsityHistory.length; i++) {
+                let x = (i / Math.max(1, 100 - 1)) * width;
+                
+                // Y axis is 0% to 100%
+                let y = height - (sparsityHistory[i] / 100.0) * height;
+
+                if (i === 0) chartCtx.moveTo(x, y);
+                else chartCtx.lineTo(x, y);
+            }
+            chartCtx.stroke();
+            
+            // Fill
+            if (sparsityHistory.length > 1) {
+                let xLast = ((sparsityHistory.length - 1) / Math.max(1, 100 - 1)) * width;
+                chartCtx.lineTo(xLast, height);
+                chartCtx.lineTo(0, height);
+                chartCtx.closePath();
+                
+                let gradient = chartCtx.createLinearGradient(0, 0, 0, height);
+                if (document.body.classList.contains('light-mode')) {
+                    gradient.addColorStop(0, 'rgba(21, 128, 61, 0.3)');
+                    gradient.addColorStop(1, 'rgba(21, 128, 61, 0.0)');
+                } else {
+                    gradient.addColorStop(0, 'rgba(34, 197, 94, 0.3)');
+                    gradient.addColorStop(1, 'rgba(34, 197, 94, 0.0)');
+                }
+                chartCtx.fillStyle = gradient;
+                chartCtx.fill();
+            }
+        }
+
+        // --- ANIMATION CONTROLS ---
+        function toggleTraining() {
+            if (isTraining) {
+                stopTraining();
+            } else {
+                isTraining = true;
+                const btn = document.getElementById('animateBtn');
+                btn.innerHTML = '<i class="fas fa-pause text-xs"></i> <span>Pause Training</span>';
+                btn.classList.remove('viz-btn-primary');
+                btn.classList.add('viz-btn-danger');
+                
+                lastFrameTime = performance.now();
+                trainingLoop();
+            }
+        }
+
+        function stopTraining() {
+            isTraining = false;
+            if (trainingRequestId) cancelAnimationFrame(trainingRequestId);
+            
+            const btn = document.getElementById('animateBtn');
+            btn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Train Network</span>';
+            btn.classList.remove('viz-btn-danger');
+            btn.classList.add('viz-btn-primary');
+        }
+
+        document.getElementById('animateBtn').addEventListener('click', toggleTraining);
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            resetTraining();
+        });
+
+        function trainingLoop() {
+            if (!isTraining) return;
+            
+            const time = performance.now();
+            if (time - lastFrameTime > 40) { // Fast loop
+                lastFrameTime = time;
+                stepTrainingEpoch();
+            }
+
+            drawNetwork();
+            drawChart();
+            
+            if (isTraining) {
+                trainingRequestId = requestAnimationFrame(trainingLoop);
+            }
+        }
+
+        // --- CANVAS DRAWING ---
+        function getThemeColors() {
+            const styles = getComputedStyle(document.body);
+            return {
+                bg: styles.getPropertyValue('--canvas-bg').trim(),
+                neuronFill: styles.getPropertyValue('--neuron-fill').trim(),
+                text: styles.getPropertyValue('--text-main').trim(),
+            };
+        }
+
+        // Color mapping based on magnitude
+        function getWeightStyle(w) {
+            let r, g, b;
+            let absW = Math.abs(w);
+            let alpha = 1.0;
+            
+            // If dropped exactly to zero
+            if (absW < 0.01) {
+                return `rgba(150, 150, 150, 0.08)`;
+            }
+
+            if (document.body.classList.contains('light-mode')) {
+                if (w < 0) { // Negative weights (Blue spectrum)
+                    r = 37; g = 99; b = 235;
+                } else { // Positive weights (Green -> Red)
+                    if (absW > 2.5) {
+                        r = 220; g = 38; b = 38; // Red overfit
+                    } else {
+                        r = 21; g = 128; b = 61; // Green stable
+                    }
+                }
+            } else {
+                if (w < 0) { // Negative weights (Blue spectrum)
+                    r = 59; g = 130; b = 246;
+                } else { // Positive weights (Green -> Red)
+                    if (absW > 2.5) {
+                        r = 239; g = 68; b = 68; // Red overfit
+                    } else {
+                        r = 34; g = 197; b = 94; // Green stable
+                    }
+                }
+            }
+            
+            // Scale alpha based on magnitude so smaller weights fade out
+            alpha = Math.max(0.15, Math.min(1.0, absW * 0.8));
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function calculateLayout() {
+            const NEURON_BASE_SPACING_FACTOR = 2.0;
+            const LAYER_SPACING_MULTIPLIER = 5;
+            const maxNeurons = Math.max(...layers);
+            
+            neuronPositions = [];
+            layers.forEach((count, layerIdx) => {
+                const positions = [];
+                const layerSpacing = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * LAYER_SPACING_MULTIPLIER;
+                const neuronSpacingY = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * 1.5;
+                const layerX = layerIdx * layerSpacing;
+                const maxLayerHeight = maxNeurons * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                const currentLayerHeight = count * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                const yOff = (maxLayerHeight - currentLayerHeight) / 2;
+
+                for(let i=0; i<count; i++) {
+                    positions.push({
+                        x: layerX + currentNeuronRadius,
+                        y: yOff + i * (2 * currentNeuronRadius + neuronSpacingY) + currentNeuronRadius
+                    });
+                }
+                neuronPositions.push(positions);
+            });
+        }
+
+        function drawNetwork() {
+            if (!ctx || !neuronPositions || neuronPositions.length === 0) return;
+            
+            const colors = getThemeColors();
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            
+            if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+            }
+            
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, rect.width, rect.height);
+
+            ctx.save();
+            ctx.translate(translateX, translateY);
+            ctx.scale(scale, scale);
+
+            // Connections (Edges)
+            for(let l=0; l<layers.length-1; l++) {
+                if(!neuronPositions[l] || !neuronPositions[l+1]) continue;
+
+                neuronPositions[l].forEach((n1, idx1) => {
+                    neuronPositions[l+1].forEach((n2, idx2) => {
+                        let w = weights[l][idx1][idx2];
+                        let absW = Math.abs(w);
+                        
+                        // Don't draw if truly zero (Lasso dropped)
+                        if (absW < 0.01) {
+                            ctx.beginPath();
+                            ctx.lineWidth = 0.5 / scale;
+                            ctx.strokeStyle = document.body.classList.contains('light-mode') ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)';
+                            ctx.moveTo(n1.x, n1.y);
+                            ctx.lineTo(n2.x, n2.y);
+                            ctx.stroke();
+                            return;
+                        }
+
+                        ctx.beginPath();
+                        let strokeColor = getWeightStyle(w);
+                        
+                        // Thickness maps to magnitude
+                        ctx.lineWidth = Math.min(6, (0.5 + absW)) / scale; 
+                        
+                        ctx.strokeStyle = strokeColor;
+                        ctx.moveTo(n1.x, n1.y);
+                        ctx.lineTo(n2.x, n2.y);
+                        ctx.stroke();
+                    });
+                });
+            }
+
+            // Neurons
+            layers.forEach((count, lIdx) => {
+                if(!neuronPositions[lIdx]) return;
+
+                neuronPositions[lIdx].forEach((pos, nIdx) => {
+                    
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, currentNeuronRadius, 0, Math.PI*2);
+                    
+                    ctx.fillStyle = colors.neuronFill;
+                    ctx.strokeStyle = document.body.classList.contains('light-mode') ? '#cbd5e1' : '#334155';
+                    ctx.lineWidth = 2.5 / scale;
+
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Text Labels
+                    ctx.fillStyle = colors.text;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    let label = '';
+                    if (lIdx === 0) { 
+                        label = `In_${nIdx+1}`; 
+                    } else if (lIdx === layers.length - 1) {
+                        label = "Out";
+                    } else { 
+                        label = `H_${lIdx}_${nIdx+1}`; 
+                    }
+
+                    let fontSize = Math.max(10, currentNeuronRadius * 0.4);
+                    ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
+                    ctx.fillText(label, pos.x, pos.y);
+                });
+            });
+
+            ctx.restore();
+        }
+
+        window.updateAndRedraw = function() {
+            calculateLayout();
+            drawChart();
+            drawNetwork();
+        };
+
+        function resetView() {
+            calculateLayout();
+            const width = (layers.length - 1) * (currentNeuronRadius * 2.0 * 5) + currentNeuronRadius*2;
+            const height = Math.max(...layers) * (currentNeuronRadius * 3.5) + currentNeuronRadius*2;
+            
+            const rect = canvas.getBoundingClientRect();
+            const panelOffset = window.innerWidth > 768 ? 170 : 0; 
+
+            const sX = (rect.width - 60) / width;
+            const sY = (rect.height - 60) / height;
+            scale = Math.min(sX, sY, 1.2);
+            
+            translateX = (rect.width - width * scale) / 2 - panelOffset;
+            translateY = (rect.height - height * scale) / 2;
+            
+            if(scale < 0.1) scale = 0.1;
+            drawNetwork();
+            drawChart();
+        }
+
+        // --- MOUSE CONTROLS ---
+        canvas.addEventListener('mousedown', e => {
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            canvas.classList.add('grabbing');
+        });
+
+        window.addEventListener('mousemove', e => {
+            if(isDragging) {
+                const dx = e.clientX - lastX;
+                const dy = e.clientY - lastY;
+                translateX += dx;
+                translateY += dy;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                drawNetwork();
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+            canvas.classList.remove('grabbing');
+        });
+
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            const zoom = 1.1;
+            const dir = e.deltaY < 0 ? 1 : -1;
+            const factor = dir > 0 ? zoom : 1/zoom;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            
+            const newScale = Math.max(0.1, Math.min(5, scale * factor));
+            
+            translateX = mx - (mx - translateX) * (newScale / scale);
+            translateY = my - (my - translateY) * (newScale / scale);
+            scale = newScale;
+            drawNetwork();
+        });
+
+        window.addEventListener('resize', () => {
+            drawNetwork();
+            drawChart();
+            resetView();
+        });
+
+        // Initialize Layout correctly first
+        calculateLayout();
+        resetTraining();
+        setTimeout(resetView, 100); 
+
+    </script>
+</body>
+</html>
