@@ -210,7 +210,7 @@
         ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
     </style>
 </head>
-<body class="flex flex-col h-screen overflow-hidden">
+<body class="flex flex-col min-h-screen">
 
     <!-- Header -->
     <header class="glass-header sticky top-0 z-50">
@@ -302,7 +302,7 @@
     </div>
 
     <!-- Main Content Area -->
-    <main class="flex-1 relative overflow-hidden bg-[var(--canvas-bg)]">
+    <main class="h-[70vh] relative overflow-hidden bg-[var(--canvas-bg)]">
         <canvas id="canvas" class="block w-full h-full"></canvas>
 
         <!-- Floating Stats Panel -->
@@ -366,78 +366,92 @@
     </main>
     
     <!-- Footer -->
-
     <!-- auto-article-vizlearn -->
-    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
-        <div class="card-container animate-fade-in">
-            <div class="card-header">
-                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Vanishing &amp; Exploding Gradients: Detailed Beginner Guide</h2>
-                <p class="mt-2 text-sm" style="color: var(--text-muted)">Read this after trying the interactive once, then run it again with the suggested experiments.</p>
+    <section class="px-4 md:px-8 py-10 max-w-[1600px] mx-auto w-full">
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; overflow: hidden;">
+            <div class="p-5 md:p-7 border-b" style="border-color: var(--border-subtle)">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Vanishing &amp; Exploding Gradients: Complete Guide</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">Why deep networks struggle and what to do about it.</p>
             </div>
             <div class="p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+
                 <div class="p-4 rounded border" style="border-color: var(--border-subtle); background: var(--input-bg)">
                     <h3 class="text-base md:text-lg font-bold mb-2" style="color: var(--accent-primary)">Quick Context</h3>
-                    <p>Vanishing &amp; Exploding Gradients belongs to <strong>deep learning</strong>. The goal is to build intuition first, then technique.</p>
+                    <p>During backpropagation, gradients are multiplied through each layer via the chain rule. If these multiplied factors are consistently &lt; 1, gradients shrink to near-zero (<strong>vanishing</strong>). If &gt; 1, they blow up (<strong>exploding</strong>). Both make training impossible for deep architectures.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">1) Core Idea You Should Know</h3>
-                    <p>Vanishing &amp; Exploding Gradients explains how neural networks learn representations through layered transformations.</p>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">1) The Chain Rule Problem</h3>
+                    <p>For a network with L layers, the gradient of the loss w.r.t. the first layer's weights involves a product of L partial derivatives:</p>
+                    <div class="mono-font text-xs md:text-sm p-4 rounded border my-3" style="border-color: var(--border-subtle); background: var(--input-bg)">
+∂L/∂W₁ = ∂L/∂aₗ · ∂aₗ/∂aₗ₋₁ · ... · ∂a₂/∂a₁ · ∂a₁/∂W₁
+                    </div>
+                    <p>If each factor |∂aᵢ/∂aᵢ₋₁| ≈ 0.5, then after 10 layers: 0.5¹⁰ ≈ 0.001 — the gradient practically disappears. If each factor ≈ 2, then 2¹⁰ ≈ 1024 — the gradient explodes.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">2) Why This Is Worth Learning</h3>
-                    <p>This concept appears in real systems and interview-style problem solving, so building intuition now will save time later.</p>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">2) What Causes Vanishing Gradients</h3>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li><strong>Sigmoid/tanh activations</strong> — their derivatives are always &lt; 1 (sigmoid max derivative is 0.25). Stacking many layers multiplies these small values.</li>
+                        <li><strong>Poor weight initialization</strong> — weights that are too small shrink activations at each layer.</li>
+                        <li><strong>Very deep networks</strong> — more layers = more multiplicative factors &lt; 1.</li>
+                    </ul>
+                    <p class="mt-2"><strong>Symptoms</strong>: early layers stop learning while later layers train normally; loss plateaus very early.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">3) Real Example</h3>
-                    <p>Picture a model learning from many examples: early layers detect simple signals, later layers combine them into useful patterns.</p>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">3) What Causes Exploding Gradients</h3>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li><strong>Large weight initialization</strong> — weights &gt; 1 amplify signals at each layer.</li>
+                        <li><strong>No normalization on large-scale inputs</strong> — the first layer's weights grow disproportionately.</li>
+                        <li><strong>Recurrent networks (RNNs)</strong> — unrolling over many time steps has the same multiplicative effect.</li>
+                    </ul>
+                    <p class="mt-2"><strong>Symptoms</strong>: loss becomes NaN, weights overflow, updates are wildly large.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">4) Guided Walkthrough Using This Interactive</h3>
-                    <ol class="list-decimal pl-5 space-y-2">
-                        <li>Run the default setup first and note baseline behavior.</li>
-                        <li>Change one control only and observe exactly what changes.</li>
-                        <li>Try an extreme value and compare with the baseline.</li>
-                        <li>Reset and reproduce the same result to validate understanding.</li>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">4) Solutions</h3>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li><strong>ReLU activation</strong> — derivative is 1 for positive inputs, avoiding the &lt; 1 multiplication problem.</li>
+                        <li><strong>Proper weight initialization</strong> — He init for ReLU, Xavier/Glorot for tanh/sigmoid.</li>
+                        <li><strong>Batch Normalization</strong> — rescales activations at each layer to maintain healthy gradient flow.</li>
+                        <li><strong>Gradient clipping</strong> — caps gradient magnitude to prevent explosions (essential for RNNs).</li>
+                        <li><strong>Residual connections (skip connections)</strong> — provide a direct path for gradients, used in ResNets.</li>
+                        <li><strong>LSTM/GRU gates</strong> — in RNNs, gating mechanisms control gradient flow over long sequences.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">5) Guided Experiments</h3>
+                    <ol class="list-decimal pl-5 space-y-3">
+                        <li>Train with default settings — observe which layers go <span style="color:var(--accent-danger)">red</span> (exploding) or <span style="color:var(--accent-blue)">blue</span> (vanishing).</li>
+                        <li>Toggle different initialization strategies and observe how gradient health changes across layers.</li>
+                        <li>Enable Batch Normalization and watch all layers stabilize to <span style="color:var(--accent-primary)">green</span>.</li>
+                        <li>Try gradient clipping and see how it caps the maximum gradient magnitude.</li>
                     </ol>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">5) Formula / Rule Focus</h3>
-                    <p>Think in terms of forward pass, loss, and update. This page shows one piece of that cycle.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">6) Pseudocode Thinking</h3>
-                    <div class="mono-font text-xs md:text-sm p-3 rounded border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-forward pass<br>compute loss<br>backpropagate gradients<br>update parameters<br>repeat
-                    </div>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">7) Complexity / Performance Note</h3>
-                    <p>Deep learning complexity depends on model size, data size, and number of training iterations.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">8) Common Mistakes</h3>
-                    <ul class="list-disc pl-5 space-y-1">
-                        <li>Changing multiple controls at once and losing cause-and-effect.</li>
-                        <li>Memorizing output patterns without understanding the rule.</li>
-                        <li>Testing only one input size and skipping edge cases.</li>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">6) Common Mistakes</h3>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li>Using sigmoid in deep networks (20+ layers) — almost guaranteed vanishing gradients.</li>
+                        <li>Not monitoring gradient norms during training — you won't know there's a problem until the model fails to converge.</li>
+                        <li>Setting gradient clip value too low — clips useful gradient information too.</li>
                     </ul>
                 </div>
 
                 <div class="p-4 rounded border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">9) Final Recap</h3>
-                    <p>Use this sequence every time: <strong>observe -> change one control -> compare -> explain -> verify</strong>. This builds real understanding, not rote memory.</p>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">7) Key Takeaways</h3>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li>Vanishing and exploding gradients are caused by repeated multiplication through layers via the chain rule.</li>
+                        <li>ReLU, proper initialization, BatchNorm, and skip connections are the modern toolkit to combat this.</li>
+                        <li>Always monitor gradient norms — healthy gradients stay within a consistent range across layers.</li>
+                    </ul>
                 </div>
             </div>
         </div>
     </section>
+
 
     <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
         <div class="w-full flex flex-col items-center justify-center px-6 text-center">

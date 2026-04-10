@@ -210,7 +210,7 @@
         ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
     </style>
 </head>
-<body class="flex flex-col h-screen overflow-hidden">
+<body class="flex flex-col min-h-screen">
 
     <!-- Header -->
     <header class="glass-header sticky top-0 z-50">
@@ -300,7 +300,7 @@
     </div>
 
     <!-- Main Content Area -->
-    <main class="flex-1 relative overflow-hidden bg-[var(--canvas-bg)]">
+    <main class="h-[70vh] relative overflow-hidden bg-[var(--canvas-bg)]">
         <canvas id="canvas" class="block w-full h-full"></canvas>
 
         <!-- Floating Stats Panel -->
@@ -364,78 +364,113 @@
     </main>
     
     <!-- Footer -->
-
     <!-- auto-article-vizlearn -->
-    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
-        <div class="card-container animate-fade-in">
-            <div class="card-header">
-                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Batch Normalization in Deep Networks: Detailed Beginner Guide</h2>
+    <section class="px-4 md:px-8 py-10 max-w-[1600px] mx-auto w-full">
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; overflow: hidden;">
+            <div class="p-5 md:p-7 border-b" style="border-color: var(--border-subtle)">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Batch Normalization in Deep Networks: Complete Guide</h2>
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Read this after trying the interactive once, then run it again with the suggested experiments.</p>
             </div>
             <div class="p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+
                 <div class="p-4 rounded border" style="border-color: var(--border-subtle); background: var(--input-bg)">
                     <h3 class="text-base md:text-lg font-bold mb-2" style="color: var(--accent-primary)">Quick Context</h3>
-                    <p>Batch Normalization in Deep Networks belongs to <strong>deep learning</strong>. The goal is to build intuition first, then technique.</p>
+                    <p>Batch Normalization (BatchNorm) was introduced by Ioffe &amp; Szegedy in 2015 and is now a standard building block in virtually every deep network. It normalizes the inputs to each layer so that training is faster and more stable. This page lets you <em>see</em> what happens with and without it.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">1) Core Idea You Should Know</h3>
-                    <p>Batch Normalization in Deep Networks explains how neural networks learn representations through layered transformations.</p>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">1) The Problem BatchNorm Solves</h3>
+                    <p>When you feed raw features with different scales (e.g., Age 18–80 vs. Salary 20k–200k) into a network, the first-layer weights that receive the large feature grow disproportionately. During backpropagation those large weights amplify gradients in early layers (<span style="color:var(--accent-danger)">exploding</span>), while deeper layers receive progressively smaller updates (<span style="color:var(--accent-blue)">vanishing</span>). The result: unstable training or very slow convergence.</p>
+                    <p class="mt-2">Normalizing inputs at the front door helps the first layer, but <strong>internal covariate shift</strong> — the distribution of each hidden layer's inputs keeps changing as weights update — still destabilizes deeper layers. BatchNorm fixes this by re-normalizing activations <em>inside</em> the network at every layer.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">2) Why This Is Worth Learning</h3>
-                    <p>This concept appears in real systems and interview-style problem solving, so building intuition now will save time later.</p>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">2) How Batch Normalization Works</h3>
+                    <p>For a mini-batch of activations <strong>z</strong> at a given layer:</p>
+                    <div class="mono-font text-xs md:text-sm p-4 rounded border my-3" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                        μ_B &nbsp;= (1/m) Σ z_i &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text-muted)"># batch mean</span><br>
+                        σ²_B = (1/m) Σ (z_i − μ_B)² &nbsp;<span style="color:var(--text-muted)"># batch variance</span><br>
+                        ẑ_i &nbsp;= (z_i − μ_B) / √(σ²_B + ε) <span style="color:var(--text-muted)"># normalize</span><br>
+                        y_i &nbsp;= γ · ẑ_i + β &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text-muted)"># scale &amp; shift (learnable)</span>
+                    </div>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li><strong>ε</strong> is a tiny constant (e.g., 1e-5) to avoid division by zero.</li>
+                        <li><strong>γ</strong> and <strong>β</strong> are learnable parameters that let the network recover any scale/shift it needs — BatchNorm doesn't permanently force zero-mean unit-variance; it just gives the optimizer a much friendlier starting point.</li>
+                        <li>At inference time, the running mean and variance computed during training are used instead of batch statistics.</li>
+                    </ul>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">3) Real Example</h3>
-                    <p>Picture a model learning from many examples: early layers detect simple signals, later layers combine them into useful patterns.</p>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">3) Why This Is Worth Learning</h3>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li><strong>Faster convergence</strong> — you can often use much higher learning rates.</li>
+                        <li><strong>Regularization effect</strong> — the noise from batch statistics acts as mild regularization, sometimes reducing the need for Dropout.</li>
+                        <li><strong>Enables deeper networks</strong> — gradients stay in a healthy range across 50, 100, or even 1000+ layers.</li>
+                        <li><strong>Interview staple</strong> — expect questions on BatchNorm in almost every ML/DL interview.</li>
+                    </ul>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">4) Guided Walkthrough Using This Interactive</h3>
-                    <ol class="list-decimal pl-5 space-y-2">
-                        <li>Run the default setup first and note baseline behavior.</li>
-                        <li>Change one control only and observe exactly what changes.</li>
-                        <li>Try an extreme value and compare with the baseline.</li>
-                        <li>Reset and reproduce the same result to validate understanding.</li>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">4) Guided Experiments with This Interactive</h3>
+                    <ol class="list-decimal pl-5 space-y-3">
+                        <li><strong>Baseline</strong> — Set Age ≈ 35, Salary ≈ 80k. Leave both toggles OFF. Click <em>Train Network</em>. Watch W1 (first layer) turn <span style="color:var(--accent-danger)">red</span> and W3 (deep layer) turn <span style="color:var(--accent-blue)">blue</span>. The status should say "Unstable".</li>
+                        <li><strong>Input normalization only</strong> — Turn ON "Normalize Raw Inputs", leave Batch Norm OFF. Train again. W1 calms down, but deep layers may still drift.</li>
+                        <li><strong>Batch Normalization</strong> — Turn ON "Enable Batch Norm" (keep input normalization ON too). Train again. All bars should stay <span style="color:var(--accent-primary)">green</span> and status should read "Stable".</li>
+                        <li><strong>Extreme inputs</strong> — Set Salary to 200k with only Batch Norm ON (no input normalization). Observe how BatchNorm alone handles large feature scales internally.</li>
+                        <li><strong>Reset &amp; reproduce</strong> — Click Reset and repeat experiment 3 to confirm the result is consistent.</li>
                     </ol>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">5) Formula / Rule Focus</h3>
-                    <p>Think in terms of forward pass, loss, and update. This page shows one piece of that cycle.</p>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">5) Where BatchNorm Is Placed</h3>
+                    <p>There are two common conventions:</p>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li><strong>Before activation</strong>: Linear → BatchNorm → ReLU (the original paper's approach).</li>
+                        <li><strong>After activation</strong>: Linear → ReLU → BatchNorm (some practitioners prefer this).</li>
+                    </ul>
+                    <p class="mt-2">In practice both work well; consistency within your architecture matters more than the placement choice.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">6) Pseudocode Thinking</h3>
-                    <div class="mono-font text-xs md:text-sm p-3 rounded border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-forward pass<br>compute loss<br>backpropagate gradients<br>update parameters<br>repeat
-                    </div>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">7) Complexity / Performance Note</h3>
-                    <p>Deep learning complexity depends on model size, data size, and number of training iterations.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">8) Common Mistakes</h3>
-                    <ul class="list-disc pl-5 space-y-1">
-                        <li>Changing multiple controls at once and losing cause-and-effect.</li>
-                        <li>Memorizing output patterns without understanding the rule.</li>
-                        <li>Testing only one input size and skipping edge cases.</li>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">6) Common Mistakes</h3>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li><strong>Forgetting model.eval()</strong> — at inference, if you don't switch to eval mode, PyTorch/TensorFlow will use live batch stats instead of running averages, producing inconsistent predictions.</li>
+                        <li><strong>Batch size too small</strong> — with batch size 1 or 2, the batch mean/variance estimate is too noisy. Use Group Normalization or Layer Normalization instead.</li>
+                        <li><strong>Using BatchNorm with Dropout carelessly</strong> — both introduce stochasticity; their interaction can hurt. Test whether you need both.</li>
+                        <li><strong>Applying BatchNorm to the output layer</strong> — normalizing the final prediction layer often harms performance.</li>
                     </ul>
                 </div>
 
+                <div>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">7) BatchNorm vs. Other Normalizations</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm border-collapse" style="color: var(--text-main)">
+                            <thead><tr style="border-bottom: 1px solid var(--border-subtle)">
+                                <th class="text-left p-2">Technique</th><th class="text-left p-2">Normalizes Over</th><th class="text-left p-2">Best For</th>
+                            </tr></thead>
+                            <tbody>
+                                <tr style="border-bottom: 1px solid var(--border-subtle)"><td class="p-2">Batch Norm</td><td class="p-2">Batch dimension</td><td class="p-2">CNNs with large batches</td></tr>
+                                <tr style="border-bottom: 1px solid var(--border-subtle)"><td class="p-2">Layer Norm</td><td class="p-2">Feature dimension</td><td class="p-2">Transformers, RNNs</td></tr>
+                                <tr style="border-bottom: 1px solid var(--border-subtle)"><td class="p-2">Group Norm</td><td class="p-2">Channel groups</td><td class="p-2">Small-batch CNNs</td></tr>
+                                <tr><td class="p-2">Instance Norm</td><td class="p-2">Single sample, single channel</td><td class="p-2">Style transfer</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="p-4 rounded border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">9) Final Recap</h3>
-                    <p>Use this sequence every time: <strong>observe -> change one control -> compare -> explain -> verify</strong>. This builds real understanding, not rote memory.</p>
+                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">8) Key Takeaways</h3>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li>BatchNorm normalizes hidden-layer activations using batch statistics during training and running statistics during inference.</li>
+                        <li>It fights internal covariate shift, enabling higher learning rates and deeper architectures.</li>
+                        <li>The learnable parameters γ and β let the network undo the normalization if needed.</li>
+                        <li>Always switch to eval mode at inference and be mindful of batch size.</li>
+                    </ul>
                 </div>
             </div>
         </div>
     </section>
+
 
     <footer class="border-t py-6 shrink-0 z-50" style="border-color: var(--border-subtle); background: var(--bg-surface)">
         <div class="w-full flex flex-col items-center justify-center px-6 text-center">
