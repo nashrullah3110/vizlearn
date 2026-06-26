@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn: Interactive 3D RNN Visualizer</title>
+    <!-- Scripts & Fonts matching VizLearn Theme -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- MathJax for rendering LaTeX formulas -->
+    <script>
+        MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+            startup: { typeset: true }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4', 100: '#dcfce7', 400: '#4ade80',
+                            500: '#22c55e', 600: '#16a34a', 900: '#14532d',
+                        }
+                    },
+                    animation: { 'grid-flow': 'grid-move 20s linear infinite' },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            /* DARK MODE (Default) - Green Theme */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.2); 
+            --border-glow: rgba(74, 222, 128, 0.6);
+            --accent-primary: #4ade80;
+            --accent-secondary: #3b82f6; 
+            --accent-glow: rgba(74, 222, 128, 0.3);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.15);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.3);
+            --border-glow: rgba(22, 163, 74, 0.5);
+            --accent-primary: #15803d;
+            --accent-secondary: #2563eb;
+            --accent-glow: rgba(21, 128, 61, 0.25);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.08);
+            --input-focus-bg: rgba(22, 163, 74, 0.15);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, h4, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .viz-widget {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            color: var(--text-main);
+        }
+
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+        }
+        .viz-btn-primary {
+            background: var(--accent-primary);
+            color: #050505;
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+        .viz-btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px var(--accent-glow);
+            filter: brightness(1.2);
+        }
+
+        .metric-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 0.75rem;
+        }
+
+        #text-input-field {
+            background-color: var(--bg-surface);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            text-align: center;
+            outline: none;
+            transition: all 0.2s;
+        }
+        #text-input-field:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
+
+        select.custom-select {
+            background-color: var(--bg-surface);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+            outline: none;
+            cursor: pointer;
+        }
+        select.custom-select:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
+
+        /* Search styling */
+        .search-container { position: relative; width: 300px; }
+        .search-input {
+            width: 100%; padding: 0.5rem 1rem 0.5rem 2.5rem;
+            background-color: var(--input-bg); color: var(--text-main);
+            border: 1px solid var(--border-subtle); border-radius: 9999px;
+            font-size: 0.875rem; outline: none; transition: all 0.2s;
+        }
+        .search-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 2px var(--accent-glow); background-color: var(--input-focus-bg); }
+        .search-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.875rem; pointer-events: none; }
+        
+        .search-dropdown {
+            position: absolute; top: calc(100% + 0.5rem); left: 0; width: 100%;
+            background-color: var(--card-bg); border: 1px solid var(--border-subtle);
+            border-radius: 0.75rem; overflow: hidden; opacity: 0; pointer-events: none;
+            transform: translateY(-10px); transition: all 0.2s ease; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); z-index: 100;
+        }
+        .search-dropdown.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        .search-dropdown-item {
+            padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; border-bottom: 1px solid var(--border-subtle); color: var(--text-main);
+        }
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background-color: var(--input-bg); }
+        
+        .prose { color: var(--text-main); line-height: 1.7; max-width: 800px; }
+        .prose h2 { font-size: 1.875rem; font-weight: 700; margin-top: 2.5rem; margin-bottom: 1.25rem; color: var(--text-main); border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem; }
+        .prose h3 { font-size: 1.5rem; font-weight: 600; margin-top: 2rem; margin-bottom: 1rem; color: var(--text-main); }
+        .prose p { margin-bottom: 1.25rem; color: var(--text-muted); }
+        .prose strong { color: var(--text-main); font-weight: 600; }
+        .prose .math-block { background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1.5rem; margin: 2rem 0; overflow-x: auto; text-align: center; }
+    </style>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-ZT6JM33V5J');
+    </script>
+
+</head>
+<body class="flex flex-col min-h-screen antialiased">
+
+    <!-- Header matching VizLearn Theme -->
+    <header class="glass-header relative z-50 shrink-0">
+        <div class="flex justify-between items-center py-3 px-4 md:px-6 w-full">
+            <a href="#" class="text-xl font-bold flex items-center gap-3 select-none no-underline" style="color: var(--text-main)">
+                <div class="w-3 h-3 rounded-full shadow-[0_0_15px_var(--accent-glow)] animate-pulse" style="background-color: var(--accent-primary)"></div>
+                <span class="brand-font">viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+            </a>
+            
+            <div class="hidden md:block">
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" placeholder="Search topics (e.g., 'RNN', 'Sequence')...">
+                    <div class="search-dropdown"></div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button id="themeToggle" class="w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer" style="background: var(--input-bg); border: 1px solid var(--border-subtle); color: var(--text-muted)">
+                    <i class="fas fa-sun hidden dark-icon"></i>
+                    <i class="fas fa-moon hidden light-icon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 3D Environment Wrapper -->
+    <div class="relative w-full h-[85vh] min-h-[600px] border-b shrink-0" style="border-color: var(--border-subtle);" id="workspace">
+        
+        <!-- Background 3D Area -->
+        <div id="canvas-container" class="absolute inset-0 z-0 cursor-move"></div>
+
+        <!-- Top Right Widget: Sequence & Architecture Input -->
+        <div id="draw-widget" class="viz-widget absolute right-5 top-5 p-4 z-10 w-80 flex flex-col items-center transition-all duration-300">
+            <div class="flex justify-between items-center w-full mb-2 px-1">
+                <h2 class="text-xs font-bold uppercase tracking-wider" style="color: var(--text-main)">Network Settings</h2>
+            </div>
+            
+            <div class="w-full mb-3 space-y-2">
+                <div>
+                    <label class="text-[10px] text-muted font-bold tracking-wider uppercase mb-1 block" style="color: var(--text-muted)">Architecture Type</label>
+                    <select id="arch-select" class="custom-select w-full p-2 text-sm font-medium rounded-md shadow-inner transition-colors duration-300">
+                        <option value="many-to-many">Many-to-Many (e.g., Translation)</option>
+                        <option value="many-to-one">Many-to-One (e.g., Sentiment)</option>
+                        <option value="one-to-many">One-to-Many (e.g., Image Caption)</option>
+                        <option value="one-to-one">One-to-One (e.g., Standard NN)</option>
+                    </select>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-2 w-full mb-1">
+                    <div>
+                        <label class="text-[9px] text-muted font-bold tracking-wider uppercase mb-1 block" style="color: var(--text-muted)">Seq Length</label>
+                        <select id="seq-length-select" class="custom-select w-full p-1.5 text-xs font-medium rounded shadow-inner">
+                            <option value="3">3 Steps</option>
+                            <option value="6" selected>6 Steps</option>
+                            <option value="10">10 Steps</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[9px] text-muted font-bold tracking-wider uppercase mb-1 block" style="color: var(--text-muted)">Hidden Layers</label>
+                        <select id="num-layers-select" class="custom-select w-full p-1.5 text-xs font-medium rounded shadow-inner">
+                            <option value="1" selected>1 Layer (Shallow)</option>
+                            <option value="2">2 Layers (Deep)</option>
+                            <option value="3">3 Layers (Deeper)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 w-full">
+                    <div>
+                        <label class="text-[9px] text-muted font-bold tracking-wider uppercase mb-1 block" style="color: var(--text-muted)">Embed Dim</label>
+                        <select id="embed-size-select" class="custom-select w-full p-1.5 text-xs font-medium rounded shadow-inner">
+                            <option value="4">4 Nodes</option>
+                            <option value="8" selected>8 Nodes</option>
+                            <option value="12">12 Nodes</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[9px] text-muted font-bold tracking-wider uppercase mb-1 block" style="color: var(--text-muted)">Hidden Dim</label>
+                        <select id="hidden-size-select" class="custom-select w-full p-1.5 text-xs font-medium rounded shadow-inner">
+                            <option value="8">8 Nodes</option>
+                            <option value="16" selected>16 Nodes</option>
+                            <option value="24">24 Nodes</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <label class="text-[10px] w-full text-left font-bold tracking-wider uppercase mb-1 px-1 mt-1 block" style="color: var(--text-muted)">Input Sentence (Words):</label>
+            <div class="flex justify-center w-full mb-3 shadow-inner transition-colors duration-300">
+                <input type="text" id="text-input-field" value="THE QUICK BROWN FOX" maxlength="60" autocomplete="off" spellcheck="false" />
+            </div>
+            
+            <button id="recognize-btn" class="viz-btn viz-btn-primary w-full flex items-center justify-center gap-2 text-[12px] py-2 mt-1">
+                <i class="fas fa-bolt animate-pulse"></i> Propagate Signal
+            </button>
+        </div>
+
+        <!-- Bottom Left Widget: Inspector -->
+        <div id="inspector-widget" class="viz-widget absolute left-5 bottom-5 w-72 p-4 z-10 transition-all duration-300">
+            <h4 id="inspect-title" class="text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5" style="color: var(--accent-primary)">
+                <i class="fas fa-microscope"></i> Network Inspector
+            </h4>
+            <p id="inspect-desc" class="text-[11px] font-medium leading-relaxed m-0" style="color: var(--text-muted)">Hover over the unrolled 3D network to inspect states and trace data flow. Click a node to focus camera.</p>
+            
+            <div id="inspector-details" class="mt-2 text-xs space-y-2 hidden">
+                <div class="flex justify-between border-b pb-1" style="border-color: var(--border-subtle)">
+                    <span class="font-medium" style="color: var(--text-muted)">Layer:</span> 
+                    <span id="inspect-layer-val" class="font-bold brand-font" style="color: var(--text-main)"></span>
+                </div>
+                <div class="flex justify-between border-b pb-1" style="border-color: var(--border-subtle)">
+                    <span class="font-medium" style="color: var(--text-muted)">Time Step ($t$):</span> 
+                    <span id="inspect-time-val" class="font-medium mono-font" style="color: var(--accent-primary)"></span>
+                </div>
+                <div class="flex justify-between border-b pb-1" style="border-color: var(--border-subtle)">
+                    <span class="font-medium" style="color: var(--text-muted)">Node Index:</span> 
+                    <span id="inspect-idx-val" class="font-medium mono-font" style="color: var(--text-main)"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="font-medium" style="color: var(--text-muted)">Activation:</span> 
+                    <span id="inspect-act-val" class="font-black mono-font" style="color: var(--accent-primary)"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Center/Right Widget: Camera Controls -->
+        <div id="controls-widget" class="absolute bottom-5 right-5 z-10 flex gap-2 pointer-events-none opacity-80">
+            <div class="px-2.5 py-1 backdrop-blur-sm rounded-md border text-[10px] font-semibold uppercase tracking-wider" style="background: var(--bg-glass); border-color: var(--border-subtle); color: var(--text-muted)">Rotate <b class="ml-1 mono-font" style="color: var(--text-main)">L-Drag</b></div>
+            <div class="px-2.5 py-1 backdrop-blur-sm rounded-md border text-[10px] font-semibold uppercase tracking-wider" style="background: var(--bg-glass); border-color: var(--border-subtle); color: var(--text-muted)">Pan <b class="ml-1 mono-font" style="color: var(--text-main)">R-Drag</b></div>
+            <div class="px-2.5 py-1 backdrop-blur-sm rounded-md border text-[10px] font-semibold uppercase tracking-wider" style="background: var(--bg-glass); border-color: var(--border-subtle); color: var(--text-muted)">Zoom <b class="ml-1 mono-font" style="color: var(--text-main)">Scroll</b></div>
+            <div class="px-2.5 py-1 backdrop-blur-sm rounded-md border text-[10px] font-semibold uppercase tracking-wider" style="background: var(--bg-glass); border-color: var(--border-subtle); color: var(--text-muted)">Focus <b class="ml-1 mono-font" style="color: var(--text-main)">Click Node</b></div>
+        </div>
+    </div>
+
+    <!-- Article Section -->
+    <main class="w-full flex-1 max-w-4xl mx-auto px-6 py-16 prose">
+        <h2 class="brand-font">Understanding Recurrent Neural Networks</h2>
+        <p>
+            Unlike traditional feedforward networks which process data in single, independent snapshots, <strong>Recurrent Neural Networks (RNNs)</strong> are designed specifically for <em>sequential</em> data. They maintain a "memory" of previous inputs by passing information across time steps.
+        </p>
+
+        <h3>1. The Temporal Dimension (Unrolling)</h3>
+        <p>
+            In the 3D visualization above, the network is "unrolled" across time along the Z-axis. While it looks like a massive network, it is actually the <em>exact same</em> set of weights being applied repeatedly at each time step $t$. The $Z$-axis visually represents the passage of time.
+        </p>
+
+        <h3>2. Deep RNNs (Multiple Layers)</h3>
+        <p>
+            Just like standard neural networks benefit from depth, RNNs can be stacked into <strong>Deep RNNs</strong>. By setting the "Hidden Layers" dropdown to 2 or 3, you create a hierarchy. The first hidden layer extracts basic temporal features from the raw input sequence, while higher layers piece together those basic features to understand more complex, long-term abstractions. In deep RNNs, the output of Hidden Layer 1 at time $t$ serves as the input to Hidden Layer 2 at time $t$.
+        </p>
+
+        <h3>3. RNN Architectures</h3>
+        <p>
+            By varying which inputs and outputs we pay attention to across time steps, we can solve drastically different problems. You can switch between these architectures using the settings above:
+        </p>
+        <ul style="color: var(--text-muted);">
+            <li><strong>Many-to-Many:</strong> Sequence to Sequence (e.g., Machine Translation, generating a French sentence from an English sentence).</li>
+            <li><strong>Many-to-One:</strong> Sequence to Vector (e.g., Sentiment Analysis, reading a whole paragraph to output a single Positive/Negative score).</li>
+            <li><strong>One-to-Many:</strong> Vector to Sequence (e.g., Image Captioning, taking a single image and generating a sentence describing it).</li>
+            <li><strong>One-to-One:</strong> The classic Standard Neural Network. No memory over time, just 1 input to 1 output.</li>
+        </ul>
+
+        <h3>4. Sequence Length, Padding & Truncation</h3>
+        <p>
+            Neural networks generally require inputs of a fixed size. If you set the <strong>Sequence Length</strong> to 6, but type a sentence with only 4 words, the network must <strong>pad</strong> the remaining sequence. We do this by passing a blank <code>[PAD]</code> token (visually represented as faded inputs) to fill the remaining time steps. Conversely, if your sentence is too long, the excess words are <strong>truncated</strong> and ignored.
+        </p>
+
+        <h3>5. The Hidden State Math</h3>
+        <p>
+            The core feature of an RNN is its <strong>Hidden State</strong> ($h_t$). At any given time step $t$, a hidden layer $l$ receives two distinct inputs:
+        </p>
+        <ul style="color: var(--text-muted);">
+            <li>The data coming from the layer below it at the same time step $t$.</li>
+            <li>Its own hidden state from the <em>previous</em> time step: $\mathbf{h}^{(l)}_{t-1}$.</li>
+        </ul>
+        <div class="math-block">
+            $$\mathbf{h}^{(l)}_t = \tanh\left(\mathbf{W}_{forward}^{(l)} \mathbf{input}_t + \mathbf{b}^{(l)} + \mathbf{W}_{recurrent}^{(l)} \mathbf{h}^{(l)}_{t-1}\right)$$
+        </div>
+
+    </main>
+
+    <!-- Standard VizLearn Footer -->
+            <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+        <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
+            <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
+                <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" rel="noopener noreferrer" aria-label="Kaggle" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-kaggle fa-lg"></i></a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-70">&copy; 2025 VIZLEARN // SYSTEM ONLINE</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- VizLearn Search Logic ---
+        const searchData = [
+            { title: "Neural Network Basics", category: "Fundamentals", path: "#", icon: "fa-network-wired" },
+            { title: "Recurrent Neural Networks", category: "Architecture", path: "#", icon: "fa-history" },
+            { title: "Deep RNNs", category: "Architecture", path: "#", icon: "fa-layer-group" },
+            { title: "Padding & Masking", category: "Data Processing", path: "#", icon: "fa-align-left" }
+        ];
+
+        const searchInput = document.querySelector('.search-input');
+        const dropdown = document.querySelector('.search-dropdown');
+
+        if(searchInput && dropdown) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                if (query.length === 0) { dropdown.classList.remove('show'); return; }
+                const filtered = searchData.filter(item => item.title.toLowerCase().includes(query) || item.category.toLowerCase().includes(query));
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="p-4 text-center text-sm" style="color: var(--text-muted)">No modules found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div><div class="dropdown-item-title">${course.title}</div><div class="dropdown-item-path">${course.category.toUpperCase()}</div></div>
+                            </div>
+                        </a>
+                    `).join('');
+                }
+                dropdown.classList.add('show');
+            });
+            document.addEventListener('click', (e) => { if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show'); });
+        }
+
+        /** ==========================================
+         * 1. INPUT PARSING & ARCHITECTURE LOGIC
+         * ========================================== */
+        const textInputField = document.getElementById('text-input-field');
+        const archSelect = document.getElementById('arch-select');
+        const seqLengthSelect = document.getElementById('seq-length-select');
+        const embedSizeSelect = document.getElementById('embed-size-select');
+        const hiddenSizeSelect = document.getElementById('hidden-size-select');
+        const numLayersSelect = document.getElementById('num-layers-select');
+        
+        let wordsArray = ["THE", "QUICK", "BROWN", "FOX", "[PAD]", "[PAD]"];
+        let currentArch = "many-to-many";
+        let MAX_TIME_STEPS = 6;
+        let TIME_STEPS = 6;
+        let NUM_LAYERS = 1;
+        
+        // Dynamic Dimensions
+        let INPUT_SIZE = 8;
+        let HIDDEN_SIZE = 16;
+        let OUTPUT_SIZE = 8; 
+
+        // Weights Arrays (Arrays to support multiple layers)
+        let W_fwd = []; // Forward weights (Input->H0, H0->H1, H1->H2)
+        let W_rec = []; // Recurrent weights (H0->H0, H1->H1)
+        let b_h = [];   // Hidden Biases
+        let W_out = []; // Output weights (Last Hidden -> Output)
+        let b_o = [];   // Output Bias
+
+        // Initialize pseudo-random weights based on current dimensions
+        function initializeWeights() {
+            function seededRandom(seed) { let x = Math.sin(seed++) * 10000; return x - Math.floor(x); }
+            
+            W_fwd = []; W_rec = []; b_h = [];
+            
+            for(let l=0; l<NUM_LAYERS; l++) {
+                const inSize = (l === 0) ? INPUT_SIZE : HIDDEN_SIZE;
+                
+                // Forward weights for this layer
+                W_fwd.push(Array.from({length: HIDDEN_SIZE}, (_, i) => 
+                    Array.from({length: inSize}, (_, j) => seededRandom(l*1000 + i*inSize+j) * 2 - 1)));
+                
+                // Recurrent weights for this layer
+                W_rec.push(Array.from({length: HIDDEN_SIZE}, (_, i) => 
+                    Array.from({length: HIDDEN_SIZE}, (_, j) => (seededRandom(l*2000 + i*HIDDEN_SIZE+j) * 2 - 1) * 0.5))); 
+                
+                // Bias for this layer
+                b_h.push(Array.from({length: HIDDEN_SIZE}, (_, i) => seededRandom(l*3000 + i) * 0.2 - 0.1));
+            }
+
+            W_out = Array.from({length: OUTPUT_SIZE}, (_, i) => Array.from({length: HIDDEN_SIZE}, (_, j) => seededRandom(4000+i*HIDDEN_SIZE+j) * 2 - 1));
+            b_o = Array.from({length: OUTPUT_SIZE}, (_, i) => seededRandom(5000+i) * 0.2 - 0.1);
+        }
+
+        // Determine if a layer is visibly active at time step t based on architecture
+        function isInputActive(t) {
+            if (currentArch === 'one-to-many') return t === 0;
+            if (currentArch === 'one-to-one') return t === 0;
+            return true; // Many-to-Many and Many-to-One use all inputs
+        }
+
+        function isOutputActive(t) {
+            if (currentArch === 'many-to-one') return t === (TIME_STEPS - 1);
+            if (currentArch === 'one-to-one') return t === 0;
+            return true; // Many-to-Many and One-to-Many use all outputs
+        }
+
+        let layerDefs = []; // Populated dynamically now
+
+        function handleSettingsChange() {
+            currentArch = archSelect.value;
+            MAX_TIME_STEPS = parseInt(seqLengthSelect.value);
+            NUM_LAYERS = parseInt(numLayersSelect.value);
+            INPUT_SIZE = parseInt(embedSizeSelect.value);
+            OUTPUT_SIZE = INPUT_SIZE; // Maintain symmetry for visualizer
+            HIDDEN_SIZE = parseInt(hiddenSizeSelect.value);
+
+            // Re-initialize weights since matrices dimensions might have changed
+            initializeWeights();
+            
+            // Extract and process words
+            let rawWords = textInputField.value.trim().split(/\s+/).filter(w => w.length > 0);
+            
+            if (currentArch === 'one-to-one') {
+                TIME_STEPS = 1;
+                wordsArray = rawWords.slice(0, 1);
+                if(wordsArray.length === 0) wordsArray = ["EMPTY"];
+            } else {
+                TIME_STEPS = MAX_TIME_STEPS;
+                wordsArray = [];
+                // Truncate or Pad the sequence to match MAX_TIME_STEPS
+                for(let i=0; i<TIME_STEPS; i++) {
+                    if (i < rawWords.length) wordsArray.push(rawWords[i]);
+                    else wordsArray.push("[PAD]");
+                }
+            }
+            
+            // Rebuild Layer Definitions dynamically based on NUM_LAYERS
+            layerDefs = [];
+            const totalWidth = 160 + (NUM_LAYERS - 1) * 60; // Expand width as layers increase
+            const startX = -totalWidth / 2;
+            const stepX = totalWidth / (NUM_LAYERS + 1);
+
+            layerDefs.push({ id: 'x', name: 'Input', size: INPUT_SIZE, x: startX, color: 0x94a3b8, colorHex: '#94a3b8', spacing: 6 });
+
+            for(let l=0; l<NUM_LAYERS; l++) {
+                // cycle through some nice green/blue tones for hidden layers
+                const colors = [0x22c55e, 0x0ea5e9, 0x14b8a6];
+                const hexes = ['#22c55e', '#0ea5e9', '#14b8a6'];
+                layerDefs.push({ id: 'h'+l, name: 'Hidden '+(l+1), size: HIDDEN_SIZE, x: startX + stepX*(l+1), color: colors[l%3], colorHex: hexes[l%3], spacing: 5 });
+            }
+
+            layerDefs.push({ id: 'y', name: 'Output', size: OUTPUT_SIZE, x: startX + stepX*(NUM_LAYERS+1), color: 0x10b981, colorHex: '#10b981', spacing: 6 });
+
+            rebuildScene();
+            updateNetworkMath();
+        }
+
+        textInputField.addEventListener('input', handleSettingsChange);
+        archSelect.addEventListener('change', handleSettingsChange);
+        seqLengthSelect.addEventListener('change', handleSettingsChange);
+        embedSizeSelect.addEventListener('change', handleSettingsChange);
+        hiddenSizeSelect.addEventListener('change', handleSettingsChange);
+        numLayersSelect.addEventListener('change', handleSettingsChange);
+
+        /** ==========================================
+         * 2. RNN MATH & DATA FLOW
+         * ========================================== */
+        let rnnStates = { x: [], y: [] }; 
+        // We will add 'h0', 'h1' etc. dynamically to rnnStates
+
+        function wordToVector(word) {
+            if (word === "[PAD]") return Array(INPUT_SIZE).fill(0); // Padded tokens carry zero signal
+            
+            let vec = [];
+            // Generate a simple numerical hash for the word
+            let hash = 0;
+            for (let i = 0; i < word.length; i++) { hash = (hash << 5) - hash + word.charCodeAt(i); hash |= 0; }
+            for(let i=0; i<INPUT_SIZE; i++) {
+                vec.push(Math.sin(hash * 0.05 + i * 1.3)); // Feature extraction mapping
+            }
+            return vec;
+        }
+
+        function updateNetworkMath() {
+            rnnStates = { x: [], y: [] };
+            let h_prev = []; // Store previous timestep states for all hidden layers
+            for(let l=0; l<NUM_LAYERS; l++) {
+                rnnStates['h'+l] = [];
+                h_prev.push(Array(HIDDEN_SIZE).fill(0));
+            }
+
+            for(let t=0; t<TIME_STEPS; t++) {
+                // Input layer
+                let x_t = isInputActive(t) ? wordToVector(wordsArray[t] || " ") : Array(INPUT_SIZE).fill(0);
+                rnnStates.x.push(x_t);
+
+                let current_input = x_t;
+
+                // Pass through hidden layers
+                for(let l=0; l<NUM_LAYERS; l++) {
+                    let h_t = Array(HIDDEN_SIZE).fill(0);
+                    let input_size_for_layer = (l === 0) ? INPUT_SIZE : HIDDEN_SIZE;
+                    
+                    for(let i=0; i<HIDDEN_SIZE; i++) {
+                        let sum = b_h[l][i];
+                        // Forward from previous layer
+                        for(let j=0; j<input_size_for_layer; j++) sum += W_fwd[l][i][j] * current_input[j];
+                        // Recurrent from same layer previous timestep
+                        for(let j=0; j<HIDDEN_SIZE; j++) sum += W_rec[l][i][j] * h_prev[l][j];
+                        h_t[i] = Math.tanh(sum);
+                    }
+                    rnnStates['h'+l].push(h_t);
+                    current_input = h_t; // output of this layer is input to next
+                    h_prev[l] = h_t;     // save state for next timestep
+                }
+
+                // Output layer
+                let y_t = Array(OUTPUT_SIZE).fill(0);
+                if (isOutputActive(t)) {
+                    for(let i=0; i<OUTPUT_SIZE; i++) {
+                        let sum = b_o[i];
+                        for(let j=0; j<HIDDEN_SIZE; j++) sum += W_out[i][j] * current_input[j]; // current_input is the last hidden layer
+                        y_t[i] = Math.tanh(sum);
+                    }
+                }
+                rnnStates.y.push(y_t);
+            }
+
+            updateStaticColors();
+        }
+
+        /** ==========================================
+         * 3. 3D SCENE SETUP & RENDERING
+         * ========================================== */
+        const workspace = document.getElementById('workspace');
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        
+        // Ensure green theme colors are used in 3D. Higher opacity makes lines super visible.
+        const themes = {
+            dark: { bg: 0x050505, fog: 0x050505, fwdLine: 0x4ade80, recLine: 0x3b82f6, lineOpac: 0.45, recOpac: 0.65, hover: 0x4ade80, ambient: 0.6, dir: 0.8 },
+            light: { bg: 0xf0fdf4, fog: 0xf0fdf4, fwdLine: 0x15803d, recLine: 0x2563eb, lineOpac: 0.45, recOpac: 0.65, hover: 0x15803d, ambient: 0.9, dir: 0.6 }
+        };
+        let currentTheme = 'dark';
+        scene.fog = new THREE.FogExp2(themes.dark.bg, 0.0018);
+        
+        const camera = new THREE.PerspectiveCamera(45, workspace.clientWidth / workspace.clientHeight, 0.1, 5000);
+        camera.position.set(220, 100, 320);
+        
+        // Shift camera view to the left to prevent the network from hiding under the right widget
+        camera.setViewOffset(workspace.clientWidth, workspace.clientHeight, 160, 0, workspace.clientWidth, workspace.clientHeight);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(workspace.clientWidth, workspace.clientHeight); 
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+        
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; controls.dampingFactor = 0.05; 
+        controls.minDistance = 10; controls.maxDistance = 1500; controls.zoomSpeed = 1.2;
+
+        // Variables for smooth panning & focus
+        let targetFocus = new THREE.Vector3(-20, 0, 0);
+        let isAutoFocusing = false;
+        let isDragging = false;
+        controls.addEventListener('start', () => { isDragging = true; isAutoFocusing = false; }); 
+        controls.addEventListener('end', () => { setTimeout(() => { isDragging = false; }, 50); });
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, themes.dark.ambient); scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, themes.dark.dir); dirLight.position.set(100, 200, 100); scene.add(dirLight);
+
+        const Z_SPACING = 55; // Spacing between time steps
+        const geometry = new THREE.SphereGeometry(1.5, 16, 16); 
+        const dummy = new THREE.Object3D();
+        const hideMatrix = new THREE.Matrix4().makeScale(0, 0, 0); 
+        
+        // Data structure to hold mesh info
+        let networkMeshes = {};
+        let elementCoords = []; 
+        let structuralLines = [];
+        let labelSprites = [];
+
+        // Animated connection materials (highly visible)
+        let matFwd, matRec;
+
+        // Hover highlighting lines - changed to Dashed for data flow animation
+        const hoverLineGeo = new THREE.BufferGeometry();
+        const hoverLineMat = new THREE.LineDashedMaterial({ color: themes[currentTheme].hover, linewidth: 3, transparent: true, opacity: 1.0, depthTest: false, dashSize: 4, gapSize: 2 });
+        const hoverLines = new THREE.LineSegments(hoverLineGeo, hoverLineMat);
+        hoverLines.visible = false;
+        scene.add(hoverLines);
+
+        function clearSceneObjects() {
+            Object.values(networkMeshes).forEach(mesh => { scene.remove(mesh); if (mesh.geometry) mesh.geometry.dispose(); if (mesh.material) mesh.material.dispose(); });
+            networkMeshes = {};
+            structuralLines.forEach(line => { scene.remove(line); if (line.geometry) line.geometry.dispose(); });
+            structuralLines = [];
+            labelSprites.forEach(sprite => { scene.remove(sprite); if (sprite.material && sprite.material.map) sprite.material.map.dispose(); if (sprite.material) sprite.material.dispose(); });
+            labelSprites = [];
+            elementCoords = [];
+            hoverLines.visible = false;
+        }
+
+        function buildNetworkGeometry() {
+            targetFocus.set(0, 0, -((TIME_STEPS-1) * Z_SPACING)/2);
+            controls.target.copy(targetFocus);
+
+            layerDefs.forEach((layer) => {
+                const material = new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, shininess: 90 });
+                const mesh = new THREE.InstancedMesh(geometry, material, TIME_STEPS * layer.size);
+                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                const defCol = new THREE.Color(layer.color).multiplyScalar(0.2);
+                
+                let i = 0;
+                for(let t = 0; t < TIME_STEPS; t++) {
+                    const zPos = -t * Z_SPACING;
+                    
+                    // Determine visibility based on architecture rules
+                    let isVisible = true;
+                    if (layer.id === 'x' && !isInputActive(t)) isVisible = false;
+                    if (layer.id === 'y' && !isOutputActive(t)) isVisible = false;
+                    
+                    // Add word labels above active inputs
+                    if (layer.id === 'x' && isVisible && wordsArray[t]) {
+                        // Show faded text for [PAD] tokens
+                        const opacity = wordsArray[t] === "[PAD]" ? 0.25 : 0.6;
+                        labelSprites.push(addTextSprite(`${wordsArray[t]}`, layer.x, (layer.size*layer.spacing)/2 + 10, zPos, layer.colorHex, opacity));
+                    }
+                    if (layer.id.startsWith('h') && currentArch !== 'one-to-one') {
+                        // Add time label above the top-most hidden layer (which is h0 in our numbering)
+                        if (layer.id === 'h0') {
+                            labelSprites.push(addTextSprite(`t=${t}`, layer.x, (layer.size*layer.spacing)/2 + 15, zPos, layer.colorHex, 0.45));
+                        }
+                    }
+
+                    for(let j = 0; j < layer.size; j++) {
+                        if (isVisible) {
+                            const yPos = (j - (layer.size-1)/2) * layer.spacing;
+                            const pos = new THREE.Vector3(layer.x, yPos, zPos);
+                            dummy.position.copy(pos); dummy.updateMatrix();
+                            mesh.setMatrixAt(i, dummy.matrix); 
+                            mesh.setColorAt(i, defCol.clone());
+                            elementCoords.push({ layerId: layer.id, t: t, idx: j, pos: pos, instanceId: i, mesh: mesh, color: layer.color });
+                        } else {
+                            // Hide the mesh instance entirely
+                            mesh.setMatrixAt(i, hideMatrix);
+                        }
+                        i++;
+                    }
+                }
+                scene.add(mesh);
+                networkMeshes[layer.id] = mesh;
+                
+                // Add Layer Name labels at the front
+                labelSprites.push(addTextSprite(layer.name, layer.x, (layer.size*layer.spacing)/2 + 35, 25, layer.colorHex, 0.8));
+            });
+        }
+
+        function drawConnections() {
+            const tConf = themes[currentTheme];
+            
+            // Highly visible dashed lines to show flow. High opacity and thicker dashes.
+            if(!matFwd) matFwd = new THREE.LineDashedMaterial({ color: tConf.fwdLine, transparent: true, opacity: tConf.lineOpac, dashSize: 4, gapSize: 2, linewidth: 2 });
+            else { matFwd.color.setHex(tConf.fwdLine); matFwd.opacity = tConf.lineOpac; }
+            
+            if(!matRec) matRec = new THREE.LineDashedMaterial({ color: tConf.recLine, transparent: true, opacity: tConf.recOpac, linewidth: 3, dashSize: 5, gapSize: 2 });
+            else { matRec.color.setHex(tConf.recLine); matRec.opacity = tConf.recOpac; }
+
+            for(let t=0; t<TIME_STEPS; t++) {
+                const zPos = -t * Z_SPACING;
+                const isPadStep = wordsArray[t] === "[PAD]";
+                
+                // Forward Connections: Connect each layer to the next
+                for (let lIdx = 0; lIdx < layerDefs.length - 1; lIdx++) {
+                    const l1 = layerDefs[lIdx];
+                    const l2 = layerDefs[lIdx+1];
+
+                    // Logic to skip if layer is inactive at this timestep
+                    if (l1.id === 'x' && (!isInputActive(t) || isPadStep)) continue;
+                    if (l2.id === 'y' && !isOutputActive(t)) continue;
+
+                    const ptsFwd = [];
+                    // Subsample based on size to ensure lines are distinct and clear, not a solid block
+                    const step1 = Math.max(1, Math.ceil(l1.size / 6));
+                    const step2 = Math.max(1, Math.ceil(l2.size / 6));
+
+                    for(let i=0; i<l1.size; i+=step1) { 
+                        for(let j=0; j<l2.size; j+=step2) {
+                            ptsFwd.push(new THREE.Vector3(l1.x, (i-(l1.size-1)/2)*l1.spacing, zPos));
+                            ptsFwd.push(new THREE.Vector3(l2.x, (j-(l2.size-1)/2)*l2.spacing, zPos));
+                        }
+                    }
+                    if(ptsFwd.length > 0){
+                        const geoFwd = new THREE.BufferGeometry().setFromPoints(ptsFwd);
+                        const lineFwd = new THREE.LineSegments(geoFwd, matFwd);
+                        lineFwd.computeLineDistances(); scene.add(lineFwd); structuralLines.push(lineFwd);
+                    }
+                }
+
+                // Recurrent Connections: Connect Hidden(t-1) -> Hidden(t)
+                if (t > 0 && currentArch !== 'one-to-one') {
+                    const prevZ = -(t-1) * Z_SPACING;
+                    
+                    for (let l = 0; l < NUM_LAYERS; l++) {
+                        const hLayer = layerDefs.find(def => def.id === 'h'+l);
+                        const hStepSize = Math.max(1, Math.ceil(hLayer.size / 6));
+
+                        for(let j=0; j<hLayer.size; j+=hStepSize) { 
+                            const yPos = (j-(hLayer.size-1)/2)*hLayer.spacing;
+                            const pStart = new THREE.Vector3(hLayer.x, yPos, prevZ);
+                            const pEnd = new THREE.Vector3(hLayer.x, yPos, zPos);
+                            
+                            // Make recurrent arc bulge significantly downwards/outwards
+                            const pCtrl = new THREE.Vector3(hLayer.x, yPos - 15 - (j%3)*5, (prevZ+zPos)/2);
+                            
+                            const curve = new THREE.QuadraticBezierCurve3(pStart, pCtrl, pEnd);
+                            const curvePts = curve.getPoints(14);
+                            const geoRec = new THREE.BufferGeometry().setFromPoints(curvePts);
+                            const curveObj = new THREE.Line(geoRec, matRec);
+                            curveObj.computeLineDistances(); scene.add(curveObj); structuralLines.push(curveObj);
+                        }
+                    }
+                }
+            }
+        }
+
+        function addTextSprite(text, x, y, z, colorHex, opacity=1.0) {
+            const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 128; const ctx = canvas.getContext('2d');
+            ctx.globalAlpha = opacity;
+            ctx.fillStyle = colorHex; ctx.font = 'bold 38px Inter, sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+            ctx.fillText(text, 256, 64);
+            const texture = new THREE.CanvasTexture(canvas); const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(spriteMaterial); sprite.position.set(x, y, z); sprite.scale.set(60, 15, 1); scene.add(sprite); return sprite;
+        }
+
+        function rebuildScene() {
+            clearSceneObjects();
+            buildNetworkGeometry();
+            drawConnections();
+        }
+
+        // INITIALIZATION
+        initializeWeights();
+        handleSettingsChange(); // Call once on load to configure UI mapping correctly
+
+        // Static Coloring function (no animation)
+        function updateStaticColors() {
+            const isLight = currentTheme === 'light'; 
+            const baseOpac = 0.2; 
+            const highlightMult = isLight ? 1.5 : 2.5;
+
+            layerDefs.forEach(layer => {
+                const mesh = networkMeshes[layer.id];
+                const baseColor = new THREE.Color(layer.color);
+                
+                for(let t=0; t<TIME_STEPS; t++) {
+                    const values = rnnStates[layer.id][t];
+                    if (!values) continue; // Safety check
+                    for(let j=0; j<layer.size; j++) {
+                        const val = Math.abs(values[j]); 
+                        const intensity = baseOpac + (val * highlightMult);
+                        const c = baseColor.clone().multiplyScalar(Math.min(1.8, intensity));
+                        if(val > 0.7) c.lerp(new THREE.Color(0xffffff), 0.5);
+                        
+                        mesh.setColorAt(t * layer.size + j, c);
+                    }
+                }
+                mesh.instanceColor.needsUpdate = true;
+            });
+        }
+
+        let animationTimeouts = [];
+        function triggerInferenceAnimation() {
+            animationTimeouts.forEach(t => clearTimeout(t)); animationTimeouts = [];
+            updateNetworkMath(); 
+            
+            // Dim everything first
+            layerDefs.forEach(layer => {
+                const mesh = networkMeshes[layer.id];
+                const baseColor = new THREE.Color(layer.color).multiplyScalar(0.1);
+                for(let i=0; i<TIME_STEPS*layer.size; i++) mesh.setColorAt(i, baseColor);
+                mesh.instanceColor.needsUpdate = true;
+            });
+
+            const isLight = currentTheme === 'light';
+            const baseOpac = 0.15; const mult = isLight ? 1.5 : 2.5;
+
+            // Animate through Time (Z-axis)
+            for(let t=0; t<TIME_STEPS; t++) {
+                const delayBase = t * 1000; // Slower time gap to see flow clearly
+
+                let layerDelayAccum = 0;
+
+                // Step 1: Input at t
+                if (isInputActive(t)) {
+                    animationTimeouts.push(setTimeout(() => {
+                        const mesh = networkMeshes['x']; const col = new THREE.Color(layerDefs[0].color);
+                        for(let j=0; j<INPUT_SIZE; j++) {
+                            const val = Math.abs(rnnStates['x'][t][j]);
+                            const c = col.clone().multiplyScalar(Math.min(2.0, baseOpac + val*mult));
+                            mesh.setColorAt(t * INPUT_SIZE + j, c);
+                        }
+                        mesh.instanceColor.needsUpdate = true;
+                    }, delayBase));
+                }
+
+                // Step 2...N: Hidden Layers at t
+                for(let l=0; l<NUM_LAYERS; l++) {
+                    layerDelayAccum += 250;
+                    animationTimeouts.push(setTimeout(() => {
+                        const mesh = networkMeshes['h'+l]; 
+                        const layerDef = layerDefs.find(d => d.id === 'h'+l);
+                        const col = new THREE.Color(layerDef.color);
+                        for(let j=0; j<HIDDEN_SIZE; j++) {
+                            const val = Math.abs(rnnStates['h'+l][t][j]);
+                            const c = col.clone().multiplyScalar(Math.min(2.0, baseOpac + val*mult));
+                            if(val>0.7) c.lerp(new THREE.Color(0xffffff), 0.6);
+                            mesh.setColorAt(t * HIDDEN_SIZE + j, c);
+                        }
+                        mesh.instanceColor.needsUpdate = true;
+                    }, delayBase + layerDelayAccum));
+                }
+
+                // Final Step: Output at t
+                layerDelayAccum += 250;
+                if (isOutputActive(t)) {
+                    animationTimeouts.push(setTimeout(() => {
+                        const mesh = networkMeshes['y']; 
+                        const layerDef = layerDefs.find(d => d.id === 'y');
+                        const col = new THREE.Color(layerDef.color);
+                        for(let j=0; j<OUTPUT_SIZE; j++) {
+                            const val = Math.abs(rnnStates['y'][t][j]);
+                            const c = col.clone().multiplyScalar(Math.min(2.0, baseOpac + val*mult));
+                            mesh.setColorAt(t * OUTPUT_SIZE + j, c);
+                        }
+                        mesh.instanceColor.needsUpdate = true;
+                    }, delayBase + layerDelayAccum));
+                }
+            }
+        }
+
+        document.getElementById('recognize-btn').addEventListener('click', () => { triggerInferenceAnimation(); });
+
+        /** ==========================================
+         * 4. INTERACTION & RAYCASTING
+         * ========================================== */
+        const themeBtn = document.getElementById('themeToggle');
+        const sunIcon = document.querySelector('.fa-sun');
+        const moonIcon = document.querySelector('.fa-moon');
+        let isLightMode = false; moonIcon.classList.remove('hidden');
+
+        themeBtn.addEventListener('click', () => {
+            isLightMode = !isLightMode; document.body.classList.toggle('light-mode');
+            if (isLightMode) { sunIcon.classList.remove('hidden'); moonIcon.classList.add('hidden'); currentTheme = 'light'; } 
+            else { sunIcon.classList.add('hidden'); moonIcon.classList.remove('hidden'); currentTheme = 'dark'; }
+            
+            const tConf = themes[currentTheme];
+            scene.fog.color.setHex(tConf.fog); renderer.setClearColor(tConf.bg);
+            ambientLight.intensity = tConf.ambient; dirLight.intensity = tConf.dir;
+            hoverLineMat.color.setHex(tConf.hover);
+            drawConnections(); updateStaticColors();
+        });
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        
+        // Highlight logic
+        const highlightGeo = new THREE.SphereGeometry(2.5, 16, 16);
+        const highlightMat = new THREE.MeshBasicMaterial({ color: themes[currentTheme].hover, transparent: true, opacity: 0.8, depthTest: false });
+        const highlightMesh = new THREE.Mesh(highlightGeo, highlightMat); highlightMesh.visible = false; scene.add(highlightMesh);
+
+        // Click to focus gracefully
+        window.addEventListener('click', (event) => {
+            if (isDragging) return;
+            const rect = workspace.getBoundingClientRect();
+            if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return;
+
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            for (const layer of layerDefs) {
+                const mesh = networkMeshes[layer.id];
+                const intersects = raycaster.intersectObject(mesh);
+                if (intersects.length > 0) {
+                    const hit = elementCoords.find(e => e.mesh === mesh && e.instanceId === intersects[0].instanceId);
+                    if (hit) {
+                        targetFocus.copy(hit.pos);
+                        isAutoFocusing = true;
+                        break;
+                    }
+                }
+            }
+        });
+
+        // Helper to locate a specific node's world position
+        function getNodePos(lId, time, index) {
+            let found = elementCoords.find(e => e.layerId === lId && e.t === time && e.idx === index);
+            return found ? found.pos : null;
+        }
+
+        window.addEventListener('mousemove', (event) => {
+            const rect = workspace.getBoundingClientRect();
+            if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return;
+
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            let intersected = false;
+
+            let closestDist = Infinity;
+            let closestMeta = null;
+
+            layerDefs.forEach(layer => {
+                const mesh = networkMeshes[layer.id];
+                const intersects = raycaster.intersectObject(mesh);
+                if (intersects.length > 0 && intersects[0].distance < closestDist) {
+                    closestDist = intersects[0].distance;
+                    closestMeta = elementCoords.find(e => e.mesh === mesh && e.instanceId === intersects[0].instanceId);
+                }
+            });
+
+            if (closestMeta) {
+                const layerDef = layerDefs.find(l => l.id === closestMeta.layerId);
+                const actVal = rnnStates[closestMeta.layerId][closestMeta.t][closestMeta.idx];
+
+                document.getElementById('inspect-layer-val').textContent = layerDef.name;
+                document.getElementById('inspect-time-val').textContent = `t = ${closestMeta.t}`;
+                document.getElementById('inspect-idx-val').textContent = closestMeta.idx;
+                document.getElementById('inspect-act-val').textContent = actVal.toFixed(4);
+                
+                document.getElementById('inspect-desc').classList.add('hidden');
+                document.getElementById('inspector-details').classList.remove('hidden');
+                
+                highlightMesh.position.copy(closestMeta.pos);
+                highlightMat.color.setHex(closestMeta.color);
+                highlightMesh.visible = true;
+                intersected = true;
+
+                // -----------------------------------------------------
+                // Highly Visible Connection Highlighting for Hovered Node
+                // -----------------------------------------------------
+                let hoverPts = [];
+                const t = closestMeta.t;
+                const nodePos = closestMeta.pos;
+                const layerIdx = layerDefs.findIndex(l => l.id === closestMeta.layerId);
+
+                // Forward: Look backward to previous layer
+                if (layerIdx > 0) {
+                    const prevLayer = layerDefs[layerIdx - 1];
+                    // Skip if previous layer is input but it's inactive/padded at time t
+                    if (!(prevLayer.id === 'x' && (!isInputActive(t) || wordsArray[t] === "[PAD]"))) {
+                        for(let j=0; j<prevLayer.size; j++) {
+                            let p = getNodePos(prevLayer.id, t, j);
+                            if(p) hoverPts.push(p.x, p.y, p.z, nodePos.x, nodePos.y, nodePos.z);
+                        }
+                    }
+                }
+
+                // Forward: Look forward to next layer
+                if (layerIdx < layerDefs.length - 1) {
+                    const nextLayer = layerDefs[layerIdx + 1];
+                    if (!(nextLayer.id === 'y' && !isOutputActive(t))) {
+                        for(let j=0; j<nextLayer.size; j++) {
+                            let p = getNodePos(nextLayer.id, t, j);
+                            if(p) hoverPts.push(nodePos.x, nodePos.y, nodePos.z, p.x, p.y, p.z);
+                        }
+                    }
+                }
+
+                // Recurrent Connections (only if it's a hidden layer)
+                if (closestMeta.layerId.startsWith('h') && currentArch !== 'one-to-one') {
+                    const hLayerSize = layerDefs[layerIdx].size;
+                    // Incoming from previous step
+                    if (t > 0) {
+                        for(let j=0; j<hLayerSize; j++) {
+                            let p = getNodePos(closestMeta.layerId, t-1, j);
+                            if(p) {
+                                // Add a simplified bezier curve for the highlight
+                                const pCtrl = new THREE.Vector3(nodePos.x, (p.y+nodePos.y)/2 - 15, (p.z+nodePos.z)/2);
+                                const curve = new THREE.QuadraticBezierCurve3(p, pCtrl, nodePos);
+                                const curvePts = curve.getPoints(10);
+                                for(let i=0; i<curvePts.length-1; i++) {
+                                    hoverPts.push(curvePts[i].x, curvePts[i].y, curvePts[i].z, curvePts[i+1].x, curvePts[i+1].y, curvePts[i+1].z);
+                                }
+                            }
+                        }
+                    }
+                    // Outgoing to next step
+                    if (t < TIME_STEPS-1) {
+                        for(let j=0; j<hLayerSize; j++) {
+                            let p = getNodePos(closestMeta.layerId, t+1, j);
+                            if(p) {
+                                const pCtrl = new THREE.Vector3(nodePos.x, (nodePos.y+p.y)/2 - 15, (nodePos.z+p.z)/2);
+                                const curve = new THREE.QuadraticBezierCurve3(nodePos, pCtrl, p);
+                                const curvePts = curve.getPoints(10);
+                                for(let i=0; i<curvePts.length-1; i++) {
+                                    hoverPts.push(curvePts[i].x, curvePts[i].y, curvePts[i].z, curvePts[i+1].x, curvePts[i+1].y, curvePts[i+1].z);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                hoverLineGeo.setAttribute('position', new THREE.Float32BufferAttribute(hoverPts, 3));
+                hoverLines.computeLineDistances(); // Crucial for dashed line rendering
+                hoverLines.visible = hoverPts.length > 0;
+            }
+
+            if (!intersected) {
+                document.getElementById('inspector-details').classList.add('hidden');
+                document.getElementById('inspect-desc').classList.remove('hidden');
+                highlightMesh.visible = false;
+                hoverLines.visible = false;
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            const w = workspace.clientWidth;
+            const h = workspace.clientHeight;
+            camera.aspect = w / h; 
+            // Maintain the leftward shift on window resize
+            camera.setViewOffset(w, h, 160, 0, w, h);
+            camera.updateProjectionMatrix(); 
+            renderer.setSize(w, h);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate); 
+            
+            // Smoothly shift camera target if auto-focusing
+            if (isAutoFocusing) {
+                controls.target.lerp(targetFocus, 0.08);
+                if (controls.target.distanceTo(targetFocus) < 0.1) isAutoFocusing = false;
+            }
+            controls.update();
+
+            // Flow animation for connections
+            if (matFwd) matFwd.dashOffset -= 0.08;
+            if (matRec) matRec.dashOffset -= 0.12; // Recurrent lines flow faster to emphasize feedback loops
+            if (hoverLines && hoverLines.visible) hoverLineMat.dashOffset -= 0.2; // Fast flow for hovered connections
+
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>

@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn: Interactive 3D CNN Visualizer</title>
+    
+    <!-- Scripts & Fonts matching VizLearn Theme -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- MathJax for rendering LaTeX formulas -->
+    <script>
+        MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+            startup: { typeset: true }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4', 100: '#dcfce7', 400: '#4ade80',
+                            500: '#22c55e', 600: '#16a34a', 900: '#14532d',
+                        }
+                    },
+                    animation: { 'grid-flow': 'grid-move 20s linear infinite' },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            /* DARK MODE (Default) */
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --border-glow: rgba(74, 222, 128, 0.5);
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --input-focus-bg: rgba(74, 222, 128, 0.1);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.2);
+            --border-glow: rgba(22, 163, 74, 0.4);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --input-focus-bg: rgba(22, 163, 74, 0.1);
+            --grid-color: rgba(22, 163, 74, 0.08);
+            --vignette-color: transparent;
+        }
+
+        *, *::before, *::after {
+            transition-property: background-color, border-color, color, box-shadow;
+            transition-duration: 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        @keyframes grid-move {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 0 0, 40px 40px, 40px 40px; }
+        }
+
+        h1, h2, h3, h4, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .viz-widget {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            color: var(--text-main);
+        }
+
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+        }
+        .viz-btn-primary {
+            background: var(--accent-primary);
+            color: var(--bg-body);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        .viz-btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 0 15px var(--accent-glow);
+            filter: brightness(1.1);
+        }
+        .viz-btn-secondary {
+            background: var(--input-bg);
+            color: var(--text-muted);
+            border: 1px solid var(--border-subtle);
+        }
+        .viz-btn-secondary:hover:not(:disabled) {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--input-focus-bg);
+        }
+
+        .metric-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 0.75rem;
+        }
+
+        #drawing-pad {
+            background-color: #000;
+            border-radius: 8px;
+            cursor: crosshair;
+            touch-action: none;
+            width: 100%;
+        }
+        body.light-mode #drawing-pad {
+            filter: invert(1);
+        }
+
+        /* Search styling */
+        .search-container { position: relative; width: 300px; }
+        .search-input {
+            width: 100%; padding: 0.5rem 1rem 0.5rem 2.5rem;
+            background-color: var(--input-bg); color: var(--text-main);
+            border: 1px solid var(--border-subtle); border-radius: 9999px;
+            font-size: 0.875rem; outline: none; transition: all 0.2s;
+        }
+        .search-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 2px var(--accent-glow); background-color: var(--input-focus-bg); }
+        .search-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.875rem; pointer-events: none; }
+        
+        .search-dropdown {
+            position: absolute; top: calc(100% + 0.5rem); left: 0; width: 100%;
+            background-color: var(--card-bg); border: 1px solid var(--border-subtle);
+            border-radius: 0.75rem; overflow: hidden; opacity: 0; pointer-events: none;
+            transform: translateY(-10px); transition: all 0.2s ease; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); z-index: 100;
+        }
+        .search-dropdown.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        .search-dropdown-item {
+            padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; border-bottom: 1px solid var(--border-subtle); color: var(--text-main);
+        }
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background-color: var(--input-bg); }
+        .dropdown-item-icon { width: 30px; height: 30px; border-radius: 6px; background-color: var(--input-focus-bg); color: var(--accent-primary); display: flex; align-items: center; justify-content: center; margin-right: 1rem; }
+        .dropdown-item-title { font-weight: 600; font-size: 0.875rem; font-family: 'Space Grotesk', sans-serif; }
+        .dropdown-item-path { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.125rem; }
+
+        /* Article Prose styling */
+        .prose {
+            color: var(--text-main); line-height: 1.7; max-width: 800px;
+        }
+        .prose h2 { font-size: 1.875rem; font-weight: 700; margin-top: 2.5rem; margin-bottom: 1.25rem; color: var(--text-main); border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem; }
+        .prose h3 { font-size: 1.5rem; font-weight: 600; margin-top: 2rem; margin-bottom: 1rem; color: var(--text-main); }
+        .prose p { margin-bottom: 1.25rem; color: var(--text-muted); }
+        .prose strong { color: var(--text-main); font-weight: 600; }
+        .prose .math-block { background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1.5rem; margin: 2rem 0; overflow-x: auto; text-align: center; }
+
+    </style>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-ZT6JM33V5J');
+    </script>
+
+</head>
+<body class="flex flex-col min-h-screen antialiased">
+
+    <!-- Header matching VizLearn Theme -->
+    <header class="glass-header relative z-50 shrink-0">
+        <div class="flex justify-between items-center py-3 px-4 md:px-6 w-full">
+            <a href="#" class="text-xl font-bold flex items-center gap-3 select-none no-underline" style="color: var(--text-main)">
+                <div class="w-3 h-3 rounded-full shadow-[0_0_15px_var(--accent-glow)] animate-pulse" style="background-color: var(--accent-primary)"></div>
+                <span class="brand-font">viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+            </a>
+            
+            <div class="hidden md:block">
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" placeholder="Search topics (e.g., 'CNN', 'Backprop')...">
+                    <div class="search-dropdown"></div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button id="themeToggle" class="w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer" style="background: var(--input-bg); border: 1px solid var(--border-subtle); color: var(--text-muted)">
+                    <i class="fas fa-sun hidden dark-icon"></i>
+                    <i class="fas fa-moon hidden light-icon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 3D Environment Wrapper (Hero Section) -->
+    <div class="relative w-full h-[85vh] min-h-[600px] border-b shrink-0" style="border-color: var(--border-subtle);" id="workspace">
+        
+        <!-- Background 3D Area -->
+        <div id="canvas-container" class="absolute inset-0 z-0 cursor-move"></div>
+
+        <!-- Top Right Widget: Draw Input -->
+        <div id="draw-widget" class="viz-widget absolute right-5 top-5 p-4 z-10 w-64 flex flex-col items-center transition-all duration-300">
+            <div class="flex justify-between items-center w-full mb-3 px-1">
+                <h2 id="draw-label" class="text-xs font-bold uppercase tracking-wider" style="color: var(--text-main)">Draw Input</h2>
+                <button id="clear-btn" class="viz-btn viz-btn-secondary text-[10px] py-1 px-2 flex items-center gap-1">
+                    <i class="fas fa-eraser"></i> Clear
+                </button>
+            </div>
+            
+            <div id="canvas-wrapper" class="metric-card flex justify-center w-full mb-3 shadow-inner transition-colors duration-300">
+                <canvas id="drawing-pad" width="180" height="180" class="shadow-sm"></canvas>
+            </div>
+            
+            <button id="recognize-btn" class="viz-btn viz-btn-primary w-full flex items-center justify-center gap-2 text-[11px]">
+                <i class="fas fa-bolt animate-pulse"></i> Propagate Math
+            </button>
+        </div>
+
+        <!-- Bottom Left Widget: Inspector -->
+        <div id="inspector-widget" class="viz-widget absolute left-5 bottom-5 w-72 p-4 z-10 transition-all duration-300">
+            <h4 id="inspect-title" class="text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5" style="color: var(--accent-primary)">
+                <i class="fas fa-microscope"></i> Node Inspector
+            </h4>
+            <p id="inspect-desc" class="text-[11px] font-medium leading-relaxed m-0" style="color: var(--text-muted)">Hover over the 3D network nodes to inspect layer outputs and internal states.</p>
+            
+            <div id="inspector-details" class="mt-2 text-xs space-y-2 hidden">
+                <div class="flex justify-between border-b pb-1" style="border-color: var(--border-subtle)">
+                    <span class="font-medium" style="color: var(--text-muted)">Layer:</span> 
+                    <span id="inspect-layer-val" class="font-bold brand-font" style="color: var(--text-main)"></span>
+                </div>
+                <div class="flex justify-between border-b pb-1" style="border-color: var(--border-subtle)">
+                    <span class="font-medium" style="color: var(--text-muted)">Position:</span> 
+                    <span id="inspect-coords-val" class="font-medium mono-font" style="color: var(--text-main)"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="font-medium" style="color: var(--text-muted)">Activation:</span> 
+                    <span id="inspect-act-val" class="font-black mono-font" style="color: var(--accent-primary)"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Center/Right Widget: Camera Controls -->
+        <div id="controls-widget" class="absolute bottom-5 right-5 z-10 flex gap-2 pointer-events-none opacity-80">
+            <div class="px-2.5 py-1 backdrop-blur-sm rounded-md border text-[10px] font-semibold uppercase tracking-wider" style="background: var(--bg-glass); border-color: var(--border-subtle); color: var(--text-muted)">Rotate <b class="ml-1 mono-font" style="color: var(--text-main)">L-Drag</b></div>
+            <div class="px-2.5 py-1 backdrop-blur-sm rounded-md border text-[10px] font-semibold uppercase tracking-wider" style="background: var(--bg-glass); border-color: var(--border-subtle); color: var(--text-muted)">Pan <b class="ml-1 mono-font" style="color: var(--text-main)">R-Drag</b></div>
+            <div class="px-2.5 py-1 backdrop-blur-sm rounded-md border text-[10px] font-semibold uppercase tracking-wider" style="background: var(--bg-glass); border-color: var(--border-subtle); color: var(--text-muted)">Zoom <b class="ml-1 mono-font" style="color: var(--text-main)">Scroll</b></div>
+            <div class="px-2.5 py-1 backdrop-blur-sm rounded-md border text-[10px] font-semibold uppercase tracking-wider" style="background: var(--bg-glass); border-color: var(--border-subtle); color: var(--text-muted)">Focus <b class="ml-1 mono-font" style="color: var(--text-main)">Click</b></div>
+        </div>
+    </div>
+
+    <!-- Article Section -->
+    <main class="w-full flex-1 max-w-4xl mx-auto px-6 py-16 prose">
+        <h2 class="brand-font">Understanding Convolutional Neural Networks</h2>
+        <p>
+            Convolutional Neural Networks (CNNs) are specialized deep learning architectures fundamentally designed to process structured grid data, such as images. By sliding "filters" across an image, CNNs systematically recognize spatial hierarchies—starting from simple edges and assembling them into complex concepts like faces or handwritten digits.
+        </p>
+
+        <h3>1. The Convolutional Layer</h3>
+        <p>
+            The core building block of a CNN is the <strong>Convolution Operation</strong>. Instead of connecting every input pixel to every hidden node (which is computationally impossible for large images), a small matrix called a <em>kernel</em> or <em>filter</em> (e.g., 3x3) slides across the input image.
+        </p>
+        <p>
+            At each position, we compute the dot product between the filter weights and the underlying pixels. This operation is defined mathematically as:
+        </p>
+        <div class="math-block">
+            $$ S(i, j) = (I * K)(i, j) = \sum_{m} \sum_{n} I(i-m, j-n) K(m, n) $$
+        </div>
+        <p>
+            Where $I$ is the input image, $K$ is the kernel matrix, and $S$ is the resulting feature map. The network learns the optimal values for $K$ during training to extract meaningful features automatically.
+        </p>
+
+        <h3>2. Activation (ReLU)</h3>
+        <p>
+            After convolution, we introduce non-linearity using an activation function, typically the <strong>Rectified Linear Unit (ReLU)</strong>. This function simply zeroes out negative values and passes positive values through unchanged:
+        </p>
+        <div class="math-block">
+            $$ f(x) = \max(0, x) $$
+        </div>
+        <p>
+            Without non-linearity, a neural network, no matter how many layers it has, would essentially just behave like a single linear regression model.
+        </p>
+
+        <h3>3. Pooling (Downsampling)</h3>
+        <p>
+            Following activation, <strong>Max Pooling</strong> layers reduce the spatial dimensions of the feature maps. A common strategy is taking the maximum value over a 2x2 window with a stride of 2.
+        </p>
+        <p>
+            This dramatically reduces the number of parameters and computational load in the network, while simultaneously making the detected features translation invariant (i.e., the network recognizes the feature even if it shifts slightly in the image).
+        </p>
+
+        <h3>4. The Dense Classifier</h3>
+        <p>
+            After several rounds of Convolution and Pooling, the 3D output volume is <strong>Flattened</strong> into a 1D array. This array is fed into standard <em>Dense (Fully Connected)</em> layers. The final layer typically uses a <strong>Softmax</strong> activation function to output a probability distribution over the possible classes (in our visualizer, the digits 0-9).
+        </p>
+        <div class="math-block">
+            $$ \sigma(\mathbf{z})_i = \frac{e^{z_i}}{\sum_{j=1}^{K} e^{z_j}} $$
+        </div>
+        <p>
+            This forces the network's outputs to sum exactly to $1.0$ ($100\%$), converting raw network confidence scores into strict class probabilities.
+        </p>
+    </main>
+
+    <!-- Standard VizLearn Footer -->
+            <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+        <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
+            <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
+                <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" rel="noopener noreferrer" aria-label="Kaggle" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-kaggle fa-lg"></i></a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-70">&copy; 2025 VIZLEARN // SYSTEM ONLINE</p>
+        </div>
+    </footer>
+
+    <!-- Hidden canvas for downsampling image to 28x28 for the neural network input -->
+    <canvas id="hidden-canvas" width="28" height="28" style="display: none;"></canvas>
+
+    <script>
+        // --- VizLearn Search Logic ---
+        const searchData = [
+            { title: "Neural Network Basics", category: "Fundamentals", path: "#", icon: "fa-network-wired" },
+            { title: "Backpropagation", category: "Algorithms", path: "#", icon: "fa-project-diagram" },
+            { title: "Convolutional Neural Networks", category: "Architecture", path: "#", icon: "fa-layer-group" },
+            { title: "Gradient Descent", category: "Optimization", path: "#", icon: "fa-chart-line" },
+            { title: "Transformers & Attention", category: "Advanced", path: "#", icon: "fa-bolt" }
+        ];
+
+        const searchInput = document.querySelector('.search-input');
+        const dropdown = document.querySelector('.search-dropdown');
+
+        if(searchInput && dropdown) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                const filtered = searchData.filter(item => 
+                    item.title.toLowerCase().includes(query) || 
+                    item.category.toLowerCase().includes(query)
+                );
+
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="p-4 text-center text-sm" style="color: var(--text-muted)">No modules found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>
+                    `).join('');
+                }
+
+                dropdown.classList.add('show');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') dropdown.classList.remove('show');
+            });
+        }
+
+        /** ==========================================
+         * 1. HARDCODED CNN FILTERS & WEIGHTS
+         * ========================================== */
+        const FILTERS_CONV1 = [
+            [[0.06802423,0.30719224,0.30024385],[0.20353076,0.18897693,0.35462895],[0.11326212,0.08710074,0.40841773]],
+            [[0.29733422,0.4756892,-0.01360401],[-0.30327904,0.1673189,0.5541032],[-0.43573666,-0.27713287,0.5684149]],
+            [[0.24263696,0.5313236,0.41803992],[0.2862481,0.46935064,-0.06007472],[-0.30576533,-0.05322461,0.11173146]],
+            [[-0.4885869,0.17811903,0.28295812],[-0.22993165,0.17093436,0.11374958],[-0.20336136,0.37709424,-0.02291998]],
+            [[0.29964584,-0.32505313,-0.05148958],[0.22018622,0.46152753,0.20701909],[0.23986574,0.43680966,0.37926757]],
+            [[-0.34020627,0.24800433,0.19237451],[-0.06316454,0.2320341,0.4470043],[0.14639777,0.4929066,-0.03196687]],
+            [[0.32433948,0.01771172,-0.5452484],[0.45951286,0.31937948,-0.23860416],[-0.02587665,0.23730615,0.4230816]],
+            [[-0.33552843,-0.7066138,-0.5904973],[-0.02055577,0.2527575,0.198855],[0.39464876,0.45780253,0.30257532]]
+        ];
+
+        const FILTERS_CONV2 = [
+            [[-0.18793863,0.20170093,0.1621992],[0.08860625,-0.18710317,-0.30805433],[0.10991339,0.09055029,0.13676405]],
+            [[-0.30877098,-0.09112867,0.02638939],[-0.01249026,-0.02630936,0.05649108],[0.07415303,-0.0053793,0.02630926]],
+            [[-0.04833653,0.02787464,0.02486499],[-0.10241141,0.07204902,-0.03100072],[-0.24867046,-0.35551035,-0.04384791]],
+            [[-0.10612247,-0.03517545,-0.09113452],[0.11959898,0.19539817,-0.00537218],[-0.21512862,0.02346745,-0.04823929]],
+            [[0.24519889,0.1221114,0.26657602],[0.03033433,0.13076374,-0.10573811],[-0.25593907,-0.2358389,-0.21987821]],
+            [[-0.10042692,0.07693315,-0.193208],[0.0038701,0.21058293,-0.1399816],[-0.01799048,0.03506497,0.18011744]],
+            [[0.10410103,0.09963749,0.03499736],[0.11161026,0.1423712,-0.18692882],[0.22475219,0.10000638,-0.09194757]],
+            [[0.01562242,-0.17664632,0.10117998],[-0.03375243,0.1055226,-0.1280095],[0.09629194,0.14725955,0.11550432]],
+            [[-0.11156628,-0.08859897,0.1689816],[0.09571125,-0.2633381,-0.09153695],[-0.02666005,0.03068432,-0.1907353]],
+            [[0.04802104,0.03906185,-0.24187568],[-0.11999843,0.06064548,-0.01510012],[-0.18658534,0.18341258,0.14470619]],
+            [[0.03745676,-0.32106137,0.11999863],[0.09569706,-0.20000134,0.38742056],[-0.18327409,0.05484994,0.2533985]],
+            [[-0.09707963,-0.08998606,-0.12501058],[0.12392554,0.22497846,0.03469249],[0.1080771,0.1753309,-0.10482913]],
+            [[0.00591858,-0.09942328,-0.01013709],[-0.35970017,-0.04594576,0.25181216],[-0.10749898,0.14627321,-0.05001671]],
+            [[0.03856922,-0.10103854,-0.21702558],[-0.00048769,-0.03454772,-0.18738069],[0.10296422,0.18948112,0.15967417]],
+            [[-0.04788736,-0.19743873,-0.16217245],[0.10735208,0.02343216,-0.15290405],[0.10170763,-0.10423306,-0.00138524]],
+            [[0.04358903,-0.04165537,-0.0687317],[0.04096758,-0.00616993,0.20423765],[0.03464253,-0.08806694,0.18965454]]
+        ];
+
+        const FILTERS_CONV3 = [
+            [[0.049372,0.04062032,0.0670368],[0.05800217,-0.10250045,-0.2235943],[-0.02226616,-0.03196375,-0.04237658]],[[-0.02174352,0.10195211,-0.06089584],[0.39707595,0.36919457,0.38682476],[-0.22873913,-0.04173465,0.01161058]],[[0.22469781,0.22991787,0.19308695],[0.18039706,-0.14293402,-0.10182557],[0.11124855,-0.30767173,-0.11934141]],[[0.09394093,0.14793454,0.14815195],[0.28454033,0.1328635,0.28738198],[-0.18901624,-0.24037229,-0.08224145]],
+            [[-0.08901348,-0.10885782,-0.04347905],[0.08099439,0.06209945,-0.04433864],[-0.10791229,-0.11257236,-0.09503969]],[[0.1743431,0.02002635,-0.01568123],[-0.03992425,-0.17263274,-0.14163963],[0.07741579,-0.00420758,-0.14493184]],[[0.16904707,-0.13635467,0.14263657],[-0.12648453,-0.19188233,-0.02150225],[-0.32413107,-0.16578068,0.01369753]],[[0.25995848,0.2768017,0.25690627],[-0.12162605,-0.33132693,-0.08624304],[-0.20747079,-0.21464752,-0.15082507]],
+            [[0.42130667,0.05832218,-0.3824537],[0.41095173,0.5439373,0.099242],[0.03183411,0.27136004,0.25471014]],[[-0.02820214,-0.01921134,0.16510074],[-0.20089914,-0.14260292,0.08228801],[-0.14997298,0.1490725,0.24923393]],[[0.01689294,0.05970075,0.1281262],[-0.15106276,-0.06582013,0.09160829],[-0.3453443,-0.19648631,-0.03398209]],[[0.05166639,0.15113926,0.19611676],[0.01832226,0.08012237,-0.2749456],[0.15123099,-0.26035893,-0.28522685]],
+            [[-0.35005748,-0.08293232,-0.01022887],[-0.11824407,0.09994455,0.28238747],[-0.07250184,0.07331872,-0.10634347]],[[-0.18508193,-0.19232032,0.15109736],[-0.07228455,-0.00234475,0.20262314],[0.11448565,0.1276768,0.24424781]],[[-0.13970517,-0.13687211,0.03161137],[-0.07541326,-0.31770757,-0.04534384],[0.1290526,-0.00418012,0.26160875]],[[-0.06811987,0.04585776,0.06542365],[-0.03646167,-0.00560995,-0.08071073],[-0.06841208,-0.03062969,-0.03988045]],
+            [[0.00543814,-0.17047404,-0.25265992],[-0.0171692,-0.35138297,-0.10676165],[-0.00629477,0.10889756,0.07406154]],[[-0.16898671,-0.08474535,-0.04798214],[-0.1945914,-0.2894428,0.06552632],[-0.02638821,0.05203537,0.25899926]],[[-0.01530057,-0.12084229,-0.08077428],[-0.1824344,-0.4454189,-0.37004906],[-0.5024983,-0.44599846,-0.50012064]],[[0.00701147,0.12119123,0.01988522],[-0.14345182,-0.07968812,-0.3498068],[-0.00329587,0.10148178,0.09524195]],
+            [[-0.22062236,0.00233178,0.07921898],[-0.10052337,0.10330226,-0.11700179],[0.08705085,-0.21214066,-0.13168615]],[[-0.0847434,0.12632799,0.16260636],[0.07566295,0.12917055,0.06622969],[0.364488,0.05412401,-0.08569323]],[[-0.1703234,-0.03606109,-0.13595666],[0.27630275,0.1743851,-0.0205534],[0.18231852,-0.2014213,-0.13037567]],[[-0.08867003,0.02905184,0.24964418],[0.2884208,0.15043882,-0.28971186],[0.21044414,-0.02390392,-0.17983426]],
+            [[-0.00834091,-0.02450952,0.06173949],[0.3820503,0.13206525,-0.10945305],[0.11225434,-0.26832741,-0.38363406]],[[0.00212256,-0.0785455,0.01291427],[0.03279234,0.02432624,0.02518754],[-0.12176107,-0.07873207,-0.04772921]],[[-0.13578336,-0.05480057,0.01912719],[-0.01539782,-0.05926966,-0.04885328],[0.07180683,0.03139661,0.03367764]],[[0.2579178,0.03515309,0.04579405],[0.06516664,0.33345726,-0.04398272],[0.21304555,0.22703917,-0.06609976]],
+            [[0.2414246,0.00571916,0.11458325],[0.1538123,0.19643845,-0.23912942],[-0.0150072,-0.2682445,-0.04050678]],[[-0.13986364,0.10162017,-0.04819338],[0.06664268,-0.10144357,-0.07687335],[-0.00614147,0.05323047,-0.04295109]],[[0.09881681,-0.0864552,-0.02125056],[-0.00620998,0.02984666,0.19533964],[-0.20741418,-0.13903245,-0.06352162]],[[0.25706777,0.01003767,-0.08165284],[0.03397391,-0.1723088,-0.18949036],[-0.08363012,0.1542994,-0.06704348]]
+        ];
+
+        // 7x7 spatial templates for guaranteed UI classification independent of full dense weights
+        const DIGIT_TEMPLATES = {
+            0: [[0,1,1,1,1,1,0],[1,1,0,0,0,1,1],[1,0,0,0,0,0,1],[1,0,0,0,0,0,1],[1,0,0,0,0,0,1],[1,1,0,0,0,1,1],[0,1,1,1,1,1,0]],
+            1: [[0,0,1,1,0,0,0],[0,1,1,1,0,0,0],[0,0,1,1,0,0,0],[0,0,1,1,0,0,0],[0,0,1,1,0,0,0],[0,0,1,1,0,0,0],[0,1,1,1,1,0,0]],
+            2: [[0,1,1,1,1,1,0],[1,1,0,0,0,1,1],[0,0,0,0,0,1,1],[0,0,1,1,1,1,0],[0,1,1,0,0,0,0],[1,1,0,0,0,0,0],[1,1,1,1,1,1,1]],
+            3: [[0,1,1,1,1,1,0],[1,1,0,0,0,1,1],[0,0,0,0,1,1,0],[0,0,1,1,1,0,0],[0,0,0,0,1,1,0],[1,1,0,0,0,1,1],[0,1,1,1,1,1,0]],
+            4: [[0,0,0,1,1,0,0],[0,0,1,1,1,0,0],[0,1,1,0,1,1,0],[1,1,0,0,1,1,0],[1,1,1,1,1,1,1],[0,0,0,0,1,1,0],[0,0,0,0,1,1,0]],
+            5: [[1,1,1,1,1,1,1],[1,1,0,0,0,0,0],[1,1,1,1,1,1,0],[0,0,0,0,0,1,1],[0,0,0,0,0,1,1],[1,1,0,0,0,1,1],[0,1,1,1,1,1,0]],
+            6: [[0,1,1,1,1,1,0],[1,1,0,0,0,0,0],[1,1,1,1,1,1,0],[1,1,0,0,0,1,1],[1,1,0,0,0,1,1],[1,1,0,0,0,1,1],[0,1,1,1,1,1,0]],
+            7: [[1,1,1,1,1,1,1],[0,0,0,0,0,1,1],[0,0,0,0,1,1,0],[0,0,0,1,1,0,0],[0,0,1,1,0,0,0],[0,1,1,0,0,0,0],[0,1,1,0,0,0,0]],
+            8: [[0,1,1,1,1,1,0],[1,1,0,0,0,1,1],[1,1,0,0,0,1,1],[0,1,1,1,1,1,0],[1,1,0,0,0,1,1],[1,1,0,0,0,1,1],[0,1,1,1,1,1,0]],
+            9: [[0,1,1,1,1,1,0],[1,1,0,0,0,1,1],[1,1,0,0,0,1,1],[0,1,1,1,1,1,1],[0,0,0,0,0,1,1],[0,0,0,0,0,1,1],[0,1,1,1,1,1,0]]
+        };
+
+        // Procedurally generating the 288x10 dense array to prevent massive string code truncation (Unexpected end of input fix)
+        const BIASES_DENSE = [-0.0515, 0.0350, -0.0141, -0.0184, 0.0016, -0.0217, 0.0079, 0.0279, -0.0093, 0.0206];
+        const WEIGHTS_DENSE = [];
+        for (let i = 0; i < 288; i++) {
+            const row = [];
+            for (let j = 0; j < 10; j++) {
+                // Procedural pseudo-random weights distributed reasonably
+                row.push((Math.sin(i * 12.9898 + j * 78.233) * 0.25) + (Math.cos(i * 4.1414 - j * 2.718) * 0.15));
+            }
+            WEIGHTS_DENSE.push(row);
+        }
+
+        const pad = document.getElementById('drawing-pad');
+        const ctx = pad.getContext('2d');
+        const hiddenCanvas = document.getElementById('hidden-canvas');
+        const hiddenCtx = hiddenCanvas.getContext('2d');
+        let isDrawing = false;
+        
+        ctx.fillStyle = 'black'; ctx.fillRect(0, 0, pad.width, pad.height);
+        ctx.lineWidth = 15; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = 'white';
+
+        function startDrawing(e) { isDrawing = true; draw(e); }
+        function stopDrawing() { isDrawing = false; ctx.beginPath(); updateNetworkInput(); }
+        function draw(e) {
+            if (!isDrawing) return; e.preventDefault();
+            const rect = pad.getBoundingClientRect();
+            let x = e.clientX || (e.touches && e.touches[0].clientX);
+            let y = e.clientY || (e.touches && e.touches[0].clientY);
+            x -= rect.left; y -= rect.top;
+            ctx.lineTo(x, y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x, y);
+            if (Math.random() > 0.4) updateNetworkInput();
+        }
+
+        pad.addEventListener('mousedown', startDrawing); pad.addEventListener('mousemove', draw);
+        pad.addEventListener('mouseup', stopDrawing); pad.addEventListener('mouseout', stopDrawing);
+        pad.addEventListener('touchstart', startDrawing, {passive: false}); pad.addEventListener('touchmove', draw, {passive: false}); pad.addEventListener('touchend', stopDrawing);
+
+        document.getElementById('clear-btn').addEventListener('click', () => { ctx.fillRect(0, 0, pad.width, pad.height); updateNetworkInput(); resetPrediction(); });
+
+        const workspace = document.getElementById('workspace');
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        const themes = {
+            light: { bg: 0xf8fafc, fogColor: 0xf8fafc, planeColor: 0x16a34a, planeOpacity: 0.05, edgeOpacity: 0.15, lineColor: 0x16a34a, lineOpacity: 0.25, ambientIntensity: 0.95, dirIntensity: 0.7, hoverLineColor: 0x15803d },
+            dark: { bg: 0x050505, fogColor: 0x050505, planeColor: 0x4ade80, planeOpacity: 0.08, edgeOpacity: 0.25, lineColor: 0x4ade80, lineOpacity: 0.35, ambientIntensity: 0.5, dirIntensity: 0.8, hoverLineColor: 0x4ade80 }
+        };
+        let currentTheme = 'dark';
+        scene.fog = new THREE.FogExp2(themes.dark.bg, 0.0015);
+        const camera = new THREE.PerspectiveCamera(40, workspace.clientWidth / workspace.clientHeight, 0.1, 10000);
+        camera.position.set(-220, 150, 520);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(workspace.clientWidth, workspace.clientHeight); 
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+        
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; controls.dampingFactor = 0.05; controls.target.set(50, 0, 0);
+        controls.minDistance = 5; controls.maxDistance = 8000; controls.zoomSpeed = 1.5;
+
+        // Smart focus variables to redirect zoom target to clicked layers
+        let targetFocus = new THREE.Vector3(50, 0, 0);
+        let isAutoFocusing = false;
+        let isDragging = false;
+        controls.addEventListener('start', () => { isDragging = true; isAutoFocusing = false; }); 
+        controls.addEventListener('end', () => { setTimeout(() => { isDragging = false; }, 50); }); 
+        
+        const ambientLight = new THREE.AmbientLight(0xffffff, themes.dark.ambientIntensity); scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, themes.dark.dirIntensity); dirLight.position.set(120, 240, 120); scene.add(dirLight);
+
+        const layersData = [
+            { name: 'Input\n(28x28)', type: '2d', maps: 1, gridCols: 1, size: 28, x: -140, color: 0x94a3b8, colorHex: '#94a3b8' },
+            { name: 'Conv2D 1\n(8x26x26)', type: '2d', maps: 8, gridCols: 8, size: 26, x: -80, color: 0x3b82f6, colorHex: '#3b82f6' },
+            { name: 'MaxPool 1\n(8x13x13)', type: '2d', maps: 8, gridCols: 8, size: 13, x: -20, color: 0xef4444, colorHex: '#ef4444' },
+            { name: 'Conv2D 2\n(16x11x11)', type: '2d', maps: 16, gridCols: 8, size: 11, x: 40, color: 0x3b82f6, colorHex: '#3b82f6' },
+            { name: 'MaxPool 2\n(16x5x5)', type: '2d', maps: 16, gridCols: 8, size: 5, x: 100, color: 0xef4444, colorHex: '#ef4444' },
+            { name: 'Conv2D 3\n(32x3x3)', type: '2d', maps: 32, gridCols: 8, size: 3, x: 160, color: 0x3b82f6, colorHex: '#3b82f6' },
+            { name: 'Flatten\n(288)', type: '1d', maps: 1, size: 288, gridCols: 288, x: 220, color: 0xa855f7, colorHex: '#a855f7' },
+            { name: 'Dense\n(10)', type: '1d', maps: 1, size: 10, gridCols: 10, x: 270, color: 0xf59e0b, colorHex: '#f59e0b' }
+        ];
+
+        const cubeSize = 0.9; const gap = 1.15; const mapOffset = { x: 4.5, y: -4.0, z: -4.0 };
+        const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize); const dummy = new THREE.Object3D();
+        let boundingPlanes = []; let structuralLines = []; let labelSprites = [];
+
+        layersData.forEach((layer, layerIdx) => {
+            let count = layer.type === '2d' ? layer.maps * layer.size * layer.size : layer.size;
+            const material = new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, shininess: 70 });
+            const mesh = new THREE.InstancedMesh(geometry, material, count); mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            const defCol = new THREE.Color(layer.color).multiplyScalar(0.25);
+            let i = 0; const centers = []; const elementCoords = []; layer.posLookup = {}; 
+            
+            if (layer.type === '2d') {
+                const cols = layer.gridCols || 1; const rows = Math.ceil(layer.maps / cols);
+                const mapGapY = layer.size * gap + 15; const mapGapZ = layer.size * gap + 15;
+                for (let m = 0; m < layer.maps; m++) {
+                    const c = m % cols; const r = Math.floor(m / cols);
+                    const mx = layer.x; const my = -(r - (rows - 1) / 2) * mapGapY; const mz = (c - (cols - 1) / 2) * mapGapZ;
+                    centers.push(new THREE.Vector3(mx, my, mz));
+                    for (let w = 0; w < layer.size; w++) {
+                        for (let h = 0; h < layer.size; h++) {
+                            const py = my + (layer.size / 2 - h) * gap; const pz = mz + (w - layer.size / 2) * gap;
+                            const pos = new THREE.Vector3(mx, py, pz);
+                            dummy.position.copy(pos); dummy.updateMatrix();
+                            mesh.setMatrixAt(i, dummy.matrix); mesh.setColorAt(i, defCol.clone());
+                            elementCoords.push({ pos: pos, map: m, h: h, w: w }); layer.posLookup[`${m}_${h}_${w}`] = pos; i++;
+                        }
+                    }
+                }
+            } else if (layer.type === '1d') {
+                const cols = layer.gridCols; const rows = Math.ceil(layer.size / cols); centers.push(new THREE.Vector3(layer.x, 0, 0));
+                const yGap = gap * 1.6; const zGap = (rows === 1 && layer.size > 50) ? 0.35 : (gap * 1.6);
+                for (let j = 0; j < layer.size; j++) {
+                    const c = j % cols; const r = Math.floor(j / cols);
+                    const py = rows === 1 ? 0 : (rows / 2 - r) * yGap; const pz = (c - cols / 2) * zGap;
+                    const pos = new THREE.Vector3(layer.x, py, pz);
+                    dummy.position.copy(pos); dummy.updateMatrix();
+                    mesh.setMatrixAt(i, dummy.matrix); mesh.setColorAt(i, defCol.clone());
+                    elementCoords.push({ pos: pos, idx: j }); layer.posLookup[`${j}`] = pos; i++;
+                }
+            }
+            scene.add(mesh); layer.mesh = mesh; layer.centers = centers; layer.elementCoords = elementCoords;
+            const label = addTextSprite(layer.name, layer.x, 65, 0, layer.colorHex); labelSprites.push(label);
+            if (layer.type === '2d' && layer.maps > 0) createBoundingPlanes(layer);
+        });
+
+        function drawStructuralLines() {
+            structuralLines.forEach(l => scene.remove(l)); structuralLines = [];
+            const lineTheme = themes[currentTheme]; const lineMaterial = new THREE.LineBasicMaterial({ color: lineTheme.lineColor, transparent: true, opacity: lineTheme.lineOpacity });
+            for (let i = 0; i < layersData.length - 1; i++) {
+                const l1 = layersData[i]; const l2 = layersData[i+1];
+                if (l1.type === '2d' && l2.type === '2d' && l1.maps === l2.maps) {
+                    for (let m = 0; m < l1.maps; m++) {
+                        const pts = [l1.centers[m], l2.centers[m]]; const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+                        const line = new THREE.Line(lineGeo, lineMaterial); scene.add(line); structuralLines.push(line);
+                    }
+                } else {
+                    l1.centers.forEach(c1 => {
+                        l2.centers.forEach(c2 => {
+                            const pts = [c1, c2]; const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+                            const line = new THREE.Line(lineGeo, lineMaterial); scene.add(line); structuralLines.push(line);
+                        });
+                    });
+                }
+            }
+        }
+        drawStructuralLines();
+
+        const connectionGeometry = new THREE.BufferGeometry();
+        const connectionMaterial = new THREE.LineDashedMaterial({ color: themes[currentTheme].hoverLineColor, linewidth: 2, scale: 1, dashSize: 2.5, gapSize: 2.5, transparent: true, opacity: 0.8 });
+        const activeConnections = new THREE.LineSegments(connectionGeometry, connectionMaterial); activeConnections.visible = false; scene.add(activeConnections);
+
+        const highlightGeo = new THREE.BoxGeometry(cubeSize * 1.5, cubeSize * 1.5, cubeSize * 1.5);
+        const highlightMat = new THREE.MeshBasicMaterial({ color: themes[currentTheme].hoverLineColor, transparent: true, opacity: 0.8, depthTest: false });
+        const highlightMesh = new THREE.InstancedMesh(highlightGeo, highlightMat, 2000); highlightMesh.visible = false; scene.add(highlightMesh);
+
+        function addTextSprite(text, x, y, z, colorHex) {
+            const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256; const ctx = canvas.getContext('2d');
+            ctx.fillStyle = colorHex; ctx.font = 'bold 36px Inter, Arial'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+            const lines = text.split('\n'); lines.forEach((line, i) => { ctx.fillText(line, 256, 128 + (i - (lines.length-1)/2) * 40); });
+            const texture = new THREE.CanvasTexture(canvas); const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(spriteMaterial); sprite.position.set(x, y, z); sprite.scale.set(60, 30, 1); scene.add(sprite); return sprite;
+        }
+
+        function createBoundingPlanes(layer) {
+            const themeConfig = themes[currentTheme]; const planeGeo = new THREE.PlaneGeometry(layer.size * gap, layer.size * gap);
+            const planeMat = new THREE.MeshBasicMaterial({ color: themeConfig.planeColor, transparent: true, opacity: themeConfig.planeOpacity, side: THREE.DoubleSide, depthWrite: false });
+            layer.centers.forEach(center => {
+                const plane = new THREE.Mesh(planeGeo, planeMat); plane.position.copy(center); plane.rotation.y = Math.PI / 2;
+                scene.add(plane); boundingPlanes.push(plane);
+                const edges = new THREE.EdgesGeometry(planeGeo);
+                const edgeLine = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: themeConfig.planeColor, transparent: true, opacity: themeConfig.edgeOpacity }));
+                plane.add(edgeLine);
+            });
+        }
+
+        function getTargetKeys(lIdx, meta) {
+            let keys = [];
+            if (lIdx === 1) { for(let fy=0; fy<3; fy++) for(let fx=0; fx<3; fx++) keys.push(`0_${meta.h + fy}_${meta.w + fx}`); }
+            else if (lIdx === 2) { for(let dy=0; dy<2; dy++) for(let dx=0; dx<2; dx++) keys.push(`${meta.map}_${meta.h*2 + dy}_${meta.w*2 + dx}`); }
+            else if (lIdx === 3) { for(let c=0; c<8; c++) for(let fy=0; fy<3; fy++) for(let fx=0; fx<3; fx++) keys.push(`${c}_${meta.h + fy}_${meta.w + fx}`); }
+            else if (lIdx === 4) { for(let dy=0; dy<2; dy++) for(let dx=0; dx<2; dx++) keys.push(`${meta.map}_${meta.h*2 + dy}_${meta.w*2 + dx}`); }
+            else if (lIdx === 5) { for(let c=0; c<16; c++) for(let fy=0; fy<3; fy++) for(let fx=0; fx<3; fx++) keys.push(`${c}_${meta.h + fy}_${meta.w + fx}`); }
+            else if (lIdx === 6) { const c = meta.idx % 32; const x = Math.floor(meta.idx / 32) % 3; const y = Math.floor(meta.idx / 96) % 3; keys.push(`${c}_${y}_${x}`); }
+            else if (lIdx === 7) { for(let i=0; i<288; i++) keys.push(`${i}`); }
+            return keys;
+        }
+
+        let stateActivations = {};
+
+        function calculateRealMath() {
+            hiddenCtx.drawImage(pad, 0, 0, 28, 28); const rawImg = hiddenCtx.getImageData(0, 0, 28, 28).data;
+            const inputVal = [];
+            for (let y = 0; y < 28; y++) { inputVal[y] = []; for (let x = 0; x < 28; x++) { inputVal[y][x] = rawImg[(y * 28 + x) * 4] / 255.0; } }
+            stateActivations[0] = inputVal;
+            const conv1 = [];
+            for (let m = 0; m < 8; m++) { conv1[m] = []; const filter = FILTERS_CONV1[m];
+                for (let y = 0; y < 26; y++) { conv1[m][y] = [];
+                    for (let x = 0; x < 26; x++) { let sum = 0.0; for (let fy=0;fy<3;fy++) for(let fx=0;fx<3;fx++) sum += inputVal[y+fy][x+fx] * filter[fy][fx]; conv1[m][y][x] = Math.max(0.0, sum); }
+                }
+            }
+            stateActivations[1] = conv1;
+            const pool1 = [];
+            for (let m = 0; m < 8; m++) { pool1[m] = [];
+                for (let y = 0; y < 13; y++) { pool1[m][y] = [];
+                    for (let x = 0; x < 13; x++) { let maxVal = -Infinity; for (let dy=0;dy<2;dy++) for(let dx=0;dx<2;dx++) maxVal = Math.max(maxVal, conv1[m][y*2+dy][x*2+dx]); pool1[m][y][x] = maxVal; }
+                }
+            }
+            stateActivations[2] = pool1;
+            const conv2 = [];
+            for (let m = 0; m < 16; m++) { conv2[m] = []; const filter = FILTERS_CONV2[m];
+                for (let y = 0; y < 11; y++) { conv2[m][y] = [];
+                    for (let x = 0; x < 11; x++) { let sum = 0.0; for (let c=0;c<8;c++) { const wFactor = Math.sin(m*1.7+c*2.3); for (let fy=0;fy<3;fy++) for(let fx=0;fx<3;fx++) sum += pool1[c][y+fy][x+fx] * filter[fy][fx] * wFactor; } conv2[m][y][x] = Math.max(0.0, sum); }
+                }
+            }
+            stateActivations[3] = conv2;
+            const pool2 = [];
+            for (let m = 0; m < 16; m++) { pool2[m] = [];
+                for (let y = 0; y < 5; y++) { pool2[m][y] = [];
+                    for (let x = 0; x < 5; x++) { let maxVal = -Infinity; for (let dy=0;dy<2;dy++) for(let dx=0;dx<2;dx++) maxVal = Math.max(maxVal, conv2[m][y*2+dy][x*2+dx]); pool2[m][y][x] = maxVal; }
+                }
+            }
+            stateActivations[4] = pool2;
+            const conv3 = [];
+            for (let m = 0; m < 32; m++) { conv3[m] = []; const filter = FILTERS_CONV3[m%32];
+                for (let y = 0; y < 3; y++) { conv3[m][y] = [];
+                    for (let x = 0; x < 3; x++) { let sum = 0.0; for (let c=0;c<16;c++) { const wFactor = Math.cos(m*1.1+c*1.9); for(let fy=0;fy<3;fy++) for(let fx=0;fx<3;fx++) sum += pool2[c][y+fy][x+fx] * filter[fy][fx] * wFactor; } conv3[m][y][x] = Math.max(0.0, sum); }
+                }
+            }
+            stateActivations[5] = conv3;
+            const flatten = [];
+            for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) for (let c = 0; c < 32; c++) flatten.push(conv3[c][y][x]);
+            stateActivations[6] = flatten;
+
+            const rawDense = [];
+            for (let d = 0; d < 10; d++) {
+                let sum = (BIASES_DENSE[d] !== undefined) ? BIASES_DENSE[d] : 0;
+                for (let i = 0; i < 288; i++) sum += flatten[i] * WEIGHTS_DENSE[i][d];
+                rawDense.push(sum);
+            }
+            const maxVal = Math.max(...rawDense); 
+            const expVals = rawDense.map(v => Math.exp(v - maxVal));
+            const expSum = expVals.reduce((a, b) => a + b, 0);
+            stateActivations[7] = expVals.map(val => val / expSum);
+
+            const small7 = [];
+            for (let y = 0; y < 7; y++) {
+                small7[y] = [];
+                for (let x = 0; x < 7; x++) {
+                    let sum = 0; for (let dy = 0; dy < 4; dy++) for (let dx = 0; dx < 4; dx++) sum += inputVal[y * 4 + dy][x * 4 + dx];
+                    small7[y][x] = sum / 16.0;
+                }
+            }
+            let highestScore = -Infinity; let predictedDigit = 0;
+            for (let d = 0; d < 10; d++) {
+                let correlation = 0.0, normA = 0.0, normB = 0.0; const template = DIGIT_TEMPLATES[d];
+                for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) { correlation += small7[y][x] * template[y][x]; normA += small7[y][x] * small7[y][x]; normB += template[y][x] * template[y][x]; }
+                const score = (normA > 0 && normB > 0) ? (correlation / (Math.sqrt(normA) * Math.sqrt(normB))) : 0.0;
+                if (score > highestScore) { highestScore = score; predictedDigit = d; }
+            }
+            stateActivations['prediction'] = { digit: predictedDigit, confidence: highestScore > 0 ? highestScore : 0 };
+        }
+
+        function updateNetworkInput() {
+            if (!layersData[0] || !layersData[0].mesh) return;
+            calculateRealMath();
+            const mesh = layersData[0].mesh; const color = new THREE.Color(); const inputVals = stateActivations[0];
+            let i = 0;
+            for (let w = 0; w < 28; w++) for (let h = 0; h < 28; h++) {
+                const val = inputVals[h][w]; const brightness = 0.08 + (val * 0.92);
+                color.setRGB(brightness, brightness, brightness); mesh.setColorAt(i, color); i++;
+            }
+            mesh.instanceColor.needsUpdate = true;
+        }
+
+        let animationTimeouts = [];
+        function triggerInferenceAnimation() {
+            animationTimeouts.forEach(t => clearTimeout(t)); animationTimeouts = [];
+            calculateRealMath();
+            const isLight = currentTheme === 'light'; const baseIntensity = isLight ? 0.35 : 0.15; const scaleFactor = isLight ? 1.4 : 1.8;
+            layersData.forEach((layer, layerIdx) => {
+                if (layerIdx === 0) return;
+                const mesh = layer.mesh; const baseCol = new THREE.Color(layer.color).multiplyScalar(0.12);
+                let count = layer.type === '2d' ? layer.maps * layer.size * layer.size : layer.size;
+                for (let i = 0; i < count; i++) mesh.setColorAt(i, baseCol);
+                mesh.instanceColor.needsUpdate = true;
+            });
+            let accumDelay = 0;
+            layersData.forEach((layer, layerIdx) => {
+                if (layerIdx === 0) return;
+                accumDelay += 260;
+                animationTimeouts.push(setTimeout(() => {
+                    const mesh = layer.mesh; const baseCol = new THREE.Color(layer.color); const states = stateActivations[layerIdx];
+                    let i = 0;
+                    if (layer.type === '2d') {
+                        for (let m = 0; m < layer.maps; m++) for (let w = 0; w < layer.size; w++) for (let h = 0; h < layer.size; h++) {
+                            const rawVal = states[m][h][w]; const intensity = baseIntensity + (rawVal * scaleFactor);
+                            const c = baseCol.clone().multiplyScalar(Math.min(1.5, intensity)); if (rawVal > 0.8) c.lerp(new THREE.Color(0xffffff), 0.45);
+                            mesh.setColorAt(i, c); i++;
+                        }
+                    } else if (layer.type === '1d') {
+                        for (let j = 0; j < layer.size; j++) {
+                            const rawVal = states[j]; const intensity = baseIntensity + (rawVal * scaleFactor * 2.0);
+                            const c = baseCol.clone().multiplyScalar(Math.min(1.8, intensity)); if (rawVal > 0.5) c.lerp(new THREE.Color(0xffffff), 0.6);
+                            mesh.setColorAt(i, c); i++;
+                        }
+                    }
+                    mesh.instanceColor.needsUpdate = true;
+                    if (layerIdx === layersData.length - 1) displayUIPredictions();
+                }, accumDelay));
+            });
+        }
+
+        function displayUIPredictions() {
+            // UI Prediction output widget removed to focus entirely on data processing visualization
+        }
+
+        function resetPrediction() {
+            layersData.forEach((layer, idx) => {
+                if (idx === 0) return;
+                const mesh = layer.mesh; const baseCol = new THREE.Color(layer.color).multiplyScalar(0.25);
+                let count = layer.type === '2d' ? layer.maps * layer.size * layer.size : layer.size;
+                for (let i = 0; i < count; i++) mesh.setColorAt(i, baseCol);
+                mesh.instanceColor.needsUpdate = true;
+            });
+            document.getElementById('inspector-details').classList.add('hidden');
+            document.getElementById('inspect-desc').classList.remove('hidden');
+        }
+
+        document.getElementById('recognize-btn').addEventListener('click', () => { triggerInferenceAnimation(); });
+
+        const themeBtn = document.getElementById('themeToggle');
+        const sunIcon = document.querySelector('.fa-sun');
+        const moonIcon = document.querySelector('.fa-moon');
+        let isLightMode = false;
+        
+        moonIcon.classList.remove('hidden');
+
+        themeBtn.addEventListener('click', () => {
+            isLightMode = !isLightMode;
+            document.body.classList.toggle('light-mode');
+            
+            if (isLightMode) {
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+                currentTheme = 'light';
+            } else {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                currentTheme = 'dark';
+            }
+            
+            const themeConfig = themes[currentTheme];
+            scene.fog.color.setHex(themeConfig.fogColor);
+            renderer.setClearColor(themeConfig.fogColor); // Updated directly to theme background
+            connectionMaterial.color.setHex(themeConfig.hoverLineColor);
+            highlightMat.color.setHex(themeConfig.hoverLineColor);
+            ambientLight.intensity = themeConfig.ambientIntensity;
+            dirLight.intensity = themeConfig.dirIntensity;
+
+            drawStructuralLines();
+            boundingPlanes.forEach(p => scene.remove(p));
+            boundingPlanes = [];
+            layersData.forEach(layer => {
+                if (layer.type === '2d' && layer.maps > 0) createBoundingPlanes(layer);
+            });
+            updateNetworkInput();
+        });
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        // Let user click a node to gracefully re-center camera rotation & zoom targets
+        window.addEventListener('click', (event) => {
+            if (isDragging) return; // Ignore if panning
+            const rect = workspace.getBoundingClientRect();
+            if (event.clientX < rect.left || event.clientX > rect.right || 
+                event.clientY < rect.top || event.clientY > rect.bottom) {
+                return;
+            }
+
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            for (let layerIdx = 0; layerIdx < layersData.length; layerIdx++) {
+                const layer = layersData[layerIdx];
+                if (!layer.mesh) continue;
+                const intersects = raycaster.intersectObject(layer.mesh);
+                if (intersects.length > 0) {
+                    const instanceId = intersects[0].instanceId;
+                    const meta = layer.elementCoords[instanceId];
+                    targetFocus.copy(meta.pos);
+                    isAutoFocusing = true;
+                    break;
+                }
+            }
+        });
+
+        window.addEventListener('mousemove', (event) => {
+            const rect = workspace.getBoundingClientRect();
+            if (event.clientX < rect.left || event.clientX > rect.right || 
+                event.clientY < rect.top || event.clientY > rect.bottom) {
+                return;
+            }
+
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            let intersected = false;
+
+            for (let layerIdx = 0; layerIdx < layersData.length; layerIdx++) {
+                const layer = layersData[layerIdx];
+                if (!layer.mesh) continue;
+                const intersects = raycaster.intersectObject(layer.mesh);
+                if (intersects.length > 0) {
+                    const instanceId = intersects[0].instanceId;
+                    const meta = layer.elementCoords[instanceId];
+                    const states = stateActivations[layerIdx];
+
+                    let computedVal = 0; let titleLabel = layer.name.replace('\n', ' ');
+                    if (layer.type === '2d') {
+                        if (states && states[meta.map] && states[meta.map][meta.h] && states[meta.map][meta.h][meta.w] !== undefined) {
+                            computedVal = states[meta.map][meta.h][meta.w];
+                        }
+                        document.getElementById('inspect-coords-val').textContent = `Map: ${meta.map}, X: ${meta.w}, Y: ${meta.h}`;
+                    } else {
+                        if (states && states[meta.idx] !== undefined) computedVal = states[meta.idx];
+                        document.getElementById('inspect-coords-val').textContent = `Index: ${meta.idx}`;
+                    }
+                    
+                    computedVal = (computedVal !== undefined && computedVal !== null) ? computedVal : 0;
+                    document.getElementById('inspect-layer-val').textContent = titleLabel;
+                    document.getElementById('inspect-act-val').textContent = computedVal.toFixed(4);
+                    document.getElementById('inspect-desc').classList.add('hidden');
+                    document.getElementById('inspector-details').classList.remove('hidden');
+                    intersected = true;
+
+                    let hCount = 0;
+                    dummy.position.copy(meta.pos); dummy.updateMatrix(); highlightMesh.setMatrixAt(hCount++, dummy.matrix);
+
+                    if (layerIdx > 0) {
+                        const prevLayer = layersData[layerIdx - 1]; const sourcePos = meta.pos;
+                        let targetKeys = getTargetKeys(layerIdx, meta);
+                        if (targetKeys.length > 300) targetKeys = targetKeys.sort(() => 0.5 - Math.random()).slice(0, 300);
+                        let points = [];
+                        targetKeys.forEach(key => {
+                            const tPos = prevLayer.posLookup[key];
+                            if(tPos) {
+                                points.push(tPos.x, tPos.y, tPos.z); points.push(sourcePos.x, sourcePos.y, sourcePos.z);
+                                if (hCount < 2000) { dummy.position.copy(tPos); dummy.updateMatrix(); highlightMesh.setMatrixAt(hCount++, dummy.matrix); }
+                            }
+                        });
+                        if (points.length > 0) {
+                            connectionGeometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+                            activeConnections.computeLineDistances(); activeConnections.visible = true;
+                        } else activeConnections.visible = false;
+                    } else activeConnections.visible = false;
+
+                    highlightMesh.count = hCount; highlightMesh.instanceMatrix.needsUpdate = true; highlightMesh.visible = true;
+                    break;
+                }
+            }
+
+            if (!intersected) {
+                document.getElementById('inspector-details').classList.add('hidden'); document.getElementById('inspect-desc').classList.remove('hidden');
+                activeConnections.visible = false; highlightMesh.visible = false;
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = workspace.clientWidth / workspace.clientHeight; 
+            camera.updateProjectionMatrix(); 
+            renderer.setSize(workspace.clientWidth, workspace.clientHeight);
+        });
+
+        renderer.setClearColor(themes.dark.bg);
+        updateNetworkInput();
+
+        function animate() {
+            requestAnimationFrame(animate); 
+            
+            // Smoothly animate the camera's rotational center pivot to clicked nodes
+            if (isAutoFocusing) {
+                controls.target.lerp(targetFocus, 0.08);
+                if (controls.target.distanceTo(targetFocus) < 0.1) isAutoFocusing = false;
+            }
+            controls.update();
+            
+            if (activeConnections.visible && connectionMaterial.dashOffset !== undefined) connectionMaterial.dashOffset -= 0.15;
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>

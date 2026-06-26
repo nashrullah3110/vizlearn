@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - What is Transfer Learning in CNN?</title>
+    <meta name="description" content="Learn how Transfer Learning works in Convolutional Neural Networks, select models, and selectively unfreeze layers for fine-tuning.">
+    <meta name="keywords" content="Transfer Learning, CNN, Fine-tuning, Feature Extraction, Pre-trained Models, Deep Learning, vizlearn, VGG16, ResNet50">
+    <meta name="robots" content="index, follow">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 40s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'pulse-fast': 'pulse 0.2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'gradient-flow': 'gradientFlow 2s linear infinite',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        gradientFlow: {
+                            '0%': { backgroundPosition: '100% 0' },
+                            '100%': { backgroundPosition: '-100% 0' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'dark';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+        :root {
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.03);
+            --input-focus-bg: rgba(74, 222, 128, 0.08);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.15);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.04);
+            --input-focus-bg: rgba(22, 163, 74, 0.08);
+            --grid-color: rgba(22, 163, 74, 0.04);
+            --vignette-color: transparent;
+        }
+
+        *, *::before, *::after {
+            transition: background-color 300ms, border-color 300ms, color 300ms, box-shadow 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        h1, h2, h3, .brand-font {
+            font-family: 'Space Grotesk', sans-serif;
+            letter-spacing: -0.02em;
+        }
+
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .glass-card {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .glass-card:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .action-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+
+        .search-input-wrapper {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .search-input-wrapper:focus-within {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .search-input-wrapper input, .search-input-wrapper select { color: var(--text-main); }
+        .search-input-wrapper input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .search-input-wrapper i { color: var(--accent-primary); opacity: 0.7; }
+
+        .search-dropdown {
+            position: absolute; top: 100%; left: 0; right: 0; background: var(--card-bg);
+            border: 1px solid var(--border-subtle); border-top: none; border-radius: 0 0 12px 12px;
+            max-height: 400px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+        .search-dropdown.show { display: block; animation: slideDown 0.2s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .search-dropdown-item { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: space-between; color: inherit; text-decoration: none; }
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        
+        .custom-select {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            border-radius: 8px;
+            width: 100%;
+            outline: none;
+            cursor: pointer;
+        }
+        .custom-select:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .formula-box { background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; }
+        body.light-mode .formula-box { background: rgba(0,0,0,0.05); }
+
+        /* Radio Group */
+        .radio-group input[type="radio"] { display: none; }
+        .radio-group label {
+            flex: 1; text-align: center; padding: 0.75rem 0.5rem; cursor: pointer;
+            border: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 0.75rem;
+            font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+        }
+        .radio-group label:first-of-type { border-radius: 8px 0 0 8px; }
+        .radio-group label:last-of-type { border-radius: 0 8px 8px 0; border-left: none;}
+        .radio-group label:nth-of-type(2) { border-left: none; }
+        .radio-group input[type="radio"]:checked + label {
+            background: var(--accent-primary); color: #000; border-color: var(--accent-primary);
+        }
+
+        /* Network Layers CSS */
+        .network-layer {
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            user-select: none;
+        }
+        
+        .layer-frozen {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: rgba(59, 130, 246, 0.4);
+            color: #60a5fa;
+        }
+        body.light-mode .layer-frozen { color: #2563eb; }
+        
+        .layer-trainable {
+            background: rgba(74, 222, 128, 0.1);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+        
+        .layer-scratch {
+            background: rgba(249, 115, 22, 0.1);
+            border-color: rgba(249, 115, 22, 0.5);
+            color: #f97316;
+        }
+        body.light-mode .layer-scratch { color: #ea580c; }
+
+        .layer-interactive:hover {
+            transform: translateX(4px);
+            box-shadow: -4px 0 10px var(--accent-glow);
+        }
+        body.light-mode .layer-interactive:hover { box-shadow: -4px 0 10px rgba(0,0,0,0.1); }
+
+        .layer-animating::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 200%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            animation: gradientFlow 1.5s linear infinite;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+    </style>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-ZT6JM33V5J');
+    </script>
+
+</head>
+<body class="flex flex-col min-h-screen overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto flex flex-col">
+        <div class="mb-8 animate-fade-in">
+            <div class="flex items-center gap-2 text-xs mono-font mb-2" style="color: var(--text-muted)">
+                <span class="opacity-50">Modules</span>
+                <span>/</span>
+                <span class="opacity-50">Deep Learning</span>
+                <span>/</span>
+                <span style="color: var(--accent-primary)">Transfer Learning</span>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">What is Transfer Learning in CNN?</h1>
+            <p class="mt-2 text-sm max-w-2xl" style="color: var(--text-muted)">
+                Select a pre-trained model, choose a strategy, and selectively unfreeze layers to see how fine-tuning impacts the learning curve and final accuracy.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full flex-1">
+            
+            <!-- Column 1: Strategy Controls -->
+            <aside class="space-y-6 animate-fade-in" style="animation-delay: 0.1s">
+                <div class="glass-card p-6 flex flex-col h-full">
+                    <div class="flex items-center justify-between w-full mb-6">
+                        <h2 class="text-xs font-bold uppercase tracking-widest opacity-70 mono-font" style="color: var(--text-muted)">Training Setup</h2>
+                        <i class="fas fa-cogs text-gray-500"></i>
+                    </div>
+                    
+                    <div class="space-y-6 flex-1">
+                        
+                        <!-- Base Model Selector -->
+                        <div>
+                            <label class="text-[10px] font-bold uppercase tracking-widest block mb-2 opacity-70 mono-font" style="color: var(--text-muted)">1. Base Architecture</label>
+                            <select id="modelSelect" class="custom-select p-3 text-sm font-bold">
+                                <option value="resnet50">ResNet-50 (25M Params)</option>
+                                <option value="vgg16">VGG-16 (138M Params)</option>
+                                <option value="mobilenet">MobileNetV2 (3.4M Params)</option>
+                            </select>
+                            <div id="modelDesc" class="text-xs opacity-70 mt-2 min-h-[40px]" style="color: var(--text-muted)">
+                                Pre-trained on ImageNet. Deep structure with residual connections.
+                            </div>
+                        </div>
+
+                        <!-- Target Task Info -->
+                        <div class="p-3 rounded border border-brand-500/20 bg-brand-500/5">
+                            <div class="text-[10px] uppercase tracking-widest text-brand-500 mb-1">2. Target Task</div>
+                            <div class="font-bold text-sm text-brand-400">Medical X-Ray Classification</div>
+                            <div class="text-xs opacity-70 mt-1" style="color: var(--text-muted)">Small custom dataset. Requires replacing the old classification head.</div>
+                        </div>
+
+                        <!-- Strategy Selector -->
+                        <div class="w-full pt-2">
+                            <label class="text-[10px] font-bold uppercase tracking-widest block mb-3 opacity-70 mono-font" style="color: var(--text-muted)">3. Select Mode</label>
+                            <div class="flex w-full radio-group">
+                                <input type="radio" id="strat-scratch" name="strategy" value="scratch">
+                                <label for="strat-scratch">
+                                    <i class="fas fa-seedling text-lg mb-1"></i>
+                                    Scratch
+                                </label>
+                                
+                                <input type="radio" id="strat-feature" name="strategy" value="feature" checked>
+                                <label for="strat-feature">
+                                    <i class="fas fa-snowflake text-lg mb-1"></i>
+                                    Feature Ext.
+                                </label>
+                                
+                                <input type="radio" id="strat-finetune" name="strategy" value="finetune">
+                                <label for="strat-finetune">
+                                    <i class="fas fa-sliders-h text-lg mb-1"></i>
+                                    Fine-Tune
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 pt-4 border-t border-dashed border-gray-700/50 flex gap-3">
+                        <button id="resetBtn" class="action-btn flex-1 bg-gray-700/30 hover:bg-gray-600/50 text-gray-300 border border-gray-600/30 py-2 text-xs font-bold uppercase tracking-wider">
+                            <i class="fas fa-undo mr-2"></i>Reset
+                        </button>
+                        <button id="startBtn" class="action-btn flex-1 bg-green-500 hover:bg-green-600 text-white py-2 text-xs font-bold uppercase tracking-wider">
+                            <i class="fas fa-play mr-2"></i>Train
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Column 2: Network Architecture -->
+            <section class="space-y-6 animate-fade-in" style="animation-delay: 0.2s">
+                <div class="glass-card p-6 flex flex-col items-center relative h-full">
+                    
+                    <h2 class="text-xs font-bold uppercase tracking-widest mb-2 opacity-70 mono-font w-full text-center" style="color: var(--text-muted)">Model Architecture</h2>
+                    
+                    <div id="finetune-hint" class="text-[10px] text-center text-brand-400 mb-4 h-4 opacity-0 transition-opacity duration-300">
+                        <i class="fas fa-hand-pointer mr-1 animate-pulse"></i> Click Conv layers to toggle Freezing
+                    </div>
+
+                    <div class="flex-1 w-full max-w-[280px] flex flex-col gap-2 relative z-10" id="network-stack">
+                        <!-- Layers generated by JS -->
+                    </div>
+
+                    <!-- Flow lines background -->
+                    <div class="absolute inset-0 z-0 pointer-events-none flex justify-center opacity-20">
+                        <div class="w-1 bg-gradient-to-b from-transparent via-gray-500 to-transparent h-full"></div>
+                    </div>
+
+                    <div class="w-full formula-box p-3 mt-6 text-center z-10">
+                        <div id="layer-status-text" class="mono-font text-xs min-h-[40px] flex items-center justify-center leading-relaxed" style="color: var(--text-main)">
+                            <!-- Dynamic Text -->
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- Column 3: Training Metrics & Chart -->
+            <aside class="space-y-6 animate-fade-in" style="animation-delay: 0.3s">
+                <div class="glass-card p-6 flex flex-col h-full items-center">
+                    <div class="flex items-center justify-between w-full mb-6">
+                        <h2 class="text-xs font-bold uppercase tracking-widest opacity-70 mono-font" style="color: var(--text-muted)">Validation Accuracy</h2>
+                        <i class="fas fa-chart-line text-green-500"></i>
+                    </div>
+                    
+                    <!-- Chart Area -->
+                    <div class="w-full aspect-[4/3] bg-black/20 rounded border border-dashed border-gray-700/50 relative mb-6">
+                        <canvas id="accuracyCanvas"></canvas>
+                    </div>
+
+                    <div class="flex-1 flex flex-col gap-4 w-full">
+                        <div class="flex gap-4">
+                            <div class="w-1/2 p-3 rounded bg-black/40 border border-gray-700/50 text-center">
+                                <div class="text-[10px] uppercase text-gray-500 mb-1 font-bold tracking-widest">Epoch</div>
+                                <div class="text-2xl font-bold mono-font text-white" id="metric-epoch">0</div>
+                            </div>
+                            <div class="w-1/2 p-3 rounded bg-black/40 border border-brand-500/30 text-center transition-all duration-300">
+                                <div class="text-[10px] uppercase text-gray-500 mb-1 font-bold tracking-widest">Accuracy</div>
+                                <div class="text-2xl font-bold mono-font text-brand-400" id="metric-acc">0.0%</div>
+                            </div>
+                        </div>
+
+                        <!-- Legend -->
+                        <div class="w-full p-4 rounded bg-black/40 border border-gray-700/50 text-xs">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-3 h-3 rounded-full bg-orange-500"></div> <span style="color: var(--text-muted)">From Scratch (Random Initialization)</span>
+                            </div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-3 h-3 rounded-full bg-blue-500"></div> <span style="color: var(--text-muted)">Feature Ext. (All Conv Frozen)</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 rounded-full bg-green-500"></div> <span style="color: var(--text-muted)">Fine-Tuning (Selective Unfreezing)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <!-- Article -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
+        <div class="glass-card animate-fade-in" style="animation-delay: 0.4s;">
+            <div class="p-6 border-b" style="border-color: var(--border-subtle);">
+                <h2 class="font-bold text-xl md:text-2xl brand-font" style="color: var(--text-main)">Understanding Transfer Learning</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">Why reinvent the wheel? Learn how to reuse powerful models trained by giant tech companies for your own custom tasks.</p>
+            </div>
+            <div class="p-6 md:p-8 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
+                
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
+                    <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-recycle"></i>What is Transfer Learning?</h3>
+                    <p class="opacity-90">Training a Deep Convolutional Neural Network from scratch requires millions of images (like the ImageNet dataset), massive amounts of computing power (GPUs), and weeks of training time. Furthermore, early layers in a CNN generally learn the exact same things regardless of the dataset: generic edges, colors, and basic textures.</p>
+                    <p class="opacity-90 mt-2"><strong>Transfer Learning</strong> is the practice of taking a pre-trained model (whose weights have already been optimized on a massive dataset) and repurposing it for a new, related task. You are transferring the "knowledge" of visual features to a new domain.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg md:text-xl font-bold mb-3 brand-font flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-layer-group"></i>How it Works: Modifying the Architecture</h3>
+                    <p class="mb-4 opacity-90">A standard pre-trained model (like ResNet-50 or VGG-16) is split into two conceptual parts:</p>
+                    <ul class="list-disc pl-5 space-y-2 opacity-90 mb-4">
+                        <li><strong>The Convolutional Base:</strong> Extracts features. We keep this part and its pre-trained weights.</li>
+                        <li><strong>The Classification Head (Dense Layers):</strong> Outputs predictions for the original 1000 classes. We <strong>remove</strong> this part, because we want to predict our own classes (e.g., 2 classes for Medical X-Rays).</li>
+                    </ul>
+                    <p class="opacity-90">After removing the original head, we attach a new, randomly initialized Dense layer matching our target class count. Now, we have to decide how to train this new hybrid model.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg md:text-xl font-bold mb-3 brand-font flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-vial"></i>The Three Strategies</h3>
+                    <ol class="list-decimal pl-6 space-y-5">
+                        <li>
+                            <strong>Train from Scratch:</strong>
+                            <p class="font-light opacity-80 mt-1">We ignore pre-trained weights and initialize the entire network randomly. The network has no prior knowledge. The accuracy climbs very slowly, and on a small dataset, heavy models like VGG-16 will likely overfit and fail to reach high performance.</p>
+                        </li>
+                        <li>
+                            <strong>Feature Extraction (Freeze the Base):</strong>
+                            <p class="font-light opacity-80 mt-1">We load the pre-trained weights into the Conv Base and <strong>freeze</strong> them (set them to untrainable). During training, only the weights of our newly added Dense Head are updated. The frozen base acts as a powerful feature extractor. Training is extremely fast, and accuracy jumps up quickly because the network already knows how to "see".</p>
+                        </li>
+                        <li>
+                            <strong>Fine-Tuning (Selective Unfreezing):</strong>
+                            <p class="font-light opacity-80 mt-1">First, we perform Feature Extraction. Then, we <strong>unfreeze</strong> specific layers of the Convolutional Base (usually the top layers) and train them alongside the Dense Head using a very small learning rate. <em>(In the app, select Fine-Tune and click layers to unlock them)</em>. We keep early layers frozen (generic edges), but let later layers adapt their specific shape-detectors to our custom images. This pushes the accuracy to its absolute maximum limit.</p>
+                        </li>
+                    </ol>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-6 mt-6">
+                    <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
+                        <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-exclamation-triangle"></i>Catastrophic Forgetting</h3>
+                        <p class="opacity-90">In Fine-Tuning mode, try unfreezing <strong>all</strong> the Convolutional layers. You will notice the accuracy curve might drop or cap lower than expected. If you unfreeze the entire network and train it on a small dataset, the massive gradients from the randomly initialized Dense Head propagate backward and wreck the delicate, pre-trained weights of the entire base. This is called Catastrophic Forgetting.</p>
+                    </div>
+                    <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
+                        <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas-regular fa-bookmark"></i>Key Takeaways</h3>
+                        <ul class="list-disc pl-5 space-y-2 mt-3 opacity-90">
+                            <li>Transfer Learning reuses Convolutional layers from models trained on huge datasets.</li>
+                            <li><strong>Freezing</strong> a layer means its weights are locked and not updated during backpropagation.</li>
+                            <li>Optimal Fine-Tuning usually involves unfreezing only the top 1 or 2 Convolutional blocks.</li>
+                            <li>Different architectures (VGG vs ResNet) have vastly different parameter counts and training speeds.</li>
+                        </ul>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+        <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+        <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
+            <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
+                <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" rel="noopener noreferrer" aria-label="Kaggle" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-kaggle fa-lg"></i></a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-70">&copy; 2025 VIZLEARN // SYSTEM ONLINE</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Theme Logic
+            const themeToggleBtn = document.getElementById('themeToggle');
+            const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+            const moonIcon = themeToggleBtn.querySelector('.light-icon');
+            let currentTheme = localStorage.getItem('theme') || 'dark';
+
+            function applyTheme(theme) {
+                if (theme === 'light') {
+                    document.body.classList.add('light-mode');
+                    moonIcon.classList.remove('hidden');
+                    sunIcon.classList.add('hidden');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    sunIcon.classList.remove('hidden');
+                    moonIcon.classList.add('hidden');
+                }
+                drawChart();
+            }
+            
+            themeToggleBtn.addEventListener('click', () => {
+                currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+                localStorage.setItem('theme', currentTheme);
+                applyTheme(currentTheme);
+            });
+
+            // Elements
+            const modelSelect = document.getElementById('modelSelect');
+            const modelDesc = document.getElementById('modelDesc');
+            const radios = document.querySelectorAll('input[name="strategy"]');
+            const startBtn = document.getElementById('startBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const layerStatusText = document.getElementById('layer-status-text');
+            const networkStack = document.getElementById('network-stack');
+            const finetuneHint = document.getElementById('finetune-hint');
+            
+            const metricEpoch = document.getElementById('metric-epoch');
+            const metricAcc = document.getElementById('metric-acc');
+            
+            const canvas = document.getElementById('accuracyCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // Model Database
+            const modelsData = {
+                resnet50: {
+                    name: 'ResNet-50',
+                    desc: '25M params. Uses residual skip-connections. Deep but highly efficient to train.',
+                    baseCap: 0.88,
+                    layers: [
+                        { id: 'r_c1', name: 'Conv1 (Basic Edges)', type: 'conv' },
+                        { id: 'r_c2', name: 'Conv2_x (Early Textures)', type: 'conv' },
+                        { id: 'r_c3', name: 'Conv3_x (Mid Patterns)', type: 'conv' },
+                        { id: 'r_c4', name: 'Conv4_x (High Features)', type: 'conv' },
+                        { id: 'r_c5', name: 'Conv5_x (Complex Shapes)', type: 'conv', defaultUnfrozen: true },
+                        { id: 'r_head', name: 'Custom Dense Head', type: 'dense', alwaysTrain: true }
+                    ]
+                },
+                vgg16: {
+                    name: 'VGG-16',
+                    desc: '138M params. Heavy and slow. Classic architecture using sequential 3x3 convolutions.',
+                    baseCap: 0.83,
+                    layers: [
+                        { id: 'v_b1', name: 'Block 1 (Edges)', type: 'conv' },
+                        { id: 'v_b2', name: 'Block 2 (Textures)', type: 'conv' },
+                        { id: 'v_b3', name: 'Block 3 (Patterns)', type: 'conv' },
+                        { id: 'v_b4', name: 'Block 4 (Parts)', type: 'conv' },
+                        { id: 'v_b5', name: 'Block 5 (Objects)', type: 'conv', defaultUnfrozen: true },
+                        { id: 'v_head', name: 'Custom Dense Head', type: 'dense', alwaysTrain: true }
+                    ]
+                },
+                mobilenet: {
+                    name: 'MobileNetV2',
+                    desc: '3.4M params. Lightweight and fast. Designed specifically for mobile devices.',
+                    baseCap: 0.80,
+                    layers: [
+                        { id: 'm_e', name: 'Early Bottlenecks', type: 'conv' },
+                        { id: 'm_m', name: 'Mid Bottlenecks', type: 'conv' },
+                        { id: 'm_l', name: 'Late Bottlenecks', type: 'conv', defaultUnfrozen: true },
+                        { id: 'm_head', name: 'Custom Dense Head', type: 'dense', alwaysTrain: true }
+                    ]
+                }
+            };
+
+            // Simulation State
+            let currentModelKey = 'resnet50';
+            let strategy = 'feature';
+            let isAnimating = false;
+            let epoch = 0;
+            const MAX_EPOCHS = 60;
+            let animationFrameId = null;
+            let history = { scratch: [], feature: [], finetune: [] }; 
+
+            function initializeModelData() {
+                // Ensure unfrozen state is set based on defaults
+                Object.values(modelsData).forEach(model => {
+                    model.layers.forEach(layer => {
+                        layer.unfrozen = layer.defaultUnfrozen || false;
+                    });
+                });
+            }
+
+            // Expose globally for the onclick handler attached to raw HTML strings
+            window.handleLayerClick = function(layerId) {
+                if (strategy !== 'finetune') return; 
+                if (isAnimating) {
+                    toggleAnimation(); // Auto pause to let user change architecture safely
+                }
+
+                const model = modelsData[currentModelKey];
+                const layer = model.layers.find(l => l.id === layerId);
+                
+                if (!layer || layer.alwaysTrain) return; // Can't toggle the head
+                
+                layer.unfrozen = !layer.unfrozen;
+                
+                // Reset finetune history since architecture changed
+                history.finetune = [];
+                if (strategy === 'finetune') {
+                    epoch = 0;
+                    metricEpoch.innerText = '0';
+                    metricAcc.innerText = '0.0%';
+                }
+
+                updateNetworkVisuals();
+                drawChart();
+            };
+
+            function buildNetworkUI() {
+                const model = modelsData[currentModelKey];
+                modelDesc.innerText = model.desc;
+
+                networkStack.innerHTML = '';
+                model.layers.forEach(layer => {
+                    const el = document.createElement('div');
+                    el.id = `layer-${layer.id}`;
+                    
+                    // Add interactive class if it's a togglable conv layer
+                    const interactiveClass = (!layer.alwaysTrain) ? 'layer-interactive cursor-pointer' : '';
+                    
+                    el.className = `network-layer w-full p-3 border-2 rounded-lg flex justify-between items-center bg-black/40 ${interactiveClass}`;
+                    el.innerHTML = `
+                        <div class="flex items-center gap-3 pointer-events-none">
+                            <i class="fas ${layer.type === 'conv' ? 'fa-layer-group' : 'fa-bars'} opacity-70"></i>
+                            <span class="text-[11px] font-bold font-mono tracking-wide">${layer.name}</span>
+                        </div>
+                        <i class="layer-icon fas fa-lock pointer-events-none"></i>
+                    `;
+                    // Assign click handler via raw DOM insertion
+                    el.setAttribute('onclick', `window.handleLayerClick('${layer.id}')`);
+                    networkStack.appendChild(el);
+                });
+
+                updateNetworkVisuals();
+            }
+
+            function updateNetworkVisuals() {
+                let statusMsg = "";
+                const model = modelsData[currentModelKey];
+
+                if (strategy === 'finetune') {
+                    finetuneHint.classList.replace('opacity-0', 'opacity-100');
+                } else {
+                    finetuneHint.classList.replace('opacity-100', 'opacity-0');
+                }
+
+                model.layers.forEach(layer => {
+                    const el = document.getElementById(`layer-${layer.id}`);
+                    if (!el) return; // Guard clause in case DOM isn't ready
+                    const icon = el.querySelector('.layer-icon');
+                    if (!icon) return;
+                    
+                    el.classList.remove('layer-frozen', 'layer-trainable', 'layer-scratch', 'layer-animating');
+                    
+                    if (strategy === 'scratch') {
+                        el.classList.add('layer-scratch');
+                        icon.className = 'layer-icon fas fa-dice text-orange-400';
+                        if (isAnimating) el.classList.add('layer-animating');
+                        statusMsg = "All weights initialized randomly. Training entire network from scratch.";
+                    } 
+                    else if (strategy === 'feature') {
+                        if (layer.type === 'conv') {
+                            el.classList.add('layer-frozen');
+                            icon.className = 'layer-icon fas fa-lock text-blue-400';
+                        } else {
+                            el.classList.add('layer-scratch');
+                            icon.className = 'layer-icon fas fa-dice text-orange-400';
+                            if (isAnimating) el.classList.add('layer-animating');
+                        }
+                        statusMsg = "Conv Base is completely FROZEN. Only Custom Head is learning (Feature Extraction).";
+                    } 
+                    else if (strategy === 'finetune') {
+                        if (layer.alwaysTrain) {
+                            el.classList.add('layer-scratch');
+                            icon.className = 'layer-icon fas fa-dice text-orange-400';
+                            if (isAnimating) el.classList.add('layer-animating');
+                        } else if (layer.unfrozen) {
+                            el.classList.add('layer-trainable');
+                            icon.className = 'layer-icon fas fa-unlock-alt text-green-400';
+                            if (isAnimating) el.classList.add('layer-animating');
+                        } else {
+                            el.classList.add('layer-frozen');
+                            icon.className = 'layer-icon fas fa-lock text-blue-400';
+                        }
+                        
+                        const unfrozenCount = model.layers.filter(l => !l.alwaysTrain && l.unfrozen).length;
+                        if (unfrozenCount === 0) statusMsg = "Zero Conv layers unfrozen. Acting identical to Feature Extraction.";
+                        else if (unfrozenCount <= 2) statusMsg = "Optimal Fine-Tuning: Adapting top features without destroying base weights.";
+                        else statusMsg = "<span class='text-red-400'>Warning: Many layers unfrozen. High risk of Catastrophic Forgetting and Overfitting!</span>";
+                    }
+                });
+
+                layerStatusText.innerHTML = statusMsg;
+            }
+
+            // Complex Math Simulation for Accuracy
+            function calculateAccuracy(ep, strat, modKey) {
+                if (ep === 0) return 0.1; 
+                
+                const model = modelsData[modKey];
+                const convLayers = model.layers.filter(l => !l.alwaysTrain);
+                const numConv = convLayers.length;
+                const unfrozenConv = convLayers.filter(l => l.unfrozen).length;
+
+                const baseCap = model.baseCap;
+
+                if (strat === 'scratch') {
+                    // Models with more params take longer/cap lower on small datasets
+                    const speed = modKey === 'mobilenet' ? 18 : (modKey === 'vgg16' ? 45 : 30);
+                    const cap = modKey === 'mobilenet' ? 0.72 : (modKey === 'vgg16' ? 0.55 : 0.65);
+                    return 0.1 + (cap - 0.1) * (1 - Math.exp(-ep / speed));
+                } 
+                else if (strat === 'feature') {
+                    // Quick jump, decent cap
+                    return 0.1 + (baseCap - 0.1) * (1 - Math.exp(-ep / 6));
+                } 
+                else if (strat === 'finetune') {
+                    let cap = baseCap;
+                    let speed = 10;
+                    
+                    if (unfrozenConv === 0) {
+                        cap = baseCap; speed = 6;
+                    } else if (unfrozenConv <= 2) {
+                        // Optimal fine-tuning boosts cap
+                        cap = Math.min(0.97, baseCap + 0.08); 
+                        speed = 12;
+                    } else if (unfrozenConv === numConv) {
+                        // Overfitting / Catastrophic forgetting drops cap
+                        cap = baseCap - 0.08; 
+                        speed = 18;
+                        // Add late epoch dropoff for realism
+                        const dropoff = ep > 25 ? (ep - 25) * 0.003 : 0;
+                        return Math.max(0.1, 0.1 + (cap - 0.1) * (1 - Math.exp(-ep / speed)) - dropoff);
+                    } else {
+                        // Mid-level
+                        cap = baseCap + 0.02;
+                        speed = 14;
+                    }
+                    
+                    return 0.1 + (cap - 0.1) * (1 - Math.exp(-ep / speed));
+                }
+                return 0.1;
+            }
+
+            function drawChart() {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const pad = { top: 20, right: 20, bottom: 30, left: 40 };
+                const plotW = canvas.width - pad.left - pad.right;
+                const plotH = canvas.height - pad.top - pad.bottom;
+
+                // Draw Grid
+                ctx.strokeStyle = currentTheme === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                
+                // Y-axis (0 to 100%)
+                for (let i = 0; i <= 5; i++) {
+                    const y = pad.top + plotH - (i / 5) * plotH;
+                    ctx.moveTo(pad.left, y);
+                    ctx.lineTo(canvas.width - pad.right, y);
+                    
+                    ctx.fillStyle = currentTheme === 'light' ? '#6b7280' : '#9ca3af';
+                    ctx.font = '10px JetBrains Mono';
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`${i * 20}%`, pad.left - 5, y);
+                }
+
+                // X-axis (0 to MAX_EPOCHS)
+                for (let i = 0; i <= 3; i++) {
+                    const x = pad.left + (i / 3) * plotW;
+                    ctx.moveTo(x, pad.top);
+                    ctx.lineTo(x, canvas.height - pad.bottom);
+                    
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(`${Math.round(i * (MAX_EPOCHS / 3))}`, x, canvas.height - pad.bottom + 5);
+                }
+                ctx.stroke();
+
+                // Draw Lines
+                const colors = {
+                    scratch: '#f97316', // Orange
+                    feature: '#3b82f6', // Blue
+                    finetune: '#22c55e' // Green
+                };
+
+                ['scratch', 'feature', 'finetune'].forEach(strat => {
+                    const data = history[strat];
+                    if (!data || data.length === 0) return;
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = colors[strat];
+                    ctx.lineWidth = strat === strategy ? 3 : 1; 
+                    ctx.globalAlpha = strat === strategy ? 1.0 : 0.3; 
+                    ctx.lineJoin = 'round';
+                    
+                    data.forEach((point, idx) => {
+                        const x = pad.left + (point.ep / MAX_EPOCHS) * plotW;
+                        const y = pad.top + plotH - (point.acc * plotH);
+                        if (idx === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    });
+                    
+                    ctx.stroke();
+                    ctx.globalAlpha = 1.0; 
+                });
+            }
+
+            function simulationStep() {
+                if (!isAnimating) return;
+
+                epoch++;
+                
+                const acc = calculateAccuracy(epoch, strategy, currentModelKey);
+                const noise = (Math.random() - 0.5) * 0.015;
+                const finalAcc = Math.min(1.0, Math.max(0, acc + noise));
+
+                history[strategy].push({ ep: epoch, acc: finalAcc });
+
+                metricEpoch.innerText = epoch;
+                metricAcc.innerText = (finalAcc * 100).toFixed(1) + '%';
+
+                drawChart();
+
+                if (epoch >= MAX_EPOCHS) {
+                    toggleAnimation();
+                    return;
+                }
+
+                animationFrameId = setTimeout(simulationStep, 50); 
+            }
+
+            function toggleAnimation() {
+                isAnimating = !isAnimating;
+                
+                updateNetworkVisuals(); 
+
+                if (isAnimating) {
+                    if (epoch >= MAX_EPOCHS) {
+                        epoch = 0;
+                        history[strategy] = [];
+                    }
+                    startBtn.innerHTML = '<i class="fas fa-pause mr-2"></i>Pause';
+                    startBtn.classList.replace('bg-green-500', 'bg-red-500');
+                    startBtn.classList.replace('hover:bg-green-600', 'hover:bg-red-600');
+                    simulationStep();
+                } else {
+                    startBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Train';
+                    startBtn.classList.replace('bg-red-500', 'bg-green-500');
+                    startBtn.classList.replace('hover:bg-red-600', 'hover:bg-green-600');
+                    clearTimeout(animationFrameId);
+                }
+            }
+
+            function resetSimulation() {
+                isAnimating = false;
+                clearTimeout(animationFrameId);
+                
+                epoch = 0;
+                history = { scratch: [], feature: [], finetune: [] };
+                
+                metricEpoch.innerText = '0';
+                metricAcc.innerText = '0.0%';
+
+                startBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Train';
+                startBtn.classList.replace('bg-red-500', 'bg-green-500');
+                startBtn.classList.replace('hover:bg-red-600', 'hover:bg-green-600');
+                
+                updateNetworkVisuals();
+                drawChart();
+            }
+
+            // Event Listeners
+            modelSelect.addEventListener('change', (e) => {
+                currentModelKey = e.target.value;
+                resetSimulation(); 
+                buildNetworkUI();
+            });
+
+            radios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    strategy = e.target.value;
+                    
+                    if (isAnimating) toggleAnimation(); 
+                    
+                    if (history[strategy].length === 0) {
+                        epoch = 0;
+                        metricEpoch.innerText = '0';
+                        metricAcc.innerText = '0.0%';
+                    } else {
+                        const last = history[strategy][history[strategy].length - 1];
+                        epoch = last.ep;
+                        metricEpoch.innerText = epoch;
+                        metricAcc.innerText = (last.acc * 100).toFixed(1) + '%';
+                    }
+
+                    updateNetworkVisuals();
+                    drawChart();
+                });
+            });
+
+            startBtn.addEventListener('click', toggleAnimation);
+            resetBtn.addEventListener('click', resetSimulation);
+            window.addEventListener('resize', drawChart);
+
+            // Init
+            initializeModelData();
+            buildNetworkUI();
+            applyTheme(currentTheme);
+        });
+
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            { title: "Calculating Parameters in CNN", path: "computer_vision/calculating_parameters_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Interactive 3D CNN Visualizer", path: "computer_vision/cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Data Loaders in CNN", path: "computer_vision/data_loaders_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Pooling Layer", path: "computer_vision/downsampling_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Real-time Edge Detection", path: "computer_vision/edge_detection.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Convolutional Layer", path: "computer_vision/feature_map_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Grayscale Image Processing", path: "computer_vision/grayscale_image_processing.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Fully Connected Layer in CNN", path: "computer_vision/how_dense_layer_works_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "How Neural Networks Process Images", path: "computer_vision/how_neural_network_process_images.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "ReLU Activation in CNN", path: "computer_vision/how_relu_works_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Image Data Augmentation", path: "computer_vision/image_data_augmentation.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Padding in CNN", path: "computer_vision/padding_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Parameter Sharing in CNN", path: "computer_vision/parameter_sharing_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "RGB Image Processing", path: "computer_vision/rgb_image_processing.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Strides in CNN", path: "computer_vision/strides_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "What is Transfer Learning in CNN?", path: "computer_vision/transfer_learning_with_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "SQL GroupBy Visualizer", path: "database/groupby_in_sql.html", category: "database", icon: "fa-database" },
+            { title: "SQL Joins Visualizer", path: "database/joins_in_sql.html", category: "database", icon: "fa-database" },
+            { title: "SQL Window Functions", path: "database/window_functions_in_sql.html", category: "database", icon: "fa-database" },
+            { title: "Activation Functions", path: "deep_learning/activation_functions.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Batch Normalization in Deep Networks", path: "deep_learning/batch_normalization.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Batch Processing in the Neural Network", path: "deep_learning/batch_processing_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Data Sparsity", path: "deep_learning/data_sparsity.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Dropout in Neural Networks", path: "deep_learning/dropout_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Early Stopping", path: "deep_learning/early_stopping_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Feature Scaling & Weight Bias", path: "deep_learning/feature_scaling_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Gradient descent batch processing", path: "deep_learning/gradient_descent_batch_processing.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Gradient Descent", path: "deep_learning/gradient_descent_training.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "How Loss is Calculated", path: "deep_learning/how_loss_is_calculated.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Hyperparameter Tuning", path: "deep_learning/hyper-paramter_tuning.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Learning Rate Scheduling", path: "deep_learning/learning_rate_scheduling.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Linear Regression with Gradient Descent", path: "deep_learning/linear_regression_with_gradient_descent.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Model Training Curves", path: "deep_learning/model_training_curve.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Model Training in CPU vs GPU", path: "deep_learning/model_training_on_cpu_vs_gpu.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Neural Network Visualizer", path: "deep_learning/neural_network.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Neural Network for Regression", path: "deep_learning/neural_network_for_regression.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Neural Network for Unsupervised Learning", path: "deep_learning/neural_network_for_unsupervised_learning.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Optimizers", path: "deep_learning/optimizers_in_3d.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Optimizers", path: "deep_learning/optimizers_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Overfitting vs Underfitting", path: "deep_learning/overfitting_vs_underfitting.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Perceptron Classifier", path: "deep_learning/perceptron.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Regularization Techniques", path: "deep_learning/regularization_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Reproducibility of Model", path: "deep_learning/reproducibility_of_model.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Vanishing & Exploding Gradients", path: "deep_learning/vanishing_vs_exploding_gradient.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Weight Initialization Methods", path: "deep_learning/weight_initialization.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Weights & Biases", path: "deep_learning/weights_and_biases.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "A* Search Algorithm", path: "dsa/a_star.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Backtracking", path: "dsa/backtracking.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Search", path: "dsa/binary_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Tree Visualizer", path: "dsa/breadth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Bubble Sort", path: "dsa/bubble_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Counting Sort", path: "dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Depth First Search", path: "dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Python Dictionary Lab", path: "dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra\u2019s Algorithm", path: "dsa/dijkstra\u2019s.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Fibonacci Search", path: "dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Insertion Sort", path: "dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Interpolation Search", path: "dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Linear Search", path: "dsa/linear_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Python List Lab", path: "dsa/lists_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Merge Sort", path: "dsa/merge_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Quick Sort", path: "dsa/quick_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Selection Sort", path: "dsa/selection_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Visual Learning Platform - Python String Lab", path: "dsa/strings_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Causal Language Modeling", path: "gen_ai/casual_language_modeling.html", category: "gen_ai", icon: "fa-robot" },
+            { title: "Bias-Variance Tradeoff", path: "machine_learning/bias_vs_variance.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Confusion Matrix", path: "machine_learning/confusion_matrix.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "machine_learning/cosine_similarity.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Cross Validation", path: "machine_learning/cross_validation.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Decision Tree (ID3)", path: "machine_learning/decision_tree.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Regression Metrics", path: "machine_learning/evaluation_metrics for_regression.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Hard vs Soft Labelling", path: "machine_learning/hard_vs_soft_labelling.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "K-Means Clustering", path: "machine_learning/k_means.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "K-Nearest Neighbors", path: "machine_learning/knn.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Label Encoding", path: "machine_learning/label_encoding.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Label Imbalance & The Accuracy Paradox", path: "machine_learning/label_imbalance_problem.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Linear Regression", path: "machine_learning/linear_regression_with_ols.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Model and Data Drift", path: "machine_learning/model_and_data_drift.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Naive Bayes Classifier", path: "machine_learning/naive_bayes.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "One Hot Encoding", path: "machine_learning/one_hot_encoding.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Sliding Window Explorer", path: "machine_learning/sliding_window_for_timeseries_data.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Support Vector Machines", path: "machine_learning/svm.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Train, Test & Validation Split", path: "machine_learning/train_test_split.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Training on Imbalanced Data", path: "machine_learning/training_on_label_imbalanced_dataset.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Equation of a Line (y = mx + c)", path: "maths/equation_of_line.html", category: "maths", icon: "fa-square-root-alt" },
+            { title: "ASCII Code Explorer", path: "natural_language_processing/ascii_codes.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "How Neural Networks Process Text", path: "natural_language_processing/how_neural_network_text.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "How RNN Processes Text", path: "natural_language_processing/how_rnn_process_text.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "N-gram Explainer", path: "natural_language_processing/n_gram.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Interactive 3D RNN Visualizer", path: "natural_language_processing/rnn.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Stemming vs Lemmatization", path: "natural_language_processing/stemming_vs_lemmatization.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Text Normalization Pipeline", path: "natural_language_processing/text_normalization_pipeline.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "NLP Tokenizer", path: "natural_language_processing/tokenization.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Word Cloud Generator", path: "natural_language_processing/word_cloud.html", category: "natural_language_processing", icon: "fa-comments" }
+        ];
+
+        function toRelativePath(fromPath, targetPath) {
+            const fromParts = fromPath.split('/').filter(Boolean);
+            const targetParts = targetPath.split('/').filter(Boolean);
+            let shared = 0;
+            while (shared < Math.min(fromParts.length, targetParts.length) && fromParts[shared] === targetParts[shared]) {
+                shared++;
+            }
+            const up = '../'.repeat(Math.max(0, fromParts.length - shared));
+            const down = targetParts.slice(shared).join('/');
+            return `${up}${down}`;
+        }
+
+        const currentPath = window.location.pathname.replace(/\/+$/g, '').replace(/index\.html$/, '');
+        const currentDir = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/')) : '';
+        const resolvedCourses = allCourses.map((course) => {
+            const normalizedTarget = course.path.replace(/^\.\//, '');
+            const relativePath = currentDir ? toRelativePath(currentDir, normalizedTarget) : normalizedTarget;
+            return { ...course, path: relativePath };
+        });
+
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                if (query.length === 0) { dropdown.classList.remove('show'); return; }
+                const filtered = resolvedCourses.filter(course => course.title.toLowerCase().includes(query) || course.category.toLowerCase().includes(query));
+                if (filtered.length === 0) { dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>'; } 
+                else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;"><i class="fas ${course.icon} dropdown-item-icon"></i><div><div class="dropdown-item-title">${course.title}</div><div class="dropdown-item-path">${course.category.toUpperCase()}</div></div></div><i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>`).join('');
+                }
+                dropdown.classList.add('show');
+            });
+            document.addEventListener('click', (e) => { if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show'); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dropdown.classList.remove('show'); });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - Fully Connected Layer in CNN</title>
+    <meta name="description" content="Learn how Fully Connected (Dense) Layers work in Convolutional Neural Networks with an interactive visualizer on VizLearn.">
+    <meta name="keywords" content="Dense Layer, Fully Connected Layer, CNN, Deep Learning, interactive learning, vizlearn, softmax">
+    <meta name="robots" content="index, follow">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            900: '#14532d',
+                        }
+                    },
+                    animation: {
+                        'grid-flow': 'grid-move 40s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'pulse-fast': 'pulse 0.2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        'grid-move': {
+                            '0%': { backgroundPosition: '0 0' },
+                            '100%': { backgroundPosition: '40px 40px' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'dark';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+        :root {
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.03);
+            --input-focus-bg: rgba(74, 222, 128, 0.08);
+            --grid-color: rgba(74, 222, 128, 0.05);
+            --vignette-color: #050505;
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.15);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.04);
+            --input-focus-bg: rgba(22, 163, 74, 0.08);
+            --grid-color: rgba(22, 163, 74, 0.04);
+            --vignette-color: transparent;
+        }
+
+        *, *::before, *::after {
+            transition: background-color 300ms, border-color 300ms, color 300ms, box-shadow 300ms;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            animation: grid-move 40s linear infinite;
+        }
+
+        h1, h2, h3, .brand-font {
+            font-family: 'Space Grotesk', sans-serif;
+            letter-spacing: -0.02em;
+        }
+
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .glass-card {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .glass-card:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .custom-select {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            padding: 0.5rem;
+            border-radius: 8px;
+            width: 100%;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .action-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+
+        .kernel-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+        }
+        
+        .kernel-input {
+            width: 100%;
+            height: 36px;
+            text-align: center;
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--accent-primary);
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+        
+        .kernel-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            background: var(--input-focus-bg);
+        }
+
+        /* Canvas for Network */
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            display: block;
+        }
+    
+        /* Search Input Wrapper */
+        .search-input-wrapper {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .search-input-wrapper:focus-within {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .search-input-wrapper input {
+            color: var(--text-main);
+        }
+        .search-input-wrapper input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .search-input-wrapper i {
+            color: var(--accent-primary);
+            opacity: 0.7;
+        }
+
+        /* Dropdown Search */
+        .search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .search-dropdown-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        .dropdown-item-title { font-weight: 500; color: var(--text-main); }
+        .dropdown-item-path { font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; }
+        .dropdown-item-icon { color: var(--accent-primary); margin-right: 8px; font-size: 0.875rem; }
+        .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
+
+        /* Formula Box */
+        .formula-box {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+        }
+        body.light-mode .formula-box {
+            background: rgba(0,0,0,0.05);
+        }
+
+        /* Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            cursor: pointer;
+            margin-top: -5px;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border-subtle);
+            border-radius: 2px;
+        }
+
+        /* Progress Bar */
+        .progress-bar-bg {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 999px;
+            overflow: hidden;
+            height: 12px;
+            width: 100%;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--accent-primary);
+            transition: width 0.3s ease;
+        }
+
+    </style>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-ZT6JM33V5J');
+    </script>
+
+</head>
+<body class="flex flex-col min-h-screen overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+                
+                <!-- Search -->
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <!-- Theme Toggle + Back Button -->
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto flex flex-col">
+        <div class="mb-8 animate-fade-in">
+            <div class="flex items-center gap-2 text-xs mono-font mb-2" style="color: var(--text-muted)">
+                <span class="opacity-50">Modules</span>
+                <span>/</span>
+                <span class="opacity-50">Deep Learning</span>
+                <span>/</span>
+                <span style="color: var(--accent-primary)">Classification</span>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">How Do Fully Connected Layers Work in CNN?</h1>
+            <p class="mt-2 text-sm max-w-2xl" style="color: var(--text-muted)">
+                Visualize how a flattened 1D array of features connects to every node in the output layer using weights, biases, and Softmax to make final classifications.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full flex-1">
+            
+            <!-- Column 1: Input Vector (Flattened) -->
+            <aside class="space-y-6 animate-fade-in" style="animation-delay: 0.1s">
+                <div class="glass-card p-6 flex flex-col h-full">
+                    <div class="flex items-center justify-between w-full mb-6">
+                        <h2 class="text-xs font-bold uppercase tracking-widest opacity-70 mono-font" style="color: var(--text-muted)">Flattened Input (1D)</h2>
+                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-green-500/10 text-green-500 border border-green-500/20 mono-font">4 NODES</span>
+                    </div>
+                    
+                    <p class="text-xs mb-6" style="color: var(--text-muted)">These values represent high-level features extracted by previous convolutional layers (e.g., "has fur", "has pointy ears").</p>
+
+                    <div class="flex-1 flex flex-col justify-around gap-4" id="input-sliders-container">
+                        <!-- Sliders injected by JS -->
+                    </div>
+
+                    <button id="randomizeInputBtn" class="mt-6 action-btn w-full bg-gray-700/30 hover:bg-gray-600/50 text-gray-300 border border-gray-600/30 py-2 text-xs font-bold uppercase tracking-wider">
+                        <i class="fas fa-random mr-2"></i>Randomize Inputs
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Column 2: Dense Connection Visualizer -->
+            <section class="space-y-6 animate-fade-in" style="animation-delay: 0.2s">
+                <div class="glass-card p-6 flex flex-col items-center">
+                    
+                    <h2 class="text-xs font-bold uppercase tracking-widest mb-3 opacity-70 mono-font w-full" style="color: var(--text-muted)">Dense Network Graph</h2>
+                    
+                    <!-- Network Canvas -->
+                    <div class="relative w-full aspect-[4/5] bg-black/20 rounded-lg border border-dashed border-gray-700/50 flex items-center justify-center p-4">
+                        <canvas id="networkCanvas"></canvas>
+                        <span id="animProgress" class="hidden text-[10px] font-bold px-2 py-1 rounded bg-green-500 text-white mono-font absolute top-4 right-4">COMPUTING...</span>
+                    </div>
+
+                    <!-- Formula Display -->
+                    <div class="w-full formula-box p-4 mt-6 text-center">
+                        <h3 class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-2 mono-font" style="color: var(--text-muted)">Dot Product Formula</h3>
+                        <div class="mono-font text-sm mb-3 font-bold" style="color: var(--text-main)">
+                            Z<sub>j</sub> = Σ (X<sub>i</sub> · W<sub>ij</sub>) + B<sub>j</sub>
+                        </div>
+                        <div id="formula-math" class="mono-font text-xs min-h-[40px] flex items-center justify-center" style="color: var(--accent-primary)">
+                            <!-- Populated by JS during animation -->
+                            Click "Forward Pass" to view calculations.
+                        </div>
+                    </div>
+                    
+                    <div class="w-full pt-4 mt-2 border-t border-dashed border-brand-400/20">
+                        <button id="animateBtn" class="action-btn w-full py-3 bg-green-500 text-white hover:bg-green-600 flex items-center justify-center uppercase tracking-widest text-xs">
+                            <i class="fas fa-play mr-2"></i> Forward Pass
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Column 3: Weights & Outputs -->
+            <aside class="space-y-6 animate-fade-in" style="animation-delay: 0.3s">
+                
+                <!-- Weights Matrix -->
+                <div class="glass-card p-6">
+                    <div class="flex items-center justify-between w-full mb-4">
+                        <h2 class="text-xs font-bold uppercase tracking-widest opacity-70 mono-font" style="color: var(--text-muted)">Weights & Biases</h2>
+                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 mono-font">4x3 MATRIX</span>
+                    </div>
+                    
+                    <div class="w-full overflow-x-auto">
+                        <table class="w-full text-center border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class="text-[10px] opacity-60 pb-2">To →</th>
+                                    <th class="text-[10px] font-bold text-red-400 pb-2"><i class="fas fa-cat"></i> Cat</th>
+                                    <th class="text-[10px] font-bold text-blue-400 pb-2"><i class="fas fa-dog"></i> Dog</th>
+                                    <th class="text-[10px] font-bold text-yellow-400 pb-2"><i class="fas fa-dove"></i> Bird</th>
+                                </tr>
+                            </thead>
+                            <tbody id="weights-tbody">
+                                <!-- Generated by JS -->
+                            </tbody>
+                            <tfoot class="border-t border-dashed" style="border-color: var(--border-subtle)">
+                                <tr>
+                                    <td class="text-[10px] opacity-60 pt-2 font-bold">Bias (B)</td>
+                                    <td class="pt-2 px-1"><input type="number" step="0.1" class="kernel-input" id="b0" value="0.0"></td>
+                                    <td class="pt-2 px-1"><input type="number" step="0.1" class="kernel-input" id="b1" value="0.0"></td>
+                                    <td class="pt-2 px-1"><input type="number" step="0.1" class="kernel-input" id="b2" value="0.0"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Final Output -->
+                <div class="glass-card p-6 flex flex-col h-full">
+                    <div class="flex items-center justify-between w-full mb-6">
+                        <h2 class="text-xs font-bold uppercase tracking-widest opacity-70 mono-font" style="color: var(--text-muted)">Softmax Output</h2>
+                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-green-500/10 text-green-500 border border-green-500/20 mono-font">3 CLASSES</span>
+                    </div>
+
+                    <div class="space-y-5" id="outputs-container">
+                        <!-- Generated by JS -->
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <!-- Article -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
+        <div class="glass-card animate-fade-in" style="animation-delay: 0.4s;">
+            <div class="p-6 border-b" style="border-color: var(--border-subtle);">
+                <h2 class="font-bold text-xl md:text-2xl brand-font" style="color: var(--text-main)">Understanding Fully Connected (Dense) Layers</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">The decision-making powerhouse at the end of a Convolutional Neural Network.</p>
+            </div>
+            <div class="p-6 md:p-8 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
+                
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
+                    <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-bullseye"></i>The Transition to 1D</h3>
+                    <p class="opacity-90">Throughout the early stages of a CNN, images are processed as 2D grids (or 3D volumes with color channels). Convolutional and pooling layers extract spatial features like edges, textures, and shapes. However, to make a final classification (e.g., "Is this a cat or a dog?"), the network must flatten this 2D/3D data into a single 1D list of numbers. This is the input vector you see on the left.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg md:text-xl font-bold mb-3 brand-font flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-project-diagram"></i>Why "Fully Connected"?</h3>
+                    <p class="mb-4 opacity-90">It is called a <strong>Fully Connected</strong> (or Dense) layer because every single node in the input vector is connected to every single node in the output vector. If you have 4 inputs and 3 outputs, there are $4 \times 3 = 12$ distinct connections (weights), plus 3 biases.</p>
+                    <p class="opacity-90">Each weight represents the "importance" of a specific feature for a specific class. For example, if Input Feature 2 strongly represents "pointy ears", the weight connecting Input 2 to the "Cat" output node will likely be a high positive number, while its connection to "Bird" might be negative.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg md:text-xl font-bold mb-3 brand-font flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-vial"></i>Guided Experiments with This Interactive</h3>
+                    <ol class="list-decimal pl-6 space-y-4">
+                        <li>
+                            <strong>Observe the Forward Pass:</strong>
+                            <p class="font-light opacity-80 mt-1">Click the <strong>Forward Pass</strong> button. Watch the center canvas. The network computes the output one node at a time. It highlights the connections, multiplies each input by its corresponding weight, sums them up, and adds a bias. This raw sum is called the <strong>Logit</strong> ($Z$).</p>
+                        </li>
+                        <li>
+                            <strong>Tweak the Weights:</strong>
+                            <p class="font-light opacity-80 mt-1">Look at the Weights table on the right. Change the weights connecting to the "Cat" column to high positive numbers (e.g., 2.0). Click Forward Pass again. Notice how the raw score (Logit) for the Cat class shoots up!</p>
+                        </li>
+                        <li>
+                            <strong>The Role of Bias:</strong>
+                            <p class="font-light opacity-80 mt-1">At the bottom of the weights table are the Biases. A bias is an extra value added to the final sum. It shifts the activation function left or right. Try setting the Bird bias to a high value like 5.0. It will artificially inflate the Bird's probability regardless of the inputs.</p>
+                        </li>
+                        <li>
+                            <strong>Softmax Activation:</strong>
+                            <p class="font-light opacity-80 mt-1">Raw Logits can be any number (e.g., -5.2, 0.4, 12.8). To interpret them as probabilities, we apply the <strong>Softmax</strong> function. Softmax squashes the logits into values between 0 and 1, ensuring they all sum up to exactly 1.0 (or 100%). Notice how the progress bars in the Output section always balance each other out.</p>
+                        </li>
+                    </ol>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
+                        <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-calculator"></i>The Dense Formula</h3>
+                        <p class="opacity-90 mb-2">For an output node $j$, the raw Logit ($Z_j$) is the dot product of the inputs ($X$) and weights ($W$), plus bias ($b$):</p>
+                        <code class="block p-2 bg-black/50 rounded mono-font text-center mb-2 text-[13px]" style="color: var(--accent-primary)">Z<sub>j</sub> = (X<sub>1</sub>·W<sub>1j</sub> + X<sub>2</sub>·W<sub>2j</sub> + ...) + b<sub>j</sub></code>
+                        <p class="opacity-90 mt-2">Softmax is then applied to turn $Z$ into probabilities ($P$):</p>
+                        <code class="block p-2 bg-black/50 rounded mono-font text-center mt-2 text-[13px]" style="color: var(--accent-primary)">P<sub>j</sub> = e<sup>Z<sub>j</sub></sup> / Σ(e<sup>Z</sup>)</code>
+                    </div>
+                    <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
+                        <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas-regular fa-bookmark"></i>Key Takeaways</h3>
+                        <ul class="list-disc pl-5 space-y-2 mt-3 opacity-90">
+                            <li>Dense layers sit at the very end of a CNN to perform classification.</li>
+                            <li>They require 1D flattened input vectors.</li>
+                            <li>Every input is connected to every output, creating a massive number of weight parameters.</li>
+                            <li>Softmax transforms raw dot-product scores (Logits) into readable probabilities.</li>
+                        </ul>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+        <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+        <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
+            <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
+                <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" rel="noopener noreferrer" aria-label="Kaggle" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-kaggle fa-lg"></i></a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-70">&copy; 2025 VIZLEARN // SYSTEM ONLINE</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Constants
+            const NUM_INPUTS = 4;
+            const NUM_OUTPUTS = 3;
+            const OUTPUT_LABELS = ['Cat', 'Dog', 'Bird'];
+            const OUTPUT_COLORS = ['#f87171', '#60a5fa', '#facc15']; // Red, Blue, Yellow
+
+            // Data State
+            let inputs = [0.8, 0.2, 0.9, 0.4];
+            let weights = [
+                [ 1.2, -0.5,  0.1],
+                [-0.8,  1.5, -0.2],
+                [ 0.5,  0.3, -1.0],
+                [-0.2, -0.9,  1.4]
+            ];
+            let biases = [0.1, -0.2, 0.5];
+            
+            let logits = [0, 0, 0];
+            let probabilities = [0, 0, 0];
+
+            let animationId = null;
+            let currentAnimStep = -1; // -1 is idle. 0,1,2 for output nodes.
+
+            // DOM Elements
+            const inputContainer = document.getElementById('input-sliders-container');
+            const weightsTbody = document.getElementById('weights-tbody');
+            const outputsContainer = document.getElementById('outputs-container');
+            const canvas = document.getElementById('networkCanvas');
+            const ctx = canvas.getContext('2d');
+            const animateBtn = document.getElementById('animateBtn');
+            const animProgress = document.getElementById('animProgress');
+            const formulaMath = document.getElementById('formula-math');
+            const themeToggleBtn = document.getElementById('themeToggle');
+            const sunIcon = themeToggleBtn.querySelector('.dark-icon');
+            const moonIcon = themeToggleBtn.querySelector('.light-icon');
+
+            // Theme Logic
+            let currentTheme = localStorage.getItem('theme') || 'dark';
+
+            function applyTheme(theme) {
+                if (theme === 'light') {
+                    document.body.classList.add('light-mode');
+                    moonIcon.classList.remove('hidden');
+                    sunIcon.classList.add('hidden');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    sunIcon.classList.remove('hidden');
+                    moonIcon.classList.add('hidden');
+                }
+                if (typeof drawNetwork === 'function') drawNetwork(currentAnimStep); // Redraw canvas on theme change
+            }
+            themeToggleBtn.addEventListener('click', () => {
+                currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+                localStorage.setItem('theme', currentTheme);
+                applyTheme(currentTheme);
+            });
+            applyTheme(currentTheme);
+
+            // Initialize UI
+            function initUI() {
+                // Generate Input Sliders
+                inputContainer.innerHTML = '';
+                for(let i=0; i<NUM_INPUTS; i++) {
+                    inputContainer.innerHTML += `
+                        <div class="w-full">
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-xs font-bold text-gray-400">X<sub>${i+1}</sub></label>
+                                <span id="in-val-${i}" class="text-xs mono-font font-bold text-green-400">${inputs[i].toFixed(2)}</span>
+                            </div>
+                            <input type="range" id="in-slider-${i}" min="0" max="1" step="0.01" value="${inputs[i]}">
+                        </div>
+                    `;
+                }
+
+                // Generate Weights Table
+                weightsTbody.innerHTML = '';
+                for(let i=0; i<NUM_INPUTS; i++) {
+                    let rowHtml = `<tr><td class="text-[10px] opacity-60 font-bold">From X<sub>${i+1}</sub></td>`;
+                    for(let j=0; j<NUM_OUTPUTS; j++) {
+                        rowHtml += `<td class="p-1"><input type="number" step="0.1" class="kernel-input w-16" id="w-${i}-${j}" value="${weights[i][j].toFixed(1)}"></td>`;
+                    }
+                    rowHtml += `</tr>`;
+                    weightsTbody.innerHTML += rowHtml;
+                }
+
+                // Initialize biases
+                for(let j=0; j<NUM_OUTPUTS; j++) {
+                    document.getElementById(`b${j}`).value = biases[j].toFixed(1);
+                }
+
+                // Generate Output Display
+                outputsContainer.innerHTML = '';
+                for(let j=0; j<NUM_OUTPUTS; j++) {
+                    outputsContainer.innerHTML += `
+                        <div class="w-full relative p-3 rounded-lg border border-gray-700/30 bg-black/20" id="out-card-${j}">
+                            <div class="flex justify-between items-end mb-2">
+                                <div>
+                                    <span class="text-xs font-bold uppercase" style="color: ${OUTPUT_COLORS[j]}">${OUTPUT_LABELS[j]}</span>
+                                    <div class="text-[10px] text-gray-500 mono-font mt-1">Logit Z<sub>${j}</sub>: <span id="logit-${j}">0.00</span></div>
+                                </div>
+                                <div class="text-lg font-bold mono-font" style="color: var(--text-main)">
+                                    <span id="prob-${j}">0.0</span>%
+                                </div>
+                            </div>
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill" id="bar-${j}" style="width: 0%; background: ${OUTPUT_COLORS[j]}"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                attachListeners();
+                updateCalculations();
+            }
+
+            function attachListeners() {
+                // Inputs
+                for(let i=0; i<NUM_INPUTS; i++) {
+                    document.getElementById(`in-slider-${i}`).addEventListener('input', (e) => {
+                        inputs[i] = parseFloat(e.target.value);
+                        document.getElementById(`in-val-${i}`).innerText = inputs[i].toFixed(2);
+                        stopAnimation(); updateCalculations();
+                    });
+                }
+                
+                // Randomize Inputs
+                document.getElementById('randomizeInputBtn').addEventListener('click', () => {
+                    for(let i=0; i<NUM_INPUTS; i++) {
+                        inputs[i] = Math.random();
+                        document.getElementById(`in-slider-${i}`).value = inputs[i];
+                        document.getElementById(`in-val-${i}`).innerText = inputs[i].toFixed(2);
+                    }
+                    stopAnimation(); updateCalculations();
+                });
+
+                // Weights
+                for(let i=0; i<NUM_INPUTS; i++) {
+                    for(let j=0; j<NUM_OUTPUTS; j++) {
+                        document.getElementById(`w-${i}-${j}`).addEventListener('input', (e) => {
+                            weights[i][j] = parseFloat(e.target.value) || 0;
+                            stopAnimation(); updateCalculations();
+                        });
+                    }
+                }
+
+                // Biases
+                for(let j=0; j<NUM_OUTPUTS; j++) {
+                    document.getElementById(`b${j}`).addEventListener('input', (e) => {
+                        biases[j] = parseFloat(e.target.value) || 0;
+                        stopAnimation(); updateCalculations();
+                    });
+                }
+
+                animateBtn.addEventListener('click', () => {
+                    if (animationId) stopAnimation();
+                    else startAnimation();
+                });
+            }
+
+            function updateCalculations() {
+                // 1. Calculate Logits (Z = X*W + B)
+                for(let j=0; j<NUM_OUTPUTS; j++) {
+                    let sum = 0;
+                    for(let i=0; i<NUM_INPUTS; i++) {
+                        sum += inputs[i] * weights[i][j];
+                    }
+                    sum += biases[j];
+                    logits[j] = sum;
+                }
+
+                // 2. Calculate Softmax
+                const maxLogit = Math.max(...logits); // For numerical stability
+                let expSums = 0;
+                const exps = logits.map(z => {
+                    const e = Math.exp(z - maxLogit);
+                    expSums += e;
+                    return e;
+                });
+                
+                probabilities = exps.map(e => e / expSums);
+
+                // 3. Update DOM
+                for(let j=0; j<NUM_OUTPUTS; j++) {
+                    document.getElementById(`logit-${j}`).innerText = logits[j].toFixed(2);
+                    const pct = (probabilities[j] * 100).toFixed(1);
+                    document.getElementById(`prob-${j}`).innerText = pct;
+                    document.getElementById(`bar-${j}`).style.width = `${pct}%`;
+                    
+                    // Reset card styles
+                    const card = document.getElementById(`out-card-${j}`);
+                    card.style.borderColor = 'rgba(75, 85, 99, 0.3)'; // gray-700/30
+                    card.style.boxShadow = 'none';
+                }
+
+                // Highlight winning class slightly
+                const winnerIdx = probabilities.indexOf(Math.max(...probabilities));
+                const winCard = document.getElementById(`out-card-${winnerIdx}`);
+                winCard.style.borderColor = OUTPUT_COLORS[winnerIdx];
+                winCard.style.boxShadow = `0 0 15px ${OUTPUT_COLORS[winnerIdx]}40`;
+
+                if (currentAnimStep === -1) {
+                    formulaMath.innerHTML = 'Click "Forward Pass" to view calculations.';
+                    formulaMath.style.color = 'var(--text-muted)';
+                    drawNetwork(-1);
+                }
+            }
+
+            // --- Canvas Drawing Logic ---
+            function resizeCanvas() {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                // Match resolution to display size for crispness
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+                drawNetwork(currentAnimStep);
+            }
+            window.addEventListener('resize', resizeCanvas);
+
+            function drawNetwork(activeNode = -1) {
+                const w = canvas.width;
+                const h = canvas.height;
+                ctx.clearRect(0, 0, w, h);
+
+                const padding = 40;
+                const inputX = padding;
+                const outputX = w - padding - 20;
+
+                // Calculate Y positions to center nodes vertically
+                const inputSpacing = (h - padding * 2) / Math.max(1, NUM_INPUTS - 1);
+                const outputSpacing = (h - padding * 2) / Math.max(1, NUM_OUTPUTS - 1);
+
+                const inputYs = [];
+                for(let i=0; i<NUM_INPUTS; i++) inputYs.push(padding + i * inputSpacing);
+                
+                const outputYs = [];
+                for(let j=0; j<NUM_OUTPUTS; j++) outputYs.push(padding + j * outputSpacing);
+
+                // Draw Lines
+                for(let i=0; i<NUM_INPUTS; i++) {
+                    for(let j=0; j<NUM_OUTPUTS; j++) {
+                        const weight = weights[i][j];
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(inputX, inputYs[i]);
+                        // Slight curve for aesthetics
+                        ctx.bezierCurveTo(inputX + w/3, inputYs[i], outputX - w/3, outputYs[j], outputX, outputYs[j]);
+                        
+                        // Styling based on animation state
+                        if (activeNode === -1 || activeNode === j) {
+                            // Determine color based on weight sign
+                            const isPositive = weight >= 0;
+                            const alpha = Math.min(1.0, 0.2 + Math.abs(weight) * 0.4); // thicker/more opaque for larger weights
+                            
+                            if (currentTheme === 'light') {
+                                ctx.strokeStyle = isPositive ? `rgba(21, 128, 61, ${alpha})` : `rgba(185, 28, 28, ${alpha})`;
+                            } else {
+                                ctx.strokeStyle = isPositive ? `rgba(74, 222, 128, ${alpha})` : `rgba(248, 113, 113, ${alpha})`;
+                            }
+                            ctx.lineWidth = activeNode === j ? 3 : (0.5 + Math.abs(weight));
+                        } else {
+                            // Dim inactive connections
+                            ctx.strokeStyle = currentTheme === 'light' ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)';
+                            ctx.lineWidth = 1;
+                        }
+                        ctx.stroke();
+                    }
+                }
+
+                // Draw Nodes
+                const nodeRadius = 14;
+
+                // Inputs
+                for(let i=0; i<NUM_INPUTS; i++) {
+                    ctx.beginPath();
+                    ctx.arc(inputX, inputYs[i], nodeRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = currentTheme === 'light' ? '#ffffff' : '#111111';
+                    ctx.fill();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = (activeNode === -1 || currentAnimStep !== -1) ? '#4ade80' : '#4b5563'; // Green if active
+                    ctx.stroke();
+
+                    // Label X_i
+                    ctx.fillStyle = currentTheme === 'light' ? '#000000' : '#ffffff';
+                    ctx.font = '10px JetBrains Mono';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`X${i+1}`, inputX, inputYs[i]);
+                }
+
+                // Outputs
+                for(let j=0; j<NUM_OUTPUTS; j++) {
+                    ctx.beginPath();
+                    ctx.arc(outputX, outputYs[j], nodeRadius + 2, 0, Math.PI * 2);
+                    ctx.fillStyle = currentTheme === 'light' ? '#ffffff' : '#111111';
+                    ctx.fill();
+                    ctx.lineWidth = activeNode === j ? 4 : 2;
+                    ctx.strokeStyle = OUTPUT_COLORS[j]; // Match class color
+                    if (activeNode !== -1 && activeNode !== j) ctx.strokeStyle = '#4b5563'; // Dim if inactive
+                    ctx.stroke();
+
+                    // Label Z_j
+                    ctx.fillStyle = currentTheme === 'light' ? '#000000' : '#ffffff';
+                    ctx.font = '10px JetBrains Mono';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`Z${j}`, outputX, outputYs[j]);
+                }
+            }
+
+            // --- Animation Logic ---
+            function startAnimation() {
+                if (animationId) return;
+                currentAnimStep = 0;
+                animateBtn.innerHTML = '<i class="fas fa-stop mr-2"></i>Stop Animation';
+                animateBtn.classList.replace('bg-green-500', 'bg-red-500');
+                animateBtn.classList.replace('hover:bg-green-600', 'hover:bg-red-600');
+                animProgress.classList.remove('hidden');
+                
+                stepAnimation();
+            }
+
+            function stepAnimation() {
+                if (currentAnimStep >= NUM_OUTPUTS) {
+                    stopAnimation();
+                    return;
+                }
+
+                const j = currentAnimStep;
+                
+                // Update Canvas
+                drawNetwork(j);
+
+                // Update Formula Box
+                let formulaHtml = `Z<sub>${j}</sub> = `;
+                for(let i=0; i<NUM_INPUTS; i++) {
+                    formulaHtml += `(<span class="text-green-400">${inputs[i].toFixed(2)}</span> × <span class="text-blue-400">${weights[i][j].toFixed(1)}</span>)`;
+                    if (i < NUM_INPUTS - 1) formulaHtml += ' + ';
+                }
+                const bStr = biases[j] >= 0 ? `+ ${biases[j].toFixed(1)}` : `- ${Math.abs(biases[j]).toFixed(1)}`;
+                formulaHtml += ` <span class="text-purple-400">${bStr}</span> = <strong class="text-white bg-black/50 px-1 rounded">${logits[j].toFixed(2)}</strong>`;
+                
+                formulaMath.innerHTML = formulaHtml;
+                formulaMath.style.color = OUTPUT_COLORS[j];
+
+                currentAnimStep++;
+                
+                // Stay on each node for 1.5 seconds
+                animationId = setTimeout(stepAnimation, 2000);
+            }
+
+            function stopAnimation() {
+                if (animationId) {
+                    clearTimeout(animationId);
+                    animationId = null;
+                }
+                currentAnimStep = -1;
+                animateBtn.innerHTML = '<i class="fas fa-play mr-2"></i> Forward Pass';
+                animateBtn.classList.replace('bg-red-500', 'bg-green-500');
+                animateBtn.classList.replace('hover:bg-red-600', 'hover:bg-green-600');
+                animProgress.classList.add('hidden');
+                
+                updateCalculations(); // Resets formula and draws full network
+            }
+
+            // Init call
+            setTimeout(() => {
+                initUI();
+                resizeCanvas();
+            }, 100); // slight delay to ensure layout metrics are ready
+        });
+
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            { title: "Calculating Parameters in CNN", path: "computer_vision/calculating_parameters_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Interactive 3D CNN Visualizer", path: "computer_vision/cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Data Loaders in CNN", path: "computer_vision/data_loaders_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Pooling Layer", path: "computer_vision/downsampling_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Real-time Edge Detection", path: "computer_vision/edge_detection.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Convolutional Layer", path: "computer_vision/feature_map_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Grayscale Image Processing", path: "computer_vision/grayscale_image_processing.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Fully Connected Layer in CNN", path: "computer_vision/how_dense_layer_works_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "How Neural Networks Process Images", path: "computer_vision/how_neural_network_process_images.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "ReLU Activation in CNN", path: "computer_vision/how_relu_works_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Image Data Augmentation", path: "computer_vision/image_data_augmentation.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Padding in CNN", path: "computer_vision/padding_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Parameter Sharing in CNN", path: "computer_vision/parameter_sharing_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "RGB Image Processing", path: "computer_vision/rgb_image_processing.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Strides in CNN", path: "computer_vision/strides_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "What is Transfer Learning in CNN?", path: "computer_vision/transfer_learning_with_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "SQL GroupBy Visualizer", path: "database/groupby_in_sql.html", category: "database", icon: "fa-database" },
+            { title: "SQL Joins Visualizer", path: "database/joins_in_sql.html", category: "database", icon: "fa-database" },
+            { title: "SQL Window Functions", path: "database/window_functions_in_sql.html", category: "database", icon: "fa-database" },
+            { title: "Activation Functions", path: "deep_learning/activation_functions.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Batch Normalization in Deep Networks", path: "deep_learning/batch_normalization.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Batch Processing in the Neural Network", path: "deep_learning/batch_processing_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Data Sparsity", path: "deep_learning/data_sparsity.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Dropout in Neural Networks", path: "deep_learning/dropout_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Early Stopping", path: "deep_learning/early_stopping_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Feature Scaling & Weight Bias", path: "deep_learning/feature_scaling_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Gradient descent batch processing", path: "deep_learning/gradient_descent_batch_processing.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Gradient Descent", path: "deep_learning/gradient_descent_training.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "How Loss is Calculated", path: "deep_learning/how_loss_is_calculated.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Hyperparameter Tuning", path: "deep_learning/hyper-paramter_tuning.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Learning Rate Scheduling", path: "deep_learning/learning_rate_scheduling.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Linear Regression with Gradient Descent", path: "deep_learning/linear_regression_with_gradient_descent.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Model Training Curves", path: "deep_learning/model_training_curve.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Model Training in CPU vs GPU", path: "deep_learning/model_training_on_cpu_vs_gpu.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Neural Network Visualizer", path: "deep_learning/neural_network.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Neural Network for Regression", path: "deep_learning/neural_network_for_regression.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Neural Network for Unsupervised Learning", path: "deep_learning/neural_network_for_unsupervised_learning.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Optimizers", path: "deep_learning/optimizers_in_3d.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Optimizers", path: "deep_learning/optimizers_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Overfitting vs Underfitting", path: "deep_learning/overfitting_vs_underfitting.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Perceptron Classifier", path: "deep_learning/perceptron.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Regularization Techniques", path: "deep_learning/regularization_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Reproducibility of Model", path: "deep_learning/reproducibility_of_model.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Vanishing & Exploding Gradients", path: "deep_learning/vanishing_vs_exploding_gradient.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Weight Initialization Methods", path: "deep_learning/weight_initialization.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Weights & Biases", path: "deep_learning/weights_and_biases.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "A* Search Algorithm", path: "dsa/a_star.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Backtracking", path: "dsa/backtracking.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Search", path: "dsa/binary_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Tree Visualizer", path: "dsa/breadth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Bubble Sort", path: "dsa/bubble_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Counting Sort", path: "dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Depth First Search", path: "dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Python Dictionary Lab", path: "dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra\u2019s Algorithm", path: "dsa/dijkstra\u2019s.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Fibonacci Search", path: "dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Insertion Sort", path: "dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Interpolation Search", path: "dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Linear Search", path: "dsa/linear_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Python List Lab", path: "dsa/lists_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Merge Sort", path: "dsa/merge_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Quick Sort", path: "dsa/quick_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Selection Sort", path: "dsa/selection_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Visual Learning Platform - Python String Lab", path: "dsa/strings_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Causal Language Modeling", path: "gen_ai/casual_language_modeling.html", category: "gen_ai", icon: "fa-robot" },
+            { title: "Bias-Variance Tradeoff", path: "machine_learning/bias_vs_variance.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Confusion Matrix", path: "machine_learning/confusion_matrix.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "machine_learning/cosine_similarity.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Cross Validation", path: "machine_learning/cross_validation.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Decision Tree (ID3)", path: "machine_learning/decision_tree.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Regression Metrics", path: "machine_learning/evaluation_metrics for_regression.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Hard vs Soft Labelling", path: "machine_learning/hard_vs_soft_labelling.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "K-Means Clustering", path: "machine_learning/k_means.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "K-Nearest Neighbors", path: "machine_learning/knn.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Label Encoding", path: "machine_learning/label_encoding.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Label Imbalance & The Accuracy Paradox", path: "machine_learning/label_imbalance_problem.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Linear Regression", path: "machine_learning/linear_regression_with_ols.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Model and Data Drift", path: "machine_learning/model_and_data_drift.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Naive Bayes Classifier", path: "machine_learning/naive_bayes.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "One Hot Encoding", path: "machine_learning/one_hot_encoding.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Sliding Window Explorer", path: "machine_learning/sliding_window_for_timeseries_data.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Support Vector Machines", path: "machine_learning/svm.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Train, Test & Validation Split", path: "machine_learning/train_test_split.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Training on Imbalanced Data", path: "machine_learning/training_on_label_imbalanced_dataset.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Equation of a Line (y = mx + c)", path: "maths/equation_of_line.html", category: "maths", icon: "fa-square-root-alt" },
+            { title: "ASCII Code Explorer", path: "natural_language_processing/ascii_codes.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "How Neural Networks Process Text", path: "natural_language_processing/how_neural_network_text.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "How RNN Processes Text", path: "natural_language_processing/how_rnn_process_text.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "N-gram Explainer", path: "natural_language_processing/n_gram.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Interactive 3D RNN Visualizer", path: "natural_language_processing/rnn.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Stemming vs Lemmatization", path: "natural_language_processing/stemming_vs_lemmatization.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Text Normalization Pipeline", path: "natural_language_processing/text_normalization_pipeline.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "NLP Tokenizer", path: "natural_language_processing/tokenization.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Word Cloud Generator", path: "natural_language_processing/word_cloud.html", category: "natural_language_processing", icon: "fa-comments" }
+        ];
+
+        function toRelativePath(fromPath, targetPath) {
+            const fromParts = fromPath.split('/').filter(Boolean);
+            const targetParts = targetPath.split('/').filter(Boolean);
+            let shared = 0;
+            while (shared < Math.min(fromParts.length, targetParts.length) && fromParts[shared] === targetParts[shared]) {
+                shared++;
+            }
+            const up = '../'.repeat(Math.max(0, fromParts.length - shared));
+            const down = targetParts.slice(shared).join('/');
+            return `${up}${down}`;
+        }
+
+        const currentPath = window.location.pathname.replace(/\/+$/g, '').replace(/index\.html$/, '');
+        const currentDir = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/')) : '';
+        const resolvedCourses = allCourses.map((course) => {
+            const normalizedTarget = course.path.replace(/^\.\//, '');
+            const relativePath = currentDir ? toRelativePath(currentDir, normalizedTarget) : normalizedTarget;
+            return { ...course, path: relativePath };
+        });
+
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                if (query.length === 0) { dropdown.classList.remove('show'); return; }
+                const filtered = resolvedCourses.filter(course => course.title.toLowerCase().includes(query) || course.category.toLowerCase().includes(query));
+                if (filtered.length === 0) { dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>'; } 
+                else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;"><i class="fas ${course.icon} dropdown-item-icon"></i><div><div class="dropdown-item-title">${course.title}</div><div class="dropdown-item-path">${course.category.toUpperCase()}</div></div></div><i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>`).join('');
+                }
+                dropdown.classList.add('show');
+            });
+            document.addEventListener('click', (e) => { if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show'); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dropdown.classList.remove('show'); });
+        }
+    </script>
+</body>
+</html>
