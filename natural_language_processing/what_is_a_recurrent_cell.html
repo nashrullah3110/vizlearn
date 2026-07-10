@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - What is a Recurrent Cell?</title>
+    <meta name="description" content="Step a sentence through a recurrent cell one word at a time and watch the hidden state — the network's memory — evolve. On VizLearn.">
+    <meta name="keywords" content="recurrent cell, RNN, hidden state, memory, sequence model, vizlearn">
+    <meta name="robots" content="index, follow">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        const initTailwind = () => {
+            if (window.tailwind) {
+                tailwind.config = {
+                    darkMode: 'class',
+                    theme: {
+                        extend: {
+                            colors: {
+                                brand: {
+                                    50: '#f0fdf4',
+                                    100: '#dcfce7',
+                                    400: '#4ade80',
+                                    500: '#22c55e',
+                                    600: '#16a34a',
+                                    900: '#14532d',
+                                }
+                            },
+                            animation: {
+                                'fade-in': 'fadeIn 0.5s ease-out forwards',
+                                'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                            },
+                            keyframes: {
+                                fadeIn: {
+                                    '0%': { opacity: '0', transform: 'translateY(10px)' },
+                                    '100%': { opacity: '1', transform: 'translateY(0)' },
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                setTimeout(initTailwind, 50);
+            }
+        };
+        initTailwind();
+    </script>
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'dark';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+        :root {
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15);
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --grid-color: rgba(74, 222, 128, 0.05);
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.15);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --grid-color: rgba(22, 163, 74, 0.04);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image:
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 1rem 1.5rem;
+            background: var(--input-bg);
+        }
+
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            border-radius: 8px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); }
+        .viz-btn-secondary { background: var(--input-bg); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+        .viz-btn-secondary:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .viz-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            border-radius: 8px;
+            padding: 12px;
+            width: 100%;
+            font-size: 0.875rem;
+            transition: border-color 0.2s;
+        }
+        .viz-input:focus { border-color: var(--accent-primary); outline: none; }
+
+        input[type="range"] { accent-color: var(--accent-primary); }
+
+        .result-row { transition: background 0.2s ease; border-bottom: 1px solid var(--border-subtle); }
+        .result-row:hover { background: rgba(255,255,255,0.02); }
+
+        footer i { transition: color 0.3s ease; }
+        footer a:hover i { color: var(--accent-primary); }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+
+        /* Search Input Wrapper */
+        .search-input-wrapper {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .search-input-wrapper:focus-within {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .search-input-wrapper input {
+            color: var(--text-main);
+        }
+        .search-input-wrapper input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .search-input-wrapper i {
+            color: var(--accent-primary);
+            opacity: 0.7;
+        }
+
+        /* Dropdown Search */
+        .search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-dropdown-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .search-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-dropdown-item:hover {
+            background: var(--input-focus-bg);
+            padding-left: 20px;
+        }
+
+        .dropdown-item-title {
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .dropdown-item-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 12px;
+        }
+
+        .dropdown-item-icon {
+            color: var(--accent-primary);
+            margin-right: 8px;
+            font-size: 0.875rem;
+        }
+
+        .dropdown-no-results {
+            padding: 20px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        
+        .token-pill { border: 1px solid var(--border-subtle); background: var(--input-bg); border-radius: 9999px; padding: 6px 14px; font-size: 12px; transition: all 0.25s ease; }
+        .token-pill.current { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(74, 222, 128, 0.12); box-shadow: 0 0 10px var(--accent-glow); font-weight: 700; }
+        .token-pill.done { opacity: 0.4; }
+        .h-cell { min-width: 60px; height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--border-subtle); font-size: 12px; transition: background 0.4s ease; }
+        .h-cell .hl { font-size: 8px; opacity: 0.55; }
+        .cell-loop { animation: loopPulse 2.4s ease-in-out infinite; }
+        @keyframes loopPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+    </style>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-ZT6JM33V5J');
+    </script>
+
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+
+                <!-- Search -->
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Theme Toggle + Back Button -->
+                <div class="flex items-center gap-3">
+                    <!-- Back to Hub Button -->
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+
+                    <!-- Theme Toggle -->
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+
+    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div class="mb-8 animate-fade-in">
+            <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
+                <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
+                <span>/</span>
+                <span>Natural Language Processing</span>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">What is a Recurrent Cell?</h1>
+            <p class="mt-2 max-w-2xl" style="color: var(--text-muted)">A recurrent cell is a neuron with memory: it reads one token at a time and carries a hidden state forward. Step through a sentence and watch the memory change.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
+
+            <!-- Controls (Left) -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="card-container">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--accent-primary)">
+                            <i class="fas fa-keyboard mr-2"></i> Input Sequence
+                        </h3>
+                    </div>
+                    <div class="p-5 space-y-4">
+                        <input id="rnnInput" class="viz-input mono-font" value="I love natural language processing" placeholder="Type a short sentence...">
+                        <div class="pt-4 border-t border-white/5 space-y-3">
+                            <button id="stepBtn" class="viz-btn viz-btn-primary w-full py-3 text-xs uppercase tracking-widest font-bold">
+                                <i class="fas fa-shoe-prints mr-2"></i> Feed Next Token
+                            </button>
+                            <button id="autoBtn" class="viz-btn viz-btn-secondary w-full py-3 text-xs uppercase tracking-widest font-bold">
+                                <i class="fas fa-play mr-2"></i> Auto Run
+                            </button>
+                            <button id="resetBtn" class="viz-btn viz-btn-secondary w-full py-3 text-xs uppercase tracking-widest font-bold">
+                                <i class="fas fa-undo mr-2"></i> Reset Memory
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-container">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-main)">
+                            <i class="fas fa-square-root-alt mr-2 text-amber-500"></i> The Update Rule
+                        </h3>
+                    </div>
+                    <div class="p-5 text-center space-y-3">
+                        <p class="mono-font text-sm" style="color: var(--accent-primary)">h&#8348; = tanh(W&middot;x&#8348; + U&middot;h&#8348;&#8331;&#8321; + b)</p>
+                        <div class="text-[10px] opacity-60 leading-relaxed text-left space-y-1.5 mono-font">
+                            <p><span style="color: var(--accent-primary)">x&#8348;</span> &mdash; embedding of the current token</p>
+                            <p><span style="color: var(--accent-primary)">h&#8348;&#8331;&#8321;</span> &mdash; memory carried from the previous step</p>
+                            <p><span style="color: var(--accent-primary)">W, U, b</span> &mdash; the same weights, reused at every step</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualization (Right) -->
+            <div class="lg:col-span-8 space-y-6">
+                <div class="card-container">
+                    <div class="card-header flex justify-between items-center">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-main)">
+                            <i class="fas fa-sync-alt mr-2" style="color: var(--accent-primary)"></i> The Cell
+                        </h3>
+                        <span id="stepBadge" class="mono-font text-[10px] px-2 py-1 rounded border border-green-500/20 text-green-400 bg-green-500/5">t = 0</span>
+                    </div>
+                    <div class="p-6 space-y-5">
+                        <div id="tokenStrip" class="flex flex-wrap gap-2 mono-font justify-center"></div>
+                        <svg viewBox="0 0 640 200" class="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+                            <defs><marker id="arrRnn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-primary)"/></marker></defs>
+                            <rect x="250" y="55" width="140" height="90" rx="14" fill="var(--input-bg)" stroke="var(--accent-primary)" stroke-width="2.5"/>
+                            <text x="320" y="95" text-anchor="middle" font-size="15" font-family="Space Grotesk, sans-serif" font-weight="700" fill="var(--text-main)">RNN Cell</text>
+                            <text x="320" y="118" text-anchor="middle" font-size="10" font-family="JetBrains Mono, monospace" fill="var(--text-muted)">tanh(Wx + Uh + b)</text>
+                            <line x1="320" y1="195" x2="320" y2="150" stroke="var(--accent-primary)" stroke-width="2.5" marker-end="url(#arrRnn)"/>
+                            <text x="338" y="185" font-size="11" font-family="JetBrains Mono, monospace" fill="var(--text-muted)">x&#8348; (input)</text>
+                            <line x1="395" y1="100" x2="480" y2="100" stroke="var(--accent-primary)" stroke-width="2.5" marker-end="url(#arrRnn)"/>
+                            <text x="490" y="104" font-size="11" font-family="JetBrains Mono, monospace" fill="var(--text-muted)">h&#8348; (output)</text>
+                            <path class="cell-loop" d="M 320 55 C 320 10, 190 10, 190 70 C 190 96, 215 100, 243 100" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#arrRnn)"/>
+                            <text x="150" y="30" font-size="11" font-family="JetBrains Mono, monospace" fill="#f59e0b">h&#8348;&#8331;&#8321; loops back (memory)</text>
+                        </svg>
+                        <div>
+                            <p class="text-[10px] uppercase tracking-widest font-bold opacity-60 mb-2">Hidden state h&#8348; — the network's memory (4 dims)</p>
+                            <div id="hRow" class="flex gap-2 flex-wrap mono-font"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-container">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-main)">
+                            <i class="fas fa-history mr-2 text-amber-500"></i> Memory Timeline
+                        </h3>
+                    </div>
+                    <div class="overflow-y-auto custom-scrollbar" style="max-height: 260px;">
+                        <table class="w-full text-left text-xs mono-font">
+                            <thead class="sticky top-0 z-20" style="background: var(--bg-surface)">
+                                <tr class="text-[10px] uppercase font-bold tracking-widest opacity-60 border-b border-white/5">
+                                    <th class="p-3">t</th><th class="p-3">Token</th><th class="p-3">Hidden state after step</th>
+                                </tr>
+                            </thead>
+                            <tbody id="timelineBody"></tbody>
+                        </table>
+                        <div id="timelineEmpty" class="p-6 text-center text-xs opacity-50">Memory starts at h&#8320; = [0, 0, 0, 0]. Feed the first token.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- auto-article-vizlearn -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
+        <div class="card-container animate-fade-in">
+            <div class="card-header">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">The Recurrent Cell: A Neuron That Remembers</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">How a single loop turns a stateless network into a sequence processor.</p>
+            </div>
+            <div class="p-5 md:p-7 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
+
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-lightbulb"></i>One Loop Changes Everything</h3>
+                    <p>A feed-forward layer computes its output from the current input and forgets it immediately. A <strong>recurrent cell</strong> adds a single wire: its own previous output, <span class="mono-font">h&#8348;&#8331;&#8321;</span>, feeds back in alongside the new input. That loop gives the network a <strong>hidden state</strong> — a running summary of everything it has seen so far.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-square-root-alt"></i>Reading the Update Rule</h3>
+                    <p class="mono-font text-sm my-3" style="color: var(--accent-primary)">h&#8348; = tanh(W&middot;x&#8348; + U&middot;h&#8348;&#8331;&#8321; + b)</p>
+                    <ul class="list-disc pl-6 mt-2 space-y-2">
+                        <li><strong>W&middot;x&#8348;</strong> — what the <em>new token</em> contributes.</li>
+                        <li><strong>U&middot;h&#8348;&#8331;&#8321;</strong> — what the <em>past</em> contributes. This term is the memory.</li>
+                        <li><strong>tanh</strong> — squashes the result into [-1, 1], keeping the state bounded step after step.</li>
+                        <li><strong>Same W, U, b at every step</strong> — the cell handles a 5-word or a 500-word sentence with the identical parameters. Variable-length input solved.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-vial"></i>Interactive Exploration Guide</h3>
+                    <ol class="list-decimal pl-6 mt-4 space-y-3">
+                        <li><strong>Feed the first token.</strong> The hidden state jumps from all zeros to its first values — the cell has formed its first memory.</li>
+                        <li><strong>Keep stepping.</strong> Each new token <em>blends into</em> the existing state rather than replacing it — compare consecutive rows in the timeline and notice values shifting, not resetting.</li>
+                        <li><strong>Reset, then type two sentences that share a last word</strong> (e.g. "dogs chase cats" vs "people love cats"). Step both to the end: the final states differ even though the last token is identical — proof the state carries history, not just the present.</li>
+                    </ol>
+                </div>
+
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Key Takeaway</h3>
+                    <p>The recurrent cell fixes all three ANN limitations at once: it consumes sequences of <em>any length</em> (one token at a time), it respects <em>order</em> (each step builds on the last), and it has <em>memory</em> (the hidden state). Training it, however, requires backpropagating through that loop — the subject of the next module.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+            <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+        <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
+            <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
+                <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" rel="noopener noreferrer" aria-label="Kaggle" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-kaggle fa-lg"></i></a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-70">&copy; 2025 VIZLEARN // SYSTEM ONLINE</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- THEME ---
+            const themeToggleBtn = document.getElementById('themeToggle');
+            const updateThemeIcon = (isLight) => {
+                themeToggleBtn.querySelector('.dark-icon').classList.toggle('hidden', isLight);
+                themeToggleBtn.querySelector('.light-icon').classList.toggle('hidden', !isLight);
+            };
+            themeToggleBtn.addEventListener('click', () => {
+                const isLight = document.body.classList.toggle('light-mode');
+                localStorage.setItem('theme', isLight ? 'light' : 'dark');
+                updateThemeIcon(isLight);
+            });
+            if (localStorage.getItem('theme') === 'light') { document.body.classList.add('light-mode'); updateThemeIcon(true); } else { updateThemeIcon(false); }
+
+            // --- APP LOGIC ---
+            // Tiny fixed RNN: 3-dim embeddings, 4-dim hidden state
+            const Wm = [[ 0.5, -0.3,  0.8], [-0.6,  0.7,  0.2], [ 0.3,  0.9, -0.5], [-0.4, -0.2,  0.6]];
+            const Um = [[ 0.4, -0.2,  0.1,  0.3], [ 0.2,  0.5, -0.3, -0.1], [-0.3,  0.1,  0.6,  0.2], [ 0.1, -0.4,  0.2,  0.5]];
+            const bv = [0.1, -0.1, 0.05, 0.0];
+
+            const rnnInput = document.getElementById('rnnInput');
+            const tokenStrip = document.getElementById('tokenStrip');
+            const hRow = document.getElementById('hRow');
+            const timelineBody = document.getElementById('timelineBody');
+            const timelineEmpty = document.getElementById('timelineEmpty');
+            const stepBadge = document.getElementById('stepBadge');
+            const stepBtn = document.getElementById('stepBtn');
+            const autoBtn = document.getElementById('autoBtn');
+
+            let tokens = [], h = [0, 0, 0, 0], t = 0, timer = null;
+
+            // deterministic pseudo-embedding from the word's characters
+            function embed(word) {
+                const e = [0, 0, 0];
+                for (let i = 0; i < word.length; i++) {
+                    const c = word.charCodeAt(i);
+                    e[0] += Math.sin(c * 0.7 + i);
+                    e[1] += Math.cos(c * 1.3 - i);
+                    e[2] += Math.sin(c * 2.1) * Math.cos(i);
+                }
+                return e.map(v => Math.max(-1, Math.min(1, v / Math.sqrt(word.length))));
+            }
+
+            function rnnStep(x, hPrev) {
+                return Wm.map((wRow, i) => {
+                    let s = bv[i];
+                    for (let j = 0; j < 3; j++) s += wRow[j] * x[j];
+                    for (let j = 0; j < 4; j++) s += Um[i][j] * hPrev[j];
+                    return Math.tanh(s);
+                });
+            }
+
+            function hCells(vec) {
+                return vec.map((v, i) => {
+                    const op = Math.min(Math.abs(v), 1) * 0.55 + 0.04;
+                    const bg = v >= 0 ? `rgba(74, 222, 128, ${op})` : `rgba(248, 113, 113, ${op})`;
+                    return `<div class="h-cell" style="background: ${bg}"><span class="font-bold">${v.toFixed(2)}</span><span class="hl">h[${i}]</span></div>`;
+                }).join('');
+            }
+
+            function renderTokens() {
+                tokenStrip.innerHTML = tokens.map((tok, i) => {
+                    let cls = 'token-pill mono-font';
+                    if (i < t) cls += ' done';
+                    if (i === t) cls += ' current';
+                    return `<span class="${cls}">${tok}</span>`;
+                }).join('');
+            }
+
+            function render() {
+                renderTokens();
+                hRow.innerHTML = hCells(h);
+                stepBadge.textContent = `t = ${t}`;
+            }
+
+            function stopAuto() {
+                if (timer) { clearInterval(timer); timer = null; }
+                autoBtn.innerHTML = '<i class="fas fa-play mr-2"></i> Auto Run';
+            }
+
+            function step() {
+                if (t >= tokens.length) { stopAuto(); return; }
+                const word = tokens[t];
+                h = rnnStep(embed(word), h);
+                t++;
+                timelineEmpty.style.display = 'none';
+                const tr = document.createElement('tr');
+                tr.className = 'result-row';
+                tr.innerHTML = `<td class="p-3 opacity-50">${t}</td><td class="p-3" style="color: var(--accent-primary)">${word}</td><td class="p-3"><div class="flex gap-1.5 flex-wrap">${hCells(h)}</div></td>`;
+                timelineBody.appendChild(tr);
+                tr.scrollIntoView({ block: 'nearest' });
+                render();
+                if (t >= tokens.length) { stopAuto(); stepBtn.disabled = true; }
+            }
+
+            function reset() {
+                stopAuto();
+                tokens = rnnInput.value.trim().split(/\s+/).filter(Boolean).slice(0, 10);
+                h = [0, 0, 0, 0];
+                t = 0;
+                timelineBody.innerHTML = '';
+                timelineEmpty.style.display = 'block';
+                stepBtn.disabled = false;
+                render();
+            }
+
+            stepBtn.addEventListener('click', step);
+            autoBtn.addEventListener('click', () => {
+                if (timer) { stopAuto(); return; }
+                if (stepBtn.disabled) reset();
+                autoBtn.innerHTML = '<i class="fas fa-pause mr-2"></i> Pause';
+                timer = setInterval(step, 750);
+            });
+            document.getElementById('resetBtn').addEventListener('click', reset);
+            rnnInput.addEventListener('input', reset);
+
+            reset();
+        });
+
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            { title: "Calculating Parameters in CNN", path: "computer_vision/calculating_parameters_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Interactive 3D CNN Visualizer", path: "computer_vision/cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Data Loaders in CNN", path: "computer_vision/data_loaders_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Pooling Layer", path: "computer_vision/downsampling_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Real-time Edge Detection", path: "computer_vision/edge_detection.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Convolutional Layer", path: "computer_vision/feature_map_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Grayscale Image Processing", path: "computer_vision/grayscale_image_processing.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Fully Connected Layer in CNN", path: "computer_vision/how_dense_layer_works_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "How Neural Networks Process Images", path: "computer_vision/how_neural_network_process_images.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "ReLU Activation in CNN", path: "computer_vision/how_relu_works_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Image Data Augmentation", path: "computer_vision/image_data_augmentation.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Padding in CNN", path: "computer_vision/padding_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Parameter Sharing in CNN", path: "computer_vision/parameter_sharing_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "RGB Image Processing", path: "computer_vision/rgb_image_processing.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Strides in CNN", path: "computer_vision/strides_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "What is Transfer Learning in CNN?", path: "computer_vision/transfer_learning_with_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "SQL GroupBy Visualizer", path: "database/groupby_in_sql.html", category: "database", icon: "fa-database" },
+            { title: "SQL Joins Visualizer", path: "database/joins_in_sql.html", category: "database", icon: "fa-database" },
+            { title: "SQL Window Functions", path: "database/window_functions_in_sql.html", category: "database", icon: "fa-database" },
+            { title: "Activation Functions", path: "deep_learning/activation_functions.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Batch Normalization in Deep Networks", path: "deep_learning/batch_normalization.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Batch Processing in the Neural Network", path: "deep_learning/batch_processing_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Data Sparsity", path: "deep_learning/data_sparsity.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Dropout in Neural Networks", path: "deep_learning/dropout_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Early Stopping", path: "deep_learning/early_stopping_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Feature Scaling & Weight Bias", path: "deep_learning/feature_scaling_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Gradient descent batch processing", path: "deep_learning/gradient_descent_batch_processing.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Gradient Descent", path: "deep_learning/gradient_descent_training.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "How Loss is Calculated", path: "deep_learning/how_loss_is_calculated.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Hyperparameter Tuning", path: "deep_learning/hyper-paramter_tuning.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Learning Rate Scheduling", path: "deep_learning/learning_rate_scheduling.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Linear Regression with Gradient Descent", path: "deep_learning/linear_regression_with_gradient_descent.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Model Training Curves", path: "deep_learning/model_training_curve.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Model Training in CPU vs GPU", path: "deep_learning/model_training_on_cpu_vs_gpu.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Neural Network Visualizer", path: "deep_learning/neural_network.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Neural Network for Regression", path: "deep_learning/neural_network_for_regression.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Neural Network for Unsupervised Learning", path: "deep_learning/neural_network_for_unsupervised_learning.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Optimizers", path: "deep_learning/optimizers_in_3d.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Optimizers", path: "deep_learning/optimizers_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Overfitting vs Underfitting", path: "deep_learning/overfitting_vs_underfitting.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Perceptron Classifier", path: "deep_learning/perceptron.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Regularization Techniques", path: "deep_learning/regularization_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Reproducibility of Model", path: "deep_learning/reproducibility_of_model.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Vanishing & Exploding Gradients", path: "deep_learning/vanishing_vs_exploding_gradient.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Weight Initialization Methods", path: "deep_learning/weight_initialization.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Weights & Biases", path: "deep_learning/weights_and_biases.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "A* Search Algorithm", path: "dsa/a_star.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Backtracking", path: "dsa/backtracking.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Search", path: "dsa/binary_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Tree Visualizer", path: "dsa/breadth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Bubble Sort", path: "dsa/bubble_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Counting Sort", path: "dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Depth First Search", path: "dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Python Dictionary Lab", path: "dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra\u2019s Algorithm", path: "dsa/dijkstras.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Fibonacci Search", path: "dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Insertion Sort", path: "dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Interpolation Search", path: "dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Linear Search", path: "dsa/linear_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Python List Lab", path: "dsa/lists_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Merge Sort", path: "dsa/merge_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Quick Sort", path: "dsa/quick_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Selection Sort", path: "dsa/selection_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Visual Learning Platform - Python String Lab", path: "dsa/strings_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Causal Language Modeling", path: "gen_ai/casual_language_modeling.html", category: "gen_ai", icon: "fa-robot" },
+            { title: "Bias-Variance Tradeoff", path: "machine_learning/bias_vs_variance.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Confusion Matrix", path: "machine_learning/confusion_matrix.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "machine_learning/cosine_similarity.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Cross Validation", path: "machine_learning/cross_validation.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Decision Tree (ID3)", path: "machine_learning/decision_tree.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Regression Metrics", path: "machine_learning/evaluation_metrics_for_regression.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Hard vs Soft Labelling", path: "machine_learning/hard_vs_soft_labelling.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "K-Means Clustering", path: "machine_learning/k_means.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "K-Nearest Neighbors", path: "machine_learning/knn.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Label Encoding", path: "machine_learning/label_encoding.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Label Imbalance & The Accuracy Paradox", path: "machine_learning/label_imbalance_problem.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Linear Regression", path: "machine_learning/linear_regression_with_ols.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Model and Data Drift", path: "machine_learning/model_and_data_drift.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Naive Bayes Classifier", path: "machine_learning/naive_bayes.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "One Hot Encoding", path: "machine_learning/one_hot_encoding.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Sliding Window Explorer", path: "machine_learning/sliding_window_for_timeseries_data.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Support Vector Machines", path: "machine_learning/svm.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Train, Test & Validation Split", path: "machine_learning/train_test_split.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Training on Imbalanced Data", path: "machine_learning/training_on_label_imbalanced_dataset.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Equation of a Line (y = mx + c)", path: "maths/equation_of_line.html", category: "maths", icon: "fa-square-root-alt" },
+            { title: "Backpropagation Through Time", path: "natural_language_processing/backpropagation_through_time.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "How are Embeddings Generated?", path: "natural_language_processing/how_are_embeddings_generated.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "How Words are Represented in Neural Networks", path: "natural_language_processing/how_words_are_represented_in_neural_networks.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Limitations of ANN with Sequential Data", path: "natural_language_processing/limitations_of_ann_with_sequential_data.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Normalization Techniques for Sequential Data", path: "natural_language_processing/normalization_techniques_for_sequential_data.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Sequential Data Preparation with Sliding Window", path: "natural_language_processing/sequential_data_preparation_with_sliding_window.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Text Encoding Techniques in NLP", path: "natural_language_processing/text_encoding_techniques_in_nlp.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Vanishing Gradient Problem in RNN", path: "natural_language_processing/vanishing_gradient_problem_in_rnn.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "What are Embeddings?", path: "natural_language_processing/what_are_embeddings.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "What is a Recurrent Cell?", path: "natural_language_processing/what_is_a_recurrent_cell.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "What is a Sequence?", path: "natural_language_processing/what_is_a_sequence.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Why Text Encoding is Needed in NLP", path: "natural_language_processing/why_text_encoding_is_needed_in_nlp.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "ASCII Code Explorer", path: "natural_language_processing/ascii_codes.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "How Neural Networks Process Text", path: "natural_language_processing/how_neural_network_text.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "How RNN Processes Text", path: "natural_language_processing/how_rnn_process_text.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "N-gram Explainer", path: "natural_language_processing/n_gram.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Interactive 3D RNN Visualizer", path: "natural_language_processing/rnn.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Stemming vs Lemmatization", path: "natural_language_processing/stemming_vs_lemmatization.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Text Normalization Pipeline", path: "natural_language_processing/text_normalization_pipeline.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "NLP Tokenizer", path: "natural_language_processing/tokenization.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Word Cloud Generator", path: "natural_language_processing/word_cloud.html", category: "natural_language_processing", icon: "fa-comments" }
+        ];
+
+        function toRelativePath(fromPath, targetPath) {
+            const fromParts = fromPath.split('/').filter(Boolean);
+            const targetParts = targetPath.split('/').filter(Boolean);
+            let shared = 0;
+            while (shared < Math.min(fromParts.length, targetParts.length) && fromParts[shared] === targetParts[shared]) {
+                shared++;
+            }
+            const up = '../'.repeat(Math.max(0, fromParts.length - shared));
+            const down = targetParts.slice(shared).join('/');
+            return `${up}${down}`;
+        }
+
+        const currentPath = window.location.pathname.replace(/\/+$/g, '').replace(/index\.html$/, '');
+        const currentDir = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/')) : '';
+        const resolvedCourses = allCourses.map((course) => {
+            const normalizedTarget = course.path.replace(/^\.\//, '');
+            const relativePath = currentDir ? toRelativePath(currentDir, normalizedTarget) : normalizedTarget;
+            return { ...course, path: relativePath };
+        });
+
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                // Filter courses
+                const filtered = resolvedCourses.filter(course =>
+                    course.title.toLowerCase().includes(query) ||
+                    course.category.toLowerCase().includes(query)
+                );
+
+                // Render results
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>
+                    `).join('');
+                }
+
+                dropdown.classList.add('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            // Close dropdown on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>

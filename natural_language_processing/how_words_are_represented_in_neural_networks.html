@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VizLearn - How Words are Represented in Neural Networks</title>
+    <meta name="description" content="Follow a word through the full representation pipeline — token ID, one-hot vector, dense embedding — interactively on VizLearn.">
+    <meta name="keywords" content="word representation, one-hot, token id, embedding, neural networks, NLP, vizlearn">
+    <meta name="robots" content="index, follow">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        const initTailwind = () => {
+            if (window.tailwind) {
+                tailwind.config = {
+                    darkMode: 'class',
+                    theme: {
+                        extend: {
+                            colors: {
+                                brand: {
+                                    50: '#f0fdf4',
+                                    100: '#dcfce7',
+                                    400: '#4ade80',
+                                    500: '#22c55e',
+                                    600: '#16a34a',
+                                    900: '#14532d',
+                                }
+                            },
+                            animation: {
+                                'fade-in': 'fadeIn 0.5s ease-out forwards',
+                                'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                            },
+                            keyframes: {
+                                fadeIn: {
+                                    '0%': { opacity: '0', transform: 'translateY(10px)' },
+                                    '100%': { opacity: '1', transform: 'translateY(0)' },
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                setTimeout(initTailwind, 50);
+            }
+        };
+        initTailwind();
+    </script>
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'dark';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+        :root {
+            --bg-body: #050505;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(10, 10, 10, 0.85);
+            --border-subtle: rgba(74, 222, 128, 0.15);
+            --accent-primary: #4ade80;
+            --accent-glow: rgba(74, 222, 128, 0.25);
+            --text-main: #f0fdf4;
+            --text-muted: #86efac;
+            --card-bg: #0a0a0a;
+            --input-bg: rgba(74, 222, 128, 0.05);
+            --grid-color: rgba(74, 222, 128, 0.05);
+        }
+
+        body.light-mode {
+            --bg-body: #f0fdf4;
+            --bg-surface: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-subtle: rgba(22, 163, 74, 0.15);
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.2);
+            --text-main: #052e16;
+            --text-muted: #4b5563;
+            --card-bg: #ffffff;
+            --input-bg: rgba(22, 163, 74, 0.05);
+            --grid-color: rgba(22, 163, 74, 0.04);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            background-image:
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 1rem 1.5rem;
+            background: var(--input-bg);
+        }
+
+        .viz-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            border-radius: 8px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); }
+        .viz-btn-secondary { background: var(--input-bg); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+        .viz-btn-secondary:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .viz-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .viz-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            border-radius: 8px;
+            padding: 12px;
+            width: 100%;
+            font-size: 0.875rem;
+            transition: border-color 0.2s;
+        }
+        .viz-input:focus { border-color: var(--accent-primary); outline: none; }
+
+        input[type="range"] { accent-color: var(--accent-primary); }
+
+        .result-row { transition: background 0.2s ease; border-bottom: 1px solid var(--border-subtle); }
+        .result-row:hover { background: rgba(255,255,255,0.02); }
+
+        footer i { transition: color 0.3s ease; }
+        footer a:hover i { color: var(--accent-primary); }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+
+        /* Search Input Wrapper */
+        .search-input-wrapper {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .search-input-wrapper:focus-within {
+            background: var(--input-focus-bg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .search-input-wrapper input {
+            color: var(--text-main);
+        }
+        .search-input-wrapper input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .search-input-wrapper i {
+            color: var(--accent-primary);
+            opacity: 0.7;
+        }
+
+        /* Dropdown Search */
+        .search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-dropdown-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .search-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-dropdown-item:hover {
+            background: var(--input-focus-bg);
+            padding-left: 20px;
+        }
+
+        .dropdown-item-title {
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .dropdown-item-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 12px;
+        }
+
+        .dropdown-item-icon {
+            color: var(--accent-primary);
+            margin-right: 8px;
+            font-size: 0.875rem;
+        }
+
+        .dropdown-no-results {
+            padding: 20px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        
+        .word-chip { border: 1px solid var(--border-subtle); background: var(--input-bg); border-radius: 9999px; padding: 8px 16px; font-size: 13px; cursor: pointer; transition: all 0.2s ease; }
+        .word-chip:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .word-chip.selected { border-color: var(--accent-primary); background: rgba(74, 222, 128, 0.12); color: var(--accent-primary); font-weight: 700; box-shadow: 0 0 10px var(--accent-glow); }
+        .word-chip.selected-b { border-color: #f59e0b; background: rgba(245, 158, 11, 0.12); color: #f59e0b; font-weight: 700; }
+        .oh-cell { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--border-subtle); font-size: 12px; }
+        .oh-cell.hot { border-color: var(--accent-primary); background: rgba(74, 222, 128, 0.2); color: var(--accent-primary); font-weight: 700; box-shadow: 0 0 8px var(--accent-glow); }
+        .emb-cell { min-width: 62px; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--border-subtle); font-size: 12px; }
+        .pipe-stage { border: 1px solid var(--border-subtle); background: var(--input-bg); border-radius: 10px; padding: 8px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+
+    </style>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-ZT6JM33V5J');
+    </script>
+
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
+                <!-- Logo -->
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+
+                <!-- Search -->
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <i class="fas fa-search text-sm"></i>
+                    <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Theme Toggle + Back Button -->
+                <div class="flex items-center gap-3">
+                    <!-- Back to Hub Button -->
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+
+                    <!-- Theme Toggle -->
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <i class="fas fa-sun hidden dark-icon"></i>
+                        <i class="fas fa-moon hidden light-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+
+    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div class="mb-8 animate-fade-in">
+            <div class="flex items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)">
+                <a href="../index.html" class="hover:text-green-400 transition-colors">Home</a>
+                <span>/</span>
+                <span>Natural Language Processing</span>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">How Words are Represented in Neural Networks</h1>
+            <p class="mt-2 max-w-2xl" style="color: var(--text-muted)">Networks never see letters. Pick a word and follow it through the pipeline: word → ID → one-hot vector → dense embedding.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
+
+            <!-- Controls (Left) -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="card-container">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--accent-primary)">
+                            <i class="fas fa-book mr-2"></i> Vocabulary (10 words)
+                        </h3>
+                    </div>
+                    <div class="p-5">
+                        <p class="text-xs opacity-70 mb-4 leading-relaxed">Click a word to trace its representation. Click a <strong>second</strong> word to compare embeddings.</p>
+                        <div id="vocabChips" class="flex flex-wrap gap-2"></div>
+                    </div>
+                </div>
+
+                <div class="card-container">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-main)">
+                            <i class="fas fa-balance-scale mr-2 text-amber-500"></i> Similarity Check
+                        </h3>
+                    </div>
+                    <div class="p-5" id="simBox">
+                        <p class="text-xs opacity-50 italic">Select two words to compare their dense embeddings.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pipeline (Right) -->
+            <div class="lg:col-span-8 space-y-6">
+                <div class="card-container">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-main)">
+                            <i class="fas fa-project-diagram mr-2" style="color: var(--accent-primary)"></i> Representation Pipeline
+                        </h3>
+                    </div>
+                    <div class="p-6 space-y-6">
+                        <div class="flex items-center gap-3 flex-wrap mono-font">
+                            <div class="pipe-stage">Word</div><i class="fas fa-arrow-right opacity-40 text-xs"></i>
+                            <div class="pipe-stage">Token ID</div><i class="fas fa-arrow-right opacity-40 text-xs"></i>
+                            <div class="pipe-stage">One-Hot</div><i class="fas fa-arrow-right opacity-40 text-xs"></i>
+                            <div class="pipe-stage" style="border-color: var(--accent-primary); color: var(--accent-primary)">Embedding</div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="p-4 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                                <p class="text-[10px] uppercase tracking-widest font-bold opacity-60 mb-2">1 &middot; The word (as humans see it)</p>
+                                <p id="stageWord" class="text-2xl font-bold" style="color: var(--text-main)">cat</p>
+                            </div>
+                            <div class="p-4 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                                <p class="text-[10px] uppercase tracking-widest font-bold opacity-60 mb-2">2 &middot; Token ID (dictionary lookup)</p>
+                                <p id="stageId" class="text-2xl font-bold mono-font" style="color: var(--accent-primary)">1</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <p class="text-[10px] uppercase tracking-widest font-bold opacity-60 mb-3">3 &middot; One-hot vector &mdash; sparse, size = vocabulary (10)</p>
+                            <div id="oneHotRow" class="flex gap-1.5 flex-wrap mono-font"></div>
+                            <p class="text-[10px] opacity-50 mt-2">A single 1 at the word's index. No word is "closer" to any other — every pair is equally distant.</p>
+                        </div>
+
+                        <div>
+                            <p class="text-[10px] uppercase tracking-widest font-bold opacity-60 mb-3">4 &middot; Dense embedding &mdash; small, learned, meaningful (4 dims)</p>
+                            <div id="embRow" class="flex gap-2 flex-wrap mono-font"></div>
+                            <p class="text-[10px] opacity-50 mt-2">Each cell is a learned feature. Similar words end up with similar numbers — that's what makes embeddings powerful.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- auto-article-vizlearn -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
+        <div class="card-container animate-fade-in">
+            <div class="card-header">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">From "cat" to a Vector: Word Representation in Neural Networks</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">The four stages every word passes through before a network can compute with it.</p>
+            </div>
+            <div class="p-5 md:p-7 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
+
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-lightbulb"></i>The Chain of Translations</h3>
+                    <p>A neural network is a pile of multiplications and additions — it can only consume numbers. So every word goes through a chain of translations: <strong>word &rarr; token ID &rarr; one-hot vector &rarr; dense embedding</strong>. Each stage exists to fix a shortcoming of the previous one.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-hashtag"></i>Token IDs and Their Trap</h3>
+                    <p>The dictionary lookup ("cat" &rarr; 1, "dog" &rarr; 3) is compact, but the raw integers smuggle in a false claim: that "dog" (3) is somehow three times "cat" (1), or that words with adjacent IDs are related. The IDs are arbitrary labels, and arithmetic on labels is meaningless — a network fed raw IDs will happily learn those fake relationships.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-border-all"></i>One-Hot: Honest but Wasteful</h3>
+                    <p>One-hot encoding fixes the fake-ordering problem: each word becomes a vector of zeros with a single 1 at its index. Now no word is numerically "bigger" than another. The costs:</p>
+                    <ul class="list-disc pl-6 mt-4 space-y-2">
+                        <li><strong>Size:</strong> the vector is as long as the vocabulary — 50,000 dimensions for a modest one.</li>
+                        <li><strong>No similarity:</strong> every pair of one-hot vectors is exactly the same distance apart. "cat" is as far from "kitten" as from "carburetor".</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-compress-arrows-alt"></i>Dense Embeddings: Small and Meaningful</h3>
+                    <p>An embedding layer maps each token ID to a short vector of <em>learned</em> real numbers (4 dims in the demo; 300–4096 in practice). Because these values are trained rather than assigned, words used in similar contexts drift toward similar vectors — similarity becomes measurable with a dot product. This single idea underpins everything from word2vec to the input layer of GPT.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-vial"></i>Interactive Exploration Guide</h3>
+                    <ol class="list-decimal pl-6 mt-4 space-y-3">
+                        <li><strong>Click "cat".</strong> Follow all four stages — note the one-hot row has a single lit cell at index 1, and the embedding is just 4 numbers.</li>
+                        <li><strong>Click "dog" as the second word.</strong> The similarity panel shows a high cosine score — the demo embeddings encode that cats and dogs are both animals.</li>
+                        <li><strong>Compare "cat" with "on".</strong> An animal versus a preposition: the similarity collapses. One-hot vectors could never express this difference — embeddings do it natively.</li>
+                    </ol>
+                </div>
+
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Key Takeaway</h3>
+                    <p>Word representation is a ladder: IDs are compact but lie about order, one-hot is honest but huge and similarity-blind, and dense embeddings are small, learned, and encode meaning as geometry. Modern NLP starts at the top of that ladder.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+            <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+        <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
+            <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
+                <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
+                <a href="https://www.linkedin.com/in/ashish-jangra/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-linkedin fa-lg"></i></a>
+                <a href="https://www.kaggle.com/ashishjangra27" target="_blank" rel="noopener noreferrer" aria-label="Kaggle" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-kaggle fa-lg"></i></a>
+            </div>
+            <p class="text-[10px] tracking-[0.2em] mono-font uppercase opacity-70">&copy; 2025 VIZLEARN // SYSTEM ONLINE</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- THEME ---
+            const themeToggleBtn = document.getElementById('themeToggle');
+            const updateThemeIcon = (isLight) => {
+                themeToggleBtn.querySelector('.dark-icon').classList.toggle('hidden', isLight);
+                themeToggleBtn.querySelector('.light-icon').classList.toggle('hidden', !isLight);
+            };
+            themeToggleBtn.addEventListener('click', () => {
+                const isLight = document.body.classList.toggle('light-mode');
+                localStorage.setItem('theme', isLight ? 'light' : 'dark');
+                updateThemeIcon(isLight);
+            });
+            if (localStorage.getItem('theme') === 'light') { document.body.classList.add('light-mode'); updateThemeIcon(true); } else { updateThemeIcon(false); }
+
+            // --- APP LOGIC ---
+            const VOCAB = ['the', 'cat', 'sat', 'dog', 'ran', 'on', 'mat', 'fast', 'big', 'red'];
+            const EMB = {
+                'the':  [ 0.10, -0.05,  0.02,  0.08],
+                'cat':  [ 0.82,  0.61, -0.14,  0.35],
+                'sat':  [-0.12,  0.24,  0.71, -0.08],
+                'dog':  [ 0.78,  0.55, -0.09,  0.41],
+                'ran':  [-0.06,  0.31,  0.68,  0.12],
+                'on':   [ 0.05, -0.62,  0.11, -0.44],
+                'mat':  [ 0.31, -0.18, -0.52,  0.62],
+                'fast': [-0.21,  0.44,  0.38,  0.55],
+                'big':  [ 0.42,  0.12, -0.31,  0.58],
+                'red':  [ 0.25, -0.35, -0.41,  0.49]
+            };
+            let selA = 'cat', selB = null;
+
+            const vocabChips = document.getElementById('vocabChips');
+            VOCAB.forEach(w => {
+                const chip = document.createElement('button');
+                chip.className = 'word-chip mono-font';
+                chip.textContent = w;
+                chip.dataset.word = w;
+                chip.addEventListener('click', () => {
+                    if (w === selA) return;
+                    if (selA && !selB) { selB = w; } else { selA = w; selB = null; }
+                    render();
+                });
+                vocabChips.appendChild(chip);
+            });
+
+            function cosine(a, b) {
+                let dot = 0, na = 0, nb = 0;
+                for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] ** 2; nb += b[i] ** 2; }
+                return dot / (Math.sqrt(na) * Math.sqrt(nb));
+            }
+
+            function embCells(vec, accent) {
+                return vec.map((v, i) => {
+                    const op = Math.min(Math.abs(v), 1) * 0.55 + 0.05;
+                    const bg = v >= 0 ? `rgba(74, 222, 128, ${op})` : `rgba(248, 113, 113, ${op})`;
+                    return `<div class="emb-cell" style="background: ${bg}"><span class="font-bold">${v.toFixed(2)}</span><span class="text-[8px] opacity-60">d${i}</span></div>`;
+                }).join('');
+            }
+
+            function render() {
+                document.querySelectorAll('.word-chip').forEach(c => {
+                    c.classList.toggle('selected', c.dataset.word === selA);
+                    c.classList.toggle('selected-b', c.dataset.word === selB);
+                });
+
+                const idx = VOCAB.indexOf(selA);
+                document.getElementById('stageWord').textContent = selA;
+                document.getElementById('stageId').textContent = idx;
+
+                document.getElementById('oneHotRow').innerHTML = VOCAB.map((w, i) =>
+                    `<div class="oh-cell ${i === idx ? 'hot' : ''}" title="${w}">${i === idx ? 1 : 0}</div>`
+                ).join('');
+
+                document.getElementById('embRow').innerHTML = embCells(EMB[selA]);
+
+                const simBox = document.getElementById('simBox');
+                if (selB) {
+                    const sim = cosine(EMB[selA], EMB[selB]);
+                    const pct = Math.max(0, Math.min(1, (sim + 1) / 2)) * 100;
+                    const verdict = sim > 0.6 ? 'SIMILAR MEANING' : sim > 0.2 ? 'WEAKLY RELATED' : 'UNRELATED';
+                    const color = sim > 0.6 ? 'var(--accent-primary)' : sim > 0.2 ? '#f59e0b' : '#f87171';
+                    simBox.innerHTML = `
+                        <p class="text-xs mono-font mb-3"><span style="color: var(--accent-primary)">${selA}</span> vs <span class="text-amber-500">${selB}</span></p>
+                        <p class="text-3xl font-bold mono-font mb-2" style="color: ${color}">${sim.toFixed(3)}</p>
+                        <div class="w-full h-2 rounded-full overflow-hidden mb-2" style="background: var(--input-bg); border: 1px solid var(--border-subtle)">
+                            <div class="h-full rounded-full" style="width: ${pct}%; background: ${color}"></div>
+                        </div>
+                        <p class="text-[10px] uppercase tracking-widest font-bold" style="color: ${color}">${verdict}</p>
+                        <p class="text-[10px] opacity-50 mt-3 leading-relaxed">Cosine similarity of the two embedding vectors. One-hot vectors would score 0 for <em>every</em> pair.</p>`;
+                } else {
+                    simBox.innerHTML = '<p class="text-xs opacity-50 italic">Select a second word to compare embeddings.</p>';
+                }
+            }
+
+            render();
+        });
+
+        // ===== DROPDOWN SEARCH FUNCTIONALITY =====
+        const allCourses = [
+            { title: "Calculating Parameters in CNN", path: "computer_vision/calculating_parameters_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Interactive 3D CNN Visualizer", path: "computer_vision/cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Data Loaders in CNN", path: "computer_vision/data_loaders_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Pooling Layer", path: "computer_vision/downsampling_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Real-time Edge Detection", path: "computer_vision/edge_detection.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Convolutional Layer", path: "computer_vision/feature_map_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Grayscale Image Processing", path: "computer_vision/grayscale_image_processing.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Fully Connected Layer in CNN", path: "computer_vision/how_dense_layer_works_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "How Neural Networks Process Images", path: "computer_vision/how_neural_network_process_images.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "ReLU Activation in CNN", path: "computer_vision/how_relu_works_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Image Data Augmentation", path: "computer_vision/image_data_augmentation.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Padding in CNN", path: "computer_vision/padding_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Parameter Sharing in CNN", path: "computer_vision/parameter_sharing_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "RGB Image Processing", path: "computer_vision/rgb_image_processing.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "Strides in CNN", path: "computer_vision/strides_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "What is Transfer Learning in CNN?", path: "computer_vision/transfer_learning_with_cnn.html", category: "computer_vision", icon: "fa-eye" },
+            { title: "SQL GroupBy Visualizer", path: "database/groupby_in_sql.html", category: "database", icon: "fa-database" },
+            { title: "SQL Joins Visualizer", path: "database/joins_in_sql.html", category: "database", icon: "fa-database" },
+            { title: "SQL Window Functions", path: "database/window_functions_in_sql.html", category: "database", icon: "fa-database" },
+            { title: "Activation Functions", path: "deep_learning/activation_functions.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Batch Normalization in Deep Networks", path: "deep_learning/batch_normalization.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Batch Processing in the Neural Network", path: "deep_learning/batch_processing_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Data Sparsity", path: "deep_learning/data_sparsity.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Dropout in Neural Networks", path: "deep_learning/dropout_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Early Stopping", path: "deep_learning/early_stopping_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Feature Scaling & Weight Bias", path: "deep_learning/feature_scaling_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Gradient descent batch processing", path: "deep_learning/gradient_descent_batch_processing.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Gradient Descent", path: "deep_learning/gradient_descent_training.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "How Loss is Calculated", path: "deep_learning/how_loss_is_calculated.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Hyperparameter Tuning", path: "deep_learning/hyper-paramter_tuning.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Learning Rate Scheduling", path: "deep_learning/learning_rate_scheduling.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Linear Regression with Gradient Descent", path: "deep_learning/linear_regression_with_gradient_descent.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Model Training Curves", path: "deep_learning/model_training_curve.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Model Training in CPU vs GPU", path: "deep_learning/model_training_on_cpu_vs_gpu.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Neural Network Visualizer", path: "deep_learning/neural_network.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Neural Network for Regression", path: "deep_learning/neural_network_for_regression.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Neural Network for Unsupervised Learning", path: "deep_learning/neural_network_for_unsupervised_learning.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Optimizers", path: "deep_learning/optimizers_in_3d.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Optimizers", path: "deep_learning/optimizers_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Overfitting vs Underfitting", path: "deep_learning/overfitting_vs_underfitting.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Perceptron Classifier", path: "deep_learning/perceptron.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Regularization Techniques", path: "deep_learning/regularization_in_neural_networks.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Reproducibility of Model", path: "deep_learning/reproducibility_of_model.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Vanishing & Exploding Gradients", path: "deep_learning/vanishing_vs_exploding_gradient.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Weight Initialization Methods", path: "deep_learning/weight_initialization.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "Weights & Biases", path: "deep_learning/weights_and_biases.html", category: "deep_learning", icon: "fa-network-wired" },
+            { title: "A* Search Algorithm", path: "dsa/a_star.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Backtracking", path: "dsa/backtracking.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Search", path: "dsa/binary_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Binary Tree Visualizer", path: "dsa/breadth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Bubble Sort", path: "dsa/bubble_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Counting Sort", path: "dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Depth First Search", path: "dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Python Dictionary Lab", path: "dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra\u2019s Algorithm", path: "dsa/dijkstras.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Fibonacci Search", path: "dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Insertion Sort", path: "dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Interpolation Search", path: "dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Linear Search", path: "dsa/linear_search.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Python List Lab", path: "dsa/lists_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Merge Sort", path: "dsa/merge_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Quick Sort", path: "dsa/quick_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Selection Sort", path: "dsa/selection_sort.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Visual Learning Platform - Python String Lab", path: "dsa/strings_in_python.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Causal Language Modeling", path: "gen_ai/casual_language_modeling.html", category: "gen_ai", icon: "fa-robot" },
+            { title: "Bias-Variance Tradeoff", path: "machine_learning/bias_vs_variance.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Confusion Matrix", path: "machine_learning/confusion_matrix.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Cosine Similarity", path: "machine_learning/cosine_similarity.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Cross Validation", path: "machine_learning/cross_validation.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Decision Tree (ID3)", path: "machine_learning/decision_tree.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Regression Metrics", path: "machine_learning/evaluation_metrics_for_regression.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Hard vs Soft Labelling", path: "machine_learning/hard_vs_soft_labelling.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "K-Means Clustering", path: "machine_learning/k_means.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "K-Nearest Neighbors", path: "machine_learning/knn.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Label Encoding", path: "machine_learning/label_encoding.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Label Imbalance & The Accuracy Paradox", path: "machine_learning/label_imbalance_problem.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Linear Regression", path: "machine_learning/linear_regression_with_ols.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Model and Data Drift", path: "machine_learning/model_and_data_drift.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Naive Bayes Classifier", path: "machine_learning/naive_bayes.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "One Hot Encoding", path: "machine_learning/one_hot_encoding.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Sliding Window Explorer", path: "machine_learning/sliding_window_for_timeseries_data.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Support Vector Machines", path: "machine_learning/svm.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Train, Test & Validation Split", path: "machine_learning/train_test_split.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Training on Imbalanced Data", path: "machine_learning/training_on_label_imbalanced_dataset.html", category: "machine_learning", icon: "fa-brain" },
+            { title: "Equation of a Line (y = mx + c)", path: "maths/equation_of_line.html", category: "maths", icon: "fa-square-root-alt" },
+            { title: "Backpropagation Through Time", path: "natural_language_processing/backpropagation_through_time.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "How are Embeddings Generated?", path: "natural_language_processing/how_are_embeddings_generated.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "How Words are Represented in Neural Networks", path: "natural_language_processing/how_words_are_represented_in_neural_networks.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Limitations of ANN with Sequential Data", path: "natural_language_processing/limitations_of_ann_with_sequential_data.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Normalization Techniques for Sequential Data", path: "natural_language_processing/normalization_techniques_for_sequential_data.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Sequential Data Preparation with Sliding Window", path: "natural_language_processing/sequential_data_preparation_with_sliding_window.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Text Encoding Techniques in NLP", path: "natural_language_processing/text_encoding_techniques_in_nlp.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Vanishing Gradient Problem in RNN", path: "natural_language_processing/vanishing_gradient_problem_in_rnn.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "What are Embeddings?", path: "natural_language_processing/what_are_embeddings.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "What is a Recurrent Cell?", path: "natural_language_processing/what_is_a_recurrent_cell.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "What is a Sequence?", path: "natural_language_processing/what_is_a_sequence.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Why Text Encoding is Needed in NLP", path: "natural_language_processing/why_text_encoding_is_needed_in_nlp.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "ASCII Code Explorer", path: "natural_language_processing/ascii_codes.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "How Neural Networks Process Text", path: "natural_language_processing/how_neural_network_text.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "How RNN Processes Text", path: "natural_language_processing/how_rnn_process_text.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "N-gram Explainer", path: "natural_language_processing/n_gram.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Interactive 3D RNN Visualizer", path: "natural_language_processing/rnn.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Stemming vs Lemmatization", path: "natural_language_processing/stemming_vs_lemmatization.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Text Normalization Pipeline", path: "natural_language_processing/text_normalization_pipeline.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "NLP Tokenizer", path: "natural_language_processing/tokenization.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "Word Cloud Generator", path: "natural_language_processing/word_cloud.html", category: "natural_language_processing", icon: "fa-comments" }
+        ];
+
+        function toRelativePath(fromPath, targetPath) {
+            const fromParts = fromPath.split('/').filter(Boolean);
+            const targetParts = targetPath.split('/').filter(Boolean);
+            let shared = 0;
+            while (shared < Math.min(fromParts.length, targetParts.length) && fromParts[shared] === targetParts[shared]) {
+                shared++;
+            }
+            const up = '../'.repeat(Math.max(0, fromParts.length - shared));
+            const down = targetParts.slice(shared).join('/');
+            return `${up}${down}`;
+        }
+
+        const currentPath = window.location.pathname.replace(/\/+$/g, '').replace(/index\.html$/, '');
+        const currentDir = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/')) : '';
+        const resolvedCourses = allCourses.map((course) => {
+            const normalizedTarget = course.path.replace(/^\.\//, '');
+            const relativePath = currentDir ? toRelativePath(currentDir, normalizedTarget) : normalizedTarget;
+            return { ...course, path: relativePath };
+        });
+
+        const searchInput = document.getElementById('appSearchInput');
+        const dropdown = document.getElementById('searchDropdown');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                // Filter courses
+                const filtered = resolvedCourses.filter(course =>
+                    course.title.toLowerCase().includes(query) ||
+                    course.category.toLowerCase().includes(query)
+                );
+
+                // Render results
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>
+                    `).join('');
+                }
+
+                dropdown.classList.add('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            // Close dropdown on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
