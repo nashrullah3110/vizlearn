@@ -187,6 +187,85 @@
             opacity: 0.7;
         }
 
+        /* Search Dropdown */
+        .search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+            margin-top: -1px;
+        }
+
+        .search-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-dropdown-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .search-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-dropdown-item:hover {
+            background: var(--input-focus-bg);
+        }
+
+        .dropdown-item-icon {
+            color: var(--accent-primary);
+            margin-right: 12px;
+            font-size: 0.9rem;
+        }
+
+        .dropdown-item-title {
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: var(--text-main);
+        }
+
+        .dropdown-item-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .dropdown-no-results {
+            padding: 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
         /* Minimalist Navigation */
         .nav-btn {
             font-family: 'Space Grotesk', sans-serif;
@@ -355,9 +434,10 @@
                 </a>
                 
                 <!-- Search -->
-                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0 relative">
                     <i class="fas fa-search text-sm"></i>
-                    <input type="text" id="searchInput" aria-label="Search courses" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <input type="text" id="searchInput" aria-label="Search courses" placeholder="Search modules..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide" />
+                    <div id="searchDropdown" class="search-dropdown"></div>
                 </div>
 
                 <!-- Theme Toggle -->
@@ -715,7 +795,77 @@
                 }
             });
 
-            searchInput.addEventListener('input', applySearchFilter);
+            // --- DROPDOWN SEARCH ---
+            const dropdown = document.getElementById('searchDropdown');
+
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    applySearchFilter();
+                    return;
+                }
+
+                // Flatten all courses from all topics
+                const allCourses = [];
+                Object.keys(courseData).forEach(topicKey => {
+                    const topic = courseData[topicKey];
+                    if (topic.courses) {
+                        topic.courses.forEach(course => {
+                            allCourses.push({
+                                title: course.title,
+                                path: course.path,
+                                category: topic.title,
+                                icon: 'fa-book'
+                            });
+                        });
+                    }
+                });
+
+                // Filter courses
+                const filtered = allCourses.filter(course =>
+                    course.title.toLowerCase().includes(query) ||
+                    course.category.toLowerCase().includes(query)
+                );
+
+                // Render dropdown results
+                if (filtered.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
+                } else {
+                    dropdown.innerHTML = filtered.map(course => `
+                        <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas ${course.icon} dropdown-item-icon"></i>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
+                        </a>
+                    `).join('');
+                }
+
+                dropdown.classList.add('show');
+
+                // Also apply inline filtering
+                applySearchFilter();
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            // Close dropdown on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
 
             // --- INIT ---
             function init() {
