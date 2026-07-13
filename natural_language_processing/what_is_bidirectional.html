@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VizLearn - What is a Recurrent Cell?</title>
-    <meta name="description" content="Step a sentence through a recurrent cell one word at a time and watch the hidden state — the network's memory — evolve. On VizLearn.">
-    <meta name="keywords" content="recurrent cell, RNN, hidden state, memory, sequence model, vizlearn">
+    <title>VizLearn - What is Bidirectional?</title>
+    <meta name="description" content="Run forward and backward RNN passes over a sentence and click any word to see what each direction knows. Understand bidirectional RNNs on VizLearn.">
+    <meta name="keywords" content="bidirectional RNN, BiLSTM, forward pass, backward pass, context, sequence labelling, vizlearn">
     <meta name="robots" content="index, follow">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -257,13 +257,15 @@
         }
 
         
-        .token-pill { border: 1px solid var(--border-subtle); background: var(--input-bg); border-radius: 9999px; padding: 6px 14px; font-size: 12px; transition: all 0.25s ease; }
-        .token-pill.current { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(74, 222, 128, 0.12); box-shadow: 0 0 10px var(--accent-glow); font-weight: 700; }
-        .token-pill.done { opacity: 0.4; }
-        .h-cell { min-width: 60px; height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--border-subtle); font-size: 12px; transition: background 0.4s ease; }
-        .h-cell .hl { font-size: 8px; opacity: 0.55; }
-        .cell-loop { animation: loopPulse 2.4s ease-in-out infinite; }
-        @keyframes loopPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+        .bi-tok { border: 1px solid var(--border-subtle); background: var(--input-bg); border-radius: 8px; padding: 8px 12px; font-size: 12px; cursor: pointer; transition: all 0.25s ease; text-align: center; }
+        .bi-tok:hover { border-color: var(--accent-primary); }
+        .bi-tok.selected { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(74, 222, 128, 0.12); box-shadow: 0 0 10px var(--accent-glow); font-weight: 700; }
+        .lane-cell { width: 34px; height: 22px; border-radius: 5px; border: 1px solid var(--border-subtle); background: var(--input-bg); transition: all 0.35s ease; display: flex; align-items: center; justify-content: center; font-size: 8px; opacity: 0.35; }
+        .lane-cell.fwd-done { background: rgba(74, 222, 128, 0.25); border-color: var(--accent-primary); opacity: 1; }
+        .lane-cell.bwd-done { background: rgba(245, 158, 11, 0.25); border-color: #f59e0b; opacity: 1; }
+        .h-cell { min-width: 50px; height: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--border-subtle); font-size: 10px; }
+        .h-cell .hl { font-size: 7px; opacity: 0.55; }
+        .ctx-chip { border-radius: 6px; padding: 3px 8px; font-size: 10px; border: 1px solid var(--border-subtle); }
 
     </style>
 
@@ -323,8 +325,8 @@
                 <span>/</span>
                 <span>Natural Language Processing</span>
             </div>
-            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">What is a Recurrent Cell?</h1>
-            <p class="mt-2 max-w-2xl" style="color: var(--text-muted)">A recurrent cell is a neuron with memory: it reads one token at a time and carries a hidden state forward. Step through a sentence and watch the memory change.</p>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">What is Bidirectional?</h1>
+            <p class="mt-2 max-w-2xl" style="color: var(--text-muted)">A forward RNN only knows the words <em>before</em> a position; a backward RNN only knows the words <em>after</em> it. Run both passes, click any word, and see how concatenating the two states gives every position the full sentence.</p>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
@@ -338,16 +340,13 @@
                         </h3>
                     </div>
                     <div class="p-5 space-y-4">
-                        <input id="rnnInput" class="viz-input mono-font" value="I love natural language processing" placeholder="Type a short sentence...">
+                        <input id="biInput" class="viz-input mono-font" value="the bank of the river was quiet" placeholder="Type a short sentence...">
                         <div class="pt-4 border-t border-white/5 space-y-3">
-                            <button id="stepBtn" class="viz-btn viz-btn-primary w-full py-3 text-xs uppercase tracking-widest font-bold">
-                                <i class="fas fa-shoe-prints mr-2"></i> Feed Next Token
-                            </button>
-                            <button id="autoBtn" class="viz-btn viz-btn-secondary w-full py-3 text-xs uppercase tracking-widest font-bold">
-                                <i class="fas fa-play mr-2"></i> Auto Run
+                            <button id="runBtn" class="viz-btn viz-btn-primary w-full py-3 text-xs uppercase tracking-widest font-bold">
+                                <i class="fas fa-play mr-2"></i> Run Both Passes
                             </button>
                             <button id="resetBtn" class="viz-btn viz-btn-secondary w-full py-3 text-xs uppercase tracking-widest font-bold">
-                                <i class="fas fa-undo mr-2"></i> Reset Memory
+                                <i class="fas fa-undo mr-2"></i> Reset
                             </button>
                         </div>
                     </div>
@@ -356,15 +355,32 @@
                 <div class="card-container">
                     <div class="card-header">
                         <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-main)">
-                            <i class="fas fa-square-root-alt mr-2 text-amber-500"></i> The Update Rule
+                            <i class="fas fa-university mr-2 text-amber-500"></i> The &ldquo;bank&rdquo; Test
+                        </h3>
+                    </div>
+                    <div class="p-5 space-y-3">
+                        <p class="text-[11px] leading-relaxed" style="color: var(--text-muted)">The word <strong>bank</strong> is ambiguous at position 2 &mdash; a forward RNN reading &ldquo;the bank&hellip;&rdquo; cannot yet tell riverside from money. Load each sentence, run the passes, then click <strong>bank</strong> and compare what the backward state knows.</p>
+                        <button class="viz-btn viz-btn-secondary w-full py-2.5 text-[10px] uppercase tracking-widest font-bold preset-btn" data-text="the bank of the river was quiet">
+                            <i class="fas fa-water mr-2"></i> river bank
+                        </button>
+                        <button class="viz-btn viz-btn-secondary w-full py-2.5 text-[10px] uppercase tracking-widest font-bold preset-btn" data-text="the bank approved my loan today">
+                            <i class="fas fa-coins mr-2"></i> money bank
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card-container">
+                    <div class="card-header">
+                        <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-main)">
+                            <i class="fas fa-square-root-alt mr-2 text-amber-500"></i> The Output Rule
                         </h3>
                     </div>
                     <div class="p-5 text-center space-y-3">
-                        <p class="mono-font text-sm" style="color: var(--accent-primary)">h&#8348; = tanh(W&middot;x&#8348; + U&middot;h&#8348;&#8331;&#8321; + b)</p>
+                        <p class="mono-font text-sm" style="color: var(--accent-primary)">y&#8348; = [ h&#8348;&#8594; ; h&#8348;&#8592; ]</p>
                         <div class="text-[10px] opacity-60 leading-relaxed text-left space-y-1.5 mono-font">
-                            <p><span style="color: var(--accent-primary)">x&#8348;</span> &mdash; embedding of the current token</p>
-                            <p><span style="color: var(--accent-primary)">h&#8348;&#8331;&#8321;</span> &mdash; memory carried from the previous step</p>
-                            <p><span style="color: var(--accent-primary)">W, U, b</span> &mdash; the same weights, reused at every step</p>
+                            <p><span style="color: var(--accent-primary)">h&#8348;&#8594;</span> &mdash; forward state: summary of words 1&hellip;t</p>
+                            <p><span style="color: #f59e0b">h&#8348;&#8592;</span> &mdash; backward state: summary of words t&hellip;n</p>
+                            <p><span style="color: var(--accent-primary)">[ ; ]</span> &mdash; concatenation: both halves, full context</p>
                         </div>
                     </div>
                 </div>
@@ -375,47 +391,53 @@
                 <div class="card-container">
                     <div class="card-header flex justify-between items-center">
                         <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-main)">
-                            <i class="fas fa-sync-alt mr-2" style="color: var(--accent-primary)"></i> The Cell
+                            <i class="fas fa-arrows-alt-h mr-2" style="color: var(--accent-primary)"></i> Two Passes Over One Sentence
                         </h3>
-                        <span id="stepBadge" class="mono-font text-[10px] px-2 py-1 rounded border border-green-500/20 text-green-400 bg-green-500/5">t = 0</span>
+                        <span id="passBadge" class="mono-font text-[10px] px-2 py-1 rounded border border-green-500/20 text-green-400 bg-green-500/5">idle</span>
                     </div>
-                    <div class="p-6 space-y-5">
-                        <div id="tokenStrip" class="flex flex-wrap gap-2 mono-font justify-center"></div>
-                        <svg viewBox="0 0 640 200" class="w-full h-auto" preserveAspectRatio="xMidYMid meet">
-                            <defs><marker id="arrRnn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-primary)"/></marker></defs>
-                            <rect x="250" y="55" width="140" height="90" rx="14" fill="var(--input-bg)" stroke="var(--accent-primary)" stroke-width="2.5"/>
-                            <text x="320" y="95" text-anchor="middle" font-size="15" font-family="Space Grotesk, sans-serif" font-weight="700" fill="var(--text-main)">RNN Cell</text>
-                            <text x="320" y="118" text-anchor="middle" font-size="10" font-family="JetBrains Mono, monospace" fill="var(--text-muted)">tanh(Wx + Uh + b)</text>
-                            <line x1="320" y1="195" x2="320" y2="150" stroke="var(--accent-primary)" stroke-width="2.5" marker-end="url(#arrRnn)"/>
-                            <text x="338" y="185" font-size="11" font-family="JetBrains Mono, monospace" fill="var(--text-muted)">x&#8348; (input)</text>
-                            <line x1="395" y1="100" x2="480" y2="100" stroke="var(--accent-primary)" stroke-width="2.5" marker-end="url(#arrRnn)"/>
-                            <text x="490" y="104" font-size="11" font-family="JetBrains Mono, monospace" fill="var(--text-muted)">h&#8348; (output)</text>
-                            <path class="cell-loop" d="M 320 55 C 320 10, 190 10, 190 70 C 190 96, 215 100, 243 100" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#arrRnn)"/>
-                            <text x="150" y="30" font-size="11" font-family="JetBrains Mono, monospace" fill="#f59e0b">h&#8348;&#8331;&#8321; loops back (memory)</text>
-                        </svg>
-                        <div>
-                            <p class="text-[10px] uppercase tracking-widest font-bold opacity-60 mb-2">Hidden state h&#8348; — the network's memory (4 dims)</p>
-                            <div id="hRow" class="flex gap-2 flex-wrap mono-font"></div>
+                    <div class="p-6 space-y-4 overflow-x-auto custom-scrollbar">
+                        <div class="min-w-fit space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="mono-font text-[9px] w-20 shrink-0" style="color: var(--accent-primary)">FORWARD &rarr;</span>
+                                <div id="fwdLane" class="flex gap-2"></div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="mono-font text-[9px] w-20 shrink-0 opacity-0">tokens</span>
+                                <div id="tokRow" class="flex gap-2"></div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="mono-font text-[9px] w-20 shrink-0" style="color: #f59e0b">&larr; BACKWARD</span>
+                                <div id="bwdLane" class="flex gap-2"></div>
+                            </div>
                         </div>
+                        <p id="clickHint" class="text-[10px] opacity-50 mono-font text-center pt-2">run the passes, then click any word to inspect what each direction knows about it</p>
                     </div>
                 </div>
 
-                <div class="card-container">
+                <div class="card-container" id="inspectorCard" style="display: none;">
                     <div class="card-header">
                         <h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-main)">
-                            <i class="fas fa-history mr-2 text-amber-500"></i> Memory Timeline
+                            <i class="fas fa-search mr-2" style="color: var(--accent-primary)"></i> Context Inspector &mdash; &ldquo;<span id="inspWord"></span>&rdquo;
                         </h3>
                     </div>
-                    <div class="overflow-y-auto custom-scrollbar" style="max-height: 260px;">
-                        <table class="w-full text-left text-xs mono-font">
-                            <thead class="sticky top-0 z-20" style="background: var(--bg-surface)">
-                                <tr class="text-[10px] uppercase font-bold tracking-widest opacity-60 border-b border-white/5">
-                                    <th class="p-3">t</th><th class="p-3">Token</th><th class="p-3">Hidden state after step</th>
-                                </tr>
-                            </thead>
-                            <tbody id="timelineBody"></tbody>
-                        </table>
-                        <div id="timelineEmpty" class="p-6 text-center text-xs opacity-50">Memory starts at h&#8320; = [0, 0, 0, 0]. Feed the first token.</div>
+                    <div class="p-6 space-y-5">
+                        <div class="grid md:grid-cols-2 gap-5">
+                            <div class="p-4 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                                <p class="text-[10px] uppercase tracking-widest font-bold mb-2" style="color: var(--accent-primary)">Forward state h&#8594; has read:</p>
+                                <div id="fwdCtx" class="flex flex-wrap gap-1.5 mono-font"></div>
+                                <div id="fwdVec" class="flex gap-1.5 flex-wrap mono-font mt-3"></div>
+                            </div>
+                            <div class="p-4 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                                <p class="text-[10px] uppercase tracking-widest font-bold mb-2" style="color: #f59e0b">Backward state h&#8592; has read:</p>
+                                <div id="bwdCtx" class="flex flex-wrap gap-1.5 mono-font"></div>
+                                <div id="bwdVec" class="flex gap-1.5 flex-wrap mono-font mt-3"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-[10px] uppercase tracking-widest font-bold opacity-60 mb-2">Concatenated output y = [h&#8594; ; h&#8592;] &mdash; 8 dims, full-sentence context</p>
+                            <div id="concatVec" class="flex gap-1.5 flex-wrap mono-font"></div>
+                        </div>
+                        <p id="inspNote" class="text-[11px] leading-relaxed p-3 rounded-lg border" style="border-color: var(--border-subtle); color: var(--text-muted)"></p>
                     </div>
                 </div>
             </div>
@@ -426,39 +448,44 @@
     <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
         <div class="card-container animate-fade-in">
             <div class="card-header">
-                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">The Recurrent Cell: A Neuron That Remembers</h2>
-                <p class="mt-2 text-sm" style="color: var(--text-muted)">How a single loop turns a stateless network into a sequence processor.</p>
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Bidirectional RNNs: Reading Both Ways</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">Why understanding a word often requires the words that come after it.</p>
             </div>
             <div class="p-5 md:p-7 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
 
                 <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-lightbulb"></i>One Loop Changes Everything</h3>
-                    <p>A feed-forward layer computes its output from the current input and forgets it immediately. A <strong>recurrent cell</strong> adds a single wire: its own previous output, <span class="mono-font">h&#8348;&#8331;&#8321;</span>, feeds back in alongside the new input. That loop gives the network a <strong>hidden state</strong> — a running summary of everything it has seen so far.</p>
+                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-lightbulb"></i>The One-Way Blind Spot</h3>
+                    <p>Every recurrent model so far &mdash; RNN, LSTM, GRU &mdash; reads strictly left to right, so its state at position t summarises only words 1&hellip;t. But language does not resolve left to right: in &ldquo;the <strong>bank</strong> of the river&rdquo;, the evidence that disambiguates <em>bank</em> arrives <em>after</em> the word itself. A forward-only model must commit before it has seen the proof.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-square-root-alt"></i>Reading the Update Rule</h3>
-                    <p class="mono-font text-sm my-3" style="color: var(--accent-primary)">h&#8348; = tanh(W&middot;x&#8348; + U&middot;h&#8348;&#8331;&#8321; + b)</p>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-arrows-alt-h"></i>The Fix: Two Networks, One Sentence</h3>
+                    <p>A <strong>bidirectional RNN</strong> (Schuster &amp; Paliwal, 1997) runs two completely independent recurrent networks over the same input:</p>
                     <ul class="list-disc pl-6 mt-2 space-y-2">
-                        <li><strong>W&middot;x&#8348;</strong> — what the <em>new token</em> contributes.</li>
-                        <li><strong>U&middot;h&#8348;&#8331;&#8321;</strong> — what the <em>past</em> contributes. This term is the memory.</li>
-                        <li><strong>tanh</strong> — squashes the result into [-1, 1], keeping the state bounded step after step.</li>
-                        <li><strong>Same W, U, b at every step</strong> — the cell handles a 5-word or a 500-word sentence with the identical parameters. Variable-length input solved.</li>
+                        <li>The <strong style="color: var(--accent-primary)">forward network</strong> reads token 1 &rarr; n; its state h&#8348;&#8594; summarises the <em>left context</em> (everything before and including t).</li>
+                        <li>The <strong style="color: #f59e0b">backward network</strong> reads token n &rarr; 1 with its own separate weights; its state h&#8348;&#8592; summarises the <em>right context</em>.</li>
+                        <li>At each position the two states are <strong>concatenated</strong>: y&#8348; = [h&#8348;&#8594; ; h&#8348;&#8592;]. Every position now sees the whole sentence &mdash; past on one side, future on the other. (Wrap the same idea around LSTM or GRU cells and you get the workhorse BiLSTM / BiGRU.)</li>
                     </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-briefcase"></i>Where It Shines &mdash; and Where It Cannot Be Used</h3>
+                    <p><strong>Shines:</strong> any task where the full sequence is available before prediction &mdash; named-entity recognition, part-of-speech tagging, machine-translation encoders, speech recognition. Before transformers, BiLSTMs were the default encoder for virtually all of NLP.</p>
+                    <p class="mt-3"><strong>Cannot be used:</strong> generation. When predicting the <em>next</em> word, the future does not exist yet &mdash; a language model must stay strictly forward (causal). This split survives today: BERT is bidirectional (an encoder that sees both sides), GPT is causal (a generator that must not peek).</p>
                 </div>
 
                 <div>
                     <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-vial"></i>Interactive Exploration Guide</h3>
                     <ol class="list-decimal pl-6 mt-4 space-y-3">
-                        <li><strong>Feed the first token.</strong> The hidden state jumps from all zeros to its first values — the cell has formed its first memory.</li>
-                        <li><strong>Keep stepping.</strong> Each new token <em>blends into</em> the existing state rather than replacing it — compare consecutive rows in the timeline and notice values shifting, not resetting.</li>
-                        <li><strong>Reset, then type two sentences that share a last word</strong> (e.g. "dogs chase cats" vs "people love cats"). Step both to the end: the final states differ even though the last token is identical — proof the state carries history, not just the present.</li>
+                        <li><strong>Run both passes</strong> and watch the green lane fill left-to-right while the amber lane fills right-to-left &mdash; two independent readers crossing in the middle.</li>
+                        <li><strong>Click the first word.</strong> Its forward state has read almost nothing, but its backward state has read the entire sentence &mdash; edges are where one direction does all the work.</li>
+                        <li><strong>Load the two &ldquo;bank&rdquo; presets</strong> and click <em>bank</em> in each. The forward context (&ldquo;the&rdquo;) is identical in both sentences &mdash; but the backward vectors differ sharply, because the right context (&ldquo;river&rdquo; vs &ldquo;loan&rdquo;) is what actually tells the two banks apart.</li>
                     </ol>
                 </div>
 
                 <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
                     <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Key Takeaway</h3>
-                    <p>The recurrent cell fixes all three ANN limitations at once: it consumes sequences of <em>any length</em> (one token at a time), it respects <em>order</em> (each step builds on the last), and it has <em>memory</em> (the hidden state). Training it, however, requires backpropagating through that loop — the subject of the next module.</p>
+                    <p>Bidirectionality is not a new cell &mdash; it is a <em>wiring pattern</em>: run any recurrent cell in both directions and concatenate the states. Each position then carries full-sentence context, which is exactly what understanding tasks need and generation tasks must forbid. Hold onto that forward/backward distinction &mdash; it returns as the encoder/decoder split in transformers.</p>
                 </div>
             </div>
         </div>
@@ -491,23 +518,30 @@
             if (localStorage.getItem('theme') === 'light') { document.body.classList.add('light-mode'); updateThemeIcon(true); } else { updateThemeIcon(false); }
 
             // --- APP LOGIC ---
-            // Tiny fixed RNN: 3-dim embeddings, 4-dim hidden state
-            const Wm = [[ 0.5, -0.3,  0.8], [-0.6,  0.7,  0.2], [ 0.3,  0.9, -0.5], [-0.4, -0.2,  0.6]];
-            const Um = [[ 0.4, -0.2,  0.1,  0.3], [ 0.2,  0.5, -0.3, -0.1], [-0.3,  0.1,  0.6,  0.2], [ 0.1, -0.4,  0.2,  0.5]];
-            const bv = [0.1, -0.1, 0.05, 0.0];
+            // Two tiny independent RNNs (separate weights) run over the sentence
+            function mkMat(r, c, s) {
+                const m = [];
+                for (let i = 0; i < r; i++) {
+                    const row = [];
+                    for (let j = 0; j < c; j++) row.push(Math.sin(s * 7.3 + i * 12.9898 + j * 78.233) * 0.85);
+                    m.push(row);
+                }
+                return m;
+            }
+            const Wfwd = mkMat(4, 3, 1), Ufwd = mkMat(4, 4, 2);
+            const Wbwd = mkMat(4, 3, 3), Ubwd = mkMat(4, 4, 4);
 
-            const rnnInput = document.getElementById('rnnInput');
-            const tokenStrip = document.getElementById('tokenStrip');
-            const hRow = document.getElementById('hRow');
-            const timelineBody = document.getElementById('timelineBody');
-            const timelineEmpty = document.getElementById('timelineEmpty');
-            const stepBadge = document.getElementById('stepBadge');
-            const stepBtn = document.getElementById('stepBtn');
-            const autoBtn = document.getElementById('autoBtn');
+            const biInput = document.getElementById('biInput');
+            const tokRow = document.getElementById('tokRow');
+            const fwdLane = document.getElementById('fwdLane');
+            const bwdLane = document.getElementById('bwdLane');
+            const passBadge = document.getElementById('passBadge');
+            const runBtn = document.getElementById('runBtn');
+            const inspectorCard = document.getElementById('inspectorCard');
+            const clickHint = document.getElementById('clickHint');
 
-            let tokens = [], h = [0, 0, 0, 0], t = 0, timer = null;
+            let tokens = [], fwdStates = [], bwdStates = [], done = false, timer = null, selected = -1;
 
-            // deterministic pseudo-embedding from the word's characters
             function embed(word) {
                 const e = [0, 0, 0];
                 for (let i = 0; i < word.length; i++) {
@@ -519,80 +553,124 @@
                 return e.map(v => Math.max(-1, Math.min(1, v / Math.sqrt(word.length))));
             }
 
-            function rnnStep(x, hPrev) {
-                return Wm.map((wRow, i) => {
-                    let s = bv[i];
+            function rnnStep(W, U, x, hPrev) {
+                return W.map((wRow, k) => {
+                    let s = 0;
                     for (let j = 0; j < 3; j++) s += wRow[j] * x[j];
-                    for (let j = 0; j < 4; j++) s += Um[i][j] * hPrev[j];
+                    for (let j = 0; j < 4; j++) s += U[k][j] * hPrev[j];
                     return Math.tanh(s);
                 });
             }
 
-            function hCells(vec) {
-                return vec.map((v, i) => {
-                    const op = Math.min(Math.abs(v), 1) * 0.55 + 0.04;
-                    const bg = v >= 0 ? `rgba(74, 222, 128, ${op})` : `rgba(248, 113, 113, ${op})`;
-                    return `<div class="h-cell" style="background: ${bg}"><span class="font-bold">${v.toFixed(2)}</span><span class="hl">h[${i}]</span></div>`;
-                }).join('');
-            }
-
-            function renderTokens() {
-                tokenStrip.innerHTML = tokens.map((tok, i) => {
-                    let cls = 'token-pill mono-font';
-                    if (i < t) cls += ' done';
-                    if (i === t) cls += ' current';
-                    return `<span class="${cls}">${tok}</span>`;
-                }).join('');
-            }
-
-            function render() {
-                renderTokens();
-                hRow.innerHTML = hCells(h);
-                stepBadge.textContent = `t = ${t}`;
-            }
-
-            function stopAuto() {
-                if (timer) { clearInterval(timer); timer = null; }
-                autoBtn.innerHTML = '<i class="fas fa-play mr-2"></i> Auto Run';
-            }
-
-            function step() {
-                if (t >= tokens.length) { stopAuto(); return; }
-                const word = tokens[t];
-                h = rnnStep(embed(word), h);
-                t++;
-                timelineEmpty.style.display = 'none';
-                const tr = document.createElement('tr');
-                tr.className = 'result-row';
-                tr.innerHTML = `<td class="p-3 opacity-50">${t}</td><td class="p-3" style="color: var(--accent-primary)">${word}</td><td class="p-3"><div class="flex gap-1.5 flex-wrap">${hCells(h)}</div></td>`;
-                timelineBody.appendChild(tr);
-                tr.scrollIntoView({ block: 'nearest' });
-                render();
-                if (t >= tokens.length) { stopAuto(); stepBtn.disabled = true; }
-            }
-
-            function reset() {
-                stopAuto();
-                tokens = rnnInput.value.trim().split(/\s+/).filter(Boolean).slice(0, 10);
+            function computeStates() {
+                fwdStates = []; bwdStates = new Array(tokens.length);
+                let h = [0, 0, 0, 0];
+                for (let k = 0; k < tokens.length; k++) {
+                    h = rnnStep(Wfwd, Ufwd, embed(tokens[k]), h);
+                    fwdStates.push(h);
+                }
                 h = [0, 0, 0, 0];
-                t = 0;
-                timelineBody.innerHTML = '';
-                timelineEmpty.style.display = 'block';
-                stepBtn.disabled = false;
-                render();
+                for (let k = tokens.length - 1; k >= 0; k--) {
+                    h = rnnStep(Wbwd, Ubwd, embed(tokens[k]), h);
+                    bwdStates[k] = h;
+                }
             }
 
-            stepBtn.addEventListener('click', step);
-            autoBtn.addEventListener('click', () => {
-                if (timer) { stopAuto(); return; }
-                if (stepBtn.disabled) reset();
-                autoBtn.innerHTML = '<i class="fas fa-pause mr-2"></i> Pause';
-                timer = setInterval(step, 750);
-            });
-            document.getElementById('resetBtn').addEventListener('click', reset);
-            rnnInput.addEventListener('input', reset);
+            function vecCells(vec, warm) {
+                return vec.map((v, k) => {
+                    const op = Math.min(Math.abs(v), 1) * 0.55 + 0.04;
+                    const bg = warm
+                        ? (v >= 0 ? `rgba(245, 158, 11, ${op})` : `rgba(248, 113, 113, ${op})`)
+                        : (v >= 0 ? `rgba(74, 222, 128, ${op})` : `rgba(248, 113, 113, ${op})`);
+                    return `<div class="h-cell" style="background: ${bg}"><span class="font-bold">${v.toFixed(2)}</span><span class="hl">[${k}]</span></div>`;
+                }).join('');
+            }
 
-            reset();
+            function renderStrip() {
+                tokRow.innerHTML = tokens.map((tok, k) =>
+                    `<div class="bi-tok mono-font${k === selected ? ' selected' : ''}" data-idx="${k}">${tok}</div>`).join('');
+                fwdLane.innerHTML = tokens.map((_, k) => `<div class="lane-cell mono-font" id="fw${k}">h&#8594;</div>`).join('');
+                bwdLane.innerHTML = tokens.map((_, k) => `<div class="lane-cell mono-font" id="bw${k}">h&#8592;</div>`).join('');
+                tokRow.querySelectorAll('.bi-tok').forEach(el => {
+                    el.addEventListener('click', () => { if (done) inspect(parseInt(el.dataset.idx)); });
+                });
+                // match lane cell widths to token widths
+                requestAnimationFrame(() => {
+                    tokRow.querySelectorAll('.bi-tok').forEach((el, k) => {
+                        const w = el.offsetWidth + 'px';
+                        const f = document.getElementById('fw' + k), b = document.getElementById('bw' + k);
+                        if (f) f.style.width = w;
+                        if (b) b.style.width = w;
+                    });
+                });
+            }
+
+            function inspect(idx) {
+                selected = idx;
+                renderStrip();
+                tokens.forEach((_, k) => {
+                    document.getElementById('fw' + k).classList.toggle('fwd-done', true);
+                    document.getElementById('bw' + k).classList.toggle('bwd-done', true);
+                });
+                inspectorCard.style.display = 'block';
+                document.getElementById('inspWord').textContent = tokens[idx];
+                const chip = (w, warm) => `<span class="ctx-chip mono-font" style="color: ${warm ? '#f59e0b' : 'var(--accent-primary)'}">${w}</span>`;
+                document.getElementById('fwdCtx').innerHTML = tokens.slice(0, idx + 1).map(w => chip(w, false)).join('') || '<span class="opacity-40 text-[10px]">nothing yet</span>';
+                document.getElementById('bwdCtx').innerHTML = tokens.slice(idx).map(w => chip(w, true)).join('') || '<span class="opacity-40 text-[10px]">nothing yet</span>';
+                document.getElementById('fwdVec').innerHTML = vecCells(fwdStates[idx], false);
+                document.getElementById('bwdVec').innerHTML = vecCells(bwdStates[idx], true);
+                document.getElementById('concatVec').innerHTML = vecCells(fwdStates[idx], false) + vecCells(bwdStates[idx], true);
+                const before = idx, after = tokens.length - 1 - idx;
+                document.getElementById('inspNote').innerHTML =
+                    `At this position the <strong style="color: var(--accent-primary)">forward</strong> state carries ${before} earlier word${before === 1 ? '' : 's'} plus the word itself, while the <strong style="color: #f59e0b">backward</strong> state carries the word plus ${after} later word${after === 1 ? '' : 's'}. Concatenated, the output at &ldquo;${tokens[idx]}&rdquo; is informed by the <strong>entire sentence</strong> &mdash; something no single-direction RNN can offer.`;
+                inspectorCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            function run() {
+                if (timer) return;
+                reset(true);
+                computeStates();
+                passBadge.textContent = 'running passes...';
+                let k = 0;
+                const n = tokens.length;
+                timer = setInterval(() => {
+                    if (k < n) {
+                        document.getElementById('fw' + k).classList.add('fwd-done');
+                        document.getElementById('bw' + (n - 1 - k)).classList.add('bwd-done');
+                        k++;
+                    } else {
+                        clearInterval(timer); timer = null;
+                        done = true;
+                        passBadge.textContent = 'both passes complete';
+                        clickHint.innerHTML = '<span style="color: var(--accent-primary)">click any word above to inspect its two states</span>';
+                        inspect(Math.min(1, n - 1));
+                    }
+                }, 420);
+            }
+
+            function reset(keepTimer) {
+                if (!keepTimer && timer) { clearInterval(timer); timer = null; }
+                tokens = biInput.value.trim().split(/\s+/).filter(Boolean).slice(0, 9);
+                done = false;
+                selected = -1;
+                inspectorCard.style.display = 'none';
+                passBadge.textContent = 'idle';
+                clickHint.textContent = 'run the passes, then click any word to inspect what each direction knows about it';
+                renderStrip();
+            }
+
+            runBtn.addEventListener('click', run);
+            document.getElementById('resetBtn').addEventListener('click', () => reset(false));
+            biInput.addEventListener('input', () => reset(false));
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    biInput.value = btn.dataset.text;
+                    reset(false);
+                    run();
+                });
+            });
+
+            reset(false);
         });
 
         // ===== DROPDOWN SEARCH FUNCTIONALITY =====
@@ -691,6 +769,9 @@
             { title: "Text Encoding Techniques in NLP", path: "natural_language_processing/text_encoding_techniques_in_nlp.html", category: "natural_language_processing", icon: "fa-comments" },
             { title: "Vanishing Gradient Problem in RNN", path: "natural_language_processing/vanishing_gradient_problem_in_rnn.html", category: "natural_language_processing", icon: "fa-comments" },
             { title: "What are Embeddings?", path: "natural_language_processing/what_are_embeddings.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "What is a LSTM?", path: "natural_language_processing/what_is_a_lstm.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "What is a GRU?", path: "natural_language_processing/what_is_a_gru.html", category: "natural_language_processing", icon: "fa-comments" },
+            { title: "What is Bidirectional?", path: "natural_language_processing/what_is_bidirectional.html", category: "natural_language_processing", icon: "fa-comments" },
             { title: "What is a LSTM?", path: "natural_language_processing/what_is_a_lstm.html", category: "natural_language_processing", icon: "fa-comments" },
             { title: "What is a GRU?", path: "natural_language_processing/what_is_a_gru.html", category: "natural_language_processing", icon: "fa-comments" },
             { title: "What is Bidirectional?", path: "natural_language_processing/what_is_bidirectional.html", category: "natural_language_processing", icon: "fa-comments" },
