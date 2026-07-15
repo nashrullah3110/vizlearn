@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VizLearn - Optimizers</title>
-    <meta name="description" content="Learn Optimizers with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn.">
-    <meta name="keywords" content="Optimizers, interactive learning, beginner tutorial, vizlearn">
+    <title>VizLearn - What is RNN?</title>
+    <meta name="description" content="Learn what a standard RNN cell is with a beginner-friendly interactive visualization of its memory states and data flow.">
+    <meta name="keywords" content="What is RNN, Recurrent Neural Network, interactive learning, beginner tutorial, vizlearn, neural networks">
     <meta name="robots" content="index, follow">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -43,6 +43,7 @@
                     animation: {
                         'grid-flow': 'grid-move 20s linear infinite',
                         'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'bounce-slight': 'bounceSlight 2s infinite',
                     },
                     keyframes: {
                         'grid-move': {
@@ -52,21 +53,15 @@
                         fadeIn: {
                             '0%': { opacity: '0', transform: 'translateY(10px)' },
                             '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        bounceSlight: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-5px)' },
                         }
                     }
                 }
             }
         }
-    </script>
-    <script>
-        (function(){
-            const apply = (t)=>{
-                if(t==='light') document.body.classList.add('light-mode');
-                else document.body.classList.remove('light-mode');
-            };
-            const t = localStorage.getItem('theme') || 'dark';
-            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
-        })();
     </script>
     <style>
         :root {
@@ -78,6 +73,7 @@
             --border-glow: rgba(74, 222, 128, 0.5);
             --accent-primary: #4ade80;
             --accent-glow: rgba(74, 222, 128, 0.25);
+            --gate-color: #ef4444; /* Red/Rose for Tanh Layer */
             --text-main: #f0fdf4;
             --text-muted: #86efac;
             --card-bg: #0a0a0a;
@@ -88,8 +84,9 @@
             
             /* Canvas Specifics - Dark */
             --canvas-bg: #0a0a0a;
-            --contour-line: rgba(74, 222, 128, 0.15);
-            --path-line: #f59e0b; /* Amber */
+            --neuron-fill: #111827;
+            --neuron-border: rgba(74, 222, 128, 0.5);
+            --connection-line: rgba(74, 222, 128, 0.4);
         }
 
         body.light-mode {
@@ -100,6 +97,7 @@
             --border-glow: rgba(22, 163, 74, 0.4);
             --accent-primary: #15803d;
             --accent-glow: rgba(21, 128, 61, 0.2);
+            --gate-color: #dc2626; 
             --text-main: #052e16;
             --text-muted: #4b5563;
             --card-bg: #ffffff;
@@ -108,10 +106,11 @@
             --grid-color: rgba(22, 163, 74, 0.08);
             --vignette-color: transparent;
 
-            /* Canvas Specifics - Light Mode */
+            /* Canvas Specifics - Light Mode Contrast Fix */
             --canvas-bg: #f8fafc;
-            --contour-line: rgba(21, 128, 61, 0.15); 
-            --path-line: #d97706; /* Darker Amber */
+            --neuron-fill: #ffffff;
+            --neuron-border: #15803d; 
+            --connection-line: rgba(21, 128, 61, 0.5); 
         }
 
         *, *::before, *::after {
@@ -147,7 +146,6 @@
         
         .toolbar-container {
             background-color: var(--bg-surface);
-            border-top: 1px solid var(--border-subtle);
             border-bottom: 1px solid var(--border-subtle);
             padding: 0.75rem 1.5rem;
             z-index: 40;
@@ -160,23 +158,16 @@
             overflow: hidden;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
-        
-        .calc-card {
-            background: var(--input-bg);
-            border: 1px solid var(--border-subtle);
-            border-radius: 10px;
-            padding: 16px;
-        }
 
         .floating-panel {
             position: absolute;
             top: 1rem;
             right: 1rem;
-            width: 280px;
+            width: 270px;
             background-color: var(--bg-surface);
             border: 1px solid var(--border-subtle);
             border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
             z-index: 30;
             opacity: 0.95;
             transition: opacity 0.3s;
@@ -199,23 +190,6 @@
             outline: none;
         }
 
-        /* Custom Range Slider */
-        input[type=range] {
-            -webkit-appearance: none;
-            background: transparent;
-        }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; }
-        input[type=range]:focus { outline: none; }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            border: 2px solid var(--bg-surface);
-            height: 14px; width: 14px; border-radius: 50%;
-            background: var(--accent-primary); cursor: pointer;
-            margin-top: -5px; box-shadow: 0 0 10px var(--accent-glow); transition: transform 0.1s;
-        }
-        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: var(--border-subtle); border-radius: 2px; }
-
         .viz-btn {
             font-family: 'Space Grotesk', sans-serif;
             font-weight: 500;
@@ -226,24 +200,36 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
             padding: 0.5rem 1rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
         }
-        .viz-btn-primary { background: var(--accent-primary); color: var(--bg-body); box-shadow: 0 0 10px var(--accent-glow); }
-        .viz-btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 15px var(--accent-glow); filter: brightness(1.1); }
-        .viz-btn-secondary { background: var(--input-bg); color: var(--text-muted); border: 1px solid var(--border-subtle); }
-        .viz-btn-secondary:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); background: var(--input-focus-bg); }
-        .viz-btn-animate.active { background: #ef4444 !important; color: white !important; border-color: #ef4444 !important; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important; }
+        .viz-btn-primary {
+            background: var(--accent-primary);
+            color: var(--bg-body);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        .viz-btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 0 15px var(--accent-glow);
+            filter: brightness(1.1);
+        }
+        .viz-btn-secondary {
+            background: var(--input-bg);
+            color: var(--text-muted);
+            border: 1px solid var(--border-subtle);
+        }
+        .viz-btn-secondary:hover:not(:disabled) {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--input-focus-bg);
+        }
 
         #canvas {
             background-color: var(--canvas-bg);
             width: 100%;
             height: 100%;
-            cursor: crosshair;
+            cursor: grab;
             user-select: none;
         }
+        #canvas.grabbing { cursor: grabbing; }
 
         .metric-card {
             background: var(--input-bg);
@@ -252,12 +238,27 @@
             margin-bottom: 0.5rem;
         }
 
+        .modal {
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+        .modal-content {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 0 20px var(--accent-glow);
+            color: var(--text-main);
+        }
+
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: var(--bg-body); }
         ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
-    
-        /* Search Input Wrapper */
+
+        /* Legend specific to RNN */
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 10px; opacity: 0.8; }
+        .legend-color { width: 10px; height: 10px; border-radius: 2px; }
+
+        /* Search Dropdown Styles */
         .search-input-wrapper { background: var(--input-bg); border: 1px solid var(--border-subtle); position: relative; }
         .search-input-wrapper:focus-within { background: var(--input-focus-bg); border-color: var(--accent-primary); box-shadow: 0 0 15px var(--accent-glow); }
         .search-input-wrapper input { color: var(--text-main); }
@@ -274,7 +275,6 @@
         .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
 
         @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-
     </style>
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
@@ -282,10 +282,8 @@
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-
         gtag('config', 'G-ZT6JM33V5J');
     </script>
-
 </head>
 <body class="flex flex-col min-h-screen overflow-x-hidden">
 
@@ -324,65 +322,45 @@
             <span>/</span>
             <span>Deep Learning</span>
         </div>
-        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Optimizers in Neural Networks</h1>
+        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">What is RNN?</h1>
         <p class="mt-2 text-sm md:text-base max-w-2xl opacity-80" style="color: var(--text-muted)">
-            Visualize how different optimization algorithms navigate the "Loss Landscape" to find the global minimum. Run multiple in parallel to observe realistic relative speeds!
+            Take a microscopic look inside a single <strong>Recurrent Neural Network</strong> block. Visualize how it simply merges past memory with new input data to generate a new context state.
         </p>
     </div>
 
-    <!-- Toolbar -->
-    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-4 justify-between animate-fade-in z-40 relative shadow-md">
-        <!-- Configuration Group -->
-        <div class="flex items-center gap-6 overflow-x-auto pb-1 md:pb-0 hide-scrollbar shrink-0">
-            
-            <div class="flex items-center gap-2">
-                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Optimizer</label>
-                <select id="optimizerSelect" class="viz-input text-center w-36 border-accent-primary">
-                    <option value="sgd" selected>SGD (Red)</option>
-                    <option value="momentum">Momentum (Blue)</option>
-                    <option value="rmsprop">RMSprop (Purple)</option>
-                    <option value="adam">Adam (Green)</option>
-                    <option value="all" class="font-bold" style="background: var(--bg-surface)">All (Compare)</option>
-                </select>
-            </div>
-            
-            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
-
-            <div class="flex items-center gap-2">
-                <label class="text-[10px] font-bold uppercase tracking-wide text-orange-400 whitespace-nowrap">Learning Rate</label>
-                <input type="number" id="learningRate" value="0.1" min="0.01" max="2.0" step="0.01" class="viz-input w-20 text-center border-orange-500/50">
+    <!-- Main Toolbars -->
+    <div class="shrink-0 animate-fade-in z-40 relative shadow-md">
+        <!-- Architecture Toolbar -->
+        <div class="toolbar-container flex flex-wrap items-center gap-4 justify-between border-t border-[var(--border-subtle)]">
+            <div class="flex items-center gap-3 overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
+                <div class="flex items-center gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-blue-400">Input Vector ($X_t$)</label>
+                    <input type="number" id="inputSize" value="4" min="1" max="50" class="viz-input w-16 text-center border-blue-500/50">
+                </div>
+                <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
+                <div class="flex items-center gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-accent-primary" style="color: var(--accent-primary)">Hidden State ($H_t$)</label>
+                    <input type="number" id="hiddenSize" value="8" min="1" max="50" class="viz-input w-16 text-center border-green-500/50">
+                </div>
             </div>
 
-            <div class="w-px h-6 bg-[var(--border-subtle)] hidden md:block"></div>
-
-            <div class="flex items-center gap-3">
-                <label class="text-[10px] font-bold uppercase tracking-wide text-blue-400 whitespace-nowrap">Sim Speed</label>
-                <input type="range" id="simSpeed" min="0.1" max="5.0" step="0.1" value="0.1" class="w-24" title="Adjust animation speed">
-                <span id="speedValue" class="text-[10px] mono-font w-8 text-blue-400">0.1x</span>
+            <div class="flex items-center gap-2 ml-auto">
+                <button id="centerCanvasBtn" class="viz-btn viz-btn-secondary" title="Center View"><i class="fas fa-crosshairs"></i></button>
+                <button id="calculateBtn" class="viz-btn viz-btn-primary"><i class="fas fa-calculator mr-2"></i> Parameters</button>
             </div>
-
         </div>
 
-        <!-- Animation Controls -->
-        <div class="flex items-center gap-2 shrink-0 md:border-l border-[var(--border-subtle)] md:pl-6 ml-auto">
-            <span class="text-[10px] font-bold uppercase tracking-wide opacity-50 mr-2 hidden md:inline-block">
-                <i class="fas fa-mouse-pointer"></i> Click Canvas to Reposition
-            </span>
-            <button id="pauseBtn" class="viz-btn viz-btn-secondary hidden whitespace-nowrap py-2 px-4 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
-                <i class="fas fa-pause text-xs"></i> <span>Pause</span>
+        <!-- Data Simulation Toolbar -->
+        <div class="toolbar-container flex flex-wrap items-center justify-center gap-4 bg-black/10 py-4">
+            <button id="simPlayBtn" class="viz-btn viz-btn-primary bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.5)] flex items-center gap-2 whitespace-nowrap text-sm px-6 py-2">
+                <i class="fas fa-play" id="simPlayIcon"></i> <span id="simPlayText">Simulate Cell Operation</span>
             </button>
-            <button id="resetPathBtn" class="viz-btn viz-btn-secondary" title="Clear Path">
-                <i class="fas fa-eraser"></i>
-            </button>
-            <button id="animateBtn" class="viz-btn viz-btn-primary viz-btn-animate whitespace-nowrap py-2 px-4 shadow-[0_0_15px_rgba(74,222,128,0.15)]">
-                <i class="fas fa-play text-xs"></i> 
-                <span>Start Training</span>
-            </button>
+            <div id="simStatus" class="mono-font text-xs opacity-70 font-bold tracking-widest uppercase w-48 text-center text-indigo-400">Waiting for Data...</div>
         </div>
     </div>
 
     <!-- Canvas Area -->
-    <div class="relative w-full h-[60vh] min-h-[500px] border-b shrink-0 overflow-hidden animate-fade-in" style="border-color: var(--border-subtle); background: var(--canvas-bg);">
+    <div class="relative w-full h-[65vh] min-h-[550px] border-b shrink-0 overflow-hidden animate-fade-in" style="border-color: var(--border-subtle); background: var(--canvas-bg);">
         <!-- Canvas -->
         <canvas id="canvas" class="block w-full h-full"></canvas>
 
@@ -390,94 +368,70 @@
         <div class="floating-panel p-4 flex flex-col gap-4 pointer-events-auto">
              <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
                  <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--accent-primary)">
-                    <i class="fas fa-compass mr-2"></i> Optimization State
+                    <i class="fas fa-microscope mr-2"></i> Internal Flow
                 </h3>
              </div>
              
-             <!-- Training Tracker (Dynamic) -->
-             <div id="statsPanel" class="metric-card p-4 border-l-4" style="border-left-color: var(--accent-primary)">
-                 <!-- Injected dynamically by JS based on selection -->
+             <!-- Legend -->
+             <div class="flex flex-col gap-2 mt-1">
+                 <div class="legend-item"><div class="legend-color" style="background: var(--accent-primary)"></div> <span class="font-bold text-xs">$H_{t-1} \to H_t$ (Hidden State)</span></div>
+                 <div class="legend-item"><div class="legend-color bg-blue-500"></div> <span class="font-bold text-xs">$X_t$ (New Input Data)</span></div>
+                 <div class="legend-item"><div class="legend-color" style="background: var(--gate-color)"></div> <span class="text-xs">Neural Network Layer (W)</span></div>
              </div>
-             
-             <div class="text-[9px] text-center opacity-60 mt-1 italic">
-                 Target Minimum is at (0, 0)
+
+             <div class="border-t border-[var(--border-subtle)] pt-3 mt-1">
+                 <div class="text-[10px] uppercase opacity-70 font-bold mb-1">Mathematical Operations</div>
+                 <div class="flex items-center gap-2 text-xs mb-1"><div class="w-4 h-4 rounded-full border border-current flex items-center justify-center opacity-80">$+$</div> Vector Concatenation / Add</div>
              </div>
         </div>
     </div>
 
-    <!-- auto-article-vizlearn -->
-    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
+    <!-- Article -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full mt-8">
         <div class="card-container animate-fade-in">
-            <div class="card-header">
-                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Optimizers: Detailed Beginner Guide</h2>
-                <p class="mt-2 text-sm" style="color: var(--text-muted)">Work through this article while testing controls above for stronger understanding.</p>
+            <div class="card-header p-5 md:p-7 border-b" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Inside the RNN: Unpacking the Cell</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">The internal architecture of a standard Recurrent Neural Network block is wonderfully simple. It takes its past memory, merges it with the present, and squashes it through a single neural layer to create the future state.</p>
             </div>
-            <div class="p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <div class="p-4 rounded border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-base md:text-lg font-bold mb-2" style="color: var(--accent-primary)">Quick Context</h3>
-                    <p><strong>Optimizers</strong> belongs to <strong>deep learning</strong>. Build intuition first, then precision.</p>
+            <div class="p-5 md:p-7 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
+                
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-history"></i>The Core Idea: The Hidden State</h3>
+                    <p>Unlike standard feed-forward networks, RNNs pass a single vector of context forward through time. This is the <strong>Hidden State ($H_t$)</strong>.</p>
+                    <p class="mt-2">Inside the cell, there is no complex long-term conveyor belt (like in an LSTM). There is only this singular hidden state, serving as both the short-term working memory and the network's output representation for that specific step.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">1) Concept in Plain Words</h3>
-                    <p>Optimizers is a deep learning building block connected to forward pass quality, gradient flow, and training stability.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">2) Where This Helps in Practice</h3>
-                    <p>This topic strongly influences convergence speed, generalization, and training reliability.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">3) Real Example</h3>
-                    <p>Start with a simple concrete example, then change one variable and observe what changes in behavior.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">4) Hands-On Flow with the Controls Above</h3>
-                    <ol class="list-decimal pl-5 space-y-2">
-                        <li>Run the default setup and note baseline output.</li>
-                        <li>Change exactly one control and observe only that effect.</li>
-                        <li>Repeat with a second test case to verify the pattern.</li>
-                        <li>Use reset and confirm you can reproduce the behavior.</li>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--gate-color)"><i class="fas fa-project-diagram"></i>Step-by-Step Flow</h3>
+                    <p>When the simulation runs, watch the data flow through these sequential steps inside the cell:</p>
+                    <ol class="list-decimal pl-6 mt-4 space-y-4">
+                        <li>
+                            <strong style="color: var(--text-main)">1. Receiving Inputs:</strong> The block takes in two pieces of information: the brand new input vector from the current step ($X_t$) coming from the bottom, and the context vector from the previous step ($H_{t-1}$) coming from the left.
+                        </li>
+                        <li>
+                            <strong style="color: var(--text-main)">2. Concatenation:</strong> These two inputs are merged (concatenated) together. By combining them, the network can look at "what just happened" and "what happened before" simultaneously.
+                        </li>
+                        <li>
+                            <strong style="color: var(--gate-color)">3. The Neural Layer ($\tanh$):</strong> The merged vector is multiplied by a set of shared weights ($W$) and passed through an activation function, typically <strong>tanh</strong> (hyperbolic tangent). This function squashes the numbers so they stay smoothly between -1 and 1, preventing the values from exploding to infinity as the loop repeats.
+                            <br><span class="opacity-70 text-sm italic">Math: $H_t = \tanh(W_{hx} \cdot X_t + W_{hh} \cdot H_{t-1} + b_h)$</span>
+                        </li>
+                        <li>
+                            <strong style="color: var(--accent-primary)">4. Outputting the New State:</strong> The result of this calculation is the brand new Hidden State ($H_t$). This vector is split: a copy is sent <em>upwards</em> to be used for a prediction ($Y_t$), and a copy is sent <em>rightwards</em> to be passed into the next RNN block as memory.
+                        </li>
                     </ol>
                 </div>
 
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">5) Formula / Rule Focus</h3>
-                    <p>Relate this page to the training loop: forward pass -&gt; loss -&gt; gradient -&gt; parameter update.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">6) Pseudocode Thinking</h3>
-                    <div class="mono-font text-xs md:text-sm p-3 rounded border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update parameters<br>repeat
+                <div class="p-5 rounded-lg border flex flex-col md:flex-row gap-6 items-start" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <div class="flex-1">
+                        <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--gate-color)"><i class="fas fa-exclamation-triangle"></i>The Vanishing Gradient Problem</h3>
+                        <p>Because the standard RNN only has this simple $tanh$ calculation repeated over and over, it suffers heavily from <strong>Vanishing Gradients</strong>. When it tries to learn connections across long sequences (e.g., matching a word at the end of a long paragraph to one at the beginning), the learning signal multiplied repeatedly through the layers shrinks to almost zero. This is why more complex architectures like LSTMs were invented!</p>
                     </div>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">7) Complexity / Performance Note</h3>
-                    <p>In deep learning, practical cost scales with model width/depth, batch size, and number of epochs.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">8) Common Mistakes</h3>
-                    <ul class="list-disc pl-5 space-y-1">
-                        <li>Jumping to advanced settings without understanding the baseline behavior.</li>
-                        <li>Changing multiple parameters at once and misreading cause-effect.</li>
-                        <li>Ignoring edge cases and evaluating only one scenario.</li>
-                    </ul>
-                </div>
-
-                <div class="p-4 rounded border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">9) Final Recap</h3>
-                    <p>Best learning loop: <strong>observe -> adjust one control -> compare -> explain -> verify</strong>.</p>
                 </div>
             </div>
         </div>
     </section>
 
-            <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+    <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
         <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
             <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
                 <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
@@ -488,11 +442,50 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
         </div>
     </footer>
 
+    <!-- Calculation Modal -->
+    <div id="calculationResultModal" class="modal fixed inset-0 hidden items-center justify-center z-[1001]">
+        <div class="modal-content p-6 rounded-xl w-full max-w-4xl m-4 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h3 class="text-lg font-bold" style="color: var(--accent-primary)">RNN Cell Shared Parameters</h3>
+                    <p class="text-xs opacity-70 mt-1">Standard RNNs only have one core neural network layer calculation.</p>
+                </div>
+                <button id="closeCalcModalBtn" class="text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="overflow-y-auto flex-1 mb-6 pr-2">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-[var(--border-subtle)]">
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">Matrix</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">Description</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">Formula</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70 text-right">Params</th>
+                        </tr>
+                    </thead>
+                    <tbody id="calc-table-body" class="text-sm mono-font">
+                        <!-- JS Injection -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-1 gap-4 border-t border-[var(--border-subtle)] pt-4">
+                <div class="metric-card p-4 text-center" style="border-color: var(--accent-primary); background: var(--accent-glow)">
+                    <div class="text-xs uppercase font-bold opacity-80" style="color: var(--accent-primary)">Total Cell Parameters</div>
+                    <div id="totalParamsResult" class="text-2xl font-bold mt-1" style="color: var(--accent-primary)">0</div>
+                    <div class="text-[10px] mt-1 opacity-70 font-sans">Used repeatedly at every time step</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // --- THEME LOGIC ---
         const themeToggleBtn = document.getElementById('themeToggle');
         const sunIcon = themeToggleBtn.querySelector('.dark-icon');
         const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        let cachedColors = null; // Cache colors to prevent frame drops
         
         const currentTheme = localStorage.getItem('theme') || 'dark';
         if (currentTheme === 'light') {
@@ -514,425 +507,512 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
                 sunIcon.classList.remove('hidden');
                 localStorage.setItem('theme', 'dark');
             }
+            cachedColors = null; // Clear cache on theme switch
             if (typeof window.updateAndRedraw === 'function') window.updateAndRedraw();
         });
 
-        // --- OPTIMIZER VISUALIZATION LOGIC ---
+        // --- RNN SINGLE CELL VISUALIZATION LOGIC ---
         document.addEventListener('DOMContentLoaded', () => {
             const canvas = document.getElementById('canvas');
             const ctx = canvas.getContext('2d');
+            const centerCanvasBtn = document.getElementById('centerCanvasBtn');
+            const calculateBtn = document.getElementById('calculateBtn');
             
-            const optimizerSelect = document.getElementById('optimizerSelect');
-            const lrInput = document.getElementById('learningRate');
-            const speedInput = document.getElementById('simSpeed');
-            const speedValue = document.getElementById('speedValue');
+            const inputSizeEl = document.getElementById('inputSize');
+            const hiddenSizeEl = document.getElementById('hiddenSize');
+
+            const simPlayBtn = document.getElementById('simPlayBtn');
+            const simPlayIcon = document.getElementById('simPlayIcon');
+            const simPlayText = document.getElementById('simPlayText');
+            const simStatus = document.getElementById('simStatus');
+
+            // Network State
+            let inputSize = 4;
+            let hiddenSize = 8;
             
-            const animateBtn = document.getElementById('animateBtn');
-            const pauseBtn = document.getElementById('pauseBtn');
-            const resetPathBtn = document.getElementById('resetPathBtn');
-            const statsPanel = document.getElementById('statsPanel');
+            let scale = 1;
+            let translateX = 0;
+            let translateY = 0;
+            let isDragging = false;
+            let lastX = 0;
+            let lastY = 0;
 
-            // Viewport & Scale
-            let dpr = window.devicePixelRatio || 1;
-            let width, height;
-            let centerX, centerY;
-            let scaleFactor = 25; // Pixels per unit in math space
-            
-            // The Mathematical Function: Asymmetric Bowl (Ravine)
-            const f = (x, y) => 0.05 * x * x + 1.0 * y * y;
-            const gradX = (x) => 0.1 * x;
-            const gradY = (y) => 2.0 * y;
+            // Simulation State
+            let isSimulating = false;
+            let simProgress = 0;
+            let lastSimTime = 0;
 
-            // Optimization State
-            let isAnimating = false;
-            let isPaused = false;
-            let animationFrameId = null;
-            let simAccumulator = 0; // For slow motion / sub-frame steps
-            let globalStepCount = 0;
-            let startPos = { x: -8, y: 3 }; 
-            
-            const ALL_OPTIMIZERS = {
-                'sgd': { name: 'SGD', color: '#ef4444' }, // Red
-                'momentum': { name: 'Momentum', color: '#3b82f6' }, // Blue
-                'rmsprop': { name: 'RMSprop', color: '#a855f7' }, // Purple
-                'adam': { name: 'Adam', color: '#4ade80' } // Green
-            };
-
-            let activeOptimizers = []; // Array to hold states
-
-            // Hyperparameters
-            let beta1 = 0.9;
-            let beta2 = 0.999;
-            let epsilon = 1e-8;
-
+            // Theme Helpers
             function getThemeColors() {
-                const isLight = document.body.classList.contains('light-mode');
-                return {
-                    bg: isLight ? '#f8fafc' : '#0a0a0a',
-                    contourBase: isLight ? 'rgba(21, 128, 61, ' : 'rgba(74, 222, 128, ',
-                    text: isLight ? '#052e16' : '#f0fdf4',
-                    textMuted: isLight ? '#4b5563' : '#86efac'
+                if (cachedColors) return cachedColors;
+                const styles = getComputedStyle(document.body);
+                cachedColors = {
+                    bg: styles.getPropertyValue('--canvas-bg').trim(),
+                    neuronFill: styles.getPropertyValue('--neuron-fill').trim(),
+                    neuronBorder: styles.getPropertyValue('--neuron-border').trim(),
+                    connection: styles.getPropertyValue('--connection-line').trim(),
+                    accent: styles.getPropertyValue('--accent-primary').trim(),
+                    gateColor: styles.getPropertyValue('--gate-color').trim(),
+                    text: styles.getPropertyValue('--text-main').trim(),
                 };
+                return cachedColors;
             }
 
-            function resize() {
-                const rect = canvas.parentNode.getBoundingClientRect();
-                width = rect.width;
-                height = rect.height;
+            // Central diagram drawing
+            function drawCell() {
+                if (!ctx) return;
+                const colors = getThemeColors();
+                const dpr = window.devicePixelRatio || 1;
+                const rect = canvas.getBoundingClientRect();
                 
-                canvas.width = width * dpr;
-                canvas.height = height * dpr;
+                // Fallback to prevent NaN scale crashes
+                let w = rect.width || 800;
+                let h = rect.height || 600;
+
+                if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+                    canvas.width = w * dpr;
+                    canvas.height = h * dpr;
+                }
                 
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.scale(dpr, dpr);
-                
-                centerX = width / 2;
-                centerY = height / 2;
-                
-                draw();
-            }
-
-            window.addEventListener('resize', resize);
-            
-            // Math <-> Canvas Coordinate Mappers
-            const mapX = (x) => centerX + x * scaleFactor;
-            const mapY = (y) => centerY - y * scaleFactor; 
-            const unmapX = (cx) => (cx - centerX) / scaleFactor;
-            const unmapY = (cy) => -(cy - centerY) / scaleFactor;
-
-            function drawContours() {
-                const colors = getThemeColors();
-                
-                // Draw topographic levels from largest (outer) to smallest (inner)
-                // f(x,y) = c => 0.05*x^2 + y^2 = c
-                // rx = sqrt(c/0.05), ry = sqrt(c)
-                const contourLevels = [50, 40, 30, 22, 15, 10, 6, 3.5, 2, 1, 0.5, 0.1, 0.02];
-                
-                contourLevels.forEach((c, idx) => {
-                    const rx = Math.sqrt(c / 0.05) * scaleFactor;
-                    const ry = Math.sqrt(c) * scaleFactor;
-                    
-                    ctx.beginPath();
-                    ctx.ellipse(centerX, centerY, rx, ry, 0, 0, 2 * Math.PI);
-                    
-                    // 3D Stacking Effect: Deepen color towards center, add shadows
-                    const depth = idx / contourLevels.length; // 0 (outer/top) to 1 (inner/bottom)
-                    
-                    ctx.fillStyle = `${colors.contourBase}${0.02 + depth * 0.15})`;
-                    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-                    ctx.shadowBlur = 8;
-                    ctx.shadowOffsetY = 2;
-                    ctx.fill();
-                    
-                    ctx.shadowBlur = 0; // reset
-                    ctx.shadowOffsetY = 0;
-                    ctx.strokeStyle = `${colors.contourBase}0.3)`;
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                });
-
-                // Target center marker
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
-                ctx.fillStyle = colors.text;
-                ctx.fill();
-            }
-
-            function drawPath() {
-                activeOptimizers.forEach(opt => {
-                    if (opt.path.length === 0) return;
-                    
-                    ctx.strokeStyle = opt.color;
-                    ctx.lineWidth = 2.5;
-                    ctx.lineJoin = 'round';
-                    ctx.lineCap = 'round';
-                    
-                    // Trace history
-                    ctx.beginPath();
-                    ctx.moveTo(mapX(opt.path[0].x), mapY(opt.path[0].y));
-                    for(let i=1; i<opt.path.length; i++) {
-                        ctx.lineTo(mapX(opt.path[i].x), mapY(opt.path[i].y));
-                    }
-                    ctx.stroke();
-
-                    // Draw current moving head
-                    const current = opt.path[opt.path.length - 1];
-                    ctx.beginPath();
-                    ctx.arc(mapX(current.x), mapY(current.y), 6, 0, Math.PI * 2);
-                    ctx.fillStyle = opt.color;
-                    ctx.shadowColor = opt.color;
-                    ctx.shadowBlur = 10;
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-                });
-            }
-
-            function draw() {
-                const colors = getThemeColors();
                 ctx.fillStyle = colors.bg;
-                ctx.fillRect(0, 0, width, height);
-                
-                drawContours();
-                drawPath();
-            }
+                ctx.fillRect(0, 0, w, h);
 
-            window.updateAndRedraw = draw; // Expose for theme toggler
+                ctx.save();
+                ctx.translate(translateX, translateY);
+                ctx.scale(scale, scale);
 
-            function resetOptimizers() {
-                const sel = optimizerSelect.value;
-                const keysToRun = sel === 'all' ? Object.keys(ALL_OPTIMIZERS) : [sel];
+                // Robust centering coordinates
+                const CX = w / (2 * scale);
+                const CY = h / (2 * scale) + 20;
                 
-                globalStepCount = 0;
-                simAccumulator = 0;
+                const cellW = 320;
+                const cellH = 220;
                 
-                activeOptimizers = keysToRun.map(key => {
-                    return {
-                        id: key,
-                        name: ALL_OPTIMIZERS[key].name,
-                        color: ALL_OPTIMIZERS[key].color,
-                        pos: { ...startPos },
-                        path: [{ ...startPos }],
-                        v: { x: 0, y: 0 },
-                        s: { x: 0, y: 0 },
-                        done: false,
-                        loss: f(startPos.x, startPos.y)
+                // Key locations
+                const yInputs = CY + 180;
+                const yOutputs = CY - 150;
+                const xLeft = CX - 220;
+                const xRight = CX + 220;
+
+                // Node locations
+                const yMerge = CY + 60;
+                const yTanh = CY;
+                const ySplit = CY - 50;
+
+                // 1. Draw Background Box
+                ctx.beginPath();
+                ctx.roundRect(CX - cellW/2, CY - cellH/2, cellW, cellH, 20);
+                ctx.fillStyle = colors.neuronFill;
+                ctx.fill();
+                ctx.strokeStyle = colors.neuronBorder;
+                ctx.lineWidth = 3 / scale;
+                ctx.setLineDash([]);
+                ctx.stroke();
+
+                // Abstract styling for background box
+                ctx.globalAlpha = 0.05;
+                ctx.beginPath();
+                for(let i=0; i<cellW; i+=20) {
+                    ctx.moveTo(CX - cellW/2 + i, CY - cellH/2);
+                    ctx.lineTo(CX - cellW/2 + i, CY + cellH/2);
+                }
+                ctx.strokeStyle = colors.text;
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+
+                // 2. Draw Static Lines & Paths
+                ctx.lineWidth = 2.5 / scale;
+                
+                // Path H_in
+                ctx.strokeStyle = colors.connection;
+                ctx.beginPath();
+                ctx.moveTo(xLeft, yMerge);
+                ctx.lineTo(CX, yMerge);
+                ctx.stroke();
+
+                // Path X_in
+                ctx.strokeStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.moveTo(CX, yInputs);
+                ctx.lineTo(CX, yMerge);
+                ctx.stroke();
+
+                // Path Merge to Tanh (combines both)
+                ctx.strokeStyle = colors.gateColor; // Mixed/Layer Path
+                ctx.beginPath();
+                ctx.moveTo(CX, yMerge);
+                ctx.lineTo(CX, yTanh);
+                ctx.stroke();
+                drawArrow(ctx, CX, yTanh + 20, -Math.PI/2, colors.gateColor);
+
+                // Path Tanh to Split
+                ctx.strokeStyle = colors.accent;
+                ctx.beginPath();
+                ctx.moveTo(CX, yTanh);
+                ctx.lineTo(CX, ySplit);
+                ctx.stroke();
+
+                // Path Split Right (H_out next step)
+                ctx.beginPath();
+                ctx.moveTo(CX, ySplit);
+                ctx.lineTo(xRight, ySplit);
+                ctx.stroke();
+                drawArrow(ctx, xRight - 5, ySplit, 0, colors.accent);
+
+                // Path Split Up (H_out prediction)
+                ctx.beginPath();
+                ctx.moveTo(CX, ySplit);
+                ctx.lineTo(CX, yOutputs);
+                ctx.stroke();
+                drawArrow(ctx, CX, yOutputs + 5, -Math.PI/2, colors.accent);
+
+
+                // 3. Draw Nodes (Gates and Ops)
+                // Concat Operation Node
+                drawOp(ctx, CX, yMerge, '+');
+                
+                // Tanh Layer Box
+                const gW = 80, gH = 40;
+                drawGate(ctx, CX, yTanh, gW, gH, colors.gateColor, 'Linear + Activation', 'tanh');
+
+
+                // 4. Draw Labels
+                ctx.fillStyle = colors.text;
+                ctx.font = `bold 14px 'JetBrains Mono'`;
+                ctx.textAlign = 'center';
+                
+                // Inputs
+                ctx.fillStyle = '#3b82f6';
+                ctx.fillText(`X_t (${inputSize})`, CX + 40, yInputs - 20);
+                
+                ctx.fillStyle = colors.accent;
+                ctx.fillText(`H_{t-1} (${hiddenSize})`, xLeft + 40, yMerge - 15);
+                
+                // Outputs
+                ctx.fillStyle = colors.accent;
+                ctx.fillText(`H_t (${hiddenSize})`, CX + 45, yOutputs + 20);
+                ctx.fillText(`H_t (${hiddenSize})`, xRight - 40, ySplit - 15);
+
+
+                // --- 5. ANIMATION LAYER ---
+                if(isSimulating) {
+                    let phase = simProgress * 3; // Map 0-1 to 0-3 phases
+                    const getP = (ph) => Math.max(0, Math.min(1, phase - ph));
+                    
+                    // Phase 0: Inputs -> Merge Bus
+                    let p0 = getP(0);
+                    if (p0 > 0 && phase < 1.5) {
+                        drawDotOnPath(ctx, [[xLeft, yMerge], [CX, yMerge]], p0, colors.accent); // H in
+                        drawDotOnPath(ctx, [[CX, yInputs], [CX, yMerge]], p0, '#3b82f6'); // X in
+                        simStatus.textContent = "1. Receiving Inputs";
                     }
-                });
 
-                updateStats();
-                draw();
-            }
-
-            function updateStats() {
-                let html = '';
-                
-                if (activeOptimizers.length === 1) {
-                    const opt = activeOptimizers[0];
-                    html = `
-                        <div class="flex justify-between text-[10px] uppercase font-bold opacity-70 mb-1" style="color: var(--text-main)">
-                            <span>Optimizer</span>
-                            <span class="mono-font" style="color: ${opt.color}">${opt.name}</span>
-                        </div>
-                        <div class="flex justify-between text-[10px] uppercase font-bold opacity-70 mb-3" style="color: var(--text-main)">
-                            <span>Iteration Step</span>
-                            <span class="mono-font text-blue-500">${globalStepCount}</span>
-                        </div>
-                        <div class="h-px w-full mb-3" style="background: var(--border-subtle)"></div>
-                        <div class="flex justify-between items-center text-[10px] uppercase font-bold text-indigo-500 mb-1">
-                            <span>Weight 1 (X)</span>
-                            <span class="mono-font" style="color: var(--text-main)">${opt.pos.x.toFixed(3)}</span>
-                        </div>
-                        <div class="flex justify-between items-center text-[10px] uppercase font-bold text-purple-500 mb-3">
-                            <span>Weight 2 (Y)</span>
-                            <span class="mono-font" style="color: var(--text-main)">${opt.pos.y.toFixed(3)}</span>
-                        </div>
-                        <div class="h-px w-full mb-3" style="background: var(--border-subtle)"></div>
-                        <div class="flex justify-between items-center text-[10px] uppercase font-bold text-orange-500">
-                            <span>Current Loss</span>
-                            <span class="mono-font text-sm font-bold px-1 rounded" style="background: rgba(249, 115, 22, 0.1); color: #f97316;">${opt.loss.toFixed(4)}</span>
-                        </div>
-                    `;
-                } else {
-                    // Leaderboard Mode
-                    html = `
-                        <div class="flex justify-between text-[10px] uppercase font-bold opacity-70 mb-3" style="color: var(--text-main)">
-                            <span>Iteration Step</span>
-                            <span class="mono-font text-blue-500">${globalStepCount}</span>
-                        </div>
-                        <div class="space-y-2">
-                    `;
-                    // Sort by loss ascending
-                    let sortedOps = [...activeOptimizers].sort((a,b) => a.loss - b.loss);
-                    sortedOps.forEach(opt => {
-                        let isWinner = opt.loss < 0.005;
-                        html += `
-                            <div class="flex justify-between items-center p-2 rounded" style="background: var(--input-bg); border: 1px solid var(--border-subtle);">
-                                <span class="text-xs font-bold" style="color: ${opt.color}">${opt.name}</span>
-                                <div class="flex items-center gap-2">
-                                    ${isWinner ? '<i class="fas fa-crown text-yellow-500 text-[10px]"></i>' : ''}
-                                    <span class="mono-font text-xs font-bold ${isWinner ? 'text-green-500' : 'opacity-70'}" style="${!isWinner ? 'color: var(--text-main)' : ''}">${opt.loss.toFixed(4)}</span>
-                                </div>
-                            </div>
-                        `;
-                    });
-                    html += `</div>`;
-                }
-                
-                statsPanel.innerHTML = html;
-            }
-
-            function mathStep(opt, lr) {
-                if (opt.done) return;
-                
-                const gx = gradX(opt.pos.x);
-                const gy = gradY(opt.pos.y);
-
-                if (opt.id === 'sgd') {
-                    opt.pos.x -= lr * gx;
-                    opt.pos.y -= lr * gy;
-                } 
-                else if (opt.id === 'momentum') {
-                    opt.v.x = beta1 * opt.v.x + (1 - beta1) * gx;
-                    opt.v.y = beta1 * opt.v.y + (1 - beta1) * gy;
-                    opt.pos.x -= lr * opt.v.x;
-                    opt.pos.y -= lr * opt.v.y;
-                }
-                else if (opt.id === 'rmsprop') {
-                    opt.s.x = beta2 * opt.s.x + (1 - beta2) * (gx * gx);
-                    opt.s.y = beta2 * opt.s.y + (1 - beta2) * (gy * gy);
-                    opt.pos.x -= (lr / (Math.sqrt(opt.s.x) + epsilon)) * gx;
-                    opt.pos.y -= (lr / (Math.sqrt(opt.s.y) + epsilon)) * gy;
-                }
-                else if (opt.id === 'adam') {
-                    opt.v.x = beta1 * opt.v.x + (1 - beta1) * gx;
-                    opt.v.y = beta1 * opt.v.y + (1 - beta1) * gy;
-                    
-                    opt.s.x = beta2 * opt.s.x + (1 - beta2) * (gx * gx);
-                    opt.s.y = beta2 * opt.s.y + (1 - beta2) * (gy * gy);
-                    
-                    let t = globalStepCount + 1;
-                    let v_hat_x = opt.v.x / (1 - Math.pow(beta1, t));
-                    let v_hat_y = opt.v.y / (1 - Math.pow(beta1, t));
-                    let s_hat_x = opt.s.x / (1 - Math.pow(beta2, t));
-                    let s_hat_y = opt.s.y / (1 - Math.pow(beta2, t));
-
-                    opt.pos.x -= (lr / (Math.sqrt(s_hat_x) + epsilon)) * v_hat_x;
-                    opt.pos.y -= (lr / (Math.sqrt(s_hat_y) + epsilon)) * v_hat_y;
-                }
-
-                opt.loss = f(opt.pos.x, opt.pos.y);
-                opt.path.push({ ...opt.pos });
-
-                // Bounds / Convergence
-                if (Math.abs(opt.pos.x) > 30 || Math.abs(opt.pos.y) > 30) opt.done = true; // Blown up
-                if (opt.loss < 0.001) opt.done = true; // Reached center
-            }
-
-            function stepAll() {
-                const lr = parseFloat(lrInput.value);
-                let allDone = true;
-                
-                activeOptimizers.forEach(opt => {
-                    mathStep(opt, lr);
-                    if (!opt.done) allDone = false;
-                });
-                
-                globalStepCount++;
-                
-                // Stop system if everyone is done or we went too long
-                if (allDone || globalStepCount > 2000) {
-                    stopAnimation();
-                }
-            }
-
-            function animationLoop() {
-                if (!isAnimating) return;
-                
-                if (!isPaused) {
-                    // Fractional speed accumulator allowing slow-motion or fast-forward
-                    const speed = parseFloat(speedInput.value);
-                    simAccumulator += speed;
-                    
-                    while(simAccumulator >= 1 && !isPaused) {
-                        stepAll();
-                        simAccumulator -= 1;
+                    // Phase 1: Merge Bus -> Tanh -> Split
+                    let p1 = getP(1);
+                    if (p1 > 0 && phase < 2.5) {
+                        drawDotOnPath(ctx, [[CX, yMerge], [CX, yTanh], [CX, ySplit]], p1, colors.gateColor);
+                        simStatus.textContent = "2. Calculating State (tanh)";
                     }
-                    updateStats();
-                    draw();
+
+                    // Phase 2: Split -> Outputs
+                    let p2 = getP(2);
+                    if (p2 > 0) {
+                        drawDotOnPath(ctx, [[CX, ySplit], [xRight, ySplit]], p2, colors.accent); // H right
+                        drawDotOnPath(ctx, [[CX, ySplit], [CX, yOutputs]], p2, colors.accent); // H up
+                        simStatus.textContent = "3. Emitting New State (H_t)";
+                    }
+                }
+
+                ctx.restore();
+            }
+
+            function drawGate(ctx, x, y, w, h, bg, name, symbol) {
+                const colors = getThemeColors();
+                ctx.beginPath();
+                ctx.roundRect(x - w/2, y - h/2, w, h, 8);
+                ctx.globalAlpha = 0.2;
+                ctx.fillStyle = bg;
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+                ctx.strokeStyle = bg;
+                ctx.lineWidth = 2 / scale;
+                ctx.stroke();
+
+                ctx.fillStyle = colors.text;
+                ctx.font = `bold 16px 'JetBrains Mono'`;
+                ctx.fillText(symbol, x, y - 2);
+                ctx.font = `10px 'JetBrains Mono'`;
+                ctx.fillStyle = bg;
+                ctx.fillText(name, x, y + 12);
+            }
+
+            function drawOp(ctx, x, y, symbol) {
+                const colors = getThemeColors();
+                ctx.beginPath();
+                ctx.arc(x, y, 14, 0, Math.PI*2);
+                ctx.fillStyle = colors.bg;
+                ctx.fill();
+                ctx.strokeStyle = colors.text;
+                ctx.lineWidth = 1.5 / scale;
+                ctx.stroke();
+                
+                ctx.fillStyle = colors.text;
+                ctx.font = `bold 18px 'JetBrains Mono'`;
+                ctx.fillText(symbol, x, y + 1);
+            }
+
+            function drawArrow(ctx, x, y, angle, color) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(angle);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(-8, -4);
+                ctx.lineTo(-8, 4);
+                ctx.closePath();
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Flawless multi-segment corner-following dot rendering
+            function drawDotOnPath(ctx, path, p, color) {
+                p = Math.max(0, Math.min(1, p));
+                if(p === 0) return; 
+                
+                let totalLen = 0;
+                let lengths = [];
+                for(let i=0; i<path.length-1; i++) {
+                    let dx = path[i+1][0] - path[i][0];
+                    let dy = path[i+1][1] - path[i][1];
+                    let len = Math.sqrt(dx*dx + dy*dy);
+                    lengths.push(len);
+                    totalLen += len;
                 }
                 
-                if (isAnimating) {
-                    animationFrameId = requestAnimationFrame(animationLoop);
+                let targetLen = totalLen * p;
+                let currentLen = 0;
+                let cx = path[0][0], cy = path[0][1];
+                
+                for(let i=0; i<path.length-1; i++) {
+                    if (currentLen + lengths[i] >= targetLen) {
+                        let segmentP = (targetLen - currentLen) / lengths[i];
+                        cx = path[i][0] + (path[i+1][0] - path[i][0]) * segmentP;
+                        cy = path[i][1] + (path[i+1][1] - path[i][1]) * segmentP;
+                        break;
+                    }
+                    currentLen += lengths[i];
                 }
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, 8 / scale, 0, Math.PI*2);
+                ctx.fillStyle = color;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.shadowBlur = 0;
             }
 
-            function startAnimation() {
-                if (isAnimating && !isPaused) return;
-                
-                // If everything finished, reset automatically
-                if (activeOptimizers.every(o => o.done)) resetOptimizers();
+            // SIMULATION ENGINE
+            function simLoop(timestamp) {
+                if (!isSimulating) return;
+                if (!lastSimTime) lastSimTime = timestamp;
+                const dt = timestamp - lastSimTime;
+                lastSimTime = timestamp;
 
-                isAnimating = true;
-                isPaused = false;
-                animateBtn.innerHTML = '<i class="fas fa-stop text-xs"></i> <span>Stop Training</span>';
-                animateBtn.classList.add('active');
-                pauseBtn.classList.remove('hidden');
-                pauseBtn.innerHTML = '<i class="fas fa-pause text-xs"></i> <span>Pause</span>';
-                
-                animationLoop();
+                // Cap DT so if tab is hidden, it doesn't instantly jump to complete
+                const safeDt = Math.min(dt, 100); 
+
+                simProgress += safeDt / 4000; // 4 seconds for a full loop in simple RNN
+
+                if (simProgress >= 1.0) {
+                    stopSimulation();
+                    simStatus.textContent = "Flow Complete!";
+                    drawCell();
+                    return;
+                }
+
+                drawCell();
+                requestAnimationFrame(simLoop);
             }
 
-            function stopAnimation() {
-                isAnimating = false;
-                isPaused = false;
-                animateBtn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Start Training</span>';
-                animateBtn.classList.remove('active');
-                pauseBtn.classList.add('hidden');
-                if (animationFrameId) cancelAnimationFrame(animationFrameId);
-                updateStats();
-                draw();
+            function stopSimulation() {
+                isSimulating = false;
+                lastSimTime = 0;
+                simPlayIcon.className = "fas fa-play";
+                simPlayText.textContent = "Restart Flow";
+                simPlayBtn.classList.remove('viz-btn-danger', 'bg-red-600', 'hover:bg-red-500');
+                simPlayBtn.classList.add('viz-btn-primary', 'bg-indigo-600', 'hover:bg-indigo-500');
             }
 
-            // Canvas Click to set start point
-            canvas.addEventListener('mousedown', (e) => {
+            function startSimulation() {
+                isSimulating = true;
+                simProgress = 0;
+                lastSimTime = 0;
+                simPlayIcon.className = "fas fa-stop";
+                simPlayText.textContent = "Stop Flow";
+                simPlayBtn.classList.remove('viz-btn-primary', 'bg-indigo-600', 'hover:bg-indigo-500');
+                simPlayBtn.classList.add('viz-btn-danger', 'bg-red-600', 'hover:bg-red-500');
+                requestAnimationFrame(simLoop);
+            }
+
+            simPlayBtn.addEventListener('click', () => {
+                if (isSimulating) {
+                    stopSimulation();
+                    simProgress = 0;
+                    simStatus.textContent = "Simulation Stopped.";
+                    drawCell();
+                }
+                else startSimulation();
+            });
+
+            // Parameters Math for Standard RNN Cell
+            function calculateParams() {
+                const whx = inputSize * hiddenSize; 
+                const whh = hiddenSize * hiddenSize; 
+                const bh = hiddenSize;                 
+                return { whx, whh, bh, total: whx + whh + bh };
+            }
+
+            // Global redraw
+            window.updateAndRedraw = function() {
+                drawCell();
+            };
+
+            function resetView() {
                 const rect = canvas.getBoundingClientRect();
-                const cx = e.clientX - rect.left;
-                const cy = e.clientY - rect.top;
+                const vW = 800, vH = 600; // Virtual design space
                 
-                startPos = {
-                    x: unmapX(cx),
-                    y: unmapY(cy)
-                };
+                let w = rect.width || 800;
+                let h = rect.height || 600;
                 
-                stopAnimation();
-                resetOptimizers();
+                const sX = w / vW;
+                const sY = h / vH;
+                scale = Math.min(sX, sY, 1.5) * 0.9;
+                
+                // Fallback catch to prevent zoom crashing coordinates 
+                if (scale < 0.1) scale = 0.5;
+                
+                translateX = 0; 
+                translateY = 0;
+                
+                drawCell();
+            }
+
+            // Interaction Panning/Zooming
+            canvas.addEventListener('mousedown', e => {
+                isDragging = true;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                canvas.classList.add('grabbing');
             });
 
-            // UI Listeners
-            animateBtn.addEventListener('click', () => {
-                if (isAnimating) stopAnimation();
-                else startAnimation();
-            });
-
-            pauseBtn.addEventListener('click', () => {
-                isPaused = !isPaused;
-                if (isPaused) {
-                    pauseBtn.innerHTML = '<i class="fas fa-play text-xs"></i> <span>Resume</span>';
-                } else {
-                    pauseBtn.innerHTML = '<i class="fas fa-pause text-xs"></i> <span>Pause</span>';
+            window.addEventListener('mousemove', e => {
+                if(isDragging) {
+                    const dx = e.clientX - lastX;
+                    const dy = e.clientY - lastY;
+                    translateX += dx;
+                    translateY += dy;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                    drawCell();
                 }
             });
 
-            resetPathBtn.addEventListener('click', () => {
-                stopAnimation();
-                resetOptimizers();
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+                canvas.classList.remove('grabbing');
             });
 
-            optimizerSelect.addEventListener('change', () => {
-                const isAll = optimizerSelect.value === 'all';
-                optimizerSelect.classList.toggle('font-bold', isAll);
-                if (isAll) {
-                    optimizerSelect.style.background = 'var(--bg-surface)';
-                } else {
-                    optimizerSelect.style.background = '';
-                }
+            canvas.addEventListener('wheel', e => {
+                e.preventDefault();
+                const zoom = 1.1;
+                const dir = e.deltaY < 0 ? 1 : -1;
+                const factor = dir > 0 ? zoom : 1/zoom;
                 
-                stopAnimation();
-                resetOptimizers();
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                
+                const newScale = Math.max(0.1, Math.min(5, scale * factor));
+                
+                translateX = mx - (mx - translateX) * (newScale / scale);
+                translateY = my - (my - translateY) * (newScale / scale);
+                scale = newScale;
+                
+                drawCell();
+            });
+
+            function updateFromInputs() {
+                if(isSimulating) stopSimulation();
+                simProgress = 0;
+                simStatus.textContent = "Data Updated. Ready.";
+                try {
+                    const inp = parseInt(inputSizeEl.value);
+                    const hid = parseInt(hiddenSizeEl.value);
+                    if(inp>0 && hid>0) {
+                        inputSize = Math.min(inp, 100);
+                        hiddenSize = Math.min(hid, 100);
+                        updateAndRedraw(); 
+                    }
+                } catch(e) {}
+            }
+
+            inputSizeEl.addEventListener('input', updateFromInputs);
+            hiddenSizeEl.addEventListener('input', updateFromInputs);
+
+            centerCanvasBtn.addEventListener('click', resetView);
+
+            calculateBtn.addEventListener('click', () => {
+                const modal = document.getElementById('calculationResultModal');
+                const tbody = document.getElementById('calc-table-body');
+                const params = calculateParams();
+                
+                tbody.innerHTML = `
+                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
+                        <td class="p-3 font-bold text-blue-400">W_hx</td>
+                        <td class="p-3">Input $\\to$ Hidden State</td>
+                        <td class="p-3">${inputSize} &times; ${hiddenSize}</td>
+                        <td class="p-3 text-right font-bold text-blue-400">${params.whx}</td>
+                    </tr>
+                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
+                        <td class="p-3 font-bold text-green-400">W_hh</td>
+                        <td class="p-3">Hidden $\\to$ Hidden State</td>
+                        <td class="p-3">${hiddenSize} &times; ${hiddenSize}</td>
+                        <td class="p-3 text-right font-bold text-green-400">${params.whh}</td>
+                    </tr>
+                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
+                        <td class="p-3 font-bold text-gray-400">b_h</td>
+                        <td class="p-3">Bias Vector</td>
+                        <td class="p-3">${hiddenSize}</td>
+                        <td class="p-3 text-right font-bold text-gray-400">${params.bh}</td>
+                    </tr>
+                `;
+                
+                document.getElementById('totalParamsResult').textContent = params.total.toLocaleString();
+                
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+
+                if (window.MathJax && window.MathJax.typesetPromise) {
+                    window.MathJax.typesetPromise([tbody]).catch(()=>console.log('MathJax Error'));
+                }
+            });
+
+            document.getElementById('closeCalcModalBtn').addEventListener('click', () => {
+                document.getElementById('calculationResultModal').classList.add('hidden');
+                document.getElementById('calculationResultModal').classList.remove('flex');
+            });
+
+            window.addEventListener('resize', () => {
+                drawCell();
+                resetView();
             });
             
-            lrInput.addEventListener('change', () => {
-                stopAnimation();
-                resetOptimizers();
-            });
-
-            speedInput.addEventListener('input', (e) => {
-                speedValue.textContent = parseFloat(e.target.value).toFixed(1) + 'x';
-            });
-
-            // Init
-            resize();
-            resetOptimizers();
+            // Initialization
+            setTimeout(resetView, 100); 
         });
 
         // ===== DROPDOWN SEARCH FUNCTIONALITY =====
@@ -991,7 +1071,7 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
             { title: "Counting Sort", path: "dsa/counting_sort.html", category: "dsa", icon: "fa-layer-group" },
             { title: "Depth First Search", path: "dsa/depth_first_search.html", category: "dsa", icon: "fa-layer-group" },
             { title: "Python Dictionary Lab", path: "dsa/dictionaries_in_python.html", category: "dsa", icon: "fa-layer-group" },
-            { title: "Dijkstra\u2019s Algorithm", path: "dsa/dijkstras.html", category: "dsa", icon: "fa-layer-group" },
+            { title: "Dijkstra’s Algorithm", path: "dsa/dijkstras.html", category: "dsa", icon: "fa-layer-group" },
             { title: "Fibonacci Search", path: "dsa/fibonacci_search.html", category: "dsa", icon: "fa-layer-group" },
             { title: "Insertion Sort", path: "dsa/insertion_sort.html", category: "dsa", icon: "fa-layer-group" },
             { title: "Interpolation Search", path: "dsa/interpolation_search.html", category: "dsa", icon: "fa-layer-group" },
@@ -1076,8 +1156,19 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value.toLowerCase().trim();
-                if (query.length === 0) { dropdown.classList.remove('show'); return; }
-                const filtered = resolvedCourses.filter(c => c.title.toLowerCase().includes(query) || c.category.toLowerCase().includes(query));
+                
+                if (query.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                // Filter courses
+                const filtered = resolvedCourses.filter(course => 
+                    course.title.toLowerCase().includes(query) || 
+                    course.category.toLowerCase().includes(query)
+                );
+
+                // Render results
                 if (filtered.length === 0) {
                     dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
                 } else {
@@ -1085,15 +1176,32 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
                         <a href="${course.path}" class="search-dropdown-item" style="text-decoration: none;">
                             <div style="display: flex; align-items: center;">
                                 <i class="fas ${course.icon} dropdown-item-icon"></i>
-                                <div><div class="dropdown-item-title">${course.title}</div><div class="dropdown-item-path">${course.category.toUpperCase()}</div></div>
+                                <div>
+                                    <div class="dropdown-item-title">${course.title}</div>
+                                    <div class="dropdown-item-path">${course.category.toUpperCase()}</div>
+                                </div>
                             </div>
                             <i class="fas fa-arrow-right" style="color: var(--accent-primary); opacity: 0.5;"></i>
-                        </a>`).join('');
+                        </a>
+                    `).join('');
                 }
+
                 dropdown.classList.add('show');
             });
-            document.addEventListener('click', (e) => { if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show'); });
-            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dropdown.classList.remove('show'); });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+            // Close dropdown on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
         }
     </script>
 </body>

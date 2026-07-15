@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VizLearn - Neural Network Visualizer</title>
-    <meta name="description" content="Learn Neural Network Visualizer with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn.">
-    <meta name="keywords" content="Neural Network Visualizer, interactive learning, beginner tutorial, vizlearn">
+    <title>VizLearn - What is LSTM?</title>
+    <meta name="description" content="Learn what an LSTM cell is with a beginner-friendly interactive visualization of its internal gates, memory states, and data flow.">
+    <meta name="keywords" content="What is LSTM, Long Short-Term Memory, interactive learning, beginner tutorial, vizlearn, neural networks">
     <meta name="robots" content="index, follow">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -43,6 +43,7 @@
                     animation: {
                         'grid-flow': 'grid-move 20s linear infinite',
                         'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'bounce-slight': 'bounceSlight 2s infinite',
                     },
                     keyframes: {
                         'grid-move': {
@@ -52,6 +53,10 @@
                         fadeIn: {
                             '0%': { opacity: '0', transform: 'translateY(10px)' },
                             '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        bounceSlight: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-5px)' },
                         }
                     }
                 }
@@ -68,6 +73,9 @@
             --border-glow: rgba(74, 222, 128, 0.5);
             --accent-primary: #4ade80;
             --accent-glow: rgba(74, 222, 128, 0.25);
+            --cell-state: #06b6d4; /* Cyan for Cell State */
+            --cell-state-glow: rgba(6, 182, 212, 0.25);
+            --gate-color: #f59e0b; /* Amber for Gates */
             --text-main: #f0fdf4;
             --text-muted: #86efac;
             --card-bg: #0a0a0a;
@@ -80,7 +88,8 @@
             --canvas-bg: #0a0a0a;
             --neuron-fill: #111827;
             --neuron-border: rgba(74, 222, 128, 0.5);
-            --connection-line: rgba(74, 222, 128, 0.2);
+            --connection-line: rgba(74, 222, 128, 0.4);
+            --connection-cell: rgba(6, 182, 212, 0.5);
         }
 
         body.light-mode {
@@ -91,6 +100,9 @@
             --border-glow: rgba(22, 163, 74, 0.4);
             --accent-primary: #15803d;
             --accent-glow: rgba(21, 128, 61, 0.2);
+            --cell-state: #0891b2;
+            --cell-state-glow: rgba(8, 145, 178, 0.2);
+            --gate-color: #b45309; 
             --text-main: #052e16;
             --text-muted: #4b5563;
             --card-bg: #ffffff;
@@ -102,8 +114,9 @@
             /* Canvas Specifics - Light Mode Contrast Fix */
             --canvas-bg: #f8fafc;
             --neuron-fill: #ffffff;
-            --neuron-border: #15803d; /* Dark green border for visibility */
-            --connection-line: rgba(21, 128, 61, 0.4); /* Darker, visible lines */
+            --neuron-border: #15803d; 
+            --connection-line: rgba(21, 128, 61, 0.5); 
+            --connection-cell: rgba(8, 145, 178, 0.6);
         }
 
         *, *::before, *::after {
@@ -139,7 +152,6 @@
         
         .toolbar-container {
             background-color: var(--bg-surface);
-            border-top: 1px solid var(--border-subtle);
             border-bottom: 1px solid var(--border-subtle);
             padding: 0.75rem 1.5rem;
             z-index: 40;
@@ -153,18 +165,11 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        .calc-card {
-            background: var(--input-bg);
-            border: 1px solid var(--border-subtle);
-            border-radius: 10px;
-            padding: 16px;
-        }
-
         .floating-panel {
             position: absolute;
             top: 1rem;
             right: 1rem;
-            width: 260px;
+            width: 270px;
             background-color: var(--bg-surface);
             border: 1px solid var(--border-subtle);
             border-radius: 12px;
@@ -175,7 +180,6 @@
         }
         .floating-panel:hover { opacity: 1; }
         
-        /* Input Styling */
         .viz-input {
             background: var(--input-bg);
             border: 1px solid var(--border-subtle);
@@ -192,7 +196,6 @@
             outline: none;
         }
 
-        /* Buttons */
         .viz-btn {
             font-family: 'Space Grotesk', sans-serif;
             font-weight: 500;
@@ -241,32 +244,6 @@
             margin-bottom: 0.5rem;
         }
 
-        #contextMenu {
-            display: none;
-            position: absolute;
-            z-index: 1000;
-            background-color: var(--bg-surface);
-            border: 1px solid var(--border-subtle);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            border-radius: 0.5rem;
-            min-width: 160px;
-        }
-        
-        .ctx-item {
-            padding: 0.5rem 1rem;
-            color: var(--text-main);
-            font-size: 0.875rem;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            text-align: left;
-            width: 100%;
-            border: none;
-            background: none;
-        }
-        .ctx-item:hover { background-color: var(--input-focus-bg); color: var(--accent-primary); }
-        .ctx-item.danger:hover { color: #ef4444; }
-        .ctx-separator { border-top: 1px solid var(--border-subtle); margin: 0.25rem 0; }
-
         .modal {
             background-color: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(4px);
@@ -282,108 +259,28 @@
         ::-webkit-scrollbar-track { background: var(--bg-body); }
         ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
-    
-        /* Search Input Wrapper */
-        .search-input-wrapper {
-            background: var(--input-bg);
-            border: 1px solid var(--border-subtle);
-            position: relative;
-        }
-        .search-input-wrapper:focus-within {
-            background: var(--input-focus-bg);
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 15px var(--accent-glow);
-        }
-        .search-input-wrapper input {
-            color: var(--text-main);
-        }
-        .search-input-wrapper input::placeholder {
-            color: var(--text-muted);
-            opacity: 0.7;
-        }
-        .search-input-wrapper i {
-            color: var(--accent-primary);
-            opacity: 0.7;
-        }
 
-        /* Dropdown Search */
-        .search-dropdown {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: var(--card-bg);
-            border: 1px solid var(--border-subtle);
-            border-top: none;
-            border-radius: 0 0 12px 12px;
-            max-height: 400px;
-            overflow-y: auto;
-            z-index: 100;
-            display: none;
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
-        }
+        /* Legend specific to LSTM */
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 10px; opacity: 0.8; }
+        .legend-color { width: 10px; height: 10px; border-radius: 2px; }
 
-        .search-dropdown.show {
-            display: block;
-            animation: slideDown 0.2s ease-out;
-        }
+        /* Search Dropdown Styles */
+        .search-input-wrapper { background: var(--input-bg); border: 1px solid var(--border-subtle); position: relative; }
+        .search-input-wrapper:focus-within { background: var(--input-focus-bg); border-color: var(--accent-primary); box-shadow: 0 0 15px var(--accent-glow); }
+        .search-input-wrapper input { color: var(--text-main); }
+        .search-input-wrapper input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .search-input-wrapper i { color: var(--accent-primary); opacity: 0.7; }
+        .search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--card-bg); border: 1px solid var(--border-subtle); border-top: none; border-radius: 0 0 12px 12px; max-height: 400px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3); }
+        .search-dropdown.show { display: block; animation: slideDown 0.2s ease-out; }
+        .search-dropdown-item { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: space-between; color: inherit; text-decoration: none; }
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        .dropdown-item-title { font-weight: 500; color: var(--text-main); }
+        .dropdown-item-path { font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; }
+        .dropdown-item-icon { color: var(--accent-primary); margin-right: 8px; font-size: 0.875rem; }
+        .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
 
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .search-dropdown-item {
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border-subtle);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            color: inherit;
-            text-decoration: none;
-        }
-
-        .search-dropdown-item:last-child {
-            border-bottom: none;
-        }
-
-        .search-dropdown-item:hover {
-            background: var(--input-focus-bg);
-            padding-left: 20px;
-        }
-
-        .dropdown-item-title {
-            font-weight: 500;
-            color: var(--text-main);
-        }
-
-        .dropdown-item-path {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-left: 12px;
-        }
-
-        .dropdown-item-icon {
-            color: var(--accent-primary);
-            margin-right: 8px;
-            font-size: 0.875rem;
-        }
-
-        .dropdown-no-results {
-            padding: 20px 16px;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 0.875rem;
-        }
-
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
@@ -391,10 +288,8 @@
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-
         gtag('config', 'G-ZT6JM33V5J');
     </script>
-
 </head>
 <body class="flex flex-col min-h-screen overflow-x-hidden">
 
@@ -402,29 +297,21 @@
     <header class="glass-header sticky top-0 z-50 shrink-0">
         <div class="flex justify-center py-3 px-4 md:px-8">
             <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
-                <!-- Logo -->
                 <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
                     <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
                     <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
                 </a>
                 
-                <!-- Search -->
                 <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
                     <i class="fas fa-search text-sm"></i>
                     <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
-                    <div id="searchDropdown" class="search-dropdown">
-                        <!-- Results will be populated here -->
-                    </div>
+                    <div id="searchDropdown" class="search-dropdown"></div>
                 </div>
 
-                <!-- Theme Toggle + Back Button -->
                 <div class="flex items-center gap-3">
-                    <!-- Back to Hub Button -->
                     <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
                         <i class="fas fa-arrow-left text-xs"></i>
                     </a>
-                    
-                    <!-- Theme Toggle -->
                     <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
                         <i class="fas fa-sun hidden dark-icon"></i>
                         <i class="fas fa-moon hidden light-icon"></i>
@@ -441,52 +328,45 @@
             <span>/</span>
             <span>Deep Learning</span>
         </div>
-        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Neural Network Visualizer</h1>
+        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">What is LSTM?</h1>
         <p class="mt-2 text-sm md:text-base max-w-2xl opacity-80" style="color: var(--text-muted)">
-            Interactive architecture builder. Drag to pan, scroll to zoom, right-click to edit.
+            Take a microscopic look inside a single <strong>Long Short-Term Memory</strong> cell. Visualize the internal architecture, the conveyor belt, and the four gates that control memory.
         </p>
     </div>
 
-    <!-- Toolbar -->
-    <div class="toolbar-container shrink-0 flex flex-wrap items-center gap-4 justify-between animate-fade-in">
-        <!-- Input Group -->
-        <div class="flex items-center gap-3 overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
-            <div class="flex items-center gap-2">
-                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Input Features</label>
-                <input type="number" id="inputFeatures" value="4" min="1" max="20" class="viz-input w-16 text-center">
+    <!-- Main Toolbars -->
+    <div class="shrink-0 animate-fade-in z-40 relative shadow-md">
+        <!-- Architecture Toolbar -->
+        <div class="toolbar-container flex flex-wrap items-center gap-4 justify-between border-t border-[var(--border-subtle)]">
+            <div class="flex items-center gap-3 overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
+                <div class="flex items-center gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-blue-400">Input Vector ($X_t$)</label>
+                    <input type="number" id="inputSize" value="4" min="1" max="50" class="viz-input w-16 text-center border-blue-500/50">
+                </div>
+                <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
+                <div class="flex items-center gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-accent-primary" style="color: var(--accent-primary)">State Size ($H_t$ & $C_t$)</label>
+                    <input type="number" id="hiddenSize" value="8" min="1" max="50" class="viz-input w-16 text-center border-green-500/50">
+                </div>
             </div>
-            
-            <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
-            
-            <div class="flex items-center gap-2">
-                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Hidden Layers</label>
-                <input type="text" id="hiddenLayers" value="8,8,8" placeholder="e.g. 8,16,8" class="viz-input w-36 text-center">
-            </div>
-            
-            <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
-            
-            <div class="flex items-center gap-2">
-                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Output Classes</label>
-                <input type="number" id="outputClasses" value="3" min="1" max="20" class="viz-input w-16 text-center">
+
+            <div class="flex items-center gap-2 ml-auto">
+                <button id="centerCanvasBtn" class="viz-btn viz-btn-secondary" title="Center View"><i class="fas fa-crosshairs"></i></button>
+                <button id="calculateBtn" class="viz-btn viz-btn-primary"><i class="fas fa-calculator mr-2"></i> Parameters</button>
             </div>
         </div>
 
-        <!-- Action Group -->
-        <div class="flex items-center gap-2 ml-auto">
-            <button id="centerCanvasBtn" class="viz-btn viz-btn-secondary" title="Center View">
-                <i class="fas fa-crosshairs"></i>
+        <!-- Data Simulation Toolbar -->
+        <div class="toolbar-container flex flex-wrap items-center justify-center gap-4 bg-black/10 py-4">
+            <button id="simPlayBtn" class="viz-btn viz-btn-primary bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.5)] flex items-center gap-2 whitespace-nowrap text-sm px-6 py-2">
+                <i class="fas fa-play" id="simPlayIcon"></i> <span id="simPlayText">Simulate Cell Operation</span>
             </button>
-            <button id="resetNetworkBtn" class="viz-btn viz-btn-secondary" title="Reset">
-                <i class="fas fa-undo"></i>
-            </button>
-            <button id="calculateBtn" class="viz-btn viz-btn-primary">
-                <i class="fas fa-calculator mr-2"></i> Parameters
-            </button>
+            <div id="simStatus" class="mono-font text-xs opacity-70 font-bold tracking-widest uppercase w-48 text-center text-indigo-400">Waiting for Data...</div>
         </div>
     </div>
 
-    <!-- Canvas Area (Fixed Height to allow scrolling for the article below) -->
-    <div class="relative w-full h-[60vh] min-h-[500px] border-b shrink-0 overflow-hidden animate-fade-in" style="border-color: var(--border-subtle); background: var(--canvas-bg);">
+    <!-- Canvas Area -->
+    <div class="relative w-full h-[65vh] min-h-[550px] border-b shrink-0 overflow-hidden animate-fade-in" style="border-color: var(--border-subtle); background: var(--canvas-bg);">
         <!-- Canvas -->
         <canvas id="canvas" class="block w-full h-full"></canvas>
 
@@ -494,121 +374,75 @@
         <div class="floating-panel p-4 flex flex-col gap-4 pointer-events-auto">
              <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
                  <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--accent-primary)">
-                    <i class="fas fa-chart-pie mr-2"></i> Analysis
+                    <i class="fas fa-microscope mr-2"></i> Internal Flow
                 </h3>
              </div>
              
-             <!-- Network Stats -->
-             <div class="grid grid-cols-2 gap-2">
-                 <div class="metric-card p-2 text-center">
-                     <span class="block text-[10px] uppercase opacity-60">Layers</span>
-                     <span id="totalLayers" class="font-bold mono-font text-sm" style="color: var(--text-main)">-</span>
-                 </div>
-                 <div class="metric-card p-2 text-center">
-                     <span class="block text-[10px] uppercase opacity-60">Neurons</span>
-                     <span id="totalNeurons" class="font-bold mono-font text-sm" style="color: var(--text-main)">-</span>
-                 </div>
-                 <div class="metric-card p-2 col-span-2 flex justify-between items-center px-3">
-                     <span class="text-[10px] uppercase opacity-60">Total Params</span>
-                     <span id="totalParameters" class="font-bold mono-font text-sm" style="color: var(--accent-primary)">-</span>
-                 </div>
+             <!-- Legend -->
+             <div class="flex flex-col gap-2 mt-1">
+                 <div class="legend-item"><div class="legend-color" style="background: var(--cell-state)"></div> <span class="font-bold text-xs">$C_{t-1} \to C_t$ (Cell State)</span></div>
+                 <div class="legend-item"><div class="legend-color" style="background: var(--accent-primary)"></div> <span class="font-bold text-xs">$H_{t-1} \to H_t$ (Hidden State)</span></div>
+                 <div class="legend-item"><div class="legend-color bg-blue-500"></div> <span class="font-bold text-xs">$X_t$ (New Input Data)</span></div>
+                 <div class="legend-item"><div class="legend-color" style="background: var(--gate-color)"></div> <span class="text-xs">Neural Network Gates (W)</span></div>
              </div>
 
-             <!-- Selected Info -->
-             <div>
-                 <h4 class="text-[10px] uppercase tracking-widest font-bold mb-2 opacity-50">Selection</h4>
-                 <div id="selectionInfo" class="metric-card p-3 text-xs leading-relaxed opacity-80 min-h-[40px] flex items-center">
-                     Hover over nodes for details.
-                 </div>
+             <div class="border-t border-[var(--border-subtle)] pt-3 mt-1">
+                 <div class="text-[10px] uppercase opacity-70 font-bold mb-1">Mathematical Operations</div>
+                 <div class="flex items-center gap-2 text-xs mb-1"><div class="w-4 h-4 rounded-full border border-current flex items-center justify-center opacity-80">$\times$</div> Pointwise Multiplication</div>
+                 <div class="flex items-center gap-2 text-xs"><div class="w-4 h-4 rounded-full border border-current flex items-center justify-center opacity-80">$+$</div> Pointwise Addition</div>
              </div>
-        </div>
-        
-        <!-- Context Menu -->
-        <div id="contextMenu">
-            <button id="ctxAddNeuron" class="ctx-item hidden"><i class="fas fa-plus mr-2 text-xs"></i> Add Neuron</button>
-            <button id="ctxRemoveNeuron" class="ctx-item hidden danger"><i class="fas fa-minus mr-2 text-xs"></i> Remove Neuron</button>
-            <div id="ctxSeparator1" class="ctx-separator hidden"></div>
-            <button id="ctxEditFeatures" class="ctx-item hidden"><i class="fas fa-pen mr-2 text-xs"></i> Edit Features</button>
-            <button id="ctxEditLabels" class="ctx-item hidden"><i class="fas fa-pen mr-2 text-xs"></i> Edit Labels</button>
-            <button id="ctxAddLayer" class="ctx-item hidden"><i class="fas fa-layer-group mr-2 text-xs"></i> Add Layer After</button>
-            <button id="ctxRemoveLayer" class="ctx-item hidden danger"><i class="fas fa-trash mr-2 text-xs"></i> Remove Layer</button>
-            <button id="ctxEditNeurons" class="ctx-item hidden"><i class="fas fa-edit mr-2 text-xs"></i> Edit Count</button>
         </div>
     </div>
 
-    <!-- auto-article-vizlearn -->
-    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
+    <!-- Article -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full mt-8">
         <div class="card-container animate-fade-in">
-            <div class="card-header">
-                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Neural Network Visualizer: Detailed Beginner Guide</h2>
-                <p class="mt-2 text-sm" style="color: var(--text-muted)">Work through this article while testing controls above for stronger understanding.</p>
+            <div class="card-header p-5 md:p-7 border-b" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Inside the LSTM: Unpacking the Cell</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">The internal architecture of a Long Short-Term Memory cell is designed to act like a smart computer memory module. It decides what to remember, what to forget, and what to output.</p>
             </div>
-            <div class="p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <div class="p-4 rounded border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-base md:text-lg font-bold mb-2" style="color: var(--accent-primary)">Quick Context</h3>
-                    <p><strong>Neural Network Visualizer</strong> belongs to <strong>deep learning</strong>. Build intuition first, then precision.</p>
+            <div class="p-5 md:p-7 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
+                
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--cell-state)"><i class="fas fa-conveyor-belt"></i>The Core Idea: The Cell State</h3>
+                    <p>The key to LSTMs is the <strong>Cell State ($C_t$)</strong>, visualized as the horizontal line running across the top of the diagram. It acts like a conveyor belt.</p>
+                    <p class="mt-2">Information can flow along it easily with only minor linear interactions. The LSTM has the ability to remove or add information to this cell state, carefully regulated by structures called <strong>gates</strong>.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">1) Concept in Plain Words</h3>
-                    <p>Neural Network Visualizer is a deep learning building block connected to forward pass quality, gradient flow, and training stability.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">2) Where This Helps in Practice</h3>
-                    <p>This topic strongly influences convergence speed, generalization, and training reliability.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">3) Real Example</h3>
-                    <p>Start with a simple concrete example, then change one variable and observe what changes in behavior.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">4) Hands-On Flow with the Controls Above</h3>
-                    <ol class="list-decimal pl-5 space-y-2">
-                        <li>Run the default setup and note baseline output.</li>
-                        <li>Change exactly one control and observe only that effect.</li>
-                        <li>Repeat with a second test case to verify the pattern.</li>
-                        <li>Use reset and confirm you can reproduce the behavior.</li>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-project-diagram"></i>Step-by-Step Flow</h3>
+                    <p>When the simulation runs, watch the data flow through these sequential steps inside the cell:</p>
+                    <ol class="list-decimal pl-6 mt-4 space-y-4">
+                        <li>
+                            <strong style="color: var(--gate-color)">Concatenation:</strong> First, the new data ($X_t$) and the previous short-term memory ($H_{t-1}$) enter the cell from the bottom and are merged together. This combined vector will be fed into four distinct neural network layers (the gates).
+                        </li>
+                        <li>
+                            <strong style="color: var(--gate-color)">1. The Forget Gate ($f_t$):</strong> This layer outputs numbers between 0 and 1 using a Sigmoid function ($\sigma$). It looks at the merged inputs and decides what information we should throw away from the past Cell State. A '0' means "completely forget this", while a '1' means "completely keep this". 
+                            <br><span class="opacity-70 text-sm italic">Math: $f_t = \sigma(W_f \cdot [H_{t-1}, X_t] + b_f)$</span>
+                        </li>
+                        <li>
+                            <strong style="color: var(--gate-color)">2. The Input Gate ($i_t$) & Candidate ($\tilde{C}_t$):</strong> Two layers work together to decide what new information to store. The Input Gate ($\sigma$) decides <em>which</em> values to update. The Candidate layer ($tanh$) creates a vector of <em>new</em> candidate values. They are multiplied together to prepare an update.
+                            <br><span class="opacity-70 text-sm italic">Math: $i_t = \sigma(W_i \cdot [H_{t-1}, X_t] + b_i)$ and $\tilde{C}_t = \tanh(W_c \cdot [H_{t-1}, X_t] + b_c)$</span>
+                        </li>
+                        <li>
+                            <strong style="color: var(--cell-state)">3. Updating the Cell State:</strong> The old Cell State ($C_{t-1}$) is multiplied ($\times$) by the Forget Gate to drop old memories. Then, the new candidate data is added ($+$) to it. The conveyor belt has been successfully updated to $C_t$!
+                        </li>
+                        <li>
+                            <strong style="color: var(--gate-color)">4. The Output Gate ($o_t$):</strong> Finally, the cell decides what to output as the new short-term memory ($H_t$). It runs the updated Cell State through a $tanh$ function (to push values between -1 and 1) and multiplies it by the Output Gate's decision.
+                            <br><span class="opacity-70 text-sm italic">Math: $H_t = o_t \times \tanh(C_t)$</span>
+                        </li>
                     </ol>
                 </div>
 
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">5) Formula / Rule Focus</h3>
-                    <p>Relate this page to the training loop: forward pass -&gt; loss -&gt; gradient -&gt; parameter update.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">6) Pseudocode Thinking</h3>
-                    <div class="mono-font text-xs md:text-sm p-3 rounded border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update parameters<br>repeat
-                    </div>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">7) Complexity / Performance Note</h3>
-                    <p>In deep learning, practical cost scales with model width/depth, batch size, and number of epochs.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">8) Common Mistakes</h3>
-                    <ul class="list-disc pl-5 space-y-1">
-                        <li>Jumping to advanced settings without understanding the baseline behavior.</li>
-                        <li>Changing multiple parameters at once and misreading cause-effect.</li>
-                        <li>Ignoring edge cases and evaluating only one scenario.</li>
-                    </ul>
-                </div>
-
-                <div class="p-4 rounded border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-lg font-bold mb-2" style="color: var(--accent-primary)">9) Final Recap</h3>
-                    <p>Best learning loop: <strong>observe -> adjust one control -> compare -> explain -> verify</strong>.</p>
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-calculator"></i>The Parameter Cost</h3>
+                    <p>Because there are <strong>four</strong> distinct neural network layers inside this one cell (Forget, Input, Candidate, Output), an LSTM is much more computationally heavy than a standard RNN. Check the <span class="font-bold border px-2 py-1 rounded text-xs" style="border-color: var(--accent-primary); color: var(--accent-primary)">Parameters</span> button to see how the matrix dimensions are multiplied by 4.</p>
                 </div>
             </div>
         </div>
     </section>
 
-            <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+    <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
         <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
             <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
                 <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
@@ -619,27 +453,14 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
         </div>
     </footer>
 
-    <!-- Modals -->
-    
-    <!-- Edit Neuron Modal -->
-    <div id="editNeuronModal" class="modal fixed inset-0 hidden items-center justify-center z-[1001]">
-        <div class="modal-content p-6 rounded-xl w-full max-w-sm m-4">
-            <h3 id="editModalTitle" class="text-lg font-bold mb-4" style="color: var(--accent-primary)">Edit</h3>
-            <label id="editModalLabel" for="edit-neuron-count" class="block text-xs font-bold uppercase mb-2 opacity-70">Value</label>
-            <input type="number" id="edit-neuron-count" class="viz-input mb-4" min="1" max="1000">
-            <p id="editNeuronError" class="text-red-500 text-xs mb-4 hidden"></p>
-            <div class="flex justify-end gap-3">
-                <button id="cancelEditBtn" class="viz-btn viz-btn-secondary px-4 py-2 text-xs">Cancel</button>
-                <button id="saveEditBtn" class="viz-btn viz-btn-primary px-4 py-2 text-xs">Save</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Calculation Modal -->
     <div id="calculationResultModal" class="modal fixed inset-0 hidden items-center justify-center z-[1001]">
         <div class="modal-content p-6 rounded-xl w-full max-w-4xl m-4 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center mb-6">
-                <h3 class="text-lg font-bold" style="color: var(--accent-primary)">Parameter Calculation</h3>
+                <div>
+                    <h3 class="text-lg font-bold" style="color: var(--accent-primary)">LSTM Cell Shared Parameters</h3>
+                    <p class="text-xs opacity-70 mt-1">LSTMs have 4 internal neural network layers (Forget, Input, Candidate, Output gates).</p>
+                </div>
                 <button id="closeCalcModalBtn" class="text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
             </div>
             
@@ -647,11 +468,10 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="border-b border-[var(--border-subtle)]">
-                            <th class="p-3 text-xs font-bold uppercase opacity-70">From</th>
-                            <th class="p-3 text-xs font-bold uppercase opacity-70">To</th>
-                            <th class="p-3 text-xs font-bold uppercase opacity-70">Weights</th>
-                            <th class="p-3 text-xs font-bold uppercase opacity-70">Biases</th>
-                            <th class="p-3 text-xs font-bold uppercase opacity-70 text-right">Total</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">Matrix</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">Description</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">Formula (4 Gates)</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70 text-right">Params</th>
                         </tr>
                     </thead>
                     <tbody id="calc-table-body" class="text-sm mono-font">
@@ -660,18 +480,11 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
                 </table>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-[var(--border-subtle)] pt-4">
-                <div class="metric-card p-3 text-center">
-                    <div class="text-[10px] uppercase font-bold opacity-60">Total Weights</div>
-                    <div id="totalWeightsResult" class="text-lg font-bold mt-1">0</div>
-                </div>
-                <div class="metric-card p-3 text-center">
-                    <div class="text-[10px] uppercase font-bold opacity-60">Total Biases</div>
-                    <div id="totalBiasesResult" class="text-lg font-bold mt-1">0</div>
-                </div>
-                <div class="metric-card p-3 text-center" style="border-color: var(--accent-primary)">
-                    <div class="text-[10px] uppercase font-bold opacity-60" style="color: var(--accent-primary)">Total Parameters</div>
-                    <div id="totalParamsResult" class="text-lg font-bold mt-1" style="color: var(--accent-primary)">0</div>
+            <div class="grid grid-cols-1 md:grid-cols-1 gap-4 border-t border-[var(--border-subtle)] pt-4">
+                <div class="metric-card p-4 text-center" style="border-color: var(--accent-primary); background: var(--accent-glow)">
+                    <div class="text-xs uppercase font-bold opacity-80" style="color: var(--accent-primary)">Total Cell Parameters</div>
+                    <div id="totalParamsResult" class="text-2xl font-bold mt-1" style="color: var(--accent-primary)">0</div>
+                    <div class="text-[10px] mt-1 opacity-70 font-sans">Used repeatedly at every time step</div>
                 </div>
             </div>
         </div>
@@ -682,6 +495,8 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
         const themeToggleBtn = document.getElementById('themeToggle');
         const sunIcon = themeToggleBtn.querySelector('.dark-icon');
         const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        let cachedColors = null; // Cache colors to prevent frame drops
         
         const currentTheme = localStorage.getItem('theme') || 'dark';
         if (currentTheme === 'light') {
@@ -703,272 +518,485 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
                 sunIcon.classList.remove('hidden');
                 localStorage.setItem('theme', 'dark');
             }
+            cachedColors = null; // Clear cache on theme switch
             if (typeof window.updateAndRedraw === 'function') window.updateAndRedraw();
         });
 
-        // --- NEURAL NETWORK LOGIC ---
+        // --- LSTM SINGLE CELL VISUALIZATION LOGIC ---
         document.addEventListener('DOMContentLoaded', () => {
             const canvas = document.getElementById('canvas');
             const ctx = canvas.getContext('2d');
             const centerCanvasBtn = document.getElementById('centerCanvasBtn');
             const calculateBtn = document.getElementById('calculateBtn');
-            const resetNetworkBtn = document.getElementById('resetNetworkBtn');
-            const inputFeaturesEl = document.getElementById('inputFeatures');
-            const hiddenLayersEl = document.getElementById('hiddenLayers');
-            const outputClassesEl = document.getElementById('outputClasses');
+            
+            const inputSizeEl = document.getElementById('inputSize');
+            const hiddenSizeEl = document.getElementById('hiddenSize');
 
-            const totalLayersEl = document.getElementById('totalLayers');
-            const totalNeuronsEl = document.getElementById('totalNeurons');
-            const totalParametersEl = document.getElementById('totalParameters');
-            const selectionInfoEl = document.getElementById('selectionInfo');
+            const simPlayBtn = document.getElementById('simPlayBtn');
+            const simPlayIcon = document.getElementById('simPlayIcon');
+            const simPlayText = document.getElementById('simPlayText');
+            const simStatus = document.getElementById('simStatus');
 
-            const contextMenu = document.getElementById('contextMenu');
-            const ctxButtons = {
-                addNeuron: document.getElementById('ctxAddNeuron'),
-                removeNeuron: document.getElementById('ctxRemoveNeuron'),
-                separator: document.getElementById('ctxSeparator1'),
-                editFeatures: document.getElementById('ctxEditFeatures'),
-                editLabels: document.getElementById('ctxEditLabels'),
-                addLayer: document.getElementById('ctxAddLayer'),
-                removeLayer: document.getElementById('ctxRemoveLayer'),
-                editNeurons: document.getElementById('ctxEditNeurons')
-            };
-
-            // State
-            let numFeatures = 4;
-            let hiddenLayerNeuronCounts = [8, 8, 8];
-            let numLabels = 3;
+            // Network State
+            let inputSize = 4;
+            let hiddenSize = 8;
+            
             let scale = 1;
             let translateX = 0;
             let translateY = 0;
             let isDragging = false;
             let lastX = 0;
             let lastY = 0;
-            let selectedNeuron = null;
-            let hoveredNeuron = null;
-            let highlightedPathNeurons = new Map(); 
-            let neuronPositions = [];
-            let currentNeuronRadius = 35;
-            let contextMenuTarget = { layer: -1, neuron: -1 };
 
-            // Theme Helpers
+            // Simulation State
+            let isSimulating = false;
+            let simProgress = 0;
+            let lastSimTime = 0;
+
+            // Theme Helpers (Cached for smooth 60fps)
             function getThemeColors() {
-                const isLight = document.body.classList.contains('light-mode');
+                if (cachedColors) return cachedColors;
                 const styles = getComputedStyle(document.body);
-                return {
+                cachedColors = {
                     bg: styles.getPropertyValue('--canvas-bg').trim(),
                     neuronFill: styles.getPropertyValue('--neuron-fill').trim(),
                     neuronBorder: styles.getPropertyValue('--neuron-border').trim(),
                     connection: styles.getPropertyValue('--connection-line').trim(),
                     accent: styles.getPropertyValue('--accent-primary').trim(),
+                    cellState: styles.getPropertyValue('--cell-state').trim(),
+                    cellConn: styles.getPropertyValue('--connection-cell').trim(),
+                    gateColor: styles.getPropertyValue('--gate-color').trim(),
                     text: styles.getPropertyValue('--text-main').trim(),
                 };
+                return cachedColors;
             }
 
-            // Drawing
-            function drawNetwork() {
+            // Central diagram drawing
+            function drawCell() {
                 if (!ctx) return;
                 const colors = getThemeColors();
                 const dpr = window.devicePixelRatio || 1;
                 const rect = canvas.getBoundingClientRect();
                 
-                if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
-                    canvas.width = rect.width * dpr;
-                    canvas.height = rect.height * dpr;
+                // Fallback to prevent NaN scale crashes if tab is rendering in background
+                let w = rect.width || 800;
+                let h = rect.height || 600;
+
+                if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+                    canvas.width = w * dpr;
+                    canvas.height = h * dpr;
                 }
                 
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.scale(dpr, dpr);
                 ctx.fillStyle = colors.bg;
-                ctx.fillRect(0, 0, rect.width, rect.height);
+                ctx.fillRect(0, 0, w, h);
 
                 ctx.save();
                 ctx.translate(translateX, translateY);
                 ctx.scale(scale, scale);
 
-                // Layout
-                const layers = [numFeatures, ...hiddenLayerNeuronCounts, numLabels];
-                const numLayers = layers.length;
-                const maxNeurons = Math.max(...layers, 1);
-                const NEURON_BASE_SPACING_FACTOR = 1.5;
-                const LAYER_SPACING_MULTIPLIER = 6;
-                const layerSpacing = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * LAYER_SPACING_MULTIPLIER;
-                const neuronSpacingY = currentNeuronRadius * NEURON_BASE_SPACING_FACTOR * 2;
-                const totalHeight = maxNeurons * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
+                // Robust centering coordinates
+                const CX = w / (2 * scale);
+                const CY = h / (2 * scale) - 20;
+                
+                const cellW = 500;
+                const cellH = 340;
+                
+                // Key Y levels
+                const yCellState = CY - 100;
+                const yGates = CY + 40;
+                const yMerge = CY + 140; 
+                const yInputs = CY + 240;
 
-                neuronPositions = [];
-                layers.forEach((count, layerIdx) => {
-                    const positions = [];
-                    const layerX = layerIdx * layerSpacing;
-                    const layerHeight = count * (2 * currentNeuronRadius + neuronSpacingY) - neuronSpacingY;
-                    const yOffset = (totalHeight - layerHeight) / 2;
-                    
-                    for(let i=0; i<count; i++) {
-                        positions.push({
-                            x: layerX + currentNeuronRadius,
-                            y: yOffset + i * (2 * currentNeuronRadius + neuronSpacingY) + currentNeuronRadius
-                        });
-                    }
-                    neuronPositions.push(positions);
-                });
+                // Key X levels (Gates)
+                const xForget = CX - 130;
+                const xInput = CX - 30;
+                const xCand = CX + 50;
+                const xOut = CX + 130;
+                const xMidInp = (xInput + xCand) / 2;
 
-                // Connections
+                // 1. Draw Background Box
                 ctx.beginPath();
-                ctx.strokeStyle = colors.connection;
-                ctx.lineWidth = 1 / scale;
-                for(let i=0; i<numLayers-1; i++) {
-                    neuronPositions[i].forEach(n1 => {
-                        neuronPositions[i+1].forEach(n2 => {
-                            const nextKey = `${i+1}_${neuronPositions[i+1].indexOf(n2)}`;
-                            if (!highlightedPathNeurons.has(nextKey)) {
-                                ctx.moveTo(n1.x, n1.y);
-                                ctx.lineTo(n2.x, n2.y);
-                            }
-                        });
-                    });
-                }
+                ctx.roundRect(CX - cellW/2, CY - cellH/2, cellW, cellH, 20);
+                ctx.fillStyle = colors.neuronFill;
+                ctx.fill();
+                ctx.strokeStyle = colors.neuronBorder;
+                ctx.lineWidth = 3 / scale;
+                ctx.setLineDash([]);
                 ctx.stroke();
 
-                // Highlighted Paths
-                if (highlightedPathNeurons.size > 0) {
-                    ctx.beginPath();
-                    ctx.lineWidth = 2 / scale;
-                    for(let i=0; i<numLayers-1; i++) {
-                        neuronPositions[i].forEach((n1, idx1) => {
-                            neuronPositions[i+1].forEach((n2, idx2) => {
-                                const nextKey = `${i+1}_${idx2}`;
-                                const dist = highlightedPathNeurons.get(nextKey);
-                                if (dist !== undefined) {
-                                    const alpha = Math.max(0.2, 0.8 - (dist / numLayers) * 0.6);
-                                    ctx.strokeStyle = colors.accent; 
-                                    ctx.globalAlpha = alpha;
-                                    ctx.moveTo(n1.x, n1.y);
-                                    ctx.lineTo(n2.x, n2.y);
-                                    ctx.stroke(); 
-                                    ctx.beginPath(); 
-                                }
-                            });
-                        });
-                    }
-                    ctx.globalAlpha = 1.0;
+                // Abstract styling for background box
+                ctx.globalAlpha = 0.05;
+                ctx.beginPath();
+                for(let i=0; i<cellW; i+=20) {
+                    ctx.moveTo(CX - cellW/2 + i, CY - cellH/2);
+                    ctx.lineTo(CX - cellW/2 + i, CY + cellH/2);
                 }
+                ctx.strokeStyle = colors.text;
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
 
-                // Neurons
-                layers.forEach((count, lIdx) => {
-                    neuronPositions[lIdx].forEach((pos, nIdx) => {
-                        const isSelected = selectedNeuron?.layer === lIdx && selectedNeuron?.neuron === nIdx;
-                        const isHovered = hoveredNeuron?.layer === lIdx && hoveredNeuron?.neuron === nIdx;
-                        const key = `${lIdx}_${nIdx}`;
-                        const isPath = highlightedPathNeurons.has(key);
+                // 2. Draw Static Lines & Paths
+                ctx.lineWidth = 2.5 / scale;
+                
+                // C_t line (Conveyor Belt)
+                ctx.strokeStyle = colors.cellConn;
+                ctx.beginPath();
+                ctx.moveTo(CX - cellW/2 - 60, yCellState);
+                ctx.lineTo(CX + cellW/2 + 60, yCellState);
+                ctx.stroke();
+                drawArrow(ctx, CX + cellW/2 + 55, yCellState, 0, colors.cellConn);
 
-                        ctx.beginPath();
-                        ctx.arc(pos.x, pos.y, currentNeuronRadius, 0, Math.PI*2);
-                        
-                        // Fill
-                        if (isSelected || isPath) {
-                            ctx.fillStyle = colors.accent;
-                            ctx.globalAlpha = isSelected ? 1 : 0.2;
-                        } else {
-                            ctx.fillStyle = colors.neuronFill;
-                            ctx.globalAlpha = 1;
-                        }
-                        ctx.fill();
-                        ctx.globalAlpha = 1;
+                // H_t line (bottom to right and up)
+                ctx.strokeStyle = colors.connection;
+                ctx.beginPath();
+                ctx.moveTo(CX - cellW/2 - 60, yInputs); // H_{t-1} in
+                ctx.lineTo(xForget, yInputs);
+                ctx.lineTo(xForget, yMerge); // Up to merge bus
+                
+                // Merge bus
+                ctx.moveTo(xForget, yMerge);
+                ctx.lineTo(xOut, yMerge);
+                
+                // Vertical lines from merge to gates
+                const gCoords = [xForget, xInput, xCand, xOut];
+                for(let x of gCoords) {
+                    ctx.moveTo(x, yMerge);
+                    ctx.lineTo(x, yGates + 20); // up to bottom of gate
+                }
+                
+                // *** CRITICAL BUG FIX *** // We MUST stroke the H_t line path BEFORE starting the X_t line path
+                // Otherwise the H_t path above is completely erased by the beginPath() below!
+                ctx.stroke(); 
 
-                        // Stroke
-                        ctx.strokeStyle = (isSelected || isHovered || isPath) ? colors.accent : colors.neuronBorder;
-                        ctx.lineWidth = (isSelected || isHovered ? 2 : 1) / scale;
-                        ctx.stroke();
+                // X_t input
+                ctx.strokeStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.moveTo(xInput - 20, yInputs + 60);
+                ctx.lineTo(xInput - 20, yMerge);
+                ctx.stroke();
 
-                        // Label
-                        ctx.fillStyle = colors.text;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        
-                        let label = lIdx === 0 ? `In ${nIdx+1}` : (lIdx === numLayers-1 ? `Out ${nIdx+1}` : `H${lIdx}_${nIdx+1}`);
-                        let fontSize = Math.max(8, currentNeuronRadius * 0.5);
-                        ctx.font = `${fontSize}px 'JetBrains Mono'`;
-                        ctx.fillText(label, pos.x, pos.y);
-                    });
-                });
+                // Path from Gates up to Operations
+                ctx.strokeStyle = colors.connection;
+
+                // Forget gate up to C
+                ctx.beginPath(); ctx.moveTo(xForget, yGates - 20); ctx.lineTo(xForget, yCellState + 10); ctx.stroke();
+                drawArrow(ctx, xForget, yCellState + 15, -Math.PI/2, colors.connection);
+
+                // Input + Cand gates merge and go up to C
+                ctx.beginPath(); 
+                ctx.moveTo(xInput, yGates - 20); ctx.lineTo(xInput, yCellState + 60); 
+                ctx.moveTo(xCand, yGates - 20); ctx.lineTo(xCand, yCellState + 60);
+                // merge them
+                ctx.moveTo(xInput, yCellState + 60); ctx.lineTo(xCand, yCellState + 60);
+                // up to add
+                ctx.moveTo(xMidInp, yCellState + 60); ctx.lineTo(xMidInp, yCellState + 10);
+                ctx.stroke();
+                drawArrow(ctx, xMidInp, yCellState + 15, -Math.PI/2, colors.connection);
+
+                // Output gate up to H out multiplier
+                ctx.beginPath();
+                ctx.moveTo(xOut, yGates - 20); ctx.lineTo(xOut, yCellState + 60);
+                ctx.stroke();
+
+                // Tanh off C line down to H out multiplier
+                ctx.strokeStyle = colors.cellConn;
+                ctx.beginPath();
+                ctx.moveTo(xOut + 40, yCellState); ctx.lineTo(xOut + 40, yCellState + 60);
+                ctx.stroke();
+
+                // H_t out path
+                ctx.strokeStyle = colors.connection;
+                ctx.beginPath();
+                ctx.moveTo(xOut + 40, yCellState + 60); // from multiplier
+                ctx.lineTo(xOut + 40, yInputs);
+                ctx.lineTo(CX + cellW/2 + 60, yInputs); // Out right
+                ctx.moveTo(xOut + 40, yCellState + 60); // split up
+                ctx.lineTo(xOut + 40, CY - cellH/2 - 40); // Out top
+                ctx.stroke();
+                drawArrow(ctx, CX + cellW/2 + 55, yInputs, 0, colors.connection);
+                drawArrow(ctx, xOut + 40, CY - cellH/2 - 35, -Math.PI/2, colors.connection);
+
+                // 3. Draw Nodes (Gates and Ops)
+                const gW = 50, gH = 40;
+                // Forget
+                drawGate(ctx, xForget, yGates, gW, gH, colors.gateColor, 'f_t', 'σ');
+                // Input
+                drawGate(ctx, xInput, yGates, gW, gH, colors.gateColor, 'i_t', 'σ');
+                // Cand
+                drawGate(ctx, xCand, yGates, gW, gH, '#ef4444', 'C~_t', 'tanh'); 
+                // Output
+                drawGate(ctx, xOut, yGates, gW, gH, colors.gateColor, 'o_t', 'σ');
+
+                // Operations
+                drawOp(ctx, xForget, yCellState, '×');
+                drawOp(ctx, xMidInp, yCellState + 60, '×');
+                drawOp(ctx, xMidInp, yCellState, '+');
+                drawOp(ctx, xOut + 40, yCellState + 60, '×');
+                
+                // Tanh block on C drop
+                ctx.fillStyle = colors.bg;
+                ctx.beginPath(); ctx.roundRect(xOut + 40 - 20, yCellState + 25, 40, 20, 10); ctx.fill();
+                ctx.strokeStyle = colors.cellState; ctx.stroke();
+                ctx.fillStyle = colors.text; ctx.font = `10px 'JetBrains Mono'`; ctx.textAlign='center'; ctx.fillText('tanh', xOut+40, yCellState+25);
+
+                // 4. Draw Labels
+                ctx.fillStyle = colors.text;
+                ctx.font = `bold 14px 'JetBrains Mono'`;
+                ctx.textAlign = 'center';
+                
+                // Inputs
+                ctx.fillStyle = '#3b82f6';
+                ctx.fillText(`X_t (${inputSize})`, xInput - 20, yInputs + 80);
+                ctx.fillStyle = colors.accent;
+                ctx.fillText(`H_{t-1} (${hiddenSize})`, CX - cellW/2 - 80, yInputs);
+                ctx.fillStyle = colors.cellState;
+                ctx.fillText(`C_{t-1} (${hiddenSize})`, CX - cellW/2 - 80, yCellState);
+
+                // Outputs
+                ctx.fillStyle = colors.accent;
+                ctx.fillText(`H_t (${hiddenSize})`, CX + cellW/2 + 90, yInputs);
+                ctx.fillText(`H_t (${hiddenSize})`, xOut + 40, CY - cellH/2 - 55);
+                ctx.fillStyle = colors.cellState;
+                ctx.fillText(`C_t (${hiddenSize})`, CX + cellW/2 + 90, yCellState);
+
+                // --- 5. ANIMATION LAYER ---
+                if(isSimulating) {
+                    let phase = simProgress * 5; // Map 0-1 to 0-5 phases
+                    const getP = (ph) => Math.max(0, Math.min(1, phase - ph));
+                    
+                    // Phase 0: Inputs -> Merge Bus + C_t waiting
+                    let p0 = getP(0);
+                    if (p0 > 0 && phase < 1.5) {
+                        drawDotOnPath(ctx, [[CX - cellW/2 - 60, yInputs], [xForget, yInputs], [xForget, yMerge]], p0, colors.accent); // H in
+                        drawDotOnPath(ctx, [[xInput - 20, yInputs + 60], [xInput - 20, yMerge]], p0, '#3b82f6'); // X in
+                        drawDotOnPath(ctx, [[CX - cellW/2 - 60, yCellState], [xForget, yCellState]], p0, colors.cellState); // C in
+                        simStatus.textContent = "1. Receiving Inputs";
+                    }
+
+                    // Phase 1: Merge Bus -> Gates
+                    let p1 = getP(1);
+                    if (p1 > 0 && phase < 2.5) {
+                        drawDotOnPath(ctx, [[xForget, yMerge], [xForget, yGates+20]], p1, '#a855f7');
+                        drawDotOnPath(ctx, [[xForget, yMerge], [xInput, yMerge], [xInput, yGates+20]], p1, '#a855f7');
+                        drawDotOnPath(ctx, [[xForget, yMerge], [xCand, yMerge], [xCand, yGates+20]], p1, '#a855f7');
+                        drawDotOnPath(ctx, [[xForget, yMerge], [xOut, yMerge], [xOut, yGates+20]], p1, '#a855f7');
+                        simStatus.textContent = "2. Feeding Gates";
+                    }
+
+                    // Phase 2: Gates -> Operations
+                    let p2 = getP(2);
+                    if (p2 > 0 && phase < 3.5) {
+                        drawDotOnPath(ctx, [[xForget, yGates-20], [xForget, yCellState]], p2, colors.gateColor);
+                        drawDotOnPath(ctx, [[xInput, yGates-20], [xInput, yCellState+60]], p2, colors.gateColor);
+                        drawDotOnPath(ctx, [[xCand, yGates-20], [xCand, yCellState+60]], p2, '#ef4444');
+                        drawDotOnPath(ctx, [[xOut, yGates-20], [xOut, yCellState+60]], p2, colors.gateColor);
+                        simStatus.textContent = "3. Calculating Gates";
+                    }
+
+                    // Phase 3: Operations -> Cell Update
+                    let p3 = getP(3);
+                    if (p3 > 0 && phase < 4.5) {
+                        drawDotOnPath(ctx, [[xForget, yCellState], [xMidInp, yCellState]], p3, colors.cellState);
+                        drawDotOnPath(ctx, [[xInput, yCellState+60], [xMidInp, yCellState+60], [xMidInp, yCellState]], p3, '#10b981');
+                        drawDotOnPath(ctx, [[xCand, yCellState+60], [xMidInp, yCellState+60], [xMidInp, yCellState]], p3, '#10b981');
+                        drawDotOnPath(ctx, [[xMidInp, yCellState], [xOut + 40, yCellState]], p3, colors.cellState);
+                        drawDotOnPath(ctx, [[xOut + 40, yCellState], [xOut + 40, yCellState + 60]], p3, colors.cellState);
+                        simStatus.textContent = "4. Updating Memory (C_t)";
+                    }
+
+                    // Phase 4: Output -> H_t out
+                    let p4 = getP(4);
+                    if (p4 > 0) {
+                        drawDotOnPath(ctx, [[xOut + 40, yCellState + 60], [xOut + 40, yInputs], [CX + cellW/2 + 60, yInputs]], p4, colors.accent); // right
+                        drawDotOnPath(ctx, [[xOut + 40, yCellState + 60], [xOut + 40, CY - cellH/2 - 40]], p4, colors.accent); // up
+                        drawDotOnPath(ctx, [[xOut + 40, yCellState], [CX + cellW/2 + 60, yCellState]], p4, colors.cellState);
+                        simStatus.textContent = "5. Emitting New States";
+                    }
+                }
 
                 ctx.restore();
             }
 
-            function updateStats() {
-                const layers = [numFeatures, ...hiddenLayerNeuronCounts, numLabels];
-                totalLayersEl.textContent = layers.length;
-                totalNeuronsEl.textContent = layers.reduce((a,b)=>a+b, 0);
+            function drawGate(ctx, x, y, w, h, bg, name, symbol) {
+                const colors = getThemeColors();
+                ctx.beginPath();
+                ctx.roundRect(x - w/2, y - h/2, w, h, 6);
+                ctx.globalAlpha = 0.2; // Reliable alpha rendering
+                ctx.fillStyle = bg;
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+                ctx.strokeStyle = bg;
+                ctx.lineWidth = 2 / scale;
+                ctx.stroke();
+
+                ctx.fillStyle = colors.text;
+                ctx.font = `bold 14px 'JetBrains Mono'`;
+                ctx.fillText(symbol, x, y - 5);
+                ctx.font = `10px 'JetBrains Mono'`;
+                ctx.fillText(name, x, y + 10);
+            }
+
+            function drawOp(ctx, x, y, symbol) {
+                const colors = getThemeColors();
+                ctx.beginPath();
+                ctx.arc(x, y, 12, 0, Math.PI*2);
+                ctx.fillStyle = colors.bg;
+                ctx.fill();
+                ctx.strokeStyle = colors.text;
+                ctx.lineWidth = 1.5 / scale;
+                ctx.stroke();
                 
-                let params = 0;
-                for(let i=0; i<layers.length-1; i++) {
-                    params += (layers[i] * layers[i+1]) + layers[i+1];
+                ctx.fillStyle = colors.text;
+                ctx.font = `bold 16px 'JetBrains Mono'`;
+                ctx.fillText(symbol, x, y + 1);
+            }
+
+            function drawArrow(ctx, x, y, angle, color) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(angle);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(-8, -4);
+                ctx.lineTo(-8, 4);
+                ctx.closePath();
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Flawless multi-segment corner-following dot rendering
+            function drawDotOnPath(ctx, path, p, color) {
+                p = Math.max(0, Math.min(1, p));
+                if(p === 0) return; 
+                
+                let totalLen = 0;
+                let lengths = [];
+                for(let i=0; i<path.length-1; i++) {
+                    let dx = path[i+1][0] - path[i][0];
+                    let dy = path[i+1][1] - path[i][1];
+                    let len = Math.sqrt(dx*dx + dy*dy);
+                    lengths.push(len);
+                    totalLen += len;
                 }
-                totalParametersEl.textContent = params.toLocaleString();
+                
+                let targetLen = totalLen * p;
+                let currentLen = 0;
+                let cx = path[0][0], cy = path[0][1];
+                
+                for(let i=0; i<path.length-1; i++) {
+                    if (currentLen + lengths[i] >= targetLen) {
+                        let segmentP = (targetLen - currentLen) / lengths[i];
+                        cx = path[i][0] + (path[i+1][0] - path[i][0]) * segmentP;
+                        cy = path[i][1] + (path[i+1][1] - path[i][1]) * segmentP;
+                        break;
+                    }
+                    currentLen += lengths[i];
+                }
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, 7 / scale, 0, Math.PI*2);
+                ctx.fillStyle = color;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // SIMULATION ENGINE
+            function simLoop(timestamp) {
+                if (!isSimulating) return;
+                if (!lastSimTime) lastSimTime = timestamp;
+                const dt = timestamp - lastSimTime;
+                lastSimTime = timestamp;
+
+                // Cap DT so if tab is hidden, it doesn't instantly jump to complete
+                const safeDt = Math.min(dt, 100); 
+
+                simProgress += safeDt / 6000; // 6 seconds for a full loop
+
+                if (simProgress >= 1.0) {
+                    stopSimulation();
+                    simStatus.textContent = "Flow Complete!";
+                    drawCell();
+                    return;
+                }
+
+                drawCell();
+                requestAnimationFrame(simLoop);
+            }
+
+            function stopSimulation() {
+                isSimulating = false;
+                lastSimTime = 0;
+                simPlayIcon.className = "fas fa-play";
+                simPlayText.textContent = "Restart Flow";
+                simPlayBtn.classList.remove('viz-btn-danger', 'bg-red-600', 'hover:bg-red-500');
+                simPlayBtn.classList.add('viz-btn-primary', 'bg-indigo-600', 'hover:bg-indigo-500');
+            }
+
+            function startSimulation() {
+                isSimulating = true;
+                simProgress = 0;
+                lastSimTime = 0;
+                simPlayIcon.className = "fas fa-stop";
+                simPlayText.textContent = "Stop Flow";
+                simPlayBtn.classList.remove('viz-btn-primary', 'bg-indigo-600', 'hover:bg-indigo-500');
+                simPlayBtn.classList.add('viz-btn-danger', 'bg-red-600', 'hover:bg-red-500');
+                requestAnimationFrame(simLoop);
+            }
+
+            simPlayBtn.addEventListener('click', () => {
+                if (isSimulating) {
+                    stopSimulation();
+                    simProgress = 0;
+                    simStatus.textContent = "Simulation Stopped.";
+                    drawCell();
+                }
+                else startSimulation();
+            });
+
+            // Parameters Math for LSTM Cell
+            function calculateParams() {
+                const whx = 4 * (inputSize * hiddenSize); 
+                const whh = 4 * (hiddenSize * hiddenSize); 
+                const bh = 4 * hiddenSize;                 
+                return { whx, whh, bh, total: whx + whh + bh };
             }
 
             // Global redraw
             window.updateAndRedraw = function() {
-                updateNeuronRadius();
-                drawNetwork();
-                updateStats();
+                drawCell();
             };
 
-            function updateNeuronRadius() {
-                const layers = [numFeatures, ...hiddenLayerNeuronCounts, numLabels];
-                const maxN = Math.max(...layers, 1);
-                const base = 35;
-                const density = Math.sqrt(maxN * layers.length) / 8;
-                currentNeuronRadius = Math.max(15, base / (1 + density * 0.4));
-            }
-
             function resetView() {
-                updateNeuronRadius();
-                const layers = [numFeatures, ...hiddenLayerNeuronCounts, numLabels];
-                const width = (layers.length - 1) * (currentNeuronRadius * 1.5 * 6) + currentNeuronRadius*2;
-                const height = Math.max(...layers) * (currentNeuronRadius * 3) + currentNeuronRadius*2;
-                
                 const rect = canvas.getBoundingClientRect();
-                const sX = (rect.width - 60) / width;
-                const sY = (rect.height - 60) / height;
-                scale = Math.min(sX, sY, 1.5);
+                const vW = 800, vH = 600; // Virtual design space
                 
-                translateX = (rect.width - width * scale) / 2;
-                translateY = (rect.height - height * scale) / 2;
+                let w = rect.width || 800;
+                let h = rect.height || 600;
                 
-                if(scale < 0.1) scale = 0.1;
+                const sX = w / vW;
+                const sY = h / vH;
+                scale = Math.min(sX, sY, 1.5) * 0.9;
                 
-                drawNetwork();
+                // Fallback catch to prevent zoom crashing coordinates 
+                if (scale < 0.1) scale = 0.5;
+                
+                translateX = 0; 
+                translateY = 0;
+                
+                drawCell();
             }
 
-            // Interaction
-            function getCanvasPos(e) {
-                const rect = canvas.getBoundingClientRect();
-                const cx = e.clientX || (e.touches && e.touches[0].clientX);
-                const cy = e.clientY || (e.touches && e.touches[0].clientY);
-                return {
-                    x: (cx - rect.left - translateX) / scale,
-                    y: (cy - rect.top - translateY) / scale,
-                };
-            }
-
-            function hitTest(x, y) {
-                for(let l=0; l<neuronPositions.length; l++) {
-                    for(let n=0; n<neuronPositions[l].length; n++) {
-                        const pos = neuronPositions[l][n];
-                        const dist = Math.sqrt((x-pos.x)**2 + (y-pos.y)**2);
-                        if(dist <= currentNeuronRadius) return { layer: l, neuron: n };
-                    }
-                }
-                return null;
-            }
-
+            // Interaction Panning/Zooming
             canvas.addEventListener('mousedown', e => {
                 isDragging = true;
                 lastX = e.clientX;
                 lastY = e.clientY;
                 canvas.classList.add('grabbing');
-                contextMenu.style.display = 'none';
             });
 
             window.addEventListener('mousemove', e => {
@@ -979,21 +1007,7 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
                     translateY += dy;
                     lastX = e.clientX;
                     lastY = e.clientY;
-                    drawNetwork();
-                } else if(e.target === canvas) {
-                    const pos = getCanvasPos(e);
-                    const hit = hitTest(pos.x, pos.y);
-                    if(JSON.stringify(hit) !== JSON.stringify(hoveredNeuron)) {
-                        hoveredNeuron = hit;
-                        canvas.style.cursor = hit ? 'pointer' : 'grab';
-                        drawNetwork();
-                        
-                        if (hit) {
-                            selectionInfoEl.textContent = `Layer ${hit.layer} (${hit.layer===0?'Input':(hit.layer===neuronPositions.length-1?'Output':'Hidden')}), Neuron ${hit.neuron+1}`;
-                        } else if (!selectedNeuron) {
-                            selectionInfoEl.textContent = "Hover over neurons to see details. Click to highlight connections.";
-                        }
-                    }
+                    drawCell();
                 }
             });
 
@@ -1018,249 +1032,63 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
                 translateY = my - (my - translateY) * (newScale / scale);
                 scale = newScale;
                 
-                drawNetwork();
-            });
-
-            canvas.addEventListener('click', e => {
-                if(isDragging && (Math.abs(e.clientX - lastX) > 5 || Math.abs(e.clientY - lastY) > 5)) return;
-                
-                const pos = getCanvasPos(e);
-                const hit = hitTest(pos.x, pos.y);
-                
-                if (hit) {
-                    selectedNeuron = (selectedNeuron?.layer === hit.layer && selectedNeuron?.neuron === hit.neuron) ? null : hit;
-                    
-                    highlightedPathNeurons.clear();
-                    if(selectedNeuron) {
-                        highlightedPathNeurons.set(`${selectedNeuron.layer}_${selectedNeuron.neuron}`, 0);
-                        let q = [{l: selectedNeuron.layer, n: selectedNeuron.neuron, d: 0}];
-                        let visited = new Set();
-                        while(q.length) {
-                            let curr = q.shift();
-                            let k = `${curr.l}_${curr.n}`;
-                            if(visited.has(k)) continue;
-                            visited.add(k);
-                            highlightedPathNeurons.set(k, curr.d);
-                            
-                            if(curr.l > 0) {
-                                let prevL = curr.l - 1;
-                                for(let i=0; i<neuronPositions[prevL].length; i++) {
-                                    q.push({l: prevL, n: i, d: curr.d + 1});
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    selectedNeuron = null;
-                    highlightedPathNeurons.clear();
-                }
-                drawNetwork();
-            });
-
-            canvas.addEventListener('contextmenu', e => {
-                e.preventDefault();
-                const pos = getCanvasPos(e);
-                const hit = hitTest(pos.x, pos.y);
-                const layers = [numFeatures, ...hiddenLayerNeuronCounts, numLabels];
-
-                Object.values(ctxButtons).forEach(b => b.classList.add('hidden'));
-
-                if(hit) {
-                    contextMenuTarget = hit;
-                    ctxButtons.addNeuron.classList.remove('hidden');
-                    ctxButtons.separator.classList.remove('hidden');
-                    if (layers[hit.layer] > 1) ctxButtons.removeNeuron.classList.remove('hidden');
-                } else {
-                    const layerSpacing = currentNeuronRadius * 1.5 * 6;
-                    let clickedL = -1;
-                    for(let i=0; i<layers.length; i++) {
-                        const lx = i * layerSpacing;
-                        if (pos.x >= lx - layerSpacing/3 && pos.x <= lx + layerSpacing/3) {
-                            clickedL = i;
-                            break;
-                        }
-                    }
-                    
-                    if(clickedL !== -1) {
-                        contextMenuTarget = { layer: clickedL };
-                        ctxButtons.addNeuron.classList.remove('hidden');
-                        ctxButtons.separator.classList.remove('hidden');
-                        
-                        if(clickedL === 0) {
-                            ctxButtons.editFeatures.classList.remove('hidden');
-                            ctxButtons.addLayer.classList.remove('hidden');
-                        } else if(clickedL === layers.length-1) {
-                            ctxButtons.editLabels.classList.remove('hidden');
-                        } else {
-                            ctxButtons.editNeurons.classList.remove('hidden');
-                            ctxButtons.addLayer.classList.remove('hidden');
-                            ctxButtons.removeLayer.classList.remove('hidden');
-                        }
-                    } else {
-                        return;
-                    }
-                }
-
-                const rect = canvas.getBoundingClientRect();
-                const menuWidth = contextMenu.offsetWidth || 160;
-                const menuHeight = contextMenu.offsetHeight || 200;
-                
-                let left = e.clientX - rect.left;
-                let top = e.clientY - rect.top;
-                
-                if (left + menuWidth > rect.width) left -= menuWidth;
-                if (top + menuHeight > rect.height) top -= menuHeight;
-
-                contextMenu.style.left = `${left}px`;
-                contextMenu.style.top = `${top}px`;
-                contextMenu.style.display = 'block';
-            });
-
-            document.addEventListener('click', e => {
-                if(!contextMenu.contains(e.target)) contextMenu.style.display = 'none';
+                drawCell();
             });
 
             function updateFromInputs() {
+                if(isSimulating) stopSimulation();
+                simProgress = 0;
+                simStatus.textContent = "Data Updated. Ready.";
                 try {
-                    const f = parseInt(inputFeaturesEl.value);
-                    const l = parseInt(outputClassesEl.value);
-                    const hStr = hiddenLayersEl.value.trim();
-                    const h = hStr ? hStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0) : [];
-                    
-                    if(f>0 && l>0) {
-                        numFeatures = Math.min(f, 20);
-                        numLabels = Math.min(l, 20);
-                        hiddenLayerNeuronCounts = h;
-                        updateAndRedraw();
+                    const inp = parseInt(inputSizeEl.value);
+                    const hid = parseInt(hiddenSizeEl.value);
+                    if(inp>0 && hid>0) {
+                        inputSize = Math.min(inp, 100);
+                        hiddenSize = Math.min(hid, 100);
+                        updateAndRedraw(); 
                     }
                 } catch(e) {}
             }
 
-            // Real-time Event Listeners
-            inputFeaturesEl.addEventListener('input', updateFromInputs);
-            outputClassesEl.addEventListener('input', updateFromInputs);
-            hiddenLayersEl.addEventListener('input', updateFromInputs);
+            inputSizeEl.addEventListener('input', updateFromInputs);
+            hiddenSizeEl.addEventListener('input', updateFromInputs);
 
-            resetNetworkBtn.addEventListener('click', () => {
-                numFeatures = 4;
-                hiddenLayerNeuronCounts = [8,8,8];
-                numLabels = 3;
-                inputFeaturesEl.value = 4;
-                hiddenLayersEl.value = '8,8,8';
-                outputClassesEl.value = 3;
-                updateAndRedraw();
-                resetView();
-            });
             centerCanvasBtn.addEventListener('click', resetView);
-
-            // Context Actions need to refresh inputs
-            const refreshInputs = () => {
-                inputFeaturesEl.value = numFeatures;
-                hiddenLayersEl.value = hiddenLayerNeuronCounts.join(',');
-                outputClassesEl.value = numLabels;
-            };
-
-            ctxButtons.addNeuron.addEventListener('click', () => {
-                const l = contextMenuTarget.layer;
-                if(l===0) numFeatures++;
-                else if(l === hiddenLayerNeuronCounts.length + 1) numLabels++;
-                else hiddenLayerNeuronCounts[l-1]++;
-                refreshInputs(); updateAndRedraw();
-            });
-            
-            ctxButtons.removeNeuron.addEventListener('click', () => {
-                const l = contextMenuTarget.layer;
-                if(l===0 && numFeatures > 1) numFeatures--;
-                else if(l === hiddenLayerNeuronCounts.length + 1 && numLabels > 1) numLabels--;
-                else if(l > 0 && hiddenLayerNeuronCounts[l-1] > 1) hiddenLayerNeuronCounts[l-1]--;
-                refreshInputs(); updateAndRedraw();
-            });
-
-            ctxButtons.addLayer.addEventListener('click', () => {
-                const idx = contextMenuTarget.layer; 
-                if (idx >= 0) hiddenLayerNeuronCounts.splice(idx, 0, 4);
-                refreshInputs(); updateAndRedraw();
-            });
-
-            ctxButtons.removeLayer.addEventListener('click', () => {
-                const idx = contextMenuTarget.layer - 1; 
-                if(idx >= 0 && idx < hiddenLayerNeuronCounts.length) {
-                    hiddenLayerNeuronCounts.splice(idx, 1);
-                    refreshInputs(); updateAndRedraw();
-                }
-            });
-
-            // Edit Modal
-            const showEdit = (type) => {
-                const l = contextMenuTarget.layer;
-                const modal = document.getElementById('editNeuronModal');
-                const title = document.getElementById('editModalTitle');
-                const input = document.getElementById('edit-neuron-count');
-                
-                input.value = (type === 'features') ? numFeatures : ((type === 'labels') ? numLabels : hiddenLayerNeuronCounts[l-1]);
-                title.textContent = type === 'features' ? 'Edit Input Features' : (type === 'labels' ? 'Edit Output Labels' : 'Edit Neuron Count');
-                
-                modal.classList.remove('hidden');
-                modal.classList.add('flex');
-                
-                const save = () => {
-                    const v = parseInt(input.value);
-                    if(v>0 && v<=1000) {
-                        if(type==='features') numFeatures = v;
-                        else if(type==='labels') numLabels = v;
-                        else hiddenLayerNeuronCounts[l-1] = v;
-                        refreshInputs(); updateAndRedraw();
-                        close();
-                    }
-                };
-                
-                const close = () => {
-                    modal.classList.add('hidden');
-                    modal.classList.remove('flex');
-                    document.getElementById('saveEditBtn').removeEventListener('click', save);
-                };
-                
-                document.getElementById('saveEditBtn').onclick = save;
-                document.getElementById('cancelEditBtn').onclick = close;
-            };
-
-            ctxButtons.editFeatures.addEventListener('click', () => showEdit('features'));
-            ctxButtons.editLabels.addEventListener('click', () => showEdit('labels'));
-            ctxButtons.editNeurons.addEventListener('click', () => showEdit('neurons'));
 
             calculateBtn.addEventListener('click', () => {
                 const modal = document.getElementById('calculationResultModal');
                 const tbody = document.getElementById('calc-table-body');
-                const layers = [numFeatures, ...hiddenLayerNeuronCounts, numLabels];
+                const params = calculateParams();
                 
-                let html = '';
-                let tW = 0, tB = 0;
+                tbody.innerHTML = `
+                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
+                        <td class="p-3 font-bold text-blue-400">W_hx</td>
+                        <td class="p-3">Input $\\to$ 4 Gates</td>
+                        <td class="p-3">4 &times; (${inputSize} &times; ${hiddenSize})</td>
+                        <td class="p-3 text-right font-bold text-blue-400">${params.whx}</td>
+                    </tr>
+                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
+                        <td class="p-3 font-bold text-green-400">W_hh</td>
+                        <td class="p-3">Hidden $\\to$ 4 Gates</td>
+                        <td class="p-3">4 &times; (${hiddenSize} &times; ${hiddenSize})</td>
+                        <td class="p-3 text-right font-bold text-green-400">${params.whh}</td>
+                    </tr>
+                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
+                        <td class="p-3 font-bold text-gray-400">b_h</td>
+                        <td class="p-3">Biases for 4 Gates</td>
+                        <td class="p-3">4 &times; ${hiddenSize}</td>
+                        <td class="p-3 text-right font-bold text-gray-400">${params.bh}</td>
+                    </tr>
+                `;
                 
-                for(let i=0; i<layers.length-1; i++) {
-                    const n1 = layers[i];
-                    const n2 = layers[i+1];
-                    const w = n1*n2;
-                    const b = n2;
-                    tW += w; tB += b;
-                    
-                    html += `
-                        <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
-                            <td class="p-3">${i===0?'Input':`Hidden ${i}`} (${n1})</td>
-                            <td class="p-3">${i===layers.length-2?'Output':`Hidden ${i+1}`} (${n2})</td>
-                            <td class="p-3">${n2} &times; ${n1} = ${w}</td>
-                            <td class="p-3">${b}</td>
-                            <td class="p-3 text-right font-bold text-[var(--accent-primary)]">${w+b}</td>
-                        </tr>
-                    `;
-                }
-                
-                tbody.innerHTML = html;
-                document.getElementById('totalWeightsResult').textContent = tW.toLocaleString();
-                document.getElementById('totalBiasesResult').textContent = tB.toLocaleString();
-                document.getElementById('totalParamsResult').textContent = (tW+tB).toLocaleString();
+                document.getElementById('totalParamsResult').textContent = params.total.toLocaleString();
                 
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
+
+                if (window.MathJax && window.MathJax.typesetPromise) {
+                    window.MathJax.typesetPromise([tbody]).catch(()=>console.log('MathJax Error'));
+                }
             });
 
             document.getElementById('closeCalcModalBtn').addEventListener('click', () => {
@@ -1269,13 +1097,14 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
             });
 
             window.addEventListener('resize', () => {
-                drawNetwork();
+                drawCell();
                 resetView();
             });
-            updateAndRedraw();
+            
+            // Initialization
             setTimeout(resetView, 100); 
         });
-    
+
         // ===== DROPDOWN SEARCH FUNCTIONALITY =====
         const allCourses = [
             { title: "Calculating Parameters in CNN", path: "computer_vision/calculating_parameters_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
@@ -1464,7 +1293,6 @@ initialize parameters<br>forward pass<br>compute loss<br>backpropagate<br>update
                 }
             });
         }
-
     </script>
 </body>
 </html>

@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VizLearn - How RNN Processes Text</title>
-    <meta name="description" content="Learn How RNN Processes Text with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn.">
-    <meta name="keywords" content="How RNN Processes Text, interactive learning, beginner tutorial, vizlearn">
+    <title>VizLearn - How LSTM Processes Text</title>
+    <meta name="description" content="Learn How LSTM Processes Text with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn.">
+    <meta name="keywords" content="How LSTM Processes Text, interactive learning, beginner tutorial, vizlearn, Long Short-Term Memory">
     <meta name="robots" content="index, follow">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -73,6 +73,8 @@
             --border-glow: rgba(74, 222, 128, 0.5);
             --accent-primary: #4ade80;
             --accent-glow: rgba(74, 222, 128, 0.25);
+            --cell-state: #06b6d4; /* Cyan for Cell State */
+            --cell-state-glow: rgba(6, 182, 212, 0.25);
             --text-main: #f0fdf4;
             --text-muted: #86efac;
             --card-bg: #0a0a0a;
@@ -86,6 +88,7 @@
             --neuron-fill: #111827;
             --neuron-border: rgba(74, 222, 128, 0.5);
             --connection-line: rgba(74, 222, 128, 0.4);
+            --connection-cell: rgba(6, 182, 212, 0.5);
         }
 
         body.light-mode {
@@ -96,6 +99,8 @@
             --border-glow: rgba(22, 163, 74, 0.4);
             --accent-primary: #15803d;
             --accent-glow: rgba(21, 128, 61, 0.2);
+            --cell-state: #0891b2;
+            --cell-state-glow: rgba(8, 145, 178, 0.2);
             --text-main: #052e16;
             --text-muted: #4b5563;
             --card-bg: #ffffff;
@@ -109,6 +114,7 @@
             --neuron-fill: #ffffff;
             --neuron-border: #15803d; 
             --connection-line: rgba(21, 128, 61, 0.5); 
+            --connection-cell: rgba(8, 145, 178, 0.6);
         }
 
         *, *::before, *::after {
@@ -157,18 +163,11 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        .calc-card {
-            background: var(--input-bg);
-            border: 1px solid var(--border-subtle);
-            border-radius: 10px;
-            padding: 16px;
-        }
-
         .floating-panel {
             position: absolute;
             top: 1rem;
             right: 1rem;
-            width: 260px;
+            width: 270px;
             background-color: var(--bg-surface);
             border: 1px solid var(--border-subtle);
             border-radius: 12px;
@@ -268,6 +267,10 @@
         ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
 
+        /* Legend specific to LSTM */
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 10px; opacity: 0.8; }
+        .legend-color { width: 10px; height: 10px; border-radius: 2px; }
+
         /* Search Dropdown Styles */
         .search-input-wrapper { background: var(--input-bg); border: 1px solid var(--border-subtle); position: relative; }
         .search-input-wrapper:focus-within { background: var(--input-focus-bg); border-color: var(--accent-primary); box-shadow: 0 0 15px var(--accent-glow); }
@@ -295,7 +298,6 @@
 
         gtag('config', 'G-ZT6JM33V5J');
     </script>
-
 </head>
 <body class="flex flex-col min-h-screen overflow-x-hidden">
 
@@ -334,9 +336,9 @@
             <span>/</span>
             <span>Deep Learning</span>
         </div>
-        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">How RNN Processes Text</h1>
+        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">How LSTM Processes Text</h1>
         <p class="mt-2 text-sm md:text-base max-w-2xl opacity-80" style="color: var(--text-muted)">
-            Visualize how memory is passed forward to perform Sentiment Analysis (a Sequence-to-Vector task).
+            Visualize how <strong>Long Short-Term Memory</strong> networks pass both a Cell State (long-term memory) and a Hidden State (short-term memory) forward to process sequences.
         </p>
     </div>
 
@@ -360,11 +362,11 @@
                 <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
                 <div class="flex items-center gap-2">
                     <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Input Size (X)</label>
-                    <input type="number" id="inputSize" value="3" min="1" max="50" class="viz-input w-16 text-center">
+                    <input type="number" id="inputSize" value="4" min="1" max="50" class="viz-input w-16 text-center">
                 </div>
                 <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
                 <div class="flex items-center gap-2">
-                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-accent-primary" style="color: var(--accent-primary)">Hidden State (H)</label>
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-accent-primary" style="color: var(--accent-primary)" title="Applies to both C_t and H_t">State Size (C & H)</label>
                     <input type="number" id="hiddenSize" value="8" min="1" max="50" class="viz-input w-16 text-center border-green-500/50">
                 </div>
                 <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
@@ -385,7 +387,7 @@
         <div class="toolbar-container flex flex-wrap items-center gap-4 bg-black/10">
             <div class="flex items-center gap-3 flex-1 min-w-[250px]">
                 <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap"><i class="fas fa-comment-dots mr-1"></i> Sentiment Text</label>
-                <input type="text" id="simDataInput" value="I love learning about Artificial Intelligence" class="viz-input flex-1 font-mono text-sm border-indigo-500/30 focus:border-indigo-500" placeholder="Type a sentence to analyze sentiment...">
+                <input type="text" id="simDataInput" value="LSTMs can remember contexts across long sentences" class="viz-input flex-1 font-mono text-sm border-indigo-500/30 focus:border-indigo-500" placeholder="Type a sentence to analyze sentiment...">
             </div>
             <button id="simPlayBtn" class="viz-btn viz-btn-primary bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_10px_rgba(79,70,229,0.4)] flex items-center gap-2 whitespace-nowrap">
                 <i class="fas fa-play" id="simPlayIcon"></i> <span id="simPlayText">Simulate Flow</span>
@@ -402,7 +404,7 @@
         <div class="floating-panel p-4 flex flex-col gap-4 pointer-events-auto">
              <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
                  <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--accent-primary)">
-                    <i class="fas fa-history mr-2"></i> RNN Analysis
+                    <i class="fas fa-memory mr-2"></i> LSTM Analysis
                 </h3>
              </div>
              
@@ -413,7 +415,7 @@
                      <span id="totalSteps" class="font-bold mono-font text-sm text-indigo-400">-</span>
                  </div>
                  <div class="metric-card p-2 text-center" style="border-color: var(--border-subtle)">
-                     <span class="block text-[10px] uppercase opacity-60">Hidden Size</span>
+                     <span class="block text-[10px] uppercase opacity-60">State Size</span>
                      <span id="stateSize" class="font-bold mono-font text-sm" style="color: var(--text-main)">-</span>
                  </div>
                  <div class="metric-card p-2 col-span-2 flex justify-between items-center px-3" style="border-color: var(--accent-primary)">
@@ -422,70 +424,66 @@
                  </div>
              </div>
 
-             <!-- Task Info -->
-             <div>
-                 <h4 id="taskTitle" class="text-[10px] uppercase tracking-widest font-bold mb-2 opacity-50">Task: Sequence Classification</h4>
-                 <div id="taskDesc" class="metric-card p-3 text-xs leading-relaxed opacity-80 min-h-[40px] flex items-center">
-                     <ul class="list-disc pl-3 opacity-90 text-[10px]">
-                         <li><strong>Many-to-One:</strong> We only care about the final prediction at the end of the sentence.</li>
-                         <li><strong>Shared Weights:</strong> The same matrices calculate memory at every step.</li>
-                     </ul>
-                 </div>
+             <!-- Legend -->
+             <div class="flex flex-col gap-1 mt-1">
+                 <div class="legend-item"><div class="legend-color" style="background: var(--cell-state)"></div> <span>Cell State ($C_t$) - Long Term</span></div>
+                 <div class="legend-item"><div class="legend-color" style="background: var(--accent-primary)"></div> <span>Hidden State ($H_t$) - Short Term</span></div>
              </div>
         </div>
     </div>
 
-    <!-- auto-article-vizlearn -->
-    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
+    <!-- Article -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full mt-8">
         <div class="card-container animate-fade-in">
-            <div class="card-header">
-                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">RNNs and Text: A Guide to Sequential Memory</h2>
-                <p class="mt-2 text-sm" style="color: var(--text-muted)">Discover how Recurrent Neural Networks (RNNs) use an internal memory loop to understand the order and context of words in a sentence.</p>
+            <div class="card-header p-5 md:p-7 border-b" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">LSTMs and Text: Mastering Long-Term Memory</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">Discover how Long Short-Term Memory networks use a dual-state architecture to overcome the limitations of standard RNNs.</p>
             </div>
             <div class="p-5 md:p-7 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
                 
-                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-lightbulb"></i>The Power of Memory in Language</h3>
-                    <p>Standard neural networks have a major limitation: they have no memory of the past. They process each input independently. This is a problem for language, where the order of words is crucial. For example, "dog bites man" and "man bites dog" use the same words but have completely different meanings.</p>
-                    <p class="mt-3"><strong>Recurrent Neural Networks (RNNs)</strong> solve this by introducing a <strong>memory loop</strong>. As an RNN reads a sentence word by word, it passes a summary of what it has seen so far to the next step. This summary is called the <strong>hidden state</strong>.</p>
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-exclamation-triangle"></i>The Vanishing Gradient Problem</h3>
+                    <p>Standard Recurrent Neural Networks (RNNs) pass a single "hidden state" forward through time. While great in theory, standard RNNs suffer from the <strong>vanishing gradient problem</strong>. During training, as the network looks back across many time steps (long sentences), the signals necessary to update the weights become microscopically small.</p>
+                    <p class="mt-3">The result? A standard RNN essentially develops "amnesia." By the time it reads the 20th word in a sentence, it has mostly forgotten the 1st word. This makes it terrible at understanding long-range dependencies in text.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-sync-alt"></i>The Unrolled RNN: Step-by-Step Processing</h3>
-                    <p>The visualization above "unrolls" the RNN loop, showing it as a sequence of identical cells, one for each word (or "time step"). Here’s how the information flows:</p>
-                    <ol class="list-decimal pl-6 mt-4 space-y-3">
-                        <li><strong>Time Step 1 (First Word):</strong> The network takes the first word's embedding (a numerical vector, $X_1$) and an initial hidden state ($H_0$, usually all zeros). It processes them to produce an output ($Y_1$) and, most importantly, a new hidden state ($H_1$).</li>
-                        <li><strong>Time Step 2 (Second Word):</strong> The network takes the second word's embedding ($X_2$) and the <em>previous</em> hidden state ($H_1$). This is the memory! $H_1$ contains information about the first word, giving the network context. It then produces a new output ($Y_2$) and an updated hidden state ($H_2$).</li>
-                        <li><strong>And so on...:</strong> This process repeats for every word in the sequence. Each step receives the current word and the memory of all preceding words.</li>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--cell-state)"><i class="fas fa-exchange-alt"></i>The Dual State Solution: Cell and Hidden States</h3>
+                    <p>LSTMs solve this amnesia by introducing a more complex internal structure that passes <strong>two</strong> distinct states forward at every time step (as seen in the visualization):</p>
+                    <ol class="list-decimal pl-6 mt-4 space-y-4">
+                        <li>
+                            <strong style="color: var(--cell-state)">The Cell State ($C_t$):</strong> Often compared to a conveyor belt. It runs straight down the entire chain, with only minor linear interactions. It's very easy for information to flow along it unchanged. This is the LSTM's <em>long-term memory</em>.
+                        </li>
+                        <li>
+                            <strong style="color: var(--accent-primary)">The Hidden State ($H_t$):</strong> This is the LSTM's <em>short-term memory</em> or its "focus" for the current time step. It is derived from the Cell State and is what gets passed up as the output ($Y_t$) for that specific step.
+                        </li>
                     </ol>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas-project-diagram"></i>Shared Weights: The Key to Learning</h3>
-                    <p>A crucial concept in RNNs is <strong>shared weights</strong>. The same set of calculations (the same "brain") is used at every single time step. This is incredibly efficient. Instead of learning a new set of rules for the first word, second word, etc., the RNN learns a single set of rules for how to update its memory based on a new word and its previous memory. The "Parameters" calculation in the visualization shows the size of these shared weights.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-vial"></i>Interactive Exploration Guide</h3>
-                    <p>Use the simulation to see how an RNN performs sentiment analysis (classifying a sentence as positive or negative):</p>
-                    <ol class="list-decimal pl-6 mt-4 space-y-3">
-                        <li><strong>Set the Architecture:</strong> The default is a "Many-to-One" RNN. This is perfect for sentiment analysis because we read many words but only need one final output (the overall sentiment).</li>
-                        <li><strong>Enter a Sentence:</strong> Type a sentence like "AI is very cool" in the "Sentiment Text" box. The "Seq Length" will automatically update to the number of words.</li>
-                        <li><strong>Simulate the Flow:</strong> Click the "Simulate Flow" button. Watch as the hidden state (the green arrow) is passed from one time step to the next. The network reads the sentence left-to-right, updating its memory at each word.</li>
-                        <li><strong>Final Prediction:</strong> In this Many-to-One setup, only the final output from the very last time step is used. This output is passed to a classifier (represented by the "Output Size" of 2: one for positive, one for negative) to make the final sentiment prediction. The network has "read" the whole sentence and is now making a judgment.</li>
-                        <li><strong>Check Parameters:</strong> Click the "Parameters" button. Now, change the "Hidden State" size from 8 to 16. Calculate again. Notice how the number of parameters increases significantly. A larger hidden state allows the network to store more complex information in its memory, but it also makes it more computationally expensive.</li>
-                    </ol>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-door-open"></i>The Four Gates (Why so many parameters?)</h3>
+                    <p>To control what gets added to or removed from the Cell State conveyor belt, the LSTM uses neural network layers called <strong>gates</strong>. Inside every single LSTM cell block shown in the visual, there are actually four separate fully-connected layers operating simultaneously:</p>
+                    <ul class="list-disc pl-6 mt-4 space-y-2 opacity-90">
+                        <li><strong>Forget Gate ($f_t$):</strong> Decides what information to throw away from the past cell state.</li>
+                        <li><strong>Input Gate ($i_t$):</strong> Decides which new values to update in the cell state.</li>
+                        <li><strong>Cell Candidate ($\tilde{C}_t$):</strong> Creates a vector of new candidate values that could be added to the state.</li>
+                        <li><strong>Output Gate ($o_t$):</strong> Decides what parts of the cell state to output as the new Hidden State ($H_t$).</li>
+                    </ul>
+                    <p class="mt-4">Because there are 4 independent layers doing calculations on the inputs ($X_t$) and previous hidden state ($H_{t-1}$), <strong>an LSTM has roughly 4 times as many parameters as a standard RNN</strong> of the same size. Click the <span class="font-bold border px-2 py-1 rounded text-xs" style="border-color: var(--accent-primary); color: var(--accent-primary)">Parameters</span> button to see the math.</p>
                 </div>
 
                 <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Key Takeaway</h3>
-                    <p>RNNs are designed for sequential data like text. Their core feature is the <strong>hidden state</strong>, a memory that is passed through time, allowing the network to remember previous inputs and understand context. By using shared weights, they can efficiently process sequences of any length, making them a cornerstone of modern Natural Language Processing.</p>
+                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Interactive Exploration</h3>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li><strong>Run the Simulation:</strong> Watch the blue data ($X_t$) enter the cell, merge with the past states, and then split into the Cyan conveyor belt ($C_t$) and the Green focus state ($H_t$).</li>
+                        <li><strong>Check Many-to-One vs Many-to-Many:</strong> In Many-to-One (like Sentiment Analysis), only the final $H_t$ is pushed up to the classifier to make the final $Y$ decision. In Many-to-Many (like Language Translation or Text Generation), an output is generated at every step.</li>
+                    </ul>
                 </div>
             </div>
         </div>
     </section>
 
-            <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+    <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
         <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
             <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
                 <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
@@ -500,7 +498,10 @@
     <div id="calculationResultModal" class="modal fixed inset-0 hidden items-center justify-center z-[1001]">
         <div class="modal-content p-6 rounded-xl w-full max-w-4xl m-4 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center mb-6">
-                <h3 class="text-lg font-bold" style="color: var(--accent-primary)">RNN Shared Parameter Calculation</h3>
+                <div>
+                    <h3 class="text-lg font-bold" style="color: var(--accent-primary)">LSTM Shared Parameter Calculation</h3>
+                    <p class="text-xs opacity-70 mt-1">LSTMs have 4 distinct gates (Forget, Input, Candidate, Output), multiplying the core parameter count by 4.</p>
+                </div>
                 <button id="closeCalcModalBtn" class="text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
             </div>
             
@@ -510,7 +511,7 @@
                         <tr class="border-b border-[var(--border-subtle)]">
                             <th class="p-3 text-xs font-bold uppercase opacity-70">Matrix</th>
                             <th class="p-3 text-xs font-bold uppercase opacity-70">Description</th>
-                            <th class="p-3 text-xs font-bold uppercase opacity-70">Formula</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">Formula (4 Gates)</th>
                             <th class="p-3 text-xs font-bold uppercase opacity-70 text-right">Params</th>
                         </tr>
                     </thead>
@@ -524,7 +525,7 @@
                 <div class="metric-card p-4 text-center" style="border-color: var(--accent-primary); background: var(--accent-glow)">
                     <div class="text-xs uppercase font-bold opacity-80" style="color: var(--accent-primary)">Total Shared Parameters</div>
                     <div id="totalParamsResult" class="text-2xl font-bold mt-1" style="color: var(--accent-primary)">0</div>
-                    <div class="text-[10px] mt-1 opacity-70 font-sans">Used across all Time Steps</div>
+                    <div class="text-[10px] mt-1 opacity-70 font-sans">Used repeatedly across all Time Steps</div>
                 </div>
             </div>
         </div>
@@ -570,7 +571,7 @@
         function generateMockOutput(word, size) {
             let out = [];
             for(let i=0; i<size; i++) {
-                out.push(getDeterministicRandom(word, i) * 2 - 1); // -1.0 to +1.0
+                out.push(getDeterministicRandom(word, i) * 2 - 1);
             }
             return out;
         }
@@ -582,11 +583,11 @@
             
             if (lower.includes('love') || lower.includes('great') || lower.includes('good') || 
                 lower.includes('best') || lower.includes('awesome') || lower.includes('artificial intelligence') || 
-                lower.includes('learning')) {
+                lower.includes('learning') || lower.includes('remember') || lower.includes('long')) {
                 score += 1.5;
             }
             if (lower.includes('hate') || lower.includes('bad') || lower.includes('terrible') || 
-                lower.includes('worst') || lower.includes('awful')) {
+                lower.includes('worst') || lower.includes('forget') || lower.includes('amnesia')) {
                 score -= 1.5;
             }
 
@@ -596,7 +597,7 @@
             return [posProb, negProb];
         }
 
-        // --- RNN VISUALIZATION LOGIC ---
+        // --- LSTM VISUALIZATION LOGIC ---
         document.addEventListener('DOMContentLoaded', () => {
             const canvas = document.getElementById('canvas');
             const ctx = canvas.getContext('2d');
@@ -619,9 +620,9 @@
             const stateSizeEl = document.getElementById('stateSize');
             const totalParametersEl = document.getElementById('totalParameters');
 
-            // RNN State
-            let seqLength = 6;
-            let inputSize = 3;
+            // Network State
+            let seqLength = 7;
+            let inputSize = 4;
             let hiddenSize = 8;
             let outputSize = 2; // Default 2 for [Pos, Neg]
             let rnnType = 'many-to-one';
@@ -634,7 +635,7 @@
             let lastY = 0;
 
             // Simulation State
-            let simWords = ["I", "love", "learning", "about", "Artificial", "Intelligence"];
+            let simWords = ["LSTMs", "can", "remember", "contexts", "across", "long", "sentences"];
             let simOutputs = [];
             let finalSentimentArray = [0.85, 0.15]; 
             let isSimulating = false;
@@ -660,7 +661,6 @@
                 seqLength = words.length;
                 seqLengthEl.value = seqLength;
 
-                // Calculate final sentiment array based on the full sentence
                 finalSentimentArray = calculateSentimentProbabilities(simDataInput.value);
 
                 syncOutputs();
@@ -704,7 +704,6 @@
 
             // Theme Helpers
             function getThemeColors() {
-                const isLight = document.body.classList.contains('light-mode');
                 const styles = getComputedStyle(document.body);
                 return {
                     bg: styles.getPropertyValue('--canvas-bg').trim(),
@@ -712,11 +711,13 @@
                     neuronBorder: styles.getPropertyValue('--neuron-border').trim(),
                     connection: styles.getPropertyValue('--connection-line').trim(),
                     accent: styles.getPropertyValue('--accent-primary').trim(),
+                    cellState: styles.getPropertyValue('--cell-state').trim(),
+                    cellConn: styles.getPropertyValue('--connection-cell').trim(),
                     text: styles.getPropertyValue('--text-main').trim(),
                 };
             }
 
-            // Draw Unrolled RNN
+            // Draw Unrolled LSTM
             function drawNetwork() {
                 if (!ctx) return;
                 const colors = getThemeColors();
@@ -741,14 +742,17 @@
                 const blockWidth = 90;
                 const blockHeight = 40;
                 
-                const hiddenBlockWidth = 100;
-                const hiddenBlockHeight = 60; 
+                const hiddenBlockWidth = 110;
+                const hiddenBlockHeight = 90; // Taller for LSTM to fit both states
 
-                const spacingX = 150;
+                const spacingX = 160;
                 const yTop = 130;    
                 const yMid = 280;    
                 const yBot = 430;    
                 const startX = 120;
+
+                const cOffset = -20; // Y offset for Cell State line relative to yMid
+                const hOffset = +20; // Y offset for Hidden State line relative to yMid
 
                 const activeT = isSimulating ? Math.floor(simProgress) : -1;
                 const phase = isSimulating ? (simProgress - activeT) : 0; // 0.0 to 1.0
@@ -769,49 +773,72 @@
 
                 for (let t = 0; t < seqLength; t++) {
                     let centerX = startX + t * spacingX;
-                    ctx.strokeStyle = colors.connection;
                     ctx.globalAlpha = getLineAlpha(t);
                     
-                    // X to H
+                    // X to LSTM
+                    ctx.strokeStyle = colors.connection;
                     ctx.beginPath();
                     ctx.moveTo(centerX, yBot - blockHeight/2);
                     ctx.lineTo(centerX, yMid + hiddenBlockHeight/2);
                     ctx.stroke();
                     drawArrow(ctx, centerX, yMid + hiddenBlockHeight/2 + 5, -Math.PI/2, colors.connection);
 
-                    // H to Y (Fade out non-final Y connections for Many-to-One visualization)
+                    // LSTM to Y (From Hidden State path)
                     let showY = rnnType === 'many-to-many' || t === seqLength - 1 || (!isSimulating && !simComplete);
                     if(showY) {
                         ctx.beginPath();
-                        ctx.moveTo(centerX, yMid - hiddenBlockHeight/2);
+                        ctx.moveTo(centerX, yMid + cOffset); // Drawing output from center top
                         ctx.lineTo(centerX, yTop + blockHeight/2);
                         ctx.stroke();
                         drawArrow(ctx, centerX, yTop + blockHeight/2 + 5, -Math.PI/2, colors.connection);
                     }
 
-                    // Recurrence
+                    // Recurrence C (Cell State)
                     if (t < seqLength - 1) {
+                        ctx.strokeStyle = colors.cellConn;
                         ctx.beginPath();
-                        ctx.moveTo(centerX + hiddenBlockWidth/2, yMid);
-                        ctx.lineTo(centerX + spacingX - hiddenBlockWidth/2, yMid);
+                        ctx.moveTo(centerX + hiddenBlockWidth/2, yMid + cOffset);
+                        ctx.lineTo(centerX + spacingX - hiddenBlockWidth/2, yMid + cOffset);
                         ctx.stroke();
-                        drawArrow(ctx, centerX + spacingX - hiddenBlockWidth/2 - 5, yMid, 0, colors.connection);
+                        drawArrow(ctx, centerX + spacingX - hiddenBlockWidth/2 - 5, yMid + cOffset, 0, colors.cellConn);
+                    }
+                    // Recurrence H (Hidden State)
+                    if (t < seqLength - 1) {
+                        ctx.strokeStyle = colors.connection;
+                        ctx.beginPath();
+                        ctx.moveTo(centerX + hiddenBlockWidth/2, yMid + hOffset);
+                        ctx.lineTo(centerX + spacingX - hiddenBlockWidth/2, yMid + hOffset);
+                        ctx.stroke();
+                        drawArrow(ctx, centerX + spacingX - hiddenBlockWidth/2 - 5, yMid + hOffset, 0, colors.connection);
                     }
                 }
 
-                // Initial Hidden State Arrow
+                // Initial States Arrows
                 ctx.globalAlpha = getLineAlpha(0);
                 ctx.setLineDash([5, 5]);
+                
+                // Initial C
+                ctx.strokeStyle = colors.cellConn;
                 ctx.beginPath();
-                ctx.moveTo(startX - spacingX + hiddenBlockWidth/2, yMid);
-                ctx.lineTo(startX - hiddenBlockWidth/2, yMid);
+                ctx.moveTo(startX - spacingX + hiddenBlockWidth/2, yMid + cOffset);
+                ctx.lineTo(startX - hiddenBlockWidth/2, yMid + cOffset);
                 ctx.stroke();
-                drawArrow(ctx, startX - hiddenBlockWidth/2 - 5, yMid, 0, colors.connection);
+                drawArrow(ctx, startX - hiddenBlockWidth/2 - 5, yMid + cOffset, 0, colors.cellConn);
+                
+                // Initial H
+                ctx.strokeStyle = colors.connection;
+                ctx.beginPath();
+                ctx.moveTo(startX - spacingX + hiddenBlockWidth/2, yMid + hOffset);
+                ctx.lineTo(startX - hiddenBlockWidth/2, yMid + hOffset);
+                ctx.stroke();
+                drawArrow(ctx, startX - hiddenBlockWidth/2 - 5, yMid + hOffset, 0, colors.connection);
+                
                 ctx.setLineDash([]);
                 ctx.fillStyle = colors.text;
                 ctx.font = `12px 'Space Grotesk'`;
                 ctx.textAlign = 'right';
-                ctx.fillText('H_init', startX - spacingX + hiddenBlockWidth/2 - 10, yMid + 4);
+                ctx.fillText('C_init', startX - spacingX + hiddenBlockWidth/2 - 10, yMid + cOffset + 4);
+                ctx.fillText('H_init', startX - spacingX + hiddenBlockWidth/2 - 10, yMid + hOffset + 4);
                 
                 ctx.globalAlpha = 1.0;
 
@@ -820,27 +847,31 @@
                     let centerX = startX + activeT * spacingX;
                     if (phase < 0.4) {
                         let p = phase / 0.4;
+                        // Data flowing in
                         drawMovingDot(ctx, centerX, yBot - blockHeight/2, centerX, yMid + hiddenBlockHeight/2, p, '#3b82f6');
                         if (activeT > 0) {
-                            drawMovingDot(ctx, centerX - spacingX + hiddenBlockWidth/2, yMid, centerX - hiddenBlockWidth/2, yMid, p, colors.accent);
+                            drawMovingDot(ctx, centerX - spacingX + hiddenBlockWidth/2, yMid + cOffset, centerX - hiddenBlockWidth/2, yMid + cOffset, p, colors.cellState);
+                            drawMovingDot(ctx, centerX - spacingX + hiddenBlockWidth/2, yMid + hOffset, centerX - hiddenBlockWidth/2, yMid + hOffset, p, colors.accent);
                         } else {
-                            drawMovingDot(ctx, startX - spacingX + hiddenBlockWidth/2, yMid, startX - hiddenBlockWidth/2, yMid, p, colors.accent);
+                            drawMovingDot(ctx, startX - spacingX + hiddenBlockWidth/2, yMid + cOffset, startX - hiddenBlockWidth/2, yMid + cOffset, p, colors.cellState);
+                            drawMovingDot(ctx, startX - spacingX + hiddenBlockWidth/2, yMid + hOffset, startX - hiddenBlockWidth/2, yMid + hOffset, p, colors.accent);
                         }
                     }
                     if (phase >= 0.4 && phase < 0.8) { 
                         let showYDot = rnnType === 'many-to-many' || activeT === seqLength - 1;
                         if (showYDot) {
                             let p = (phase - 0.4) / 0.4;
-                            drawMovingDot(ctx, centerX, yMid - hiddenBlockHeight/2, centerX, yTop + blockHeight/2, p, '#f59e0b');
+                            drawMovingDot(ctx, centerX, yMid + cOffset, centerX, yTop + blockHeight/2, p, '#f59e0b');
                         }
                     }
                     if (phase >= 0.8 && activeT < seqLength - 1) {
                         let p = (phase - 0.8) / 0.2;
-                        drawMovingDot(ctx, centerX + hiddenBlockWidth/2, yMid, centerX + spacingX - hiddenBlockWidth/2, yMid, p, colors.accent);
+                        drawMovingDot(ctx, centerX + hiddenBlockWidth/2, yMid + cOffset, centerX + spacingX - hiddenBlockWidth/2, yMid + cOffset, p, colors.cellState);
+                        drawMovingDot(ctx, centerX + hiddenBlockWidth/2, yMid + hOffset, centerX + spacingX - hiddenBlockWidth/2, yMid + hOffset, p, colors.accent);
                     }
                 }
 
-                // 3. Draw Nodes (Vector Blocks & RNN Cells)
+                // 3. Draw Nodes (Vector Blocks & LSTM Cells)
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 
@@ -858,8 +889,8 @@
                     ctx.globalAlpha = blockAlpha;
                     drawBlock(ctx, centerX, yBot, blockWidth, blockHeight, isXActive ? '#3b82f6' : colors.neuronFill, '#3b82f6', `X_${t} (${inputSize})`, isXActive ? '#fff' : colors.text, isXActive);
                     
-                    // Hidden Cell
-                    drawHiddenCell(ctx, centerX, yMid, hiddenBlockWidth, hiddenBlockHeight, isHActive ? colors.accent : colors.neuronFill, colors.accent, `H_${t} (${hiddenSize})`, isHActive ? '#000' : colors.text, isHActive);
+                    // Hidden Cell (LSTM)
+                    drawLSTMCell(ctx, centerX, yMid, hiddenBlockWidth, hiddenBlockHeight, isHActive ? colors.accent : colors.neuronFill, colors.accent, `LSTM Cell ${t}`, isHActive ? '#000' : colors.text, isHActive, cOffset, hOffset, colors);
                     
                     // Output Block (Dim non-final blocks entirely if Many-to-One simulation is active)
                     let drawYBlock = rnnType === 'many-to-many' || t === seqLength - 1 || (!isSimulating && !simComplete);
@@ -953,7 +984,6 @@
                     ctx.font = `bold 13px 'Space Grotesk'`;
                     ctx.fillText(badgeText, lastX, badgeY - 5);
                 } else if ((isFinalStep || simComplete) && outputSize !== 2) {
-                    // Fallback array generation for non-sentiment output sizes
                     let lastX = startX + (seqLength - 1) * spacingX;
                     let badgeY = yTop - blockHeight - 30;
                     let mockArr = generateMockOutput("final", outputSize);
@@ -990,7 +1020,8 @@
                 ctx.fillText(text, x, y);
             }
 
-            function drawHiddenCell(ctx, x, y, w, h, fill, stroke, text, textColor, isGlow) {
+            // Custom LSTM Cell Drawing
+            function drawLSTMCell(ctx, x, y, w, h, fill, stroke, text, textColor, isGlow, cOffset, hOffset, colors) {
                 ctx.beginPath();
                 ctx.roundRect(x - w/2, y - h/2, w, h, 8); 
                 
@@ -1006,21 +1037,55 @@
                 ctx.strokeStyle = stroke;
                 ctx.lineWidth = 2 / scale;
                 ctx.stroke();
-                
-                // The internal "tanh" operation visual
-                ctx.fillStyle = isGlow ? stroke : 'rgba(255,255,255,0.05)';
+
+                // Draw Internal C line (Conveyor belt)
                 ctx.beginPath();
-                ctx.roundRect(x - 22, y + 8, 44, 16, 4);
-                ctx.fill();
+                ctx.moveTo(x - w/2, y + cOffset);
+                ctx.lineTo(x + w/2, y + cOffset);
+                ctx.strokeStyle = colors.cellState;
+                ctx.lineWidth = 3 / scale;
+                ctx.stroke();
+
+                // Draw Internal H line
+                ctx.beginPath();
+                ctx.moveTo(x - w/2, y + hOffset);
+                ctx.lineTo(x + w/2, y + hOffset);
+                ctx.strokeStyle = isGlow ? '#000' : stroke;
+                ctx.lineWidth = 1.5 / scale;
+                ctx.setLineDash([3, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
                 
-                ctx.fillStyle = isGlow ? '#000' : stroke;
-                ctx.font = `bold 10px 'JetBrains Mono'`;
-                ctx.fillText('tanh', x, y + 16);
+                // Four Gates abstract representation
+                ctx.fillStyle = isGlow ? stroke : 'rgba(255,255,255,0.05)';
+                let gateW = 16, gateH = 16;
+                let startGateX = x - w/2 + 15;
+                let gateSpacing = 22;
+                let gateY = y + 2;
+
+                const gateLabels = ['f', 'i', 'c', 'o'];
                 
-                // Text
+                for(let i=0; i<4; i++) {
+                    ctx.beginPath();
+                    ctx.roundRect(startGateX + i*gateSpacing - gateW/2, gateY - gateH/2, gateW, gateH, 4);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = isGlow ? '#000' : stroke;
+                    ctx.font = `italic 10px 'JetBrains Mono'`;
+                    ctx.fillText(gateLabels[i], startGateX + i*gateSpacing, gateY + 1);
+                    ctx.fillStyle = isGlow ? stroke : 'rgba(255,255,255,0.05)';
+                }
+                
+                // Labels for ports
+                ctx.fillStyle = isGlow ? '#000' : colors.text;
+                ctx.font = `9px 'Space Grotesk'`;
+                ctx.fillText('C', x + w/2 - 10, y + cOffset - 8);
+                ctx.fillText('H', x + w/2 - 10, y + hOffset - 8);
+                
+                // Text Title
                 ctx.fillStyle = textColor;
-                ctx.font = `bold 14px 'JetBrains Mono'`;
-                ctx.fillText(text, x, y - 8);
+                ctx.font = `bold 12px 'JetBrains Mono'`;
+                ctx.fillText(text, x, y - h/2 + 12);
             }
 
             function drawArrow(ctx, x, y, angle, color) {
@@ -1098,13 +1163,13 @@
                 else startSimulation();
             });
 
-            // Parameters Math
+            // Parameters Math for LSTM (Multiplied by 4 for the 4 gates)
             function calculateParams() {
-                const whx = inputSize * hiddenSize;
-                const whh = hiddenSize * hiddenSize;
-                const bh = hiddenSize;
-                const wyh = hiddenSize * outputSize;
-                const by = outputSize;
+                const whx = 4 * (inputSize * hiddenSize); // 4 gates * Input->Hidden
+                const whh = 4 * (hiddenSize * hiddenSize); // 4 gates * Hidden->Hidden
+                const bh = 4 * hiddenSize;                 // 4 gates * Bias
+                const wyh = hiddenSize * outputSize;       // Final Hidden to Output (Not part of cell internal gates)
+                const by = outputSize;                     // Output Bias
                 return { whx, whh, bh, wyh, by, total: whx + whh + bh + wyh + by };
             }
 
@@ -1114,81 +1179,6 @@
                 
                 const params = calculateParams();
                 totalParametersEl.textContent = params.total.toLocaleString();
-
-                const taskTitle = document.getElementById('taskTitle');
-                const taskDesc = document.getElementById('taskDesc');
-                if (rnnType === 'many-to-one') {
-                    taskTitle.innerHTML = "Task: Sequence Classification";
-                    taskDesc.innerHTML = `
-                        <ul class="list-disc pl-3 opacity-90 text-[10px]">
-                            <li><strong>Many-to-One:</strong> We only care about the final prediction at the end of the sequence.</li>
-                            <li><strong>Shared Weights:</strong> The same matrices calculate memory at every step.</li>
-                        </ul>`;
-                } else {
-                    taskTitle.innerHTML = "Task: Sequence-to-Sequence";
-                    taskDesc.innerHTML = `
-                        <ul class="list-disc pl-3 opacity-90 text-[10px]">
-                            <li><strong>Many-to-Many:</strong> A prediction ($Y_t$) is made at every single time step.</li>
-                            <li><strong>Shared Weights:</strong> The same matrices calculate memory and output at every step.</li>
-                        </ul>`;
-                }
-
-                // Update Article Dynamic Table
-                const dynArticle = document.getElementById('dynamic-article-calc');
-                if(dynArticle) {
-                    dynArticle.innerHTML = `
-                        <table class="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr style="background: var(--input-bg); color: var(--text-main)">
-                                    <th class="p-4 border-b border-r" style="border-color: var(--border-subtle)">Matrix</th>
-                                    <th class="p-4 border-b border-r" style="border-color: var(--border-subtle)">Description</th>
-                                    <th class="p-4 border-b border-r" style="border-color: var(--border-subtle)">Math</th>
-                                    <th class="p-4 border-b text-right font-bold" style="border-color: var(--border-subtle)">Parameters</th>
-                                </tr>
-                            </thead>
-                            <tbody class="mono-font text-xs">
-                                <tr class="transition-colors hover:bg-white/5">
-                                    <td class="p-3 border-b border-r font-sans font-bold text-blue-400" style="border-color: var(--border-subtle)">$W_{hx}$</td>
-                                    <td class="p-3 border-b border-r font-sans" style="border-color: var(--border-subtle)">Input to Hidden</td>
-                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$${inputSize} \\times ${hiddenSize}$</td>
-                                    <td class="p-3 border-b text-right font-bold" style="border-color: var(--border-subtle)">${params.whx}</td>
-                                </tr>
-                                <tr class="transition-colors hover:bg-white/5">
-                                    <td class="p-3 border-b border-r font-sans font-bold text-green-400" style="border-color: var(--border-subtle)">$W_{hh}$</td>
-                                    <td class="p-3 border-b border-r font-sans" style="border-color: var(--border-subtle)">Hidden to Hidden (Recurrent)</td>
-                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$${hiddenSize} \\times ${hiddenSize}$</td>
-                                    <td class="p-3 border-b text-right font-bold" style="border-color: var(--border-subtle)">${params.whh}</td>
-                                </tr>
-                                <tr class="transition-colors hover:bg-white/5">
-                                    <td class="p-3 border-b border-r font-sans font-bold text-gray-400" style="border-color: var(--border-subtle)">$b_h$</td>
-                                    <td class="p-3 border-b border-r font-sans" style="border-color: var(--border-subtle)">Hidden Bias</td>
-                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$${hiddenSize}$</td>
-                                    <td class="p-3 border-b text-right font-bold" style="border-color: var(--border-subtle)">${params.bh}</td>
-                                </tr>
-                                <tr class="transition-colors hover:bg-white/5">
-                                    <td class="p-3 border-b border-r font-sans font-bold text-amber-500" style="border-color: var(--border-subtle)">$W_{yh}$</td>
-                                    <td class="p-3 border-b border-r font-sans" style="border-color: var(--border-subtle)">Hidden to Output</td>
-                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$${hiddenSize} \\times ${outputSize}$</td>
-                                    <td class="p-3 border-b text-right font-bold" style="border-color: var(--border-subtle)">${params.wyh}</td>
-                                </tr>
-                                <tr class="transition-colors hover:bg-white/5">
-                                    <td class="p-3 border-b border-r font-sans font-bold text-gray-400" style="border-color: var(--border-subtle)">$b_y$</td>
-                                    <td class="p-3 border-b border-r font-sans" style="border-color: var(--border-subtle)">Output Bias</td>
-                                    <td class="p-3 border-b border-r text-indigo-400" style="border-color: var(--border-subtle)">$${outputSize}$</td>
-                                    <td class="p-3 border-b text-right font-bold" style="border-color: var(--border-subtle)">${params.by}</td>
-                                </tr>
-                                <tr style="background: var(--bg-surface)">
-                                    <td colspan="3" class="p-4 text-right font-sans font-bold uppercase tracking-wider text-xs" style="color: var(--accent-primary)">Total Shared Network Parameters</td>
-                                    <td class="p-4 text-right font-bold text-lg" style="color: var(--accent-primary)">${params.total}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    `;
-                    // Retypeset mathjax dynamically
-                    if (window.MathJax && window.MathJax.typesetPromise) {
-                        window.MathJax.typesetPromise([dynArticle]).catch(()=>console.log('MathJax Error'));
-                    }
-                }
             }
 
             // Global redraw
@@ -1198,7 +1188,7 @@
             };
 
             function resetView() {
-                const width = seqLength * 150 + 200; // rough width estimation
+                const width = seqLength * 160 + 200; // rough width estimation
                 const height = 500; // fixed virt height
                 
                 const rect = canvas.getBoundingClientRect();
@@ -1291,13 +1281,13 @@
             resetNetworkBtn.addEventListener('click', () => {
                 if(isSimulating) stopSimulation();
                 simProgress = 0;
-                seqLengthEl.value = 6;
-                inputSizeEl.value = 3;
+                seqLengthEl.value = 7;
+                inputSizeEl.value = 4;
                 hiddenSizeEl.value = 8;
                 outputSizeEl.value = 2;
                 rnnTypeEl.value = 'many-to-one';
                 rnnType = 'many-to-one';
-                simDataInput.value = "I love learning about Artificial Intelligence";
+                simDataInput.value = "LSTMs can remember contexts across long sentences";
                 updateFromInputs();
                 resetView();
             });
@@ -1311,25 +1301,25 @@
                 tbody.innerHTML = `
                     <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
                         <td class="p-3 font-bold text-blue-400">W_hx</td>
-                        <td class="p-3">Input $\\to$ Hidden</td>
-                        <td class="p-3">${inputSize} &times; ${hiddenSize}</td>
+                        <td class="p-3">Input $\\to$ Gates</td>
+                        <td class="p-3">4 &times; (${inputSize} &times; ${hiddenSize})</td>
                         <td class="p-3 text-right font-bold text-blue-400">${params.whx}</td>
                     </tr>
                     <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
                         <td class="p-3 font-bold text-green-400">W_hh</td>
-                        <td class="p-3">Hidden $\\to$ Hidden</td>
-                        <td class="p-3">${hiddenSize} &times; ${hiddenSize}</td>
+                        <td class="p-3">Hidden $\\to$ Gates</td>
+                        <td class="p-3">4 &times; (${hiddenSize} &times; ${hiddenSize})</td>
                         <td class="p-3 text-right font-bold text-green-400">${params.whh}</td>
                     </tr>
                     <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
                         <td class="p-3 font-bold text-gray-400">b_h</td>
-                        <td class="p-3">Hidden Bias</td>
-                        <td class="p-3">${hiddenSize}</td>
+                        <td class="p-3">Gate Biases</td>
+                        <td class="p-3">4 &times; ${hiddenSize}</td>
                         <td class="p-3 text-right font-bold text-gray-400">${params.bh}</td>
                     </tr>
                     <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
                         <td class="p-3 font-bold text-amber-500">W_yh</td>
-                        <td class="p-3">Hidden $\\to$ Output</td>
+                        <td class="p-3">Final Hidden $\\to$ Output</td>
                         <td class="p-3">${hiddenSize} &times; ${outputSize}</td>
                         <td class="p-3 text-right font-bold text-amber-500">${params.wyh}</td>
                     </tr>
@@ -1365,7 +1355,7 @@
             syncData();
             setTimeout(resetView, 100); 
         });
-    
+
         // ===== DROPDOWN SEARCH FUNCTIONALITY =====
         const allCourses = [
             { title: "Calculating Parameters in CNN", path: "computer_vision/calculating_parameters_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
@@ -1554,7 +1544,6 @@
                 }
             });
         }
-
     </script>
 </body>
 </html>
