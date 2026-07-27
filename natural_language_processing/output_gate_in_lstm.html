@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VizLearn - How LSTM Processes Text</title>
-    <meta name="description" content="Learn How LSTM Processes Text with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn.">
-    <meta name="keywords" content="How LSTM Processes Text, interactive learning, beginner tutorial, vizlearn, Long Short-Term Memory">
+    <title>VizLearn - Output Gate in LSTM</title>
+    <meta name="description" content="Interactive walkthrough of the Output Gate in an LSTM cell - see how it filters the cell state through tanh to produce the hidden state that the rest of the network sees.">
+    <meta name="keywords" content="output gate, LSTM, hidden state, cell state, tanh, vizlearn, deep learning">
     <meta name="robots" content="index, follow">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -75,6 +75,7 @@
             --accent-glow: rgba(74, 222, 128, 0.25);
             --cell-state: #06b6d4; /* Cyan for Cell State */
             --cell-state-glow: rgba(6, 182, 212, 0.25);
+            --gate-color: #f59e0b; /* Amber for Gates */
             --text-main: #f0fdf4;
             --text-muted: #86efac;
             --card-bg: #0a0a0a;
@@ -101,6 +102,7 @@
             --accent-glow: rgba(21, 128, 61, 0.2);
             --cell-state: #0891b2;
             --cell-state-glow: rgba(8, 145, 178, 0.2);
+            --gate-color: #b45309; 
             --text-main: #052e16;
             --text-muted: #4b5563;
             --card-bg: #ffffff;
@@ -225,15 +227,6 @@
             color: var(--accent-primary);
             background: var(--input-focus-bg);
         }
-        .viz-btn-danger {
-            background: #ef4444;
-            color: white;
-            box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
-        }
-        .viz-btn-danger:hover:not(:disabled) {
-            filter: brightness(1.1);
-            box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
-        }
 
         #canvas {
             background-color: var(--canvas-bg);
@@ -271,6 +264,32 @@
         .legend-item { display: flex; align-items: center; gap: 6px; font-size: 10px; opacity: 0.8; }
         .legend-color { width: 10px; height: 10px; border-radius: 2px; }
 
+
+        /* --- Gate Lab (per-gate interactive panel) --- */
+        .gate-lab {
+            position: absolute;
+            left: 1rem;
+            bottom: 1rem;
+            width: 300px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            z-index: 30;
+            opacity: 0.96;
+            transition: opacity 0.3s;
+        }
+        .gate-lab:hover { opacity: 1; }
+        .lab-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; opacity: 0.75; margin-bottom: 6px; }
+        .lab-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; opacity: 1; color: var(--gate-color); }
+        .lab-slider { width: 100%; accent-color: var(--gate-color); margin-bottom: 12px; cursor: pointer; }
+        .lab-eq { background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px 10px; font-size: 11px; text-align: center; margin-bottom: 12px; color: var(--text-main); }
+        .lab-row { display: flex; justify-content: space-between; font-size: 10px; opacity: 0.75; margin-bottom: 3px; }
+        .lab-bar { height: 8px; border-radius: 4px; background: var(--input-bg); border: 1px solid var(--border-subtle); overflow: hidden; margin-bottom: 10px; }
+        .lab-fill { height: 100%; width: 0%; border-radius: 4px; background: var(--gate-color); transition: width 0.25s ease; }
+        .lab-fill.neg { background: #ef4444; }
+        .lab-note { font-size: 10.5px; line-height: 1.5; opacity: 0.8; border-top: 1px solid var(--border-subtle); padding-top: 8px; margin-top: 2px; }
+
         /* Search Dropdown Styles */
         .search-input-wrapper { background: var(--input-bg); border: 1px solid var(--border-subtle); position: relative; }
         .search-input-wrapper:focus-within { background: var(--input-focus-bg); border-color: var(--accent-primary); box-shadow: 0 0 15px var(--accent-glow); }
@@ -295,7 +314,6 @@
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-
         gtag('config', 'G-ZT6JM33V5J');
     </script>
 </head>
@@ -336,9 +354,9 @@
             <span>/</span>
             <span>Deep Learning</span>
         </div>
-        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">How LSTM Processes Text</h1>
+        <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Output Gate in LSTM</h1>
         <p class="mt-2 text-sm md:text-base max-w-2xl opacity-80" style="color: var(--text-muted)">
-            Visualize how <strong>Long Short-Term Memory</strong> networks pass both a Cell State (long-term memory) and a Hidden State (short-term memory) forward to process sequences.
+            Zoom in on the final gate. The <strong>Output Gate</strong> ($o_t$) decides how much of the cell's private memory becomes the visible hidden state $H_t$ &mdash; the only thing the rest of the network ever sees.
         </p>
     </div>
 
@@ -348,87 +366,75 @@
         <div class="toolbar-container flex flex-wrap items-center gap-4 justify-between border-t border-[var(--border-subtle)]">
             <div class="flex items-center gap-3 overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
                 <div class="flex items-center gap-2">
-                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Architecture</label>
-                    <select id="rnnType" class="viz-input text-center">
-                        <option value="many-to-one">Many-to-One</option>
-                        <option value="many-to-many">Many-to-Many</option>
-                    </select>
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-blue-400">Input Vector ($X_t$)</label>
+                    <input type="number" id="inputSize" value="4" min="1" max="50" class="viz-input w-16 text-center border-blue-500/50">
                 </div>
                 <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
                 <div class="flex items-center gap-2">
-                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Seq Length (Time)</label>
-                    <input type="number" id="seqLength" value="6" min="1" max="15" class="viz-input w-16 text-center border-indigo-500/50">
-                </div>
-                <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
-                <div class="flex items-center gap-2">
-                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap">Input Size (X)</label>
-                    <input type="number" id="inputSize" value="4" min="1" max="50" class="viz-input w-16 text-center">
-                </div>
-                <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
-                <div class="flex items-center gap-2">
-                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-accent-primary" style="color: var(--accent-primary)" title="Applies to both C_t and H_t">State Size (C & H)</label>
+                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-accent-primary" style="color: var(--accent-primary)">State Size ($H_t$ & $C_t$)</label>
                     <input type="number" id="hiddenSize" value="8" min="1" max="50" class="viz-input w-16 text-center border-green-500/50">
-                </div>
-                <div class="w-px h-6 bg-[var(--border-subtle)]"></div>
-                <div class="flex items-center gap-2">
-                    <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap text-amber-500" title="2 Outputs = [Prob Positive, Prob Negative]">Output Size (Y)</label>
-                    <input type="number" id="outputSize" value="2" min="1" max="50" class="viz-input w-16 text-center border-amber-500/50">
                 </div>
             </div>
 
             <div class="flex items-center gap-2 ml-auto">
                 <button id="centerCanvasBtn" class="viz-btn viz-btn-secondary" title="Center View"><i class="fas fa-crosshairs"></i></button>
-                <button id="resetNetworkBtn" class="viz-btn viz-btn-secondary" title="Reset"><i class="fas fa-undo"></i></button>
                 <button id="calculateBtn" class="viz-btn viz-btn-primary"><i class="fas fa-calculator mr-2"></i> Parameters</button>
             </div>
         </div>
 
         <!-- Data Simulation Toolbar -->
-        <div class="toolbar-container flex flex-wrap items-center gap-4 bg-black/10">
-            <div class="flex items-center gap-3 flex-1 min-w-[250px]">
-                <label class="text-[10px] font-bold uppercase tracking-wide opacity-70 whitespace-nowrap"><i class="fas fa-comment-dots mr-1"></i> Sentiment Text</label>
-                <input type="text" id="simDataInput" value="LSTMs can remember contexts across long sentences" class="viz-input flex-1 font-mono text-sm border-indigo-500/30 focus:border-indigo-500" placeholder="Type a sentence to analyze sentiment...">
-            </div>
-            <button id="simPlayBtn" class="viz-btn viz-btn-primary bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_10px_rgba(79,70,229,0.4)] flex items-center gap-2 whitespace-nowrap">
-                <i class="fas fa-play" id="simPlayIcon"></i> <span id="simPlayText">Simulate Flow</span>
+        <div class="toolbar-container flex flex-wrap items-center justify-center gap-4 bg-black/10 py-4">
+            <button id="simPlayBtn" class="viz-btn viz-btn-primary bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.5)] flex items-center gap-2 whitespace-nowrap text-sm px-6 py-2">
+                <i class="fas fa-play" id="simPlayIcon"></i> <span id="simPlayText">Simulate Cell Operation</span>
             </button>
+            <div id="simStatus" class="mono-font text-xs opacity-70 font-bold tracking-widest uppercase w-48 text-center text-indigo-400">Waiting for Data...</div>
         </div>
     </div>
 
     <!-- Canvas Area -->
-    <div class="relative w-full h-[60vh] min-h-[500px] border-b shrink-0 overflow-hidden animate-fade-in" style="border-color: var(--border-subtle); background: var(--canvas-bg);">
+    <div class="relative w-full h-[65vh] min-h-[550px] border-b shrink-0 overflow-hidden animate-fade-in" style="border-color: var(--border-subtle); background: var(--canvas-bg);">
         <!-- Canvas -->
         <canvas id="canvas" class="block w-full h-full"></canvas>
 
         <!-- Floating Stats Panel -->
         <div class="floating-panel p-4 flex flex-col gap-4 pointer-events-auto">
              <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
-                 <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--accent-primary)">
-                    <i class="fas fa-memory mr-2"></i> LSTM Analysis
+                 <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--gate-color)">
+                    <i class="fas fa-microscope mr-2"></i> Studying: Output Gate ($o_t$)
                 </h3>
              </div>
              
-             <!-- Network Stats -->
-             <div class="grid grid-cols-2 gap-2">
-                 <div class="metric-card p-2 text-center border-indigo-500/30">
-                     <span class="block text-[10px] uppercase opacity-60 text-indigo-400">Time Steps</span>
-                     <span id="totalSteps" class="font-bold mono-font text-sm text-indigo-400">-</span>
-                 </div>
-                 <div class="metric-card p-2 text-center" style="border-color: var(--border-subtle)">
-                     <span class="block text-[10px] uppercase opacity-60">State Size</span>
-                     <span id="stateSize" class="font-bold mono-font text-sm" style="color: var(--text-main)">-</span>
-                 </div>
-                 <div class="metric-card p-2 col-span-2 flex justify-between items-center px-3" style="border-color: var(--accent-primary)">
-                     <span class="text-[10px] uppercase opacity-80" style="color: var(--accent-primary)">Shared Parameters</span>
-                     <span id="totalParameters" class="font-bold mono-font text-sm" style="color: var(--accent-primary)">-</span>
-                 </div>
+             <!-- Legend -->
+             <div class="flex flex-col gap-2 mt-1">
+                 <div class="legend-item"><div class="legend-color" style="background: var(--cell-state)"></div> <span class="font-bold text-xs">$C_{t-1} \to C_t$ (Cell State)</span></div>
+                 <div class="legend-item"><div class="legend-color" style="background: var(--accent-primary)"></div> <span class="font-bold text-xs">$H_{t-1} \to H_t$ (Hidden State)</span></div>
+                 <div class="legend-item"><div class="legend-color bg-blue-500"></div> <span class="font-bold text-xs">$X_t$ (New Input Data)</span></div>
+                 <div class="legend-item"><div class="legend-color" style="background: var(--gate-color)"></div> <span class="text-xs">Neural Network Gates (W)</span></div>
              </div>
 
-             <!-- Legend -->
-             <div class="flex flex-col gap-1 mt-1">
-                 <div class="legend-item"><div class="legend-color" style="background: var(--cell-state)"></div> <span>Cell State ($C_t$) - Long Term</span></div>
-                 <div class="legend-item"><div class="legend-color" style="background: var(--accent-primary)"></div> <span>Hidden State ($H_t$) - Short Term</span></div>
+             <div class="border-t border-[var(--border-subtle)] pt-3 mt-1">
+                 <div class="text-[10px] uppercase opacity-70 font-bold mb-1">Mathematical Operations</div>
+                 <div class="flex items-center gap-2 text-xs mb-1"><div class="w-4 h-4 rounded-full border border-current flex items-center justify-center opacity-80">$\times$</div> Pointwise Multiplication</div>
+                 <div class="flex items-center gap-2 text-xs"><div class="w-4 h-4 rounded-full border border-current flex items-center justify-center opacity-80">$+$</div> Pointwise Addition</div>
              </div>
+        </div>
+        <!-- Gate Lab -->
+        <div class="gate-lab p-4">
+            <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 mb-3">
+                <h3 class="font-bold text-xs uppercase tracking-wide" style="color: var(--gate-color)">
+                    <i class="fas fa-flask mr-2"></i> Output Gate Lab
+                </h3>
+            </div>
+            <label class="lab-label">Output gate $o_t$ <span class="lab-val" id="oVal">0.50</span></label>
+            <input type="range" id="oSlider" min="0" max="1" step="0.01" value="0.5" class="lab-slider">
+            <label class="lab-label">Cell state $C_t$ <span class="lab-val" id="csVal">1.50</span></label>
+            <input type="range" id="csSlider" min="-3" max="3" step="0.05" value="1.5" class="lab-slider">
+            <div class="lab-eq mono-font" id="oEq">H_t = 0.50 &times; tanh(1.50) = 0.453</div>
+            <div class="lab-row"><span>memory held (|C_t|)</span><span class="mono-font" id="memAmt">1.500</span></div>
+            <div class="lab-bar"><div class="lab-fill" id="memBar" style="background: var(--cell-state)"></div></div>
+            <div class="lab-row"><span>revealed as H_t</span><span class="mono-font" id="hAmt">0.453</span></div>
+            <div class="lab-bar"><div class="lab-fill" id="hBar"></div></div>
+            <p class="lab-note" id="oNote"></p>
         </div>
     </div>
 
@@ -436,48 +442,54 @@
     <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full mt-8">
         <div class="card-container animate-fade-in">
             <div class="card-header p-5 md:p-7 border-b" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">LSTMs and Text: Mastering Long-Term Memory</h2>
-                <p class="mt-2 text-sm" style="color: var(--text-muted)">Discover how Long Short-Term Memory networks use a dual-state architecture to overcome the limitations of standard RNNs.</p>
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">The Output Gate: Deciding What to Reveal</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">The cell state is private. The hidden state is public. The Output Gate is the filter between them &mdash; and that separation is one of the most under-appreciated ideas in the LSTM.</p>
             </div>
             <div class="p-5 md:p-7 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
-                
+
                 <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--bg-surface)">
-                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-exclamation-triangle"></i>The Vanishing Gradient Problem</h3>
-                    <p>Standard Recurrent Neural Networks (RNNs) pass a single "hidden state" forward through time. While great in theory, standard RNNs suffer from the <strong>vanishing gradient problem</strong>. During training, as the network looks back across many time steps (long sentences), the signals necessary to update the weights become microscopically small.</p>
-                    <p class="mt-3">The result? A standard RNN essentially develops "amnesia." By the time it reads the 20th word in a sentence, it has mostly forgotten the 1st word. This makes it terrible at understanding long-range dependencies in text.</p>
+                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--gate-color)"><i class="fas fa-eye"></i>What the Gate Actually Is</h3>
+                    <p>A third sigmoid layer, computed from the same merged input as the others:</p>
+                    <p class="my-3 text-center">$$o_t = \sigma(W_o \cdot [H_{t-1}, X_t] + b_o)$$</p>
+                    <p>It is applied only at the very end, to the <em>already updated</em> cell state, after that state has been squashed by $\tanh$:</p>
+                    <p class="my-3 text-center">$$H_t = o_t \odot \tanh(C_t)$$</p>
+                    <p>Note the ordering carefully: the memory is updated first, then filtered. The Output Gate never changes what is stored &mdash; it only changes what is <strong>shown</strong>.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--cell-state)"><i class="fas fa-exchange-alt"></i>The Dual State Solution: Cell and Hidden States</h3>
-                    <p>LSTMs solve this amnesia by introducing a more complex internal structure that passes <strong>two</strong> distinct states forward at every time step (as seen in the visualization):</p>
-                    <ol class="list-decimal pl-6 mt-4 space-y-4">
-                        <li>
-                            <strong style="color: var(--cell-state)">The Cell State ($C_t$):</strong> Often compared to a conveyor belt. It runs straight down the entire chain, with only minor linear interactions. It's very easy for information to flow along it unchanged. This is the LSTM's <em>long-term memory</em>.
-                        </li>
-                        <li>
-                            <strong style="color: var(--accent-primary)">The Hidden State ($H_t$):</strong> This is the LSTM's <em>short-term memory</em> or its "focus" for the current time step. It is derived from the Cell State and is what gets passed up as the output ($Y_t$) for that specific step.
-                        </li>
-                    </ol>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-door-open"></i>The Four Gates (Why so many parameters?)</h3>
-                    <p>To control what gets added to or removed from the Cell State conveyor belt, the LSTM uses neural network layers called <strong>gates</strong>. Inside every single LSTM cell block shown in the visual, there are actually four separate fully-connected layers operating simultaneously:</p>
-                    <ul class="list-disc pl-6 mt-4 space-y-2 opacity-90">
-                        <li><strong>Forget Gate ($f_t$):</strong> Decides what information to throw away from the past cell state.</li>
-                        <li><strong>Input Gate ($i_t$):</strong> Decides which new values to update in the cell state.</li>
-                        <li><strong>Cell Candidate ($\tilde{C}_t$):</strong> Creates a vector of new candidate values that could be added to the state.</li>
-                        <li><strong>Output Gate ($o_t$):</strong> Decides what parts of the cell state to output as the new Hidden State ($H_t$).</li>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-user-secret"></i>Two Memories: Private and Public</h3>
+                    <p>This gate is the reason an LSTM carries two state vectors instead of one:</p>
+                    <ul class="list-disc pl-6 mt-3 space-y-2">
+                        <li><strong style="color: var(--cell-state)">$C_t$ &mdash; the cell state.</strong> Long-term, internal. It never leaves the cell directly and is never seen by the next layer.</li>
+                        <li><strong style="color: var(--accent-primary)">$H_t$ &mdash; the hidden state.</strong> Short-term, external. It is passed to the next layer, used for the prediction, and fed back into this same cell at the next time step.</li>
                     </ul>
-                    <p class="mt-4">Because there are 4 independent layers doing calculations on the inputs ($X_t$) and previous hidden state ($H_{t-1}$), <strong>an LSTM has roughly 4 times as many parameters as a standard RNN</strong> of the same size. Click the <span class="font-bold border px-2 py-1 rounded text-xs" style="border-color: var(--accent-primary); color: var(--accent-primary)">Parameters</span> button to see the math.</p>
+                    <p class="mt-3">Because of this split, the cell can <em>remember something without acting on it</em>. Suppose the LSTM reads a plural subject: it stores that fact in $C_t$ and keeps the output gate closed on that slot for many steps. Only when the verb finally arrives does the gate open, releasing "the subject was plural" exactly when it is needed to choose <em>are</em> over <em>is</em>. A single-state RNN cannot do this &mdash; anything it remembers, it must also expose.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-compress-alt"></i>Why $\tanh(C_t)$ First?</h3>
+                    <p>The cell state is a running sum, so it can drift well outside $[-1, 1]$ after many additions. Feeding that raw value to the next layer would produce unstable activations. Squashing with $\tanh$ rescales it into a bounded, zero-centred range before the gate scales it further.</p>
+                    <p class="mt-2">There is a side effect worth seeing in the lab: once $|C_t|$ is large, $\tanh$ flattens out. Piling more into memory stops changing the output. Use the $C_t$ slider beyond $\pm 2.5$ and watch the revealed bar barely move.</p>
                 </div>
 
                 <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Interactive Exploration</h3>
-                    <ul class="list-disc pl-5 space-y-2">
-                        <li><strong>Run the Simulation:</strong> Watch the blue data ($X_t$) enter the cell, merge with the past states, and then split into the Cyan conveyor belt ($C_t$) and the Green focus state ($H_t$).</li>
-                        <li><strong>Check Many-to-One vs Many-to-Many:</strong> In Many-to-One (like Sentiment Analysis), only the final $H_t$ is pushed up to the classifier to make the final $Y$ decision. In Many-to-Many (like Language Translation or Text Generation), an output is generated at every step.</li>
-                    </ul>
+                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--gate-color)"><i class="fas fa-repeat"></i>It Closes the Loop</h3>
+                    <p>$H_t$ is not just the cell's answer &mdash; it is also half of the input to the <em>next</em> time step, where it will help compute all four layers again. So the Output Gate does double duty: it decides what the outside world sees, and it decides what the cell tells its own future self. A closed output gate leaves the next step reasoning almost entirely from the incoming token.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-vial"></i>Interactive Exploration Guide</h3>
+                    <ol class="list-decimal pl-6 mt-4 space-y-3">
+                        <li><strong>Run the simulation.</strong> The highlighted route runs from the glowing $o_t$ box to the final $\times$, where it meets the cell state coming down through the $\tanh$ block &mdash; and only then splits out as $H_t$, both upward and to the right.</li>
+                        <li><strong>Set the gate to 0 with $C_t$ at 1.50.</strong> The blue memory bar stays full while the revealed bar drops to zero. The cell knows something and is deliberately saying nothing.</li>
+                        <li><strong>Now open the gate to 1.00.</strong> The same stored memory suddenly appears at the output, unchanged in the cell but fully exposed &mdash; that is a gate opening at the moment the information becomes relevant.</li>
+                        <li><strong>Push $C_t$ from 2.5 to 3.0.</strong> Memory grows visibly; the revealed value hardly moves. That is $\tanh$ saturation limiting how much any single slot can shout.</li>
+                    </ol>
+                </div>
+
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Key Takeaway</h3>
+                    <p>The Output Gate separates <em>having</em> information from <em>using</em> it. Together with the Forget Gate (what to erase), the Input Gate (what to write), and the Candidate (what the content is), it completes the four-layer machine that makes an LSTM cell work &mdash; and explains why it costs four times a simple RNN's parameters.</p>
                 </div>
             </div>
         </div>
@@ -499,8 +511,8 @@
         <div class="modal-content p-6 rounded-xl w-full max-w-4xl m-4 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center mb-6">
                 <div>
-                    <h3 class="text-lg font-bold" style="color: var(--accent-primary)">LSTM Shared Parameter Calculation</h3>
-                    <p class="text-xs opacity-70 mt-1">LSTMs have 4 distinct gates (Forget, Input, Candidate, Output), multiplying the core parameter count by 4.</p>
+                    <h3 class="text-lg font-bold" style="color: var(--accent-primary)">Output Gate Parameters</h3>
+                    <p class="text-xs opacity-70 mt-1">The Output Gate is one of the four internal layers. It owns exactly a quarter of the cell's parameters.</p>
                 </div>
                 <button id="closeCalcModalBtn" class="text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
             </div>
@@ -511,7 +523,7 @@
                         <tr class="border-b border-[var(--border-subtle)]">
                             <th class="p-3 text-xs font-bold uppercase opacity-70">Matrix</th>
                             <th class="p-3 text-xs font-bold uppercase opacity-70">Description</th>
-                            <th class="p-3 text-xs font-bold uppercase opacity-70">Formula (4 Gates)</th>
+                            <th class="p-3 text-xs font-bold uppercase opacity-70">Formula (this layer)</th>
                             <th class="p-3 text-xs font-bold uppercase opacity-70 text-right">Params</th>
                         </tr>
                     </thead>
@@ -523,9 +535,9 @@
 
             <div class="grid grid-cols-1 md:grid-cols-1 gap-4 border-t border-[var(--border-subtle)] pt-4">
                 <div class="metric-card p-4 text-center" style="border-color: var(--accent-primary); background: var(--accent-glow)">
-                    <div class="text-xs uppercase font-bold opacity-80" style="color: var(--accent-primary)">Total Shared Parameters</div>
+                    <div class="text-xs uppercase font-bold opacity-80" style="color: var(--accent-primary)">Output Gate Parameters</div>
                     <div id="totalParamsResult" class="text-2xl font-bold mt-1" style="color: var(--accent-primary)">0</div>
-                    <div class="text-[10px] mt-1 opacity-70 font-sans">Used repeatedly across all Time Steps</div>
+                    <div class="text-[10px] mt-1 opacity-70 font-sans">One of four such layers &mdash; a quarter of the cell</div>
                 </div>
             </div>
         </div>
@@ -536,6 +548,8 @@
         const themeToggleBtn = document.getElementById('themeToggle');
         const sunIcon = themeToggleBtn.querySelector('.dark-icon');
         const moonIcon = themeToggleBtn.querySelector('.light-icon');
+        
+        let cachedColors = null; // Cache colors to prevent frame drops
         
         const currentTheme = localStorage.getItem('theme') || 'dark';
         if (currentTheme === 'light') {
@@ -557,75 +571,41 @@
                 sunIcon.classList.remove('hidden');
                 localStorage.setItem('theme', 'dark');
             }
+            cachedColors = null; // Clear cache on theme switch
             if (typeof window.updateAndRedraw === 'function') window.updateAndRedraw();
         });
 
-        // --- MOCK OUTPUT GENERATOR ---
-        function getDeterministicRandom(str, index) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) hash = Math.imul(31, hash) + str.charCodeAt(i) | 0;
-            let seed = hash + index * 12345;
-            let x = Math.sin(seed++) * 10000;
-            return x - Math.floor(x);
-        }
-        function generateMockOutput(word, size) {
-            let out = [];
-            for(let i=0; i<size; i++) {
-                out.push(getDeterministicRandom(word, i) * 2 - 1);
-            }
-            return out;
-        }
+        // --- ARTICLE FOCUS CONFIG ---
+        // This page is a focused view of the shared LSTM cell: one layer is drawn
+        // bright and driven live by the Gate Lab sliders, the other three are dimmed.
+        const FOCUS = 'out';
+        window.GATE_VALUE = 0.5;
+        const PHASE_TEXT = [
+            "1. Inputs reach the Output Gate",
+            "2. Merged vector feeds the gates",
+            "3. Output Gate outputs o_t (0 to 1)",
+            "4. Memory is squashed by tanh",
+            "5. o_t filters it into H_t"
+        ];
 
-        // --- SENTIMENT MOCK GENERATOR ---
-        function calculateSentimentProbabilities(text) {
-            const lower = text.toLowerCase();
-            let score = 0; 
-            
-            if (lower.includes('love') || lower.includes('great') || lower.includes('good') || 
-                lower.includes('best') || lower.includes('awesome') || lower.includes('artificial intelligence') || 
-                lower.includes('learning') || lower.includes('remember') || lower.includes('long')) {
-                score += 1.5;
-            }
-            if (lower.includes('hate') || lower.includes('bad') || lower.includes('terrible') || 
-                lower.includes('worst') || lower.includes('forget') || lower.includes('amnesia')) {
-                score -= 1.5;
-            }
-
-            let posProb = Math.max(0.01, Math.min(0.99, 0.5 + score / 3));
-            let negProb = 1 - posProb;
-            
-            return [posProb, negProb];
-        }
-
-        // --- LSTM VISUALIZATION LOGIC ---
+        // --- LSTM SINGLE CELL VISUALIZATION LOGIC ---
         document.addEventListener('DOMContentLoaded', () => {
             const canvas = document.getElementById('canvas');
             const ctx = canvas.getContext('2d');
             const centerCanvasBtn = document.getElementById('centerCanvasBtn');
             const calculateBtn = document.getElementById('calculateBtn');
-            const resetNetworkBtn = document.getElementById('resetNetworkBtn');
             
-            const seqLengthEl = document.getElementById('seqLength');
             const inputSizeEl = document.getElementById('inputSize');
             const hiddenSizeEl = document.getElementById('hiddenSize');
-            const outputSizeEl = document.getElementById('outputSize');
-            const rnnTypeEl = document.getElementById('rnnType');
 
-            const simDataInput = document.getElementById('simDataInput');
             const simPlayBtn = document.getElementById('simPlayBtn');
             const simPlayIcon = document.getElementById('simPlayIcon');
             const simPlayText = document.getElementById('simPlayText');
-
-            const totalStepsEl = document.getElementById('totalSteps');
-            const stateSizeEl = document.getElementById('stateSize');
-            const totalParametersEl = document.getElementById('totalParameters');
+            const simStatus = document.getElementById('simStatus');
 
             // Network State
-            let seqLength = 7;
             let inputSize = 4;
             let hiddenSize = 8;
-            let outputSize = 2; // Default 2 for [Pos, Neg]
-            let rnnType = 'many-to-one';
             
             let scale = 1;
             let translateX = 0;
@@ -635,77 +615,15 @@
             let lastY = 0;
 
             // Simulation State
-            let simWords = ["LSTMs", "can", "remember", "contexts", "across", "long", "sentences"];
-            let simOutputs = [];
-            let finalSentimentArray = [0.85, 0.15]; 
             let isSimulating = false;
             let simProgress = 0;
             let lastSimTime = 0;
 
-            function syncOutputs() {
-                simOutputs = simWords.map(w => generateMockOutput(w, outputSize));
-            }
-
-            // Sync Input Text with Seq Length
-            function syncData() {
-                let words = simDataInput.value.trim().split(/\s+/).filter(w => w.length > 0);
-                if (words.length === 0) {
-                    words = ["data"];
-                    simDataInput.value = "data";
-                }
-                if (words.length > 15) {
-                    words = words.slice(0, 15);
-                    simDataInput.value = words.join(" ");
-                }
-                simWords = words;
-                seqLength = words.length;
-                seqLengthEl.value = seqLength;
-
-                finalSentimentArray = calculateSentimentProbabilities(simDataInput.value);
-
-                syncOutputs();
-                updateAndRedraw();
-                resetView();
-            }
-
-            function syncTextFromSeqLength() {
-                let words = simDataInput.value.trim().split(/\s+/).filter(w => w.length > 0);
-                const targetLen = parseInt(seqLengthEl.value) || 1;
-                
-                if (words.length > targetLen) {
-                    simDataInput.value = words.slice(0, targetLen).join(" ");
-                } else if (words.length < targetLen) {
-                    let diff = targetLen - words.length;
-                    for(let i=0; i<diff; i++) words.push(`w_${words.length+1}`);
-                    simDataInput.value = words.join(" ");
-                }
-                simWords = simDataInput.value.trim().split(/\s+/);
-                seqLength = targetLen;
-
-                finalSentimentArray = calculateSentimentProbabilities(simDataInput.value);
-
-                syncOutputs();
-                updateAndRedraw();
-                resetView();
-            }
-
-            simDataInput.addEventListener('change', () => {
-                if(isSimulating) stopSimulation();
-                syncData();
-            });
-            
-            simDataInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    if(isSimulating) stopSimulation();
-                    syncData();
-                    e.target.blur();
-                }
-            });
-
-            // Theme Helpers
+            // Theme Helpers (Cached for smooth 60fps)
             function getThemeColors() {
+                if (cachedColors) return cachedColors;
                 const styles = getComputedStyle(document.body);
-                return {
+                cachedColors = {
                     bg: styles.getPropertyValue('--canvas-bg').trim(),
                     neuronFill: styles.getPropertyValue('--neuron-fill').trim(),
                     neuronBorder: styles.getPropertyValue('--neuron-border').trim(),
@@ -713,379 +631,360 @@
                     accent: styles.getPropertyValue('--accent-primary').trim(),
                     cellState: styles.getPropertyValue('--cell-state').trim(),
                     cellConn: styles.getPropertyValue('--connection-cell').trim(),
+                    gateColor: styles.getPropertyValue('--gate-color').trim(),
                     text: styles.getPropertyValue('--text-main').trim(),
                 };
+                return cachedColors;
             }
 
-            // Draw Unrolled LSTM
-            function drawNetwork() {
+            // Central diagram drawing
+            function drawCell() {
                 if (!ctx) return;
                 const colors = getThemeColors();
                 const dpr = window.devicePixelRatio || 1;
                 const rect = canvas.getBoundingClientRect();
                 
-                if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
-                    canvas.width = rect.width * dpr;
-                    canvas.height = rect.height * dpr;
+                // Fallback to prevent NaN scale crashes if tab is rendering in background
+                let w = rect.width || 800;
+                let h = rect.height || 600;
+
+                if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+                    canvas.width = w * dpr;
+                    canvas.height = h * dpr;
                 }
                 
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.scale(dpr, dpr);
                 ctx.fillStyle = colors.bg;
-                ctx.fillRect(0, 0, rect.width, rect.height);
+                ctx.fillRect(0, 0, w, h);
 
                 ctx.save();
                 ctx.translate(translateX, translateY);
                 ctx.scale(scale, scale);
 
-                // Setup Virtual Layout
-                const blockWidth = 90;
-                const blockHeight = 40;
+                // Robust centering coordinates
+                const CX = w / (2 * scale);
+                const CY = h / (2 * scale) - 20;
                 
-                const hiddenBlockWidth = 110;
-                const hiddenBlockHeight = 90; // Taller for LSTM to fit both states
-
-                const spacingX = 160;
-                const yTop = 130;    
-                const yMid = 280;    
-                const yBot = 430;    
-                const startX = 120;
-
-                const cOffset = -20; // Y offset for Cell State line relative to yMid
-                const hOffset = +20; // Y offset for Hidden State line relative to yMid
-
-                const activeT = isSimulating ? Math.floor(simProgress) : -1;
-                const phase = isSimulating ? (simProgress - activeT) : 0; // 0.0 to 1.0
-                const isFinalStep = isSimulating && activeT === seqLength - 1 && phase >= 0.8;
-                const simComplete = !isSimulating && simProgress >= seqLength;
-
-                // Helpers for Animation
-                const getLineAlpha = (t) => {
-                    if (!isSimulating && !simComplete) return 1.0;
-                    if (simComplete) return 0.5; // Dim paths when done
-                    if (t < activeT) return 0.4;
-                    if (t === activeT) return 0.8;
-                    return 0.15; // Future
-                };
-
-                // 1. Draw Connections (Lines)
-                ctx.lineWidth = 2 / scale;
-
-                for (let t = 0; t < seqLength; t++) {
-                    let centerX = startX + t * spacingX;
-                    ctx.globalAlpha = getLineAlpha(t);
-                    
-                    // X to LSTM
-                    ctx.strokeStyle = colors.connection;
-                    ctx.beginPath();
-                    ctx.moveTo(centerX, yBot - blockHeight/2);
-                    ctx.lineTo(centerX, yMid + hiddenBlockHeight/2);
-                    ctx.stroke();
-                    drawArrow(ctx, centerX, yMid + hiddenBlockHeight/2 + 5, -Math.PI/2, colors.connection);
-
-                    // LSTM to Y (From Hidden State path)
-                    let showY = rnnType === 'many-to-many' || t === seqLength - 1 || (!isSimulating && !simComplete);
-                    if(showY) {
-                        ctx.beginPath();
-                        ctx.moveTo(centerX, yMid + cOffset); // Drawing output from center top
-                        ctx.lineTo(centerX, yTop + blockHeight/2);
-                        ctx.stroke();
-                        drawArrow(ctx, centerX, yTop + blockHeight/2 + 5, -Math.PI/2, colors.connection);
-                    }
-
-                    // Recurrence C (Cell State)
-                    if (t < seqLength - 1) {
-                        ctx.strokeStyle = colors.cellConn;
-                        ctx.beginPath();
-                        ctx.moveTo(centerX + hiddenBlockWidth/2, yMid + cOffset);
-                        ctx.lineTo(centerX + spacingX - hiddenBlockWidth/2, yMid + cOffset);
-                        ctx.stroke();
-                        drawArrow(ctx, centerX + spacingX - hiddenBlockWidth/2 - 5, yMid + cOffset, 0, colors.cellConn);
-                    }
-                    // Recurrence H (Hidden State)
-                    if (t < seqLength - 1) {
-                        ctx.strokeStyle = colors.connection;
-                        ctx.beginPath();
-                        ctx.moveTo(centerX + hiddenBlockWidth/2, yMid + hOffset);
-                        ctx.lineTo(centerX + spacingX - hiddenBlockWidth/2, yMid + hOffset);
-                        ctx.stroke();
-                        drawArrow(ctx, centerX + spacingX - hiddenBlockWidth/2 - 5, yMid + hOffset, 0, colors.connection);
-                    }
-                }
-
-                // Initial States Arrows
-                ctx.globalAlpha = getLineAlpha(0);
-                ctx.setLineDash([5, 5]);
+                const cellW = 500;
+                const cellH = 340;
                 
-                // Initial C
-                ctx.strokeStyle = colors.cellConn;
+                // Key Y levels
+                const yCellState = CY - 100;
+                const yGates = CY + 40;
+                const yMerge = CY + 140; 
+                const yInputs = CY + 240;
+
+                // Key X levels (Gates)
+                const xForget = CX - 130;
+                const xInput = CX - 30;
+                const xCand = CX + 50;
+                const xOut = CX + 130;
+                const xMidInp = (xInput + xCand) / 2;
+
+                // 1. Draw Background Box
                 ctx.beginPath();
-                ctx.moveTo(startX - spacingX + hiddenBlockWidth/2, yMid + cOffset);
-                ctx.lineTo(startX - hiddenBlockWidth/2, yMid + cOffset);
-                ctx.stroke();
-                drawArrow(ctx, startX - hiddenBlockWidth/2 - 5, yMid + cOffset, 0, colors.cellConn);
-                
-                // Initial H
-                ctx.strokeStyle = colors.connection;
-                ctx.beginPath();
-                ctx.moveTo(startX - spacingX + hiddenBlockWidth/2, yMid + hOffset);
-                ctx.lineTo(startX - hiddenBlockWidth/2, yMid + hOffset);
-                ctx.stroke();
-                drawArrow(ctx, startX - hiddenBlockWidth/2 - 5, yMid + hOffset, 0, colors.connection);
-                
+                ctx.roundRect(CX - cellW/2, CY - cellH/2, cellW, cellH, 20);
+                ctx.fillStyle = colors.neuronFill;
+                ctx.fill();
+                ctx.strokeStyle = colors.neuronBorder;
+                ctx.lineWidth = 3 / scale;
                 ctx.setLineDash([]);
-                ctx.fillStyle = colors.text;
-                ctx.font = `12px 'Space Grotesk'`;
-                ctx.textAlign = 'right';
-                ctx.fillText('C_init', startX - spacingX + hiddenBlockWidth/2 - 10, yMid + cOffset + 4);
-                ctx.fillText('H_init', startX - spacingX + hiddenBlockWidth/2 - 10, yMid + hOffset + 4);
-                
+                ctx.stroke();
+
+                // Abstract styling for background box
+                ctx.globalAlpha = 0.05;
+                ctx.beginPath();
+                for(let i=0; i<cellW; i+=20) {
+                    ctx.moveTo(CX - cellW/2 + i, CY - cellH/2);
+                    ctx.lineTo(CX - cellW/2 + i, CY + cellH/2);
+                }
+                ctx.strokeStyle = colors.text;
+                ctx.stroke();
                 ctx.globalAlpha = 1.0;
 
-                // 2. Draw Moving Simulation Dots
-                if (isSimulating && activeT >= 0 && activeT < seqLength) {
-                    let centerX = startX + activeT * spacingX;
-                    if (phase < 0.4) {
-                        let p = phase / 0.4;
-                        // Data flowing in
-                        drawMovingDot(ctx, centerX, yBot - blockHeight/2, centerX, yMid + hiddenBlockHeight/2, p, '#3b82f6');
-                        if (activeT > 0) {
-                            drawMovingDot(ctx, centerX - spacingX + hiddenBlockWidth/2, yMid + cOffset, centerX - hiddenBlockWidth/2, yMid + cOffset, p, colors.cellState);
-                            drawMovingDot(ctx, centerX - spacingX + hiddenBlockWidth/2, yMid + hOffset, centerX - hiddenBlockWidth/2, yMid + hOffset, p, colors.accent);
-                        } else {
-                            drawMovingDot(ctx, startX - spacingX + hiddenBlockWidth/2, yMid + cOffset, startX - hiddenBlockWidth/2, yMid + cOffset, p, colors.cellState);
-                            drawMovingDot(ctx, startX - spacingX + hiddenBlockWidth/2, yMid + hOffset, startX - hiddenBlockWidth/2, yMid + hOffset, p, colors.accent);
-                        }
-                    }
-                    if (phase >= 0.4 && phase < 0.8) { 
-                        let showYDot = rnnType === 'many-to-many' || activeT === seqLength - 1;
-                        if (showYDot) {
-                            let p = (phase - 0.4) / 0.4;
-                            drawMovingDot(ctx, centerX, yMid + cOffset, centerX, yTop + blockHeight/2, p, '#f59e0b');
-                        }
-                    }
-                    if (phase >= 0.8 && activeT < seqLength - 1) {
-                        let p = (phase - 0.8) / 0.2;
-                        drawMovingDot(ctx, centerX + hiddenBlockWidth/2, yMid + cOffset, centerX + spacingX - hiddenBlockWidth/2, yMid + cOffset, p, colors.cellState);
-                        drawMovingDot(ctx, centerX + hiddenBlockWidth/2, yMid + hOffset, centerX + spacingX - hiddenBlockWidth/2, yMid + hOffset, p, colors.accent);
-                    }
-                }
-
-                // 3. Draw Nodes (Vector Blocks & LSTM Cells)
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
+                // 2. Draw Static Lines & Paths
+                ctx.lineWidth = 2.5 / scale;
                 
-                for (let t = 0; t < seqLength; t++) {
-                    let centerX = startX + t * spacingX;
+                // C_t line (Conveyor Belt)
+                ctx.strokeStyle = colors.cellConn;
+                ctx.beginPath();
+                ctx.moveTo(CX - cellW/2 - 60, yCellState);
+                ctx.lineTo(CX + cellW/2 + 60, yCellState);
+                ctx.stroke();
+                drawArrow(ctx, CX + cellW/2 + 55, yCellState, 0, colors.cellConn);
 
-                    let isXActive = isSimulating && t === activeT && phase < 0.4;
-                    let isHActive = isSimulating && t === activeT && phase >= 0.4;
-                    let isYActive = isSimulating && t === activeT && phase >= 0.4 && phase < 0.8;
-                    
-                    let blockAlpha = isSimulating ? (t > activeT ? 0.3 : (t === activeT ? 1.0 : 0.7)) : 1.0;
-                    if (simComplete) blockAlpha = 0.5; // Dim everything when done
-                    
-                    // Input Block
-                    ctx.globalAlpha = blockAlpha;
-                    drawBlock(ctx, centerX, yBot, blockWidth, blockHeight, isXActive ? '#3b82f6' : colors.neuronFill, '#3b82f6', `X_${t} (${inputSize})`, isXActive ? '#fff' : colors.text, isXActive);
-                    
-                    // Hidden Cell (LSTM)
-                    drawLSTMCell(ctx, centerX, yMid, hiddenBlockWidth, hiddenBlockHeight, isHActive ? colors.accent : colors.neuronFill, colors.accent, `LSTM Cell ${t}`, isHActive ? '#000' : colors.text, isHActive, cOffset, hOffset, colors);
-                    
-                    // Output Block (Dim non-final blocks entirely if Many-to-One simulation is active)
-                    let drawYBlock = rnnType === 'many-to-many' || t === seqLength - 1 || (!isSimulating && !simComplete);
-                    if (drawYBlock) {
-                        let highlightY = isYActive || (simComplete && (rnnType === 'many-to-many' || t === seqLength - 1));
-                        ctx.globalAlpha = highlightY ? 1.0 : blockAlpha;
-                        drawBlock(ctx, centerX, yTop, blockWidth, blockHeight, isYActive ? '#f59e0b' : colors.neuronFill, '#f59e0b', `Y_${t} (${outputSize})`, isYActive ? '#000' : colors.text, highlightY);
+                // H_t line (bottom to right and up)
+                ctx.strokeStyle = colors.connection;
+                ctx.beginPath();
+                ctx.moveTo(CX - cellW/2 - 60, yInputs); // H_{t-1} in
+                ctx.lineTo(xForget, yInputs);
+                ctx.lineTo(xForget, yMerge); // Up to merge bus
+                
+                // Merge bus
+                ctx.moveTo(xForget, yMerge);
+                ctx.lineTo(xOut, yMerge);
+                
+                // Vertical lines from merge to gates
+                const gCoords = [xForget, xInput, xCand, xOut];
+                for(let x of gCoords) {
+                    ctx.moveTo(x, yMerge);
+                    ctx.lineTo(x, yGates + 20); // up to bottom of gate
+                }
+                
+                // *** CRITICAL BUG FIX *** // We MUST stroke the H_t line path BEFORE starting the X_t line path
+                // Otherwise the H_t path above is completely erased by the beginPath() below!
+                ctx.stroke(); 
+
+                // X_t input
+                ctx.strokeStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.moveTo(xInput - 20, yInputs + 60);
+                ctx.lineTo(xInput - 20, yMerge);
+                ctx.stroke();
+
+                // Path from Gates up to Operations
+                ctx.strokeStyle = colors.connection;
+
+                // Forget gate up to C
+                ctx.beginPath(); ctx.moveTo(xForget, yGates - 20); ctx.lineTo(xForget, yCellState + 10); ctx.stroke();
+                drawArrow(ctx, xForget, yCellState + 15, -Math.PI/2, colors.connection);
+
+                // Input + Cand gates merge and go up to C
+                ctx.beginPath(); 
+                ctx.moveTo(xInput, yGates - 20); ctx.lineTo(xInput, yCellState + 60); 
+                ctx.moveTo(xCand, yGates - 20); ctx.lineTo(xCand, yCellState + 60);
+                // merge them
+                ctx.moveTo(xInput, yCellState + 60); ctx.lineTo(xCand, yCellState + 60);
+                // up to add
+                ctx.moveTo(xMidInp, yCellState + 60); ctx.lineTo(xMidInp, yCellState + 10);
+                ctx.stroke();
+                drawArrow(ctx, xMidInp, yCellState + 15, -Math.PI/2, colors.connection);
+
+                // Output gate up to H out multiplier
+                ctx.beginPath();
+                ctx.moveTo(xOut, yGates - 20); ctx.lineTo(xOut, yCellState + 60);
+                ctx.stroke();
+
+                // Tanh off C line down to H out multiplier
+                ctx.strokeStyle = colors.cellConn;
+                ctx.beginPath();
+                ctx.moveTo(xOut + 40, yCellState); ctx.lineTo(xOut + 40, yCellState + 60);
+                ctx.stroke();
+
+                // H_t out path
+                ctx.strokeStyle = colors.connection;
+                ctx.beginPath();
+                ctx.moveTo(xOut + 40, yCellState + 60); // from multiplier
+                ctx.lineTo(xOut + 40, yInputs);
+                ctx.lineTo(CX + cellW/2 + 60, yInputs); // Out right
+                ctx.moveTo(xOut + 40, yCellState + 60); // split up
+                ctx.lineTo(xOut + 40, CY - cellH/2 - 40); // Out top
+                ctx.stroke();
+                drawArrow(ctx, CX + cellW/2 + 55, yInputs, 0, colors.connection);
+                drawArrow(ctx, xOut + 40, CY - cellH/2 - 35, -Math.PI/2, colors.connection);
+
+                // --- FOCUS OVERLAY: re-trace this article's gate route in bright colour ---
+                {
+                    const FOCUS_COLOR = (FOCUS === 'cand') ? '#ef4444' : colors.gateColor;
+                    const routes = {
+                        forget: [
+                            [[CX - cellW/2 - 60, yCellState], [xForget, yCellState]],
+                            [[xForget, yMerge], [xForget, yGates + 20]],
+                            [[xForget, yGates - 20], [xForget, yCellState + 10]]
+                        ],
+                        input: [
+                            [[xForget, yMerge], [xInput, yMerge], [xInput, yGates + 20]],
+                            [[xInput, yGates - 20], [xInput, yCellState + 60], [xMidInp, yCellState + 60], [xMidInp, yCellState + 10]]
+                        ],
+                        cand: [
+                            [[xForget, yMerge], [xCand, yMerge], [xCand, yGates + 20]],
+                            [[xCand, yGates - 20], [xCand, yCellState + 60], [xMidInp, yCellState + 60], [xMidInp, yCellState + 10]]
+                        ],
+                        out: [
+                            [[xForget, yMerge], [xOut, yMerge], [xOut, yGates + 20]],
+                            [[xOut, yGates - 20], [xOut, yCellState + 60], [xOut + 40, yCellState + 60]],
+                            [[xOut + 40, yCellState], [xOut + 40, yCellState + 60]],
+                            [[xOut + 40, yCellState + 60], [xOut + 40, yInputs], [CX + cellW/2 + 60, yInputs]]
+                        ]
+                    };
+                    ctx.save();
+                    ctx.strokeStyle = FOCUS_COLOR;
+                    ctx.lineWidth = 4 / scale;
+                    ctx.shadowColor = FOCUS_COLOR;
+                    ctx.shadowBlur = 14;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.globalAlpha = 0.85;
+                    for (const seg of (routes[FOCUS] || [])) {
+                        ctx.beginPath();
+                        ctx.moveTo(seg[0][0], seg[0][1]);
+                        for (let i = 1; i < seg.length; i++) ctx.lineTo(seg[i][0], seg[i][1]);
+                        ctx.stroke();
                     }
-                    
-                    ctx.globalAlpha = 1.0;
-
-                    // Data Word mapped to Input
-                    if (simWords && simWords[t]) {
-                        ctx.fillStyle = colors.text;
-                        ctx.font = `italic 13px 'Space Grotesk'`;
-                        let wordAlpha = isSimulating ? (t > activeT ? 0.2 : (t === activeT ? 1.0 : 0.5)) : 0.8;
-                        if (isSimulating && t === activeT) {
-                            ctx.fillStyle = '#4ade80';
-                            ctx.font = `bold italic 14px 'Space Grotesk'`;
-                        }
-                        ctx.globalAlpha = wordAlpha;
-                        ctx.fillText(`"${simWords[t]}"`, centerX, yBot + blockHeight + 20);
-                        ctx.globalAlpha = 1.0;
-                    }
-
-                    // Time Label
-                    ctx.fillStyle = colors.text;
-                    ctx.globalAlpha = 0.4;
-                    ctx.font = `11px 'JetBrains Mono'`;
-                    ctx.fillText(`t=${t}`, centerX, yTop - blockHeight - 20);
-                    ctx.globalAlpha = 1.0;
+                    ctx.restore();
                 }
 
-                // 4. DRAW FINAL PREDICTION BADGE(S)
-                if (rnnType === 'many-to-many') {
-                    for (let t = 0; t < seqLength; t++) {
-                        let isOutReady = (!isSimulating && simComplete) || (isSimulating && (t < activeT || (t === activeT && phase >= 0.8)));
-                        if (isOutReady && simOutputs && simOutputs[t]) {
-                            let centerX = startX + t * spacingX;
-                            let badgeY = yTop - blockHeight - 20;
-                            let arr = simOutputs[t];
-                            
-                            let isPos = arr[0] > arr[1];
-                            let outStr = outputSize === 2 ? (isPos ? 'POS' : 'NEG') : `Out_${t}`;
-                            let badgeColor = outputSize === 2 ? (isPos ? '#4ade80' : '#ef4444') : '#f59e0b';
-                            
-                            ctx.fillStyle = colors.text;
-                            ctx.font = `10px 'JetBrains Mono'`;
-                            let numStr = outputSize <= 3 ? `[${arr.map(v=>v.toFixed(1)).join(",")}]` : `[${arr[0].toFixed(1)},...]`;
-                            ctx.fillText(numStr, centerX, badgeY + 15);
-                            
-                            ctx.beginPath();
-                            ctx.roundRect(centerX - 25, badgeY - 10, 50, 16, 4);
-                            ctx.fillStyle = badgeColor + '20';
-                            ctx.fill();
-                            ctx.strokeStyle = badgeColor;
-                            ctx.lineWidth = 1;
-                            ctx.stroke();
-                            
-                            ctx.fillStyle = badgeColor;
-                            ctx.font = `bold 10px 'Space Grotesk'`;
-                            ctx.fillText(outStr, centerX, badgeY - 2);
-                        }
+                // 3. Draw Nodes (Gates and Ops)
+                const gW = 50, gH = 40;
+                // Forget
+                drawGate(ctx, xForget, yGates, gW, gH, colors.gateColor, 'f_t', 'σ', FOCUS === 'forget');
+                // Input
+                drawGate(ctx, xInput, yGates, gW, gH, colors.gateColor, 'i_t', 'σ', FOCUS === 'input');
+                // Cand
+                drawGate(ctx, xCand, yGates, gW, gH, '#ef4444', 'C~_t', 'tanh', FOCUS === 'cand'); 
+                // Output
+                drawGate(ctx, xOut, yGates, gW, gH, colors.gateColor, 'o_t', 'σ', FOCUS === 'out');
+
+                // Operations
+                drawOp(ctx, xForget, yCellState, '×');
+                drawOp(ctx, xMidInp, yCellState + 60, '×');
+                drawOp(ctx, xMidInp, yCellState, '+');
+                drawOp(ctx, xOut + 40, yCellState + 60, '×');
+                
+                // Tanh block on C drop
+                ctx.fillStyle = colors.bg;
+                ctx.beginPath(); ctx.roundRect(xOut + 40 - 20, yCellState + 25, 40, 20, 10); ctx.fill();
+                ctx.strokeStyle = colors.cellState; ctx.stroke();
+                ctx.fillStyle = colors.text; ctx.font = `10px 'JetBrains Mono'`; ctx.textAlign='center'; ctx.fillText('tanh', xOut+40, yCellState+25);
+
+                // 4. Draw Labels
+                ctx.fillStyle = colors.text;
+                ctx.font = `bold 14px 'JetBrains Mono'`;
+                ctx.textAlign = 'center';
+                
+                // Inputs
+                ctx.fillStyle = '#3b82f6';
+                ctx.fillText(`X_t (${inputSize})`, xInput - 20, yInputs + 80);
+                ctx.fillStyle = colors.accent;
+                ctx.fillText(`H_{t-1} (${hiddenSize})`, CX - cellW/2 - 80, yInputs);
+                ctx.fillStyle = colors.cellState;
+                ctx.fillText(`C_{t-1} (${hiddenSize})`, CX - cellW/2 - 80, yCellState);
+
+                // Outputs
+                ctx.fillStyle = colors.accent;
+                ctx.fillText(`H_t (${hiddenSize})`, CX + cellW/2 + 90, yInputs);
+                ctx.fillText(`H_t (${hiddenSize})`, xOut + 40, CY - cellH/2 - 55);
+                ctx.fillStyle = colors.cellState;
+                ctx.fillText(`C_t (${hiddenSize})`, CX + cellW/2 + 90, yCellState);
+
+                // --- 5. ANIMATION LAYER ---
+                if(isSimulating) {
+                    let phase = simProgress * 5; // Map 0-1 to 0-5 phases
+                    const getP = (ph) => Math.max(0, Math.min(1, phase - ph));
+                    
+                    // Phase 0: Inputs -> Merge Bus + C_t waiting
+                    let p0 = getP(0);
+                    if (p0 > 0 && phase < 1.5) {
+                        drawDotOnPath(ctx, [[CX - cellW/2 - 60, yInputs], [xForget, yInputs], [xForget, yMerge]], p0, colors.accent); // H in
+                        drawDotOnPath(ctx, [[xInput - 20, yInputs + 60], [xInput - 20, yMerge]], p0, '#3b82f6'); // X in
+                        drawDotOnPath(ctx, [[CX - cellW/2 - 60, yCellState], [xForget, yCellState]], p0, colors.cellState); // C in
+                        simStatus.textContent = PHASE_TEXT[0];
                     }
-                } else if ((isFinalStep || simComplete) && outputSize === 2) {
-                    let lastX = startX + (seqLength - 1) * spacingX;
-                    let badgeY = yTop - blockHeight - 35;
-                    
-                    let posVal = finalSentimentArray[0];
-                    let negVal = finalSentimentArray[1];
-                    let isPos = posVal > negVal;
-                    
-                    let badgeColor = isPos ? '#4ade80' : '#ef4444';
-                    let badgeText = isPos ? `Positive (${Math.round(posVal*100)}%)` : `Negative (${Math.round(negVal*100)}%)`;
 
-                    // Output Array
-                    ctx.fillStyle = colors.text;
-                    ctx.font = `bold 12px 'JetBrains Mono'`;
-                    ctx.fillText(`[ ${posVal.toFixed(2)}, ${negVal.toFixed(2)} ]`, lastX, badgeY + 25);
+                    // Phase 1: Merge Bus -> Gates
+                    let p1 = getP(1);
+                    if (p1 > 0 && phase < 2.5) {
+                        drawDotOnPath(ctx, [[xForget, yMerge], [xForget, yGates+20]], p1, '#a855f7');
+                        drawDotOnPath(ctx, [[xForget, yMerge], [xInput, yMerge], [xInput, yGates+20]], p1, '#a855f7');
+                        drawDotOnPath(ctx, [[xForget, yMerge], [xCand, yMerge], [xCand, yGates+20]], p1, '#a855f7');
+                        drawDotOnPath(ctx, [[xForget, yMerge], [xOut, yMerge], [xOut, yGates+20]], p1, '#a855f7');
+                        simStatus.textContent = PHASE_TEXT[1];
+                    }
 
-                    // Badge Box
-                    ctx.beginPath();
-                    ctx.roundRect(lastX - 70, badgeY - 20, 140, 30, 6);
-                    ctx.fillStyle = badgeColor + '20';
-                    ctx.fill();
-                    ctx.strokeStyle = badgeColor;
-                    ctx.lineWidth = 2 / scale;
-                    ctx.stroke();
-                    
-                    ctx.fillStyle = badgeColor;
-                    ctx.font = `bold 13px 'Space Grotesk'`;
-                    ctx.fillText(badgeText, lastX, badgeY - 5);
-                } else if ((isFinalStep || simComplete) && outputSize !== 2) {
-                    let lastX = startX + (seqLength - 1) * spacingX;
-                    let badgeY = yTop - blockHeight - 30;
-                    let mockArr = generateMockOutput("final", outputSize);
-                    let outStr = mockArr.length <= 3 ? `[ ${mockArr.map(v=>v.toFixed(2)).join(", ")} ]` : `[ ${mockArr[0].toFixed(2)}, ..., ${mockArr[mockArr.length-1].toFixed(2)} ]`;
-                    
-                    ctx.fillStyle = '#f59e0b';
-                    ctx.font = `bold 12px 'JetBrains Mono'`;
-                    ctx.fillText(outStr, lastX, badgeY);
+                    // Phase 2: Gates -> Operations
+                    let p2 = getP(2);
+                    if (p2 > 0 && phase < 3.5) {
+                        drawDotOnPath(ctx, [[xForget, yGates-20], [xForget, yCellState]], p2, colors.gateColor);
+                        drawDotOnPath(ctx, [[xInput, yGates-20], [xInput, yCellState+60]], p2, colors.gateColor);
+                        drawDotOnPath(ctx, [[xCand, yGates-20], [xCand, yCellState+60]], p2, '#ef4444');
+                        drawDotOnPath(ctx, [[xOut, yGates-20], [xOut, yCellState+60]], p2, colors.gateColor);
+                        simStatus.textContent = PHASE_TEXT[2];
+                    }
+
+                    // Phase 3: Operations -> Cell Update
+                    let p3 = getP(3);
+                    if (p3 > 0 && phase < 4.5) {
+                        drawDotOnPath(ctx, [[xForget, yCellState], [xMidInp, yCellState]], p3, colors.cellState);
+                        drawDotOnPath(ctx, [[xInput, yCellState+60], [xMidInp, yCellState+60], [xMidInp, yCellState]], p3, '#10b981');
+                        drawDotOnPath(ctx, [[xCand, yCellState+60], [xMidInp, yCellState+60], [xMidInp, yCellState]], p3, '#10b981');
+                        drawDotOnPath(ctx, [[xMidInp, yCellState], [xOut + 40, yCellState]], p3, colors.cellState);
+                        drawDotOnPath(ctx, [[xOut + 40, yCellState], [xOut + 40, yCellState + 60]], p3, colors.cellState);
+                        simStatus.textContent = PHASE_TEXT[3];
+                    }
+
+                    // Phase 4: Output -> H_t out
+                    let p4 = getP(4);
+                    if (p4 > 0) {
+                        drawDotOnPath(ctx, [[xOut + 40, yCellState + 60], [xOut + 40, yInputs], [CX + cellW/2 + 60, yInputs]], p4, colors.accent); // right
+                        drawDotOnPath(ctx, [[xOut + 40, yCellState + 60], [xOut + 40, CY - cellH/2 - 40]], p4, colors.accent); // up
+                        drawDotOnPath(ctx, [[xOut + 40, yCellState], [CX + cellW/2 + 60, yCellState]], p4, colors.cellState);
+                        simStatus.textContent = PHASE_TEXT[4];
+                    }
                 }
 
                 ctx.restore();
             }
 
-            function drawBlock(ctx, x, y, w, h, fill, stroke, text, textColor, isGlow) {
-                ctx.beginPath();
-                ctx.roundRect(x - w/2, y - h/2, w, h, 8); 
-                
-                if (isGlow) {
-                    ctx.shadowColor = stroke;
-                    ctx.shadowBlur = 15;
+            function drawGate(ctx, x, y, w, h, bg, name, symbol, isFocus) {
+                const colors = getThemeColors();
+                ctx.textAlign = 'center';
+
+                // The gate this article is about glows; the other three recede.
+                const dim = isFocus ? 1 : 0.28;
+
+                if (isFocus) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.roundRect(x - w/2 - 9, y - h/2 - 9, w + 18, h + 18, 11);
+                    ctx.strokeStyle = bg;
+                    ctx.lineWidth = 2 / scale;
+                    ctx.shadowColor = bg;
+                    ctx.shadowBlur = 24;
+                    ctx.globalAlpha = 0.9;
+                    ctx.stroke();
+                    ctx.restore();
                 }
-                
-                ctx.fillStyle = fill;
+
+                ctx.beginPath();
+                ctx.roundRect(x - w/2, y - h/2, w, h, 6);
+                // Focused gate fills in proportion to its live value from the Gate Lab
+                const fillA = isFocus ? (0.15 + 0.55 * (window.GATE_VALUE ?? 0.5)) : 0.2 * dim;
+                ctx.globalAlpha = fillA;
+                ctx.fillStyle = bg;
                 ctx.fill();
-                
-                ctx.shadowBlur = 0; // reset
-                ctx.strokeStyle = stroke;
-                ctx.lineWidth = 2 / scale;
+                ctx.globalAlpha = dim;
+                ctx.strokeStyle = bg;
+                ctx.lineWidth = (isFocus ? 3 : 2) / scale;
                 ctx.stroke();
-                
-                // Text
-                ctx.fillStyle = textColor;
+
+                ctx.fillStyle = colors.text;
                 ctx.font = `bold 14px 'JetBrains Mono'`;
-                ctx.fillText(text, x, y);
+                ctx.fillText(symbol, x, y - 5);
+                ctx.font = `10px 'JetBrains Mono'`;
+                ctx.fillText(name, x, y + 10);
+
+                if (isFocus) {
+                    ctx.fillStyle = bg;
+                    ctx.font = `bold 12px 'JetBrains Mono'`;
+                    ctx.fillText((window.GATE_VALUE ?? 0).toFixed(2), x, y + h/2 + 20);
+                }
+                ctx.globalAlpha = 1.0;
             }
 
-            // Custom LSTM Cell Drawing
-            function drawLSTMCell(ctx, x, y, w, h, fill, stroke, text, textColor, isGlow, cOffset, hOffset, colors) {
+            function drawOp(ctx, x, y, symbol) {
+                const colors = getThemeColors();
                 ctx.beginPath();
-                ctx.roundRect(x - w/2, y - h/2, w, h, 8); 
-                
-                if (isGlow) {
-                    ctx.shadowColor = stroke;
-                    ctx.shadowBlur = 20;
-                }
-                
-                ctx.fillStyle = fill;
+                ctx.arc(x, y, 12, 0, Math.PI*2);
+                ctx.fillStyle = colors.bg;
                 ctx.fill();
-                
-                ctx.shadowBlur = 0; // reset
-                ctx.strokeStyle = stroke;
-                ctx.lineWidth = 2 / scale;
-                ctx.stroke();
-
-                // Draw Internal C line (Conveyor belt)
-                ctx.beginPath();
-                ctx.moveTo(x - w/2, y + cOffset);
-                ctx.lineTo(x + w/2, y + cOffset);
-                ctx.strokeStyle = colors.cellState;
-                ctx.lineWidth = 3 / scale;
-                ctx.stroke();
-
-                // Draw Internal H line
-                ctx.beginPath();
-                ctx.moveTo(x - w/2, y + hOffset);
-                ctx.lineTo(x + w/2, y + hOffset);
-                ctx.strokeStyle = isGlow ? '#000' : stroke;
+                ctx.strokeStyle = colors.text;
                 ctx.lineWidth = 1.5 / scale;
-                ctx.setLineDash([3, 3]);
                 ctx.stroke();
-                ctx.setLineDash([]);
                 
-                // Four Gates abstract representation
-                ctx.fillStyle = isGlow ? stroke : 'rgba(255,255,255,0.05)';
-                let gateW = 16, gateH = 16;
-                let startGateX = x - w/2 + 15;
-                let gateSpacing = 22;
-                let gateY = y + 2;
-
-                const gateLabels = ['f', 'i', 'c', 'o'];
-                
-                for(let i=0; i<4; i++) {
-                    ctx.beginPath();
-                    ctx.roundRect(startGateX + i*gateSpacing - gateW/2, gateY - gateH/2, gateW, gateH, 4);
-                    ctx.fill();
-                    
-                    ctx.fillStyle = isGlow ? '#000' : stroke;
-                    ctx.font = `italic 10px 'JetBrains Mono'`;
-                    ctx.fillText(gateLabels[i], startGateX + i*gateSpacing, gateY + 1);
-                    ctx.fillStyle = isGlow ? stroke : 'rgba(255,255,255,0.05)';
-                }
-                
-                // Labels for ports
-                ctx.fillStyle = isGlow ? '#000' : colors.text;
-                ctx.font = `9px 'Space Grotesk'`;
-                ctx.fillText('C', x + w/2 - 10, y + cOffset - 8);
-                ctx.fillText('H', x + w/2 - 10, y + hOffset - 8);
-                
-                // Text Title
-                ctx.fillStyle = textColor;
-                ctx.font = `bold 12px 'JetBrains Mono'`;
-                ctx.fillText(text, x, y - h/2 + 12);
+                ctx.fillStyle = colors.text;
+                ctx.font = `bold 16px 'JetBrains Mono'`;
+                ctx.fillText(symbol, x, y + 1);
             }
 
             function drawArrow(ctx, x, y, angle, color) {
@@ -1102,14 +1001,40 @@
                 ctx.restore();
             }
 
-            function drawMovingDot(ctx, x1, y1, x2, y2, p, color) {
-                const cx = x1 + (x2 - x1) * p;
-                const cy = y1 + (y2 - y1) * p;
+            // Flawless multi-segment corner-following dot rendering
+            function drawDotOnPath(ctx, path, p, color) {
+                p = Math.max(0, Math.min(1, p));
+                if(p === 0) return; 
+                
+                let totalLen = 0;
+                let lengths = [];
+                for(let i=0; i<path.length-1; i++) {
+                    let dx = path[i+1][0] - path[i][0];
+                    let dy = path[i+1][1] - path[i][1];
+                    let len = Math.sqrt(dx*dx + dy*dy);
+                    lengths.push(len);
+                    totalLen += len;
+                }
+                
+                let targetLen = totalLen * p;
+                let currentLen = 0;
+                let cx = path[0][0], cy = path[0][1];
+                
+                for(let i=0; i<path.length-1; i++) {
+                    if (currentLen + lengths[i] >= targetLen) {
+                        let segmentP = (targetLen - currentLen) / lengths[i];
+                        cx = path[i][0] + (path[i+1][0] - path[i][0]) * segmentP;
+                        cy = path[i][1] + (path[i+1][1] - path[i][1]) * segmentP;
+                        break;
+                    }
+                    currentLen += lengths[i];
+                }
+
                 ctx.beginPath();
-                ctx.arc(cx, cy, 6 / scale, 0, Math.PI*2);
+                ctx.arc(cx, cy, 7 / scale, 0, Math.PI*2);
                 ctx.fillStyle = color;
                 ctx.shadowColor = color;
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = 15;
                 ctx.fill();
                 ctx.shadowBlur = 0;
             }
@@ -1121,16 +1046,19 @@
                 const dt = timestamp - lastSimTime;
                 lastSimTime = timestamp;
 
-                simProgress += dt / 1200; // Speed control
+                // Cap DT so if tab is hidden, it doesn't instantly jump to complete
+                const safeDt = Math.min(dt, 100); 
 
-                if (simProgress >= seqLength) {
+                simProgress += safeDt / 6000; // 6 seconds for a full loop
+
+                if (simProgress >= 1.0) {
                     stopSimulation();
-                    simProgress = seqLength; // Keep at end state
-                    drawNetwork();
+                    simStatus.textContent = "Flow Complete!";
+                    drawCell();
                     return;
                 }
 
-                drawNetwork();
+                drawCell();
                 requestAnimationFrame(simLoop);
             }
 
@@ -1138,7 +1066,7 @@
                 isSimulating = false;
                 lastSimTime = 0;
                 simPlayIcon.className = "fas fa-play";
-                simPlayText.textContent = "Re-run Flow";
+                simPlayText.textContent = "Restart Flow";
                 simPlayBtn.classList.remove('viz-btn-danger', 'bg-red-600', 'hover:bg-red-500');
                 simPlayBtn.classList.add('viz-btn-primary', 'bg-indigo-600', 'hover:bg-indigo-500');
             }
@@ -1158,49 +1086,45 @@
                 if (isSimulating) {
                     stopSimulation();
                     simProgress = 0;
-                    drawNetwork();
+                    simStatus.textContent = "Simulation Stopped.";
+                    drawCell();
                 }
                 else startSimulation();
             });
 
-            // Parameters Math for LSTM (Multiplied by 4 for the 4 gates)
+            // Parameters Math for LSTM Cell
             function calculateParams() {
-                const whx = 4 * (inputSize * hiddenSize); // 4 gates * Input->Hidden
-                const whh = 4 * (hiddenSize * hiddenSize); // 4 gates * Hidden->Hidden
-                const bh = 4 * hiddenSize;                 // 4 gates * Bias
-                const wyh = hiddenSize * outputSize;       // Final Hidden to Output (Not part of cell internal gates)
-                const by = outputSize;                     // Output Bias
-                return { whx, whh, bh, wyh, by, total: whx + whh + bh + wyh + by };
-            }
-
-            function updateStatsAndArticle() {
-                totalStepsEl.textContent = seqLength;
-                stateSizeEl.textContent = hiddenSize;
-                
-                const params = calculateParams();
-                totalParametersEl.textContent = params.total.toLocaleString();
+                // Parameters for THIS gate only - one of the cell's four layers.
+                const whx = inputSize * hiddenSize;
+                const whh = hiddenSize * hiddenSize;
+                const bh = hiddenSize;
+                const total = whx + whh + bh;
+                return { whx, whh, bh, total, cellTotal: total * 4 };
             }
 
             // Global redraw
             window.updateAndRedraw = function() {
-                drawNetwork();
-                updateStatsAndArticle();
+                drawCell();
             };
 
             function resetView() {
-                const width = seqLength * 160 + 200; // rough width estimation
-                const height = 500; // fixed virt height
-                
                 const rect = canvas.getBoundingClientRect();
-                const sX = (rect.width - 40) / width;
-                const sY = (rect.height - 40) / height;
-                scale = Math.min(sX, sY, 1.2);
+                const vW = 800, vH = 600; // Virtual design space
                 
-                translateX = (rect.width - width * scale) / 2 + (100*scale); // offset left padding
-                translateY = (rect.height - height * scale) / 2 + 20;
+                let w = rect.width || 800;
+                let h = rect.height || 600;
                 
-                if(scale < 0.1) scale = 0.1;
-                drawNetwork();
+                const sX = w / vW;
+                const sY = h / vH;
+                scale = Math.min(sX, sY, 1.5) * 0.9;
+                
+                // Fallback catch to prevent zoom crashing coordinates 
+                if (scale < 0.1) scale = 0.5;
+                
+                translateX = 0; 
+                translateY = 0;
+                
+                drawCell();
             }
 
             // Interaction Panning/Zooming
@@ -1219,7 +1143,7 @@
                     translateY += dy;
                     lastX = e.clientX;
                     lastY = e.clientY;
-                    drawNetwork();
+                    drawCell();
                 }
             });
 
@@ -1244,53 +1168,27 @@
                 translateY = my - (my - translateY) * (newScale / scale);
                 scale = newScale;
                 
-                drawNetwork();
+                drawCell();
             });
 
             function updateFromInputs() {
                 if(isSimulating) stopSimulation();
                 simProgress = 0;
+                simStatus.textContent = "Data Updated. Ready.";
                 try {
-                    const seq = parseInt(seqLengthEl.value);
                     const inp = parseInt(inputSizeEl.value);
                     const hid = parseInt(hiddenSizeEl.value);
-                    const out = parseInt(outputSizeEl.value);
-                    
-                    if(seq>0 && inp>0 && hid>0 && out>0) {
-                        seqLength = Math.min(seq, 20);
+                    if(inp>0 && hid>0) {
                         inputSize = Math.min(inp, 100);
                         hiddenSize = Math.min(hid, 100);
-                        outputSize = Math.min(out, 100);
-                        syncTextFromSeqLength(); // This calls updateAndRedraw()
+                        updateAndRedraw(); 
                     }
                 } catch(e) {}
             }
 
-            // Real-time Event Listeners
-            rnnTypeEl.addEventListener('change', (e) => {
-                rnnType = e.target.value;
-                if(isSimulating) stopSimulation();
-                updateAndRedraw();
-                resetView();
-            });
-            seqLengthEl.addEventListener('change', updateFromInputs);
             inputSizeEl.addEventListener('input', updateFromInputs);
             hiddenSizeEl.addEventListener('input', updateFromInputs);
-            outputSizeEl.addEventListener('input', updateFromInputs);
 
-            resetNetworkBtn.addEventListener('click', () => {
-                if(isSimulating) stopSimulation();
-                simProgress = 0;
-                seqLengthEl.value = 7;
-                inputSizeEl.value = 4;
-                hiddenSizeEl.value = 8;
-                outputSizeEl.value = 2;
-                rnnTypeEl.value = 'many-to-one';
-                rnnType = 'many-to-one';
-                simDataInput.value = "LSTMs can remember contexts across long sentences";
-                updateFromInputs();
-                resetView();
-            });
             centerCanvasBtn.addEventListener('click', resetView);
 
             calculateBtn.addEventListener('click', () => {
@@ -1300,34 +1198,28 @@
                 
                 tbody.innerHTML = `
                     <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
-                        <td class="p-3 font-bold text-blue-400">W_hx</td>
-                        <td class="p-3">Input $\\to$ Gates</td>
-                        <td class="p-3">4 &times; (${inputSize} &times; ${hiddenSize})</td>
+                        <td class="p-3 font-bold text-blue-400">W_ox</td>
+                        <td class="p-3">Input $\\to$ Output Gate</td>
+                        <td class="p-3">${inputSize} &times; ${hiddenSize}</td>
                         <td class="p-3 text-right font-bold text-blue-400">${params.whx}</td>
                     </tr>
                     <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
-                        <td class="p-3 font-bold text-green-400">W_hh</td>
-                        <td class="p-3">Hidden $\\to$ Gates</td>
-                        <td class="p-3">4 &times; (${hiddenSize} &times; ${hiddenSize})</td>
+                        <td class="p-3 font-bold text-green-400">W_oh</td>
+                        <td class="p-3">Hidden $\\to$ Output Gate</td>
+                        <td class="p-3">${hiddenSize} &times; ${hiddenSize}</td>
                         <td class="p-3 text-right font-bold text-green-400">${params.whh}</td>
                     </tr>
                     <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
-                        <td class="p-3 font-bold text-gray-400">b_h</td>
-                        <td class="p-3">Gate Biases</td>
-                        <td class="p-3">4 &times; ${hiddenSize}</td>
+                        <td class="p-3 font-bold text-gray-400">b_o</td>
+                        <td class="p-3">Bias for Output Gate</td>
+                        <td class="p-3">${hiddenSize}</td>
                         <td class="p-3 text-right font-bold text-gray-400">${params.bh}</td>
                     </tr>
-                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
-                        <td class="p-3 font-bold text-amber-500">W_yh</td>
-                        <td class="p-3">Final Hidden $\\to$ Output</td>
-                        <td class="p-3">${hiddenSize} &times; ${outputSize}</td>
-                        <td class="p-3 text-right font-bold text-amber-500">${params.wyh}</td>
-                    </tr>
-                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--input-bg)]">
-                        <td class="p-3 font-bold text-gray-400">b_y</td>
-                        <td class="p-3">Output Bias</td>
-                        <td class="p-3">${outputSize}</td>
-                        <td class="p-3 text-right font-bold text-gray-400">${params.by}</td>
+                    <tr class="hover:bg-[var(--input-bg)]">
+                        <td class="p-3 font-bold opacity-60">&Sigma; cell</td>
+                        <td class="p-3 opacity-60">All 4 layers together</td>
+                        <td class="p-3 opacity-60">4 &times; ${params.total}</td>
+                        <td class="p-3 text-right font-bold opacity-60">${params.cellTotal}</td>
                     </tr>
                 `;
                 
@@ -1347,12 +1239,53 @@
             });
 
             window.addEventListener('resize', () => {
-                drawNetwork();
+                drawCell();
                 resetView();
             });
             
+            // --- OUTPUT GATE LAB ---
+            const oSlider = document.getElementById('oSlider');
+            const csSlider = document.getElementById('csSlider');
+            function updateOutputLab() {
+                const o = parseFloat(oSlider.value);
+                const C = parseFloat(csSlider.value);
+                const squashed = Math.tanh(C);
+                const h = o * squashed;
+                window.GATE_VALUE = o;
+
+                document.getElementById('oVal').textContent = o.toFixed(2);
+                document.getElementById('csVal').textContent = C.toFixed(2);
+                document.getElementById('oEq').textContent =
+                    `H_t = ${o.toFixed(2)} × tanh(${C.toFixed(2)}) = ${h.toFixed(3)}`;
+                document.getElementById('memAmt').textContent = Math.abs(C).toFixed(3);
+                document.getElementById('hAmt').textContent = h.toFixed(3);
+
+                document.getElementById('memBar').style.width = (Math.min(Math.abs(C) / 3, 1) * 100) + '%';
+                const hBar = document.getElementById('hBar');
+                hBar.style.width = (Math.abs(h) * 100) + '%';
+                hBar.classList.toggle('neg', h < 0);
+
+                // Memory-driven cases are checked before gate-position cases, so the
+                // tanh-saturation lesson still surfaces when the gate is wide open.
+                let note;
+                if (o <= 0.02 && Math.abs(C) > 0.5)
+                    note = "Held privately. The cell is storing a strong memory, yet reveals nothing this step — the information stays available for later without influencing the current output.";
+                else if (Math.abs(C) < 0.1)
+                    note = "There is barely anything in memory to reveal — opening the gate wider would not help.";
+                else if (Math.abs(C) > 2.5)
+                    note = "Memory is deep in tanh's flat zone: adding more to C_t now barely changes H_t, because the squash has already saturated near ±1.";
+                else if (o >= 0.98)
+                    note = "Fully exposed. The whole (squashed) memory becomes the hidden state and drives the next layer's prediction.";
+                else
+                    note = "A partial reveal — the cell is exposing some of its memory while keeping the rest in reserve.";
+                document.getElementById('oNote').textContent = note;
+                window.updateAndRedraw();
+            }
+            oSlider.addEventListener('input', updateOutputLab);
+            csSlider.addEventListener('input', updateOutputLab);
+            updateOutputLab();
+
             // Initialization
-            syncData();
             setTimeout(resetView, 100); 
         });
 
