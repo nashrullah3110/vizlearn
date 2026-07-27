@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VizLearn - Grayscale Image Processing</title>
-    <meta name="description" content="Learn Grayscale Image Processing with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn.">
-    <meta name="keywords" content="Grayscale Image Processing, interactive learning, beginner tutorial, vizlearn">
+    <title>VizLearn - Quantization in LLMs</title>
+    <meta name="description" content="Interactive quantization lab for LLMs - map FP32 weights to INT8 or INT4, see quantization error, outlier effects and real model memory savings.">
+    <meta name="keywords" content="quantization, INT8, INT4, FP16, model compression, LLM memory, GPTQ, outliers, vizlearn, gen ai">
     <meta name="robots" content="index, follow">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -26,6 +26,7 @@
                     animation: {
                         'grid-flow': 'grid-move 40s linear infinite',
                         'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'cursor-blink': 'blink 1s infinite'
                     },
                     keyframes: {
                         'grid-move': {
@@ -35,6 +36,10 @@
                         fadeIn: {
                             '0%': { opacity: '0', transform: 'translateY(10px)' },
                             '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        blink: {
+                            '0%, 50%': { opacity: '1' },
+                            '51%, 100%': { opacity: '0' }
                         }
                     }
                 }
@@ -43,75 +48,59 @@
     </script>
     <script>
         (function(){
-            const apply = (t)=>{
-                if(t==='light') document.body.classList.add('light-mode');
-                else document.body.classList.remove('light-mode');
-            };
             const t = localStorage.getItem('theme') || 'dark';
-            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+            const apply = () => { if (t === 'light') document.body.classList.add('light-mode'); };
+            if (document.body) apply(); else document.addEventListener('DOMContentLoaded', apply);
         })();
     </script>
     <style>
         :root {
-            /* DARK MODE (Default) */
             --bg-body: #050505;
             --bg-surface: #0a0a0a;
             --bg-glass: rgba(10, 10, 10, 0.85);
-            
-            --border-subtle: rgba(74, 222, 128, 0.15); 
-            --border-glow: rgba(74, 222, 128, 0.5);
-
-            --accent-primary: #4ade80; /* Neon Green */
+            --border-subtle: rgba(74, 222, 128, 0.15);
+            --accent-primary: #4ade80;
             --accent-glow: rgba(74, 222, 128, 0.25);
-            
             --text-main: #f0fdf4;
             --text-muted: #86efac;
-            
             --card-bg: #0a0a0a;
             --input-bg: rgba(74, 222, 128, 0.03);
             --input-focus-bg: rgba(74, 222, 128, 0.08);
-
+            --display-bg: rgba(0, 0, 0, 0.4);
             --grid-color: rgba(74, 222, 128, 0.05);
             --vignette-color: #050505;
+            --stat-bg: rgba(0, 0, 0, 0.2);
+            --stat-border: rgba(255, 255, 255, 0.05);
         }
 
-        /* LIGHT MODE OVERRIDES */
         body.light-mode {
             --bg-body: #f0fdf4;
             --bg-surface: #ffffff;
-            --bg-glass: rgba(255, 255, 255, 0.85);
-
-            --border-subtle: rgba(22, 163, 74, 0.15);
-            --border-glow: rgba(22, 163, 74, 0.4);
-
+            --bg-glass: rgba(255, 255, 255, 0.95);
+            --border-subtle: rgba(22, 163, 74, 0.2);
             --accent-primary: #15803d;
-            --accent-glow: rgba(21, 128, 61, 0.2);
-
-            --text-main: #052e16;
-            --text-muted: #4b5563;
-
+            --accent-glow: rgba(21, 128, 61, 0.15);
+            --text-main: #111827;
+            --text-muted: #374151;
             --card-bg: #ffffff;
-            --input-bg: rgba(22, 163, 74, 0.04);
-            --input-focus-bg: rgba(22, 163, 74, 0.08);
-
-            --grid-color: rgba(22, 163, 74, 0.04);
+            --input-bg: rgba(0, 0, 0, 0.04);
+            --input-focus-bg: rgba(0, 0, 0, 0.06);
+            --display-bg: rgba(0, 0, 0, 0.03);
+            --grid-color: rgba(0, 0, 0, 0.05);
             --vignette-color: transparent;
+            --stat-bg: #f9fafb;
+            --stat-border: #e5e7eb;
         }
 
-        /* Global Smooth Transition */
         *, *::before, *::after {
-            transition-property: background-color, border-color, color, box-shadow;
-            transition-duration: 300ms;
-            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition: background-color 300ms, border-color 300ms, color 300ms, box-shadow 300ms;
         }
 
         body {
             font-family: 'Inter', sans-serif;
             background-color: var(--bg-body);
             color: var(--text-main);
-            
-            /* Animated Grid Background */
-            background-image: 
+            background-image:
                 radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
                 linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
                 linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
@@ -119,161 +108,171 @@
             animation: grid-move 40s linear infinite;
         }
 
-        h1, h2, h3, .brand-font {
-            font-family: 'Space Grotesk', sans-serif;
-            letter-spacing: -0.02em;
-        }
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
 
-        .mono-font {
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        /* Glassmorphism Header */
         .glass-header {
             background-color: var(--bg-glass);
             backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border-subtle);
         }
 
-        /* Futuristic Card */
         .glass-card {
             border: 1px solid var(--border-subtle);
             background: var(--card-bg);
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
+        .glass-card:hover { border-color: var(--accent-primary); }
 
-        .glass-card:hover {
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 20px var(--accent-glow);
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
         }
-
-        /* Function Buttons */
-        .func-btn {
-            width: 100%;
-            text-align: left;
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            font-family: 'Space Grotesk', sans-serif;
-            font-weight: 500;
-            color: var(--text-muted);
-            transition: all 0.2s ease;
-            border: 1px solid transparent;
-            background: transparent;
-        }
-
-        .func-btn:hover {
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
             background: var(--input-bg);
-            color: var(--accent-primary);
-            padding-left: 1.25rem; /* Slide effect */
+            color: var(--text-main);
         }
 
-        .func-btn:active {
-            transform: scale(0.98);
-        }
-
-        /* Inputs and Controls */
-        .custom-input {
+        .custom-textarea {
             background: var(--input-bg);
             border: 1px solid var(--border-subtle);
             color: var(--text-main);
-            font-family: 'JetBrains Mono', monospace;
-        }
-        
-        /* Slider Styling */
-        input[type=range] {
-            -webkit-appearance: none; 
-            background: transparent; 
-        }
-
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 16px;
-            width: 16px;
-            border-radius: 50%;
-            background: var(--accent-primary);
-            cursor: pointer;
-            margin-top: -6px; 
-            box-shadow: 0 0 10px var(--accent-glow);
-        }
-
-        input[type=range]::-webkit-slider-runnable-track {
+            border-radius: 12px;
+            padding: 1rem;
             width: 100%;
-            height: 4px;
-            cursor: pointer;
-            background: var(--border-subtle);
-            border-radius: 2px;
+            outline: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            transition: border-color 0.2s;
         }
+        .custom-textarea:focus { border-color: var(--accent-primary); }
 
         .action-btn {
+            background: rgba(21, 128, 61, 0.1);
+            border: 1px solid rgba(21, 128, 61, 0.2);
+            color: var(--accent-primary);
             font-family: 'Space Grotesk', sans-serif;
             font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            padding: 0.75rem;
+            border-radius: 8px;
             transition: all 0.2s;
-            position: relative;
-            overflow: hidden;
-            border: 1px solid transparent;
-        }
-        
-        .action-btn::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
-            transform: translateX(-100%);
-            transition: 0.3s;
-        }
-        
-        .action-btn:hover::after {
-            transform: translateX(100%);
-        }
-
-        /* Toggle Button */
-        .theme-toggle {
-            background: var(--input-bg);
-            border: 1px solid var(--border-subtle);
-            color: var(--text-muted);
-        }
-        .theme-toggle:hover {
-            color: var(--accent-primary);
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 10px var(--accent-glow);
-        }
-
-        /* Canvas & Matrix Specifics */
-        #drawingCanvas {
-            image-rendering: pixelated;
-            touch-action: none;
-            aspect-ratio: 1;
-            box-shadow: 0 0 20px rgba(0,0,0,0.3);
-        }
-        
-        #matrix-display {
-            display: grid;
-            grid-template-columns: repeat(28, 1fr); /* Force equal columns */
-            gap: 1px;
-            line-height: 1;
-            font-size: 10px; /* Slightly larger fixed size */
-            font-family: 'JetBrains Mono', monospace;
-            width: fit-content; /* Shrink to fit cells */
-            min-width: 600px; /* Ensure enough width for 3-digit numbers */
-            margin: 0 auto;
-        }
-        
-        #matrix-display > div {
-            aspect-ratio: 1 / 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background-color 0.1s, color 0.1s;
-            border-radius: 1px;
-            overflow: hidden; /* Prevent 3 digit numbers from breaking layout */
+            gap: 0.5rem;
+            width: 100%;
+            cursor: pointer;
         }
-    
+        .action-btn:hover:not(:disabled) { background: var(--accent-glow); }
+        .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .stat-box {
+            background: var(--stat-bg);
+            border: 1px solid var(--stat-border);
+            padding: 1rem;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .token-item {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 0.85rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.6rem;
+            transition: all 0.2s;
+        }
+        .token-item:hover { background: var(--bg-glass); border-color: var(--accent-primary); }
+        .token-item.selected {
+            border-color: var(--accent-primary);
+            background: var(--accent-glow);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .prob-bar {
+            height: 4px;
+            border-radius: 2px;
+            background: var(--accent-primary);
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px; width: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 6px;
+            background: var(--border-subtle);
+            border-radius: 3px;
+        }
+
+        .scroll-container::-webkit-scrollbar { display: none; }
+
+        .display-box {
+            background: var(--display-bg);
+            border-radius: 12px;
+            padding: 1.25rem;
+            min-height: 100px;
+            overflow-y: auto;
+            line-height: 1.8;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+        }
+
+        select.custom-select {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            padding: 0.5rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            width: 100%;
+            outline: none;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid var(--border-subtle);
+            background: var(--input-bg);
+            border-radius: 8px;
+            padding: 5px 10px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.2s ease;
+        }
+        .chip.on {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--accent-glow);
+        }
+
+
+        .lvl-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--border-subtle); }
+        .wdot { position: absolute; width: 9px; height: 9px; border-radius: 50%; transform: translate(-50%, -50%); transition: all 0.35s ease; }
+        .prec-btn { border: 1px solid var(--border-subtle); background: var(--input-bg); border-radius: 8px; padding: 10px 6px; font-size: 11px; font-family: 'JetBrains Mono', monospace; cursor: pointer; transition: all 0.2s ease; color: var(--text-muted); text-align: center; }
+        .prec-btn.active { border-color: var(--accent-primary); background: var(--accent-glow); color: var(--accent-primary); font-weight: 700; }
+
+
         /* Search Input Wrapper */
         .search-input-wrapper {
             background: var(--input-bg);
@@ -285,24 +284,14 @@
             border-color: var(--accent-primary);
             box-shadow: 0 0 15px var(--accent-glow);
         }
-        .search-input-wrapper input {
-            color: var(--text-main);
-        }
-        .search-input-wrapper input::placeholder {
-            color: var(--text-muted);
-            opacity: 0.7;
-        }
-        .search-input-wrapper i {
-            color: var(--accent-primary);
-            opacity: 0.7;
-        }
+        .search-input-wrapper input { color: var(--text-main); }
+        .search-input-wrapper input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .search-input-wrapper i { color: var(--accent-primary); opacity: 0.7; }
 
         /* Dropdown Search */
         .search-dropdown {
             position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
+            top: 100%; left: 0; right: 0;
             background: var(--card-bg);
             border: 1px solid var(--border-subtle);
             border-top: none;
@@ -313,23 +302,11 @@
             display: none;
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
         }
-
-        .search-dropdown.show {
-            display: block;
-            animation: slideDown 0.2s ease-out;
-        }
-
+        .search-dropdown.show { display: block; animation: slideDown 0.2s ease-out; }
         @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-
         .search-dropdown-item {
             padding: 12px 16px;
             border-bottom: 1px solid var(--border-subtle);
@@ -341,40 +318,12 @@
             color: inherit;
             text-decoration: none;
         }
-
-        .search-dropdown-item:last-child {
-            border-bottom: none;
-        }
-
-        .search-dropdown-item:hover {
-            background: var(--input-focus-bg);
-            padding-left: 20px;
-        }
-
-        .dropdown-item-title {
-            font-weight: 500;
-            color: var(--text-main);
-        }
-
-        .dropdown-item-path {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-left: 12px;
-        }
-
-        .dropdown-item-icon {
-            color: var(--accent-primary);
-            margin-right: 8px;
-            font-size: 0.875rem;
-        }
-
-        .dropdown-no-results {
-            padding: 20px 16px;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 0.875rem;
-        }
-
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        .dropdown-item-title { font-weight: 500; color: var(--text-main); }
+        .dropdown-item-path { font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; }
+        .dropdown-item-icon { color: var(--accent-primary); margin-right: 8px; font-size: 0.875rem; }
+        .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
     </style>
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
@@ -382,10 +331,8 @@
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-
         gtag('config', 'G-ZT6JM33V5J');
     </script>
-
 </head>
 <body class="flex flex-col min-h-screen overflow-x-hidden">
 
@@ -393,29 +340,21 @@
     <header class="glass-header sticky top-0 z-50">
         <div class="flex justify-center py-3 px-4 md:px-8">
             <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
-                <!-- Logo -->
                 <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
                     <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
                     <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
                 </a>
-                
-                <!-- Search -->
+
                 <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
                     <i class="fas fa-search text-sm"></i>
                     <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
-                    <div id="searchDropdown" class="search-dropdown">
-                        <!-- Results will be populated here -->
-                    </div>
+                    <div id="searchDropdown" class="search-dropdown"></div>
                 </div>
 
-                <!-- Theme Toggle + Back Button -->
                 <div class="flex items-center gap-3">
-                    <!-- Back to Hub Button -->
                     <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
                         <i class="fas fa-arrow-left text-xs"></i>
                     </a>
-                    
-                    <!-- Theme Toggle -->
                     <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
                         <i class="fas fa-sun hidden dark-icon"></i>
                         <i class="fas fa-moon hidden light-icon"></i>
@@ -425,159 +364,152 @@
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto flex flex-col">
-        
-        <!-- Breadcrumb / Title -->
+
         <div class="mb-8 animate-fade-in">
             <div class="flex items-center gap-2 text-xs mono-font mb-2" style="color: var(--text-muted)">
                 <span class="opacity-50">Modules</span>
                 <span>/</span>
-                <span class="opacity-50">Computer Vision</span>
+                <span class="opacity-50">Gen AI</span>
                 <span>/</span>
-                <span style="color: var(--accent-primary)">Grayscale Processing</span>
+                <span style="color: var(--accent-primary)">Quantization Lab</span>
             </div>
-            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Grayscale Logic</h1>
+            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Quantization in LLMs</h1>
             <p class="mt-2 text-sm max-w-2xl" style="color: var(--text-muted)">
-                Draw on the canvas to understand how images are represented as matrices and apply basic filters.
+                Shrink a model by storing its weights in fewer bits. Watch a real weight distribution snap onto a coarse grid, measure the error you introduce, and see how many gigabytes you save.
             </p>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full flex-1">
-            
-            <!-- Controls Sidebar -->
-            <aside class="lg:col-span-4 space-y-6 animate-fade-in" style="animation-delay: 0.1s">
-                
-                <!-- Canvas Area -->
-                <div class="glass-card p-6 flex flex-col items-center">
-                    <h2 class="text-xs font-bold uppercase tracking-widest mb-4 opacity-70 mono-font w-full" style="color: var(--text-muted)">Input Image (28x28)</h2>
-                    
-                    <canvas id="drawingCanvas" class="w-full max-w-[280px] rounded-lg bg-black border border-gray-700 mb-4"></canvas>
-                    
-                    <button id="clearBtn" class="action-btn w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors">
-                        <i class="fas fa-trash mr-2"></i>Clear Canvas
-                    </button>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <aside class="lg:col-span-5 flex flex-col gap-6 animate-fade-in" style="animation-delay: 0.1s">
+                <div class="glass-card p-6 flex flex-col gap-4">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">1. Precision</h2>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button class="prec-btn" data-bits="32">FP32<br><span class="opacity-50 text-[9px]">4 bytes</span></button>
+                        <button class="prec-btn" data-bits="16">FP16<br><span class="opacity-50 text-[9px]">2 bytes</span></button>
+                        <button class="prec-btn active" data-bits="8">INT8<br><span class="opacity-50 text-[9px]">1 byte</span></button>
+                        <button class="prec-btn" data-bits="4">INT4<br><span class="opacity-50 text-[9px]">0.5 byte</span></button>
+                    </div>
+                    <div class="flex items-center justify-between pt-2">
+                        <span class="text-[10px] uppercase font-bold opacity-60">Scheme</span>
+                        <div class="flex gap-2">
+                            <button id="symBtn" class="chip on">symmetric</button>
+                            <button id="asymBtn" class="chip">asymmetric</button>
+                        </div>
+                    </div>
+                    <label class="flex items-center gap-2 text-[11px] cursor-pointer pt-1">
+                        <input type="checkbox" id="outlierChk" class="accent-green-400">
+                        <span>Inject an outlier weight</span>
+                    </label>
                 </div>
 
-                <!-- Filters -->
-                <div class="glass-card p-4">
-                    <h2 class="text-xs font-bold uppercase tracking-widest mb-4 opacity-70 mono-font" style="color: var(--text-muted)">Filters</h2>
-                    <div class="space-y-2">
-                        <button id="invertBtn" class="func-btn"><i class="fas fa-adjust mr-2 opacity-50 text-xs"></i> Invert Colors</button>
-                        <button id="blurBtn" class="func-btn"><i class="fas fa-blur mr-2 opacity-50 text-xs"></i> Gaussian Blur</button>
-                        <button id="edgeBtn" class="func-btn"><i class="fas fa-border-style mr-2 opacity-50 text-xs"></i> Edge Detection</button>
+                <div class="glass-card p-6 flex flex-col gap-4">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">2. Model Size Calculator</h2>
+                    <select id="modelSel" class="custom-select">
+                        <option value="7">7B parameters (Llama-class)</option>
+                        <option value="13">13B parameters</option>
+                        <option value="70">70B parameters</option>
+                        <option value="175">175B parameters (GPT-3 scale)</option>
+                    </select>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">At FP32</span><span id="szFp32" class="text-lg font-bold opacity-70">0 GB</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">At this precision</span><span id="szNow" class="text-lg font-bold" style="color: var(--accent-primary)">0 GB</span></div>
+                        <div class="stat-box text-center col-span-2"><span class="text-[9px] uppercase font-bold opacity-50">Memory Saved</span><span id="szSaved" class="text-xl font-bold">0%</span></div>
                     </div>
+                    <p class="text-[10px] opacity-60 leading-relaxed" id="fitNote"></p>
+                </div>
 
-                    <!-- Threshold Control -->
-                    <div class="mt-6 pt-4 border-t border-dashed" style="border-color: var(--border-subtle)">
-                        <div class="flex justify-between items-center mb-2">
-                            <label for="thresholdSlider" class="text-xs font-bold uppercase tracking-wider opacity-80" style="color: var(--text-main)">Threshold</label>
-                            <span id="thresholdValue" class="mono-font text-sm font-bold" style="color: var(--accent-primary)">128</span>
-                        </div>
-                        <input id="thresholdSlider" type="range" min="0" max="255" value="128" class="w-full mb-3">
-                        
-                        <button id="applyThresholdBtn" class="action-btn w-full py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2" style="background: var(--input-bg); color: var(--text-main); border-color: var(--border-subtle)">
-                            Apply Threshold
-                        </button>
+                <div class="glass-card p-6">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-4">Quantization Quality</h2>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Levels</span><span id="qLevels" class="text-xl font-bold" style="color: var(--accent-primary)">256</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Step Size</span><span id="qStep" class="text-xl font-bold mono-font">0</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Max Error</span><span id="qMax" class="text-xl font-bold mono-font">0</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">RMS Error</span><span id="qRms" class="text-xl font-bold mono-font">0</span></div>
                     </div>
                 </div>
             </aside>
 
-            <!-- Visualization Area -->
-            <section class="lg:col-span-8 h-full min-h-[500px] animate-fade-in" style="animation-delay: 0.2s">
-                <div class="glass-card h-full w-full flex flex-col p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-xs font-bold uppercase tracking-widest opacity-70 mono-font" style="color: var(--text-muted)">Pixel Matrix Values</h2>
-                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-green-500/10 text-green-500 border border-green-500/20 mono-font">LIVE DATA</span>
-                    </div>
-
-                    <!-- Matrix Display -->
-                    <div class="flex-grow overflow-auto bg-black/20 rounded-lg p-4 border border-dashed" style="border-color: var(--border-subtle)">
-                        <div id="matrix-display">
-                            <!-- Matrix cells generated by JS -->
+            <section class="lg:col-span-7 flex flex-col gap-6 animate-fade-in" style="animation-delay: 0.2s">
+                <div class="glass-card p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">Weights Snapping to the Grid</h2>
+                        <div class="flex gap-2">
+                            <span class="chip">original</span>
+                            <span class="chip on">quantized</span>
                         </div>
                     </div>
+                    <div id="gridPlot" class="relative" style="height: 300px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--display-bg);"></div>
+                    <p class="text-[10px] opacity-60 mt-3">Grey dots are the original FP32 weights; green dots are where they land after rounding. Horizontal lines are the representable levels.</p>
+                </div>
+
+                <div class="glass-card p-6 flex-1">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-4">Per-Weight Detail</h2>
+                    <div id="wTable" class="scroll-container overflow-y-auto" style="max-height: 260px;"></div>
                 </div>
             </section>
-
         </div>
     </main>
 
-    <!-- Footer -->
-
     <!-- auto-article-vizlearn -->
-    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
-        <div class="glass-card animate-fade-in" style="animation-delay: 0.3s;">
-            <div class="p-6 border-b" style="border-color: var(--border-subtle);">
-                <h2 class="font-bold text-xl md:text-2xl brand-font" style="color: var(--text-main)">Deconstructing Grayscale Images</h2>
-                <p class="mt-2 text-sm" style="color: var(--text-muted)">From visual drawings to numerical matrices—the foundation of computer vision.</p>
+    <section class="px-4 md:px-8 pb-8 max-w-7xl mx-auto w-full animate-fade-in" style="animation-delay: 200ms;">
+        <div class="card-container">
+            <div class="card-header">
+                <h2 class="text-xl md:text-2xl font-bold flex items-center gap-3">
+                    <i class="fas fa-compress" style="color: var(--accent-primary);"></i>
+                    Quantization: Trading Precision for Memory
+                </h2>
             </div>
-            <div class="p-6 md:p-8 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
-                
-                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
-                    <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-bullseye"></i>Quick Context</h3>
-                    <p class="opacity-90">At its core, a digital grayscale image is nothing more than a grid of numbers—a <strong>matrix</strong>. Each number, called a <strong>pixel</strong>, represents the brightness at that specific point, typically ranging from <strong>0 (black)</strong> to <strong>255 (white)</strong>. This interactive bridges the gap between the visual image you draw and the underlying numerical data that a computer actually "sees" and manipulates.</p>
+            <div class="p-6 md:p-8 space-y-8 text-base leading-relaxed" style="color: var(--text-main);">
+
+                <p class="text-lg">
+                    A 70B-parameter model in full 32-bit precision needs about <strong>280 GB</strong> just to hold its weights &mdash; far beyond any single GPU. <strong>Quantization</strong> stores those same weights in fewer bits, and it is the single technique most responsible for large models running on ordinary hardware.
+                </p>
+
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-ruler"></i>The Core Idea: A Coarser Ruler</h3>
+                    <p>A 32-bit float can express billions of distinct values. An 8-bit integer can express 256, and a 4-bit integer just 16. Quantization finds the range your weights actually occupy and divides it into that many evenly spaced levels:</p>
+                    <p class="my-3 text-center mono-font text-sm">scale = (max &minus; min) / (2<sup>bits</sup> &minus; 1) &nbsp;&nbsp;&nbsp; q = round(w / scale)</p>
+                    <p>Every weight is then snapped to its nearest level. The difference between where a weight <em>was</em> and where it <em>landed</em> is the quantization error &mdash; unavoidable, and the entire subject in one sentence.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg md:text-xl font-bold mb-3 brand-font flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-lightbulb"></i>The Core Idea: Images as Data</h3>
-                    <p class="mb-4 opacity-90">The most fundamental concept in all of computer vision is that images are just data. Every operation, from a simple filter to a complex neural network, is a mathematical function performed on this matrix of pixel values. By understanding this relationship, you unlock the ability to understand how image processing algorithms work.</p>
-                    <p class="opacity-90">As you draw on the canvas, you are directly changing the numbers in the matrix on the right. A bright stroke sets pixel values to 255, while the empty canvas is all zeros. Every filter you apply is just a rule that transforms these numbers.</p>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-arrows-left-right-to-line"></i>Symmetric vs Asymmetric</h3>
+                    <ul class="list-disc pl-6 mt-3 space-y-2">
+                        <li><strong>Symmetric</strong> centres the grid on zero, using a range of &plusmn;max(|w|). Simpler and faster, since zero maps exactly to zero &mdash; but if your weights are lopsided, half the levels are wasted on values that never occur.</li>
+                        <li><strong>Asymmetric</strong> fits the grid to the actual min and max, adding a <em>zero-point</em> offset. It uses every level, at the cost of slightly more arithmetic at inference.</li>
+                    </ul>
+                    <p class="mt-3">Toggle between them with the outlier enabled and watch the step size and RMS error change.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg md:text-xl font-bold mb-3 brand-font flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-vial"></i>Guided Experiments with This Interactive</h3>
-                    <ol class="list-decimal pl-6 space-y-4">
-                        <li>
-                            <strong>Draw and Observe:</strong>
-                            <p class="font-light opacity-80 mt-1">Draw a simple diagonal line on the canvas. Watch the corresponding cells in the matrix light up with values like 255, 120, and 80. Notice how the "brush" has a soft edge, creating intermediate gray values, not just pure white.</p>
-                        </li>
-                        <li>
-                            <strong>Invert Colors:</strong>
-                            <p class="font-light opacity-80 mt-1">Click the <strong>Invert Colors</strong> button. Observe the matrix. Every pixel value `p` has been replaced by `255 - p`. The black background (0) becomes white (255), and your white drawing (255) becomes black (0). This is a simple but powerful pixel-wise operation.</p>
-                        </li>
-                        <li>
-                            <strong>Apply Threshold:</strong>
-                            <p class="font-light opacity-80 mt-1">Draw a shape and then click <strong>Apply Threshold</strong> with the slider at 128. All pixels with a value greater than 128 become pure white (255), and all others become pure black (0). This is called <strong>binarization</strong>, and it's a common step to simplify an image and isolate objects of interest.</p>
-                        </li>
-                        <li>
-                            <strong>Gaussian Blur:</strong>
-                            <p class="font-light opacity-80 mt-1">Clear the canvas and draw a single, sharp dot. Now click <strong>Gaussian Blur</strong>. Look at the matrix. The single high-value pixel has been "spread out" to its neighbors, creating a smooth gradient. This is achieved by averaging each pixel with its surrounding pixels, which is essential for reducing noise in images.</p>
-                        </li>
-                         <li>
-                            <strong>Edge Detection:</strong>
-                            <p class="font-light opacity-80 mt-1">Draw a solid square. Click <strong>Edge Detection</strong>. Notice that only the borders of your square remain as bright pixels in the matrix. The solid interior becomes black (0). This filter calculates the difference between neighboring pixels; where the difference is large (at an edge), the output value is high.</p>
-                        </li>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-triangle-exclamation"></i>Outliers Are the Real Enemy</h3>
+                    <p>Quantization error does not grow smoothly with bit-width &mdash; it is dominated by <strong>range</strong>. A single weight far from the others stretches the min-max span, and since the step size is that span divided by a fixed number of levels, <em>every other weight</em> gets a coarser grid.</p>
+                    <p class="mt-2">Tick "Inject an outlier" and watch the step size jump while the ordinary weights suddenly land further from home. This is not a toy effect: emergent outlier features in large transformers are precisely why naive INT8 broke down, and why methods like LLM.int8(), GPTQ and AWQ exist &mdash; they isolate or protect the outliers instead of letting them ruin the scale for everyone.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-flask"></i>Interactive Exploration Guide</h3>
+                    <ol class="list-decimal pl-6 mt-4 space-y-3">
+                        <li><strong>Step from FP32 down to INT4.</strong> Levels fall from billions to 16, the horizontal grid lines thin out, and the green dots drift visibly away from the grey ones.</li>
+                        <li><strong>Watch RMS error against memory saved.</strong> FP16 is nearly free &mdash; huge savings, negligible error. That is why it is the default almost everywhere.</li>
+                        <li><strong>Now enable the outlier at INT4.</strong> Step size roughly doubles and every ordinary weight is punished for one extreme value.</li>
+                        <li><strong>Switch to asymmetric with the outlier on.</strong> Error usually improves, because the grid stops wasting levels on an empty side of the range.</li>
+                        <li><strong>Pick 70B and compare FP16 to INT4.</strong> 140 GB versus roughly 35 GB &mdash; the difference between a multi-GPU server and a single high-end card. That is the whole reason anyone tolerates the error.</li>
                     </ol>
                 </div>
 
-                <div class="grid md:grid-cols-2 gap-6">
-                    <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
-                        <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-exclamation-triangle"></i>Common Pitfalls</h3>
-                        <ul class="list-disc pl-5 space-y-2 mt-3 opacity-90">
-                            <li><strong>Thinking Visually, Not Numerically:</strong> Always try to connect the visual effect of a filter back to the mathematical operation happening on the pixel values.</li>
-                            <li><strong>Order of Operations Matters:</strong> Applying a blur and then edge detection gives a very different result than applying edge detection and then a blur. Experiment to see why!</li>
-                        </ul>
-                    </div>
-                    <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
-                        <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas-regular fa-bookmark"></i>Key Takeaways</h3>
-                        <ul class="list-disc pl-5 space-y-2 mt-3 opacity-90">
-                            <li>Grayscale images are 2D matrices of numbers (0-255).</li>
-                            <li>Image filters are mathematical functions that transform these numbers.</li>
-                            <li><strong>Pixel-wise operations</strong> (like Invert and Threshold) treat each pixel independently.</li>
-                            <li><strong>Neighborhood operations</strong> (like Blur and Edge Detection) calculate a pixel's new value based on its neighbors.</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="pt-6 border-t text-center" style="border-color: var(--border-subtle);">
-                    <p class="text-sm" style="color: var(--text-muted);">Mastering this fundamental concept—that images are just grids of numbers—is the key to understanding all of computer vision.</p>
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Key Takeaway</h3>
+                    <p>Quantization buys memory and speed with precision. The surprise is how cheap the trade is: 8-bit is usually indistinguishable from full precision, and modern 4-bit methods come remarkably close. The size numbers here count weights only &mdash; real deployments also need memory for activations and the KV cache, which grows with context length.</p>
                 </div>
             </div>
         </div>
     </section>
+    <!-- End auto-article-vizlearn -->
 
-        <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+    <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
         <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
             <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
                 <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
@@ -590,7 +522,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- THEME LOGIC (Matches Activation Fns) ---
+            // --- THEME ---
             const themeToggleBtn = document.getElementById('themeToggle');
             const sunIcon = themeToggleBtn.querySelector('.dark-icon');
             const moonIcon = themeToggleBtn.querySelector('.light-icon');
@@ -599,240 +531,142 @@
             function applyTheme(theme) {
                 if (theme === 'light') {
                     document.body.classList.add('light-mode');
-                    moonIcon.classList.remove('hidden');
                     sunIcon.classList.add('hidden');
+                    moonIcon.classList.remove('hidden');
                 } else {
                     document.body.classList.remove('light-mode');
-                    sunIcon.classList.remove('hidden');
                     moonIcon.classList.add('hidden');
+                    sunIcon.classList.remove('hidden');
                 }
-                refreshDisplays(); // Re-render matrix to match theme colors
+                localStorage.setItem('theme', theme);
+                if (typeof window.onThemeChange === 'function') window.onThemeChange();
             }
-
+            applyTheme(currentTheme);
             themeToggleBtn.addEventListener('click', () => {
-                currentTheme = currentTheme === 'light' ? 'dark' : 'light';
-                localStorage.setItem('theme', currentTheme);
+                currentTheme = document.body.classList.contains('light-mode') ? 'dark' : 'light';
                 applyTheme(currentTheme);
             });
 
-            // --- Configuration ---
-            const GRID_SIZE = 28;
-            const PIXEL_SIZE = 11; 
-            const CANVAS_WIDTH = GRID_SIZE * PIXEL_SIZE;
-            const CANVAS_HEIGHT = GRID_SIZE * PIXEL_SIZE;
+            // --- APP LOGIC ---
+            let bits = 8, symmetric = true, outlier = false;
 
-            // --- DOM Elements ---
-            const canvas = document.getElementById('drawingCanvas');
-            const ctx = canvas.getContext('2d');
-            const clearBtn = document.getElementById('clearBtn');
-            const matrixDisplay = document.getElementById('matrix-display');
-            const invertBtn = document.getElementById('invertBtn');
-            const blurBtn = document.getElementById('blurBtn');
-            const edgeBtn = document.getElementById('edgeBtn');
-            const thresholdSlider = document.getElementById('thresholdSlider');
-            const thresholdValue = document.getElementById('thresholdValue');
-            const applyThresholdBtn = document.getElementById('applyThresholdBtn');
+            // a fixed, bell-ish set of "weights" so comparisons are stable
+            const BASE = [-0.82,-0.61,-0.55,-0.41,-0.38,-0.29,-0.22,-0.18,-0.11,-0.07,
+                          -0.03, 0.02, 0.06, 0.12, 0.17, 0.24, 0.31, 0.36, 0.44, 0.52,
+                           0.58, 0.67, 0.74, 0.88];
 
-            // --- State ---
-            let isDrawing = false;
-            let grid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
-            let matrixCells = [];
-            
-            // --- Initialization ---
-            function initialize() {
-                canvas.width = CANVAS_WIDTH;
-                canvas.height = CANVAS_HEIGHT;
-                matrixDisplay.innerHTML = '';
-                for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
-                    const cell = document.createElement('div');
-                    matrixCells.push(cell);
-                    matrixDisplay.appendChild(cell);
+            function weights() { return outlier ? BASE.concat([4.6]) : BASE.slice(); }
+
+            function quantize(ws, b, sym) {
+                if (b >= 16) {   // float formats: treat as effectively exact here
+                    return { q: ws.slice(), scale: b === 32 ? 1.2e-7 : 6e-4, levels: b === 32 ? 4.3e9 : 65504, zp: 0 };
                 }
-                
-                // Initialize Theme and Canvas
-                applyTheme(currentTheme);
-                clearCanvas();
-            }
-            
-            // --- Update & Drawing Functions ---
-            function refreshDisplays() {
-                drawCanvas();
-                updateMatrixDisplay();
-            }
-
-            function drawCanvas() {
-                ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-                // Background color for canvas (Always blackish to represent empty space)
-                ctx.fillStyle = '#000';
-                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-                for (let y = 0; y < GRID_SIZE; y++) {
-                    for (let x = 0; x < GRID_SIZE; x++) {
-                        const intensity = grid[y][x];
-                        if (intensity > 0) {
-                            ctx.fillStyle = `rgb(${intensity}, ${intensity}, ${intensity})`;
-                            ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
-                        }
-                    }
-                }
-            }
-            
-            function updateMatrixDisplay() {
-                const isLightMode = document.body.classList.contains('light-mode');
-                
-                for (let y = 0; y < GRID_SIZE; y++) {
-                    for (let x = 0; x < GRID_SIZE; x++) {
-                        const index = y * GRID_SIZE + x;
-                        const cellValue = grid[y][x];
-                        const cellElement = matrixCells[index];
-                        cellElement.textContent = cellValue;
-                        
-                        if (cellValue > 0) {
-                            // Grayscale Visualization (0-255)
-                            // Strict Grayscale: Background reflects value, Text contrasts
-                            const intensity = cellValue;
-                            cellElement.style.backgroundColor = `rgb(${intensity}, ${intensity}, ${intensity})`;
-                            
-                            // Text contrast calculation
-                            cellElement.style.color = intensity > 128 ? '#000000' : '#ffffff';
-                            cellElement.style.fontWeight = '700';
-                        } else {
-                            // Empty cells (0)
-                            // Kept subtle to show grid structure without noise
-                            cellElement.style.backgroundColor = isLightMode ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)';
-                            cellElement.style.color = isLightMode ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'; 
-                            cellElement.style.fontWeight = '400';
-                        }
-                    }
-                }
-            }
-
-            function clearCanvas() {
-                grid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
-                refreshDisplays();
-            }
-
-            // --- Drawing Logic ---
-            function draw(event) {
-                if (!isDrawing) return;
-                event.preventDefault();
-                const rect = canvas.getBoundingClientRect();
-                
-                // Handle both touch and mouse
-                let clientX, clientY;
-                if(event.touches) {
-                    clientX = event.touches[0].clientX;
-                    clientY = event.touches[0].clientY;
+                const levels = Math.pow(2, b);
+                let lo, hi, zp = 0;
+                if (sym) {
+                    const m = Math.max(...ws.map(Math.abs));
+                    lo = -m; hi = m;
                 } else {
-                    clientX = event.clientX;
-                    clientY = event.clientY;
+                    lo = Math.min(...ws); hi = Math.max(...ws);
                 }
-                
-                // Calculate Scale Factor (Canvas Display Size vs Actual Size)
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
+                const scale = (hi - lo) / (levels - 1);
+                zp = sym ? 0 : lo;
+                const q = ws.map(w => {
+                    const idx = Math.round((w - zp) / scale);
+                    const clamped = Math.max(0, Math.min(levels - 1, idx + (sym ? Math.round(-lo / scale) : 0)));
+                    // dequantize back
+                    return sym ? (clamped * scale + lo) : (clamped * scale + zp);
+                });
+                return { q, scale, levels, zp, lo, hi };
+            }
 
-                const canvasX = (clientX - rect.left) * scaleX;
-                const canvasY = (clientY - rect.top) * scaleY;
-                
-                const gridX = Math.floor(canvasX / PIXEL_SIZE);
-                const gridY = Math.floor(canvasY / PIXEL_SIZE);
+            function render() {
+                const ws = weights();
+                const { q, scale, levels, lo, hi } = quantize(ws, bits, symmetric);
 
-                // Brush settings
-                const brushKernel = [[80, 120, 80], [120, 255, 120], [80, 120, 80]];
-                const brushSize = 3;
-                const brushOffset = Math.floor(brushSize / 2);
+                const errs = ws.map((w, i) => Math.abs(w - q[i]));
+                const maxE = Math.max(...errs);
+                const rms = Math.sqrt(errs.reduce((a, e) => a + e * e, 0) / errs.length);
 
-                for(let i = 0; i < brushSize; i++) {
-                    for(let j = 0; j < brushSize; j++) {
-                       const y = gridY + i - brushOffset;
-                       const x = gridX + j - brushOffset;
-                       if(y >= 0 && y < GRID_SIZE && x >= 0 && x < GRID_SIZE) {
-                           const currentVal = grid[y][x];
-                           const brushVal = brushKernel[i][j];
-                           grid[y][x] = Math.min(255, currentVal + brushVal);
-                       }
+                document.getElementById('qLevels').textContent = bits >= 16 ? (bits === 32 ? '~4.3e9' : '65k') : levels;
+                document.getElementById('qStep').textContent = bits >= 16 ? '~0' : scale.toFixed(4);
+                document.getElementById('qMax').textContent = maxE.toFixed(4);
+                document.getElementById('qRms').textContent = rms.toFixed(4);
+
+                // ---- plot ----
+                const plot = document.getElementById('gridPlot');
+                const H = 300, pad = 14;
+                const vmin = Math.min(...ws, lo ?? Math.min(...ws));
+                const vmax = Math.max(...ws, hi ?? Math.max(...ws));
+                const span = (vmax - vmin) || 1;
+                const yOf = v => pad + (1 - (v - vmin) / span) * (H - pad * 2);
+
+                let lines = '';
+                if (bits < 16 && levels <= 256) {
+                    const stepShown = levels > 64 ? Math.ceil(levels / 64) : 1;
+                    for (let i = 0; i < levels; i += stepShown) {
+                        const v = (lo ?? vmin) + i * scale;
+                        if (v < vmin - 0.01 || v > vmax + 0.01) continue;
+                        lines += `<div class="lvl-line" style="top:${yOf(v).toFixed(1)}px; opacity:${levels <= 16 ? 0.55 : 0.18}"></div>`;
                     }
                 }
-                refreshDisplays();
+                const dots = ws.map((w, i) => {
+                    const x = ((i + 0.5) / ws.length) * 100;
+                    return `<div class="wdot" style="left:${x}%; top:${yOf(w).toFixed(1)}px; background: var(--text-muted); opacity:0.45"></div>
+                            <div class="wdot" style="left:${x}%; top:${yOf(q[i]).toFixed(1)}px; background: var(--accent-primary); box-shadow: 0 0 8px var(--accent-glow)"></div>
+                            <div style="position:absolute; left:${x}%; top:${Math.min(yOf(w), yOf(q[i])).toFixed(1)}px; height:${Math.abs(yOf(w) - yOf(q[i])).toFixed(1)}px; width:1px; background:#ef4444; opacity:0.5; transform:translateX(-50%)"></div>`;
+                }).join('');
+                plot.innerHTML = lines + dots;
+
+                // ---- table ----
+                document.getElementById('wTable').innerHTML = ws.map((w, i) => `
+                    <div class="token-item" style="padding:8px 12px">
+                        <span class="mono-font text-[11px] opacity-50 w-8">w${i}</span>
+                        <span class="mono-font text-xs flex-1">${w.toFixed(4)}</span>
+                        <span class="mono-font text-xs opacity-50">&rarr;</span>
+                        <span class="mono-font text-xs flex-1 text-right" style="color: var(--accent-primary)">${q[i].toFixed(4)}</span>
+                        <span class="mono-font text-[11px] w-20 text-right" style="color:${errs[i] > rms * 1.5 ? '#ef4444' : 'inherit'}; opacity:${errs[i] > rms * 1.5 ? 1 : 0.55}">${errs[i].toFixed(4)}</span>
+                    </div>`).join('');
+
+                // ---- model size ----
+                const P = +document.getElementById('modelSel').value * 1e9;
+                const bytes = bits / 8;
+                const gbNow = (P * bytes) / 1e9;
+                const gb32 = (P * 4) / 1e9;
+                document.getElementById('szFp32').textContent = gb32.toFixed(0) + ' GB';
+                document.getElementById('szNow').textContent = gbNow.toFixed(1) + ' GB';
+                document.getElementById('szSaved').textContent = ((1 - bytes / 4) * 100).toFixed(0) + '%';
+
+                const note = gbNow <= 24 ? 'Fits on a single 24 GB consumer GPU.'
+                          : gbNow <= 80 ? 'Fits on one 80 GB data-centre GPU.'
+                          : `Needs about ${Math.ceil(gbNow / 80)} x 80 GB GPUs just for the weights.`;
+                document.getElementById('fitNote').textContent = note + ' Weights only - activations and KV cache add more.';
             }
 
-            // --- Filter Functions ---
-            function invertImage() {
-                grid = grid.map(row => row.map(pixel => 255 - pixel));
-                refreshDisplays();
-            }
+            document.querySelectorAll('.prec-btn').forEach(b => b.addEventListener('click', () => {
+                document.querySelectorAll('.prec-btn').forEach(x => x.classList.remove('active'));
+                b.classList.add('active');
+                bits = +b.dataset.bits;
+                render();
+            }));
+            document.getElementById('symBtn').addEventListener('click', () => {
+                symmetric = true;
+                document.getElementById('symBtn').classList.add('on');
+                document.getElementById('asymBtn').classList.remove('on');
+                render();
+            });
+            document.getElementById('asymBtn').addEventListener('click', () => {
+                symmetric = false;
+                document.getElementById('asymBtn').classList.add('on');
+                document.getElementById('symBtn').classList.remove('on');
+                render();
+            });
+            document.getElementById('outlierChk').addEventListener('change', e => { outlier = e.target.checked; render(); });
+            document.getElementById('modelSel').addEventListener('change', render);
 
-            function applyThreshold() {
-                const threshold = parseInt(thresholdSlider.value, 10);
-                grid = grid.map(row => row.map(pixel => pixel > threshold ? 255 : 0));
-                refreshDisplays();
-            }
-
-            function applyBlur() {
-                const readGrid = JSON.parse(JSON.stringify(grid));
-                for (let y = 0; y < GRID_SIZE; y++) {
-                    for (let x = 0; x < GRID_SIZE; x++) {
-                        let total = 0, count = 0;
-                        for (let dy = -1; dy <= 1; dy++) {
-                            for (let dx = -1; dx <= 1; dx++) {
-                                const ny = y + dy, nx = x + dx;
-                                if (ny >= 0 && ny < GRID_SIZE && nx >= 0 && nx < GRID_SIZE) {
-                                    total += readGrid[ny][nx];
-                                    count++;
-                                }
-                            }
-                        }
-                        grid[y][x] = Math.round(total / count);
-                    }
-                }
-                refreshDisplays();
-            }
-
-            function applyEdgeDetection() {
-                const readGrid = JSON.parse(JSON.stringify(grid));
-                const newGrid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
-                const sobelX = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
-                const sobelY = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
-                for (let y = 1; y < GRID_SIZE - 1; y++) {
-                    for (let x = 1; x < GRID_SIZE - 1; x++) {
-                        let pixelX = 0, pixelY = 0;
-                        for (let dy = -1; dy <= 1; dy++) {
-                            for (let dx = -1; dx <= 1; dx++) {
-                                const pixel = readGrid[y + dy][x + dx];
-                                pixelX += pixel * sobelX[dy + 1][dx + 1];
-                                pixelY += pixel * sobelY[dy + 1][dx + 1];
-                            }
-                        }
-                        const magnitude = Math.round(Math.sqrt(pixelX * pixelX + pixelY * pixelY));
-                        newGrid[y][x] = Math.min(255, magnitude);
-                    }
-                }
-                grid = newGrid;
-                refreshDisplays();
-            }
-            
-            // --- Event Listeners ---
-            clearBtn.addEventListener('click', clearCanvas);
-
-            invertBtn.addEventListener('click', invertImage);
-            blurBtn.addEventListener('click', applyBlur);
-            edgeBtn.addEventListener('click', applyEdgeDetection);
-            applyThresholdBtn.addEventListener('click', applyThreshold);
-            thresholdSlider.addEventListener('input', () => { thresholdValue.textContent = thresholdSlider.value; });
-
-            canvas.addEventListener('mousedown', (e) => { isDrawing = true; draw(e); });
-            canvas.addEventListener('mousemove', draw);
-            canvas.addEventListener('mouseup', () => { isDrawing = false; });
-            canvas.addEventListener('mouseleave', () => { isDrawing = false; });
-            canvas.addEventListener('touchstart', (e) => { isDrawing = true; draw(e); });
-            canvas.addEventListener('touchmove', draw);
-            canvas.addEventListener('touchend', () => { isDrawing = false; });
-
-            // --- Run Initialization ---
-            initialize();
+            render();
         });
-    
+
         // ===== DROPDOWN SEARCH FUNCTIONALITY =====
         const allCourses = [
             { title: "Calculating Parameters in CNN", path: "computer_vision/calculating_parameters_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
@@ -959,22 +793,18 @@
             { title: "Word Cloud Generator", path: "natural_language_processing/word_cloud.html", category: "natural_language_processing", icon: "fa-comments" }
         ];
 
-        function toRelativePath(fromPath, targetPath) {
-            const fromParts = fromPath.split('/').filter(Boolean);
-            const targetParts = targetPath.split('/').filter(Boolean);
-            let shared = 0;
-            while (shared < Math.min(fromParts.length, targetParts.length) && fromParts[shared] === targetParts[shared]) {
-                shared++;
-            }
-            const up = '../'.repeat(Math.max(0, fromParts.length - shared));
-            const down = targetParts.slice(shared).join('/');
-            return `${up}${down}`;
+        function toRelativePath(fromDir, targetPath) {
+            const fromParts = fromDir.split('/').filter(Boolean);
+            const toParts = targetPath.split('/').filter(Boolean);
+            let i = 0;
+            while (i < fromParts.length && i < toParts.length && fromParts[i] === toParts[i]) i++;
+            const ups = fromParts.length - i;
+            return '../'.repeat(ups) + toParts.slice(i).join('/');
         }
 
-        const currentPath = window.location.pathname.replace(/\/+$/g, '').replace(/index\.html$/, '');
-        const currentDir = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/')) : '';
-        const resolvedCourses = allCourses.map((course) => {
-            const normalizedTarget = course.path.replace(/^\.\//, '');
+        const currentDir = window.location.pathname.split('/').slice(0, -1).filter(Boolean).slice(-1)[0] || '';
+        const resolvedCourses = allCourses.map(course => {
+            const normalizedTarget = course.path;
             const relativePath = currentDir ? toRelativePath(currentDir, normalizedTarget) : normalizedTarget;
             return { ...course, path: relativePath };
         });
@@ -985,19 +815,17 @@
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value.toLowerCase().trim();
-                
+
                 if (query.length === 0) {
                     dropdown.classList.remove('show');
                     return;
                 }
 
-                // Filter courses
-                const filtered = resolvedCourses.filter(course => 
-                    course.title.toLowerCase().includes(query) || 
+                const filtered = resolvedCourses.filter(course =>
+                    course.title.toLowerCase().includes(query) ||
                     course.category.toLowerCase().includes(query)
                 );
 
-                // Render results
                 if (filtered.length === 0) {
                     dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
                 } else {
@@ -1018,21 +846,13 @@
                 dropdown.classList.add('show');
             });
 
-            // Close dropdown when clicking outside
             document.addEventListener('click', (e) => {
-                if (!searchInput.parentElement.contains(e.target)) {
-                    dropdown.classList.remove('show');
-                }
+                if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show');
             });
-
-            // Close dropdown on Escape key
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    dropdown.classList.remove('show');
-                }
+                if (e.key === 'Escape') dropdown.classList.remove('show');
             });
         }
-
     </script>
 </body>
 </html>

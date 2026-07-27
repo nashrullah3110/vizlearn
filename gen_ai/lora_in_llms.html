@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VizLearn - Grayscale Image Processing</title>
-    <meta name="description" content="Learn Grayscale Image Processing with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn.">
-    <meta name="keywords" content="Grayscale Image Processing, interactive learning, beginner tutorial, vizlearn">
+    <title>VizLearn - LoRA in LLMs</title>
+    <meta name="description" content="Interactive LoRA lab - see how low-rank adapters replace full fine-tuning, how rank controls trainable parameters, and what a rank-limited update can represent.">
+    <meta name="keywords" content="LoRA, low rank adaptation, PEFT, fine-tuning, adapters, rank, QLoRA, vizlearn, gen ai">
     <meta name="robots" content="index, follow">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -26,6 +26,7 @@
                     animation: {
                         'grid-flow': 'grid-move 40s linear infinite',
                         'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'cursor-blink': 'blink 1s infinite'
                     },
                     keyframes: {
                         'grid-move': {
@@ -35,6 +36,10 @@
                         fadeIn: {
                             '0%': { opacity: '0', transform: 'translateY(10px)' },
                             '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        blink: {
+                            '0%, 50%': { opacity: '1' },
+                            '51%, 100%': { opacity: '0' }
                         }
                     }
                 }
@@ -43,75 +48,59 @@
     </script>
     <script>
         (function(){
-            const apply = (t)=>{
-                if(t==='light') document.body.classList.add('light-mode');
-                else document.body.classList.remove('light-mode');
-            };
             const t = localStorage.getItem('theme') || 'dark';
-            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+            const apply = () => { if (t === 'light') document.body.classList.add('light-mode'); };
+            if (document.body) apply(); else document.addEventListener('DOMContentLoaded', apply);
         })();
     </script>
     <style>
         :root {
-            /* DARK MODE (Default) */
             --bg-body: #050505;
             --bg-surface: #0a0a0a;
             --bg-glass: rgba(10, 10, 10, 0.85);
-            
-            --border-subtle: rgba(74, 222, 128, 0.15); 
-            --border-glow: rgba(74, 222, 128, 0.5);
-
-            --accent-primary: #4ade80; /* Neon Green */
+            --border-subtle: rgba(74, 222, 128, 0.15);
+            --accent-primary: #4ade80;
             --accent-glow: rgba(74, 222, 128, 0.25);
-            
             --text-main: #f0fdf4;
             --text-muted: #86efac;
-            
             --card-bg: #0a0a0a;
             --input-bg: rgba(74, 222, 128, 0.03);
             --input-focus-bg: rgba(74, 222, 128, 0.08);
-
+            --display-bg: rgba(0, 0, 0, 0.4);
             --grid-color: rgba(74, 222, 128, 0.05);
             --vignette-color: #050505;
+            --stat-bg: rgba(0, 0, 0, 0.2);
+            --stat-border: rgba(255, 255, 255, 0.05);
         }
 
-        /* LIGHT MODE OVERRIDES */
         body.light-mode {
             --bg-body: #f0fdf4;
             --bg-surface: #ffffff;
-            --bg-glass: rgba(255, 255, 255, 0.85);
-
-            --border-subtle: rgba(22, 163, 74, 0.15);
-            --border-glow: rgba(22, 163, 74, 0.4);
-
+            --bg-glass: rgba(255, 255, 255, 0.95);
+            --border-subtle: rgba(22, 163, 74, 0.2);
             --accent-primary: #15803d;
-            --accent-glow: rgba(21, 128, 61, 0.2);
-
-            --text-main: #052e16;
-            --text-muted: #4b5563;
-
+            --accent-glow: rgba(21, 128, 61, 0.15);
+            --text-main: #111827;
+            --text-muted: #374151;
             --card-bg: #ffffff;
-            --input-bg: rgba(22, 163, 74, 0.04);
-            --input-focus-bg: rgba(22, 163, 74, 0.08);
-
-            --grid-color: rgba(22, 163, 74, 0.04);
+            --input-bg: rgba(0, 0, 0, 0.04);
+            --input-focus-bg: rgba(0, 0, 0, 0.06);
+            --display-bg: rgba(0, 0, 0, 0.03);
+            --grid-color: rgba(0, 0, 0, 0.05);
             --vignette-color: transparent;
+            --stat-bg: #f9fafb;
+            --stat-border: #e5e7eb;
         }
 
-        /* Global Smooth Transition */
         *, *::before, *::after {
-            transition-property: background-color, border-color, color, box-shadow;
-            transition-duration: 300ms;
-            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition: background-color 300ms, border-color 300ms, color 300ms, box-shadow 300ms;
         }
 
         body {
             font-family: 'Inter', sans-serif;
             background-color: var(--bg-body);
             color: var(--text-main);
-            
-            /* Animated Grid Background */
-            background-image: 
+            background-image:
                 radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
                 linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
                 linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
@@ -119,161 +108,172 @@
             animation: grid-move 40s linear infinite;
         }
 
-        h1, h2, h3, .brand-font {
-            font-family: 'Space Grotesk', sans-serif;
-            letter-spacing: -0.02em;
-        }
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
 
-        .mono-font {
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        /* Glassmorphism Header */
         .glass-header {
             background-color: var(--bg-glass);
             backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border-subtle);
         }
 
-        /* Futuristic Card */
         .glass-card {
             border: 1px solid var(--border-subtle);
             background: var(--card-bg);
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
+        .glass-card:hover { border-color: var(--accent-primary); }
 
-        .glass-card:hover {
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 20px var(--accent-glow);
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
         }
-
-        /* Function Buttons */
-        .func-btn {
-            width: 100%;
-            text-align: left;
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            font-family: 'Space Grotesk', sans-serif;
-            font-weight: 500;
-            color: var(--text-muted);
-            transition: all 0.2s ease;
-            border: 1px solid transparent;
-            background: transparent;
-        }
-
-        .func-btn:hover {
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
             background: var(--input-bg);
-            color: var(--accent-primary);
-            padding-left: 1.25rem; /* Slide effect */
+            color: var(--text-main);
         }
 
-        .func-btn:active {
-            transform: scale(0.98);
-        }
-
-        /* Inputs and Controls */
-        .custom-input {
+        .custom-textarea {
             background: var(--input-bg);
             border: 1px solid var(--border-subtle);
             color: var(--text-main);
-            font-family: 'JetBrains Mono', monospace;
-        }
-        
-        /* Slider Styling */
-        input[type=range] {
-            -webkit-appearance: none; 
-            background: transparent; 
-        }
-
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 16px;
-            width: 16px;
-            border-radius: 50%;
-            background: var(--accent-primary);
-            cursor: pointer;
-            margin-top: -6px; 
-            box-shadow: 0 0 10px var(--accent-glow);
-        }
-
-        input[type=range]::-webkit-slider-runnable-track {
+            border-radius: 12px;
+            padding: 1rem;
             width: 100%;
-            height: 4px;
-            cursor: pointer;
-            background: var(--border-subtle);
-            border-radius: 2px;
+            outline: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            transition: border-color 0.2s;
         }
+        .custom-textarea:focus { border-color: var(--accent-primary); }
 
         .action-btn {
+            background: rgba(21, 128, 61, 0.1);
+            border: 1px solid rgba(21, 128, 61, 0.2);
+            color: var(--accent-primary);
             font-family: 'Space Grotesk', sans-serif;
             font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            padding: 0.75rem;
+            border-radius: 8px;
             transition: all 0.2s;
-            position: relative;
-            overflow: hidden;
-            border: 1px solid transparent;
-        }
-        
-        .action-btn::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
-            transform: translateX(-100%);
-            transition: 0.3s;
-        }
-        
-        .action-btn:hover::after {
-            transform: translateX(100%);
-        }
-
-        /* Toggle Button */
-        .theme-toggle {
-            background: var(--input-bg);
-            border: 1px solid var(--border-subtle);
-            color: var(--text-muted);
-        }
-        .theme-toggle:hover {
-            color: var(--accent-primary);
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 10px var(--accent-glow);
-        }
-
-        /* Canvas & Matrix Specifics */
-        #drawingCanvas {
-            image-rendering: pixelated;
-            touch-action: none;
-            aspect-ratio: 1;
-            box-shadow: 0 0 20px rgba(0,0,0,0.3);
-        }
-        
-        #matrix-display {
-            display: grid;
-            grid-template-columns: repeat(28, 1fr); /* Force equal columns */
-            gap: 1px;
-            line-height: 1;
-            font-size: 10px; /* Slightly larger fixed size */
-            font-family: 'JetBrains Mono', monospace;
-            width: fit-content; /* Shrink to fit cells */
-            min-width: 600px; /* Ensure enough width for 3-digit numbers */
-            margin: 0 auto;
-        }
-        
-        #matrix-display > div {
-            aspect-ratio: 1 / 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background-color 0.1s, color 0.1s;
-            border-radius: 1px;
-            overflow: hidden; /* Prevent 3 digit numbers from breaking layout */
+            gap: 0.5rem;
+            width: 100%;
+            cursor: pointer;
         }
-    
+        .action-btn:hover:not(:disabled) { background: var(--accent-glow); }
+        .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .stat-box {
+            background: var(--stat-bg);
+            border: 1px solid var(--stat-border);
+            padding: 1rem;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .token-item {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 0.85rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.6rem;
+            transition: all 0.2s;
+        }
+        .token-item:hover { background: var(--bg-glass); border-color: var(--accent-primary); }
+        .token-item.selected {
+            border-color: var(--accent-primary);
+            background: var(--accent-glow);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .prob-bar {
+            height: 4px;
+            border-radius: 2px;
+            background: var(--accent-primary);
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px; width: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 6px;
+            background: var(--border-subtle);
+            border-radius: 3px;
+        }
+
+        .scroll-container::-webkit-scrollbar { display: none; }
+
+        .display-box {
+            background: var(--display-bg);
+            border-radius: 12px;
+            padding: 1.25rem;
+            min-height: 100px;
+            overflow-y: auto;
+            line-height: 1.8;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+        }
+
+        select.custom-select {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            padding: 0.5rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            width: 100%;
+            outline: none;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid var(--border-subtle);
+            background: var(--input-bg);
+            border-radius: 8px;
+            padding: 5px 10px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.2s ease;
+        }
+        .chip.on {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--accent-glow);
+        }
+
+
+        .mx { display: inline-grid; gap: 2px; vertical-align: middle; }
+        .mx div { border-radius: 2px; }
+        .mx-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; opacity: 0.7; text-align: center; margin-top: 6px; }
+        .frozen { position: relative; }
+        .frozen::after { content: '\f023'; font-family: 'Font Awesome 6 Free'; font-weight: 900; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--text-muted); opacity: 0.5; }
+
+
         /* Search Input Wrapper */
         .search-input-wrapper {
             background: var(--input-bg);
@@ -285,24 +285,14 @@
             border-color: var(--accent-primary);
             box-shadow: 0 0 15px var(--accent-glow);
         }
-        .search-input-wrapper input {
-            color: var(--text-main);
-        }
-        .search-input-wrapper input::placeholder {
-            color: var(--text-muted);
-            opacity: 0.7;
-        }
-        .search-input-wrapper i {
-            color: var(--accent-primary);
-            opacity: 0.7;
-        }
+        .search-input-wrapper input { color: var(--text-main); }
+        .search-input-wrapper input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .search-input-wrapper i { color: var(--accent-primary); opacity: 0.7; }
 
         /* Dropdown Search */
         .search-dropdown {
             position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
+            top: 100%; left: 0; right: 0;
             background: var(--card-bg);
             border: 1px solid var(--border-subtle);
             border-top: none;
@@ -313,23 +303,11 @@
             display: none;
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
         }
-
-        .search-dropdown.show {
-            display: block;
-            animation: slideDown 0.2s ease-out;
-        }
-
+        .search-dropdown.show { display: block; animation: slideDown 0.2s ease-out; }
         @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-
         .search-dropdown-item {
             padding: 12px 16px;
             border-bottom: 1px solid var(--border-subtle);
@@ -341,40 +319,12 @@
             color: inherit;
             text-decoration: none;
         }
-
-        .search-dropdown-item:last-child {
-            border-bottom: none;
-        }
-
-        .search-dropdown-item:hover {
-            background: var(--input-focus-bg);
-            padding-left: 20px;
-        }
-
-        .dropdown-item-title {
-            font-weight: 500;
-            color: var(--text-main);
-        }
-
-        .dropdown-item-path {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-left: 12px;
-        }
-
-        .dropdown-item-icon {
-            color: var(--accent-primary);
-            margin-right: 8px;
-            font-size: 0.875rem;
-        }
-
-        .dropdown-no-results {
-            padding: 20px 16px;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 0.875rem;
-        }
-
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        .dropdown-item-title { font-weight: 500; color: var(--text-main); }
+        .dropdown-item-path { font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; }
+        .dropdown-item-icon { color: var(--accent-primary); margin-right: 8px; font-size: 0.875rem; }
+        .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
     </style>
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
@@ -382,10 +332,8 @@
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-
         gtag('config', 'G-ZT6JM33V5J');
     </script>
-
 </head>
 <body class="flex flex-col min-h-screen overflow-x-hidden">
 
@@ -393,29 +341,21 @@
     <header class="glass-header sticky top-0 z-50">
         <div class="flex justify-center py-3 px-4 md:px-8">
             <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
-                <!-- Logo -->
                 <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
                     <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
                     <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
                 </a>
-                
-                <!-- Search -->
+
                 <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
                     <i class="fas fa-search text-sm"></i>
                     <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
-                    <div id="searchDropdown" class="search-dropdown">
-                        <!-- Results will be populated here -->
-                    </div>
+                    <div id="searchDropdown" class="search-dropdown"></div>
                 </div>
 
-                <!-- Theme Toggle + Back Button -->
                 <div class="flex items-center gap-3">
-                    <!-- Back to Hub Button -->
                     <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
                         <i class="fas fa-arrow-left text-xs"></i>
                     </a>
-                    
-                    <!-- Theme Toggle -->
                     <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
                         <i class="fas fa-sun hidden dark-icon"></i>
                         <i class="fas fa-moon hidden light-icon"></i>
@@ -425,159 +365,174 @@
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto flex flex-col">
-        
-        <!-- Breadcrumb / Title -->
+
         <div class="mb-8 animate-fade-in">
             <div class="flex items-center gap-2 text-xs mono-font mb-2" style="color: var(--text-muted)">
                 <span class="opacity-50">Modules</span>
                 <span>/</span>
-                <span class="opacity-50">Computer Vision</span>
+                <span class="opacity-50">Gen AI</span>
                 <span>/</span>
-                <span style="color: var(--accent-primary)">Grayscale Processing</span>
+                <span style="color: var(--accent-primary)">LoRA Lab</span>
             </div>
-            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Grayscale Logic</h1>
+            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">LoRA in LLMs</h1>
             <p class="mt-2 text-sm max-w-2xl" style="color: var(--text-muted)">
-                Draw on the canvas to understand how images are represented as matrices and apply basic filters.
+                Fine-tune a giant model by training two thin matrices instead of one huge one. Set the rank and watch trainable parameters collapse by orders of magnitude while the update still does its job.
             </p>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full flex-1">
-            
-            <!-- Controls Sidebar -->
-            <aside class="lg:col-span-4 space-y-6 animate-fade-in" style="animation-delay: 0.1s">
-                
-                <!-- Canvas Area -->
-                <div class="glass-card p-6 flex flex-col items-center">
-                    <h2 class="text-xs font-bold uppercase tracking-widest mb-4 opacity-70 mono-font w-full" style="color: var(--text-muted)">Input Image (28x28)</h2>
-                    
-                    <canvas id="drawingCanvas" class="w-full max-w-[280px] rounded-lg bg-black border border-gray-700 mb-4"></canvas>
-                    
-                    <button id="clearBtn" class="action-btn w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors">
-                        <i class="fas fa-trash mr-2"></i>Clear Canvas
-                    </button>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <aside class="lg:col-span-5 flex flex-col gap-6 animate-fade-in" style="animation-delay: 0.1s">
+                <div class="glass-card p-6 flex flex-col gap-5">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">1. Layer Shape</h2>
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[10px] uppercase font-bold opacity-60">Output dim (d)</span>
+                            <span id="dVal" class="text-xs font-bold" style="color: var(--accent-primary)">4096</span>
+                        </div>
+                        <input type="range" id="dSlider" min="512" max="8192" step="512" value="4096">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[10px] uppercase font-bold opacity-60">Input dim (k)</span>
+                            <span id="kVal" class="text-xs font-bold" style="color: var(--accent-primary)">4096</span>
+                        </div>
+                        <input type="range" id="kSlider" min="512" max="8192" step="512" value="4096">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[10px] uppercase font-bold opacity-60">LoRA rank (r)</span>
+                            <span id="rVal" class="text-xs font-bold" style="color: var(--accent-primary)">8</span>
+                        </div>
+                        <input type="range" id="rSlider" min="1" max="128" step="1" value="8">
+                        <div class="flex justify-between text-[9px] opacity-50 mono-font mt-1"><span>1</span><span>typical: 8-64</span><span>128</span></div>
+                    </div>
                 </div>
 
-                <!-- Filters -->
-                <div class="glass-card p-4">
-                    <h2 class="text-xs font-bold uppercase tracking-widest mb-4 opacity-70 mono-font" style="color: var(--text-muted)">Filters</h2>
-                    <div class="space-y-2">
-                        <button id="invertBtn" class="func-btn"><i class="fas fa-adjust mr-2 opacity-50 text-xs"></i> Invert Colors</button>
-                        <button id="blurBtn" class="func-btn"><i class="fas fa-blur mr-2 opacity-50 text-xs"></i> Gaussian Blur</button>
-                        <button id="edgeBtn" class="func-btn"><i class="fas fa-border-style mr-2 opacity-50 text-xs"></i> Edge Detection</button>
+                <div class="glass-card p-6 flex flex-col gap-4">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">2. Whole-Model View</h2>
+                    <select id="modelSel" class="custom-select">
+                        <option value="7">7B parameters</option>
+                        <option value="13">13B parameters</option>
+                        <option value="70">70B parameters</option>
+                    </select>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Full fine-tune</span><span id="ftParams" class="text-lg font-bold opacity-70">0</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">With LoRA</span><span id="loraParams" class="text-lg font-bold" style="color: var(--accent-primary)">0</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Optimizer RAM</span><span id="optRam" class="text-lg font-bold">0</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Adapter file</span><span id="adapterSz" class="text-lg font-bold">0</span></div>
                     </div>
+                    <p class="text-[10px] opacity-60 leading-relaxed">Assumes adapters on the attention projections of every layer &mdash; the usual configuration.</p>
+                </div>
 
-                    <!-- Threshold Control -->
-                    <div class="mt-6 pt-4 border-t border-dashed" style="border-color: var(--border-subtle)">
-                        <div class="flex justify-between items-center mb-2">
-                            <label for="thresholdSlider" class="text-xs font-bold uppercase tracking-wider opacity-80" style="color: var(--text-main)">Threshold</label>
-                            <span id="thresholdValue" class="mono-font text-sm font-bold" style="color: var(--accent-primary)">128</span>
-                        </div>
-                        <input id="thresholdSlider" type="range" min="0" max="255" value="128" class="w-full mb-3">
-                        
-                        <button id="applyThresholdBtn" class="action-btn w-full py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2" style="background: var(--input-bg); color: var(--text-main); border-color: var(--border-subtle)">
-                            Apply Threshold
-                        </button>
+                <div class="glass-card p-6">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-4">This Layer</h2>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">W (frozen)</span><span id="wCount" class="text-lg font-bold mono-font opacity-70">0</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">A + B (trained)</span><span id="abCount" class="text-lg font-bold mono-font" style="color: var(--accent-primary)">0</span></div>
+                        <div class="stat-box text-center col-span-2"><span class="text-[9px] uppercase font-bold opacity-50">Trainable Fraction</span><span id="fracVal" class="text-2xl font-bold" style="color: var(--accent-primary)">0%</span></div>
                     </div>
                 </div>
             </aside>
 
-            <!-- Visualization Area -->
-            <section class="lg:col-span-8 h-full min-h-[500px] animate-fade-in" style="animation-delay: 0.2s">
-                <div class="glass-card h-full w-full flex flex-col p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-xs font-bold uppercase tracking-widest opacity-70 mono-font" style="color: var(--text-muted)">Pixel Matrix Values</h2>
-                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-green-500/10 text-green-500 border border-green-500/20 mono-font">LIVE DATA</span>
-                    </div>
+            <section class="lg:col-span-7 flex flex-col gap-6 animate-fade-in" style="animation-delay: 0.2s">
+                <div class="glass-card p-6">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-5">The Decomposition</h2>
+                    <div class="flex items-center justify-center gap-4 flex-wrap" id="mxArea"></div>
+                    <p class="text-center mono-font text-sm mt-6" style="color: var(--accent-primary)">h = Wx + BAx</p>
+                    <p class="text-center text-[11px] opacity-60 mt-2">W stays frozen. Only A and B receive gradients.</p>
+                </div>
 
-                    <!-- Matrix Display -->
-                    <div class="flex-grow overflow-auto bg-black/20 rounded-lg p-4 border border-dashed" style="border-color: var(--border-subtle)">
-                        <div id="matrix-display">
-                            <!-- Matrix cells generated by JS -->
-                        </div>
+                <div class="glass-card p-6">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-4">Parameter Comparison</h2>
+                    <div class="mb-4">
+                        <div class="flex justify-between text-[11px] mono-font mb-1"><span>Full fine-tune (d &times; k)</span><span id="barFullLbl">0</span></div>
+                        <div style="height:14px;background:var(--stat-bg);border-radius:7px;overflow:hidden"><div id="barFull" style="height:100%;width:100%;background:var(--text-muted);opacity:0.45;border-radius:7px"></div></div>
                     </div>
+                    <div>
+                        <div class="flex justify-between text-[11px] mono-font mb-1"><span>LoRA r&times;(d+k)</span><span id="barLoraLbl" style="color: var(--accent-primary)">0</span></div>
+                        <div style="height:14px;background:var(--stat-bg);border-radius:7px;overflow:hidden"><div id="barLora" class="prob-bar" style="height:100%;border-radius:7px"></div></div>
+                    </div>
+                    <div id="loraNote" class="mt-5 p-4 rounded-lg text-[11px] leading-relaxed" style="background: var(--input-bg); border: 1px solid var(--border-subtle)"></div>
+                </div>
+
+                <div class="glass-card p-6 flex-1">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-4">What a Rank-r Update Can Express</h2>
+                    <div id="rankDemo"></div>
+                    <p class="text-[10px] opacity-60 mt-3">A small &Delta;W = BA built with the current rank. Higher rank produces visibly richer structure; rank 1 can only produce one repeating pattern scaled up and down.</p>
                 </div>
             </section>
-
         </div>
     </main>
 
-    <!-- Footer -->
-
     <!-- auto-article-vizlearn -->
-    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
-        <div class="glass-card animate-fade-in" style="animation-delay: 0.3s;">
-            <div class="p-6 border-b" style="border-color: var(--border-subtle);">
-                <h2 class="font-bold text-xl md:text-2xl brand-font" style="color: var(--text-main)">Deconstructing Grayscale Images</h2>
-                <p class="mt-2 text-sm" style="color: var(--text-muted)">From visual drawings to numerical matrices—the foundation of computer vision.</p>
+    <section class="px-4 md:px-8 pb-8 max-w-7xl mx-auto w-full animate-fade-in" style="animation-delay: 200ms;">
+        <div class="card-container">
+            <div class="card-header">
+                <h2 class="text-xl md:text-2xl font-bold flex items-center gap-3">
+                    <i class="fas fa-compress-arrows-alt" style="color: var(--accent-primary);"></i>
+                    LoRA: Fine-Tuning Without Touching the Model
+                </h2>
             </div>
-            <div class="p-6 md:p-8 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
-                
-                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
-                    <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-bullseye"></i>Quick Context</h3>
-                    <p class="opacity-90">At its core, a digital grayscale image is nothing more than a grid of numbers—a <strong>matrix</strong>. Each number, called a <strong>pixel</strong>, represents the brightness at that specific point, typically ranging from <strong>0 (black)</strong> to <strong>255 (white)</strong>. This interactive bridges the gap between the visual image you draw and the underlying numerical data that a computer actually "sees" and manipulates.</p>
+            <div class="p-6 md:p-8 space-y-8 text-base leading-relaxed" style="color: var(--text-main);">
+
+                <p class="text-lg">
+                    Fine-tuning a 7B model the traditional way means updating all 7 billion weights &mdash; and storing optimizer state for each, which typically needs <strong>four to six times</strong> the model's own size in GPU memory. <strong>LoRA</strong> (Low-Rank Adaptation) sidesteps this almost entirely, and it has become the default way to adapt large models.
+                </p>
+
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-lightbulb"></i>The Insight: Updates Are Low-Rank</h3>
+                    <p>Fine-tuning changes a weight matrix from <span class="mono-font">W</span> to <span class="mono-font">W + &Delta;W</span>. The observation behind LoRA is that although <span class="mono-font">W</span> is enormously expressive, the <em>change</em> needed to specialise a model for one task has very low intrinsic rank &mdash; it does not need the full space.</p>
+                    <p class="mt-2">So instead of learning a full <span class="mono-font">d &times; k</span> matrix, LoRA factorises the update into two thin matrices:</p>
+                    <p class="my-3 text-center mono-font text-sm">&Delta;W = B &middot; A &nbsp;&nbsp; where B is d&times;r and A is r&times;k, with r &lll; min(d, k)</p>
+                    <p>The original weights are <strong>frozen</strong>. Only A and B are trained.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg md:text-xl font-bold mb-3 brand-font flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-lightbulb"></i>The Core Idea: Images as Data</h3>
-                    <p class="mb-4 opacity-90">The most fundamental concept in all of computer vision is that images are just data. Every operation, from a simple filter to a complex neural network, is a mathematical function performed on this matrix of pixel values. By understanding this relationship, you unlock the ability to understand how image processing algorithms work.</p>
-                    <p class="opacity-90">As you draw on the canvas, you are directly changing the numbers in the matrix on the right. A bright stroke sets pixel values to 255, while the empty canvas is all zeros. Every filter you apply is just a rule that transforms these numbers.</p>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-calculator"></i>Why the Savings Are So Extreme</h3>
+                    <p>A full update on a 4096&times;4096 layer is <strong>16.7 million</strong> parameters. The LoRA version at rank 8 is <span class="mono-font">8 &times; (4096 + 4096) = 65,536</span> &mdash; about <strong>0.4%</strong>. The saving comes from replacing a product of dimensions with a sum of them.</p>
+                    <p class="mt-2">The memory win is even larger than the parameter count suggests, because optimizers like Adam store two extra values per <em>trainable</em> parameter. Freezing 99.6% of the weights removes that overhead almost completely &mdash; which is what lets a 7B model be fine-tuned on a single consumer GPU.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg md:text-xl font-bold mb-3 brand-font flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-vial"></i>Guided Experiments with This Interactive</h3>
-                    <ol class="list-decimal pl-6 space-y-4">
-                        <li>
-                            <strong>Draw and Observe:</strong>
-                            <p class="font-light opacity-80 mt-1">Draw a simple diagonal line on the canvas. Watch the corresponding cells in the matrix light up with values like 255, 120, and 80. Notice how the "brush" has a soft edge, creating intermediate gray values, not just pure white.</p>
-                        </li>
-                        <li>
-                            <strong>Invert Colors:</strong>
-                            <p class="font-light opacity-80 mt-1">Click the <strong>Invert Colors</strong> button. Observe the matrix. Every pixel value `p` has been replaced by `255 - p`. The black background (0) becomes white (255), and your white drawing (255) becomes black (0). This is a simple but powerful pixel-wise operation.</p>
-                        </li>
-                        <li>
-                            <strong>Apply Threshold:</strong>
-                            <p class="font-light opacity-80 mt-1">Draw a shape and then click <strong>Apply Threshold</strong> with the slider at 128. All pixels with a value greater than 128 become pure white (255), and all others become pure black (0). This is called <strong>binarization</strong>, and it's a common step to simplify an image and isolate objects of interest.</p>
-                        </li>
-                        <li>
-                            <strong>Gaussian Blur:</strong>
-                            <p class="font-light opacity-80 mt-1">Clear the canvas and draw a single, sharp dot. Now click <strong>Gaussian Blur</strong>. Look at the matrix. The single high-value pixel has been "spread out" to its neighbors, creating a smooth gradient. This is achieved by averaging each pixel with its surrounding pixels, which is essential for reducing noise in images.</p>
-                        </li>
-                         <li>
-                            <strong>Edge Detection:</strong>
-                            <p class="font-light opacity-80 mt-1">Draw a solid square. Click <strong>Edge Detection</strong>. Notice that only the borders of your square remain as bright pixels in the matrix. The solid interior becomes black (0). This filter calculates the difference between neighboring pixels; where the difference is large (at an edge), the output value is high.</p>
-                        </li>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-gauge-high"></i>Choosing the Rank</h3>
+                    <p>Rank is the one hyperparameter that matters, and it is a capacity dial:</p>
+                    <ul class="list-disc pl-6 mt-3 space-y-2">
+                        <li><strong>r = 1&ndash;4</strong> &mdash; extremely cheap; enough for style or tone adjustments.</li>
+                        <li><strong>r = 8&ndash;16</strong> &mdash; the common default. Handles most instruction-tuning and domain adaptation.</li>
+                        <li><strong>r = 64&ndash;128</strong> &mdash; for teaching genuinely new capabilities, approaching full fine-tuning behaviour at a fraction of the cost.</li>
+                    </ul>
+                    <p class="mt-3">Higher is not automatically better: past the task's intrinsic rank you are adding parameters that mostly learn noise. Note also that A is initialised randomly while B is initialised to <strong>zero</strong>, so <span class="mono-font">BA = 0</span> at the start and training begins from exactly the pretrained model.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-boxes-stacked"></i>The Practical Superpower: Swappable Adapters</h3>
+                    <p>Because the base model is untouched, a LoRA adapter is a small standalone file &mdash; often just a few megabytes. One copy of a 70B model in memory can serve many specialisations by swapping adapters, and they can be merged into the weights before deployment (<span class="mono-font">W' = W + BA</span>) so inference costs nothing extra.</p>
+                    <p class="mt-2">Combine LoRA with a 4-bit quantized base and you get <strong>QLoRA</strong>, the recipe that made fine-tuning very large models possible on a single GPU.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-flask"></i>Interactive Exploration Guide</h3>
+                    <ol class="list-decimal pl-6 mt-4 space-y-3">
+                        <li><strong>Start at r = 8</strong> on a 4096&times;4096 layer and read the trainable fraction &mdash; well under 1%.</li>
+                        <li><strong>Drag the rank to 128.</strong> Parameters climb steeply but remain a small slice of the full matrix. Even a large rank is cheap.</li>
+                        <li><strong>Widen d and k while holding rank fixed.</strong> Full fine-tuning grows <em>quadratically</em>; LoRA grows only linearly. The bigger the model, the better LoRA looks.</li>
+                        <li><strong>Watch the &Delta;W preview at r = 1</strong>, then raise the rank. At rank 1 every row is a scaled copy of a single pattern; higher ranks can express genuinely independent structure.</li>
+                        <li><strong>Switch to 70B</strong> and compare the adapter file size to the full model. That gap is why model hubs host thousands of adapters instead of thousands of full checkpoints.</li>
                     </ol>
                 </div>
 
-                <div class="grid md:grid-cols-2 gap-6">
-                    <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
-                        <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-exclamation-triangle"></i>Common Pitfalls</h3>
-                        <ul class="list-disc pl-5 space-y-2 mt-3 opacity-90">
-                            <li><strong>Thinking Visually, Not Numerically:</strong> Always try to connect the visual effect of a filter back to the mathematical operation happening on the pixel values.</li>
-                            <li><strong>Order of Operations Matters:</strong> Applying a blur and then edge detection gives a very different result than applying edge detection and then a blur. Experiment to see why!</li>
-                        </ul>
-                    </div>
-                    <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
-                        <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas-regular fa-bookmark"></i>Key Takeaways</h3>
-                        <ul class="list-disc pl-5 space-y-2 mt-3 opacity-90">
-                            <li>Grayscale images are 2D matrices of numbers (0-255).</li>
-                            <li>Image filters are mathematical functions that transform these numbers.</li>
-                            <li><strong>Pixel-wise operations</strong> (like Invert and Threshold) treat each pixel independently.</li>
-                            <li><strong>Neighborhood operations</strong> (like Blur and Edge Detection) calculate a pixel's new value based on its neighbors.</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="pt-6 border-t text-center" style="border-color: var(--border-subtle);">
-                    <p class="text-sm" style="color: var(--text-muted);">Mastering this fundamental concept—that images are just grids of numbers—is the key to understanding all of computer vision.</p>
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Key Takeaway</h3>
+                    <p>LoRA does not make the model smaller &mdash; it makes the <em>update</em> smaller. By constraining the change to a low-rank subspace, it converts fine-tuning from an infrastructure project into something that runs on one GPU and ships as a few-megabyte file, with no inference penalty once merged.</p>
                 </div>
             </div>
         </div>
     </section>
+    <!-- End auto-article-vizlearn -->
 
-        <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+    <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
         <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
             <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
                 <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
@@ -590,7 +545,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- THEME LOGIC (Matches Activation Fns) ---
+            // --- THEME ---
             const themeToggleBtn = document.getElementById('themeToggle');
             const sunIcon = themeToggleBtn.querySelector('.dark-icon');
             const moonIcon = themeToggleBtn.querySelector('.light-icon');
@@ -599,240 +554,113 @@
             function applyTheme(theme) {
                 if (theme === 'light') {
                     document.body.classList.add('light-mode');
-                    moonIcon.classList.remove('hidden');
                     sunIcon.classList.add('hidden');
+                    moonIcon.classList.remove('hidden');
                 } else {
                     document.body.classList.remove('light-mode');
-                    sunIcon.classList.remove('hidden');
                     moonIcon.classList.add('hidden');
+                    sunIcon.classList.remove('hidden');
                 }
-                refreshDisplays(); // Re-render matrix to match theme colors
+                localStorage.setItem('theme', theme);
+                if (typeof window.onThemeChange === 'function') window.onThemeChange();
             }
-
+            applyTheme(currentTheme);
             themeToggleBtn.addEventListener('click', () => {
-                currentTheme = currentTheme === 'light' ? 'dark' : 'light';
-                localStorage.setItem('theme', currentTheme);
+                currentTheme = document.body.classList.contains('light-mode') ? 'dark' : 'light';
                 applyTheme(currentTheme);
             });
 
-            // --- Configuration ---
-            const GRID_SIZE = 28;
-            const PIXEL_SIZE = 11; 
-            const CANVAS_WIDTH = GRID_SIZE * PIXEL_SIZE;
-            const CANVAS_HEIGHT = GRID_SIZE * PIXEL_SIZE;
+            // --- APP LOGIC ---
+            const dSlider = document.getElementById('dSlider');
+            const kSlider = document.getElementById('kSlider');
+            const rSlider = document.getElementById('rSlider');
+            const mxArea  = document.getElementById('mxArea');
 
-            // --- DOM Elements ---
-            const canvas = document.getElementById('drawingCanvas');
-            const ctx = canvas.getContext('2d');
-            const clearBtn = document.getElementById('clearBtn');
-            const matrixDisplay = document.getElementById('matrix-display');
-            const invertBtn = document.getElementById('invertBtn');
-            const blurBtn = document.getElementById('blurBtn');
-            const edgeBtn = document.getElementById('edgeBtn');
-            const thresholdSlider = document.getElementById('thresholdSlider');
-            const thresholdValue = document.getElementById('thresholdValue');
-            const applyThresholdBtn = document.getElementById('applyThresholdBtn');
+            const fmt = n => n >= 1e9 ? (n / 1e9).toFixed(2) + 'B'
+                          : n >= 1e6 ? (n / 1e6).toFixed(2) + 'M'
+                          : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : String(n);
 
-            // --- State ---
-            let isDrawing = false;
-            let grid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
-            let matrixCells = [];
-            
-            // --- Initialization ---
-            function initialize() {
-                canvas.width = CANVAS_WIDTH;
-                canvas.height = CANVAS_HEIGHT;
-                matrixDisplay.innerHTML = '';
-                for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
-                    const cell = document.createElement('div');
-                    matrixCells.push(cell);
-                    matrixDisplay.appendChild(cell);
-                }
-                
-                // Initialize Theme and Canvas
-                applyTheme(currentTheme);
-                clearCanvas();
-            }
-            
-            // --- Update & Drawing Functions ---
-            function refreshDisplays() {
-                drawCanvas();
-                updateMatrixDisplay();
+            function block(cols, rows, color, label, frozen) {
+                const cw = Math.max(2, Math.min(9, 130 / cols));
+                const ch = Math.max(2, Math.min(9, 130 / rows));
+                let cells = '';
+                for (let i = 0; i < rows * cols; i++) cells += `<div style="width:${cw}px;height:${ch}px;background:${color}"></div>`;
+                return `<div class="text-center">
+                    <div class="mx ${frozen ? 'frozen' : ''}" style="grid-template-columns: repeat(${cols}, ${cw}px);">${cells}</div>
+                    <div class="mx-label">${label}</div>
+                </div>`;
             }
 
-            function drawCanvas() {
-                ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-                // Background color for canvas (Always blackish to represent empty space)
-                ctx.fillStyle = '#000';
-                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            function render() {
+                const d = +dSlider.value, k = +kSlider.value, r = +rSlider.value;
+                document.getElementById('dVal').textContent = d;
+                document.getElementById('kVal').textContent = k;
+                document.getElementById('rVal').textContent = r;
 
-                for (let y = 0; y < GRID_SIZE; y++) {
-                    for (let x = 0; x < GRID_SIZE; x++) {
-                        const intensity = grid[y][x];
-                        if (intensity > 0) {
-                            ctx.fillStyle = `rgb(${intensity}, ${intensity}, ${intensity})`;
-                            ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
-                        }
+                const full = d * k;
+                const lora = r * (d + k);
+                const frac = lora / full;
+
+                document.getElementById('wCount').textContent = fmt(full);
+                document.getElementById('abCount').textContent = fmt(lora);
+                document.getElementById('fracVal').textContent = (frac * 100).toFixed(2) + '%';
+                document.getElementById('barFullLbl').textContent = fmt(full);
+                document.getElementById('barLoraLbl').textContent = fmt(lora);
+                document.getElementById('barLora').style.width = Math.max(0.4, frac * 100) + '%';
+
+                // matrix diagram (visual proportions, capped for display)
+                const vd = Math.max(6, Math.min(22, Math.round(d / 400)));
+                const vk = Math.max(6, Math.min(22, Math.round(k / 400)));
+                const vr = Math.max(1, Math.min(8, Math.round(r / 8)));
+                mxArea.innerHTML =
+                    block(vk, vd, 'var(--text-muted)', `W &nbsp;${d}\u00d7${k} &nbsp;(frozen)`, true) +
+                    `<div class="text-2xl opacity-40 mono-font">+</div>` +
+                    block(vr, vd, 'var(--accent-primary)', `B &nbsp;${d}\u00d7${r}`, false) +
+                    `<div class="text-2xl opacity-40 mono-font">\u00d7</div>` +
+                    block(vk, vr, 'var(--accent-primary)', `A &nbsp;${r}\u00d7${k}`, false);
+
+                // whole-model estimate: adapters on q,k,v,o of every layer
+                const P = +document.getElementById('modelSel').value * 1e9;
+                const layers = P >= 70e9 ? 80 : P >= 13e9 ? 40 : 32;
+                const hid = P >= 70e9 ? 8192 : P >= 13e9 ? 5120 : 4096;
+                const loraTotal = layers * 4 * r * (hid + hid);
+                document.getElementById('ftParams').textContent = fmt(P);
+                document.getElementById('loraParams').textContent = fmt(loraTotal);
+                document.getElementById('optRam').textContent = ((loraTotal * 12) / 1e9).toFixed(2) + ' GB';
+                document.getElementById('adapterSz').textContent = ((loraTotal * 2) / 1e6).toFixed(0) + ' MB';
+
+                const ratio = P / loraTotal;
+                document.getElementById('loraNote').innerHTML =
+                    `At rank <strong>${r}</strong>, LoRA trains <strong>${fmt(loraTotal)}</strong> parameters instead of <strong>${fmt(P)}</strong> &mdash; about <strong>1/${Math.round(ratio).toLocaleString()}</strong> of the model. ` +
+                    (r <= 4 ? 'This rank is best for light style or tone shifts.'
+                     : r <= 16 ? 'This is the usual sweet spot for instruction tuning and domain adaptation.'
+                     : r <= 64 ? 'A high rank - useful when teaching substantially new behaviour.'
+                     : 'Very high rank; you are approaching full fine-tuning capacity, so check that the task really needs it.');
+
+                // delta-W preview: genuine B x A product
+                const N = 12;
+                const A = [], B = [];
+                for (let i = 0; i < r; i++) { const row = []; for (let j = 0; j < N; j++) row.push(Math.sin(i * 2.7 + j * 0.9) * 0.9); A.push(row); }
+                for (let i = 0; i < N; i++) { const row = []; for (let j = 0; j < r; j++) row.push(Math.cos(i * 1.3 + j * 2.1) * 0.9); B.push(row); }
+                let html = '<div style="display:grid;grid-template-columns:repeat(' + N + ',1fr);gap:2px;max-width:420px">';
+                for (let i = 0; i < N; i++) {
+                    for (let j = 0; j < N; j++) {
+                        let v = 0;
+                        for (let x = 0; x < r; x++) v += B[i][x] * A[x][j];
+                        v = Math.tanh(v / Math.sqrt(r));
+                        const c = v >= 0 ? `rgba(74,222,128,${(0.1 + Math.abs(v) * 0.75).toFixed(2)})`
+                                         : `rgba(239,68,68,${(0.1 + Math.abs(v) * 0.75).toFixed(2)})`;
+                        html += `<div style="aspect-ratio:1;background:${c};border-radius:2px"></div>`;
                     }
                 }
-            }
-            
-            function updateMatrixDisplay() {
-                const isLightMode = document.body.classList.contains('light-mode');
-                
-                for (let y = 0; y < GRID_SIZE; y++) {
-                    for (let x = 0; x < GRID_SIZE; x++) {
-                        const index = y * GRID_SIZE + x;
-                        const cellValue = grid[y][x];
-                        const cellElement = matrixCells[index];
-                        cellElement.textContent = cellValue;
-                        
-                        if (cellValue > 0) {
-                            // Grayscale Visualization (0-255)
-                            // Strict Grayscale: Background reflects value, Text contrasts
-                            const intensity = cellValue;
-                            cellElement.style.backgroundColor = `rgb(${intensity}, ${intensity}, ${intensity})`;
-                            
-                            // Text contrast calculation
-                            cellElement.style.color = intensity > 128 ? '#000000' : '#ffffff';
-                            cellElement.style.fontWeight = '700';
-                        } else {
-                            // Empty cells (0)
-                            // Kept subtle to show grid structure without noise
-                            cellElement.style.backgroundColor = isLightMode ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)';
-                            cellElement.style.color = isLightMode ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'; 
-                            cellElement.style.fontWeight = '400';
-                        }
-                    }
-                }
+                document.getElementById('rankDemo').innerHTML = html + '</div>';
             }
 
-            function clearCanvas() {
-                grid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
-                refreshDisplays();
-            }
-
-            // --- Drawing Logic ---
-            function draw(event) {
-                if (!isDrawing) return;
-                event.preventDefault();
-                const rect = canvas.getBoundingClientRect();
-                
-                // Handle both touch and mouse
-                let clientX, clientY;
-                if(event.touches) {
-                    clientX = event.touches[0].clientX;
-                    clientY = event.touches[0].clientY;
-                } else {
-                    clientX = event.clientX;
-                    clientY = event.clientY;
-                }
-                
-                // Calculate Scale Factor (Canvas Display Size vs Actual Size)
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-
-                const canvasX = (clientX - rect.left) * scaleX;
-                const canvasY = (clientY - rect.top) * scaleY;
-                
-                const gridX = Math.floor(canvasX / PIXEL_SIZE);
-                const gridY = Math.floor(canvasY / PIXEL_SIZE);
-
-                // Brush settings
-                const brushKernel = [[80, 120, 80], [120, 255, 120], [80, 120, 80]];
-                const brushSize = 3;
-                const brushOffset = Math.floor(brushSize / 2);
-
-                for(let i = 0; i < brushSize; i++) {
-                    for(let j = 0; j < brushSize; j++) {
-                       const y = gridY + i - brushOffset;
-                       const x = gridX + j - brushOffset;
-                       if(y >= 0 && y < GRID_SIZE && x >= 0 && x < GRID_SIZE) {
-                           const currentVal = grid[y][x];
-                           const brushVal = brushKernel[i][j];
-                           grid[y][x] = Math.min(255, currentVal + brushVal);
-                       }
-                    }
-                }
-                refreshDisplays();
-            }
-
-            // --- Filter Functions ---
-            function invertImage() {
-                grid = grid.map(row => row.map(pixel => 255 - pixel));
-                refreshDisplays();
-            }
-
-            function applyThreshold() {
-                const threshold = parseInt(thresholdSlider.value, 10);
-                grid = grid.map(row => row.map(pixel => pixel > threshold ? 255 : 0));
-                refreshDisplays();
-            }
-
-            function applyBlur() {
-                const readGrid = JSON.parse(JSON.stringify(grid));
-                for (let y = 0; y < GRID_SIZE; y++) {
-                    for (let x = 0; x < GRID_SIZE; x++) {
-                        let total = 0, count = 0;
-                        for (let dy = -1; dy <= 1; dy++) {
-                            for (let dx = -1; dx <= 1; dx++) {
-                                const ny = y + dy, nx = x + dx;
-                                if (ny >= 0 && ny < GRID_SIZE && nx >= 0 && nx < GRID_SIZE) {
-                                    total += readGrid[ny][nx];
-                                    count++;
-                                }
-                            }
-                        }
-                        grid[y][x] = Math.round(total / count);
-                    }
-                }
-                refreshDisplays();
-            }
-
-            function applyEdgeDetection() {
-                const readGrid = JSON.parse(JSON.stringify(grid));
-                const newGrid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
-                const sobelX = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
-                const sobelY = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
-                for (let y = 1; y < GRID_SIZE - 1; y++) {
-                    for (let x = 1; x < GRID_SIZE - 1; x++) {
-                        let pixelX = 0, pixelY = 0;
-                        for (let dy = -1; dy <= 1; dy++) {
-                            for (let dx = -1; dx <= 1; dx++) {
-                                const pixel = readGrid[y + dy][x + dx];
-                                pixelX += pixel * sobelX[dy + 1][dx + 1];
-                                pixelY += pixel * sobelY[dy + 1][dx + 1];
-                            }
-                        }
-                        const magnitude = Math.round(Math.sqrt(pixelX * pixelX + pixelY * pixelY));
-                        newGrid[y][x] = Math.min(255, magnitude);
-                    }
-                }
-                grid = newGrid;
-                refreshDisplays();
-            }
-            
-            // --- Event Listeners ---
-            clearBtn.addEventListener('click', clearCanvas);
-
-            invertBtn.addEventListener('click', invertImage);
-            blurBtn.addEventListener('click', applyBlur);
-            edgeBtn.addEventListener('click', applyEdgeDetection);
-            applyThresholdBtn.addEventListener('click', applyThreshold);
-            thresholdSlider.addEventListener('input', () => { thresholdValue.textContent = thresholdSlider.value; });
-
-            canvas.addEventListener('mousedown', (e) => { isDrawing = true; draw(e); });
-            canvas.addEventListener('mousemove', draw);
-            canvas.addEventListener('mouseup', () => { isDrawing = false; });
-            canvas.addEventListener('mouseleave', () => { isDrawing = false; });
-            canvas.addEventListener('touchstart', (e) => { isDrawing = true; draw(e); });
-            canvas.addEventListener('touchmove', draw);
-            canvas.addEventListener('touchend', () => { isDrawing = false; });
-
-            // --- Run Initialization ---
-            initialize();
+            [dSlider, kSlider, rSlider].forEach(s => s.addEventListener('input', render));
+            document.getElementById('modelSel').addEventListener('change', render);
+            render();
         });
-    
+
         // ===== DROPDOWN SEARCH FUNCTIONALITY =====
         const allCourses = [
             { title: "Calculating Parameters in CNN", path: "computer_vision/calculating_parameters_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
@@ -959,22 +787,18 @@
             { title: "Word Cloud Generator", path: "natural_language_processing/word_cloud.html", category: "natural_language_processing", icon: "fa-comments" }
         ];
 
-        function toRelativePath(fromPath, targetPath) {
-            const fromParts = fromPath.split('/').filter(Boolean);
-            const targetParts = targetPath.split('/').filter(Boolean);
-            let shared = 0;
-            while (shared < Math.min(fromParts.length, targetParts.length) && fromParts[shared] === targetParts[shared]) {
-                shared++;
-            }
-            const up = '../'.repeat(Math.max(0, fromParts.length - shared));
-            const down = targetParts.slice(shared).join('/');
-            return `${up}${down}`;
+        function toRelativePath(fromDir, targetPath) {
+            const fromParts = fromDir.split('/').filter(Boolean);
+            const toParts = targetPath.split('/').filter(Boolean);
+            let i = 0;
+            while (i < fromParts.length && i < toParts.length && fromParts[i] === toParts[i]) i++;
+            const ups = fromParts.length - i;
+            return '../'.repeat(ups) + toParts.slice(i).join('/');
         }
 
-        const currentPath = window.location.pathname.replace(/\/+$/g, '').replace(/index\.html$/, '');
-        const currentDir = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/')) : '';
-        const resolvedCourses = allCourses.map((course) => {
-            const normalizedTarget = course.path.replace(/^\.\//, '');
+        const currentDir = window.location.pathname.split('/').slice(0, -1).filter(Boolean).slice(-1)[0] || '';
+        const resolvedCourses = allCourses.map(course => {
+            const normalizedTarget = course.path;
             const relativePath = currentDir ? toRelativePath(currentDir, normalizedTarget) : normalizedTarget;
             return { ...course, path: relativePath };
         });
@@ -985,19 +809,17 @@
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value.toLowerCase().trim();
-                
+
                 if (query.length === 0) {
                     dropdown.classList.remove('show');
                     return;
                 }
 
-                // Filter courses
-                const filtered = resolvedCourses.filter(course => 
-                    course.title.toLowerCase().includes(query) || 
+                const filtered = resolvedCourses.filter(course =>
+                    course.title.toLowerCase().includes(query) ||
                     course.category.toLowerCase().includes(query)
                 );
 
-                // Render results
                 if (filtered.length === 0) {
                     dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
                 } else {
@@ -1018,21 +840,13 @@
                 dropdown.classList.add('show');
             });
 
-            // Close dropdown when clicking outside
             document.addEventListener('click', (e) => {
-                if (!searchInput.parentElement.contains(e.target)) {
-                    dropdown.classList.remove('show');
-                }
+                if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show');
             });
-
-            // Close dropdown on Escape key
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    dropdown.classList.remove('show');
-                }
+                if (e.key === 'Escape') dropdown.classList.remove('show');
             });
         }
-
     </script>
 </body>
 </html>

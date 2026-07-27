@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VizLearn - N-gram Explainer</title>
-    <meta name="description" content="Learn N-gram Explainer with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn.">
-    <meta name="keywords" content="N-gram Explainer, interactive learning, beginner tutorial, vizlearn">
+    <title>VizLearn - What is Masked Language Modeling?</title>
+    <meta name="description" content="Interactive Masked Language Modeling lab - mask tokens in a sentence and see how a bidirectional model like BERT predicts them from left and right context.">
+    <meta name="keywords" content="masked language modeling, MLM, BERT, bidirectional, pretraining, 80/10/10, vizlearn, gen ai">
     <meta name="robots" content="index, follow">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -26,6 +26,7 @@
                     animation: {
                         'grid-flow': 'grid-move 40s linear infinite',
                         'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'cursor-blink': 'blink 1s infinite'
                     },
                     keyframes: {
                         'grid-move': {
@@ -35,6 +36,10 @@
                         fadeIn: {
                             '0%': { opacity: '0', transform: 'translateY(10px)' },
                             '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        blink: {
+                            '0%, 50%': { opacity: '1' },
+                            '51%, 100%': { opacity: '0' }
                         }
                     }
                 }
@@ -43,12 +48,9 @@
     </script>
     <script>
         (function(){
-            const apply = (t)=>{
-                if(t==='light') document.body.classList.add('light-mode');
-                else document.body.classList.remove('light-mode');
-            };
             const t = localStorage.getItem('theme') || 'dark';
-            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+            const apply = () => { if (t === 'light') document.body.classList.add('light-mode'); };
+            if (document.body) apply(); else document.addEventListener('DOMContentLoaded', apply);
         })();
     </script>
     <style>
@@ -56,7 +58,7 @@
             --bg-body: #050505;
             --bg-surface: #0a0a0a;
             --bg-glass: rgba(10, 10, 10, 0.85);
-            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --border-subtle: rgba(74, 222, 128, 0.15);
             --accent-primary: #4ade80;
             --accent-glow: rgba(74, 222, 128, 0.25);
             --text-main: #f0fdf4;
@@ -64,24 +66,30 @@
             --card-bg: #0a0a0a;
             --input-bg: rgba(74, 222, 128, 0.03);
             --input-focus-bg: rgba(74, 222, 128, 0.08);
+            --display-bg: rgba(0, 0, 0, 0.4);
             --grid-color: rgba(74, 222, 128, 0.05);
             --vignette-color: #050505;
+            --stat-bg: rgba(0, 0, 0, 0.2);
+            --stat-border: rgba(255, 255, 255, 0.05);
         }
 
         body.light-mode {
             --bg-body: #f0fdf4;
             --bg-surface: #ffffff;
-            --bg-glass: rgba(255, 255, 255, 0.85);
-            --border-subtle: rgba(22, 163, 74, 0.15);
+            --bg-glass: rgba(255, 255, 255, 0.95);
+            --border-subtle: rgba(22, 163, 74, 0.2);
             --accent-primary: #15803d;
-            --accent-glow: rgba(21, 128, 61, 0.2);
-            --text-main: #052e16;
-            --text-muted: #4b5563;
+            --accent-glow: rgba(21, 128, 61, 0.15);
+            --text-main: #111827;
+            --text-muted: #374151;
             --card-bg: #ffffff;
-            --input-bg: rgba(22, 163, 74, 0.04);
-            --input-focus-bg: rgba(22, 163, 74, 0.08);
-            --grid-color: rgba(22, 163, 74, 0.04);
+            --input-bg: rgba(0, 0, 0, 0.04);
+            --input-focus-bg: rgba(0, 0, 0, 0.06);
+            --display-bg: rgba(0, 0, 0, 0.03);
+            --grid-color: rgba(0, 0, 0, 0.05);
             --vignette-color: transparent;
+            --stat-bg: #f9fafb;
+            --stat-border: #e5e7eb;
         }
 
         *, *::before, *::after {
@@ -92,7 +100,7 @@
             font-family: 'Inter', sans-serif;
             background-color: var(--bg-body);
             color: var(--text-main);
-            background-image: 
+            background-image:
                 radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
                 linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
                 linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
@@ -100,14 +108,8 @@
             animation: grid-move 40s linear infinite;
         }
 
-        h1, h2, h3, .brand-font {
-            font-family: 'Space Grotesk', sans-serif;
-            letter-spacing: -0.02em;
-        }
-
-        .mono-font {
-            font-family: 'JetBrains Mono', monospace;
-        }
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
 
         .glass-header {
             background-color: var(--bg-glass);
@@ -122,130 +124,157 @@
             overflow: hidden;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
+        .glass-card:hover { border-color: var(--accent-primary); }
 
-        .glass-card:hover {
-            border-color: var(--accent-primary);
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
+            background: var(--input-bg);
+            color: var(--text-main);
         }
 
-        /* Form Elements */
         .custom-textarea {
             background: var(--input-bg);
             border: 1px solid var(--border-subtle);
             color: var(--text-main);
-            border-radius: 8px;
-            padding: 12px;
+            border-radius: 12px;
+            padding: 1rem;
             width: 100%;
             outline: none;
-            transition: all 0.2s;
-            font-family: 'Inter', sans-serif;
-            resize: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            transition: border-color 0.2s;
         }
-        
-        .custom-textarea:focus {
-            background: var(--input-focus-bg);
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 10px var(--accent-glow);
-        }
+        .custom-textarea:focus { border-color: var(--accent-primary); }
 
         .action-btn {
+            background: rgba(21, 128, 61, 0.1);
+            border: 1px solid rgba(21, 128, 61, 0.2);
+            color: var(--accent-primary);
             font-family: 'Space Grotesk', sans-serif;
             font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            padding: 0.75rem;
             border-radius: 8px;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+            cursor: pointer;
+        }
+        .action-btn:hover:not(:disabled) { background: var(--accent-glow); }
+        .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .stat-box {
+            background: var(--stat-bg);
+            border: 1px solid var(--stat-border);
+            padding: 1rem;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
         }
 
-        .quick-select-btn {
+        .token-item {
             background: var(--input-bg);
             border: 1px solid var(--border-subtle);
-            color: var(--text-muted);
+            border-radius: 12px;
+            padding: 0.85rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.6rem;
             transition: all 0.2s;
         }
-        
-        .quick-select-btn:hover {
+        .token-item:hover { background: var(--bg-glass); border-color: var(--accent-primary); }
+        .token-item.selected {
             border-color: var(--accent-primary);
-            color: var(--accent-primary);
-        }
-        
-        .quick-select-btn.active {
-            background: var(--accent-primary);
-            color: var(--bg-surface); /* Contrast text */
-            border-color: var(--accent-primary);
-            font-weight: bold;
+            background: var(--accent-glow);
+            box-shadow: 0 0 15px var(--accent-glow);
         }
 
-        /* Slider */
-        input[type=range] {
-            -webkit-appearance: none;
-            background: transparent;
-            width: 100%;
+        .prob-bar {
+            height: 4px;
+            border-radius: 2px;
+            background: var(--accent-primary);
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
+        input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; }
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            height: 16px;
-            width: 16px;
+            height: 18px; width: 18px;
             border-radius: 50%;
-            background: var(--accent-primary);
+            background: #3b82f6;
             cursor: pointer;
             margin-top: -6px;
-            box-shadow: 0 0 10px var(--accent-glow);
         }
         input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 4px;
-            cursor: pointer;
+            width: 100%; height: 6px;
             background: var(--border-subtle);
-            border-radius: 2px;
+            border-radius: 3px;
         }
 
-        /* N-gram Pills */
-        .ngram-pill {
+        .scroll-container::-webkit-scrollbar { display: none; }
+
+        .display-box {
+            background: var(--display-bg);
+            border-radius: 12px;
+            padding: 1.25rem;
+            min-height: 100px;
+            overflow-y: auto;
+            line-height: 1.8;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+        }
+
+        select.custom-select {
             background: var(--input-bg);
             border: 1px solid var(--border-subtle);
             color: var(--text-main);
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            cursor: default; /* Changed from pointer */
-            transition: all 0.2s;
+            padding: 0.5rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            width: 100%;
+            outline: none;
+        }
+
+        .chip {
             display: inline-flex;
             align-items: center;
+            border: 1px solid var(--border-subtle);
+            background: var(--input-bg);
+            border-radius: 8px;
+            padding: 5px 10px;
+            font-size: 11px;
             font-family: 'JetBrains Mono', monospace;
+            transition: all 0.2s ease;
         }
-        
-        .ngram-pill:hover {
+        .chip.on {
             border-color: var(--accent-primary);
-            background: var(--input-focus-bg);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px var(--accent-glow);
+            color: var(--accent-primary);
+            background: var(--accent-glow);
         }
 
-        /* Active highlight for pills (controlled by slider) */
-        .ngram-pill.active-highlight {
-            border-color: var(--accent-primary);
-            background: var(--input-focus-bg);
-            box-shadow: 0 0 15px var(--accent-glow);
-            transform: scale(1.05);
-            z-index: 10;
-        }
 
-        /* Empty State */
-        .empty-state {
-            color: var(--text-muted);
-            opacity: 0.5;
-            text-align: center;
-            padding: 40px 0;
-            font-style: italic;
-        }
-        
-        /* Hide Scrollbar for custom scrolling */
-        #ngramsDisplay::-webkit-scrollbar {
-            display: none;
-        }
-        #ngramsDisplay {
-            -ms-overflow-style: none;  
-            scrollbar-width: none;  
-        }
-    
+        .tok { cursor: pointer; user-select: none; border: 1px solid var(--border-subtle); background: var(--input-bg); border-radius: 8px; padding: 8px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; transition: all 0.2s ease; }
+        .tok:hover { border-color: var(--accent-primary); transform: translateY(-2px); }
+        .tok.masked { border-color: #f59e0b; color: #f59e0b; background: rgba(245,158,11,0.12); font-weight: 700; }
+        .tok.rand { border-color: #a855f7; color: #a855f7; background: rgba(168,85,247,0.12); font-weight: 700; }
+        .tok.kept { border-color: #38bdf8; color: #38bdf8; background: rgba(56,189,248,0.12); font-weight: 700; }
+        .ctx-arrow { font-size: 10px; opacity: 0.5; font-family: 'JetBrains Mono', monospace; }
+
+
         /* Search Input Wrapper */
         .search-input-wrapper {
             background: var(--input-bg);
@@ -257,24 +286,14 @@
             border-color: var(--accent-primary);
             box-shadow: 0 0 15px var(--accent-glow);
         }
-        .search-input-wrapper input {
-            color: var(--text-main);
-        }
-        .search-input-wrapper input::placeholder {
-            color: var(--text-muted);
-            opacity: 0.7;
-        }
-        .search-input-wrapper i {
-            color: var(--accent-primary);
-            opacity: 0.7;
-        }
+        .search-input-wrapper input { color: var(--text-main); }
+        .search-input-wrapper input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .search-input-wrapper i { color: var(--accent-primary); opacity: 0.7; }
 
         /* Dropdown Search */
         .search-dropdown {
             position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
+            top: 100%; left: 0; right: 0;
             background: var(--card-bg);
             border: 1px solid var(--border-subtle);
             border-top: none;
@@ -285,23 +304,11 @@
             display: none;
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
         }
-
-        .search-dropdown.show {
-            display: block;
-            animation: slideDown 0.2s ease-out;
-        }
-
+        .search-dropdown.show { display: block; animation: slideDown 0.2s ease-out; }
         @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-
         .search-dropdown-item {
             padding: 12px 16px;
             border-bottom: 1px solid var(--border-subtle);
@@ -313,40 +320,12 @@
             color: inherit;
             text-decoration: none;
         }
-
-        .search-dropdown-item:last-child {
-            border-bottom: none;
-        }
-
-        .search-dropdown-item:hover {
-            background: var(--input-focus-bg);
-            padding-left: 20px;
-        }
-
-        .dropdown-item-title {
-            font-weight: 500;
-            color: var(--text-main);
-        }
-
-        .dropdown-item-path {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-left: 12px;
-        }
-
-        .dropdown-item-icon {
-            color: var(--accent-primary);
-            margin-right: 8px;
-            font-size: 0.875rem;
-        }
-
-        .dropdown-no-results {
-            padding: 20px 16px;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 0.875rem;
-        }
-
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        .dropdown-item-title { font-weight: 500; color: var(--text-main); }
+        .dropdown-item-path { font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; }
+        .dropdown-item-icon { color: var(--accent-primary); margin-right: 8px; font-size: 0.875rem; }
+        .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
     </style>
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
@@ -354,10 +333,8 @@
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-
         gtag('config', 'G-ZT6JM33V5J');
     </script>
-
 </head>
 <body class="flex flex-col min-h-screen overflow-x-hidden">
 
@@ -365,29 +342,21 @@
     <header class="glass-header sticky top-0 z-50">
         <div class="flex justify-center py-3 px-4 md:px-8">
             <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
-                <!-- Logo -->
                 <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
                     <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
                     <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
                 </a>
-                
-                <!-- Search -->
+
                 <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
                     <i class="fas fa-search text-sm"></i>
                     <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
-                    <div id="searchDropdown" class="search-dropdown">
-                        <!-- Results will be populated here -->
-                    </div>
+                    <div id="searchDropdown" class="search-dropdown"></div>
                 </div>
 
-                <!-- Theme Toggle + Back Button -->
                 <div class="flex items-center gap-3">
-                    <!-- Back to Hub Button -->
                     <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
                         <i class="fas fa-arrow-left text-xs"></i>
                     </a>
-                    
-                    <!-- Theme Toggle -->
                     <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
                         <i class="fas fa-sun hidden dark-icon"></i>
                         <i class="fas fa-moon hidden light-icon"></i>
@@ -397,176 +366,159 @@
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto flex flex-col">
-        
-        <!-- Breadcrumb / Title -->
+
         <div class="mb-8 animate-fade-in">
             <div class="flex items-center gap-2 text-xs mono-font mb-2" style="color: var(--text-muted)">
                 <span class="opacity-50">Modules</span>
                 <span>/</span>
-                <span class="opacity-50">NLP</span>
+                <span class="opacity-50">Gen AI</span>
                 <span>/</span>
-                <span style="color: var(--accent-primary)">N-grams</span>
+                <span style="color: var(--accent-primary)">MLM Lab</span>
             </div>
-            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">N-Gram</h1>
+            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">What is Masked Language Modeling?</h1>
             <p class="mt-2 text-sm max-w-2xl" style="color: var(--text-muted)">
-                Interactive visualization of how text is broken down into contiguous sequences of N items for language modeling.
+                Hide words in a sentence and let a bidirectional model guess them back. Click any token to mask it, then watch the model score candidates using context from <em>both</em> sides.
             </p>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full flex-1">
-            
-            <!-- Controls Sidebar -->
-            <aside class="lg:col-span-4 space-y-6 animate-fade-in" style="animation-delay: 0.1s">
-                
-                <!-- Input Panel -->
-                <div class="glass-card p-6">
-                    <h2 class="text-xs font-bold uppercase tracking-widest mb-4 opacity-70 mono-font" style="color: var(--text-muted)">Source Text</h2>
-                    
-                    <div class="relative mb-4 group">
-                        <textarea id="textInput" rows="5" class="custom-textarea text-sm" placeholder="Enter text here...">The quick brown fox jumps over the lazy dog</textarea>
-                    </div>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                    <h2 class="text-xs font-bold uppercase tracking-widest mb-3 opacity-70 mono-font mt-6" style="color: var(--text-muted)">N-gram Size (N)</h2>
-                    
-                    <div class="flex gap-2 mb-4">
-                        <button class="quick-select-btn px-4 py-2 rounded-lg text-xs font-medium flex-1" onclick="setN(1)">Uni (1)</button>
-                        <button class="quick-select-btn px-4 py-2 rounded-lg text-xs font-medium flex-1 active" onclick="setN(2)">Bi (2)</button>
-                        <button class="quick-select-btn px-4 py-2 rounded-lg text-xs font-medium flex-1" onclick="setN(3)">Tri (3)</button>
+            <!-- Controls -->
+            <aside class="lg:col-span-5 flex flex-col gap-6 animate-fade-in" style="animation-delay: 0.1s">
+                <div class="glass-card p-6 flex flex-col gap-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">1. Sentence</h2>
+                        <select id="presetSel" class="custom-select max-w-[160px]">
+                            <option value="0">the cat sat on the mat</option>
+                            <option value="1">bank / river</option>
+                            <option value="2">paris / france</option>
+                            <option value="3">custom</option>
+                        </select>
                     </div>
-
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold" style="color: var(--text-main)">Value</span>
-                        <span id="nValueDisplay" class="text-xs font-bold mono-font" style="color: var(--accent-primary)">2</span>
-                    </div>
-                    <input type="range" id="nSlider" min="1" max="6" value="2" class="mb-6">
-
-                    <button id="resetBtn" class="action-btn w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 py-2.5 text-xs uppercase tracking-wider flex items-center justify-center gap-2">
-                        <i class="fas fa-undo"></i> Reset Default
-                    </button>
+                    <input id="sentInput" class="custom-textarea text-xs py-2" value="the cat sat on the soft mat">
+                    <p class="text-[10px] opacity-60 leading-relaxed">Click any token on the right to mask it. The model then ranks every word in its vocabulary for that slot.</p>
                 </div>
 
-                <!-- Stats Panel -->
+                <div class="glass-card p-6 flex flex-col gap-4">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">2. Masking Strategy</h2>
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] uppercase font-bold opacity-60">Mask Rate</span>
+                        <span id="rateVal" class="text-xs font-bold" style="color: var(--accent-primary)">15%</span>
+                    </div>
+                    <input type="range" id="rateSlider" min="5" max="50" step="5" value="15">
+                    <button id="autoMaskBtn" class="action-btn"><i class="fas fa-dice"></i> Auto-mask at this rate</button>
+                    <button id="clearBtn" class="action-btn" style="background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.2); color: #ef4444"><i class="fas fa-undo"></i> Clear all masks</button>
+
+                    <div class="pt-3 border-t" style="border-color: var(--border-subtle)">
+                        <div class="text-[10px] uppercase font-bold opacity-60 mb-2">The 80 / 10 / 10 rule</div>
+                        <div class="flex flex-col gap-2 text-[11px] mono-font">
+                            <div class="flex items-center gap-2"><span class="chip" style="border-color:#f59e0b;color:#f59e0b">[MASK]</span> 80% &mdash; replaced with the mask token</div>
+                            <div class="flex items-center gap-2"><span class="chip" style="border-color:#a855f7;color:#a855f7">random</span> 10% &mdash; swapped for a random word</div>
+                            <div class="flex items-center gap-2"><span class="chip" style="border-color:#38bdf8;color:#38bdf8">kept</span> 10% &mdash; left unchanged</div>
+                        </div>
+                        <p class="text-[10px] opacity-60 mt-3 leading-relaxed">Auto-mask applies this real split, which is why some picks are not literal <span class="mono-font">[MASK]</span> tokens.</p>
+                    </div>
+                </div>
+
                 <div class="glass-card p-6">
-                    <h2 class="text-xs font-bold uppercase tracking-widest mb-4 opacity-70 mono-font" style="color: var(--text-muted)">Statistics</h2>
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-4">Statistics</h2>
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="p-3 rounded bg-black/20 border border-white/5">
-                            <div class="text-[10px] uppercase opacity-50 mb-1">Total N-grams</div>
-                            <div id="totalCount" class="text-lg font-bold mono-font" style="color: var(--accent-primary)">0</div>
-                        </div>
-                        <div class="p-3 rounded bg-black/20 border border-white/5">
-                            <div class="text-[10px] uppercase opacity-50 mb-1">Unique</div>
-                            <div id="uniqueCount" class="text-lg font-bold mono-font" style="color: var(--text-main)">0</div>
-                        </div>
-                        <div class="p-3 rounded bg-black/20 border border-white/5">
-                            <div class="text-[10px] uppercase opacity-50 mb-1">Word Count</div>
-                            <div id="wordCount" class="text-lg font-bold mono-font" style="color: var(--text-muted)">0</div>
-                        </div>
-                        <div class="p-3 rounded bg-black/20 border border-white/5">
-                            <div class="text-[10px] uppercase opacity-50 mb-1">Current N</div>
-                            <div id="currentNStat" class="text-lg font-bold mono-font" style="color: var(--text-muted)">2</div>
-                        </div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Tokens</span><span id="statTok" class="text-xl font-bold" style="color: var(--accent-primary)">0</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Masked</span><span id="statMask" class="text-xl font-bold">0</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Vocabulary</span><span id="statVocab" class="text-xl font-bold">0</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Top-1 Conf.</span><span id="statConf" class="text-xl font-bold">&ndash;</span></div>
                     </div>
                 </div>
             </aside>
 
-            <!-- Visualization Area -->
-            <section class="lg:col-span-8 h-full min-h-[500px] animate-fade-in" style="animation-delay: 0.2s">
-                <div class="glass-card h-full w-full flex flex-col p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-xs font-bold uppercase tracking-widest opacity-70 mono-font" style="color: var(--text-muted)">Generated N-grams</h2>
-                        <span id="ngramCountLabel" class="text-[10px] font-bold px-2 py-1 rounded bg-green-500/10 text-green-500 border border-green-500/20 mono-font">0 ITEMS</span>
+            <!-- Visualization -->
+            <section class="lg:col-span-7 flex flex-col gap-6 animate-fade-in" style="animation-delay: 0.2s">
+                <div class="glass-card p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">Input Sequence</h2>
+                        <span class="text-[10px] font-bold px-2 py-1 rounded mono-font" style="background: var(--accent-glow); color: var(--accent-primary)">CLICK TO MASK</span>
                     </div>
+                    <div id="tokenStrip" class="flex flex-wrap gap-2 mb-4"></div>
+                    <div class="flex items-center justify-center gap-3 text-[10px] mono-font opacity-70 pt-3 border-t" style="border-color: var(--border-subtle)">
+                        <span class="ctx-arrow">&larr; left context</span>
+                        <span style="color: #f59e0b">both directions feed the prediction</span>
+                        <span class="ctx-arrow">right context &rarr;</span>
+                    </div>
+                </div>
 
-                    <!-- N-grams Container -->
-                    <div id="ngramsDisplay" class="flex-grow bg-black/20 rounded-lg p-4 border border-dashed border-white/10 overflow-y-auto content-start flex flex-wrap gap-2 transition-all h-[400px]">
-                        <!-- Pills generated here -->
-                        <div class="empty-state w-full h-full flex flex-col items-center justify-center">
-                            <i class="fas fa-cubes text-3xl mb-3 opacity-30"></i>
-                            <p class="text-xs">Enter text to generate sequences</p>
-                        </div>
-                    </div>
-                    
-                    <!-- Scroll Slider -->
-                    <div id="scrollSliderContainer" class="mt-4 px-2 hidden">
-                        <div class="flex justify-between text-[10px] uppercase font-bold tracking-wider mb-2 opacity-70">
-                            <span style="color: var(--text-main)">List Scroll</span>
-                            <span class="mono-font" style="color: var(--accent-primary)">VIEW</span>
-                        </div>
-                        <input type="range" id="scrollSlider" min="0" max="100" value="0" class="w-full">
-                    </div>
-                    
-                    <div class="mt-4 pt-4 border-t border-white/5">
-                        <p class="text-[10px] opacity-60 leading-relaxed">
-                            <i class="fas fa-info-circle mr-1 text-green-400"></i>
-                            <span class="font-bold text-green-400">Tip:</span> Use the slider to scroll through the list if it overflows.
-                        </p>
+                <div class="glass-card p-6 flex-1">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-4">Model Predictions</h2>
+                    <div id="predArea" class="scroll-container overflow-y-auto" style="max-height: 460px;">
+                        <div class="h-32 flex items-center justify-center opacity-40 text-xs italic">Click a token above to mask it</div>
                     </div>
                 </div>
             </section>
-
         </div>
     </main>
 
-    <!-- Footer -->
-
     <!-- auto-article-vizlearn -->
-    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
-        <div class="card-container animate-fade-in">
+    <section class="px-4 md:px-8 pb-8 max-w-7xl mx-auto w-full animate-fade-in" style="animation-delay: 200ms;">
+        <div class="card-container">
             <div class="card-header">
-                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Understanding N-grams: The Building Blocks of Language Models</h2>
-                <p class="mt-2 text-sm" style="color: var(--text-muted)">See how text is broken down into overlapping sequences to help machines understand context and predict the next word.</p>
+                <h2 class="text-xl md:text-2xl font-bold flex items-center gap-3">
+                    <i class="fas fa-mask" style="color: var(--accent-primary);"></i>
+                    Masked Language Modeling: Learning by Filling Blanks
+                </h2>
             </div>
-            <div class="p-5 md:p-7 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
-                
+            <div class="p-6 md:p-8 space-y-8 text-base leading-relaxed" style="color: var(--text-main);">
+
+                <p class="text-lg">
+                    <strong>Masked Language Modeling (MLM)</strong> is the pretraining objective behind BERT and its descendants. The recipe is deceptively simple: take ordinary text, hide a fraction of the tokens, and train the model to reconstruct exactly what was hidden. No human labels required &mdash; the text supplies its own answer key.
+                </p>
+
                 <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-lightbulb"></i>What are N-grams?</h3>
-                    <p>An <strong>n-gram</strong> is a contiguous sequence of 'n' items from a given sample of text or speech. The "items" can be characters, syllables, or, most commonly, words. N-grams are a simple yet powerful way for machines to capture the context and statistical properties of a language.</p>
-                    <p class="mt-3">By analyzing which words tend to appear together, n-gram models can form a probabilistic understanding of a language. This is the foundation for many Natural Language Processing (NLP) tasks.</p>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-arrows-left-right"></i>Why It Must Be Bidirectional</h3>
+                    <p>A causal model reads left to right and predicts what comes next, so it can never look ahead. MLM has no such restriction: the blank sits in the <em>middle</em>, and the model is free to use every token on both sides at once.</p>
+                    <p class="mt-2">Mask <span class="mono-font">soft</span> in "the cat sat on the ___ mat" and the left context narrows it to a modifier while the right context (<span class="mono-font">mat</span>) rules out most adjectives. Neither side alone is enough. That is why MLM produces such strong <em>understanding</em> representations &mdash; and why it cannot be used to generate text.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-cubes"></i>Types of N-grams</h3>
-                    <p>The 'n' in n-gram determines the size of the sequence. The most common types are:</p>
-                    <ul class="list-disc pl-6 mt-4 space-y-2 mono-font">
-                        <li><strong>Unigram (1-gram):</strong> A single word. This tells you about word frequency but nothing about context. (e.g., "The", "quick", "brown")</li>
-                        <li><strong>Bigram (2-gram):</strong> A sequence of two words. This starts to capture basic context. (e.g., "The quick", "quick brown", "brown fox")</li>
-                        <li><strong>Trigram (3-gram):</strong> A sequence of three words, capturing more specific context. (e.g., "The quick brown", "quick brown fox")</li>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-percent"></i>The Curious 80 / 10 / 10 Split</h3>
+                    <p>BERT masks about <strong>15%</strong> of tokens, but does not always insert a literal <span class="mono-font">[MASK]</span>. Of the chosen positions:</p>
+                    <ul class="list-disc pl-6 mt-3 space-y-2">
+                        <li><strong style="color:#f59e0b">80%</strong> become <span class="mono-font">[MASK]</span> &mdash; the standard fill-in-the-blank case.</li>
+                        <li><strong style="color:#a855f7">10%</strong> are replaced by a <em>random</em> word &mdash; forcing the model to notice when a token does not fit, rather than trusting whatever it sees.</li>
+                        <li><strong style="color:#38bdf8">10%</strong> are left <em>unchanged</em> &mdash; but still predicted, so the model keeps a useful representation of every token, not just masked ones.</li>
                     </ul>
+                    <p class="mt-3">The reason is a train/test mismatch: <span class="mono-font">[MASK]</span> never appears during fine-tuning or inference. If every masked slot were a literal mask token, the model would learn features that only activate on a symbol it will never see again.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-vial"></i>Interactive Exploration Guide</h3>
-                    <p>Use the N-gram Explainer above to see how this works in practice:</p>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-scale-balanced"></i>Masking Rate Is a Trade-off</h3>
+                    <p>Mask too little and each sentence teaches the model almost nothing &mdash; training is slow because most positions carry no loss. Mask too much and you destroy the very context needed to make a prediction. Around 15% is the long-standing sweet spot, though later work has shown much higher rates can work with large enough models. Drag the rate slider and watch the sentence degrade: at 50% the remaining context often cannot pin the answer down.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-flask"></i>Interactive Exploration Guide</h3>
                     <ol class="list-decimal pl-6 mt-4 space-y-3">
-                        <li><strong>Enter Text:</strong> The default text is "The quick brown fox jumps over the lazy dog".</li>
-                        <li><strong>Select N-gram Size:</strong> The default is set to "Bi (2)". Look at the "Generated N-grams" panel. You'll see a list of all the two-word sequences: "The quick", "quick brown", "brown fox", and so on. This is a "sliding window" of size 2 moving across the text.</li>
-                        <li><strong>Change to Unigrams:</strong> Click the "Uni (1)" button or set the slider to 1. The panel now shows each individual word. This is a simple bag-of-words representation.</li>
-                        <li><strong>Change to Trigrams:</strong> Click the "Tri (3)" button or set the slider to 3. The panel now shows three-word sequences like "The quick brown". Notice how much more specific the context becomes.</li>
-                        <li><strong>Check the Statistics:</strong> As you change the value of 'n', observe the "Total N-grams" count. For a text with 'k' words, the number of n-grams is `k - n + 1`. This is why the total count decreases as 'n' gets larger.</li>
+                        <li><strong>Mask a single strongly-constrained token</strong> such as <span class="mono-font">mat</span>. The top candidate should dominate &mdash; the surrounding words leave little freedom.</li>
+                        <li><strong>Now mask an adjective</strong> like <span class="mono-font">soft</span>. Confidence spreads across several plausible words: the context permits a whole family of answers.</li>
+                        <li><strong>Load the "bank / river" preset</strong> and mask <span class="mono-font">bank</span>. The words after it are what disambiguate the sense &mdash; exactly the information a left-to-right model would not yet have.</li>
+                        <li><strong>Mask two adjacent tokens.</strong> Accuracy drops sharply, because MLM predicts each blank <em>independently</em> and cannot coordinate between them &mdash; a genuine known limitation of the objective.</li>
                     </ol>
                 </div>
 
-                <div>
-                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas-project-diagram"></i>Why are N-grams Important in NLP?</h3>
-                    <p>N-grams are fundamental to many classic NLP applications:</p>
-                    <ul class="list-disc pl-6 mt-4 space-y-2">
-                        <li><strong>Language Modeling:</strong> N-grams are used to build statistical models that can predict the next word in a sentence. For example, after seeing the bigram "peanut butter", the model knows there's a high probability the next word is "and" or "sandwich". This is how smartphone keyboards suggest the next word.</li>
-                        <li><strong>Text Classification:</strong> The presence of certain n-grams can be a strong signal for classifying documents. For instance, a movie review containing bigrams like "highly recommend" or "waste of time" is a good indicator of its sentiment.</li>
-                        <li><strong>Machine Translation:</strong> N-gram models help ensure that translated sentences are fluent and grammatically correct by comparing the probability of different word sequences.</li>
-                    </ul>
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-circle-info"></i>About the model in this lab</h3>
+                    <p>Predictions come from a small context-scoring model built live in your browser from the demo corpus shown in the vocabulary count &mdash; it ranks candidate words by how often they co-occur with the surviving context. It is a genuine calculation, not a canned list, but it is far simpler than a transformer: treat the <em>shape</em> of the results as the lesson, not the exact percentages.</p>
                 </div>
 
-                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Key Takeaway</h3>
-                    <p>N-grams are a simple but effective method for capturing local context in text by breaking it into small, overlapping chunks. While modern deep learning models use more sophisticated techniques, n-grams remain a foundational concept for understanding how machines begin to process and find patterns in human language.</p>
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Key Takeaway</h3>
+                    <p>MLM turns any raw text into supervised training data by deleting parts of it. Because the blank is surrounded rather than trailing, the model learns deep bidirectional understanding &mdash; ideal for classification, retrieval and question answering, and unsuitable for generation. That generative job belongs to causal models, which predict strictly forward.</p>
                 </div>
             </div>
         </div>
     </section>
+    <!-- End auto-article-vizlearn -->
 
-        <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+    <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
         <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
             <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
                 <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
@@ -579,7 +531,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- THEME LOGIC ---
+            // --- THEME ---
             const themeToggleBtn = document.getElementById('themeToggle');
             const sunIcon = themeToggleBtn.querySelector('.dark-icon');
             const moonIcon = themeToggleBtn.querySelector('.light-icon');
@@ -588,169 +540,228 @@
             function applyTheme(theme) {
                 if (theme === 'light') {
                     document.body.classList.add('light-mode');
-                    moonIcon.classList.remove('hidden');
                     sunIcon.classList.add('hidden');
+                    moonIcon.classList.remove('hidden');
                 } else {
                     document.body.classList.remove('light-mode');
-                    sunIcon.classList.remove('hidden');
                     moonIcon.classList.add('hidden');
+                    sunIcon.classList.remove('hidden');
                 }
+                localStorage.setItem('theme', theme);
+                if (typeof window.onThemeChange === 'function') window.onThemeChange();
             }
+            applyTheme(currentTheme);
             themeToggleBtn.addEventListener('click', () => {
-                currentTheme = currentTheme === 'light' ? 'dark' : 'light';
-                localStorage.setItem('theme', currentTheme);
+                currentTheme = document.body.classList.contains('light-mode') ? 'dark' : 'light';
                 applyTheme(currentTheme);
             });
-            applyTheme(currentTheme);
 
-            // --- VARIABLES ---
-            let currentN = 2;
-            let ngrams = [];
-            
-            // --- DOM ELEMENTS ---
-            const textInput = document.getElementById('textInput');
-            const nSlider = document.getElementById('nSlider');
-            const nValueDisplay = document.getElementById('nValueDisplay');
-            const ngramsDisplay = document.getElementById('ngramsDisplay');
-            const ngramCountLabel = document.getElementById('ngramCountLabel');
-            const quickSelectButtons = document.querySelectorAll('.quick-select-btn');
-            
-            // Stats
-            const totalCountEl = document.getElementById('totalCount');
-            const uniqueCountEl = document.getElementById('uniqueCount');
-            const wordCountEl = document.getElementById('wordCount');
-            const currentNStatEl = document.getElementById('currentNStat');
-            
-            // Scroll Slider Elements
-            const scrollSliderContainer = document.getElementById('scrollSliderContainer');
-            const scrollSlider = document.getElementById('scrollSlider');
+            // --- APP LOGIC ---
+            // ---- demo corpus: the toy model is genuinely fit to this text ----
+            const CORPUS = `the cat sat on the soft mat . the dog sat on the warm rug .
+                a cat slept on the mat . the soft mat was warm . the dog barked at the cat .
+                he sat on the river bank and watched the water flow .
+                the river bank was muddy after the rain . we walked along the river bank .
+                she went to the bank to deposit money . the bank approved the loan today .
+                the bank manager counted the money . money was kept in the bank .
+                paris is the capital of france . france is a country in europe .
+                the capital of japan is tokyo . tokyo is a large city in japan .
+                london is the capital of england . berlin is the capital of germany .
+                the quick brown fox jumps over the lazy dog .`;
 
-            // --- CORE LOGIC ---
-            
-            function tokenizeText(text) {
-                return text.trim().split(/\s+/).filter(word => word.length > 0);
-            }
+            const PRESETS = [
+                'the cat sat on the soft mat',
+                'he sat on the river bank and watched the water',
+                'paris is the capital of france'
+            ];
 
-            function generateNgramsFromText(text, n) {
-                const words = tokenizeText(text);
-                const result = [];
-                
-                if (words.length === 0 || n <= 0) return { ngrams: [], wordCount: 0 };
+            const sentInput   = document.getElementById('sentInput');
+            const presetSel   = document.getElementById('presetSel');
+            const tokenStrip  = document.getElementById('tokenStrip');
+            const predArea    = document.getElementById('predArea');
+            const rateSlider  = document.getElementById('rateSlider');
+            const rateVal     = document.getElementById('rateVal');
 
-                for (let i = 0; i <= words.length - n; i++) {
-                    const slice = words.slice(i, i + n);
-                    result.push({
-                        text: slice.join(' '),
-                        startWordIndex: i,
-                        endWordIndex: i + n
-                    });
+            let tokens = [], states = [];   // state: null | 'mask' | 'rand' | 'kept'
+            let randomWords = {};           // for the 10% random-replacement case
+
+            // ---- fit a tiny context model on the corpus ----
+            const sentences = CORPUS.toLowerCase().split('.').map(s => s.trim().split(/\s+/).filter(Boolean)).filter(a => a.length > 1);
+            const vocab = [...new Set(sentences.flat())].sort();
+            const vIdx = Object.fromEntries(vocab.map((w, i) => [w, i]));
+            const unigram = new Array(vocab.length).fill(0);
+            // co[a][b] = proximity-weighted sentence co-occurrence
+            const co = vocab.map(() => new Map());
+            const coRow = new Array(vocab.length).fill(0);   // marginal, for PMI
+            // adjacency counts: bigram[a][b] = how often b directly follows a
+            const bigram = vocab.map(() => new Map());
+
+            for (const s of sentences) {
+                for (const w of s) unigram[vIdx[w]]++;
+                for (let i = 0; i < s.length - 1; i++) {
+                    const a = vIdx[s[i]], b = vIdx[s[i + 1]];
+                    bigram[a].set(b, (bigram[a].get(b) || 0) + 1);
                 }
-                return { ngrams: result, wordCount: words.length };
+                for (let i = 0; i < s.length; i++) {
+                    for (let j = 0; j < s.length; j++) {
+                        if (i === j) continue;
+                        const a = vIdx[s[i]], b = vIdx[s[j]];
+                        const wgt = 1 / Math.abs(i - j);
+                        co[a].set(b, (co[a].get(b) || 0) + wgt);
+                        coRow[a] += wgt;
+                    }
+                }
+            }
+            const totalUni = unigram.reduce((a, b) => a + b, 0);
+            const totalCo = coRow.reduce((a, b) => a + b, 0);
+
+            // Score every vocabulary word for a blank.
+            // Adjacency (what fits right here) dominates; PMI adds wider sentence
+            // context. PMI is used instead of raw counts so that ubiquitous words
+            // like "the" do not win every slot purely by being frequent.
+            function predict(maskIdx) {
+                const visibleAt = i => (!states[i] || states[i] === 'kept') ? tokens[i] : null;
+                let prev = null, next = null;
+                for (let i = maskIdx - 1; i >= 0; i--) { const w = visibleAt(i); if (w) { prev = w; break; } }
+                for (let i = maskIdx + 1; i < tokens.length; i++) { const w = visibleAt(i); if (w) { next = w; break; } }
+
+                const ctxList = [];
+                for (let i = 0; i < tokens.length; i++) {
+                    if (i === maskIdx) continue;
+                    const w = visibleAt(i);
+                    if (w && vIdx[w] !== undefined) ctxList.push({ w, dist: Math.abs(i - maskIdx) });
+                }
+
+                const scores = vocab.map((cand, ci) => {
+                    let s = 0.25 * Math.log((unigram[ci] + 0.5) / totalUni);
+
+                    // left and right adjacency - the strongest local signal
+                    if (prev && vIdx[prev] !== undefined) s += 2.6 * Math.log(1 + (bigram[vIdx[prev]].get(ci) || 0));
+                    if (next && vIdx[next] !== undefined) s += 2.6 * Math.log(1 + (bigram[ci].get(vIdx[next]) || 0));
+
+                    // positive PMI over the rest of the sentence
+                    for (const { w, dist } of ctxList) {
+                        const cj = vIdx[w];
+                        const joint = co[ci].get(cj) || 0;
+                        if (joint <= 0) continue;
+                        const pmi = Math.log((joint * totalCo) / (coRow[ci] * coRow[cj] || 1));
+                        if (pmi > 0) s += pmi * (0.8 / Math.sqrt(dist));
+                    }
+                    return { word: cand, score: s };
+                });
+                const mx = Math.max(...scores.map(s => s.score));
+                let z = 0;
+                for (const s of scores) { s.p = Math.exp(s.score - mx); z += s.p; }
+                for (const s of scores) s.p /= z;
+                return scores.sort((a, b) => b.p - a.p).slice(0, 6);
             }
 
-            function updateUI() {
-                const text = textInput.value;
-                const { ngrams: generated, wordCount } = generateNgramsFromText(text, currentN);
-                ngrams = generated;
-
-                // Update Stats
-                totalCountEl.textContent = ngrams.length;
-                const unique = new Set(ngrams.map(n => n.text)).size;
-                uniqueCountEl.textContent = unique;
-                wordCountEl.textContent = wordCount;
-                currentNStatEl.textContent = currentN;
-                ngramCountLabel.textContent = `${ngrams.length} ITEMS`;
-
-                // Render Pills
-                renderPills();
+            function renderTokens() {
+                tokenStrip.innerHTML = tokens.map((t, i) => {
+                    const st = states[i];
+                    let label = t, cls = 'tok';
+                    if (st === 'mask') { label = '[MASK]'; cls += ' masked'; }
+                    else if (st === 'rand') { label = randomWords[i] || t; cls += ' rand'; }
+                    else if (st === 'kept') { cls += ' kept'; }
+                    return `<span class="${cls}" data-i="${i}">${label}</span>`;
+                }).join('');
+                tokenStrip.querySelectorAll('.tok').forEach(el => {
+                    el.addEventListener('click', () => {
+                        const i = +el.dataset.i;
+                        states[i] = states[i] ? null : 'mask';
+                        update();
+                    });
+                });
             }
 
-            function renderPills() {
-                ngramsDisplay.innerHTML = '';
-                
-                if (ngrams.length === 0) {
-                    ngramsDisplay.innerHTML = `
-                        <div class="empty-state w-full h-full flex flex-col items-center justify-center">
-                            <i class="fas fa-cubes text-3xl mb-3 opacity-30"></i>
-                            <p class="text-xs">No N-grams (Text too short or empty)</p>
-                        </div>`;
-                    updateScrollSlider(); // Update visibility
+            function update() {
+                renderTokens();
+                const maskedIdx = states.map((s, i) => s ? i : -1).filter(i => i >= 0);
+                document.getElementById('statTok').textContent = tokens.length;
+                document.getElementById('statMask').textContent = maskedIdx.length;
+                document.getElementById('statVocab').textContent = vocab.length;
+
+                if (maskedIdx.length === 0) {
+                    predArea.innerHTML = '<div class="h-32 flex items-center justify-center opacity-40 text-xs italic">Click a token above to mask it</div>';
+                    document.getElementById('statConf').textContent = '\u2013';
                     return;
                 }
 
-                ngrams.forEach((item, idx) => {
-                    const pill = document.createElement('div');
-                    pill.className = 'ngram-pill animate-fade-in';
-                    pill.style.animationDelay = `${idx * 0.02}s`;
-                    pill.textContent = item.text;
-                    
-                    // Interaction listeners removed for this version
-                    
-                    ngramsDisplay.appendChild(pill);
-                });
-                
-                // Update slider after rendering to check overflow
-                requestAnimationFrame(updateScrollSlider);
+                let topConf = 0;
+
+                predArea.innerHTML = maskedIdx.map(i => {
+                    const truth = tokens[i];
+                    const preds = predict(i);
+                    topConf = Math.max(topConf, preds[0].p);
+                    const hit = preds[0].word === truth;
+                    const rows = preds.map((p, r) => `
+                        <div class="token-item ${p.word === truth ? 'selected' : ''}">
+                            <div class="flex items-center gap-3 flex-1">
+                                <span class="text-[10px] opacity-40 mono-font w-4">${r + 1}</span>
+                                <div class="flex-1">
+                                    <div class="flex justify-between items-baseline mb-1">
+                                        <span class="mono-font text-sm font-bold">${p.word}${p.word === truth ? ' <span class="text-[9px] opacity-70">(actual)</span>' : ''}</span>
+                                        <span class="mono-font text-xs" style="color: var(--accent-primary)">${(p.p * 100).toFixed(1)}%</span>
+                                    </div>
+                                    <div class="w-full rounded" style="background: var(--stat-bg); height: 4px;">
+                                        <div class="prob-bar" style="width: ${(p.p * 100).toFixed(1)}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`).join('');
+                    const stLabel = states[i] === 'rand' ? 'random-swapped' : states[i] === 'kept' ? 'kept unchanged' : 'masked';
+                    return `
+                        <div class="mb-5">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] uppercase font-bold tracking-widest" style="color:#f59e0b">Position ${i + 1} &middot; ${stLabel}</span>
+                                <span class="text-[10px] mono-font ${hit ? '' : 'opacity-60'}" style="${hit ? 'color: var(--accent-primary)' : ''}">${hit ? 'top-1 correct' : 'top-1 missed'}</span>
+                            </div>
+                            ${rows}
+                        </div>`;
+                }).join('');
+
+                document.getElementById('statConf').textContent = (topConf * 100).toFixed(0) + '%';
             }
 
-            // --- SCROLL SLIDER LOGIC ---
-            function updateScrollSlider() {
-                const contentHeight = ngramsDisplay.scrollHeight;
-                const viewHeight = ngramsDisplay.clientHeight;
-                
-                // Show slider only if content overflows significantly (> 10px diff)
-                if (contentHeight > viewHeight + 10) {
-                    scrollSliderContainer.classList.remove('hidden');
-                    // Set max scroll value
-                    const maxScroll = contentHeight - viewHeight;
-                    scrollSlider.max = maxScroll;
-                    scrollSlider.value = ngramsDisplay.scrollTop;
-                } else {
-                    scrollSliderContainer.classList.add('hidden');
+            function loadSentence(txt) {
+                tokens = txt.toLowerCase().trim().split(/\s+/).filter(Boolean).slice(0, 14);
+                states = tokens.map(() => null);
+                randomWords = {};
+                update();
+            }
+
+            sentInput.addEventListener('input', () => { presetSel.value = '3'; loadSentence(sentInput.value); });
+            presetSel.addEventListener('change', e => {
+                const v = +e.target.value;
+                if (v < 3) { sentInput.value = PRESETS[v]; loadSentence(PRESETS[v]); }
+            });
+
+            rateSlider.addEventListener('input', e => { rateVal.textContent = e.target.value + '%'; });
+
+            document.getElementById('autoMaskBtn').addEventListener('click', () => {
+                const rate = +rateSlider.value / 100;
+                states = tokens.map(() => null);
+                randomWords = {};
+                const n = Math.max(1, Math.round(tokens.length * rate));
+                const order = tokens.map((_, i) => i).sort(() => Math.random() - 0.5).slice(0, n);
+                for (const i of order) {
+                    const r = Math.random();
+                    if (r < 0.8) states[i] = 'mask';
+                    else if (r < 0.9) { states[i] = 'rand'; randomWords[i] = vocab[Math.floor(Math.random() * vocab.length)]; }
+                    else states[i] = 'kept';
                 }
-            }
-
-            // --- CONTROLS ---
-            window.setN = (n) => {
-                currentN = n;
-                nSlider.value = n;
-                nValueDisplay.textContent = n;
-                quickSelectButtons.forEach((btn, idx) => {
-                    if ((idx + 1) === n) btn.classList.add('active');
-                    else btn.classList.remove('active');
-                });
-                updateUI();
-            };
-
-            nSlider.addEventListener('input', (e) => {
-                const val = parseInt(e.target.value);
-                setN(val);
+                update();
             });
 
-            // Slider Scroll Binding
-            scrollSlider.addEventListener('input', (e) => {
-                ngramsDisplay.scrollTop = e.target.value;
+            document.getElementById('clearBtn').addEventListener('click', () => {
+                states = tokens.map(() => null);
+                randomWords = {};
+                update();
             });
 
-            // Bi-directional Binding: Update slider when user scrolls div directly
-            ngramsDisplay.addEventListener('scroll', () => {
-                scrollSlider.value = ngramsDisplay.scrollTop;
-            });
-
-            textInput.addEventListener('input', updateUI);
-
-            document.getElementById('resetBtn').addEventListener('click', () => {
-                textInput.value = 'The quick brown fox jumps over the lazy dog';
-                setN(2);
-            });
-            
-            // Re-check scroll on resize
-            window.addEventListener('resize', updateScrollSlider);
-
-            // --- INIT ---
-            updateUI();
+            loadSentence(sentInput.value);
         });
-    
+
         // ===== DROPDOWN SEARCH FUNCTIONALITY =====
         const allCourses = [
             { title: "Calculating Parameters in CNN", path: "computer_vision/calculating_parameters_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
@@ -877,22 +888,18 @@
             { title: "Word Cloud Generator", path: "natural_language_processing/word_cloud.html", category: "natural_language_processing", icon: "fa-comments" }
         ];
 
-        function toRelativePath(fromPath, targetPath) {
-            const fromParts = fromPath.split('/').filter(Boolean);
-            const targetParts = targetPath.split('/').filter(Boolean);
-            let shared = 0;
-            while (shared < Math.min(fromParts.length, targetParts.length) && fromParts[shared] === targetParts[shared]) {
-                shared++;
-            }
-            const up = '../'.repeat(Math.max(0, fromParts.length - shared));
-            const down = targetParts.slice(shared).join('/');
-            return `${up}${down}`;
+        function toRelativePath(fromDir, targetPath) {
+            const fromParts = fromDir.split('/').filter(Boolean);
+            const toParts = targetPath.split('/').filter(Boolean);
+            let i = 0;
+            while (i < fromParts.length && i < toParts.length && fromParts[i] === toParts[i]) i++;
+            const ups = fromParts.length - i;
+            return '../'.repeat(ups) + toParts.slice(i).join('/');
         }
 
-        const currentPath = window.location.pathname.replace(/\/+$/g, '').replace(/index\.html$/, '');
-        const currentDir = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/')) : '';
-        const resolvedCourses = allCourses.map((course) => {
-            const normalizedTarget = course.path.replace(/^\.\//, '');
+        const currentDir = window.location.pathname.split('/').slice(0, -1).filter(Boolean).slice(-1)[0] || '';
+        const resolvedCourses = allCourses.map(course => {
+            const normalizedTarget = course.path;
             const relativePath = currentDir ? toRelativePath(currentDir, normalizedTarget) : normalizedTarget;
             return { ...course, path: relativePath };
         });
@@ -903,19 +910,17 @@
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value.toLowerCase().trim();
-                
+
                 if (query.length === 0) {
                     dropdown.classList.remove('show');
                     return;
                 }
 
-                // Filter courses
-                const filtered = resolvedCourses.filter(course => 
-                    course.title.toLowerCase().includes(query) || 
+                const filtered = resolvedCourses.filter(course =>
+                    course.title.toLowerCase().includes(query) ||
                     course.category.toLowerCase().includes(query)
                 );
 
-                // Render results
                 if (filtered.length === 0) {
                     dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
                 } else {
@@ -936,21 +941,13 @@
                 dropdown.classList.add('show');
             });
 
-            // Close dropdown when clicking outside
             document.addEventListener('click', (e) => {
-                if (!searchInput.parentElement.contains(e.target)) {
-                    dropdown.classList.remove('show');
-                }
+                if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show');
             });
-
-            // Close dropdown on Escape key
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    dropdown.classList.remove('show');
-                }
+                if (e.key === 'Escape') dropdown.classList.remove('show');
             });
         }
-
     </script>
 </body>
 </html>

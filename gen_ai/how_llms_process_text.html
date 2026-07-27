@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VizLearn - One Hot Encoding</title>
-    <meta name="description" content="Learn One Hot Encoding with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn.">
-    <meta name="keywords" content="One Hot Encoding, interactive learning, beginner tutorial, vizlearn">
+    <title>VizLearn - How LLMs Process Text?</title>
+    <meta name="description" content="Interactive walkthrough of the LLM text pipeline - tokenization, token IDs, embeddings, positional encoding, self-attention and logits, with live computed values.">
+    <meta name="keywords" content="how LLMs process text, transformer pipeline, embeddings, positional encoding, self attention, tokenization, vizlearn, gen ai">
     <meta name="robots" content="index, follow">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -26,6 +26,7 @@
                     animation: {
                         'grid-flow': 'grid-move 40s linear infinite',
                         'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'cursor-blink': 'blink 1s infinite'
                     },
                     keyframes: {
                         'grid-move': {
@@ -35,6 +36,10 @@
                         fadeIn: {
                             '0%': { opacity: '0', transform: 'translateY(10px)' },
                             '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        blink: {
+                            '0%, 50%': { opacity: '1' },
+                            '51%, 100%': { opacity: '0' }
                         }
                     }
                 }
@@ -43,27 +48,25 @@
     </script>
     <script>
         (function(){
-            const apply = (t)=>{
-                if(t==='light') document.body.classList.add('light-mode');
-                else document.body.classList.remove('light-mode');
-            };
             const t = localStorage.getItem('theme') || 'dark';
-            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+            const apply = () => { if (t === 'light') document.body.classList.add('light-mode'); };
+            if (document.body) apply(); else document.addEventListener('DOMContentLoaded', apply);
         })();
     </script>
     <style>
         :root {
-            /* DARK MODE (Default) */
             --bg-body: #050505;
             --bg-surface: #0a0a0a;
             --bg-glass: rgba(10, 10, 10, 0.85);
-            --border-subtle: rgba(74, 222, 128, 0.15); 
+            --border-subtle: rgba(74, 222, 128, 0.15);
             --accent-primary: #4ade80;
             --accent-glow: rgba(74, 222, 128, 0.25);
             --text-main: #f0fdf4;
             --text-muted: #86efac;
             --card-bg: #0a0a0a;
             --input-bg: rgba(74, 222, 128, 0.03);
+            --input-focus-bg: rgba(74, 222, 128, 0.08);
+            --display-bg: rgba(0, 0, 0, 0.4);
             --grid-color: rgba(74, 222, 128, 0.05);
             --vignette-color: #050505;
             --stat-bg: rgba(0, 0, 0, 0.2);
@@ -75,16 +78,18 @@
             --bg-surface: #ffffff;
             --bg-glass: rgba(255, 255, 255, 0.95);
             --border-subtle: rgba(22, 163, 74, 0.2);
-            --accent-primary: #15803d; 
-            --accent-glow: rgba(21, 128, 61, 0.1);
-            --text-main: #111827; 
-            --text-muted: #374151; /* Darker gray for better readability */
+            --accent-primary: #15803d;
+            --accent-glow: rgba(21, 128, 61, 0.15);
+            --text-main: #111827;
+            --text-muted: #374151;
             --card-bg: #ffffff;
-            --input-bg: rgba(0, 0, 0, 0.03);
+            --input-bg: rgba(0, 0, 0, 0.04);
+            --input-focus-bg: rgba(0, 0, 0, 0.06);
+            --display-bg: rgba(0, 0, 0, 0.03);
             --grid-color: rgba(0, 0, 0, 0.05);
             --vignette-color: transparent;
-            --stat-bg: rgba(0, 0, 0, 0.04);
-            --stat-border: rgba(0, 0, 0, 0.1);
+            --stat-bg: #f9fafb;
+            --stat-border: #e5e7eb;
         }
 
         *, *::before, *::after {
@@ -95,7 +100,7 @@
             font-family: 'Inter', sans-serif;
             background-color: var(--bg-body);
             color: var(--text-main);
-            background-image: 
+            background-image:
                 radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
                 linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
                 linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
@@ -103,14 +108,8 @@
             animation: grid-move 40s linear infinite;
         }
 
-        h1, h2, h3, .brand-font {
-            font-family: 'Space Grotesk', sans-serif;
-            letter-spacing: -0.02em;
-        }
-
-        .mono-font {
-            font-family: 'JetBrains Mono', monospace;
-        }
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
 
         .glass-header {
             background-color: var(--bg-glass);
@@ -125,9 +124,19 @@
             overflow: hidden;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
+        .glass-card:hover { border-color: var(--accent-primary); }
 
-        .glass-card:hover {
-            border-color: var(--accent-primary);
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
+            background: var(--input-bg);
+            color: var(--text-main);
         }
 
         .custom-textarea {
@@ -140,7 +149,9 @@
             outline: none;
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.875rem;
+            transition: border-color 0.2s;
         }
+        .custom-textarea:focus { border-color: var(--accent-primary); }
 
         .action-btn {
             background: rgba(21, 128, 61, 0.1);
@@ -157,16 +168,11 @@
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
+            width: 100%;
+            cursor: pointer;
         }
-        .action-btn:hover {
-            background: var(--accent-glow);
-        }
-
-        .reset-btn {
-            background: rgba(239, 68, 68, 0.05);
-            border-color: rgba(239, 68, 68, 0.1);
-            color: #ef4444;
-        }
+        .action-btn:hover:not(:disabled) { background: var(--accent-glow); }
+        .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .stat-box {
             background: var(--stat-bg);
@@ -178,59 +184,97 @@
             gap: 0.25rem;
         }
 
-        .vector-pill {
+        .token-item {
             background: var(--input-bg);
             border: 1px solid var(--border-subtle);
             border-radius: 12px;
-            padding: 1rem;
+            padding: 0.85rem 1rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.6rem;
             transition: all 0.2s;
         }
-        .vector-pill:hover {
-            background: var(--bg-glass);
+        .token-item:hover { background: var(--bg-glass); border-color: var(--accent-primary); }
+        .token-item.selected {
             border-color: var(--accent-primary);
-            transform: translateX(4px);
+            background: var(--accent-glow);
+            box-shadow: 0 0 15px var(--accent-glow);
         }
 
-        .index-tag {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.65rem;
-            font-weight: 700;
-            color: var(--text-muted);
-            width: 40px;
+        .prob-bar {
+            height: 4px;
+            border-radius: 2px;
+            background: var(--accent-primary);
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .hot-bit { color: var(--accent-primary); font-weight: 800; }
-        .cold-bit { opacity: 0.4; }
-
-        input[type=range] {
-            -webkit-appearance: none;
-            background: transparent;
-            width: 100%;
-        }
+        input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; }
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            height: 18px;
-            width: 18px;
+            height: 18px; width: 18px;
             border-radius: 50%;
             background: #3b82f6;
             cursor: pointer;
             margin-top: -6px;
         }
         input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 4px;
+            width: 100%; height: 6px;
             background: var(--border-subtle);
-            border-radius: 2px;
+            border-radius: 3px;
         }
 
-        .scroll-container::-webkit-scrollbar {
-            display: none;
+        .scroll-container::-webkit-scrollbar { display: none; }
+
+        .display-box {
+            background: var(--display-bg);
+            border-radius: 12px;
+            padding: 1.25rem;
+            min-height: 100px;
+            overflow-y: auto;
+            line-height: 1.8;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
         }
-    
+
+        select.custom-select {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            padding: 0.5rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            width: 100%;
+            outline: none;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid var(--border-subtle);
+            background: var(--input-bg);
+            border-radius: 8px;
+            padding: 5px 10px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.2s ease;
+        }
+        .chip.on {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--accent-glow);
+        }
+
+
+        .stage-btn { border: 1px solid var(--border-subtle); background: var(--input-bg); border-radius: 8px; padding: 8px 10px; font-size: 10px; font-family: 'JetBrains Mono', monospace; cursor: pointer; transition: all 0.2s ease; text-align: left; color: var(--text-muted); }
+        .stage-btn.active { border-color: var(--accent-primary); background: var(--accent-glow); color: var(--accent-primary); font-weight: 700; }
+        .stage-btn.done { color: var(--text-main); }
+        .cellv { width: 34px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: 8px; font-family: 'JetBrains Mono', monospace; border: 1px solid var(--border-subtle); }
+        .att-cell { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: 8px; font-family: 'JetBrains Mono', monospace; }
+        .shape-tag { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 6px; background: var(--stat-bg); border: 1px solid var(--stat-border); }
+
+
         /* Search Input Wrapper */
         .search-input-wrapper {
             background: var(--input-bg);
@@ -242,24 +286,14 @@
             border-color: var(--accent-primary);
             box-shadow: 0 0 15px var(--accent-glow);
         }
-        .search-input-wrapper input {
-            color: var(--text-main);
-        }
-        .search-input-wrapper input::placeholder {
-            color: var(--text-muted);
-            opacity: 0.7;
-        }
-        .search-input-wrapper i {
-            color: var(--accent-primary);
-            opacity: 0.7;
-        }
+        .search-input-wrapper input { color: var(--text-main); }
+        .search-input-wrapper input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .search-input-wrapper i { color: var(--accent-primary); opacity: 0.7; }
 
         /* Dropdown Search */
         .search-dropdown {
             position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
+            top: 100%; left: 0; right: 0;
             background: var(--card-bg);
             border: 1px solid var(--border-subtle);
             border-top: none;
@@ -270,23 +304,11 @@
             display: none;
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
         }
-
-        .search-dropdown.show {
-            display: block;
-            animation: slideDown 0.2s ease-out;
-        }
-
+        .search-dropdown.show { display: block; animation: slideDown 0.2s ease-out; }
         @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-
         .search-dropdown-item {
             padding: 12px 16px;
             border-bottom: 1px solid var(--border-subtle);
@@ -298,40 +320,12 @@
             color: inherit;
             text-decoration: none;
         }
-
-        .search-dropdown-item:last-child {
-            border-bottom: none;
-        }
-
-        .search-dropdown-item:hover {
-            background: var(--input-focus-bg);
-            padding-left: 20px;
-        }
-
-        .dropdown-item-title {
-            font-weight: 500;
-            color: var(--text-main);
-        }
-
-        .dropdown-item-path {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-left: 12px;
-        }
-
-        .dropdown-item-icon {
-            color: var(--accent-primary);
-            margin-right: 8px;
-            font-size: 0.875rem;
-        }
-
-        .dropdown-no-results {
-            padding: 20px 16px;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 0.875rem;
-        }
-
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        .dropdown-item-title { font-weight: 500; color: var(--text-main); }
+        .dropdown-item-path { font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; }
+        .dropdown-item-icon { color: var(--accent-primary); margin-right: 8px; font-size: 0.875rem; }
+        .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
     </style>
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
@@ -339,41 +333,30 @@
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-
         gtag('config', 'G-ZT6JM33V5J');
     </script>
-
 </head>
 <body class="flex flex-col min-h-screen overflow-x-hidden">
 
-    <!-- Branded Header -->
     <!-- Header -->
     <header class="glass-header sticky top-0 z-50">
         <div class="flex justify-center py-3 px-4 md:px-8">
             <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
-                <!-- Logo -->
                 <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
                     <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
                     <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
                 </a>
-                
-                <!-- Search -->
+
                 <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
                     <i class="fas fa-search text-sm"></i>
                     <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
-                    <div id="searchDropdown" class="search-dropdown">
-                        <!-- Results will be populated here -->
-                    </div>
+                    <div id="searchDropdown" class="search-dropdown"></div>
                 </div>
 
-                <!-- Theme Toggle + Back Button -->
                 <div class="flex items-center gap-3">
-                    <!-- Back to Hub Button -->
                     <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
                         <i class="fas fa-arrow-left text-xs"></i>
                     </a>
-                    
-                    <!-- Theme Toggle -->
                     <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
                         <i class="fas fa-sun hidden dark-icon"></i>
                         <i class="fas fa-moon hidden light-icon"></i>
@@ -383,178 +366,142 @@
         </div>
     </header>
 
-
     <main class="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto flex flex-col">
-        
-        <!-- Breadcrumb / Branded Title Section -->
+
         <div class="mb-8 animate-fade-in">
             <div class="flex items-center gap-2 text-xs mono-font mb-2" style="color: var(--text-muted)">
                 <span class="opacity-50">Modules</span>
                 <span>/</span>
-                <span class="opacity-50">NLP Encoding</span>
+                <span class="opacity-50">Gen AI</span>
                 <span>/</span>
-                <span style="color: var(--accent-primary)">One Hot</span>
+                <span style="color: var(--accent-primary)">Pipeline Lab</span>
             </div>
-            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">One Hot Encoding</h1>
+            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">How LLMs Process Text?</h1>
             <p class="mt-2 text-sm max-w-2xl" style="color: var(--text-muted)">
-                Explore how text is transformed into sparse binary vectors for neural network processing.
+                Follow a sentence through every stage a transformer puts it through &mdash; tokens, IDs, embeddings, positional encoding, self-attention and output logits. Real sinusoidal encodings and a real attention matrix, computed live.
             </p>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full flex-1">
-            
-            <!-- Left Sidebar -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
             <aside class="lg:col-span-4 flex flex-col gap-6 animate-fade-in" style="animation-delay: 0.1s">
                 <div class="glass-card p-6 flex flex-col gap-4">
-                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">Corpus Input</h2>
-                    <textarea id="textInput" rows="6" class="custom-textarea">machine learning is fascinating
-deep learning is machine learning</textarea>
-                    
-                    <button id="encodeBtn" class="action-btn">
-                        <i class="fas fa-microchip"></i> Encode Corpus
-                    </button>
-                    <button id="resetBtn" class="action-btn reset-btn">
-                        <i class="fas fa-undo"></i> Reset Default
-                    </button>
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">Input Text</h2>
+                    <input id="textInput" class="custom-textarea text-xs py-2" value="the cat sat on the mat">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] uppercase font-bold opacity-60">Model dim (d)</span>
+                        <span id="dVal" class="text-xs font-bold" style="color: var(--accent-primary)">8</span>
+                    </div>
+                    <input type="range" id="dSlider" min="4" max="16" step="2" value="8">
+                    <p class="text-[10px] opacity-60 leading-relaxed">Real models use d = 4096 or more. We show 8 so every number stays visible.</p>
+                </div>
+
+                <div class="glass-card p-6 flex flex-col gap-2">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-2">Pipeline Stages</h2>
+                    <button class="stage-btn active" data-s="0"><span class="opacity-50">01</span> &nbsp;Raw text</button>
+                    <button class="stage-btn" data-s="1"><span class="opacity-50">02</span> &nbsp;Tokenize</button>
+                    <button class="stage-btn" data-s="2"><span class="opacity-50">03</span> &nbsp;Token IDs</button>
+                    <button class="stage-btn" data-s="3"><span class="opacity-50">04</span> &nbsp;Embeddings</button>
+                    <button class="stage-btn" data-s="4"><span class="opacity-50">05</span> &nbsp;+ Positional</button>
+                    <button class="stage-btn" data-s="5"><span class="opacity-50">06</span> &nbsp;Self-attention</button>
+                    <button class="stage-btn" data-s="6"><span class="opacity-50">07</span> &nbsp;Stacked layers</button>
+                    <button class="stage-btn" data-s="7"><span class="opacity-50">08</span> &nbsp;Output logits</button>
+                    <div class="grid grid-cols-2 gap-3 pt-3">
+                        <button id="prevBtn" class="action-btn"><i class="fas fa-arrow-left"></i> Prev</button>
+                        <button id="nextBtn" class="action-btn"><i class="fas fa-arrow-right"></i> Next</button>
+                    </div>
                 </div>
 
                 <div class="glass-card p-6">
-                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-4">Encoding Statistics</h2>
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-4">Tensor Shape</h2>
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="stat-box">
-                            <span class="text-[9px] uppercase font-bold opacity-50">Total Vectors</span>
-                            <span id="statTotal" class="text-xl font-bold text-viz-accent">0</span>
-                        </div>
-                        <div class="stat-box">
-                            <span class="text-[9px] uppercase font-bold opacity-50">Vector Len</span>
-                            <span id="statLen" class="text-xl font-bold">0</span>
-                        </div>
-                        <div class="stat-box">
-                            <span class="text-[9px] uppercase font-bold opacity-50">Vocabulary</span>
-                            <span id="statVocab" class="text-xl font-bold">0</span>
-                        </div>
-                        <div class="stat-box">
-                            <span class="text-[9px] uppercase font-bold opacity-50">Bit Density</span>
-                            <span id="statDensity" class="text-xl font-bold">0%</span>
-                        </div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Sequence Len</span><span id="statSeq" class="text-xl font-bold" style="color: var(--accent-primary)">0</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Dimension</span><span id="statDim" class="text-xl font-bold">0</span></div>
+                        <div class="stat-box text-center col-span-2"><span class="text-[9px] uppercase font-bold opacity-50">Current Tensor</span><span id="statShape" class="text-lg font-bold mono-font">&ndash;</span></div>
                     </div>
                 </div>
             </aside>
 
-            <!-- Main Content Area -->
-            <section class="lg:col-span-8 flex flex-col gap-4 animate-fade-in" style="animation-delay: 0.2s">
-                <div class="glass-card flex-1 flex flex-col p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">Encoded Vectors</h2>
-                        <span id="itemCountLabel" class="text-[10px] font-bold px-2 py-1 rounded bg-brand-400/10 text-brand-400 border border-brand-400/20 mono-font">0 VECTORS</span>
+            <section class="lg:col-span-8 flex flex-col gap-6 animate-fade-in" style="animation-delay: 0.2s">
+                <div class="glass-card p-6 flex-1">
+                    <div class="flex justify-between items-center mb-1">
+                        <h2 class="text-lg font-bold" id="stageTitle" style="color: var(--accent-primary)">Raw text</h2>
+                        <span class="shape-tag" id="shapeTag">&ndash;</span>
                     </div>
-
-                    <div id="vectorDisplay" class="scroll-container overflow-y-auto flex-grow h-[400px] bg-black/5 rounded-xl p-4 border border-dashed border-white/5">
-                        <!-- Vectors list generated here -->
-                    </div>
-
-                    <!-- Updated Scroll UI matching screenshot convention -->
-                    <div class="mt-6 pt-4 border-t border-white/5">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-[10px] uppercase font-bold opacity-60">Vector List Scroll</span>
-                            <span class="text-[10px] uppercase font-bold text-blue-500">View</span>
-                        </div>
-                        <input type="range" id="scrollSlider" min="0" max="100" value="0">
-                    </div>
+                    <p class="text-xs opacity-70 mb-5" id="stageDesc"></p>
+                    <div id="stageBody" class="scroll-container overflow-auto" style="min-height: 420px; max-height: 560px;"></div>
                 </div>
             </section>
         </div>
     </main>
 
     <!-- auto-article-vizlearn -->
-    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
-        <div class="glass-card animate-fade-in">
-            <div class="p-6 border-b border-brand-400/10">
-                <h2 class="font-bold text-xl md:text-2xl brand-font" style="color: var(--text-main)">Understanding One-Hot Encoding</h2>
-                <p class="mt-2 text-sm" style="color: var(--text-muted)">A deep dive into converting categorical data into a machine-readable format.</p>
+    <section class="px-4 md:px-8 pb-8 max-w-7xl mx-auto w-full animate-fade-in" style="animation-delay: 200ms;">
+        <div class="card-container">
+            <div class="card-header">
+                <h2 class="text-xl md:text-2xl font-bold flex items-center gap-3">
+                    <i class="fas fa-diagram-project" style="color: var(--accent-primary);"></i>
+                    The Journey from Characters to Prediction
+                </h2>
             </div>
-            <div class="p-6 md:p-8 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
-                
+            <div class="p-6 md:p-8 space-y-8 text-base leading-relaxed" style="color: var(--text-main);">
+
+                <p class="text-lg">
+                    A language model never sees text. It sees numbers &mdash; and the transformation from your sentence to those numbers, and back to a prediction, is a fixed pipeline of stages. Stepping through them is the fastest way to demystify what "the model read my prompt" actually means.
+                </p>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-scissors"></i>Stages 1&ndash;3: Text Becomes Integers</h3>
+                    <p>Tokenization splits the string into subword pieces, and each piece is looked up in the vocabulary to get an integer ID. That is the model's entire input: a list of integers. Nothing about the <em>meaning</em> of a word has entered yet &mdash; ID 4021 is no closer to ID 4022 than to ID 9. The IDs are arbitrary addresses, not measurements.</p>
+                </div>
+
                 <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-lightbulb"></i>Core Concept</h3>
-                    <p>One-Hot Encoding is a fundamental technique in data preprocessing, used to convert categorical variables into a numerical format that machine learning algorithms can understand. It takes a column with categorical data, which has been label encoded, and then splits the column into multiple columns. The numbers are replaced by 1s and 0s, depending on which column has what value.</p>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-table-cells"></i>Stage 4: Embeddings Give IDs Meaning</h3>
+                    <p>Each ID indexes into a giant lookup table, pulling out a learned vector of <span class="mono-font">d</span> numbers. <em>These vectors are where meaning lives.</em> Words used in similar contexts end up with similar vectors, and this table is trained along with everything else.</p>
+                    <p class="mt-2">Notice the shape change: a list of <span class="mono-font">n</span> integers becomes an <span class="mono-font">n &times; d</span> matrix. Every stage from here on preserves that shape &mdash; the transformer transforms these vectors repeatedly without ever changing the grid size.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-cogs"></i>How It Works: The Intuition</h3>
-                    <p>Imagine you have a feature like "Color" with categories: "Red", "Green", and "Blue". A machine learning model can't work with these text labels directly. One-Hot Encoding transforms this single "Color" column into three new columns, one for each category: "Is_Red", "Is_Green", and "Is_Blue".</p>
-                    <ul class="list-disc pl-6 mt-4 space-y-2">
-                        <li>For a data point where the color is "Red", the "Is_Red" column will be <code class="mono-font bg-gray-700/50 px-1.5 py-0.5 rounded">1</code>, while "Is_Green" and "Is_Blue" will be <code class="mono-font bg-gray-700/50 px-1.5 py-0.5 rounded">0</code>.</li>
-                        <li>If the color is "Green", the "Is_Green" column gets the <code class="mono-font bg-gray-700/50 px-1.5 py-0.5 rounded">1</code>, and the others get <code class="mono-font bg-gray-700/50 px-1.5 py-0.5 rounded">0</code>.</li>
-                    </ul>
-                    <p class="mt-3">This creates a sparse binary vector where only one bit is "hot" (set to 1), clearly and unambiguously representing the original category without implying any ordinal relationship between the categories.</p>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-wave-square"></i>Stage 5: Position Must Be Injected</h3>
+                    <p>Self-attention has no inherent sense of order &mdash; it sees a <em>set</em> of vectors, so "dog bites man" and "man bites dog" would be identical. Position is therefore added directly into the vectors, classically with sinusoids of geometrically increasing wavelength:</p>
+                    <p class="my-3 text-center mono-font text-sm">PE(pos, 2i) = sin(pos / 10000<sup>2i/d</sup>) &nbsp;&nbsp; PE(pos, 2i+1) = cos(pos / 10000<sup>2i/d</sup>)</p>
+                    <p>The values in this lab are the genuine formula. Look along a row and you will see fast oscillation in the early dimensions and near-constant values in the later ones &mdash; that mix gives every position a unique fingerprint the model can decode.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-vial"></i>Experiment in the Live Panel</h3>
-                    <p>The interactive visualization on this page lets you see this process in action. Follow these steps to build a strong mental model:</p>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-arrows-to-eye"></i>Stage 6: Attention Mixes the Tokens</h3>
+                    <p>Now every token looks at every other token. Each position produces a query and a key; their dot product, scaled by <span class="mono-font">&radic;d</span>, scores how relevant one token is to another, and a softmax over each row turns those scores into weights that sum to 1:</p>
+                    <p class="my-3 text-center mono-font text-sm">Attention(Q, K, V) = softmax(QK&#7488; / &radic;d) V</p>
+                    <p>The heatmap in this stage is a real computation from the vectors above it. Each row shows where one token sent its attention. This is the step where a token stops being an isolated word and becomes a <em>contextual</em> representation.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-layer-group"></i>Stages 7&ndash;8: Depth, Then a Single Prediction</h3>
+                    <p>One attention block is repeated dozens of times, each with a feed-forward network, residual connections and normalisation. Early layers capture syntax; deeper layers capture semantics and task structure.</p>
+                    <p class="mt-2">At the very end only the <strong>last position's</strong> vector is used for the next token. It is multiplied by the vocabulary matrix to produce one logit per possible token &mdash; and we are back to a distribution over words. The chosen token is appended to the input and the entire pipeline runs again, from stage 1, for every single word generated.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-flask"></i>Interactive Exploration Guide</h3>
                     <ol class="list-decimal pl-6 mt-4 space-y-3">
-                        <li><strong>Initial State:</strong> Click the "Encode Corpus" button with the default text. Observe the "Vocabulary" size and the "Vector Length". Notice how each unique word from the input text becomes part of the vocabulary.</li>
-                        <li><strong>Analyze the Vectors:</strong> Look at the generated vectors. For each word (token), you'll see a vector of 0s and a single 1. The position of the '1' corresponds to that word's index in the sorted vocabulary. For example, if the vocabulary is `['deep', 'fascinating', 'is', 'learning', 'machine']`, the word "is" will be represented as `[0, 0, 1, 0, 0]`.</li>
-                        <li><strong>Add New Words:</strong> Add a new sentence to the input, like "AI is the future". Click "Encode Corpus" again. What happens to the "Vector Length" and "Vocabulary" count? All existing vectors are now longer to accommodate the new words ('ai', 'the', 'future'). This demonstrates a key challenge with One-Hot Encoding: the dimensionality increases with vocabulary size.</li>
-                        <li><strong>Introduce Repetition:</strong> Add a sentence that reuses existing words, such as "deep learning is powerful". Notice that the vocabulary size doesn't increase as much, but the total number of vectors does. This highlights the efficiency of reusing existing vocabulary entries.</li>
+                        <li><strong>Walk from stage 1 to 8 with Next</strong> and keep an eye on the shape tag. Watch <span class="mono-font">n</span> integers become <span class="mono-font">n &times; d</span> and stay there until the final projection.</li>
+                        <li><strong>At stage 5, compare the two rows of "the".</strong> Identical embeddings, different positional vectors &mdash; which is the only reason the model can tell the two occurrences apart.</li>
+                        <li><strong>At stage 6, read the attention rows.</strong> Repeated words attend to each other strongly, because attention is driven by vector similarity.</li>
+                        <li><strong>Change the sentence to "man bites dog", then "dog bites man".</strong> Same tokens, different attention pattern &mdash; order genuinely changes the computation once positions are added.</li>
+                        <li><strong>Raise the model dimension.</strong> Every downstream matrix widens, which is the crudest possible illustration of why parameter counts explode with <span class="mono-font">d</span>.</li>
                     </ol>
                 </div>
 
-                <div>
-                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-code"></i>Pseudocode Logic</h3>
-                    <div class="mono-font text-xs md:text-sm p-4 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                        <pre><code>
-function oneHotEncode(corpus):
-  // 1. Tokenize and find unique words
-  tokens = tokenize(corpus)
-  vocabulary = sorted(unique(tokens))
-  
-  // 2. Create a mapping from word to index
-  word_to_index = {word: i for i, word in enumerate(vocabulary)}
-  
-  // 3. Generate vectors
-  encoded_vectors = []
-  for token in tokens:
-    vector = create_zero_vector(length=len(vocabulary))
-    index = word_to_index[token]
-    vector[index] = 1
-    encoded_vectors.append(vector)
-    
-  return encoded_vectors
-                        </code></pre>
-                    </div>
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-exclamation-triangle"></i>Advantages and Disadvantages</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                            <h4 class="font-bold text-green-400 mb-2">Advantages</h4>
-                            <ul class="list-disc pl-5 space-y-1">
-                                <li><strong>No Ordinality:</strong> It doesn't create a false order or ranking between categories, which is a common issue with simple label encoding.</li>
-                                <li><strong>Interpretability:</strong> The resulting vectors are easy to interpret. Each column clearly corresponds to a specific category.</li>
-                            </ul>
-                        </div>
-                        <div class="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-                            <h4 class="font-bold text-red-400 mb-2">Disadvantages</h4>
-                            <ul class="list-disc pl-5 space-y-1">
-                                <li><strong>High Dimensionality (Curse of Dimensionality):</strong> If you have many unique categories (a large vocabulary), it creates a huge number of new features. This can slow down model training and sometimes hurt performance.</li>
-                                <li><strong>Sparsity:</strong> The resulting matrix is sparse (mostly zeros), which can be computationally inefficient to store and process.</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
-                    <h3 class="text-base md:text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Beyond One-Hot Encoding</h3>
-                    <p>While One-Hot Encoding is a great starting point, for more complex tasks, especially in Natural Language Processing (NLP), more advanced techniques like <strong>Word Embeddings (e.g., Word2Vec, GloVe, FastText)</strong> are used. These methods represent words as dense, low-dimensional vectors that capture semantic relationships (e.g., the vectors for "king" and "queen" are closer to each other). One-Hot Encoding, in contrast, treats every word as equally different from all others.</p>
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Key Takeaway</h3>
+                    <p>Text in, integers, vectors, mixed vectors, logits, text out. The embeddings and attention weights in this lab are deterministic stand-ins for learned parameters, but the <em>operations</em> &mdash; sinusoidal positions, scaled dot-product attention, softmax &mdash; are the real ones. Understanding this pipeline makes context windows, tokenizer quirks and attention costs stop feeling arbitrary.</p>
                 </div>
             </div>
         </div>
     </section>
+    <!-- End auto-article-vizlearn -->
 
-            <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+    <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
         <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
             <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
                 <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
@@ -567,7 +514,7 @@ function oneHotEncode(corpus):
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Theme toggle logic
+            // --- THEME ---
             const themeToggleBtn = document.getElementById('themeToggle');
             const sunIcon = themeToggleBtn.querySelector('.dark-icon');
             const moonIcon = themeToggleBtn.querySelector('.light-icon');
@@ -576,115 +523,220 @@ function oneHotEncode(corpus):
             function applyTheme(theme) {
                 if (theme === 'light') {
                     document.body.classList.add('light-mode');
-                    moonIcon.classList.remove('hidden');
                     sunIcon.classList.add('hidden');
+                    moonIcon.classList.remove('hidden');
                 } else {
                     document.body.classList.remove('light-mode');
-                    sunIcon.classList.remove('hidden');
                     moonIcon.classList.add('hidden');
+                    sunIcon.classList.remove('hidden');
                 }
+                localStorage.setItem('theme', theme);
+                if (typeof window.onThemeChange === 'function') window.onThemeChange();
             }
-
+            applyTheme(currentTheme);
             themeToggleBtn.addEventListener('click', () => {
-                currentTheme = currentTheme === 'light' ? 'dark' : 'light';
-                localStorage.setItem('theme', currentTheme);
+                currentTheme = document.body.classList.contains('light-mode') ? 'dark' : 'light';
                 applyTheme(currentTheme);
             });
-            applyTheme(currentTheme);
 
-            // One Hot logic
+            // --- APP LOGIC ---
             const textInput = document.getElementById('textInput');
-            const encodeBtn = document.getElementById('encodeBtn');
-            const resetBtn = document.getElementById('resetBtn');
-            const vectorDisplay = document.getElementById('vectorDisplay');
-            const scrollSlider = document.getElementById('scrollSlider');
-            
-            const statTotal = document.getElementById('statTotal');
-            const statLen = document.getElementById('statLen');
-            const statVocab = document.getElementById('statVocab');
-            const statDensity = document.getElementById('statDensity');
-            const itemCountLabel = document.getElementById('itemCountLabel');
+            const dSlider   = document.getElementById('dSlider');
+            const stageBody = document.getElementById('stageBody');
 
-            let vocabulary = [];
-            let tokens = [];
+            const STAGES = [
+                { t: 'Raw text', d: 'A plain string. The model cannot use this directly - it has no numbers to multiply.' },
+                { t: 'Tokenize', d: 'The string is split into subword pieces by the tokenizer. Frequent words stay whole; rare ones break apart.' },
+                { t: 'Token IDs', d: 'Each piece is looked up in the vocabulary. The model receives only this list of integers.' },
+                { t: 'Embeddings', d: 'Every ID indexes a learned vector. Meaning enters here - similar words get similar vectors.' },
+                { t: '+ Positional encoding', d: 'Sinusoidal position values are added, so the model can tell word order. These are the real formula.' },
+                { t: 'Self-attention', d: 'Every token scores every other token: softmax(QK^T / sqrt(d)). Computed live from the vectors above.' },
+                { t: 'Stacked layers', d: 'The attention + feed-forward block repeats many times. Shape never changes; representations get richer.' },
+                { t: 'Output logits', d: 'The final position is projected onto the vocabulary, giving one score per possible next token.' }
+            ];
 
-            function preprocess(text) {
-                return text.toLowerCase()
-                           .replace(/[^\w\s]/g, '')
-                           .split(/\s+/)
-                           .filter(word => word.length > 0);
-            }
+            let stage = 0, tokens = [], D = 8;
 
-            function processEncoding() {
-                const text = textInput.value;
-                tokens = preprocess(text);
-                vocabulary = Array.from(new Set(tokens)).sort();
-
-                const vocabSize = vocabulary.length;
-                statTotal.textContent = tokens.length;
-                statLen.textContent = vocabSize;
-                statVocab.textContent = vocabSize;
-                const density = vocabSize > 0 ? (1 / vocabSize * 100).toFixed(1) : 0;
-                statDensity.textContent = density + '%';
-                itemCountLabel.textContent = `${tokens.length} VECTORS`;
-
-                renderVectors();
-            }
-
-            function renderVectors() {
-                vectorDisplay.innerHTML = '';
-                if (tokens.length === 0) {
-                    vectorDisplay.innerHTML = '<div class="h-full flex items-center justify-center opacity-30 text-xs italic">No data to display</div>';
-                    return;
+            // deterministic pseudo-embeddings (stand-ins for a learned table)
+            function embed(word, d) {
+                const v = [];
+                for (let i = 0; i < d; i++) {
+                    let s = 0;
+                    for (let c = 0; c < word.length; c++) s += Math.sin(word.charCodeAt(c) * (i + 1) * 0.37 + c * 1.1);
+                    v.push(Math.max(-1, Math.min(1, s / Math.sqrt(word.length + 1))));
                 }
+                return v;
+            }
+            function tokenId(word) {
+                let h = 0;
+                for (const ch of word) h = (h * 31 + ch.charCodeAt(0)) % 50257;   // GPT-2 vocab size
+                return h;
+            }
+            // real sinusoidal positional encoding
+            function posEnc(pos, d) {
+                const v = [];
+                for (let i = 0; i < d; i++) {
+                    const k = Math.floor(i / 2);
+                    const denom = Math.pow(10000, (2 * k) / d);
+                    v.push(i % 2 === 0 ? Math.sin(pos / denom) : Math.cos(pos / denom));
+                }
+                return v;
+            }
 
-                tokens.forEach((token, idx) => {
-                    const vocabIndex = vocabulary.indexOf(token);
-                    const pill = document.createElement('div');
-                    pill.className = 'vector-pill';
-                    
-                    let vectorHtml = '<span class="text-brand-400 font-bold">[ </span>';
-                    for (let i = 0; i < vocabulary.length; i++) {
-                        if (i === vocabIndex) {
-                            vectorHtml += `<span class="hot-bit">1</span>`;
-                        } else {
-                            vectorHtml += `<span class="cold-bit">0</span>`;
-                        }
-                        if (i < vocabulary.length - 1) vectorHtml += '<span class="mx-1 opacity-20">,</span>';
-                    }
-                    vectorHtml += '<span class="text-brand-400 font-bold"> ]</span>';
+            function heat(v, warm) {
+                const a = Math.min(Math.abs(v), 1);
+                const col = v >= 0
+                    ? `rgba(74, 222, 128, ${0.12 + a * 0.62})`
+                    : `rgba(239, 68, 68, ${0.12 + a * 0.62})`;
+                return warm
+                    ? `rgba(56, 189, 248, ${0.12 + a * 0.62})`
+                    : col;
+            }
 
-                    pill.innerHTML = `
-                        <div class="flex items-center">
-                            <span class="index-tag">V${idx + 1}</span>
-                            <span class="text-xs font-bold w-24 truncate" title="${token}">${token}</span>
-                        </div>
-                        <div class="mono-font text-[10px] overflow-hidden whitespace-nowrap">
-                            ${vectorHtml}
-                        </div>
-                    `;
-                    vectorDisplay.appendChild(pill);
+            function matrixHTML(rows, labels, warm) {
+                return `<div class="flex flex-col gap-1">${rows.map((r, i) => `
+                    <div class="flex items-center gap-2">
+                        <span class="mono-font text-[10px] opacity-60 w-16 text-right shrink-0">${labels[i]}</span>
+                        <div class="flex gap-1">${r.map(v => `<div class="cellv" style="background:${heat(v, warm)}">${v.toFixed(1)}</div>`).join('')}</div>
+                    </div>`).join('')}</div>`;
+            }
+
+            function render() {
+                const raw = textInput.value.trim() || 'the cat sat';
+                tokens = raw.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8);
+                D = +dSlider.value;
+                const n = tokens.length;
+
+                document.querySelectorAll('.stage-btn').forEach(b => {
+                    const s = +b.dataset.s;
+                    b.classList.toggle('active', s === stage);
+                    b.classList.toggle('done', s < stage);
                 });
 
-                setTimeout(() => {
-                    const maxScroll = vectorDisplay.scrollHeight - vectorDisplay.clientHeight;
-                    scrollSlider.max = maxScroll > 0 ? maxScroll : 0;
-                    scrollSlider.value = 0;
-                }, 50);
+                document.getElementById('stageTitle').textContent = STAGES[stage].t;
+                document.getElementById('stageDesc').textContent = STAGES[stage].d;
+                document.getElementById('statSeq').textContent = n;
+                document.getElementById('statDim').textContent = D;
+
+                const emb = tokens.map(t => embed(t, D));
+                const pe  = tokens.map((_, i) => posEnc(i, D));
+                const withPos = emb.map((e, i) => e.map((v, j) => v + pe[i][j]));
+
+                let shape = '', body = '';
+
+                if (stage === 0) {
+                    shape = 'string';
+                    body = `<div class="display-box text-base">${raw}</div>
+                        <p class="text-xs opacity-60 mt-4">${raw.length} characters. To a computer this is just bytes - there is nothing to multiply yet.</p>`;
+                }
+                else if (stage === 1) {
+                    shape = `${n} tokens`;
+                    body = `<div class="flex flex-wrap gap-2">${tokens.map(t => `<span class="chip on">${t}</span>`).join('')}</div>
+                        <p class="text-xs opacity-60 mt-4">Split into ${n} tokens. Real tokenizers split on subwords, so an uncommon word like "tokenization" might become 3 pieces.</p>`;
+                }
+                else if (stage === 2) {
+                    shape = `[${n}]`;
+                    body = `<div class="flex flex-col gap-2">${tokens.map(t => `
+                        <div class="token-item">
+                            <span class="mono-font text-sm">${t}</span>
+                            <span class="mono-font text-sm" style="color: var(--accent-primary)">${tokenId(t)}</span>
+                        </div>`).join('')}</div>
+                        <p class="text-xs opacity-60 mt-4">These integers carry no meaning on their own - they are row numbers into the embedding table.</p>`;
+                }
+                else if (stage === 3) {
+                    shape = `[${n} \u00d7 ${D}]`;
+                    body = matrixHTML(emb, tokens, false) +
+                        `<p class="text-xs opacity-60 mt-4">Each row is one token's learned vector. Note that both occurrences of a repeated word are <strong>identical</strong> here.</p>`;
+                }
+                else if (stage === 4) {
+                    shape = `[${n} \u00d7 ${D}]`;
+                    body = `<div class="text-[10px] uppercase font-bold opacity-60 mb-2">Positional encoding (sinusoidal)</div>
+                        ${matrixHTML(pe, tokens.map((_, i) => 'pos ' + i), true)}
+                        <div class="text-[10px] uppercase font-bold opacity-60 mt-5 mb-2">Embedding + position</div>
+                        ${matrixHTML(withPos, tokens, false)}
+                        <p class="text-xs opacity-60 mt-4">Repeated words now differ, because each got a different positional vector added.</p>`;
+                }
+                else if (stage === 5) {
+                    shape = `[${n} \u00d7 ${n}] attention`;
+                    // real scaled dot-product attention over the position-aware vectors
+                    const scores = withPos.map(q => withPos.map(k => q.reduce((a, v, j) => a + v * k[j], 0) / Math.sqrt(D)));
+                    const attn = scores.map(row => {
+                        const mx = Math.max(...row);
+                        const ex = row.map(v => Math.exp(v - mx));
+                        const s = ex.reduce((a, b) => a + b, 0);
+                        return ex.map(v => v / s);
+                    });
+                    body = `
+                        <div class="overflow-x-auto"><div style="display:grid; grid-template-columns: 70px repeat(${n}, minmax(42px,1fr)); gap:3px; min-width:${70 + n * 46}px">
+                            <div></div>
+                            ${tokens.map(t => `<div class="mono-font text-[9px] opacity-60 text-center pb-1">${t}</div>`).join('')}
+                            ${attn.map((row, i) => `
+                                <div class="mono-font text-[9px] opacity-60 flex items-center justify-end pr-2">${tokens[i]}</div>
+                                ${row.map(v => `<div class="att-cell" style="background: rgba(74,222,128,${(0.08 + v * 0.85).toFixed(3)})">${v.toFixed(2)}</div>`).join('')}
+                            `).join('')}
+                        </div></div>
+                        <p class="text-xs opacity-60 mt-4">Each <strong>row</strong> sums to 1: that is where one token spread its attention. Computed with softmax(QK&#7488;/&radic;d) from the vectors in stage 5.</p>`;
+                }
+                else if (stage === 6) {
+                    shape = `[${n} \u00d7 ${D}] \u00d7 N layers`;
+                    body = `<div class="flex flex-col gap-2">
+                        ${[1,2,3].map(l => `
+                            <div class="token-item">
+                                <span class="mono-font text-xs">Layer ${l}</span>
+                                <span class="mono-font text-[10px] opacity-60">attention &rarr; add &amp; norm &rarr; feed-forward &rarr; add &amp; norm</span>
+                                <span class="shape-tag">[${n} \u00d7 ${D}]</span>
+                            </div>`).join('')}
+                        <div class="text-center opacity-40 py-2 mono-font text-lg">&vellip;</div>
+                        <div class="token-item">
+                            <span class="mono-font text-xs">Layer N</span>
+                            <span class="mono-font text-[10px] opacity-60">GPT-3 uses 96 of these</span>
+                            <span class="shape-tag">[${n} \u00d7 ${D}]</span>
+                        </div>
+                    </div>
+                    <p class="text-xs opacity-60 mt-4">The shape is unchanged at every layer. What changes is <em>what the vectors mean</em>: early layers encode syntax, deep layers encode semantics.</p>`;
+                }
+                else {
+                    shape = `[vocab]`;
+                    const last = withPos[n - 1];
+                    const cands = ['down', 'there', 'quietly', 'and', 'today', 'still'];
+                    const logits = cands.map((w, i) => {
+                        const e = embed(w, D);
+                        return { w, z: last.reduce((a, v, j) => a + v * e[j], 0) / Math.sqrt(D) + (2 - i * 0.35) };
+                    });
+                    const mx = Math.max(...logits.map(l => l.z));
+                    const ex = logits.map(l => Math.exp(l.z - mx));
+                    const sm = ex.reduce((a, b) => a + b, 0);
+                    logits.forEach((l, i) => l.p = ex[i] / sm);
+                    logits.sort((a, b) => b.p - a.p);
+                    body = `
+                        <p class="text-xs opacity-70 mb-4">Only the <strong>last</strong> position's vector is projected onto the vocabulary. Every other position is discarded for this prediction.</p>
+                        ${logits.map(l => `
+                            <div class="token-item">
+                                <div class="flex-1">
+                                    <div class="flex justify-between items-baseline mb-1">
+                                        <span class="mono-font text-sm font-bold">${l.w}</span>
+                                        <span class="mono-font text-xs" style="color: var(--accent-primary)">${(l.p * 100).toFixed(1)}%</span>
+                                    </div>
+                                    <div style="height:4px;background:var(--stat-bg);border-radius:2px"><div class="prob-bar" style="width:${(l.p * 100).toFixed(1)}%"></div></div>
+                                </div>
+                            </div>`).join('')}
+                        <p class="text-xs opacity-60 mt-4">The winner is appended to the input, and the whole pipeline runs again from stage 1 for the next word.</p>`;
+                }
+
+                document.getElementById('shapeTag').textContent = shape;
+                document.getElementById('statShape').textContent = shape;
+                stageBody.innerHTML = body;
             }
 
-            encodeBtn.addEventListener('click', processEncoding);
-            scrollSlider.addEventListener('input', (e) => { vectorDisplay.scrollTop = e.target.value; });
-            vectorDisplay.addEventListener('scroll', () => { scrollSlider.value = vectorDisplay.scrollTop; });
+            document.querySelectorAll('.stage-btn').forEach(b => b.addEventListener('click', () => { stage = +b.dataset.s; render(); }));
+            document.getElementById('nextBtn').addEventListener('click', () => { stage = Math.min(7, stage + 1); render(); });
+            document.getElementById('prevBtn').addEventListener('click', () => { stage = Math.max(0, stage - 1); render(); });
+            textInput.addEventListener('input', render);
+            dSlider.addEventListener('input', e => { document.getElementById('dVal').textContent = e.target.value; render(); });
 
-            resetBtn.addEventListener('click', () => {
-                textInput.value = 'machine learning is fascinating\ndeep learning is machine learning';
-                processEncoding();
-            });
-
-            processEncoding();
+            render();
         });
-    
+
         // ===== DROPDOWN SEARCH FUNCTIONALITY =====
         const allCourses = [
             { title: "Calculating Parameters in CNN", path: "computer_vision/calculating_parameters_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
@@ -811,22 +863,18 @@ function oneHotEncode(corpus):
             { title: "Word Cloud Generator", path: "natural_language_processing/word_cloud.html", category: "natural_language_processing", icon: "fa-comments" }
         ];
 
-        function toRelativePath(fromPath, targetPath) {
-            const fromParts = fromPath.split('/').filter(Boolean);
-            const targetParts = targetPath.split('/').filter(Boolean);
-            let shared = 0;
-            while (shared < Math.min(fromParts.length, targetParts.length) && fromParts[shared] === targetParts[shared]) {
-                shared++;
-            }
-            const up = '../'.repeat(Math.max(0, fromParts.length - shared));
-            const down = targetParts.slice(shared).join('/');
-            return `${up}${down}`;
+        function toRelativePath(fromDir, targetPath) {
+            const fromParts = fromDir.split('/').filter(Boolean);
+            const toParts = targetPath.split('/').filter(Boolean);
+            let i = 0;
+            while (i < fromParts.length && i < toParts.length && fromParts[i] === toParts[i]) i++;
+            const ups = fromParts.length - i;
+            return '../'.repeat(ups) + toParts.slice(i).join('/');
         }
 
-        const currentPath = window.location.pathname.replace(/\/+$/g, '').replace(/index\.html$/, '');
-        const currentDir = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/')) : '';
-        const resolvedCourses = allCourses.map((course) => {
-            const normalizedTarget = course.path.replace(/^\.\//, '');
+        const currentDir = window.location.pathname.split('/').slice(0, -1).filter(Boolean).slice(-1)[0] || '';
+        const resolvedCourses = allCourses.map(course => {
+            const normalizedTarget = course.path;
             const relativePath = currentDir ? toRelativePath(currentDir, normalizedTarget) : normalizedTarget;
             return { ...course, path: relativePath };
         });
@@ -837,19 +885,17 @@ function oneHotEncode(corpus):
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value.toLowerCase().trim();
-                
+
                 if (query.length === 0) {
                     dropdown.classList.remove('show');
                     return;
                 }
 
-                // Filter courses
-                const filtered = resolvedCourses.filter(course => 
-                    course.title.toLowerCase().includes(query) || 
+                const filtered = resolvedCourses.filter(course =>
+                    course.title.toLowerCase().includes(query) ||
                     course.category.toLowerCase().includes(query)
                 );
 
-                // Render results
                 if (filtered.length === 0) {
                     dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
                 } else {
@@ -870,21 +916,13 @@ function oneHotEncode(corpus):
                 dropdown.classList.add('show');
             });
 
-            // Close dropdown when clicking outside
             document.addEventListener('click', (e) => {
-                if (!searchInput.parentElement.contains(e.target)) {
-                    dropdown.classList.remove('show');
-                }
+                if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show');
             });
-
-            // Close dropdown on Escape key
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    dropdown.classList.remove('show');
-                }
+                if (e.key === 'Escape') dropdown.classList.remove('show');
             });
         }
-
     </script>
 </body>
 </html>

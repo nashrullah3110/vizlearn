@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VizLearn - Grayscale Image Processing</title>
-    <meta name="description" content="Learn Grayscale Image Processing with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn.">
-    <meta name="keywords" content="Grayscale Image Processing, interactive learning, beginner tutorial, vizlearn">
+    <title>VizLearn - Knowledge Distillation in LLMs</title>
+    <meta name="description" content="Interactive knowledge distillation lab - soften teacher logits with temperature, compare hard labels to soft targets, and watch KL divergence guide a student model.">
+    <meta name="keywords" content="knowledge distillation, teacher student, soft targets, dark knowledge, temperature, KL divergence, DistilBERT, vizlearn, gen ai">
     <meta name="robots" content="index, follow">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -26,6 +26,7 @@
                     animation: {
                         'grid-flow': 'grid-move 40s linear infinite',
                         'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'cursor-blink': 'blink 1s infinite'
                     },
                     keyframes: {
                         'grid-move': {
@@ -35,6 +36,10 @@
                         fadeIn: {
                             '0%': { opacity: '0', transform: 'translateY(10px)' },
                             '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        blink: {
+                            '0%, 50%': { opacity: '1' },
+                            '51%, 100%': { opacity: '0' }
                         }
                     }
                 }
@@ -43,75 +48,59 @@
     </script>
     <script>
         (function(){
-            const apply = (t)=>{
-                if(t==='light') document.body.classList.add('light-mode');
-                else document.body.classList.remove('light-mode');
-            };
             const t = localStorage.getItem('theme') || 'dark';
-            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+            const apply = () => { if (t === 'light') document.body.classList.add('light-mode'); };
+            if (document.body) apply(); else document.addEventListener('DOMContentLoaded', apply);
         })();
     </script>
     <style>
         :root {
-            /* DARK MODE (Default) */
             --bg-body: #050505;
             --bg-surface: #0a0a0a;
             --bg-glass: rgba(10, 10, 10, 0.85);
-            
-            --border-subtle: rgba(74, 222, 128, 0.15); 
-            --border-glow: rgba(74, 222, 128, 0.5);
-
-            --accent-primary: #4ade80; /* Neon Green */
+            --border-subtle: rgba(74, 222, 128, 0.15);
+            --accent-primary: #4ade80;
             --accent-glow: rgba(74, 222, 128, 0.25);
-            
             --text-main: #f0fdf4;
             --text-muted: #86efac;
-            
             --card-bg: #0a0a0a;
             --input-bg: rgba(74, 222, 128, 0.03);
             --input-focus-bg: rgba(74, 222, 128, 0.08);
-
+            --display-bg: rgba(0, 0, 0, 0.4);
             --grid-color: rgba(74, 222, 128, 0.05);
             --vignette-color: #050505;
+            --stat-bg: rgba(0, 0, 0, 0.2);
+            --stat-border: rgba(255, 255, 255, 0.05);
         }
 
-        /* LIGHT MODE OVERRIDES */
         body.light-mode {
             --bg-body: #f0fdf4;
             --bg-surface: #ffffff;
-            --bg-glass: rgba(255, 255, 255, 0.85);
-
-            --border-subtle: rgba(22, 163, 74, 0.15);
-            --border-glow: rgba(22, 163, 74, 0.4);
-
+            --bg-glass: rgba(255, 255, 255, 0.95);
+            --border-subtle: rgba(22, 163, 74, 0.2);
             --accent-primary: #15803d;
-            --accent-glow: rgba(21, 128, 61, 0.2);
-
-            --text-main: #052e16;
-            --text-muted: #4b5563;
-
+            --accent-glow: rgba(21, 128, 61, 0.15);
+            --text-main: #111827;
+            --text-muted: #374151;
             --card-bg: #ffffff;
-            --input-bg: rgba(22, 163, 74, 0.04);
-            --input-focus-bg: rgba(22, 163, 74, 0.08);
-
-            --grid-color: rgba(22, 163, 74, 0.04);
+            --input-bg: rgba(0, 0, 0, 0.04);
+            --input-focus-bg: rgba(0, 0, 0, 0.06);
+            --display-bg: rgba(0, 0, 0, 0.03);
+            --grid-color: rgba(0, 0, 0, 0.05);
             --vignette-color: transparent;
+            --stat-bg: #f9fafb;
+            --stat-border: #e5e7eb;
         }
 
-        /* Global Smooth Transition */
         *, *::before, *::after {
-            transition-property: background-color, border-color, color, box-shadow;
-            transition-duration: 300ms;
-            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition: background-color 300ms, border-color 300ms, color 300ms, box-shadow 300ms;
         }
 
         body {
             font-family: 'Inter', sans-serif;
             background-color: var(--bg-body);
             color: var(--text-main);
-            
-            /* Animated Grid Background */
-            background-image: 
+            background-image:
                 radial-gradient(circle at 50% 50%, transparent 0%, var(--vignette-color) 90%),
                 linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
                 linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
@@ -119,161 +108,171 @@
             animation: grid-move 40s linear infinite;
         }
 
-        h1, h2, h3, .brand-font {
-            font-family: 'Space Grotesk', sans-serif;
-            letter-spacing: -0.02em;
-        }
+        h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        .mono-font { font-family: 'JetBrains Mono', monospace; }
 
-        .mono-font {
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        /* Glassmorphism Header */
         .glass-header {
             background-color: var(--bg-glass);
             backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border-subtle);
         }
 
-        /* Futuristic Card */
         .glass-card {
             border: 1px solid var(--border-subtle);
             background: var(--card-bg);
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
+        .glass-card:hover { border-color: var(--accent-primary); }
 
-        .glass-card:hover {
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 20px var(--accent-glow);
+        .card-container {
+            border: 1px solid var(--border-subtle);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
         }
-
-        /* Function Buttons */
-        .func-btn {
-            width: 100%;
-            text-align: left;
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            font-family: 'Space Grotesk', sans-serif;
-            font-weight: 500;
-            color: var(--text-muted);
-            transition: all 0.2s ease;
-            border: 1px solid transparent;
-            background: transparent;
-        }
-
-        .func-btn:hover {
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
             background: var(--input-bg);
-            color: var(--accent-primary);
-            padding-left: 1.25rem; /* Slide effect */
+            color: var(--text-main);
         }
 
-        .func-btn:active {
-            transform: scale(0.98);
-        }
-
-        /* Inputs and Controls */
-        .custom-input {
+        .custom-textarea {
             background: var(--input-bg);
             border: 1px solid var(--border-subtle);
             color: var(--text-main);
-            font-family: 'JetBrains Mono', monospace;
-        }
-        
-        /* Slider Styling */
-        input[type=range] {
-            -webkit-appearance: none; 
-            background: transparent; 
-        }
-
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 16px;
-            width: 16px;
-            border-radius: 50%;
-            background: var(--accent-primary);
-            cursor: pointer;
-            margin-top: -6px; 
-            box-shadow: 0 0 10px var(--accent-glow);
-        }
-
-        input[type=range]::-webkit-slider-runnable-track {
+            border-radius: 12px;
+            padding: 1rem;
             width: 100%;
-            height: 4px;
-            cursor: pointer;
-            background: var(--border-subtle);
-            border-radius: 2px;
+            outline: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            transition: border-color 0.2s;
         }
+        .custom-textarea:focus { border-color: var(--accent-primary); }
 
         .action-btn {
+            background: rgba(21, 128, 61, 0.1);
+            border: 1px solid rgba(21, 128, 61, 0.2);
+            color: var(--accent-primary);
             font-family: 'Space Grotesk', sans-serif;
             font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            padding: 0.75rem;
+            border-radius: 8px;
             transition: all 0.2s;
-            position: relative;
-            overflow: hidden;
-            border: 1px solid transparent;
-        }
-        
-        .action-btn::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
-            transform: translateX(-100%);
-            transition: 0.3s;
-        }
-        
-        .action-btn:hover::after {
-            transform: translateX(100%);
-        }
-
-        /* Toggle Button */
-        .theme-toggle {
-            background: var(--input-bg);
-            border: 1px solid var(--border-subtle);
-            color: var(--text-muted);
-        }
-        .theme-toggle:hover {
-            color: var(--accent-primary);
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 10px var(--accent-glow);
-        }
-
-        /* Canvas & Matrix Specifics */
-        #drawingCanvas {
-            image-rendering: pixelated;
-            touch-action: none;
-            aspect-ratio: 1;
-            box-shadow: 0 0 20px rgba(0,0,0,0.3);
-        }
-        
-        #matrix-display {
-            display: grid;
-            grid-template-columns: repeat(28, 1fr); /* Force equal columns */
-            gap: 1px;
-            line-height: 1;
-            font-size: 10px; /* Slightly larger fixed size */
-            font-family: 'JetBrains Mono', monospace;
-            width: fit-content; /* Shrink to fit cells */
-            min-width: 600px; /* Ensure enough width for 3-digit numbers */
-            margin: 0 auto;
-        }
-        
-        #matrix-display > div {
-            aspect-ratio: 1 / 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background-color 0.1s, color 0.1s;
-            border-radius: 1px;
-            overflow: hidden; /* Prevent 3 digit numbers from breaking layout */
+            gap: 0.5rem;
+            width: 100%;
+            cursor: pointer;
         }
-    
+        .action-btn:hover:not(:disabled) { background: var(--accent-glow); }
+        .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .stat-box {
+            background: var(--stat-bg);
+            border: 1px solid var(--stat-border);
+            padding: 1rem;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .token-item {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 0.85rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.6rem;
+            transition: all 0.2s;
+        }
+        .token-item:hover { background: var(--bg-glass); border-color: var(--accent-primary); }
+        .token-item.selected {
+            border-color: var(--accent-primary);
+            background: var(--accent-glow);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .prob-bar {
+            height: 4px;
+            border-radius: 2px;
+            background: var(--accent-primary);
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px; width: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 6px;
+            background: var(--border-subtle);
+            border-radius: 3px;
+        }
+
+        .scroll-container::-webkit-scrollbar { display: none; }
+
+        .display-box {
+            background: var(--display-bg);
+            border-radius: 12px;
+            padding: 1.25rem;
+            min-height: 100px;
+            overflow-y: auto;
+            line-height: 1.8;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+        }
+
+        select.custom-select {
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            padding: 0.5rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            width: 100%;
+            outline: none;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid var(--border-subtle);
+            background: var(--input-bg);
+            border-radius: 8px;
+            padding: 5px 10px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.2s ease;
+        }
+        .chip.on {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--accent-glow);
+        }
+
+
+        .dist-row { display: grid; grid-template-columns: 92px 1fr 56px; align-items: center; gap: 10px; margin-bottom: 9px; }
+        .dist-bar { height: 20px; border-radius: 5px; background: var(--stat-bg); overflow: hidden; }
+        .dist-fill { height: 100%; border-radius: 5px; transition: width 0.45s cubic-bezier(0.4,0,0.2,1); }
+        .badge { font-family: 'JetBrains Mono', monospace; font-size: 9px; padding: 2px 7px; border-radius: 5px; border: 1px solid var(--border-subtle); }
+
+
         /* Search Input Wrapper */
         .search-input-wrapper {
             background: var(--input-bg);
@@ -285,24 +284,14 @@
             border-color: var(--accent-primary);
             box-shadow: 0 0 15px var(--accent-glow);
         }
-        .search-input-wrapper input {
-            color: var(--text-main);
-        }
-        .search-input-wrapper input::placeholder {
-            color: var(--text-muted);
-            opacity: 0.7;
-        }
-        .search-input-wrapper i {
-            color: var(--accent-primary);
-            opacity: 0.7;
-        }
+        .search-input-wrapper input { color: var(--text-main); }
+        .search-input-wrapper input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        .search-input-wrapper i { color: var(--accent-primary); opacity: 0.7; }
 
         /* Dropdown Search */
         .search-dropdown {
             position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
+            top: 100%; left: 0; right: 0;
             background: var(--card-bg);
             border: 1px solid var(--border-subtle);
             border-top: none;
@@ -313,23 +302,11 @@
             display: none;
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
         }
-
-        .search-dropdown.show {
-            display: block;
-            animation: slideDown 0.2s ease-out;
-        }
-
+        .search-dropdown.show { display: block; animation: slideDown 0.2s ease-out; }
         @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-
         .search-dropdown-item {
             padding: 12px 16px;
             border-bottom: 1px solid var(--border-subtle);
@@ -341,40 +318,12 @@
             color: inherit;
             text-decoration: none;
         }
-
-        .search-dropdown-item:last-child {
-            border-bottom: none;
-        }
-
-        .search-dropdown-item:hover {
-            background: var(--input-focus-bg);
-            padding-left: 20px;
-        }
-
-        .dropdown-item-title {
-            font-weight: 500;
-            color: var(--text-main);
-        }
-
-        .dropdown-item-path {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-left: 12px;
-        }
-
-        .dropdown-item-icon {
-            color: var(--accent-primary);
-            margin-right: 8px;
-            font-size: 0.875rem;
-        }
-
-        .dropdown-no-results {
-            padding: 20px 16px;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 0.875rem;
-        }
-
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: var(--input-focus-bg); padding-left: 20px; }
+        .dropdown-item-title { font-weight: 500; color: var(--text-main); }
+        .dropdown-item-path { font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; }
+        .dropdown-item-icon { color: var(--accent-primary); margin-right: 8px; font-size: 0.875rem; }
+        .dropdown-no-results { padding: 20px 16px; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
     </style>
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
@@ -382,10 +331,8 @@
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-
         gtag('config', 'G-ZT6JM33V5J');
     </script>
-
 </head>
 <body class="flex flex-col min-h-screen overflow-x-hidden">
 
@@ -393,29 +340,21 @@
     <header class="glass-header sticky top-0 z-50">
         <div class="flex justify-center py-3 px-4 md:px-8">
             <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-4">
-                <!-- Logo -->
                 <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
                     <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
                     <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
                 </a>
-                
-                <!-- Search -->
+
                 <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
                     <i class="fas fa-search text-sm"></i>
                     <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
-                    <div id="searchDropdown" class="search-dropdown">
-                        <!-- Results will be populated here -->
-                    </div>
+                    <div id="searchDropdown" class="search-dropdown"></div>
                 </div>
 
-                <!-- Theme Toggle + Back Button -->
                 <div class="flex items-center gap-3">
-                    <!-- Back to Hub Button -->
                     <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)">
                         <i class="fas fa-arrow-left text-xs"></i>
                     </a>
-                    
-                    <!-- Theme Toggle -->
                     <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
                         <i class="fas fa-sun hidden dark-icon"></i>
                         <i class="fas fa-moon hidden light-icon"></i>
@@ -425,159 +364,167 @@
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto flex flex-col">
-        
-        <!-- Breadcrumb / Title -->
+
         <div class="mb-8 animate-fade-in">
             <div class="flex items-center gap-2 text-xs mono-font mb-2" style="color: var(--text-muted)">
                 <span class="opacity-50">Modules</span>
                 <span>/</span>
-                <span class="opacity-50">Computer Vision</span>
+                <span class="opacity-50">Gen AI</span>
                 <span>/</span>
-                <span style="color: var(--accent-primary)">Grayscale Processing</span>
+                <span style="color: var(--accent-primary)">Distillation Lab</span>
             </div>
-            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Grayscale Logic</h1>
+            <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Knowledge Distillation in LLMs</h1>
             <p class="mt-2 text-sm max-w-2xl" style="color: var(--text-muted)">
-                Draw on the canvas to understand how images are represented as matrices and apply basic filters.
+                Train a small student to imitate a large teacher. Raise the temperature to expose the <em>dark knowledge</em> hidden in the teacher's wrong answers &mdash; the signal a plain label can never carry.
             </p>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full flex-1">
-            
-            <!-- Controls Sidebar -->
-            <aside class="lg:col-span-4 space-y-6 animate-fade-in" style="animation-delay: 0.1s">
-                
-                <!-- Canvas Area -->
-                <div class="glass-card p-6 flex flex-col items-center">
-                    <h2 class="text-xs font-bold uppercase tracking-widest mb-4 opacity-70 mono-font w-full" style="color: var(--text-muted)">Input Image (28x28)</h2>
-                    
-                    <canvas id="drawingCanvas" class="w-full max-w-[280px] rounded-lg bg-black border border-gray-700 mb-4"></canvas>
-                    
-                    <button id="clearBtn" class="action-btn w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors">
-                        <i class="fas fa-trash mr-2"></i>Clear Canvas
-                    </button>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <aside class="lg:col-span-5 flex flex-col gap-6 animate-fade-in" style="animation-delay: 0.1s">
+                <div class="glass-card p-6 flex flex-col gap-4">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">1. Training Example</h2>
+                    <select id="exSel" class="custom-select">
+                        <option value="0">Image: a dog photo</option>
+                        <option value="1">Next token: "The cat sat on the ___"</option>
+                        <option value="2">Sentiment: "not bad at all"</option>
+                    </select>
+                    <div class="display-box text-xs" style="min-height:auto;padding:0.85rem 1rem">
+                        <span class="opacity-60">true label:</span>
+                        <span id="trueLbl" style="color: var(--accent-primary); font-weight:700"></span>
+                    </div>
                 </div>
 
-                <!-- Filters -->
-                <div class="glass-card p-4">
-                    <h2 class="text-xs font-bold uppercase tracking-widest mb-4 opacity-70 mono-font" style="color: var(--text-muted)">Filters</h2>
-                    <div class="space-y-2">
-                        <button id="invertBtn" class="func-btn"><i class="fas fa-adjust mr-2 opacity-50 text-xs"></i> Invert Colors</button>
-                        <button id="blurBtn" class="func-btn"><i class="fas fa-blur mr-2 opacity-50 text-xs"></i> Gaussian Blur</button>
-                        <button id="edgeBtn" class="func-btn"><i class="fas fa-border-style mr-2 opacity-50 text-xs"></i> Edge Detection</button>
-                    </div>
-
-                    <!-- Threshold Control -->
-                    <div class="mt-6 pt-4 border-t border-dashed" style="border-color: var(--border-subtle)">
+                <div class="glass-card p-6 flex flex-col gap-5">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">2. Distillation Controls</h2>
+                    <div>
                         <div class="flex justify-between items-center mb-2">
-                            <label for="thresholdSlider" class="text-xs font-bold uppercase tracking-wider opacity-80" style="color: var(--text-main)">Threshold</label>
-                            <span id="thresholdValue" class="mono-font text-sm font-bold" style="color: var(--accent-primary)">128</span>
+                            <span class="text-[10px] uppercase font-bold opacity-60">Temperature (T)</span>
+                            <span id="tVal" class="text-xs font-bold" style="color: var(--accent-primary)">1.0</span>
                         </div>
-                        <input id="thresholdSlider" type="range" min="0" max="255" value="128" class="w-full mb-3">
-                        
-                        <button id="applyThresholdBtn" class="action-btn w-full py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2" style="background: var(--input-bg); color: var(--text-main); border-color: var(--border-subtle)">
-                            Apply Threshold
-                        </button>
+                        <input type="range" id="tSlider" min="1" max="10" step="0.5" value="1">
+                        <div class="flex justify-between text-[9px] opacity-50 mono-font mt-1"><span>1 = raw</span><span>10 = very soft</span></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[10px] uppercase font-bold opacity-60">Loss mix (&alpha;)</span>
+                            <span id="aVal" class="text-xs font-bold" style="color: var(--accent-primary)">0.5</span>
+                        </div>
+                        <input type="range" id="aSlider" min="0" max="1" step="0.05" value="0.5">
+                        <div class="flex justify-between text-[9px] opacity-50 mono-font mt-1"><span>hard labels only</span><span>teacher only</span></div>
+                    </div>
+                    <button id="stepBtn" class="action-btn"><i class="fas fa-graduation-cap"></i> Train student one step</button>
+                    <button id="resetBtn" class="action-btn" style="background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.2); color: #ef4444"><i class="fas fa-undo"></i> Reset student</button>
+                </div>
+
+                <div class="glass-card p-6">
+                    <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60 mb-4">Training Signal</h2>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">KL(teacher&Vert;student)</span><span id="mKl" class="text-lg font-bold" style="color: var(--accent-primary)">0</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Hard-label CE</span><span id="mCe" class="text-lg font-bold">0</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Teacher entropy</span><span id="mEnt" class="text-lg font-bold">0</span></div>
+                        <div class="stat-box text-center"><span class="text-[9px] uppercase font-bold opacity-50">Steps trained</span><span id="mSteps" class="text-lg font-bold">0</span></div>
                     </div>
                 </div>
             </aside>
 
-            <!-- Visualization Area -->
-            <section class="lg:col-span-8 h-full min-h-[500px] animate-fade-in" style="animation-delay: 0.2s">
-                <div class="glass-card h-full w-full flex flex-col p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-xs font-bold uppercase tracking-widest opacity-70 mono-font" style="color: var(--text-muted)">Pixel Matrix Values</h2>
-                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-green-500/10 text-green-500 border border-green-500/20 mono-font">LIVE DATA</span>
+            <section class="lg:col-span-7 flex flex-col gap-6 animate-fade-in" style="animation-delay: 0.2s">
+                <div class="glass-card p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">Teacher &mdash; softened at T</h2>
+                        <span class="badge" style="color:#38bdf8;border-color:#38bdf8">LARGE MODEL</span>
                     </div>
+                    <div id="teacherDist"></div>
+                    <div class="mt-4 p-3 rounded-lg text-[11px] leading-relaxed" id="darkNote" style="background: var(--input-bg); border: 1px solid var(--border-subtle)"></div>
+                </div>
 
-                    <!-- Matrix Display -->
-                    <div class="flex-grow overflow-auto bg-black/20 rounded-lg p-4 border border-dashed" style="border-color: var(--border-subtle)">
-                        <div id="matrix-display">
-                            <!-- Matrix cells generated by JS -->
-                        </div>
+                <div class="glass-card p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">Hard label (one-hot)</h2>
+                        <span class="badge opacity-60">WHAT A NORMAL DATASET GIVES YOU</span>
                     </div>
+                    <div id="hardDist"></div>
+                </div>
+
+                <div class="glass-card p-6 flex-1">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-[10px] uppercase font-bold tracking-widest opacity-60">Student &mdash; current beliefs</h2>
+                        <span class="badge" style="color: var(--accent-primary); border-color: var(--accent-primary)">SMALL MODEL</span>
+                    </div>
+                    <div id="studentDist"></div>
                 </div>
             </section>
-
         </div>
     </main>
 
-    <!-- Footer -->
-
     <!-- auto-article-vizlearn -->
-    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full">
-        <div class="glass-card animate-fade-in" style="animation-delay: 0.3s;">
-            <div class="p-6 border-b" style="border-color: var(--border-subtle);">
-                <h2 class="font-bold text-xl md:text-2xl brand-font" style="color: var(--text-main)">Deconstructing Grayscale Images</h2>
-                <p class="mt-2 text-sm" style="color: var(--text-muted)">From visual drawings to numerical matrices—the foundation of computer vision.</p>
+    <section class="px-4 md:px-8 pb-8 max-w-7xl mx-auto w-full animate-fade-in" style="animation-delay: 200ms;">
+        <div class="card-container">
+            <div class="card-header">
+                <h2 class="text-xl md:text-2xl font-bold flex items-center gap-3">
+                    <i class="fas fa-graduation-cap" style="color: var(--accent-primary);"></i>
+                    Knowledge Distillation: Teaching a Small Model to Think Big
+                </h2>
             </div>
-            <div class="p-6 md:p-8 space-y-8 text-sm md:text-base leading-relaxed" style="color: var(--text-main)">
-                
-                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
-                    <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-bullseye"></i>Quick Context</h3>
-                    <p class="opacity-90">At its core, a digital grayscale image is nothing more than a grid of numbers—a <strong>matrix</strong>. Each number, called a <strong>pixel</strong>, represents the brightness at that specific point, typically ranging from <strong>0 (black)</strong> to <strong>255 (white)</strong>. This interactive bridges the gap between the visual image you draw and the underlying numerical data that a computer actually "sees" and manipulates.</p>
+            <div class="p-6 md:p-8 space-y-8 text-base leading-relaxed" style="color: var(--text-main);">
+
+                <p class="text-lg">
+                    A large model is accurate but expensive. A small model is cheap but weaker. <strong>Knowledge distillation</strong> narrows that gap by training the small <em>student</em> to imitate the large <em>teacher</em> &mdash; and remarkably, the student often beats an identical model trained on the original labels.
+                </p>
+
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg)">
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-gem"></i>Dark Knowledge: The Central Idea</h3>
+                    <p>A training label says "this is a dog" and nothing else. But a trained teacher, shown that same photo, might output <span class="mono-font">dog 0.90, wolf 0.07, cat 0.02, car 0.001</span>.</p>
+                    <p class="mt-2">Those small numbers are not noise &mdash; they encode <strong>similarity structure</strong> the label cannot express: a dog resembles a wolf far more than a car. Geoffrey Hinton named this <em>dark knowledge</em>. It is the teacher's entire learned view of how the classes relate, and it is free supervision on every single example.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg md:text-xl font-bold mb-3 brand-font flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-lightbulb"></i>The Core Idea: Images as Data</h3>
-                    <p class="mb-4 opacity-90">The most fundamental concept in all of computer vision is that images are just data. Every operation, from a simple filter to a complex neural network, is a mathematical function performed on this matrix of pixel values. By understanding this relationship, you unlock the ability to understand how image processing algorithms work.</p>
-                    <p class="opacity-90">As you draw on the canvas, you are directly changing the numbers in the matrix on the right. A bright stroke sets pixel values to 255, while the empty canvas is all zeros. Every filter you apply is just a rule that transforms these numbers.</p>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-temperature-high"></i>Why Temperature Is Essential</h3>
+                    <p>There is a catch: a confident teacher's non-target probabilities are so tiny that they contribute almost nothing to the gradient. At <span class="mono-font">T = 1</span> the distribution is nearly one-hot, so the student learns roughly what the plain label already told it.</p>
+                    <p class="mt-2">Raising the temperature in the softmax flattens the distribution and <em>amplifies the ratios between the small values</em>:</p>
+                    <p class="my-3 text-center mono-font text-sm">p&#7522; = exp(z&#7522; / T) / &Sigma;&#11002; exp(z&#11002; / T)</p>
+                    <p>Drag T from 1 to 6 and watch the runner-up bars rise out of nothing. That is the dark knowledge becoming visible &mdash; and becoming trainable. Both teacher and student are softened by the same T, and the distillation loss is scaled by <span class="mono-font">T&sup2;</span> to keep gradient magnitudes comparable to the hard-label term.</p>
                 </div>
 
                 <div>
-                    <h3 class="text-lg md:text-xl font-bold mb-3 brand-font flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-vial"></i>Guided Experiments with This Interactive</h3>
-                    <ol class="list-decimal pl-6 space-y-4">
-                        <li>
-                            <strong>Draw and Observe:</strong>
-                            <p class="font-light opacity-80 mt-1">Draw a simple diagonal line on the canvas. Watch the corresponding cells in the matrix light up with values like 255, 120, and 80. Notice how the "brush" has a soft edge, creating intermediate gray values, not just pure white.</p>
-                        </li>
-                        <li>
-                            <strong>Invert Colors:</strong>
-                            <p class="font-light opacity-80 mt-1">Click the <strong>Invert Colors</strong> button. Observe the matrix. Every pixel value `p` has been replaced by `255 - p`. The black background (0) becomes white (255), and your white drawing (255) becomes black (0). This is a simple but powerful pixel-wise operation.</p>
-                        </li>
-                        <li>
-                            <strong>Apply Threshold:</strong>
-                            <p class="font-light opacity-80 mt-1">Draw a shape and then click <strong>Apply Threshold</strong> with the slider at 128. All pixels with a value greater than 128 become pure white (255), and all others become pure black (0). This is called <strong>binarization</strong>, and it's a common step to simplify an image and isolate objects of interest.</p>
-                        </li>
-                        <li>
-                            <strong>Gaussian Blur:</strong>
-                            <p class="font-light opacity-80 mt-1">Clear the canvas and draw a single, sharp dot. Now click <strong>Gaussian Blur</strong>. Look at the matrix. The single high-value pixel has been "spread out" to its neighbors, creating a smooth gradient. This is achieved by averaging each pixel with its surrounding pixels, which is essential for reducing noise in images.</p>
-                        </li>
-                         <li>
-                            <strong>Edge Detection:</strong>
-                            <p class="font-light opacity-80 mt-1">Draw a solid square. Click <strong>Edge Detection</strong>. Notice that only the borders of your square remain as bright pixels in the matrix. The solid interior becomes black (0). This filter calculates the difference between neighboring pixels; where the difference is large (at an edge), the output value is high.</p>
-                        </li>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-scale-balanced"></i>The Combined Loss</h3>
+                    <p>In practice the student learns from both sources at once:</p>
+                    <p class="my-3 text-center mono-font text-sm">L = (1 &minus; &alpha;) &middot; CE(student, true label) &nbsp; + &nbsp; &alpha; &middot; T&sup2; &middot; KL(teacher&#8202;&Vert;&#8202;student)</p>
+                    <ul class="list-disc pl-6 mt-3 space-y-2">
+                        <li>The <strong>cross-entropy</strong> term keeps the student anchored to ground truth, so it cannot inherit the teacher's mistakes wholesale.</li>
+                        <li>The <strong>KL divergence</strong> term pulls the student's whole distribution toward the teacher's, transferring the similarity structure.</li>
+                        <li><strong>&alpha;</strong> balances them. Typical values lean toward the teacher, since the soft targets carry strictly more information per example.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-industry"></i>Why It Matters for LLMs</h3>
+                    <p>Distillation is how most small production models are made. DistilBERT keeps roughly 97% of BERT's performance at 40% of the size and 60% faster inference. The same recipe produced the compact members of most modern model families.</p>
+                    <p class="mt-2">For generative models the idea extends naturally: the teacher's full next-token distribution at every position is a far richer target than the single token that happened to appear in the text. A related variant, <em>sequence-level</em> distillation, simply trains the student on text the teacher generated.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-flask"></i>Interactive Exploration Guide</h3>
+                    <ol class="list-decimal pl-6 mt-4 space-y-3">
+                        <li><strong>Look at T = 1.</strong> The teacher is nearly one-hot and looks almost identical to the hard label &mdash; barely any extra signal.</li>
+                        <li><strong>Raise T to 5.</strong> The runner-ups emerge. Note <em>which</em> ones rise: semantically related classes, never random ones. That ordering is the knowledge being transferred.</li>
+                        <li><strong>Press "Train student" repeatedly</strong> and watch KL divergence fall as the student's bars converge on the teacher's shape &mdash; including the small ones.</li>
+                        <li><strong>Set &alpha; = 0 and retrain from reset.</strong> The student matches only the one-hot label; its non-target probabilities collapse and the similarity structure is lost.</li>
+                        <li><strong>Try the sentiment example.</strong> "not bad at all" is genuinely ambiguous, so the teacher stays uncertain even at T = 1 &mdash; and that calibrated uncertainty is itself worth teaching.</li>
                     </ol>
                 </div>
 
-                <div class="grid md:grid-cols-2 gap-6">
-                    <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
-                        <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas fa-exclamation-triangle"></i>Common Pitfalls</h3>
-                        <ul class="list-disc pl-5 space-y-2 mt-3 opacity-90">
-                            <li><strong>Thinking Visually, Not Numerically:</strong> Always try to connect the visual effect of a filter back to the mathematical operation happening on the pixel values.</li>
-                            <li><strong>Order of Operations Matters:</strong> Applying a blur and then edge detection gives a very different result than applying edge detection and then a blur. Experiment to see why!</li>
-                        </ul>
-                    </div>
-                    <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--input-bg);">
-                        <h3 class="text-base md:text-lg font-bold mb-2 flex items-center gap-3" style="color: var(--accent-primary);"><i class="fas-regular fa-bookmark"></i>Key Takeaways</h3>
-                        <ul class="list-disc pl-5 space-y-2 mt-3 opacity-90">
-                            <li>Grayscale images are 2D matrices of numbers (0-255).</li>
-                            <li>Image filters are mathematical functions that transform these numbers.</li>
-                            <li><strong>Pixel-wise operations</strong> (like Invert and Threshold) treat each pixel independently.</li>
-                            <li><strong>Neighborhood operations</strong> (like Blur and Edge Detection) calculate a pixel's new value based on its neighbors.</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="pt-6 border-t text-center" style="border-color: var(--border-subtle);">
-                    <p class="text-sm" style="color: var(--text-muted);">Mastering this fundamental concept—that images are just grids of numbers—is the key to understanding all of computer vision.</p>
+                <div class="p-5 rounded-lg border" style="border-color: var(--border-subtle); background: var(--bg-surface)">
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-3" style="color: var(--accent-primary)"><i class="fas fa-rocket"></i>Key Takeaway</h3>
+                    <p>A hard label answers one question. A teacher's full distribution answers every question at once &mdash; how likely each alternative is, and therefore how the classes relate. Temperature is the tool that makes that hidden structure large enough to learn from. The student in this lab performs real gradient descent on the combined loss, so the convergence you watch is genuine optimisation, just at a much smaller scale.</p>
                 </div>
             </div>
         </div>
     </section>
+    <!-- End auto-article-vizlearn -->
 
-        <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+    <footer class="w-full py-6 mt-8 border-t" style="border-color: var(--border-subtle); background: var(--bg-surface);">
         <div class="container mx-auto px-6 text-center" style="color: var(--text-muted)">
             <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-4">
                 <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer" aria-label="GitHub" style="color: var(--text-muted); transition: color 0.3s ease;"><i class="fab fa-github fa-lg"></i></a>
@@ -590,7 +537,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- THEME LOGIC (Matches Activation Fns) ---
+            // --- THEME ---
             const themeToggleBtn = document.getElementById('themeToggle');
             const sunIcon = themeToggleBtn.querySelector('.dark-icon');
             const moonIcon = themeToggleBtn.querySelector('.light-icon');
@@ -599,240 +546,126 @@
             function applyTheme(theme) {
                 if (theme === 'light') {
                     document.body.classList.add('light-mode');
-                    moonIcon.classList.remove('hidden');
                     sunIcon.classList.add('hidden');
+                    moonIcon.classList.remove('hidden');
                 } else {
                     document.body.classList.remove('light-mode');
-                    sunIcon.classList.remove('hidden');
                     moonIcon.classList.add('hidden');
+                    sunIcon.classList.remove('hidden');
                 }
-                refreshDisplays(); // Re-render matrix to match theme colors
+                localStorage.setItem('theme', theme);
+                if (typeof window.onThemeChange === 'function') window.onThemeChange();
             }
-
+            applyTheme(currentTheme);
             themeToggleBtn.addEventListener('click', () => {
-                currentTheme = currentTheme === 'light' ? 'dark' : 'light';
-                localStorage.setItem('theme', currentTheme);
+                currentTheme = document.body.classList.contains('light-mode') ? 'dark' : 'light';
                 applyTheme(currentTheme);
             });
 
-            // --- Configuration ---
-            const GRID_SIZE = 28;
-            const PIXEL_SIZE = 11; 
-            const CANVAS_WIDTH = GRID_SIZE * PIXEL_SIZE;
-            const CANVAS_HEIGHT = GRID_SIZE * PIXEL_SIZE;
+            // --- APP LOGIC ---
+            const EXAMPLES = [
+                { label: 'dog', classes: ['dog','wolf','cat','fox','horse','car'], logits: [6.0, 3.2, 2.1, 2.6, 0.9, -1.8] },
+                { label: 'mat', classes: ['mat','rug','floor','chair','sofa','sky'],  logits: [5.4, 3.6, 3.1, 1.8, 1.5, -1.2] },
+                { label: 'positive', classes: ['positive','neutral','negative','mixed','sarcastic','spam'], logits: [3.1, 2.4, 1.9, 2.2, 1.4, -2.0] }
+            ];
 
-            // --- DOM Elements ---
-            const canvas = document.getElementById('drawingCanvas');
-            const ctx = canvas.getContext('2d');
-            const clearBtn = document.getElementById('clearBtn');
-            const matrixDisplay = document.getElementById('matrix-display');
-            const invertBtn = document.getElementById('invertBtn');
-            const blurBtn = document.getElementById('blurBtn');
-            const edgeBtn = document.getElementById('edgeBtn');
-            const thresholdSlider = document.getElementById('thresholdSlider');
-            const thresholdValue = document.getElementById('thresholdValue');
-            const applyThresholdBtn = document.getElementById('applyThresholdBtn');
+            const tSlider = document.getElementById('tSlider');
+            const aSlider = document.getElementById('aSlider');
+            let exIdx = 0, steps = 0, studentLogits = null;
 
-            // --- State ---
-            let isDrawing = false;
-            let grid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
-            let matrixCells = [];
-            
-            // --- Initialization ---
-            function initialize() {
-                canvas.width = CANVAS_WIDTH;
-                canvas.height = CANVAS_HEIGHT;
-                matrixDisplay.innerHTML = '';
-                for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
-                    const cell = document.createElement('div');
-                    matrixCells.push(cell);
-                    matrixDisplay.appendChild(cell);
+            function softmax(z, T) {
+                const s = z.map(v => v / T);
+                const mx = Math.max(...s);
+                const ex = s.map(v => Math.exp(v - mx));
+                const sum = ex.reduce((a, b) => a + b, 0);
+                return ex.map(v => v / sum);
+            }
+
+            function resetStudent() {
+                const n = EXAMPLES[exIdx].classes.length;
+                // student starts near-uniform with a little noise
+                studentLogits = Array.from({ length: n }, () => (Math.random() - 0.5) * 0.4);
+                steps = 0;
+            }
+
+            function bars(container, probs, classes, color, highlight) {
+                document.getElementById(container).innerHTML = classes.map((c, i) => `
+                    <div class="dist-row">
+                        <span class="mono-font text-[11px] ${i === highlight ? 'font-bold' : 'opacity-70'}">${c}</span>
+                        <div class="dist-bar"><div class="dist-fill" style="width:${(probs[i] * 100).toFixed(1)}%; background:${color}"></div></div>
+                        <span class="mono-font text-[11px] text-right ${probs[i] < 0.01 ? 'opacity-40' : ''}">${(probs[i] * 100).toFixed(1)}%</span>
+                    </div>`).join('');
+            }
+
+            function render() {
+                const ex = EXAMPLES[exIdx];
+                const T = parseFloat(tSlider.value);
+                const alpha = parseFloat(aSlider.value);
+                const n = ex.classes.length;
+
+                document.getElementById('trueLbl').textContent = ex.label;
+                document.getElementById('tVal').textContent = T.toFixed(1);
+                document.getElementById('aVal').textContent = alpha.toFixed(2);
+
+                const teacher = softmax(ex.logits, T);
+                const student = softmax(studentLogits, T);
+                const hard = ex.classes.map((_, i) => i === 0 ? 1 : 0);
+
+                bars('teacherDist', teacher, ex.classes, '#38bdf8', 0);
+                bars('hardDist', hard, ex.classes, 'var(--text-muted)', 0);
+                bars('studentDist', student, ex.classes, 'var(--accent-primary)', 0);
+
+                // KL(teacher || student), cross-entropy on the hard label, teacher entropy
+                let kl = 0;
+                for (let i = 0; i < n; i++) if (teacher[i] > 1e-9) kl += teacher[i] * Math.log(teacher[i] / Math.max(student[i], 1e-9));
+                const studentP1 = softmax(studentLogits, 1);
+                const ce = -Math.log(Math.max(studentP1[0], 1e-9));
+                const ent = -teacher.reduce((a, p) => a + (p > 1e-9 ? p * Math.log2(p) : 0), 0);
+
+                document.getElementById('mKl').textContent = kl.toFixed(3);
+                document.getElementById('mCe').textContent = ce.toFixed(3);
+                document.getElementById('mEnt').textContent = ent.toFixed(2);
+                document.getElementById('mSteps').textContent = steps;
+
+                const runnerUp = teacher.map((p, i) => ({ p, i })).sort((a, b) => b.p - a.p)[1];
+                document.getElementById('darkNote').innerHTML = T < 1.6
+                    ? `At T = ${T.toFixed(1)} the teacher is nearly one-hot: the runner-up "<strong>${ex.classes[runnerUp.i]}</strong>" sits at just <strong>${(runnerUp.p * 100).toFixed(1)}%</strong>. There is almost no extra signal beyond the plain label &mdash; raise the temperature.`
+                    : `At T = ${T.toFixed(1)} the runner-up "<strong>${ex.classes[runnerUp.i]}</strong>" has risen to <strong>${(runnerUp.p * 100).toFixed(1)}%</strong>. The teacher is now revealing which classes it considers <em>similar</em> &mdash; this is the dark knowledge the student can learn from.`;
+            }
+
+            // one genuine gradient step on L = (1-a)*CE + a*T^2*KL
+            function trainStep() {
+                const ex = EXAMPLES[exIdx];
+                const T = parseFloat(tSlider.value);
+                const alpha = parseFloat(aSlider.value);
+                const lr = 0.5;
+                const n = ex.classes.length;
+
+                const teacherT = softmax(ex.logits, T);
+                const studentT = softmax(studentLogits, T);
+                const student1 = softmax(studentLogits, 1);
+
+                for (let i = 0; i < n; i++) {
+                    // d/dz of KL wrt student logits (softened): (p_student - p_teacher)/T, scaled by T^2
+                    const gKL = (studentT[i] - teacherT[i]) / T * (T * T);
+                    // d/dz of CE against the one-hot label
+                    const gCE = student1[i] - (i === 0 ? 1 : 0);
+                    studentLogits[i] -= lr * (alpha * gKL + (1 - alpha) * gCE);
                 }
-                
-                // Initialize Theme and Canvas
-                applyTheme(currentTheme);
-                clearCanvas();
-            }
-            
-            // --- Update & Drawing Functions ---
-            function refreshDisplays() {
-                drawCanvas();
-                updateMatrixDisplay();
+                steps++;
+                render();
             }
 
-            function drawCanvas() {
-                ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-                // Background color for canvas (Always blackish to represent empty space)
-                ctx.fillStyle = '#000';
-                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            tSlider.addEventListener('input', render);
+            aSlider.addEventListener('input', render);
+            document.getElementById('stepBtn').addEventListener('click', trainStep);
+            document.getElementById('resetBtn').addEventListener('click', () => { resetStudent(); render(); });
+            document.getElementById('exSel').addEventListener('change', e => { exIdx = +e.target.value; resetStudent(); render(); });
 
-                for (let y = 0; y < GRID_SIZE; y++) {
-                    for (let x = 0; x < GRID_SIZE; x++) {
-                        const intensity = grid[y][x];
-                        if (intensity > 0) {
-                            ctx.fillStyle = `rgb(${intensity}, ${intensity}, ${intensity})`;
-                            ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
-                        }
-                    }
-                }
-            }
-            
-            function updateMatrixDisplay() {
-                const isLightMode = document.body.classList.contains('light-mode');
-                
-                for (let y = 0; y < GRID_SIZE; y++) {
-                    for (let x = 0; x < GRID_SIZE; x++) {
-                        const index = y * GRID_SIZE + x;
-                        const cellValue = grid[y][x];
-                        const cellElement = matrixCells[index];
-                        cellElement.textContent = cellValue;
-                        
-                        if (cellValue > 0) {
-                            // Grayscale Visualization (0-255)
-                            // Strict Grayscale: Background reflects value, Text contrasts
-                            const intensity = cellValue;
-                            cellElement.style.backgroundColor = `rgb(${intensity}, ${intensity}, ${intensity})`;
-                            
-                            // Text contrast calculation
-                            cellElement.style.color = intensity > 128 ? '#000000' : '#ffffff';
-                            cellElement.style.fontWeight = '700';
-                        } else {
-                            // Empty cells (0)
-                            // Kept subtle to show grid structure without noise
-                            cellElement.style.backgroundColor = isLightMode ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)';
-                            cellElement.style.color = isLightMode ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'; 
-                            cellElement.style.fontWeight = '400';
-                        }
-                    }
-                }
-            }
-
-            function clearCanvas() {
-                grid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
-                refreshDisplays();
-            }
-
-            // --- Drawing Logic ---
-            function draw(event) {
-                if (!isDrawing) return;
-                event.preventDefault();
-                const rect = canvas.getBoundingClientRect();
-                
-                // Handle both touch and mouse
-                let clientX, clientY;
-                if(event.touches) {
-                    clientX = event.touches[0].clientX;
-                    clientY = event.touches[0].clientY;
-                } else {
-                    clientX = event.clientX;
-                    clientY = event.clientY;
-                }
-                
-                // Calculate Scale Factor (Canvas Display Size vs Actual Size)
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-
-                const canvasX = (clientX - rect.left) * scaleX;
-                const canvasY = (clientY - rect.top) * scaleY;
-                
-                const gridX = Math.floor(canvasX / PIXEL_SIZE);
-                const gridY = Math.floor(canvasY / PIXEL_SIZE);
-
-                // Brush settings
-                const brushKernel = [[80, 120, 80], [120, 255, 120], [80, 120, 80]];
-                const brushSize = 3;
-                const brushOffset = Math.floor(brushSize / 2);
-
-                for(let i = 0; i < brushSize; i++) {
-                    for(let j = 0; j < brushSize; j++) {
-                       const y = gridY + i - brushOffset;
-                       const x = gridX + j - brushOffset;
-                       if(y >= 0 && y < GRID_SIZE && x >= 0 && x < GRID_SIZE) {
-                           const currentVal = grid[y][x];
-                           const brushVal = brushKernel[i][j];
-                           grid[y][x] = Math.min(255, currentVal + brushVal);
-                       }
-                    }
-                }
-                refreshDisplays();
-            }
-
-            // --- Filter Functions ---
-            function invertImage() {
-                grid = grid.map(row => row.map(pixel => 255 - pixel));
-                refreshDisplays();
-            }
-
-            function applyThreshold() {
-                const threshold = parseInt(thresholdSlider.value, 10);
-                grid = grid.map(row => row.map(pixel => pixel > threshold ? 255 : 0));
-                refreshDisplays();
-            }
-
-            function applyBlur() {
-                const readGrid = JSON.parse(JSON.stringify(grid));
-                for (let y = 0; y < GRID_SIZE; y++) {
-                    for (let x = 0; x < GRID_SIZE; x++) {
-                        let total = 0, count = 0;
-                        for (let dy = -1; dy <= 1; dy++) {
-                            for (let dx = -1; dx <= 1; dx++) {
-                                const ny = y + dy, nx = x + dx;
-                                if (ny >= 0 && ny < GRID_SIZE && nx >= 0 && nx < GRID_SIZE) {
-                                    total += readGrid[ny][nx];
-                                    count++;
-                                }
-                            }
-                        }
-                        grid[y][x] = Math.round(total / count);
-                    }
-                }
-                refreshDisplays();
-            }
-
-            function applyEdgeDetection() {
-                const readGrid = JSON.parse(JSON.stringify(grid));
-                const newGrid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
-                const sobelX = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
-                const sobelY = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
-                for (let y = 1; y < GRID_SIZE - 1; y++) {
-                    for (let x = 1; x < GRID_SIZE - 1; x++) {
-                        let pixelX = 0, pixelY = 0;
-                        for (let dy = -1; dy <= 1; dy++) {
-                            for (let dx = -1; dx <= 1; dx++) {
-                                const pixel = readGrid[y + dy][x + dx];
-                                pixelX += pixel * sobelX[dy + 1][dx + 1];
-                                pixelY += pixel * sobelY[dy + 1][dx + 1];
-                            }
-                        }
-                        const magnitude = Math.round(Math.sqrt(pixelX * pixelX + pixelY * pixelY));
-                        newGrid[y][x] = Math.min(255, magnitude);
-                    }
-                }
-                grid = newGrid;
-                refreshDisplays();
-            }
-            
-            // --- Event Listeners ---
-            clearBtn.addEventListener('click', clearCanvas);
-
-            invertBtn.addEventListener('click', invertImage);
-            blurBtn.addEventListener('click', applyBlur);
-            edgeBtn.addEventListener('click', applyEdgeDetection);
-            applyThresholdBtn.addEventListener('click', applyThreshold);
-            thresholdSlider.addEventListener('input', () => { thresholdValue.textContent = thresholdSlider.value; });
-
-            canvas.addEventListener('mousedown', (e) => { isDrawing = true; draw(e); });
-            canvas.addEventListener('mousemove', draw);
-            canvas.addEventListener('mouseup', () => { isDrawing = false; });
-            canvas.addEventListener('mouseleave', () => { isDrawing = false; });
-            canvas.addEventListener('touchstart', (e) => { isDrawing = true; draw(e); });
-            canvas.addEventListener('touchmove', draw);
-            canvas.addEventListener('touchend', () => { isDrawing = false; });
-
-            // --- Run Initialization ---
-            initialize();
+            resetStudent();
+            render();
         });
-    
+
         // ===== DROPDOWN SEARCH FUNCTIONALITY =====
         const allCourses = [
             { title: "Calculating Parameters in CNN", path: "computer_vision/calculating_parameters_in_cnn.html", category: "computer_vision", icon: "fa-eye" },
@@ -959,22 +792,18 @@
             { title: "Word Cloud Generator", path: "natural_language_processing/word_cloud.html", category: "natural_language_processing", icon: "fa-comments" }
         ];
 
-        function toRelativePath(fromPath, targetPath) {
-            const fromParts = fromPath.split('/').filter(Boolean);
-            const targetParts = targetPath.split('/').filter(Boolean);
-            let shared = 0;
-            while (shared < Math.min(fromParts.length, targetParts.length) && fromParts[shared] === targetParts[shared]) {
-                shared++;
-            }
-            const up = '../'.repeat(Math.max(0, fromParts.length - shared));
-            const down = targetParts.slice(shared).join('/');
-            return `${up}${down}`;
+        function toRelativePath(fromDir, targetPath) {
+            const fromParts = fromDir.split('/').filter(Boolean);
+            const toParts = targetPath.split('/').filter(Boolean);
+            let i = 0;
+            while (i < fromParts.length && i < toParts.length && fromParts[i] === toParts[i]) i++;
+            const ups = fromParts.length - i;
+            return '../'.repeat(ups) + toParts.slice(i).join('/');
         }
 
-        const currentPath = window.location.pathname.replace(/\/+$/g, '').replace(/index\.html$/, '');
-        const currentDir = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/')) : '';
-        const resolvedCourses = allCourses.map((course) => {
-            const normalizedTarget = course.path.replace(/^\.\//, '');
+        const currentDir = window.location.pathname.split('/').slice(0, -1).filter(Boolean).slice(-1)[0] || '';
+        const resolvedCourses = allCourses.map(course => {
+            const normalizedTarget = course.path;
             const relativePath = currentDir ? toRelativePath(currentDir, normalizedTarget) : normalizedTarget;
             return { ...course, path: relativePath };
         });
@@ -985,19 +814,17 @@
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value.toLowerCase().trim();
-                
+
                 if (query.length === 0) {
                     dropdown.classList.remove('show');
                     return;
                 }
 
-                // Filter courses
-                const filtered = resolvedCourses.filter(course => 
-                    course.title.toLowerCase().includes(query) || 
+                const filtered = resolvedCourses.filter(course =>
+                    course.title.toLowerCase().includes(query) ||
                     course.category.toLowerCase().includes(query)
                 );
 
-                // Render results
                 if (filtered.length === 0) {
                     dropdown.innerHTML = '<div class="dropdown-no-results">No courses found</div>';
                 } else {
@@ -1018,21 +845,13 @@
                 dropdown.classList.add('show');
             });
 
-            // Close dropdown when clicking outside
             document.addEventListener('click', (e) => {
-                if (!searchInput.parentElement.contains(e.target)) {
-                    dropdown.classList.remove('show');
-                }
+                if (!searchInput.parentElement.contains(e.target)) dropdown.classList.remove('show');
             });
-
-            // Close dropdown on Escape key
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    dropdown.classList.remove('show');
-                }
+                if (e.key === 'Escape') dropdown.classList.remove('show');
             });
         }
-
     </script>
 </body>
 </html>
