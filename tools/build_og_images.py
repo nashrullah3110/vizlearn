@@ -14,7 +14,8 @@ import re
 import subprocess
 import sys
 
-from lib_catalog import ROOT, modules
+from lib_catalog import ROOT, by_topic, modules
+from lib_pages import STATIC_PAGES, STATIC_TITLES, TOPICS, TOPIC_ORDER
 
 OUT_DIR = os.path.join(ROOT, "assets", "og")
 
@@ -149,9 +150,49 @@ def build_svg(mod):
 </svg>"""
 
 
+# --------------------------------------------------------------------------
+# The pages that are not modules still need a card.
+# --------------------------------------------------------------------------
+# A neutral mark for pages with no artwork of their own.
+GENERIC_ART = (
+    '<svg viewBox="0 0 160 90">'
+    '<circle cx="40" cy="45" r="7" fill="var(--accent-primary)"/>'
+    '<circle cx="80" cy="26" r="7" fill="var(--text-muted)"/>'
+    '<circle cx="80" cy="64" r="7" fill="var(--text-muted)"/>'
+    '<circle cx="120" cy="45" r="7" fill="var(--accent-primary)"/>'
+    '<path d="M40 45 L80 26 M40 45 L80 64 M80 26 L120 45 M80 64 L120 45" '
+    'stroke="var(--border-subtle)" stroke-width="2" fill="none"/>'
+    "</svg>"
+)
+
+
+def extra_entries():
+    """Synthetic module-shaped dicts for the hub, tracks and static pages."""
+    groups = by_topic()
+    out = [{"path": "index.html", "title": "Interactive AI & Algorithm Visualizations",
+            "category": "VizLearn", "svg": GENERIC_ART}]
+
+    for key in TOPIC_ORDER:
+        mods = groups.get(key) or []
+        t = TOPICS[key]
+        out.append({
+            "path": "%s/index.html" % t["dir"],
+            "title": t["h1"],
+            # The track's first module lends its artwork, so each track card
+            # looks like the thing it opens onto.
+            "category": "%d modules" % len(mods),
+            "svg": mods[0]["svg"] if mods else GENERIC_ART,
+        })
+
+    for rel in STATIC_PAGES:
+        out.append({"path": rel, "title": STATIC_TITLES[rel],
+                    "category": "VizLearn", "svg": GENERIC_ART})
+    return out
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
-    mods = modules()
+    mods = modules() + extra_entries()
     only = sys.argv[1] if len(sys.argv) > 1 else None
 
     made = 0

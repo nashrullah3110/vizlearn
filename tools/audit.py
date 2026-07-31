@@ -9,6 +9,8 @@ import sys
 from collections import Counter
 
 from lib_catalog import ROOT, SITE, modules
+from lib_pages import (STATIC_PAGES, TOPIC_ORDER, is_static_page, is_topic_page,
+                       page_url, topic_rel)
 
 problems = []
 
@@ -23,7 +25,9 @@ def main():
     files = [f for f in files
              if os.path.basename(os.path.dirname(f)) not in ("tools", "assets", "node_modules")]
     files.append(os.path.join(ROOT, "index.html"))
+    files += [os.path.join(ROOT, p) for p in STATIC_PAGES]
 
+    module_paths = {m["path"] for m in modules()}
     titles = Counter()
     for f in files:
         rel = os.path.relpath(f, ROOT)
@@ -60,9 +64,49 @@ def main():
         # canonical must match the real URL
         cm = re.search(r'<link rel="canonical" href="([^"]+)"', s)
         if cm:
-            want = SITE + "/" + ("" if rel == "index.html" else rel)
+            want = page_url(rel)
             check(cm.group(1) == want,
                   "%s: canonical is %s, expected %s" % (rel, cm.group(1), want))
+
+        # --- breadcrumbs ---
+        # Every page but the hub sits under something, and the visible trail
+        # was already there; without the JSON-LD a result renders the raw URL.
+        if rel != "index.html":
+            check('"BreadcrumbList"' in s, "%s: no BreadcrumbList JSON-LD" % rel)
+
+        # --- freshness ---
+        if rel != "index.html":
+            check('"dateModified"' in s, "%s: JSON-LD has no dateModified" % rel)
+
+        # --- the policy pages must be reachable from everywhere ---
+        for target, what in (("privacy.html", "privacy policy"),
+                             ("about.html", "about page"),
+                             ("contact.html", "contact page")):
+            check(target in s, "%s: no link to the %s" % (rel, what))
+        check("VIZLEARN:FOOTER:BEGIN" in s, "%s: missing the shared footer" % rel)
+        # Generated regions must not nest. They did once: build_module_ui
+        # anchored on "<footer", which lands inside the footer's own markers,
+        # so the next footer rebuild deleted the module block with it. Only the
+        # second build showed the damage, which is exactly why this is checked.
+        foot = s.find("VIZLEARN:FOOTER:BEGIN")
+        for other in ("VIZLEARN:MODULE:BEGIN", "VIZLEARN:LAB:BEGIN"):
+            at = s.find(other)
+            if at != -1 and foot != -1:
+                check(at < foot, "%s: %s is nested inside the footer block" % (rel, other))
+        check(s.count("VIZLEARN:FOOTER:BEGIN") == 1,
+              "%s: footer injected more than once" % rel)
+        check(s.count("<footer") == 1,
+              "%s: %d <footer> elements (expected 1)" % (rel, s.count("<footer")))
+
+        # --- mobile ---
+        check('viewport-fit=cover' in s, "%s: viewport meta not updated" % rel)
+        bare = re.findall(r'class="([^"]*)"', s)
+        for cls in bare:
+            m2 = re.search(r"(?<![a-z:-])grid-cols-(\d+)", cls)
+            if m2 and int(m2.group(1)) > 1 and not re.search(r"(sm|md|lg|xl):grid-cols-", cls):
+                problems.append("%s: grid-cols-%s with no mobile breakpoint (%s)"
+                                % (rel, m2.group(1), cls[:60]))
+                break
 
         # JSON-LD must parse
         for block in re.findall(r'<script type="application/ld\+json">(.*?)</script>', s, re.S):
@@ -83,14 +127,17 @@ def main():
             check(os.path.exists(target), "%s: broken asset reference %s" % (rel, href))
 
         # --- shared runtime wiring (every page, hub included) ---
-        for script in ("assets/modules.js", "assets/search.js", "assets/vizlearn.js"):
+        for script in ("assets/modules.js", "assets/search.js", "assets/vizlearn.js",
+                       "assets/vizlearn-lab.js"):
             check(s.count('src="%s%s"' % (prefix, script)) == 1,
                   "%s: expected exactly one <script src> for %s" % (rel, script))
         check("const allCourses" not in s, "%s: still inlines its own catalog" % rel)
         check("appSearchInput" in s or "searchInput" in s, "%s: no search input" % rel)
 
         # --- module furniture ---
-        if rel != "index.html":
+        # Only real modules carry the cheat sheet / related rail / prev-next
+        # block. Topic landings and the policy pages are neither.
+        if rel in module_paths:
             for marker, what in (
                 ("VIZLEARN:MODULE:BEGIN", "cheat sheet / related / prev-next block"),
                 ("vz-cheatsheet", "cheat sheet"),
@@ -116,6 +163,41 @@ def main():
             check(rel not in re.findall(r'data-vz-path="([^"]+)"', block),
                   "%s: related rail links back to the page itself" % rel)
 
+            # --- the lab layer ---
+            check("VIZLEARN:LAB:BEGIN" in s, "%s: no lab block" % rel)
+            check(s.count("VIZLEARN:LAB:BEGIN") == 1,
+                  "%s: lab block injected more than once" % rel)
+            check("vz-check" in s, "%s: no end-of-module check" % rel)
+            check(s.count("VIZLEARN:BYLINE:BEGIN") == 1,
+                  "%s: missing or duplicated last-updated byline" % rel)
+
+            lm = re.search(
+                r'<script type="application/json" id="vz-lab-data">(.*?)</script>', s, re.S)
+            check(bool(lm), "%s: lab block has no config" % rel)
+            if lm:
+                try:
+                    cfg = json.loads(lm.group(1))
+                except ValueError as e:
+                    problems.append("%s: lab config is not valid JSON (%s)" % (rel, e))
+                    cfg = {}
+                # Every preset a Run button points at must exist, and every
+                # control it names must be on the page - a button that quietly
+                # does nothing is worse than no button.
+                presets = cfg.get("presets", [])
+                for idx in re.findall(r'data-vz-run="(\d+)"', s):
+                    check(int(idx) < len(presets),
+                          "%s: Run button %s has no preset" % (rel, idx))
+                for i, p in enumerate(presets):
+                    for item in p.get("set", []):
+                        check('id="%s"' % item["id"] in s or 'name="%s"' % item["id"] in s,
+                              "%s: preset %d sets unknown control %s" % (rel, i, item["id"]))
+                    for cid in p.get("click", []):
+                        check('id="%s"' % cid in s,
+                              "%s: preset %d clicks unknown button %s" % (rel, i, cid))
+                for r in cfg.get("readouts", []):
+                    check('id="%s"' % r["id"] in s,
+                          "%s: readout %s is not on the page" % (rel, r["id"]))
+
         if "vzIcon(" in s:
             check("assets/icons.js" in s, "%s: uses vzIcon() but does not load icons.js" % rel)
 
@@ -133,10 +215,41 @@ def main():
     check(os.path.exists(sm), "sitemap.xml missing")
     if os.path.exists(sm):
         locs = re.findall(r"<loc>([^<]+)</loc>", open(sm, encoding="utf-8").read())
-        check(len(locs) == 167, "sitemap has %d urls (expected 167)" % len(locs))
+        want = 1 + len(TOPIC_ORDER) + len(modules()) + len(STATIC_PAGES)
+        check(len(locs) == want, "sitemap has %d urls (expected %d)" % (len(locs), want))
         for loc in locs:
             p = loc.replace(SITE + "/", "") or "index.html"
+            # Topic landings are listed directory-style, so map back to disk.
+            if p.endswith("/"):
+                p += "index.html"
             check(os.path.exists(os.path.join(ROOT, p)), "sitemap url has no file: %s" % loc)
+
+        # Each track must be in there exactly once, as a real URL rather than
+        # the `index.html#ml` fragment it used to be.
+        for key in TOPIC_ORDER:
+            check(page_url(topic_rel(key)) in locs,
+                  "sitemap is missing the %s landing page" % key)
+
+    # --- the pages that are not modules exist at all ---
+    for key in TOPIC_ORDER:
+        check(os.path.exists(os.path.join(ROOT, topic_rel(key))),
+              "missing topic landing page: %s" % topic_rel(key))
+    for p in STATIC_PAGES:
+        check(os.path.exists(os.path.join(ROOT, p)), "missing static page: %s" % p)
+
+    # --- the privacy policy has to describe what the pages really load ---
+    priv = os.path.join(ROOT, "privacy.html")
+    if os.path.exists(priv):
+        from build_seo import ADSENSE_CLIENT
+        ps = open(priv, encoding="utf-8").read()
+        check(ADSENSE_CLIENT in ps,
+              "privacy.html does not name the AdSense publisher ID the pages load")
+        idx = open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
+        ga = re.search(r"gtag/js\?id=([A-Z0-9-]+)", idx)
+        if ga:
+            check(ga.group(1) in ps,
+                  "privacy.html does not name the analytics ID (%s) the pages load"
+                  % ga.group(1))
 
     check(os.path.exists(os.path.join(ROOT, "robots.txt")), "robots.txt missing")
 

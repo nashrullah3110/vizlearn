@@ -3,45 +3,44 @@
 
 lastmod comes from each file's last commit date, so re-crawls are driven by
 real edits rather than a blanket "today".
+
+The map covers four kinds of URL now: the hub, the eight topic landings, the
+166 modules, and the about/contact/privacy/terms set. Before the landings
+existed a track was only reachable as `index.html#ml`, which is the same URL
+as the hub and so could not appear here at all.
 """
 
 import os
-import subprocess
 import xml.sax.saxutils as sx
 
 from lib_catalog import ROOT, SITE, modules
+from lib_pages import STATIC_PAGES, TOPIC_ORDER, last_modified, page_url, topic_rel
 
 SITEMAP = os.path.join(ROOT, "sitemap.xml")
 ROBOTS = os.path.join(ROOT, "robots.txt")
 
 
-def last_modified(rel):
-    try:
-        out = subprocess.run(
-            ["git", "log", "-1", "--format=%cs", "--", rel],
-            cwd=ROOT, capture_output=True, text=True, check=True,
-        ).stdout.strip()
-        if out:
-            return out
-    except subprocess.CalledProcessError:
-        pass
-    return subprocess.run(["date", "+%Y-%m-%d"], capture_output=True, text=True).stdout.strip()
+def entries():
+    """(rel, priority, changefreq) in the order they appear in the sitemap."""
+    out = [("index.html", "1.0", "weekly")]
+    out += [(topic_rel(k), "0.9", "weekly") for k in TOPIC_ORDER]
+    out += [(m["path"], "0.8", "monthly") for m in modules()]
+    # Policy pages matter for trust and for AdSense review, not for ranking.
+    out += [(p, "0.3", "yearly") for p in STATIC_PAGES
+            if os.path.exists(os.path.join(ROOT, p))]
+    return out
 
 
 def main():
-    entries = [("index.html", "1.0", "weekly")]
-    entries += [(m["path"], "0.8", "monthly") for m in modules()]
-
     rows = []
-    for rel, priority, freq in entries:
-        loc = SITE + "/" + ("" if rel == "index.html" else rel)
+    for rel, priority, freq in entries():
         rows.append(
             "  <url>\n"
             "    <loc>%s</loc>\n"
             "    <lastmod>%s</lastmod>\n"
             "    <changefreq>%s</changefreq>\n"
             "    <priority>%s</priority>\n"
-            "  </url>" % (sx.escape(loc), last_modified(rel), freq, priority)
+            "  </url>" % (sx.escape(page_url(rel)), last_modified(rel), freq, priority)
         )
 
     xml = (
@@ -64,7 +63,7 @@ def main():
     )
     open(ROBOTS, "w", encoding="utf-8").write(robots)
 
-    print("sitemap.xml : %d urls" % len(entries))
+    print("sitemap.xml : %d urls" % len(rows))
     print("robots.txt  : written")
 
 
