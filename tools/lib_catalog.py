@@ -72,9 +72,22 @@ def read_course_data(path=INDEX):
 
 DESC_RE = re.compile(r'<meta\s+name="description"\s+content="([^"]*)"', re.I)
 
+try:
+    from descriptions import DESCRIPTIONS as _OVERRIDES
+except ImportError:  # running from another cwd
+    _OVERRIDES = {}
+
 
 def page_description(rel):
-    """The module page's own meta description, or ''."""
+    """The description for a module page.
+
+    Hand-written entries in descriptions.py win over whatever the page
+    currently declares, so the search catalog, the social cards and the page's
+    own <meta> can never disagree. build_seo.py writes the same value back into
+    the HTML.
+    """
+    if rel in _OVERRIDES:
+        return _OVERRIDES[rel]
     p = os.path.join(ROOT, rel)
     if not os.path.exists(p):
         return ""

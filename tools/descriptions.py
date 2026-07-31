@@ -1,0 +1,192 @@
+# -*- coding: utf-8 -*-
+"""Hand-written meta descriptions.
+
+81 pages shared one template ("Learn X with a beginner-friendly interactive
+visualization, examples, and guided practice on VizLearn"), which is what
+Google sees as the search snippet, what social cards show, and what the site's
+own search matches against. Near-identical descriptions across half the site
+invite Google to discard them and write its own.
+
+Each entry says what the reader will actually see or do. Aim for 110-165
+characters: long enough to fill a result snippet, short enough not to be cut.
+
+Anything absent here keeps whatever the page already declares.
+"""
+
+DESCRIPTIONS = {
+    # --- Machine Learning -------------------------------------------------
+    "machine_learning/confusion_matrix.html":
+        "See why accuracy alone misleads. Build a confusion matrix cell by cell and watch precision, recall and F1 shift with every prediction.",
+    "machine_learning/cosine_similarity.html":
+        "Measure similarity by angle instead of distance. Drag two vectors apart and watch the cosine similarity score respond in real time.",
+    "machine_learning/cross_validation.html":
+        "Watch data split into k folds, each taking a turn as validation, and see why a single train/test split can flatter a model.",
+    "machine_learning/decision_tree.html":
+        "Watch a decision tree choose each split by information gain, growing branch by branch until every leaf holds a single class.",
+    "machine_learning/k_means.html":
+        "Place centroids and watch K-Means alternate between assigning points and recentring clusters until it converges.",
+    "machine_learning/knn.html":
+        "Drop a new point on the plane and watch KNN classify it by neighbour vote. Change k to see the decision boundary tighten or smooth.",
+    "machine_learning/label_encoding.html":
+        "Turn categories into integers, and see where label encoding is safe and where it invents an ordering your model will believe.",
+    "machine_learning/linear_regression_with_ols.html":
+        "Drag a regression line by hand and watch the residuals and mean squared error react, then let least squares find the optimum.",
+    "machine_learning/naive_bayes.html":
+        "Step through Bayes' theorem on real text and see why a 'naive' independence assumption still classifies spam remarkably well.",
+    "machine_learning/one_hot_encoding.html":
+        "Expand a categorical column into binary columns and see how one-hot encoding avoids implying an order that was never there.",
+    "machine_learning/sliding_window_for_timeseries_data.html":
+        "Slide a window across a time series to turn a raw sequence into supervised training rows of features and targets.",
+    "machine_learning/svm.html":
+        "Add points from two classes and watch a support vector machine find the hyperplane with the widest possible margin between them.",
+    "machine_learning/train_test_split.html":
+        "See why testing on data you trained on flatters a model, and how holding out a test set gives you an honest score.",
+    "machine_learning/bias_vs_variance.html":
+        "Dial bias and variance up and down, resample the data, and watch a stable underfit turn into an unstable overfit.",
+    "machine_learning/evaluation_metrics_for_regression.html":
+        "Compare MAE, MSE, RMSE and R-squared on identical predictions and see which kinds of error each metric punishes hardest.",
+    "machine_learning/hard_vs_soft_labelling.html":
+        "Compare a single hard label against a probability distribution, and see what a model loses when forced to pick one winner.",
+    "machine_learning/label_imbalance_problem.html":
+        "See how a model scores 99% accuracy while missing every fraud case, and why imbalance breaks your intuition about metrics.",
+    "machine_learning/model_and_data_drift.html":
+        "Fast-forward through production and watch a well-trained model decay as incoming data drifts away from what it learned.",
+    "machine_learning/training_on_label_imbalanced_dataset.html":
+        "Try resampling, class weights and threshold tuning on an imbalanced dataset and watch minority-class recall respond.",
+
+    # --- Deep Learning ----------------------------------------------------
+    "deep_learning/activation_functions.html":
+        "Compare ReLU, sigmoid, tanh and others on the same input, and see how each one bends the signal passing through a layer.",
+    "deep_learning/batch_processing_in_neural_networks.html":
+        "Compare stochastic, mini-batch and full-batch training, and see how batch size trades gradient noise against speed.",
+    "deep_learning/dropout_in_neural_networks.html":
+        "Switch neurons off at random during training and watch dropout stop the network leaning on any single pathway.",
+    "deep_learning/batch_normalization.html":
+        "Toggle batch normalisation on a deep network and watch it rescale layer outputs to keep gradients stable as they flow back.",
+    "deep_learning/data_sparsity.html":
+        "Feed mostly-zero inputs through a network and watch entire pathways go dormant, because anything multiplied by zero stays zero.",
+    "deep_learning/early_stopping_in_neural_networks.html":
+        "Watch validation loss bottom out then start climbing, and see early stopping halt training at the moment generalisation peaks.",
+    "deep_learning/feature_scaling_in_neural_networks.html":
+        "See what happens when one feature is measured in thousands and another in decimals, and how scaling rebalances the gradients.",
+    "deep_learning/gradient_descent_batch_processing.html":
+        "Change one control at a time and watch how batch size reshapes the path gradient descent takes toward the minimum.",
+    "deep_learning/gradient_descent_training.html":
+        "Watch gradient descent step downhill across a loss surface, and see how the learning rate decides between converging and diverging.",
+    "deep_learning/how_loss_is_calculated.html":
+        "Follow a prediction through to a single loss value, and see how the error signal that drives all learning is actually computed.",
+    "deep_learning/hyper-paramter_tuning.html":
+        "Run grid search and random search side by side on the same model and see which finds strong hyperparameters in fewer trials.",
+    "deep_learning/learning_rate_scheduling.html":
+        "Compare a fixed learning rate against a decaying schedule, and watch scheduling rescue a model that would otherwise overshoot.",
+    "deep_learning/linear_regression_with_gradient_descent.html":
+        "Take gradient descent one step at a time and watch the best-fit line and its mean squared error converge together.",
+    "deep_learning/model_training_curve.html":
+        "Read training and validation curves like a practitioner: spot underfitting, a healthy fit and overfitting from their shape alone.",
+    "deep_learning/reproducibility_of_model.html":
+        "Fix the random seed and see exactly what becomes repeatable: initial weights and the order training data is shuffled in.",
+    "deep_learning/neural_network.html":
+        "Build a neural network layer by layer and watch data flow forward through weights, biases and activations into a prediction.",
+    "deep_learning/neural_network_for_regression.html":
+        "Adapt a neural network to predict continuous values, and see how its output layer and loss differ from a classifier's.",
+    "deep_learning/neural_network_for_unsupervised_learning.html":
+        "Train a network with no labels at all and watch it uncover structure by learning to reconstruct its own input.",
+    "deep_learning/optimizers_in_3d.html":
+        "Race SGD, Momentum, RMSprop and Adam across a 3D loss landscape and watch which of them escape local minima and which get stuck.",
+    "deep_learning/optimizers_in_neural_networks.html":
+        "Run several optimizers in parallel on one loss surface and see how momentum and adaptive learning rates change the route.",
+    "deep_learning/overfitting_vs_underfitting.html":
+        "Move model complexity from too simple to too flexible and watch the gap open between training and validation performance.",
+    "deep_learning/perceptron.html":
+        "Adjust the weights and bias of a single perceptron by hand and watch its decision boundary swing across the data.",
+    "deep_learning/regularization_in_neural_networks.html":
+        "Compare L1 and L2 penalties, and watch Lasso zero out useless weights while Ridge shrinks all of them smoothly.",
+    "deep_learning/vanishing_vs_exploding_gradient.html":
+        "Watch gradients shrink to nothing or blow up as they multiply back through layers, and see what keeps them in range.",
+    "deep_learning/weight_initialization.html":
+        "Compare He, Xavier, random and zero initialisation, and watch poor starting weights kill a deep network before it learns.",
+    "deep_learning/weights_and_biases.html":
+        "See what the numbers a network learns are actually for: weights scale each input, bias shifts where the neuron fires.",
+
+    # --- Algorithms -------------------------------------------------------
+    "dsa/a_star.html":
+        "Watch A* combine real distance with a heuristic estimate to reach the goal while exploring far fewer nodes than Dijkstra.",
+    "dsa/backtracking.html":
+        "Watch backtracking commit to a path, hit a dead end, and unwind to the last decision point until the puzzle resolves.",
+    "dsa/binary_search.html":
+        "Halve the search space with every comparison and watch binary search locate a target in a sorted array in log n steps.",
+    "dsa/bubble_sort.html":
+        "Watch adjacent pairs compare and swap, sending the largest value bubbling to the end on every pass through the array.",
+    "dsa/counting_sort.html":
+        "Sort integers without a single comparison by tallying how often each value occurs, then rebuilding the array in order.",
+    "dsa/depth_first_search.html":
+        "Follow depth-first search as far down one branch as it goes, then watch it backtrack and take the next unexplored edge.",
+    "dsa/dictionaries_in_python.html":
+        "Insert, look up and delete key-value pairs in a Python dictionary, and see how hashing makes each operation instant.",
+    "dsa/dijkstras.html":
+        "Watch Dijkstra's algorithm settle nodes in order of distance and build the shortest path across a weighted graph.",
+    "dsa/fibonacci_search.html":
+        "Divide a sorted array using Fibonacci numbers rather than midpoints, avoiding the division binary search relies on.",
+    "dsa/insertion_sort.html":
+        "Build a sorted section one element at a time and watch each new value shift left into the position where it belongs.",
+    "dsa/interpolation_search.html":
+        "Estimate where a value should sit instead of always splitting the middle, the way you open a phone book near the S pages.",
+    "dsa/linear_search.html":
+        "Step through an array one element at a time and see exactly when brute-force scanning is genuinely the right choice.",
+    "dsa/lists_in_python.html":
+        "Index, slice, append and mutate Python lists interactively, and see how the underlying dynamic array grows as you go.",
+    "dsa/merge_sort.html":
+        "Split an array down to single elements and watch merge sort combine sorted halves back together in n log n time.",
+    "dsa/quick_sort.html":
+        "Pick a pivot, partition around it, then recurse, and see why the pivot choice decides whether quick sort flies or crawls.",
+    "dsa/selection_sort.html":
+        "Scan for the smallest remaining value and swap it into place, one position at a time, until the whole array is sorted.",
+    "dsa/strings_in_python.html":
+        "Slice, index, join and format Python strings interactively, and see how immutability shapes what each operation does.",
+
+    # --- NLP --------------------------------------------------------------
+    "natural_language_processing/ascii_codes.html":
+        "Type any character and see the ASCII number a computer actually stores, the very first step from text into numbers.",
+    "natural_language_processing/how_neural_network_text.html":
+        "Follow a sentence from raw characters through tokens and vectors into something a neural network can actually multiply.",
+    "natural_language_processing/how_rnn_process_text.html":
+        "Feed a sentence word by word into a recurrent network and watch the hidden state carry context from each step to the next.",
+    "natural_language_processing/n_gram.html":
+        "Slide an n-gram window across text and see how counting short sequences lets a model guess which word comes next.",
+    "natural_language_processing/stemming_vs_lemmatization.html":
+        "Compare a stemmer chopping suffixes against a lemmatizer resolving proper dictionary forms of the very same words.",
+    "natural_language_processing/text_normalization_pipeline.html":
+        "Run raw text through lowercasing, punctuation stripping and stop-word removal, and watch each stage clean it further.",
+    "natural_language_processing/tokenization.html":
+        "Split text into words, characters or sentences and see how the tokenizer you choose changes what a model actually reads.",
+    "natural_language_processing/word_cloud.html":
+        "Paste any text and watch a word cloud size each term by how often it appears, exposing what a document is really about.",
+    "natural_language_processing/how_lstm_processes_text.html":
+        "Watch an LSTM carry a cell state for long-term memory and a hidden state for short-term as it reads through a sequence.",
+
+    # --- Computer Vision --------------------------------------------------
+    "computer_vision/downsampling_in_cnn.html":
+        "Shrink a feature map with max, average or min pooling and see how downsampling keeps the signal but discards the detail.",
+    "computer_vision/edge_detection.html":
+        "Slide a sensitivity threshold across a real image and watch edges appear wherever brightness changes sharply enough.",
+    "computer_vision/feature_map_in_cnn.html":
+        "Drag a convolution filter across an image and watch it build a feature map one value at a time, the core operation inside a CNN.",
+    "computer_vision/grayscale_image_processing.html":
+        "See a grayscale image for what it is: a grid of brightness numbers you can filter, threshold and edit directly.",
+    "computer_vision/image_data_augmentation.html":
+        "Flip, rotate, zoom and add noise to an image, and see how augmentation multiplies a small training set into a larger one.",
+    "computer_vision/rgb_image_processing.html":
+        "Split a colour image into red, green and blue channels and see how three grids of numbers combine into every pixel.",
+
+    # --- Database ---------------------------------------------------------
+    "database/joins_in_sql.html":
+        "Watch INNER, LEFT, RIGHT and FULL joins pull rows from two tables, and see exactly which rows each variant keeps.",
+    "database/groupby_in_sql.html":
+        "Group rows by a column and watch COUNT, SUM and AVG collapse many rows into one row per group, live against a sample table.",
+    "database/window_functions_in_sql.html":
+        "Rank, total and compare across rows without collapsing them, using OVER and PARTITION BY on a live result set.",
+
+    # --- Gen AI -----------------------------------------------------------
+    "gen_ai/casual_language_modeling.html":
+        "See how predicting the next token, over and over, is all it takes for a model like GPT to produce fluent text.",
+}

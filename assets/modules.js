@@ -9,7 +9,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn A* Search Algorithm with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Watch A* combine real distance with a heuristic estimate to reach the goal while exploring far fewer nodes than Dijkstra."
  },
  {
   "title": "Backtracking Search Method",
@@ -17,7 +17,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Backtracking with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Watch backtracking commit to a path, hit a dead end, and unwind to the last decision point until the puzzle resolves."
  },
  {
   "title": "Bellman-Ford and Negative Weights",
@@ -41,7 +41,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Binary Search with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Halve the search space with every comparison and watch binary search locate a target in a sorted array in log n steps."
  },
  {
   "title": "Binary Search Trees",
@@ -65,7 +65,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Bubble Sort with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Watch adjacent pairs compare and swap, sending the largest value bubbling to the end on every pass through the array."
  },
  {
   "title": "Counting Sort",
@@ -73,7 +73,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Counting Sort with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Sort integers without a single comparison by tallying how often each value occurs, then rebuilding the array in order."
  },
  {
   "title": "Cycle Detection",
@@ -89,7 +89,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Depth First Search with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Follow depth-first search as far down one branch as it goes, then watch it backtrack and take the next unexplored edge."
  },
  {
   "title": "Dijkstra's Algorithm",
@@ -97,7 +97,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Dijkstra’s Algorithm with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Watch Dijkstra's algorithm settle nodes in order of distance and build the shortest path across a weighted graph."
  },
  {
   "title": "Divide and Conquer",
@@ -121,7 +121,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Fibonacci Search with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Divide a sorted array using Fibonacci numbers rather than midpoints, avoiding the division binary search relies on."
  },
  {
   "title": "Graph Representations",
@@ -169,7 +169,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Insertion Sort with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Build a sorted section one element at a time and watch each new value shift left into the position where it belongs."
  },
  {
   "title": "Interpolation Search",
@@ -177,7 +177,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Interpolation Search with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Estimate where a value should sit instead of always splitting the middle, the way you open a phone book near the S pages."
  },
  {
   "title": "KMP String Matching",
@@ -193,7 +193,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Linear Search with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Step through an array one element at a time and see exactly when brute-force scanning is genuinely the right choice."
  },
  {
   "title": "Linked Lists",
@@ -209,7 +209,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Merge Sort with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Split an array down to single elements and watch merge sort combine sorted halves back together in n log n time."
  },
  {
   "title": "Minimum Spanning Tree",
@@ -225,7 +225,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Python Dictionary Lab with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Insert, look up and delete key-value pairs in a Python dictionary, and see how hashing makes each operation instant."
  },
  {
   "title": "Python List Lab",
@@ -233,7 +233,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Python List Lab with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Index, slice, append and mutate Python lists interactively, and see how the underlying dynamic array grows as you go."
  },
  {
   "title": "Python String Lab",
@@ -241,7 +241,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Visual Learning Platform - Python String Lab with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Slice, index, join and format Python strings interactively, and see how immutability shapes what each operation does."
  },
  {
   "title": "Queues (FIFO)",
@@ -257,7 +257,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Quick Sort with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Pick a pivot, partition around it, then recurse, and see why the pivot choice decides whether quick sort flies or crawls."
  },
  {
   "title": "Radix Sort",
@@ -281,7 +281,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Selection Sort with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Scan for the smallest remaining value and swap it into place, one position at a time, until the whole array is sorted."
  },
  {
   "title": "Sliding Window",
@@ -353,7 +353,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn Convolutional Layer with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Drag a convolution filter across an image and watch it build a feature map one value at a time, the core operation inside a CNN."
  },
  {
   "title": "Data Loaders in CNN",
@@ -377,7 +377,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn Grayscale Image Processing with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "See a grayscale image for what it is: a grid of brightness numbers you can filter, threshold and edit directly."
  },
  {
   "title": "How Neural Networks Process Images",
@@ -393,7 +393,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn Image Data Augmentation with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Flip, rotate, zoom and add noise to an image, and see how augmentation multiplies a small training set into a larger one."
  },
  {
   "title": "Padding in CNN",
@@ -417,7 +417,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn Pooling Layer with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Shrink a feature map with max, average or min pooling and see how downsampling keeps the signal but discards the detail."
  },
  {
   "title": "RGB Image Processing",
@@ -425,7 +425,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn RGB Image Processing with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Split a colour image into red, green and blue channels and see how three grids of numbers combine into every pixel."
  },
  {
   "title": "ReLU Activation in CNN",
@@ -441,7 +441,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn Real-time Edge Detection with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Slide a sensitivity threshold across a real image and watch edges appear wherever brightness changes sharply enough."
  },
  {
   "title": "Strides in CNN",
@@ -513,7 +513,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": "Learn SQL GroupBy Visualizer with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Group rows by a column and watch COUNT, SUM and AVG collapse many rows into one row per group, live against a sample table."
  },
  {
   "title": "SQL Joins Visualizer",
@@ -521,7 +521,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": "Learn SQL Joins Visualizer with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Watch INNER, LEFT, RIGHT and FULL joins pull rows from two tables, and see exactly which rows each variant keeps."
  },
  {
   "title": "SQL Window Functions",
@@ -529,7 +529,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": "Learn SQL Window Functions with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Rank, total and compare across rows without collapsing them, using OVER and PARTITION BY on a live result set."
  },
  {
   "title": "What are Non Relational Databases?",
@@ -561,7 +561,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Activation Functions with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Compare ReLU, sigmoid, tanh and others on the same input, and see how each one bends the signal passing through a layer."
  },
  {
   "title": "Batch Normalization in Deep Networks",
@@ -569,7 +569,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Batch Normalization in Deep Networks with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Toggle batch normalisation on a deep network and watch it rescale layer outputs to keep gradients stable as they flow back."
  },
  {
   "title": "Batch Processing in Networks",
@@ -577,7 +577,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Batch Processing in the Neural Network with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Compare stochastic, mini-batch and full-batch training, and see how batch size trades gradient noise against speed."
  },
  {
   "title": "Data Sparsity",
@@ -585,7 +585,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Data Sparsity with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Feed mostly-zero inputs through a network and watch entire pathways go dormant, because anything multiplied by zero stays zero."
  },
  {
   "title": "Dropout Regularization",
@@ -593,7 +593,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Dropout in Neural Networks with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Switch neurons off at random during training and watch dropout stop the network leaning on any single pathway."
  },
  {
   "title": "Early Stopping",
@@ -601,7 +601,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Early Stopping with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Watch validation loss bottom out then start climbing, and see early stopping halt training at the moment generalisation peaks."
  },
  {
   "title": "Feature Scaling & Weight Bias",
@@ -609,7 +609,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Feature Scaling & Weight Bias with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "See what happens when one feature is measured in thousands and another in decimals, and how scaling rebalances the gradients."
  },
  {
   "title": "Gradient Descent",
@@ -617,7 +617,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Gradient Descent with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Watch gradient descent step downhill across a loss surface, and see how the learning rate decides between converging and diverging."
  },
  {
   "title": "Gradient Descent Batch Processing",
@@ -625,7 +625,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Gradient descent batch processing with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Change one control at a time and watch how batch size reshapes the path gradient descent takes toward the minimum."
  },
  {
   "title": "How Loss is Calculated",
@@ -633,7 +633,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn How Loss is Calculated with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Follow a prediction through to a single loss value, and see how the error signal that drives all learning is actually computed."
  },
  {
   "title": "Hyperparameter Tuning",
@@ -641,7 +641,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Hyperparameter Tuning with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Run grid search and random search side by side on the same model and see which finds strong hyperparameters in fewer trials."
  },
  {
   "title": "Learning Rate Scheduling",
@@ -649,7 +649,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Learning Rate Scheduling with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Compare a fixed learning rate against a decaying schedule, and watch scheduling rescue a model that would otherwise overshoot."
  },
  {
   "title": "Linear Regression with Gradient Descent",
@@ -657,7 +657,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Linear Regression with Gradient Descent with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Take gradient descent one step at a time and watch the best-fit line and its mean squared error converge together."
  },
  {
   "title": "Model Reproducibility",
@@ -665,7 +665,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Reproducibility of Model with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Fix the random seed and see exactly what becomes repeatable: initial weights and the order training data is shuffled in."
  },
  {
   "title": "Model Training Curves",
@@ -673,7 +673,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Model Training Curves with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Read training and validation curves like a practitioner: spot underfitting, a healthy fit and overfitting from their shape alone."
  },
  {
   "title": "Model Training on CPU vs GPU",
@@ -689,7 +689,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Neural Network Visualizer with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Build a neural network layer by layer and watch data flow forward through weights, biases and activations into a prediction."
  },
  {
   "title": "Neural Network for Regression",
@@ -697,7 +697,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Neural Network for Regression with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Adapt a neural network to predict continuous values, and see how its output layer and loss differ from a classifier's."
  },
  {
   "title": "Neural Network for Unsupervised Learning",
@@ -705,7 +705,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Neural Network for Unsupervised Learning with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Train a network with no labels at all and watch it uncover structure by learning to reconstruct its own input."
  },
  {
   "title": "Optimizers in 3D",
@@ -713,7 +713,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Optimizers with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Race SGD, Momentum, RMSprop and Adam across a 3D loss landscape and watch which of them escape local minima and which get stuck."
  },
  {
   "title": "Optimizers in Neural Networks",
@@ -721,7 +721,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Optimizers with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Run several optimizers in parallel on one loss surface and see how momentum and adaptive learning rates change the route."
  },
  {
   "title": "Overfitting vs Underfitting",
@@ -729,7 +729,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Overfitting vs Underfitting with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Move model complexity from too simple to too flexible and watch the gap open between training and validation performance."
  },
  {
   "title": "Perceptron Classifier",
@@ -737,7 +737,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Perceptron Classifier with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Adjust the weights and bias of a single perceptron by hand and watch its decision boundary swing across the data."
  },
  {
   "title": "Regularization Techniques",
@@ -745,7 +745,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Regularization Techniques with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Compare L1 and L2 penalties, and watch Lasso zero out useless weights while Ridge shrinks all of them smoothly."
  },
  {
   "title": "Vanishing & Exploding Gradients",
@@ -753,7 +753,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Vanishing & Exploding Gradients with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Watch gradients shrink to nothing or blow up as they multiply back through layers, and see what keeps them in range."
  },
  {
   "title": "Weight Initialization Methods",
@@ -761,7 +761,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Weight Initialization Methods with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Compare He, Xavier, random and zero initialisation, and watch poor starting weights kill a deep network before it learns."
  },
  {
   "title": "Weights & Biases",
@@ -769,7 +769,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Learn Weights & Biases with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "See what the numbers a network learns are actually for: weights scale each input, bias shifts where the neuron fires."
  },
  {
   "title": "Byte Pair Encoding Tokenizer",
@@ -785,7 +785,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Causal Language Modeling with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "See how predicting the next token, over and over, is all it takes for a model like GPT to produce fluent text."
  },
  {
   "title": "How LLMs Predict the Next Word?",
@@ -841,7 +841,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Bias-Variance Tradeoff with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Dial bias and variance up and down, resample the data, and watch a stable underfit turn into an unstable overfit."
  },
  {
   "title": "Confusion Matrix Analysis",
@@ -849,7 +849,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Confusion Matrix with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "See why accuracy alone misleads. Build a confusion matrix cell by cell and watch precision, recall and F1 shift with every prediction."
  },
  {
   "title": "Cosine Similarity Metric",
@@ -857,7 +857,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Cosine Similarity with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Measure similarity by angle instead of distance. Drag two vectors apart and watch the cosine similarity score respond in real time."
  },
  {
   "title": "Decision Tree Analysis",
@@ -865,7 +865,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Decision Tree (ID3) with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Watch a decision tree choose each split by information gain, growing branch by branch until every leaf holds a single class."
  },
  {
   "title": "Evaluation Metrics for Regression",
@@ -873,7 +873,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Regression Metrics with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Compare MAE, MSE, RMSE and R-squared on identical predictions and see which kinds of error each metric punishes hardest."
  },
  {
   "title": "Hard vs Soft Labelling",
@@ -881,7 +881,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Hard vs Soft Labelling with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Compare a single hard label against a probability distribution, and see what a model loses when forced to pick one winner."
  },
  {
   "title": "K-Fold Cross Validation",
@@ -889,7 +889,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Cross Validation with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Watch data split into k folds, each taking a turn as validation, and see why a single train/test split can flatter a model."
  },
  {
   "title": "K-Means Clustering",
@@ -897,7 +897,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn K-Means Clustering with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Place centroids and watch K-Means alternate between assigning points and recentring clusters until it converges."
  },
  {
   "title": "K-Nearest Neighbors",
@@ -905,7 +905,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn K-Nearest Neighbors with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Drop a new point on the plane and watch KNN classify it by neighbour vote. Change k to see the decision boundary tighten or smooth."
  },
  {
   "title": "Label Encoding Process",
@@ -913,7 +913,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Label Encoding with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Turn categories into integers, and see where label encoding is safe and where it invents an ordering your model will believe."
  },
  {
   "title": "Label Imbalance Problem",
@@ -921,7 +921,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Label Imbalance & The Accuracy Paradox with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "See how a model scores 99% accuracy while missing every fraud case, and why imbalance breaks your intuition about metrics."
  },
  {
   "title": "Linear Regression with OLS",
@@ -929,7 +929,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Linear Regression with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Drag a regression line by hand and watch the residuals and mean squared error react, then let least squares find the optimum."
  },
  {
   "title": "Model and Data Drift",
@@ -937,7 +937,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Model and Data Drift with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Fast-forward through production and watch a well-trained model decay as incoming data drifts away from what it learned."
  },
  {
   "title": "Naive Bayes Classifier",
@@ -945,7 +945,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Naive Bayes Classifier with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Step through Bayes' theorem on real text and see why a 'naive' independence assumption still classifies spam remarkably well."
  },
  {
   "title": "One-Hot Encoding",
@@ -953,7 +953,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn One Hot Encoding with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Expand a categorical column into binary columns and see how one-hot encoding avoids implying an order that was never there."
  },
  {
   "title": "Sliding Window for Time Series",
@@ -961,7 +961,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Sliding Window Explorer with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Slide a window across a time series to turn a raw sequence into supervised training rows of features and targets."
  },
  {
   "title": "Support Vector Machines",
@@ -969,7 +969,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Support Vector Machines with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Add points from two classes and watch a support vector machine find the hyperplane with the widest possible margin between them."
  },
  {
   "title": "Train-Test Split Method",
@@ -977,7 +977,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Train, Test & Validation Split with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "See why testing on data you trained on flatters a model, and how holding out a test set gives you an honest score."
  },
  {
   "title": "Training on Imbalanced Dataset",
@@ -985,7 +985,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": "Learn Training on Imbalanced Data with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Try resampling, class weights and threshold tuning on an imbalanced dataset and watch minority-class recall respond."
  },
  {
   "title": "Bayes' Theorem",
@@ -1097,7 +1097,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Learn ASCII Code Explorer with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Type any character and see the ASCII number a computer actually stores, the very first step from text into numbers."
  },
  {
   "title": "Backpropagation Through Time",
@@ -1129,7 +1129,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Learn How LSTM Processes Text with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Watch an LSTM carry a cell state for long-term memory and a hidden state for short-term as it reads through a sequence."
  },
  {
   "title": "How Neural Networks Process Text",
@@ -1137,7 +1137,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Learn How Neural Networks Process Text with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Follow a sentence from raw characters through tokens and vectors into something a neural network can actually multiply."
  },
  {
   "title": "How RNN Processes Text",
@@ -1145,7 +1145,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Learn How RNN Processes Text with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Feed a sentence word by word into a recurrent network and watch the hidden state carry context from each step to the next."
  },
  {
   "title": "How Words are Represented in Neural Networks",
@@ -1193,7 +1193,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Learn N-gram Explainer with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Slide an n-gram window across text and see how counting short sequences lets a model guess which word comes next."
  },
  {
   "title": "NLP Tokenizer",
@@ -1201,7 +1201,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Learn NLP Tokenizer with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Split text into words, characters or sentences and see how the tokenizer you choose changes what a model actually reads."
  },
  {
   "title": "Normalization Techniques for Sequential Data",
@@ -1241,7 +1241,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Learn Stemming vs Lemmatization with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Compare a stemmer chopping suffixes against a lemmatizer resolving proper dictionary forms of the very same words."
  },
  {
   "title": "Text Encoding Techniques in NLP",
@@ -1257,7 +1257,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Learn Text Normalization Pipeline with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Run raw text through lowercasing, punctuation stripping and stop-word removal, and watch each stage clean it further."
  },
  {
   "title": "Vanishing Gradient Problem in RNN",
@@ -1329,6 +1329,164 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Learn Word Cloud Generator with a beginner-friendly interactive visualization, examples, and guided practice on VizLearn."
+  "desc": "Paste any text and watch a word cloud size each term by how often it appears, exposing what a document is really about."
+ }
+];
+
+window.VIZLEARN_PATH = [
+ {
+  "title": "Groundwork",
+  "blurb": "The handful of maths ideas everything else leans on.",
+  "modules": [
+   {
+    "title": "Equation of a Line (y = mx + c)",
+    "path": "maths/equation_of_line.html",
+    "category": "Maths"
+   },
+   {
+    "title": "Vectors and the Dot Product",
+    "path": "maths/vectors_and_dot_product.html",
+    "category": "Maths"
+   },
+   {
+    "title": "Derivatives and Slope",
+    "path": "maths/derivatives_and_slope.html",
+    "category": "Maths"
+   },
+   {
+    "title": "Mean, Variance and Standard Deviation",
+    "path": "maths/mean_variance_standard_deviation.html",
+    "category": "Maths"
+   },
+   {
+    "title": "Probability Basics",
+    "path": "maths/probability_basics.html",
+    "category": "Maths"
+   }
+  ]
+ },
+ {
+  "title": "Your first models",
+  "blurb": "Split the data, fit something simple, then find out if it worked.",
+  "modules": [
+   {
+    "title": "Train-Test Split Method",
+    "path": "machine_learning/train_test_split.html",
+    "category": "Machine Learning"
+   },
+   {
+    "title": "One-Hot Encoding",
+    "path": "machine_learning/one_hot_encoding.html",
+    "category": "Machine Learning"
+   },
+   {
+    "title": "Linear Regression with OLS",
+    "path": "machine_learning/linear_regression_with_ols.html",
+    "category": "Machine Learning"
+   },
+   {
+    "title": "K-Nearest Neighbors",
+    "path": "machine_learning/knn.html",
+    "category": "Machine Learning"
+   },
+   {
+    "title": "Confusion Matrix Analysis",
+    "path": "machine_learning/confusion_matrix.html",
+    "category": "Machine Learning"
+   }
+  ]
+ },
+ {
+  "title": "How learning actually works",
+  "blurb": "From one neuron to a network that trains itself downhill.",
+  "modules": [
+   {
+    "title": "Perceptron Classifier",
+    "path": "deep_learning/perceptron.html",
+    "category": "Deep Learning"
+   },
+   {
+    "title": "Activation Functions in DL",
+    "path": "deep_learning/activation_functions.html",
+    "category": "Deep Learning"
+   },
+   {
+    "title": "How Loss is Calculated",
+    "path": "deep_learning/how_loss_is_calculated.html",
+    "category": "Deep Learning"
+   },
+   {
+    "title": "Gradient Descent",
+    "path": "deep_learning/gradient_descent_training.html",
+    "category": "Deep Learning"
+   },
+   {
+    "title": "Neural Network Visualizer",
+    "path": "deep_learning/neural_network.html",
+    "category": "Deep Learning"
+   }
+  ]
+ },
+ {
+  "title": "Making training behave",
+  "blurb": "The failure modes every practitioner meets, and their fixes.",
+  "modules": [
+   {
+    "title": "Overfitting vs Underfitting",
+    "path": "deep_learning/overfitting_vs_underfitting.html",
+    "category": "Deep Learning"
+   },
+   {
+    "title": "K-Fold Cross Validation",
+    "path": "machine_learning/cross_validation.html",
+    "category": "Machine Learning"
+   },
+   {
+    "title": "Dropout Regularization",
+    "path": "deep_learning/dropout_in_neural_networks.html",
+    "category": "Deep Learning"
+   },
+   {
+    "title": "Early Stopping",
+    "path": "deep_learning/early_stopping_in_neural_networks.html",
+    "category": "Deep Learning"
+   },
+   {
+    "title": "Model Training Curves",
+    "path": "deep_learning/model_training_curve.html",
+    "category": "Deep Learning"
+   }
+  ]
+ },
+ {
+  "title": "Pick a specialism",
+  "blurb": "Same foundations, four directions. Start wherever you like.",
+  "modules": [
+   {
+    "title": "Convolutional Layer",
+    "path": "computer_vision/feature_map_in_cnn.html",
+    "category": "Computer Vision"
+   },
+   {
+    "title": "What are Embeddings?",
+    "path": "natural_language_processing/what_are_embeddings.html",
+    "category": "NLP"
+   },
+   {
+    "title": "How LLMs Predict the Next Word?",
+    "path": "gen_ai/how_llms_predict_next_word.html",
+    "category": "Gen AI"
+   },
+   {
+    "title": "Big-O Notation and Time Complexity",
+    "path": "dsa/big_o_notation.html",
+    "category": "Algorithms"
+   },
+   {
+    "title": "SQL Joins Visualizer",
+    "path": "database/joins_in_sql.html",
+    "category": "Database"
+   }
+  ]
  }
 ];

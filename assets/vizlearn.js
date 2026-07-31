@@ -277,10 +277,31 @@
     site: SITE
   };
 
+  // --- pointer safety net --------------------------------------------------
+  // The visualisations use pointer events so touch and stylus work. If the
+  // browser cancels a gesture mid-drag (an interruption, a system gesture),
+  // `pointerup` never arrives and the page can be left stuck mid-drag. Turning
+  // a cancel into a synthetic release keeps that state machine honest.
+  function initPointerCancel() {
+    window.addEventListener('pointercancel', function (e) {
+      var up = new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        pointerId: e.pointerId,
+        pointerType: e.pointerType
+      });
+      (e.target || window).dispatchEvent(up);
+      if (e.target !== window) window.dispatchEvent(up);
+    });
+  }
+
   function boot() {
     initProgress();
     initShare();
     initCheatSheet();
+    initPointerCancel();
     decorateVisited(document);
   }
 

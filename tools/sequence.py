@@ -1,0 +1,275 @@
+# -*- coding: utf-8 -*-
+"""Teaching order for each track.
+
+courseData was alphabetical, which meant prev/next, the related rail and the
+hub all presented modules in an order nobody would teach in - Maths opened on
+Bayes' Theorem, Deep Learning opened on Activation Functions before a
+perceptron had been introduced.
+
+This is the intended sequence: each module should only rely on ideas from the
+ones above it. Reorder here, run `npm run build`, and prev/next, the related
+rail, the Learning Path and the hub all follow.
+"""
+
+SEQUENCE = {
+    # Foundations the rest of the site quietly assumes.
+    "maths": [
+        "maths/equation_of_line.html",
+        "maths/logarithms.html",
+        "maths/exponentials.html",
+        "maths/vectors_and_dot_product.html",
+        "maths/matrix_multiplication.html",
+        "maths/derivatives_and_slope.html",
+        "maths/the_chain_rule.html",
+        "maths/partial_derivatives_and_gradient.html",
+        "maths/mean_mode_and_median.html",
+        "maths/mean_variance_standard_deviation.html",
+        "maths/probability_basics.html",
+        "maths/bayes_theorem.html",
+        "maths/the_normal_distribution.html",
+    ],
+
+    # Prepare data -> fit a first model -> measure it -> more models -> pitfalls.
+    "ml": [
+        "machine_learning/train_test_split.html",
+        "machine_learning/label_encoding.html",
+        "machine_learning/one_hot_encoding.html",
+        "machine_learning/linear_regression_with_ols.html",
+        "machine_learning/evaluation_metrics_for_regression.html",
+        "machine_learning/knn.html",
+        "machine_learning/confusion_matrix.html",
+        "machine_learning/decision_tree.html",
+        "machine_learning/naive_bayes.html",
+        "machine_learning/svm.html",
+        "machine_learning/k_means.html",
+        "machine_learning/cosine_similarity.html",
+        "machine_learning/cross_validation.html",
+        "machine_learning/bias_vs_variance.html",
+        "machine_learning/label_imbalance_problem.html",
+        "machine_learning/training_on_label_imbalanced_dataset.html",
+        "machine_learning/hard_vs_soft_labelling.html",
+        "machine_learning/sliding_window_for_timeseries_data.html",
+        "machine_learning/model_and_data_drift.html",
+    ],
+
+    # One neuron -> a network -> how it learns -> what goes wrong -> practice.
+    "dl": [
+        "deep_learning/perceptron.html",
+        "deep_learning/weights_and_biases.html",
+        "deep_learning/activation_functions.html",
+        "deep_learning/neural_network.html",
+        "deep_learning/how_loss_is_calculated.html",
+        "deep_learning/gradient_descent_training.html",
+        "deep_learning/linear_regression_with_gradient_descent.html",
+        "deep_learning/optimizers_in_neural_networks.html",
+        "deep_learning/optimizers_in_3d.html",
+        "deep_learning/learning_rate_scheduling.html",
+        "deep_learning/batch_processing_in_neural_networks.html",
+        "deep_learning/gradient_descent_batch_processing.html",
+        "deep_learning/feature_scaling_in_neural_networks.html",
+        "deep_learning/weight_initialization.html",
+        "deep_learning/vanishing_vs_exploding_gradient.html",
+        "deep_learning/batch_normalization.html",
+        "deep_learning/overfitting_vs_underfitting.html",
+        "deep_learning/model_training_curve.html",
+        "deep_learning/dropout_in_neural_networks.html",
+        "deep_learning/regularization_in_neural_networks.html",
+        "deep_learning/early_stopping_in_neural_networks.html",
+        "deep_learning/hyper-paramter_tuning.html",
+        "deep_learning/data_sparsity.html",
+        "deep_learning/neural_network_for_regression.html",
+        "deep_learning/neural_network_for_unsupervised_learning.html",
+        "deep_learning/reproducibility_of_model.html",
+        "deep_learning/model_training_on_cpu_vs_gpu.html",
+    ],
+
+    # Cost -> built-in types -> search -> sort -> recursion -> structures ->
+    # graphs -> techniques.
+    "dsa": [
+        "dsa/big_o_notation.html",
+        "dsa/lists_in_python.html",
+        "dsa/strings_in_python.html",
+        "dsa/dictionaries_in_python.html",
+        "dsa/linear_search.html",
+        "dsa/binary_search.html",
+        "dsa/interpolation_search.html",
+        "dsa/fibonacci_search.html",
+        "dsa/bubble_sort.html",
+        "dsa/selection_sort.html",
+        "dsa/insertion_sort.html",
+        "dsa/recursion_and_call_stack.html",
+        "dsa/divide_and_conquer.html",
+        "dsa/merge_sort.html",
+        "dsa/quick_sort.html",
+        "dsa/counting_sort.html",
+        "dsa/radix_sort.html",
+        "dsa/stacks.html",
+        "dsa/queues.html",
+        "dsa/linked_lists.html",
+        "dsa/hash_tables.html",
+        "dsa/binary_search_trees.html",
+        "dsa/heaps_and_priority_queues.html",
+        "dsa/heap_sort.html",
+        "dsa/trie_prefix_tree.html",
+        "dsa/union_find.html",
+        "dsa/graph_representations.html",
+        "dsa/breadth_first_search.html",
+        "dsa/depth_first_search.html",
+        "dsa/cycle_detection.html",
+        "dsa/topological_sort.html",
+        "dsa/dijkstras.html",
+        "dsa/bellman_ford.html",
+        "dsa/a_star.html",
+        "dsa/minimum_spanning_tree.html",
+        "dsa/two_pointers.html",
+        "dsa/sliding_window.html",
+        "dsa/greedy_algorithms.html",
+        "dsa/backtracking.html",
+        "dsa/dynamic_programming.html",
+        "dsa/kmp_string_matching.html",
+    ],
+
+    # Text as numbers -> encodings -> embeddings -> sequences -> RNN -> LSTM.
+    "nlp": [
+        "natural_language_processing/ascii_codes.html",
+        "natural_language_processing/tokenization.html",
+        "natural_language_processing/text_normalization_pipeline.html",
+        "natural_language_processing/stemming_vs_lemmatization.html",
+        "natural_language_processing/n_gram.html",
+        "natural_language_processing/word_cloud.html",
+        "natural_language_processing/why_text_encoding_is_needed_in_nlp.html",
+        "natural_language_processing/text_encoding_techniques_in_nlp.html",
+        "natural_language_processing/how_words_are_represented_in_neural_networks.html",
+        "natural_language_processing/what_are_embeddings.html",
+        "natural_language_processing/how_are_embeddings_generated.html",
+        "natural_language_processing/how_neural_network_text.html",
+        "natural_language_processing/what_is_a_sequence.html",
+        "natural_language_processing/sequential_data_preparation_with_sliding_window.html",
+        "natural_language_processing/normalization_techniques_for_sequential_data.html",
+        "natural_language_processing/limitations_of_ann_with_sequential_data.html",
+        "natural_language_processing/what_is_a_recurrent_cell.html",
+        "natural_language_processing/how_rnn_process_text.html",
+        "natural_language_processing/rnn_architecture.html",
+        "natural_language_processing/rnn.html",
+        "natural_language_processing/backpropagation_through_time.html",
+        "natural_language_processing/vanishing_gradient_problem_in_rnn.html",
+        "natural_language_processing/what_is_lstm.html",
+        "natural_language_processing/forget_gate_in_lstm.html",
+        "natural_language_processing/input_gate_in_lstm.html",
+        "natural_language_processing/candidate_memory_in_lstm.html",
+        "natural_language_processing/output_gate_in_lstm.html",
+        "natural_language_processing/how_lstm_processes_text.html",
+        "natural_language_processing/what_is_a_gru.html",
+        "natural_language_processing/what_is_bi_directional_layer.html",
+    ],
+
+    # Pixels -> one convolution -> its knobs -> a whole CNN -> training it.
+    "computer-vision": [
+        "computer_vision/how_neural_network_process_images.html",
+        "computer_vision/grayscale_image_processing.html",
+        "computer_vision/rgb_image_processing.html",
+        "computer_vision/edge_detection.html",
+        "computer_vision/feature_map_in_cnn.html",
+        "computer_vision/padding_in_cnn.html",
+        "computer_vision/strides_in_cnn.html",
+        "computer_vision/parameter_sharing_in_cnn.html",
+        "computer_vision/how_relu_works_in_cnn.html",
+        "computer_vision/downsampling_in_cnn.html",
+        "computer_vision/how_dense_layer_works_in_cnn.html",
+        "computer_vision/calculating_parameters_in_cnn.html",
+        "computer_vision/cnn.html",
+        "computer_vision/data_loaders_in_cnn.html",
+        "computer_vision/image_data_augmentation.html",
+        "computer_vision/transfer_learning_with_cnn.html",
+    ],
+
+    # What a database is -> define -> insert -> query -> aggregate -> advanced.
+    "db": [
+        "database/what_are_relational_databases.html",
+        "database/what_are_non_relational_databases.html",
+        "database/datatypes_in_sql.html",
+        "database/ddl_in_sql.html",
+        "database/dml_in_sql.html",
+        "database/where_clause_in_sql.html",
+        "database/limit_and_offset_in_sql.html",
+        "database/groupby_in_sql.html",
+        "database/joins_in_sql.html",
+        "database/common_table_expressions_in_sql.html",
+        "database/window_functions_in_sql.html",
+        "database/regular_expressions_in_sql.html",
+    ],
+
+    # How an LLM reads -> how it predicts -> how it is trained -> how it is shrunk.
+    "gen-ai": [
+        "gen_ai/how_llms_process_text.html",
+        "gen_ai/byte_pair_encoding_tokenizer.html",
+        "gen_ai/how_llms_predict_next_word.html",
+        "gen_ai/casual_language_modeling.html",
+        "gen_ai/masked_language_modeling.html",
+        "gen_ai/quantization_in_llms.html",
+        "gen_ai/lora_in_llms.html",
+        "gen_ai/knowledge_distillation_in_llms.html",
+    ],
+}
+
+
+# A curated cross-track route for someone starting from nothing. Each stage is
+# a handful of modules from the sequences above, in the order they build on
+# each other.
+LEARNING_PATH = [
+    {
+        "title": "Groundwork",
+        "blurb": "The handful of maths ideas everything else leans on.",
+        "modules": [
+            "maths/equation_of_line.html",
+            "maths/vectors_and_dot_product.html",
+            "maths/derivatives_and_slope.html",
+            "maths/mean_variance_standard_deviation.html",
+            "maths/probability_basics.html",
+        ],
+    },
+    {
+        "title": "Your first models",
+        "blurb": "Split the data, fit something simple, then find out if it worked.",
+        "modules": [
+            "machine_learning/train_test_split.html",
+            "machine_learning/one_hot_encoding.html",
+            "machine_learning/linear_regression_with_ols.html",
+            "machine_learning/knn.html",
+            "machine_learning/confusion_matrix.html",
+        ],
+    },
+    {
+        "title": "How learning actually works",
+        "blurb": "From one neuron to a network that trains itself downhill.",
+        "modules": [
+            "deep_learning/perceptron.html",
+            "deep_learning/activation_functions.html",
+            "deep_learning/how_loss_is_calculated.html",
+            "deep_learning/gradient_descent_training.html",
+            "deep_learning/neural_network.html",
+        ],
+    },
+    {
+        "title": "Making training behave",
+        "blurb": "The failure modes every practitioner meets, and their fixes.",
+        "modules": [
+            "deep_learning/overfitting_vs_underfitting.html",
+            "machine_learning/cross_validation.html",
+            "deep_learning/dropout_in_neural_networks.html",
+            "deep_learning/early_stopping_in_neural_networks.html",
+            "deep_learning/model_training_curve.html",
+        ],
+    },
+    {
+        "title": "Pick a specialism",
+        "blurb": "Same foundations, four directions. Start wherever you like.",
+        "modules": [
+            "computer_vision/feature_map_in_cnn.html",
+            "natural_language_processing/what_are_embeddings.html",
+            "gen_ai/how_llms_predict_next_word.html",
+            "dsa/big_o_notation.html",
+            "database/joins_in_sql.html",
+        ],
+    },
+]

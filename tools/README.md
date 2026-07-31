@@ -15,7 +15,8 @@ That runs, in order:
 
 | Step | Script | Produces |
 | --- | --- | --- |
-| 1 | `tools/build_catalog.py` | `assets/modules.js` — the module list every page's search reads |
+| 0 | `tools/apply_sequence.py` | reorders `courseData` to the teaching order in `sequence.py` |
+| 1 | `tools/build_catalog.py` | `assets/modules.js` — the module list and the Learning Path |
 | 2 | `tools/merge_tw_config.js` | `tailwind.config.js` |
 | 3 | `tailwindcss` | `assets/vizlearn.css` |
 | 4 | `tools/build_icons_js.py` | `assets/icons.js` — SVG for icons chosen at runtime |
@@ -24,7 +25,8 @@ That runs, in order:
 | 7 | `tools/build_seo.py` | canonical / OG / Twitter / JSON-LD, plus the shared `<script>` tags |
 | 8 | `tools/build_prerender.py` | static card grid inside `index.html` |
 | 9 | `tools/build_sitemap.py` | `sitemap.xml`, `robots.txt` |
-| 10 | `tools/audit.py` | fails the build if anything is inconsistent |
+| 10 | `tools/check_inline_js.js` | parses every inline `<script>`; catches unbalanced braces |
+| 11 | `tools/audit.py` | fails the build if anything is inconsistent |
 
 Steps 6–8 write into the HTML between `VIZLEARN:*` markers and are idempotent —
 re-running replaces the block rather than stacking copies. Don't hand-edit
@@ -44,9 +46,17 @@ Every module page gets, as real markup so crawlers follow it:
 - **Prev / next** — the neighbouring modules in the track.
 - **Share** — in the header, wired up by `assets/vizlearn.js`.
 
-**Prev/next and related order follows `courseData` order within a topic**, so
-reordering a topic's `courses` array in `index.html` is how you define the
-learning sequence. Today that order is roughly alphabetical.
+**Prev/next and related order follows `courseData`**, which
+`tools/apply_sequence.py` keeps in sync with `tools/sequence.py`. That file is
+where the teaching order lives — edit it, not `index.html`. It also defines
+`LEARNING_PATH`, the curated 25-module beginner route rendered on the hub.
+
+`tools/descriptions.py` holds hand-written meta descriptions, which override
+whatever a page declares and are written back into its `<meta>` on build.
+
+`tools/fix_touch_input.py` is a one-off that converted mouse listeners to
+pointer events so the visualisations work on touchscreens; it is safe to re-run
+and reports nothing left to convert.
 
 ## Progress tracking
 
@@ -67,7 +77,9 @@ move through results, Enter opens, Escape closes, and `/` focuses the box.
 
 1. Create the page under the relevant topic directory.
 2. Add one entry to `courseData` in `index.html` (title, path, card `svg`).
-3. `npm run build`.
+3. Slot its path into the right position in `tools/sequence.py`.
+4. Optionally add a description to `tools/descriptions.py`.
+5. `npm run build`.
 
 `index.html`'s `courseData` is the single source of truth. Everything else —
 the search catalog on all 167 pages, the sitemap, the OG image, the pre-rendered
