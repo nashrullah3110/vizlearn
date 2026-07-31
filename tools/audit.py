@@ -140,6 +140,23 @@ def main():
 
     check(os.path.exists(os.path.join(ROOT, "robots.txt")), "robots.txt missing")
 
+    # --- ads.txt must agree with the AdSense client the pages actually load ---
+    ads = os.path.join(ROOT, "ads.txt")
+    check(os.path.exists(ads), "ads.txt missing (AdSense will report 'needs ads.txt')")
+    if os.path.exists(ads):
+        from build_seo import ADSENSE_CLIENT
+        pub = ADSENSE_CLIENT.replace("ca-", "")   # ads.txt drops the ca- prefix
+        lines = [l.strip() for l in open(ads, encoding="utf-8")
+                 if l.strip() and not l.strip().startswith("#")]
+        check(any(pub in l for l in lines),
+              "ads.txt does not list %s, the publisher ID the pages load" % pub)
+        for l in lines:
+            fields = [f.strip() for f in l.split(",")]
+            check(len(fields) in (3, 4),
+                  "ads.txt line has %d fields, expected 3 or 4: %s" % (len(fields), l))
+            check(not fields[1].startswith("ca-"),
+                  "ads.txt publisher ID must not include the 'ca-' prefix: %s" % l)
+
     print("checked %d pages" % len(files))
     if problems:
         print("\n%d PROBLEM(S):" % len(problems))
