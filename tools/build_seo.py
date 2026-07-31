@@ -23,6 +23,18 @@ END = "<!-- VIZLEARN:HEAD:END -->"
 
 AUTHOR = "Ashish Jangra"
 
+# Google AdSense loader. Google expects this in <head> on every page you want
+# ads on; it also serves as the site-verification signal during review. It does
+# nothing visible until the account is approved.
+ADSENSE_CLIENT = "ca-pub-7551664560637561"
+ADSENSE_TAG = (
+    '    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js'
+    '?client=%s" crossorigin="anonymous"></script>' % ADSENSE_CLIENT
+)
+# Any copy placed by hand outside the generated block, so re-runs cannot stack.
+LOOSE_ADSENSE = re.compile(
+    r'[ \t]*<script[^>]*pagead2\.googlesyndication\.com[^>]*>\s*</script>\n?', re.S)
+
 # Pages that had no description of their own.
 FALLBACK_DESC = {
     "index.html": (
@@ -148,6 +160,9 @@ def build_block(rel, title, desc, prefix, mod, needs_icons=False):
         "",
         "    <!-- prebuilt stylesheet (replaces the Tailwind CDN compiler) -->",
         '    <link rel="stylesheet" href="%sassets/vizlearn.css">' % prefix,
+        "",
+        "    <!-- Google AdSense -->",
+        ADSENSE_TAG,
     ] + ([
         "",
         "    <!-- runtime icon lookup, for icons this page picks in JS -->",
@@ -178,6 +193,7 @@ def main():
 
         # strip anything we are replacing
         src = GENERATED.sub("", src)
+        src = LOOSE_ADSENSE.sub("", src)
         src = CDN_TAILWIND.sub("", src)
         src = CDN_FA.sub("", src)
         src = INLINE_TW_CONFIG.sub("", src)
