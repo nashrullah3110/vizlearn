@@ -248,4 +248,8 @@ DESCRIPTIONS = {
     "maths/covariance_and_correlation.html":
         "Stretch and tilt a point cloud. Covariance moves with the units, correlation does "
         "not, and neither notices a curve.",
+
+    "maths/maximum_likelihood_estimation.html":
+        "Slide a candidate distribution over fixed data and watch the likelihood peak. "
+        "Where squared error, log loss and cross-entropy all come from.",
 }

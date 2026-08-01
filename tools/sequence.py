@@ -31,6 +31,7 @@ SEQUENCE = {
         "maths/probability_basics.html",
         "maths/bayes_theorem.html",
         "maths/the_normal_distribution.html",
+        "maths/maximum_likelihood_estimation.html",
         "maths/entropy_and_information.html",
     ],
 

@@ -1116,6 +1116,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive matrix multiplication - click an output cell to see the row and column that produce it, with the shape rule enforced live."
  },
  {
+  "title": "Maximum Likelihood Estimation",
+  "path": "maths/maximum_likelihood_estimation.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "Slide a candidate distribution over fixed data and watch the likelihood peak. Where squared error, log loss and cross-entropy all come from."
+ },
+ {
   "title": "Mean, Mode and Median",
   "path": "maths/mean_mode_and_median.html",
   "category": "Maths",
