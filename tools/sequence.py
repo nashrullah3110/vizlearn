@@ -18,6 +18,7 @@ SEQUENCE = {
         "maths/logarithms.html",
         "maths/exponentials.html",
         "maths/vectors_and_dot_product.html",
+        "maths/vector_norms.html",
         "maths/matrix_multiplication.html",
         "maths/derivatives_and_slope.html",
         "maths/the_chain_rule.html",
@@ -27,6 +28,7 @@ SEQUENCE = {
         "maths/probability_basics.html",
         "maths/bayes_theorem.html",
         "maths/the_normal_distribution.html",
+        "maths/entropy_and_information.html",
     ],
 
     # Prepare data -> fit a first model -> measure it -> more models -> pitfalls.

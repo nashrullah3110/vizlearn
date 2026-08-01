@@ -1052,6 +1052,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive derivatives lesson - drag a point along a curve, shrink the secant to a tangent, and see the limit definition of the derivative in action."
  },
  {
+  "title": "Entropy and Information",
+  "path": "maths/entropy_and_information.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "Drag a distribution and watch uncertainty rise and fall. Entropy is the average surprise, and the quantity every classification loss is built from."
+ },
+ {
   "title": "Equation of a Line (y = mx + c)",
   "path": "maths/equation_of_line.html",
   "category": "Maths",
@@ -1130,6 +1138,14 @@ window.VIZLEARN_MODULES = [
   "topic": "maths",
   "icon": "sigma",
   "desc": "Interactive normal distribution lesson - adjust mean and standard deviation, see the 68-95-99.7 rule, z-scores, and the central limit theorem by sampling."
+ },
+ {
+  "title": "Vector Norms",
+  "path": "maths/vector_norms.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "Three answers to how big a vector is. See why the L1 diamond's corners make Lasso produce exact zeros while the L2 circle only shrinks."
  },
  {
   "title": "Vectors and the Dot Product",

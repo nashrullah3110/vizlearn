@@ -230,4 +230,11 @@ DESCRIPTIONS = {
     "natural_language_processing/transformer_architecture.html":
         "Attention, add, normalise, feed-forward, add, normalise - stacked. Switch the "
         "residual connections off and watch a 24-layer stack stop being trainable.",
+
+    "maths/entropy_and_information.html":
+        "Drag a distribution and watch uncertainty rise and fall. Entropy is the average "
+        "surprise, and the quantity every classification loss is built from.",
+    "maths/vector_norms.html":
+        "Three answers to how big a vector is. See why the L1 diamond's corners make Lasso "
+        "produce exact zeros while the L2 circle only shrinks.",
 }
