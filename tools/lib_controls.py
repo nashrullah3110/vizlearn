@@ -38,33 +38,47 @@ def text_of(fragment):
     return WS.sub(" ", html.unescape(TAG.sub(" ", fragment))).strip()
 
 
+# Every element that plausibly captions a control or a readout.
+_LABEL_PATS = [
+    re.compile(r"<label\b[^>]*>(.*?)</label>", re.S | re.I),
+    re.compile(r"<h[2-6]\b[^>]*>([^<]*)</h[2-6]>", re.I),
+    re.compile(r"<span\b[^>]*>([^<]*)</span>", re.I),
+    re.compile(r"<div\b[^>]*>([^<]*)</div>", re.I),
+    re.compile(r"<p\b[^>]*>([^<]*)</p>", re.I),
+    re.compile(r"<strong\b[^>]*>([^<]*)</strong>", re.I),
+    re.compile(r"<td\b[^>]*>([^<]*)</td>", re.I),
+]
+
+
 def _label_before(src, pos):
-    """The nearest <label> (or small heading) text that precedes `pos`."""
+    """The caption nearest to `pos`, searching backwards.
+
+    Proximity decides, not tag type. An earlier version tried each tag kind in
+    turn - labels, then headings, then spans - and returned the first kind it
+    found anywhere in the window. That let a card's <h3> half a panel away beat
+    the <span> sitting immediately beside the value, so a readout called
+    "Accuracy" came back named "Fit Quality" after the section it lived in.
+    """
     window = src[max(0, pos - LOOKBACK):pos]
 
-    # A <label> that closes before the control is the strongest signal.
-    labels = re.findall(r"<label\b[^>]*>(.*?)</label>", window, re.S | re.I)
-    for raw in reversed(labels):
-        t = text_of(raw)
-        # A label wrapping a radio/checkbox names the option, not the group.
-        if t and "<input" not in raw.lower() and 1 <= len(t) <= 60:
-            return t
-
-    # Then any small text element that closes just before the control. Many
-    # panels caption their readouts with a plain <div> or <p> rather than a
-    # <label>, so leaving those out loses most of the good names.
-    for pat in (r"<h[2-6]\b[^>]*>([^<]*)</h[2-6]>",
-                r"<span\b[^>]*>([^<]*)</span>",
-                r"<div\b[^>]*>([^<]*)</div>",
-                r"<p\b[^>]*>([^<]*)</p>",
-                r"<strong\b[^>]*>([^<]*)</strong>"):
-        found = re.findall(pat, window, re.I)
-        for raw in reversed(found):
+    best = None   # (end offset within window, text)
+    for pat in _LABEL_PATS:
+        for m in pat.finditer(window):
+            raw = m.group(1)
+            # A <label> wrapping a radio or checkbox names that option rather
+            # than the group it belongs to.
+            if "<input" in raw.lower():
+                continue
             t = text_of(raw)
+            if not t or len(t) > 60:
+                continue
             # Digits alone are a value being mirrored, not a name for one.
-            if t and 2 <= len(t) <= 60 and not re.fullmatch(r"[\d.,%+-]+", t):
-                return t
-    return ""
+            if re.fullmatch(r"[\d.,%+\-/]+", t):
+                continue
+            if best is None or m.end() > best[0]:
+                best = (m.end(), t)
+
+    return best[1] if best else ""
 
 
 def _clean_label(t):

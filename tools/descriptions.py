@@ -189,4 +189,20 @@ DESCRIPTIONS = {
     # --- Gen AI -----------------------------------------------------------
     "gen_ai/casual_language_modeling.html":
         "See how predicting the next token, over and over, is all it takes for a model like GPT to produce fluent text.",
+
+    "machine_learning/logistic_regression.html":
+        "Fit a linear score, squash it through a sigmoid, and read the probability "
+        "anywhere on the plot. See why the boundary is always a straight line.",
+    "machine_learning/roc_curve_and_auc.html":
+        "Drag a threshold through two overlapping score distributions and watch the "
+        "ROC curve, AUC and precision respond - including the imbalance trap.",
+    "machine_learning/ridge_and_lasso_regression.html":
+        "Turn lambda up and watch a wild polynomial calm down. Ridge shrinks every "
+        "coefficient; Lasso drives the useless ones to exactly zero.",
+    "machine_learning/random_forest.html":
+        "Grow one deep tree, then forty, and watch a jagged unstable boundary average "
+        "into a smooth one. Bagging and feature subsampling, measured.",
+    "machine_learning/gradient_boosting.html":
+        "Add one small tree at a time, each fitted to the residuals left by the last. "
+        "Watch the errors shrink, and watch it overfit when the trees get too deep.",
 }

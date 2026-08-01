@@ -375,7 +375,7 @@ NOT_READOUT = re.compile(r"^(vz-|search|theme|nav|header|footer|menu|tooltip)", 
 READOUT_DERIVED = re.compile(
     r"(accur|precis|recall|f1|score|loss|error|entrop|gini|margin|cost|"
     r"rate|prob|mean|avg|ratio|percent|pct|confid|spec|sensit|auc|r2|"
-    r"pred|result|output|dist|similar|angle|weight|bias|grad)", re.I)
+    r"pred|result|output|distance|similar|angle|weight|bias|grad)", re.I)
 READOUT_TALLY = re.compile(
     r"(count|total|sum|size|len|num|steps?|swaps?|compar|ops|time|"
     r"hit|miss|node|depth|state|status|badge|display|value|val)", re.I)
@@ -399,11 +399,39 @@ def readouts(src, ctrls):
     from lib_controls import _label_before
 
     control_ids = set(c["id"] for c in ctrls)
+
+    # Most pages mirror a slider's position in a <span> beside its label, named
+    # after the same thing: "k-slider" is echoed by "k-value", "lr-slider" by
+    # "lr-value". Those are not readouts - asking what happens to Weight w1
+    # when you set Weight w1 is not a prediction - so match them by stem.
+    #
+    # Comparing the displayed text against the control's value is not enough:
+    # a slider set to "1" is commonly displayed as "1.0".
+    SUFFIX = re.compile(
+        r"[-_]?(slider|input|select|range|box|field|btn|button|check|checkbox|"
+        r"value|val|display|out|readout|num|txt|text|label)$", re.I)
+
+    def stem(cid):
+        prev = None
+        while prev != cid:
+            prev = cid
+            cid = SUFFIX.sub("", cid)
+        return cid.lower()
+
+    control_stems = set(stem(c["id"]) for c in ctrls if stem(c["id"]))
+
     control_values = set()
     for c in ctrls:
         v = c.get("value")
-        if v not in (None, "", True, False):
-            control_values.add(str(v).strip())
+        if v in (None, "", True, False):
+            continue
+        control_values.add(str(v).strip())
+        try:
+            # "1" and "1.0" are the same number even though they are not the
+            # same string, and the mirror usually formats to a fixed width.
+            control_values.add(("%g" % float(v)))
+        except (TypeError, ValueError):
+            pass
 
     def from_id(cid):
         """"stepBadge" -> "step badge"."""
@@ -418,9 +446,16 @@ def readouts(src, ctrls):
         cid, inner = m.group(2), m.group(3)
         if cid in control_ids or cid in seen or NOT_READOUT.match(cid):
             continue
+        if stem(cid) in control_stems:
+            continue
         txt = text_of(inner)
         if len(txt) > 24 or txt in control_values:
             continue
+        try:
+            if ("%g" % float(txt)) in control_values:
+                continue
+        except (TypeError, ValueError):
+            pass
         seen.add(cid)
 
         label = _label_before(src, m.start())
@@ -437,9 +472,14 @@ def readouts(src, ctrls):
         bucket = 2 if not txt else (0 if re.search(r"\d", txt) else 1)
         found.append({"id": cid, "label": label[:48], "_b": bucket})
 
+    CHROME = re.compile(r"(badge|status|caption|heading|title|legend)", re.I)
+
     def key(e):
         blob = e["id"] + " " + e["label"]
-        if READOUT_DERIVED.search(blob):
+        # A "badge" is decoration that usually just restates a control.
+        if CHROME.search(e["id"]):
+            name_rank = 3
+        elif READOUT_DERIVED.search(blob):
             name_rank = 0
         elif READOUT_TALLY.search(blob):
             name_rank = 2

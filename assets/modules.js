@@ -876,6 +876,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Compare MAE, MSE, RMSE and R-squared on identical predictions and see which kinds of error each metric punishes hardest."
  },
  {
+  "title": "Gradient Boosting",
+  "path": "machine_learning/gradient_boosting.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": "Add one small tree at a time, each fitted to the residuals left by the last. Watch the errors shrink, and watch it overfit when the trees get too deep."
+ },
+ {
   "title": "Hard vs Soft Labelling",
   "path": "machine_learning/hard_vs_soft_labelling.html",
   "category": "Machine Learning",
@@ -932,6 +940,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Drag a regression line by hand and watch the residuals and mean squared error react, then let least squares find the optimum."
  },
  {
+  "title": "Logistic Regression",
+  "path": "machine_learning/logistic_regression.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": "Fit a linear score, squash it through a sigmoid, and read the probability anywhere on the plot. See why the boundary is always a straight line."
+ },
+ {
   "title": "Model and Data Drift",
   "path": "machine_learning/model_and_data_drift.html",
   "category": "Machine Learning",
@@ -954,6 +970,30 @@ window.VIZLEARN_MODULES = [
   "topic": "ml",
   "icon": "brain",
   "desc": "Expand a categorical column into binary columns and see how one-hot encoding avoids implying an order that was never there."
+ },
+ {
+  "title": "ROC Curve and AUC",
+  "path": "machine_learning/roc_curve_and_auc.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": "Drag a threshold through two overlapping score distributions and watch the ROC curve, AUC and precision respond - including the imbalance trap."
+ },
+ {
+  "title": "Random Forest and Bagging",
+  "path": "machine_learning/random_forest.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": "Grow one deep tree, then forty, and watch a jagged unstable boundary average into a smooth one. Bagging and feature subsampling, measured."
+ },
+ {
+  "title": "Ridge and Lasso Regression",
+  "path": "machine_learning/ridge_and_lasso_regression.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": "Turn lambda up and watch a wild polynomial calm down. Ridge shrinks every coefficient; Lasso drives the useless ones to exactly zero."
  },
  {
   "title": "Sliding Window for Time Series",
@@ -1387,6 +1427,11 @@ window.VIZLEARN_PATH = [
    {
     "title": "K-Nearest Neighbors",
     "path": "machine_learning/knn.html",
+    "category": "Machine Learning"
+   },
+   {
+    "title": "Logistic Regression",
+    "path": "machine_learning/logistic_regression.html",
     "category": "Machine Learning"
    },
    {
