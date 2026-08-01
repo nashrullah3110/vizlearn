@@ -218,4 +218,8 @@ DESCRIPTIONS = {
     "natural_language_processing/self_attention.html":
         "The full n x n attention matrix over one sentence. Watch a pronoun resolve at "
         "layer 2, apply a causal mask, and see why word order needs encoding.",
+
+    "natural_language_processing/positional_encoding.html":
+        "Self-attention is blind to word order. See sinusoidal encoding give every "
+        "position a bounded unique fingerprint, and watch the naive schemes fail.",
 }

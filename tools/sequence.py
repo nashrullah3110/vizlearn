@@ -170,6 +170,7 @@ SEQUENCE = {
         "natural_language_processing/attention_mechanism.html",
         "natural_language_processing/query_key_value.html",
         "natural_language_processing/self_attention.html",
+        "natural_language_processing/positional_encoding.html",
     ],
 
     # Pixels -> one convolution -> its knobs -> a whole CNN -> training it.

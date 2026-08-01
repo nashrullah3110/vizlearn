@@ -1268,6 +1268,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive walkthrough of the Output Gate in an LSTM cell - see how it filters the cell state through tanh to produce the hidden state that the rest of the network sees."
  },
  {
+  "title": "Positional Encoding",
+  "path": "natural_language_processing/positional_encoding.html",
+  "category": "NLP",
+  "topic": "nlp",
+  "icon": "comments",
+  "desc": "Self-attention is blind to word order. See sinusoidal encoding give every position a bounded unique fingerprint, and watch the naive schemes fail."
+ },
+ {
   "title": "Query, Key and Value",
   "path": "natural_language_processing/query_key_value.html",
   "category": "NLP",
