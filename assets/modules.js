@@ -748,6 +748,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Compare L1 and L2 penalties, and watch Lasso zero out useless weights while Ridge shrinks all of them smoothly."
  },
  {
+  "title": "Softmax and Cross-Entropy",
+  "path": "deep_learning/softmax_and_cross_entropy.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": "Drag raw logits and watch softmax turn them into probabilities, then watch cross-entropy punish a confident mistake. Includes the p - y gradient."
+ },
+ {
   "title": "Vanishing & Exploding Gradients",
   "path": "deep_learning/vanishing_vs_exploding_gradient.html",
   "category": "Deep Learning",
@@ -1260,12 +1268,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive walkthrough of the Output Gate in an LSTM cell - see how it filters the cell state through tanh to produce the hidden state that the rest of the network sees."
  },
  {
+  "title": "Query, Key and Value",
+  "path": "natural_language_processing/query_key_value.html",
+  "category": "NLP",
+  "topic": "nlp",
+  "icon": "comments",
+  "desc": "Follow one attention lookup end to end - score, scale, softmax, blend - and watch softmax saturate when the 1/sqrt(d_k) scaling is removed."
+ },
+ {
   "title": "RNN Architecture",
   "path": "natural_language_processing/rnn_architecture.html",
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
   "desc": "Learn what a standard RNN cell is with a beginner-friendly interactive visualization of its memory states and data flow."
+ },
+ {
+  "title": "Self-Attention",
+  "path": "natural_language_processing/self_attention.html",
+  "category": "NLP",
+  "topic": "nlp",
+  "icon": "comments",
+  "desc": "The full n x n attention matrix over one sentence. Watch a pronoun resolve at layer 2, apply a causal mask, and see why word order needs encoding."
  },
  {
   "title": "Sequential Data Preparation with Sliding Window",
@@ -1298,6 +1322,14 @@ window.VIZLEARN_MODULES = [
   "topic": "nlp",
   "icon": "comments",
   "desc": "Run raw text through lowercasing, punctuation stripping and stop-word removal, and watch each stage clean it further."
+ },
+ {
+  "title": "The Attention Mechanism",
+  "path": "natural_language_processing/attention_mechanism.html",
+  "category": "NLP",
+  "topic": "nlp",
+  "icon": "comments",
+  "desc": "See why a fixed context vector forgets, and how attention lets the decoder re-weigh every input word at each output step. Full alignment matrix."
  },
  {
   "title": "Vanishing Gradient Problem in RNN",

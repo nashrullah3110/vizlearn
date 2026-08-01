@@ -205,4 +205,17 @@ DESCRIPTIONS = {
     "machine_learning/gradient_boosting.html":
         "Add one small tree at a time, each fitted to the residuals left by the last. "
         "Watch the errors shrink, and watch it overfit when the trees get too deep.",
+
+    "deep_learning/softmax_and_cross_entropy.html":
+        "Drag raw logits and watch softmax turn them into probabilities, then watch "
+        "cross-entropy punish a confident mistake. Includes the p - y gradient.",
+    "natural_language_processing/attention_mechanism.html":
+        "See why a fixed context vector forgets, and how attention lets the decoder "
+        "re-weigh every input word at each output step. Full alignment matrix.",
+    "natural_language_processing/query_key_value.html":
+        "Follow one attention lookup end to end - score, scale, softmax, blend - and "
+        "watch softmax saturate when the 1/sqrt(d_k) scaling is removed.",
+    "natural_language_processing/self_attention.html":
+        "The full n x n attention matrix over one sentence. Watch a pronoun resolve at "
+        "layer 2, apply a causal mask, and see why word order needs encoding.",
 }

@@ -64,6 +64,7 @@ SEQUENCE = {
         "deep_learning/activation_functions.html",
         "deep_learning/neural_network.html",
         "deep_learning/how_loss_is_calculated.html",
+        "deep_learning/softmax_and_cross_entropy.html",
         "deep_learning/gradient_descent_training.html",
         "deep_learning/linear_regression_with_gradient_descent.html",
         "deep_learning/optimizers_in_neural_networks.html",
@@ -166,6 +167,9 @@ SEQUENCE = {
         "natural_language_processing/how_lstm_processes_text.html",
         "natural_language_processing/what_is_a_gru.html",
         "natural_language_processing/what_is_bi_directional_layer.html",
+        "natural_language_processing/attention_mechanism.html",
+        "natural_language_processing/query_key_value.html",
+        "natural_language_processing/self_attention.html",
     ],
 
     # Pixels -> one convolution -> its knobs -> a whole CNN -> training it.
