@@ -125,9 +125,10 @@ TOPICS = {
             "never sees words. This track follows a piece of text all the way down - "
             "characters to codes, codes to tokens, tokens to vectors - and then back up "
             "through the architectures that read those vectors in order.",
-            "It ends where modern systems begin, with attention: the mechanism that lets "
-            "a model weigh every other token in the sentence when deciding what the "
-            "current one means.",
+            "It covers the recurrent family in full: what a recurrent cell holds, why "
+            "backpropagation through time makes long sequences hard, and how LSTM's four "
+            "gates were designed to fix exactly that. It ends on GRUs and bidirectional "
+            "layers.",
         ],
     },
     "computer-vision": {
