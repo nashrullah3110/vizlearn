@@ -256,4 +256,8 @@ DESCRIPTIONS = {
     "maths/conditional_probability.html":
         "Conditioning does not change the outcomes, it discards them. Watch the sample "
         "space shrink, and see why P(A given B) is not P(B given A).",
+
+    "maths/distance_metrics.html":
+        "Four answers to how far apart two points are. Watch cosine ignore length entirely "
+        "while Euclidean, Manhattan and Chebyshev disagree by shape.",
 }

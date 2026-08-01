@@ -1076,6 +1076,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive derivatives lesson - drag a point along a curve, shrink the secant to a tangent, and see the limit definition of the derivative in action."
  },
  {
+  "title": "Distance Metrics",
+  "path": "maths/distance_metrics.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "Four answers to how far apart two points are. Watch cosine ignore length entirely while Euclidean, Manhattan and Chebyshev disagree by shape."
+ },
+ {
   "title": "Eigenvalues and Eigenvectors",
   "path": "maths/eigenvalues_and_eigenvectors.html",
   "category": "Maths",

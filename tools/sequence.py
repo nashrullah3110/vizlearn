@@ -19,6 +19,7 @@ SEQUENCE = {
         "maths/exponentials.html",
         "maths/vectors_and_dot_product.html",
         "maths/vector_norms.html",
+        "maths/distance_metrics.html",
         "maths/matrix_multiplication.html",
         "maths/matrix_as_transformation.html",
         "maths/eigenvalues_and_eigenvectors.html",
