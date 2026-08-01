@@ -237,4 +237,8 @@ DESCRIPTIONS = {
     "maths/vector_norms.html":
         "Three answers to how big a vector is. See why the L1 diamond's corners make Lasso "
         "produce exact zeros while the L2 circle only shrinks.",
+
+    "maths/matrix_as_transformation.html":
+        "Drag four numbers and watch space rotate, stretch and shear. The columns are "
+        "where the basis vectors land, and the determinant is the area they span.",
 }

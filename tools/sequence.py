@@ -20,6 +20,7 @@ SEQUENCE = {
         "maths/vectors_and_dot_product.html",
         "maths/vector_norms.html",
         "maths/matrix_multiplication.html",
+        "maths/matrix_as_transformation.html",
         "maths/derivatives_and_slope.html",
         "maths/the_chain_rule.html",
         "maths/partial_derivatives_and_gradient.html",

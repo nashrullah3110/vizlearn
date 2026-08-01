@@ -1036,6 +1036,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Try resampling, class weights and threshold tuning on an imbalanced dataset and watch minority-class recall respond."
  },
  {
+  "title": "A Matrix is a Transformation",
+  "path": "maths/matrix_as_transformation.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "Drag four numbers and watch space rotate, stretch and shear. The columns are where the basis vectors land, and the determinant is the area they span."
+ },
+ {
   "title": "Bayes' Theorem",
   "path": "maths/bayes_theorem.html",
   "category": "Maths",
