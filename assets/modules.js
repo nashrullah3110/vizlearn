@@ -1052,12 +1052,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive Bayes theorem lesson - the medical test paradox shown as a natural frequency grid, with adjustable base rate, sensitivity and specificity."
  },
  {
+  "title": "Covariance and Correlation",
+  "path": "maths/covariance_and_correlation.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "Stretch and tilt a point cloud. Covariance moves with the units, correlation does not, and neither notices a curve."
+ },
+ {
   "title": "Derivatives and Slope",
   "path": "maths/derivatives_and_slope.html",
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
   "desc": "Interactive derivatives lesson - drag a point along a curve, shrink the secant to a tangent, and see the limit definition of the derivative in action."
+ },
+ {
+  "title": "Eigenvalues and Eigenvectors",
+  "path": "maths/eigenvalues_and_eigenvectors.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "Sweep a vector around the circle and find the two directions a matrix does not rotate. Trace, determinant and the guarantee PCA is built on."
  },
  {
   "title": "Entropy and Information",

@@ -241,4 +241,11 @@ DESCRIPTIONS = {
     "maths/matrix_as_transformation.html":
         "Drag four numbers and watch space rotate, stretch and shear. The columns are "
         "where the basis vectors land, and the determinant is the area they span.",
+
+    "maths/eigenvalues_and_eigenvectors.html":
+        "Sweep a vector around the circle and find the two directions a matrix does not "
+        "rotate. Trace, determinant and the guarantee PCA is built on.",
+    "maths/covariance_and_correlation.html":
+        "Stretch and tilt a point cloud. Covariance moves with the units, correlation does "
+        "not, and neither notices a curve.",
 }
