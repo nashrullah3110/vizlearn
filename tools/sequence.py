@@ -29,6 +29,7 @@ SEQUENCE = {
         "maths/mean_variance_standard_deviation.html",
         "maths/covariance_and_correlation.html",
         "maths/probability_basics.html",
+        "maths/conditional_probability.html",
         "maths/bayes_theorem.html",
         "maths/the_normal_distribution.html",
         "maths/maximum_likelihood_estimation.html",

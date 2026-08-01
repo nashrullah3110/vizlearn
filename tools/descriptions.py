@@ -252,4 +252,8 @@ DESCRIPTIONS = {
     "maths/maximum_likelihood_estimation.html":
         "Slide a candidate distribution over fixed data and watch the likelihood peak. "
         "Where squared error, log loss and cross-entropy all come from.",
+
+    "maths/conditional_probability.html":
+        "Conditioning does not change the outcomes, it discards them. Watch the sample "
+        "space shrink, and see why P(A given B) is not P(B given A).",
 }

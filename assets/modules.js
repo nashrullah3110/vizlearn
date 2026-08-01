@@ -1052,6 +1052,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive Bayes theorem lesson - the medical test paradox shown as a natural frequency grid, with adjustable base rate, sensitivity and specificity."
  },
  {
+  "title": "Conditional Probability",
+  "path": "maths/conditional_probability.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "Conditioning does not change the outcomes, it discards them. Watch the sample space shrink, and see why P(A given B) is not P(B given A)."
+ },
+ {
   "title": "Covariance and Correlation",
   "path": "maths/covariance_and_correlation.html",
   "category": "Maths",
