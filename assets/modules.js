@@ -1236,6 +1236,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Discover why plain feed-forward neural networks struggle with sequences: fixed input size, order blindness, and no memory. Interactive demos on VizLearn."
  },
  {
+  "title": "Multi-Head Attention",
+  "path": "natural_language_processing/multi_head_attention.html",
+  "category": "NLP",
+  "topic": "nlp",
+  "icon": "comments",
+  "desc": "Run several attention patterns at once, each tracking a different relationship. See why more heads cost no extra parameters - the dimension is split, not added."
+ },
+ {
   "title": "N-gram Explainer",
   "path": "natural_language_processing/n_gram.html",
   "category": "NLP",

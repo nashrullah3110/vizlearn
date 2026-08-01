@@ -222,4 +222,8 @@ DESCRIPTIONS = {
     "natural_language_processing/positional_encoding.html":
         "Self-attention is blind to word order. See sinusoidal encoding give every "
         "position a bounded unique fingerprint, and watch the naive schemes fail.",
+
+    "natural_language_processing/multi_head_attention.html":
+        "Run several attention patterns at once, each tracking a different relationship. "
+        "See why more heads cost no extra parameters - the dimension is split, not added.",
 }
