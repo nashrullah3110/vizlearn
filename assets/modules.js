@@ -1348,6 +1348,14 @@ window.VIZLEARN_MODULES = [
   "desc": "See why a fixed context vector forgets, and how attention lets the decoder re-weigh every input word at each output step. Full alignment matrix."
  },
  {
+  "title": "The Transformer Architecture",
+  "path": "natural_language_processing/transformer_architecture.html",
+  "category": "NLP",
+  "topic": "nlp",
+  "icon": "comments",
+  "desc": "Attention, add, normalise, feed-forward, add, normalise - stacked. Switch the residual connections off and watch a 24-layer stack stop being trainable."
+ },
+ {
   "title": "Vanishing Gradient Problem in RNN",
   "path": "natural_language_processing/vanishing_gradient_problem_in_rnn.html",
   "category": "NLP",

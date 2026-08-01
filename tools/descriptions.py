@@ -226,4 +226,8 @@ DESCRIPTIONS = {
     "natural_language_processing/multi_head_attention.html":
         "Run several attention patterns at once, each tracking a different relationship. "
         "See why more heads cost no extra parameters - the dimension is split, not added.",
+
+    "natural_language_processing/transformer_architecture.html":
+        "Attention, add, normalise, feed-forward, add, normalise - stacked. Switch the "
+        "residual connections off and watch a 24-layer stack stop being trainable.",
 }

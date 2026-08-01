@@ -172,6 +172,7 @@ SEQUENCE = {
         "natural_language_processing/self_attention.html",
         "natural_language_processing/multi_head_attention.html",
         "natural_language_processing/positional_encoding.html",
+        "natural_language_processing/transformer_architecture.html",
     ],
 
     # Pixels -> one convolution -> its knobs -> a whole CNN -> training it.
