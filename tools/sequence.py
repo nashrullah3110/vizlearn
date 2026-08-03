@@ -189,6 +189,7 @@ SEQUENCE = {
         "natural_language_processing/multi_head_attention.html",
         "natural_language_processing/positional_encoding.html",
         "natural_language_processing/transformer_architecture.html",
+        "natural_language_processing/bert_vs_gpt.html",
     ],
 
     # Pixels -> one convolution -> its knobs -> a whole CNN -> training it.

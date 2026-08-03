@@ -3787,6 +3787,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "natural_language_processing/bert_vs_gpt.html",
+  "title": "Encoder-only vs Decoder-only (BERT vs GPT)",
+  "cat": "NLP",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Encoder-only and decoder-only transformers differ by one thing: whether the attention mask deletes the upper triangle. Bidirectional attention lets every token see the whole sequence, which rules out next-token prediction and demands a masked objective instead, and yields strong representations with no ability to generate."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "Both families are stacks of the same block: multi-head attention and a feed-forward layer, repeated. The difference is a mask applied inside self-attention — a matrix of minus infinities that deletes some of the attention scores before the softmax."
+   },
+   {
+    "t": "What does this module say about “Why the mask decides the objective”?",
+    "ans": "A model that can see the future cannot be trained to predict it. If position 4 can attend to position 5, then \"predict the token at position 5\" is answered by copying it, and nothing is learned. So the two masks admit different training tasks."
+   }
+  ]
+ },
+ {
   "path": "natural_language_processing/forget_gate_in_lstm.html",
   "title": "Forget Gate in LSTM",
   "cat": "NLP",

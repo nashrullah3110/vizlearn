@@ -1364,6 +1364,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive walkthrough of the candidate memory layer in an LSTM - see how tanh proposes new signed content for the cell state and why it saturates."
  },
  {
+  "title": "Encoder-only vs Decoder-only (BERT vs GPT)",
+  "path": "natural_language_processing/bert_vs_gpt.html",
+  "category": "NLP",
+  "topic": "nlp",
+  "icon": "comments",
+  "desc": "One change to the attention mask splits the transformer family in two. See what each token may look at, and which training objective that permits."
+ },
+ {
   "title": "Forget Gate in LSTM",
   "path": "natural_language_processing/forget_gate_in_lstm.html",
   "category": "NLP",
