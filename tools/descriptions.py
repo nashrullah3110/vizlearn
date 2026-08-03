@@ -291,6 +291,10 @@ DESCRIPTIONS = {
         "Drag two columns until one is a multiple of the other and watch the reachable "
         "plane collapse onto a line. That collapse is what rank counts.",
 
+    "maths/cross_entropy_and_kl_divergence.html":
+        "Drag one distribution towards another and watch the gap close. Cross-entropy is "
+        "the cost of being wrong; KL divergence is how much of it is your fault.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "

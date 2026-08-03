@@ -1116,6 +1116,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Stretch and tilt a point cloud. Covariance moves with the units, correlation does not, and neither notices a curve."
  },
  {
+  "title": "Cross-Entropy and KL Divergence",
+  "path": "maths/cross_entropy_and_kl_divergence.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "Drag one distribution towards another and watch the gap close. Cross-entropy is the cost of being wrong; KL divergence is how much of it is your fault."
+ },
+ {
   "title": "Derivatives and Slope",
   "path": "maths/derivatives_and_slope.html",
   "category": "Maths",
