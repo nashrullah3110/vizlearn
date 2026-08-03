@@ -128,7 +128,7 @@ def main():
 
         # --- shared runtime wiring (every page, hub included) ---
         for script in ("assets/modules.js", "assets/search.js", "assets/vizlearn.js",
-                       "assets/vizlearn-lab.js"):
+                       "assets/vizlearn-lab.js", "assets/vizlearn-state.js"):
             check(s.count('src="%s%s"' % (prefix, script)) == 1,
                   "%s: expected exactly one <script src> for %s" % (rel, script))
         check("const allCourses" not in s, "%s: still inlines its own catalog" % rel)
@@ -215,7 +215,8 @@ def main():
     check(os.path.exists(sm), "sitemap.xml missing")
     if os.path.exists(sm):
         locs = re.findall(r"<loc>([^<]+)</loc>", open(sm, encoding="utf-8").read())
-        want = 1 + len(TOPIC_ORDER) + len(modules()) + len(STATIC_PAGES)
+        # hub + tracks + modules + policy pages + /practice/
+        want = 1 + len(TOPIC_ORDER) + len(modules()) + len(STATIC_PAGES) + 1
         check(len(locs) == want, "sitemap has %d urls (expected %d)" % (len(locs), want))
         for loc in locs:
             p = loc.replace(SITE + "/", "") or "index.html"

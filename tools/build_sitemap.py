@@ -14,7 +14,7 @@ import os
 import xml.sax.saxutils as sx
 
 from lib_catalog import ROOT, SITE, modules
-from lib_pages import STATIC_PAGES, TOPIC_ORDER, last_modified, page_url, topic_rel
+from lib_pages import PRACTICE, STATIC_PAGES, TOPIC_ORDER, last_modified, page_url, topic_rel
 
 SITEMAP = os.path.join(ROOT, "sitemap.xml")
 ROBOTS = os.path.join(ROOT, "robots.txt")
@@ -28,6 +28,8 @@ def entries():
     # Policy pages matter for trust and for AdSense review, not for ranking.
     out += [(p, "0.3", "yearly") for p in STATIC_PAGES
             if os.path.exists(os.path.join(ROOT, p))]
+    if os.path.exists(os.path.join(ROOT, PRACTICE["rel"])):
+        out.append((PRACTICE["rel"], "0.7", "weekly"))
     return out
 
 

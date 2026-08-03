@@ -765,11 +765,44 @@ def process(path, rel, authored):
         "cards": 1 if cards else 0,
         "nocheck": 0 if (questions or cards) else 1,
         "rel": rel,
+        # Handed back for the practice bank, so the questions on /practice/ and
+        # the ones on the module are the same objects rather than a second
+        # transcription that could drift.
+        "questions": questions,
+        "cards_list": cards,
     }
+
+
+BANK_OUT = os.path.join(ROOT, "assets", "practice-bank.js")
+
+BANK_HEADER = """/* GENERATED FILE - do not edit by hand.
+ * Source: the same checks tools/build_labs.py writes into each module.
+ * Rebuild: python3 tools/build_labs.py
+ */
+"""
+
+
+def write_bank(entries):
+    """The question bank /practice/ draws from.
+
+    One record per module that has a check, holding either its authored
+    multiple-choice questions or the recall cards derived from its own prose.
+    Nothing is invented here that the module page does not already show.
+    """
+    entries.sort(key=lambda e: (e["cat"], e["title"]))
+    with open(BANK_OUT, "w", encoding="utf-8") as fh:
+        fh.write(BANK_HEADER)
+        fh.write("window.VIZLEARN_PRACTICE = %s;\n"
+                 % json.dumps(entries, ensure_ascii=False, indent=1))
+    total = sum(len(e["q"]) for e in entries)
+    print("practice bank             : %d questions across %d modules"
+          % (total, len(entries)))
 
 
 def main():
     mods = {m["path"] for m in modules()}
+    meta = {m["path"]: m for m in modules()}
+    bank = []
     files = sorted(glob.glob(os.path.join(ROOT, "*", "*.html")))
     files = [f for f in files
              if os.path.basename(os.path.dirname(f)) not in ("tools", "assets", "node_modules")]
@@ -795,6 +828,15 @@ def main():
         if not r["predict"]:
             no_predict.append(rel)
 
+        qs = [{"t": q["q"], "o": q["options"], "a": q["answer"], "w": q.get("why", "")}
+              for q in r["questions"]]
+        qs += [{"t": prompt, "ans": answer} for prompt, answer in r["cards_list"]]
+        if qs:
+            m = meta[rel]
+            bank.append({"path": rel, "title": m["title"],
+                         "cat": m["category"], "q": qs})
+
+    write_bank(bank)
     print("pages processed           : %d" % pages)
     print("runnable experiments      : %d across %d pages" % (runnable, pages_runnable))
     print("predict-then-reveal       : %d pages" % predict)

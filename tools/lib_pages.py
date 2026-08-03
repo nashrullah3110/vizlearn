@@ -204,6 +204,27 @@ def topic_rel(key):
 # Static pages
 # --------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------
+# Practice
+# --------------------------------------------------------------------------
+# Not a module and not a landing page: a study tool built on the answers the
+# lab layer has been recording all along. Served at /practice/.
+
+PRACTICE = {
+    "rel": "practice/index.html",
+    "title": "Practice",
+    "lead": "Questions drawn from the modules you have actually opened, weighted "
+            "by what you got wrong and how long ago you saw it.",
+    "description": "Spaced practice across every VizLearn module, drawn from the "
+                   "checks you have already answered and weighted by what you got "
+                   "wrong. Runs entirely in your browser.",
+}
+
+
+def is_practice_page(rel):
+    return rel == PRACTICE["rel"]
+
+
 STATIC_PAGES = ["about.html", "contact.html", "privacy.html", "terms.html"]
 
 STATIC_TITLES = {
@@ -239,7 +260,7 @@ def page_url(rel):
     """
     if rel == "index.html":
         return SITE + "/"
-    if is_topic_page(rel):
+    if is_topic_page(rel) or is_practice_page(rel):
         return "%s/%s/" % (SITE, rel.split("/")[0])
     return SITE + "/" + rel
 
@@ -311,4 +332,5 @@ def all_routable(mods):
     rels += [topic_rel(k) for k in TOPIC_ORDER]
     rels += [m["path"] for m in mods]
     rels += STATIC_PAGES
+    rels.append(PRACTICE["rel"])
     return rels

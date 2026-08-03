@@ -20,7 +20,7 @@ import os
 import re
 import sys
 
-from lib_pages import (GITHUB, KAGGLE, LINKEDIN, STATIC_PAGES, STATIC_TITLES,
+from lib_pages import (GITHUB, KAGGLE, LINKEDIN, PRACTICE, STATIC_PAGES, STATIC_TITLES,
                        TOPICS, TOPIC_ORDER, is_static_page, is_topic_page)
 from lib_catalog import ROOT
 
@@ -60,7 +60,10 @@ def build(prefix):
                                              html.escape(TOPICS[k]["title"]))
         for k in TOPIC_ORDER
     )
-    site = "".join(
+    # Practice first: it is the only entry here a reader has a reason to open
+    # twice, and it was unreachable from anywhere until it appeared in this list.
+    site = '<li><a href="%spractice/">Practice</a></li>' % prefix
+    site += "".join(
         '<li><a href="%s%s">%s</a></li>' % (prefix, p, html.escape(STATIC_TITLES[p]))
         for p in STATIC_PAGES
     )
