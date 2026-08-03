@@ -860,6 +860,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Three stages, three jobs. Watch a model's answers move under supervised fine-tuning, then under preference optimisation, and watch reward hacking happen."
  },
  {
+  "title": "Hallucination and Grounding",
+  "path": "gen_ai/hallucination_and_grounding.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "A model always has probability mass somewhere, even when it knows nothing. Watch it move as evidence, temperature, retrieval and an abstain option are added."
+ },
+ {
   "title": "How LLMs Predict the Next Word?",
   "path": "gen_ai/how_llms_predict_next_word.html",
   "category": "Gen AI",

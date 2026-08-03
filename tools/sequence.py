@@ -244,6 +244,7 @@ SEQUENCE = {
         "gen_ai/rag.html",
         "gen_ai/context_window_and_kv_cache.html",
         "gen_ai/fine_tuning_vs_rlhf.html",
+        "gen_ai/hallucination_and_grounding.html",
     ],
 }
 

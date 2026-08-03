@@ -312,6 +312,10 @@ DESCRIPTIONS = {
         "Three stages, three jobs. Watch a model's answers move under supervised "
         "fine-tuning, then under preference optimisation, and watch reward hacking happen.",
 
+    "gen_ai/hallucination_and_grounding.html":
+        "A model always has probability mass somewhere, even when it knows nothing. Watch "
+        "it move as evidence, temperature, retrieval and an abstain option are added.",
+
     "gen_ai/rag.html":
         "Ask about a product no model has heard of. Watch retrieval score every chunk, "
         "paste the winners into the prompt, and turn a guess into a cited answer.",
