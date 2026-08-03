@@ -266,6 +266,10 @@ DESCRIPTIONS = {
         "Watch rows slide into their new order as you change the sort key, direction, "
         "tie-breaker and NULLS placement, with the query building live.",
 
+    "database/having_in_sql.html":
+        "Rows become groups become filtered groups. Move the same condition between WHERE "
+        "and HAVING and watch the answer change, one stage at a time.",
+
     # --- Machine Learning, later additions --------------------------------
     "machine_learning/pca.html":
         "Rotate a line through a point cloud and watch the variance it captures peak on "

@@ -492,6 +492,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive SQL datatypes lab - integer ranges and overflow, CHAR vs VARCHAR storage, FLOAT vs DECIMAL precision loss, dates and NULL."
  },
  {
+  "title": "HAVING in SQL",
+  "path": "database/having_in_sql.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": "Rows become groups become filtered groups. Move the same condition between WHERE and HAVING and watch the answer change, one stage at a time."
+ },
+ {
   "title": "Limit and Offset in SQL",
   "path": "database/limit_and_offset_in_sql.html",
   "category": "Database",

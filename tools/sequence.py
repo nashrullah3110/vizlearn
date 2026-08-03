@@ -215,6 +215,7 @@ SEQUENCE = {
         "database/order_by_in_sql.html",
         "database/limit_and_offset_in_sql.html",
         "database/groupby_in_sql.html",
+        "database/having_in_sql.html",
         "database/joins_in_sql.html",
         "database/common_table_expressions_in_sql.html",
         "database/window_functions_in_sql.html",
