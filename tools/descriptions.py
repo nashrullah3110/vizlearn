@@ -300,6 +300,10 @@ DESCRIPTIONS = {
         "it most is exactly the question a decision tree decides to ask.",
 
     # --- Gen AI, later additions -------------------------------------------
+    "gen_ai/embeddings_and_vector_search.html":
+        "Meaning becomes geometry. Run an exact nearest-neighbour search, then a "
+        "partitioned one, and watch comparisons collapse while recall quietly slips.",
+
     "gen_ai/rag.html":
         "Ask about a product no model has heard of. Watch retrieval score every chunk, "
         "paste the winners into the prompt, and turn a guess into a cited answer.",

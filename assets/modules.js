@@ -836,6 +836,14 @@ window.VIZLEARN_MODULES = [
   "desc": "See how predicting the next token, over and over, is all it takes for a model like GPT to produce fluent text."
  },
  {
+  "title": "Embeddings and Vector Search",
+  "path": "gen_ai/embeddings_and_vector_search.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Meaning becomes geometry. Run an exact nearest-neighbour search, then a partitioned one, and watch comparisons collapse while recall quietly slips."
+ },
+ {
   "title": "How LLMs Predict the Next Word?",
   "path": "gen_ai/how_llms_predict_next_word.html",
   "category": "Gen AI",

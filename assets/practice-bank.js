@@ -2252,6 +2252,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/embeddings_and_vector_search.html",
+  "title": "Embeddings and Vector Search",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "An embedding puts meaning somewhere in space, so similarity becomes geometry and retrieval becomes nearest-neighbour search, ranked by cosine because vector length carries length rather than meaning. Exact search costs one comparison per document and does not survive scale, so production indexes partition the space and probe only the nearest few cells — buying a large drop in work for a small, measurable chance of mi..."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "An embedding model maps a piece of text to a point, arranged so that texts about the same thing land near each other. Nothing about the words themselves survives the trip — \"peel a mango\" and \"how to prepare tropical fruit\" share no vocabulary and end up as neighbours anyway."
+   },
+   {
+    "t": "What does this module say about “Cosine, and why it is the default”?",
+    "ans": "Retrieval almost always ranks by cosine similarity : the angle between the query vector and the document vector, ignoring how long either one is. Length in an embedding tends to carry things like document length or token count rather than meaning, so ignoring it is the point."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/how_llms_predict_next_word.html",
   "title": "How LLMs Predict the Next Word?",
   "cat": "Gen AI",
