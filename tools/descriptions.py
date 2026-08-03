@@ -278,6 +278,11 @@ DESCRIPTIONS = {
         "Walk a B-tree instead of reading every row and watch rows-examined collapse. Then "
         "meet the queries an index cannot help, and what it costs on writes.",
 
+    # --- Deep Learning, later additions ------------------------------------
+    "deep_learning/backpropagation.html":
+        "Step forward through a small computational graph, then backward, watching each "
+        "local gradient multiply along the chain. Checked against finite differences.",
+
     # --- Machine Learning, later additions --------------------------------
     "machine_learning/pca.html":
         "Rotate a line through a point cloud and watch the variance it captures peak on "

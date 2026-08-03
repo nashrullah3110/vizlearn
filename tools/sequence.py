@@ -74,6 +74,7 @@ SEQUENCE = {
         "deep_learning/neural_network.html",
         "deep_learning/how_loss_is_calculated.html",
         "deep_learning/softmax_and_cross_entropy.html",
+        "deep_learning/backpropagation.html",
         "deep_learning/gradient_descent_training.html",
         "deep_learning/linear_regression_with_gradient_descent.html",
         "deep_learning/optimizers_in_neural_networks.html",

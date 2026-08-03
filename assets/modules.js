@@ -596,6 +596,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Compare ReLU, sigmoid, tanh and others on the same input, and see how each one bends the signal passing through a layer."
  },
  {
+  "title": "Backpropagation and the Computational Graph",
+  "path": "deep_learning/backpropagation.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": "Step forward through a small computational graph, then backward, watching each local gradient multiply along the chain. Checked against finite differences."
+ },
+ {
   "title": "Batch Normalization in Deep Networks",
   "path": "deep_learning/batch_normalization.html",
   "category": "Deep Learning",
