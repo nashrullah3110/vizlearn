@@ -3382,6 +3382,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "maths/identity_inverse_transpose.html",
+  "title": "Identity, Inverse and Transpose",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "The identity is the matrix that changes nothing, and the inverse is the one that undoes A — defined by A A⁻¹ = I and computed by dividing through by the determinant, which is precisely why a zero determinant means no inverse exists: the transformation destroyed information and no matrix can recover it."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "A matrix is a transformation . Once you can do something to space, three questions follow immediately: what does nothing, what puts it back, and what happens if you read the matrix sideways."
+   },
+   {
+    "t": "What does this module say about “Key Takeaway”?",
+    "ans": "The identity is the matrix that changes nothing, and the inverse is the one that undoes A — defined by A A⁻¹ = I and computed by dividing through by the determinant, which is precisely why a zero determinant means no inverse exists: the transformation destroyed information and no matrix can recover it."
+   }
+  ]
+ },
+ {
   "path": "maths/information_gain.html",
   "title": "Information Gain",
   "cat": "Maths",

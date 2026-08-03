@@ -1220,6 +1220,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive exponentials lesson - growth versus decay, the number e, doubling time, and why exponential always beats polynomial eventually."
  },
  {
+  "title": "Identity, Inverse and Transpose",
+  "path": "maths/identity_inverse_transpose.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "Apply a transformation, then undo it. Watch the undo fail the moment the determinant hits zero, and see why the transpose is not an undo at all."
+ },
+ {
   "title": "Information Gain",
   "path": "maths/information_gain.html",
   "category": "Maths",

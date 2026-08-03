@@ -287,6 +287,10 @@ DESCRIPTIONS = {
         "The determinant is the area the unit square becomes. Sweep it through zero and "
         "watch the plane flatten, then turn itself inside out.",
 
+    "maths/identity_inverse_transpose.html":
+        "Apply a transformation, then undo it. Watch the undo fail the moment the "
+        "determinant hits zero, and see why the transpose is not an undo at all.",
+
     "maths/rank_and_linear_independence.html":
         "Drag two columns until one is a multiple of the other and watch the reachable "
         "plane collapse onto a line. That collapse is what rank counts.",
