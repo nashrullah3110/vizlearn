@@ -264,6 +264,64 @@ def parse_step(step_html, ctrls):
     return {"set": sets, "click": clicks}
 
 
+def key_targets(ctrls):
+    """The one or two sliders the arrow keys should drive.
+
+    Every visualisation on the site is driven by a pointer, and a slider is
+    already keyboard-accessible once focused - but the drag surfaces are not,
+    and nothing tells a keyboard user which control matters. This picks the
+    page's widest-range slider as the primary axis and the next widest as the
+    secondary, which is the same heuristic derive_preset uses and is right far
+    more often than it is wrong.
+
+    Returns {} when the page has no bounded slider at all, and the runtime
+    then leaves the page exactly as it found it.
+    """
+    ranked = []
+    for c in ctrls:
+        if c["kind"] != "range" or not c.get("label"):
+            continue
+        lo_s = c["min"] if c["min"] != "" else "0"
+        hi_s = c["max"] if c["max"] != "" else "100"
+        try:
+            lo, hi = float(lo_s), float(hi_s)
+            step = float(c["step"] or 1)
+        except ValueError:
+            continue
+        if hi <= lo or step <= 0:
+            continue
+        ranked.append(((hi - lo) / step, {
+            "id": c["id"], "label": c["label"],
+            "min": lo, "max": hi, "step": step,
+        }))
+
+    ranked.sort(key=lambda r: -r[0])
+    out = {}
+    if ranked:
+        out["primary"] = ranked[0][1]
+    if len(ranked) > 1:
+        out["secondary"] = ranked[1][1]
+
+    # Half the site has no slider at all - the SQL labs, most of the CNN
+    # pages - and a select is just as drivable with an arrow key. Fill any
+    # empty slot with the longest option list rather than leaving the
+    # visualisation a focus stop that does nothing.
+    selects = sorted(
+        [c for c in ctrls
+         if c["kind"] == "select" and c.get("label") and len(c.get("options") or []) > 1],
+        key=lambda c: -len(c["options"]))
+    for c in selects:
+        entry = {"id": c["id"], "label": c["label"], "kind": "select",
+                 "count": len(c["options"])}
+        if "primary" not in out:
+            out["primary"] = entry
+        elif "secondary" not in out and entry["id"] != out["primary"]["id"]:
+            out["secondary"] = entry
+        else:
+            break
+    return out
+
+
 def derive_preset(ctrls):
     """A real experiment built from the controls themselves.
 
@@ -735,6 +793,7 @@ def process(path, rel, authored):
         "presets": [{"set": p["set"], "click": p["click"]} for p in presets],
         "readouts": reads,
         "viz": viz_container_id(src),
+        "keys": key_targets(ctrls),
     }
 
     block = (

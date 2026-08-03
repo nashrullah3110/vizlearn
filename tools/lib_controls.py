@@ -50,6 +50,13 @@ _LABEL_PATS = [
 ]
 
 
+# The site's convention for a span that mirrors a control's current value:
+# <span id="k-value">5</span> sitting between the label and the input. Those
+# are the *value*, never the name, and being nearest they would otherwise win.
+VALUE_MIRROR = re.compile(
+    r'<(\w+)\b[^>]*\bid="[^"]*(?:-value|-val)"[^>]*>.*?</\1>', re.S | re.I)
+
+
 def _label_before(src, pos):
     """The caption nearest to `pos`, searching backwards.
 
@@ -58,8 +65,12 @@ def _label_before(src, pos):
     found anywhere in the window. That let a card's <h3> half a panel away beat
     the <span> sitting immediately beside the value, so a readout called
     "Accuracy" came back named "Fit Quality" after the section it lived in.
+
+    The one exception is a span that mirrors the control's own value, which is
+    nearer still and is never a name: "Cloud Tilt" would come back as "30" or
+    "1.5x". Those are removed before proximity is judged.
     """
-    window = src[max(0, pos - LOOKBACK):pos]
+    window = VALUE_MIRROR.sub(" ", src[max(0, pos - LOOKBACK):pos])
 
     best = None   # (end offset within window, text)
     for pat in _LABEL_PATS:

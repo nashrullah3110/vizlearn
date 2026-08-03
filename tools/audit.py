@@ -134,7 +134,7 @@ def main():
         # --- shared runtime wiring (every page, hub included) ---
         for script in ("assets/modules.js", "assets/search.js", "assets/vizlearn.js",
                        "assets/vizlearn-lab.js", "assets/vizlearn-state.js",
-                       "assets/vizlearn-pwa.js"):
+                       "assets/vizlearn-pwa.js", "assets/vizlearn-keys.js"):
             check(s.count('src="%s%s"' % (prefix, script)) == 1,
                   "%s: expected exactly one <script src> for %s" % (rel, script))
         check("const allCourses" not in s, "%s: still inlines its own catalog" % rel)
@@ -203,6 +203,13 @@ def main():
                 for r in cfg.get("readouts", []):
                     check('id="%s"' % r["id"] in s,
                           "%s: readout %s is not on the page" % (rel, r["id"]))
+                # Arrow keys drive real controls; a target that is not on the
+                # page would give a keyboard user a focus stop that does
+                # nothing, which is worse than no focus stop.
+                for role, t in (cfg.get("keys") or {}).items():
+                    check('id="%s"' % t["id"] in s,
+                          "%s: keyboard %s target %s is not on the page"
+                          % (rel, role, t["id"]))
 
         if "vzIcon(" in s:
             check("assets/icons.js" in s, "%s: uses vzIcon() but does not load icons.js" % rel)
