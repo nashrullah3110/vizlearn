@@ -24,6 +24,7 @@ SEQUENCE = {
         "maths/matrix_as_transformation.html",
         "maths/projections.html",
         "maths/determinant.html",
+        "maths/rank_and_linear_independence.html",
         "maths/eigenvalues_and_eigenvectors.html",
         "maths/derivatives_and_slope.html",
         "maths/the_chain_rule.html",

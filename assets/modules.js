@@ -1236,6 +1236,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Drag one vector onto another and watch its shadow, plus the perpendicular residual left behind. The geometric root of least squares."
  },
  {
+  "title": "Rank and Linear Independence",
+  "path": "maths/rank_and_linear_independence.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "Drag two columns until one is a multiple of the other and watch the reachable plane collapse onto a line. That collapse is what rank counts."
+ },
+ {
   "title": "The Chain Rule",
   "path": "maths/the_chain_rule.html",
   "category": "Maths",

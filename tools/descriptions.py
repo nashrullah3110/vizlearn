@@ -287,6 +287,10 @@ DESCRIPTIONS = {
         "The determinant is the area the unit square becomes. Sweep it through zero and "
         "watch the plane flatten, then turn itself inside out.",
 
+    "maths/rank_and_linear_independence.html":
+        "Drag two columns until one is a multiple of the other and watch the reachable "
+        "plane collapse onto a line. That collapse is what rank counts.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "
