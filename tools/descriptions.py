@@ -295,6 +295,10 @@ DESCRIPTIONS = {
         "Drag one distribution towards another and watch the gap close. Cross-entropy is "
         "the cost of being wrong; KL divergence is how much of it is your fault.",
 
+    "maths/information_gain.html":
+        "Move a split through a dataset and watch entropy fall. The threshold that drops "
+        "it most is exactly the question a decision tree decides to ask.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "

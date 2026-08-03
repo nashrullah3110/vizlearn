@@ -39,6 +39,7 @@ SEQUENCE = {
         "maths/maximum_likelihood_estimation.html",
         "maths/entropy_and_information.html",
         "maths/cross_entropy_and_kl_divergence.html",
+        "maths/information_gain.html",
     ],
 
     # Prepare data -> fit a first model -> measure it -> more models -> pitfalls.

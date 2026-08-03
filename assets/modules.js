@@ -1180,6 +1180,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive exponentials lesson - growth versus decay, the number e, doubling time, and why exponential always beats polynomial eventually."
  },
  {
+  "title": "Information Gain",
+  "path": "maths/information_gain.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "Move a split through a dataset and watch entropy fall. The threshold that drops it most is exactly the question a decision tree decides to ask."
+ },
+ {
   "title": "Logarithms",
   "path": "maths/logarithms.html",
   "category": "Maths",
