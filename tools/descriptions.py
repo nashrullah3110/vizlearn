@@ -261,6 +261,11 @@ DESCRIPTIONS = {
         "Four answers to how far apart two points are. Watch cosine ignore length entirely "
         "while Euclidean, Manhattan and Chebyshev disagree by shape.",
 
+    # --- Databases & SQL, later additions ---------------------------------
+    "database/order_by_in_sql.html":
+        "Watch rows slide into their new order as you change the sort key, direction, "
+        "tie-breaker and NULLS placement, with the query building live.",
+
     # --- Machine Learning, later additions --------------------------------
     "machine_learning/pca.html":
         "Rotate a line through a point cloud and watch the variance it captures peak on "

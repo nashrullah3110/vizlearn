@@ -500,6 +500,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive SQL LIMIT and OFFSET lab - page through results, see why ORDER BY is mandatory, and understand the cost of deep offsets."
  },
  {
+  "title": "ORDER BY in SQL",
+  "path": "database/order_by_in_sql.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": "Watch rows slide into their new order as you change the sort key, direction, tie-breaker and NULLS placement, with the query building live."
+ },
+ {
   "title": "Regular Expressions in SQL",
   "path": "database/regular_expressions_in_sql.html",
   "category": "Database",
