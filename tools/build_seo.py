@@ -72,10 +72,11 @@ SCRIPTS_BEGIN = "<!-- VIZLEARN:SCRIPTS:BEGIN -->"
 SCRIPTS_END = "<!-- VIZLEARN:SCRIPTS:END -->"
 SCRIPTS_BLOCK = re.compile(
     re.escape(SCRIPTS_BEGIN) + r".*?" + re.escape(SCRIPTS_END) + r"\n?", re.S)
-SHARED_SCRIPTS = ("modules.js", "search.js", "vizlearn.js", "vizlearn-lab.js")
+SHARED_SCRIPTS = ("modules.js", "search.js", "vizlearn.js", "vizlearn-lab.js",
+                  "vizlearn-state.js")
 # The one-time migration wrote these directly; drop the loose copies.
 LOOSE_SCRIPT = re.compile(
-    r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab)\.js"></script>\n?')
+    r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state)\.js"></script>\n?')
 
 META_DESC = re.compile(r'<meta\s+name="description"\s+content="([^"]*)"\s*/?>', re.I)
 TITLE = re.compile(r"<title>(.*?)</title>", re.S)
