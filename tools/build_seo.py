@@ -74,10 +74,10 @@ SCRIPTS_END = "<!-- VIZLEARN:SCRIPTS:END -->"
 SCRIPTS_BLOCK = re.compile(
     re.escape(SCRIPTS_BEGIN) + r".*?" + re.escape(SCRIPTS_END) + r"\n?", re.S)
 SHARED_SCRIPTS = ("modules.js", "search.js", "vizlearn.js", "vizlearn-lab.js",
-                  "vizlearn-state.js")
+                  "vizlearn-state.js", "vizlearn-pwa.js")
 # The one-time migration wrote these directly; drop the loose copies.
 LOOSE_SCRIPT = re.compile(
-    r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state)\.js"></script>\n?')
+    r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa)\.js"></script>\n?')
 
 META_DESC = re.compile(r'<meta\s+name="description"\s+content="([^"]*)"\s*/?>', re.I)
 TITLE = re.compile(r"<title>(.*?)</title>", re.S)
@@ -228,6 +228,12 @@ def build_block(rel, title, desc, prefix, mod, needs_icons=False):
         '    <link rel="icon" type="image/x-icon" href="%sfavicon.ico">' % prefix,
         '    <link rel="apple-touch-icon" href="%sassets/apple-touch-icon.png">' % prefix,
         '    <meta name="theme-color" content="#050505">',
+        "",
+        "    <!-- installable -->",
+        '    <link rel="manifest" href="%smanifest.webmanifest">' % prefix,
+        '    <meta name="apple-mobile-web-app-capable" content="yes">',
+        '    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">',
+        '    <meta name="apple-mobile-web-app-title" content="VizLearn">',
         "",
         "    <!-- social preview -->",
         '    <meta property="og:type" content="%s">' % og_type(rel),

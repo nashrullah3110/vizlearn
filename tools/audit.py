@@ -98,6 +98,11 @@ def main():
         check(s.count("<footer") == 1,
               "%s: %d <footer> elements (expected 1)" % (rel, s.count("<footer")))
 
+        # --- installable ---
+        # A manifest that only some pages link is a manifest that only works
+        # if you happen to install from the right page.
+        check('rel="manifest"' in s, "%s: no manifest link" % rel)
+
         # --- mobile ---
         check('viewport-fit=cover' in s, "%s: viewport meta not updated" % rel)
         bare = re.findall(r'class="([^"]*)"', s)
@@ -128,7 +133,8 @@ def main():
 
         # --- shared runtime wiring (every page, hub included) ---
         for script in ("assets/modules.js", "assets/search.js", "assets/vizlearn.js",
-                       "assets/vizlearn-lab.js", "assets/vizlearn-state.js"):
+                       "assets/vizlearn-lab.js", "assets/vizlearn-state.js",
+                       "assets/vizlearn-pwa.js"):
             check(s.count('src="%s%s"' % (prefix, script)) == 1,
                   "%s: expected exactly one <script src> for %s" % (rel, script))
         check("const allCourses" not in s, "%s: still inlines its own catalog" % rel)
@@ -209,6 +215,31 @@ def main():
     for m in modules():
         check(os.path.exists(os.path.join(ROOT, m["path"])),
               "catalog points at missing file: %s" % m["path"])
+
+    # --- the PWA files, and that the service worker is current ---
+    for name in ("manifest.webmanifest", "sw.js", "offline.html",
+                 "assets/icon-192.png", "assets/icon-512.png"):
+        check(os.path.exists(os.path.join(ROOT, name)), "%s is missing" % name)
+
+    mf = os.path.join(ROOT, "manifest.webmanifest")
+    if os.path.exists(mf):
+        try:
+            data = json.load(open(mf, encoding="utf-8"))
+            for icon in data.get("icons", []):
+                p = icon["src"].lstrip("/")
+                check(os.path.exists(os.path.join(ROOT, p)),
+                      "manifest points at a missing icon: %s" % icon["src"])
+        except ValueError as e:
+            problems.append("manifest.webmanifest is not valid JSON (%s)" % e)
+
+    swp = os.path.join(ROOT, "sw.js")
+    if os.path.exists(swp):
+        import build_pwa
+        want = "vizlearn-%s" % build_pwa.version()
+        got = re.search(r"const CACHE = '([^']+)'", open(swp, encoding="utf-8").read())
+        check(bool(got) and got.group(1) == want,
+              "sw.js cache name is stale (%s, expected %s) - run npm run pwa"
+              % (got.group(1) if got else "none", want))
 
     # --- sitemap ---
     sm = os.path.join(ROOT, "sitemap.xml")
