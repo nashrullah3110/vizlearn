@@ -500,6 +500,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Rows become groups become filtered groups. Move the same condition between WHERE and HAVING and watch the answer change, one stage at a time."
  },
  {
+  "title": "Indexes and Query Performance",
+  "path": "database/indexes_in_sql.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": "Walk a B-tree instead of reading every row and watch rows-examined collapse. Then meet the queries an index cannot help, and what it costs on writes."
+ },
+ {
   "title": "Limit and Offset in SQL",
   "path": "database/limit_and_offset_in_sql.html",
   "category": "Database",

@@ -221,6 +221,7 @@ SEQUENCE = {
         "database/common_table_expressions_in_sql.html",
         "database/window_functions_in_sql.html",
         "database/regular_expressions_in_sql.html",
+        "database/indexes_in_sql.html",
     ],
 
     # How an LLM reads -> how it predicts -> how it is trained -> how it is shrunk.

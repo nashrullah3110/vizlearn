@@ -274,6 +274,10 @@ DESCRIPTIONS = {
         "The inner query runs first and hands its answer to the outer one. Scalar, IN-list, "
         "derived table, and a correlated subquery re-running once per row.",
 
+    "database/indexes_in_sql.html":
+        "Walk a B-tree instead of reading every row and watch rows-examined collapse. Then "
+        "meet the queries an index cannot help, and what it costs on writes.",
+
     # --- Machine Learning, later additions --------------------------------
     "machine_learning/pca.html":
         "Rotate a line through a point cloud and watch the variance it captures peak on "
