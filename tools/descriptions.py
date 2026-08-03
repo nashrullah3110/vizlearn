@@ -308,6 +308,10 @@ DESCRIPTIONS = {
         "Fill a context window and watch what gets pushed out, then switch off the KV "
         "cache and watch the work per token go quadratic.",
 
+    "gen_ai/fine_tuning_vs_rlhf.html":
+        "Three stages, three jobs. Watch a model's answers move under supervised "
+        "fine-tuning, then under preference optimisation, and watch reward hacking happen.",
+
     "gen_ai/rag.html":
         "Ask about a product no model has heard of. Watch retrieval score every chunk, "
         "paste the winners into the prompt, and turn a guess into a cited answer.",

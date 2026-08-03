@@ -243,6 +243,7 @@ SEQUENCE = {
         "gen_ai/embeddings_and_vector_search.html",
         "gen_ai/rag.html",
         "gen_ai/context_window_and_kv_cache.html",
+        "gen_ai/fine_tuning_vs_rlhf.html",
     ],
 }
 

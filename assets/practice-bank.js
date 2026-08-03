@@ -2290,6 +2290,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/fine_tuning_vs_rlhf.html",
+  "title": "Fine-Tuning vs RLHF and DPO",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Pretraining supplies knowledge and fluency, supervised fine-tuning supplies behaviour by imitation, and preference optimisation supplies judgement between answers that are all plausible. RLHF and DPO reach the same optimum — a policy proportional to the reference times the exponentiated reward — with DPO skipping the reward model that RLHF has to train and then defend."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "A pretrained model is a text predictor. Ask it a question and it produces something a document containing that question might plausibly continue with — which is not the same as an answer, and certainly not a helpful one."
+   },
+   {
+    "t": "What does this module say about “The maths both preference methods share”?",
+    "ans": "Every preference method optimises the same objective: get more reward without drifting far from the model you started with. That constraint has a closed form,"
+   }
+  ]
+ },
+ {
   "path": "gen_ai/how_llms_predict_next_word.html",
   "title": "How LLMs Predict the Next Word?",
   "cat": "Gen AI",

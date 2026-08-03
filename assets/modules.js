@@ -852,6 +852,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Meaning becomes geometry. Run an exact nearest-neighbour search, then a partitioned one, and watch comparisons collapse while recall quietly slips."
  },
  {
+  "title": "Fine-Tuning vs RLHF and DPO",
+  "path": "gen_ai/fine_tuning_vs_rlhf.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Three stages, three jobs. Watch a model's answers move under supervised fine-tuning, then under preference optimisation, and watch reward hacking happen."
+ },
+ {
   "title": "How LLMs Predict the Next Word?",
   "path": "gen_ai/how_llms_predict_next_word.html",
   "category": "Gen AI",
