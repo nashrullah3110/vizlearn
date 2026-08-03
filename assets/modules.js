@@ -876,6 +876,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive quantization lab for LLMs - map FP32 weights to INT8 or INT4, see quantization error, outlier effects and real model memory savings."
  },
  {
+  "title": "Retrieval-Augmented Generation (RAG)",
+  "path": "gen_ai/rag.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Ask about a product no model has heard of. Watch retrieval score every chunk, paste the winners into the prompt, and turn a guess into a cited answer."
+ },
+ {
   "title": "What is Masked Language Modeling?",
   "path": "gen_ai/masked_language_modeling.html",
   "category": "Gen AI",

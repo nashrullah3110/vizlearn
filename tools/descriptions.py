@@ -299,6 +299,11 @@ DESCRIPTIONS = {
         "Move a split through a dataset and watch entropy fall. The threshold that drops "
         "it most is exactly the question a decision tree decides to ask.",
 
+    # --- Gen AI, later additions -------------------------------------------
+    "gen_ai/rag.html":
+        "Ask about a product no model has heard of. Watch retrieval score every chunk, "
+        "paste the winners into the prompt, and turn a guess into a cited answer.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "

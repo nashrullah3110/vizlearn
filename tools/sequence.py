@@ -240,6 +240,7 @@ SEQUENCE = {
         "gen_ai/quantization_in_llms.html",
         "gen_ai/lora_in_llms.html",
         "gen_ai/knowledge_distillation_in_llms.html",
+        "gen_ai/rag.html",
     ],
 }
 

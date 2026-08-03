@@ -2368,6 +2368,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/rag.html",
+  "title": "Retrieval-Augmented Generation (RAG)",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "RAG answers questions a model was never trained on by finding relevant passages and putting them in the prompt, so generation becomes reading rather than recall. The retrieval step is ordinary similarity search and it always returns something, which makes the quality of your chunking, your ranking and your \"I could not find it\" path the whole ballgame."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "A language model knows what was in its training data, frozen at some cutoff date. It does not know your company's handbook, last week's incident report, or a product invented for a teaching page. Asked anyway, it will answer — fluently, and wrongly."
+   },
+   {
+    "t": "What does this module say about “The pipeline”?",
+    "ans": "Only steps 3 to 5 happen per question. Steps 1 and 2 happen once, when the documents change — which is why RAG updates in the time it takes to re-index rather than the time it takes to retrain."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/masked_language_modeling.html",
   "title": "What is Masked Language Modeling?",
   "cat": "Gen AI",
