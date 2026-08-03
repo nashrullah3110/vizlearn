@@ -54,6 +54,7 @@ SEQUENCE = {
         "machine_learning/naive_bayes.html",
         "machine_learning/svm.html",
         "machine_learning/k_means.html",
+        "machine_learning/pca.html",
         "machine_learning/cosine_similarity.html",
         "machine_learning/cross_validation.html",
         "machine_learning/bias_vs_variance.html",

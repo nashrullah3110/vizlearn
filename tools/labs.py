@@ -778,4 +778,35 @@ LABS = {
             "one side."},
 ]},
 
+"machine_learning/pca.html": {"check": [
+    {"q": "What does the first principal component point along?",
+     "options": ["The direction that best separates the classes",
+                 "The direction the data varies along most",
+                 "The column with the largest values",
+                 "The line minimising vertical distance to the target"],
+     "answer": 1,
+     "why": "PC1 maximises uᵀΣu - the variance measured along the direction u. "
+            "It has never seen your labels, which is why it is unsupervised and "
+            "why it can happily discard the direction that separates the classes."},
+    {"q": "Two features are almost perfectly correlated. What happens to the "
+          "second eigenvalue?",
+     "options": ["It grows", "It stays the same",
+                 "It collapses towards zero",
+                 "It becomes negative"],
+     "answer": 2,
+     "why": "Perfect correlation means the cloud lies on a line: there is no "
+            "spread in the perpendicular direction, so λ₂ is zero and PC1 "
+            "explains 100%. Two columns, one dimension of information."},
+    {"q": "Why must you usually standardise the columns before running PCA?",
+     "options": ["Otherwise the maths is undefined",
+                 "Because variance carries units, so a column measured in "
+                 "large numbers dominates the first component",
+                 "To make the components interpretable",
+                 "To speed up the eigen-decomposition"],
+     "answer": 1,
+     "why": "PCA maximises variance, and variance is in squared units. Income in "
+            "rupees next to age in years makes income the first component no "
+            "matter what the data means."},
+]},
+
 }

@@ -260,4 +260,9 @@ DESCRIPTIONS = {
     "maths/distance_metrics.html":
         "Four answers to how far apart two points are. Watch cosine ignore length entirely "
         "while Euclidean, Manhattan and Chebyshev disagree by shape.",
+
+    # --- Machine Learning, later additions --------------------------------
+    "machine_learning/pca.html":
+        "Rotate a line through a point cloud and watch the variance it captures peak on "
+        "exactly one angle. That angle is PC1, and the rest is what you lose.",
 }

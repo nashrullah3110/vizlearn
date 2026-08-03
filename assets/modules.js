@@ -980,6 +980,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Expand a categorical column into binary columns and see how one-hot encoding avoids implying an order that was never there."
  },
  {
+  "title": "Principal Component Analysis",
+  "path": "machine_learning/pca.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": "Rotate a line through a point cloud and watch the variance it captures peak on exactly one angle. That angle is PC1, and the rest is what you lose."
+ },
+ {
   "title": "ROC Curve and AUC",
   "path": "machine_learning/roc_curve_and_auc.html",
   "category": "Machine Learning",
