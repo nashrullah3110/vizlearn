@@ -1124,6 +1124,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive derivatives lesson - drag a point along a curve, shrink the secant to a tangent, and see the limit definition of the derivative in action."
  },
  {
+  "title": "Determinant",
+  "path": "maths/determinant.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "The determinant is the area the unit square becomes. Sweep it through zero and watch the plane flatten, then turn itself inside out."
+ },
+ {
   "title": "Distance Metrics",
   "path": "maths/distance_metrics.html",
   "category": "Maths",

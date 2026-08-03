@@ -283,6 +283,10 @@ DESCRIPTIONS = {
         "Drag one vector onto another and watch its shadow, plus the perpendicular residual "
         "left behind. The geometric root of least squares.",
 
+    "maths/determinant.html":
+        "The determinant is the area the unit square becomes. Sweep it through zero and "
+        "watch the plane flatten, then turn itself inside out.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "
