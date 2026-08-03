@@ -2252,6 +2252,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/context_window_and_kv_cache.html",
+  "title": "Context Windows and the KV Cache",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "The context window is the model's entire working memory, re-sent on every request, and it is shared between the system prompt, retrieved context, the conversation and the reply being written into it. The KV cache turns generation from quadratic work into linear by storing each token's key and value once, and it is paid for in memory that scales with layers, KV heads and sequence length — half a megabyte per token on..."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "A language model holds no state between requests. Everything it appears to remember — your name, the file you pasted, what it said three turns ago — is re-sent on every call, inside the context window. The window is a hard limit on how much can be sent, and everything competes for it: the system prompt, retrieved documents, the conversation so far, and the space the reply needs to be written into."
+   },
+   {
+    "t": "What does this module say about “What the KV cache is”?",
+    "ans": "Generation is one token at a time, and each new token attends to every token before it. Attention needs a key and a value vector for each earlier position — and those never change once computed, because a token's key and value depend only on the tokens up to it."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/embeddings_and_vector_search.html",
   "title": "Embeddings and Vector Search",
   "cat": "Gen AI",

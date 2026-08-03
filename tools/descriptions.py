@@ -304,6 +304,10 @@ DESCRIPTIONS = {
         "Meaning becomes geometry. Run an exact nearest-neighbour search, then a "
         "partitioned one, and watch comparisons collapse while recall quietly slips.",
 
+    "gen_ai/context_window_and_kv_cache.html":
+        "Fill a context window and watch what gets pushed out, then switch off the KV "
+        "cache and watch the work per token go quadratic.",
+
     "gen_ai/rag.html":
         "Ask about a product no model has heard of. Watch retrieval score every chunk, "
         "paste the winners into the prompt, and turn a guess into a cited answer.",

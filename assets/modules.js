@@ -836,6 +836,14 @@ window.VIZLEARN_MODULES = [
   "desc": "See how predicting the next token, over and over, is all it takes for a model like GPT to produce fluent text."
  },
  {
+  "title": "Context Windows and the KV Cache",
+  "path": "gen_ai/context_window_and_kv_cache.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Fill a context window and watch what gets pushed out, then switch off the KV cache and watch the work per token go quadratic."
+ },
+ {
   "title": "Embeddings and Vector Search",
   "path": "gen_ai/embeddings_and_vector_search.html",
   "category": "Gen AI",
