@@ -548,6 +548,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Rank, total and compare across rows without collapsing them, using OVER and PARTITION BY on a live result set."
  },
  {
+  "title": "Subqueries in SQL",
+  "path": "database/subqueries_in_sql.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": "The inner query runs first and hands its answer to the outer one. Scalar, IN-list, derived table, and a correlated subquery re-running once per row."
+ },
+ {
   "title": "What are Non Relational Databases?",
   "path": "database/what_are_non_relational_databases.html",
   "category": "Database",

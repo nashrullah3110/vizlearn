@@ -270,6 +270,10 @@ DESCRIPTIONS = {
         "Rows become groups become filtered groups. Move the same condition between WHERE "
         "and HAVING and watch the answer change, one stage at a time.",
 
+    "database/subqueries_in_sql.html":
+        "The inner query runs first and hands its answer to the outer one. Scalar, IN-list, "
+        "derived table, and a correlated subquery re-running once per row.",
+
     # --- Machine Learning, later additions --------------------------------
     "machine_learning/pca.html":
         "Rotate a line through a point cloud and watch the variance it captures peak on "
