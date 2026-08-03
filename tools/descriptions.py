@@ -278,6 +278,11 @@ DESCRIPTIONS = {
         "Walk a B-tree instead of reading every row and watch rows-examined collapse. Then "
         "meet the queries an index cannot help, and what it costs on writes.",
 
+    # --- Maths, later additions --------------------------------------------
+    "maths/projections.html":
+        "Drag one vector onto another and watch its shadow, plus the perpendicular residual "
+        "left behind. The geometric root of least squares.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "

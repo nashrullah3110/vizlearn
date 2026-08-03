@@ -22,6 +22,7 @@ SEQUENCE = {
         "maths/distance_metrics.html",
         "maths/matrix_multiplication.html",
         "maths/matrix_as_transformation.html",
+        "maths/projections.html",
         "maths/eigenvalues_and_eigenvectors.html",
         "maths/derivatives_and_slope.html",
         "maths/the_chain_rule.html",

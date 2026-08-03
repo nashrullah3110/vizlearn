@@ -1220,6 +1220,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive probability basics - sample spaces, events, AND vs OR, independence, and the law of large numbers demonstrated by simulation."
  },
  {
+  "title": "Projections",
+  "path": "maths/projections.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": "Drag one vector onto another and watch its shadow, plus the perpendicular residual left behind. The geometric root of least squares."
+ },
+ {
   "title": "The Chain Rule",
   "path": "maths/the_chain_rule.html",
   "category": "Maths",
