@@ -385,6 +385,10 @@ DESCRIPTIONS = {
         "Run vector search and BM25 side by side and watch them disagree, then fuse the two "
         "rankings and see a document neither method alone ranked first win on consensus.",
 
+    "gen_ai/reranking_bi_encoders_vs_cross_encoders.html":
+        "Retrieve six candidates fast with a bi-encoder, then re-score them with a slower "
+        "cross-encoder that reads query and document together and catches what was missed.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "

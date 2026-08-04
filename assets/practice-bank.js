@@ -2691,6 +2691,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/reranking_bi_encoders_vs_cross_encoders.html",
+  "title": "Re-ranking: Bi-Encoders vs Cross-Encoders",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A bi-encoder scores query and document independently, which is what makes it fast enough to search a whole corpus but blind to interactions between them — a lexical coincidence can outrank a genuine match. A cross-encoder reads both together and catches that, at a cost that only scales with the shortlist, not the corpus."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "A bi-encoder embeds the query and every document separately , ahead of time — that is what makes the embeddings precomputable and search fast, but it also means the model never looks at a query and a document together. A cross-encoder takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable."
+   },
+   {
+    "t": "What does this module say about “The two-stage pattern”?",
+    "ans": "Cross-encoders are far more accurate but cost too much to run over an entire corpus — a million documents means a million forward passes per query. The standard fix is two stages: a cheap bi-encoder (or BM25, or both) retrieves a shortlist of maybe 20-100 candidates, and only that shortlist is re-scored by the expensive cross-encoder, which then decides the final order."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/retrieval_evaluation_metrics.html",
   "title": "Retrieval Evaluation Metrics",
   "cat": "Gen AI",

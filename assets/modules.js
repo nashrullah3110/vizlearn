@@ -1012,6 +1012,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive quantization lab for LLMs - map FP32 weights to INT8 or INT4, see quantization error, outlier effects and real model memory savings."
  },
  {
+  "title": "Re-ranking: Bi-Encoders vs Cross-Encoders",
+  "path": "gen_ai/reranking_bi_encoders_vs_cross_encoders.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Retrieve six candidates fast with a bi-encoder, then re-score them with a slower cross-encoder that reads query and document together and catches what was missed."
+ },
+ {
   "title": "Retrieval Evaluation Metrics",
   "path": "gen_ai/retrieval_evaluation_metrics.html",
   "category": "Gen AI",
