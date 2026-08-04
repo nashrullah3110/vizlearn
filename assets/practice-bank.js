@@ -1489,6 +1489,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "database/transactions_and_acid.html",
+  "title": "Transactions and ACID in SQL",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A transaction makes a group of writes behave as one unit: Atomicity guarantees all-or-nothing, Consistency guarantees the result is valid, Isolation controls what concurrent sessions can see of work in progress, and Durability guarantees a commit survives a crash."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "A transfer between two accounts is two separate UPDATE statements. If the database crashes between them, one account has lost money and the other never received it — unless the two are wrapped in a transaction, which guarantees they happen together or not at all."
+   },
+   {
+    "t": "What does this module say about “The four letters”?",
+    "ans": "READ UNCOMMITTED lets one session see another's uncommitted changes — a \"dirty read\". READ COMMITTED , the default in most engines, blocks that: a session only ever sees data that has actually been committed. Stricter levels (REPEATABLE READ, SERIALIZABLE) exist to stop other classes of anomaly, at a cost in concurrency."
+   }
+  ]
+ },
+ {
   "path": "database/union_intersect_except_in_sql.html",
   "title": "UNION, INTERSECT and EXCEPT in SQL",
   "cat": "Database",

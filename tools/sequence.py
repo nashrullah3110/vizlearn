@@ -220,6 +220,7 @@ SEQUENCE = {
         "database/ddl_in_sql.html",
         "database/normalization_in_sql.html",
         "database/dml_in_sql.html",
+        "database/transactions_and_acid.html",
         "database/where_clause_in_sql.html",
         "database/null_handling_in_sql.html",
         "database/order_by_in_sql.html",

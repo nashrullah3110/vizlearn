@@ -282,6 +282,10 @@ DESCRIPTIONS = {
         "One table with a multi-valued column, split step by step into 1NF, 2NF and 3NF. "
         "Watch the redundant cells that cause update anomalies drop to zero.",
 
+    "database/transactions_and_acid.html":
+        "Step a transfer through BEGIN, two UPDATEs and COMMIT or ROLLBACK, with a second "
+        "session watching. Fail it halfway and watch atomicity undo both writes, not one.",
+
     "database/order_by_in_sql.html":
         "Watch rows slide into their new order as you change the sort key, direction, "
         "tie-breaker and NULLS placement, with the query building live.",

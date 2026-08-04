@@ -596,6 +596,14 @@ window.VIZLEARN_MODULES = [
   "desc": "The inner query runs first and hands its answer to the outer one. Scalar, IN-list, derived table, and a correlated subquery re-running once per row."
  },
  {
+  "title": "Transactions and ACID in SQL",
+  "path": "database/transactions_and_acid.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": "Step a transfer through BEGIN, two UPDATEs and COMMIT or ROLLBACK, with a second session watching. Fail it halfway and watch atomicity undo both writes, not one."
+ },
+ {
   "title": "UNION, INTERSECT and EXCEPT in SQL",
   "path": "database/union_intersect_except_in_sql.html",
   "category": "Database",
