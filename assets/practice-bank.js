@@ -1168,6 +1168,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/semantic_segmentation_unet.html",
+  "title": "Semantic Segmentation and U-Net",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Downsampling for context and needing pixel-precise output are in direct tension — the same pooling that builds semantic understanding destroys the spatial detail a segmentation mask needs back. Skip connections resolve that tension not by improving the upsampling step, but by making it partly unnecessary: the fine detail rides across the encoder-decoder bridge instead of being reconstructed from a coarse map that no..."
+   },
+   {
+    "t": "What does this module say about “Downsample Depth”?",
+    "ans": "a 16×16 mask, majority-vote 2×2 pooling per level, nearest-neighbour upsampling back"
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "Semantic segmentation labels every pixel with a class, not just the image as a whole. A CNN classifier's usual move — pool down repeatedly to build up wide receptive fields and semantic context — is exactly what a segmentation decoder then has to undo, pixel by pixel, to produce a full-resolution output mask."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/strides_in_cnn.html",
   "title": "Strides in CNN",
   "cat": "Computer Vision",

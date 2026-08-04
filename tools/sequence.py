@@ -216,6 +216,7 @@ SEQUENCE = {
         "computer_vision/iou_and_non_max_suppression.html",
         "computer_vision/object_detection_with_bounding_boxes.html",
         "computer_vision/resnet_and_identity_shortcuts.html",
+        "computer_vision/semantic_segmentation_unet.html",
     ],
 
     # What a database is -> define -> insert -> query -> aggregate -> advanced.

@@ -183,6 +183,8 @@ DESCRIPTIONS = {
         "Drag a predicted box toward the ground truth and watch IoU climb, the loss fall, and the detection flip from a miss to a match at the 0.5 threshold.",
     "computer_vision/resnet_and_identity_shortcuts.html":
         "Push a signal vector through the same contractive layer twenty times, with and without an identity shortcut, and watch one collapse toward zero while the other never can.",
+    "computer_vision/semantic_segmentation_unet.html":
+        "Downsample a mask to see more context, then upsample it back, and watch the boundary blur unless a skip connection carries the resolution pooling just destroyed.",
 
     # --- Database ---------------------------------------------------------
     "database/joins_in_sql.html":

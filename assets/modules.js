@@ -468,6 +468,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Push a signal vector through the same contractive layer twenty times, with and without an identity shortcut, and watch one collapse toward zero while the other never can."
  },
  {
+  "title": "Semantic Segmentation and U-Net",
+  "path": "computer_vision/semantic_segmentation_unet.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": "Downsample a mask to see more context, then upsample it back, and watch the boundary blur unless a skip connection carries the resolution pooling just destroyed."
+ },
+ {
   "title": "Strides in CNN",
   "path": "computer_vision/strides_in_cnn.html",
   "category": "Computer Vision",
