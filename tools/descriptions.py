@@ -181,6 +181,8 @@ DESCRIPTIONS = {
         "A detector proposes four boxes for two objects. IoU measures the overlap, and Non-Max Suppression uses that number to throw the duplicates away.",
     "computer_vision/object_detection_with_bounding_boxes.html":
         "Drag a predicted box toward the ground truth and watch IoU climb, the loss fall, and the detection flip from a miss to a match at the 0.5 threshold.",
+    "computer_vision/resnet_and_identity_shortcuts.html":
+        "Push a signal vector through the same contractive layer twenty times, with and without an identity shortcut, and watch one collapse toward zero while the other never can.",
 
     # --- Database ---------------------------------------------------------
     "database/joins_in_sql.html":

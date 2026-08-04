@@ -1149,6 +1149,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/resnet_and_identity_shortcuts.html",
+  "title": "ResNet and Identity Shortcuts",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A plain stack of layers with a contractive weight matrix shrinks its forward signal geometrically with depth — the same kind of multiplicative decay that causes vanishing gradients on the way back. An identity shortcut adds a nonnegative quantity back onto the running signal at every block, which makes shrinkage below the starting point mathematically impossible."
+   },
+   {
+    "t": "What does this module say about “Depth”?",
+    "ans": "same fixed weight matrix W applied at every block, ReLU after each one — a stand-in for a stack of identical conv blocks"
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "ResNet's headline idea is the identity shortcut: instead of a block computing x_{i+1} = f(x_i) , it computes x_{i+1} = x_i + f(x_i) , adding the block's own input back onto its output. The usual explanation is about gradients flowing backward through very deep networks."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/strides_in_cnn.html",
   "title": "Strides in CNN",
   "cat": "Computer Vision",

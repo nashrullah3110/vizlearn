@@ -460,6 +460,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Slide a sensitivity threshold across a real image and watch edges appear wherever brightness changes sharply enough."
  },
  {
+  "title": "ResNet and Identity Shortcuts",
+  "path": "computer_vision/resnet_and_identity_shortcuts.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": "Push a signal vector through the same contractive layer twenty times, with and without an identity shortcut, and watch one collapse toward zero while the other never can."
+ },
+ {
   "title": "Strides in CNN",
   "path": "computer_vision/strides_in_cnn.html",
   "category": "Computer Vision",
