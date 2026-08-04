@@ -389,6 +389,10 @@ DESCRIPTIONS = {
         "Retrieve six candidates fast with a bi-encoder, then re-score them with a slower "
         "cross-encoder that reads query and document together and catches what was missed.",
 
+    "gen_ai/maximal_marginal_relevance.html":
+        "Pick the next document by relevance minus similarity to what you already picked, "
+        "and watch three near-duplicate chunks stop crowding out everything else.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "

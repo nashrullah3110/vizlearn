@@ -2672,6 +2672,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/maximal_marginal_relevance.html",
+  "title": "Maximal Marginal Relevance (MMR)",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "MMR selects documents one at a time, and after the first pick, every subsequent choice is weighed against how similar it is to what has already been selected — trading some relevance for coverage. λ controls the trade directly: 1.0 is ordinary top-k relevance ranking, 0.0 ignores relevance and maximises spread, and everything between balances the two."
+   },
+   {
+    "t": "What does this module say about “Selection”?",
+    "ans": "1.0 = pure relevance (same as MMR off). 0.0 = pure diversity, ignores relevance entirely."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "Plain top-k retrieval picks the k highest-scoring documents independently. If a document collection has several near-identical passages about the same popular sub-topic, all of them can legitimately score near the top — and a naive top-k fills the context with repetition instead of coverage, wasting the retrieval budget on saying the same thing three times."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/quantization_in_llms.html",
   "title": "Quantization in LLMs",
   "cat": "Gen AI",

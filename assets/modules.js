@@ -1004,6 +1004,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive LoRA lab - see how low-rank adapters replace full fine-tuning, how rank controls trainable parameters, and what a rank-limited update can represent."
  },
  {
+  "title": "Maximal Marginal Relevance (MMR)",
+  "path": "gen_ai/maximal_marginal_relevance.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Pick the next document by relevance minus similarity to what you already picked, and watch three near-duplicate chunks stop crowding out everything else."
+ },
+ {
   "title": "Quantization in LLMs",
   "path": "gen_ai/quantization_in_llms.html",
   "category": "Gen AI",
