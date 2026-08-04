@@ -2442,6 +2442,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/dot_product_vs_cosine_similarity.html",
+  "title": "Dot Product vs Cosine Similarity for Retrieval",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Cosine similarity divides out vector length and only ever measures direction; dot product does not, so it rewards longer vectors regardless of whether that length means anything. The two metrics agree only when every vector has the same length — true if you normalise your embeddings to unit length, false otherwise."
+   },
+   {
+    "t": "What does this module say about “Stretch Doc B”?",
+    "ans": "same direction as before, just longer — like a verbose, repetitive document embedding"
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "Cosine similarity asks \"what angle apart are these two vectors\" and ignores length entirely. Dot product asks \"how much do these two vectors agree, weighted by how long they both are\" — length is part of the answer, not discarded."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/embeddings_and_vector_search.html",
   "title": "Embeddings and Vector Search",
   "cat": "Gen AI",

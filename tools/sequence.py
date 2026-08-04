@@ -252,6 +252,7 @@ SEQUENCE = {
         "gen_ai/lora_in_llms.html",
         "gen_ai/knowledge_distillation_in_llms.html",
         "gen_ai/embeddings_and_vector_search.html",
+        "gen_ai/dot_product_vs_cosine_similarity.html",
         "gen_ai/rag.html",
         "gen_ai/context_window_and_kv_cache.html",
         "gen_ai/fine_tuning_vs_rlhf.html",

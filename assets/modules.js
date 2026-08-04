@@ -916,6 +916,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Fill a context window and watch what gets pushed out, then switch off the KV cache and watch the work per token go quadratic."
  },
  {
+  "title": "Dot Product vs Cosine Similarity for Retrieval",
+  "path": "gen_ai/dot_product_vs_cosine_similarity.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Stretch one document's vector and watch dot-product ranking promote it purely for being longer, while cosine ranking never moves. Two different questions, one embedding."
+ },
+ {
   "title": "Embeddings and Vector Search",
   "path": "gen_ai/embeddings_and_vector_search.html",
   "category": "Gen AI",

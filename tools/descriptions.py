@@ -365,6 +365,10 @@ DESCRIPTIONS = {
         "Ask about a product no model has heard of. Watch retrieval score every chunk, "
         "paste the winners into the prompt, and turn a guess into a cited answer.",
 
+    "gen_ai/dot_product_vs_cosine_similarity.html":
+        "Stretch one document's vector and watch dot-product ranking promote it purely for "
+        "being longer, while cosine ranking never moves. Two different questions, one embedding.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "
