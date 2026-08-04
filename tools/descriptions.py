@@ -336,6 +336,10 @@ DESCRIPTIONS = {
         "Step a weight down a parabola and inject one exploding gradient. Without clipping "
         "the weight flies off; with it, the update is capped and training survives.",
 
+    "deep_learning/residual_connections.html":
+        "Chain the same shrinking layer N times and watch the gradient vanish before it "
+        "reaches the input. Add a skip connection to each layer and watch it stop vanishing.",
+
     # --- Gen AI, later additions -------------------------------------------
     "gen_ai/embeddings_and_vector_search.html":
         "Meaning becomes geometry. Run an exact nearest-neighbour search, then a "

@@ -844,6 +844,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Compare L1 and L2 penalties, and watch Lasso zero out useless weights while Ridge shrinks all of them smoothly."
  },
  {
+  "title": "Residual and Skip Connections",
+  "path": "deep_learning/residual_connections.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": "Chain the same shrinking layer N times and watch the gradient vanish before it reaches the input. Add a skip connection to each layer and watch it stop vanishing."
+ },
+ {
   "title": "Softmax and Cross-Entropy",
   "path": "deep_learning/softmax_and_cross_entropy.html",
   "category": "Deep Learning",

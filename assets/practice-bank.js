@@ -2267,6 +2267,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "deep_learning/residual_connections.html",
+  "title": "Residual and Skip Connections",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A residual connection adds the block's input back onto its output, which adds a constant 1 to that layer's local derivative during backpropagation. A chain of derivatives all below 1 shrinks geometrically and vanishes; a chain that includes a guaranteed +1 at every step cannot collapse toward zero regardless of how small the learned part's derivative is."
+   },
+   {
+    "t": "What does this module say about “The Stack”?",
+    "ans": "every layer squashes its input by the same factor (local derivative 0.55) — realistic for a deep sigmoid/tanh stack"
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "Stack enough layers and, by the chain rule, the gradient reaching an early layer is the product of every local derivative between it and the loss. If each of those derivatives is reliably less than 1 — true of sigmoid and tanh almost everywhere — the product shrinks geometrically."
+   }
+  ]
+ },
+ {
   "path": "deep_learning/softmax_and_cross_entropy.html",
   "title": "Softmax and Cross-Entropy",
   "cat": "Deep Learning",
