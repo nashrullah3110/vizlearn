@@ -223,6 +223,7 @@ SEQUENCE = {
         "database/null_handling_in_sql.html",
         "database/order_by_in_sql.html",
         "database/limit_and_offset_in_sql.html",
+        "database/case_and_views_in_sql.html",
         "database/groupby_in_sql.html",
         "database/having_in_sql.html",
         "database/query_execution_order.html",

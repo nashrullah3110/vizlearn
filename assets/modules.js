@@ -460,6 +460,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Learn how Transfer Learning works in Convolutional Neural Networks, select models, and selectively unfreeze layers for fine-tuning."
  },
  {
+  "title": "CASE and Views in SQL",
+  "path": "database/case_and_views_in_sql.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": "Build a CASE expression that turns raw numbers into labels, then save the whole query as a view and watch it stay a live query, not a snapshot."
+ },
+ {
   "title": "Common Table Expressions in SQL",
   "path": "database/common_table_expressions_in_sql.html",
   "category": "Database",

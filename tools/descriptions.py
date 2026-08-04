@@ -270,6 +270,10 @@ DESCRIPTIONS = {
         "NULL is not a value, so nothing about it compares the way you expect. Pick an "
         "expression and watch COALESCE, NULLIF and IS NULL treat the same rows differently.",
 
+    "database/case_and_views_in_sql.html":
+        "Build a CASE expression that turns raw numbers into labels, then save the whole "
+        "query as a view and watch it stay a live query, not a snapshot.",
+
     "database/order_by_in_sql.html":
         "Watch rows slide into their new order as you change the sort key, direction, "
         "tie-breaker and NULLS placement, with the query building live.",

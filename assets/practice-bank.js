@@ -1145,6 +1145,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "database/case_and_views_in_sql.html",
+  "title": "CASE and Views in SQL",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "CASE is a per-row branch inside SELECT that returns the first matching value or NULL if nothing matches and there is no ELSE. A view is a saved query, not saved data — it re-runs against live tables on every read, which is what makes it stay correct as the underlying data changes and is exactly the property a materialized view trades away for speed."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "CASE is an if/else that lives inside a SELECT list, evaluated once per row. A VIEW is a query with a name, so you can SELECT from it like a table without repeating the logic every time."
+   },
+   {
+    "t": "What does this module say about “Views: a name for a query, not a copy of it”?",
+    "ans": "A plain view stores no data. Every time you query it, the underlying SELECT runs again against the current table — which is the whole point of the raise experiment below. This is different from a materialized view , which does store a snapshot and has to be refreshed explicitly to catch up with changes underneath it."
+   }
+  ]
+ },
+ {
   "path": "database/common_table_expressions_in_sql.html",
   "title": "Common Table Expressions in SQL",
   "cat": "Database",
