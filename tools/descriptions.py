@@ -369,6 +369,10 @@ DESCRIPTIONS = {
         "Stretch one document's vector and watch dot-product ranking promote it purely for "
         "being longer, while cosine ranking never moves. Two different questions, one embedding.",
 
+    "gen_ai/bm25_and_sparse_retrieval.html":
+        "The keyword-matching half of search, computed live. Drag length normalization to "
+        "zero and watch a verbose repetitive document dominate purely on term count.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "

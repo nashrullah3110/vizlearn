@@ -892,6 +892,14 @@ window.VIZLEARN_MODULES = [
   "desc": "See what the numbers a network learns are actually for: weights scale each input, bias shifts where the neuron fires."
  },
  {
+  "title": "BM25 and Sparse Lexical Retrieval",
+  "path": "gen_ai/bm25_and_sparse_retrieval.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "The keyword-matching half of search, computed live. Drag length normalization to zero and watch a verbose repetitive document dominate purely on term count."
+ },
+ {
   "title": "Byte Pair Encoding Tokenizer",
   "path": "gen_ai/byte_pair_encoding_tokenizer.html",
   "category": "Gen AI",

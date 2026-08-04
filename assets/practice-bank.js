@@ -2381,6 +2381,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/bm25_and_sparse_retrieval.html",
+  "title": "BM25 and Sparse Lexical Retrieval",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "BM25 scores a document by summing, over each query term it contains, that term's rarity across the corpus times a saturating function of how often it appears, normalised by document length. b controls how much long documents are penalised for being long; k1 controls how much repeated terms are rewarded before diminishing returns kick in."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "Before dense vector search , and still running alongside it in most real systems, is sparse lexical search: score a document by which query terms it contains, weighted by how informative each term is. BM25 is the version of this idea that actually works well, and it needs no training, no GPU, and no embedding model."
+   },
+   {
+    "t": "What does this module say about “Why it still matters next to embeddings”?",
+    "ans": "BM25 gets exact terms right where embeddings can blur them — product codes, error messages, names, acronyms. It is also completely interpretable: every score decomposes into per-term contributions, which is why the breakdown panel above can show exactly where a score came from. This is the sparse half of the hybrid search that most production RAG systems actually run."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/byte_pair_encoding_tokenizer.html",
   "title": "Byte Pair Encoding Tokenizer",
   "cat": "Gen AI",
