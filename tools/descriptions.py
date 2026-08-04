@@ -179,6 +179,8 @@ DESCRIPTIONS = {
         "Split a colour image into red, green and blue channels and see how three grids of numbers combine into every pixel.",
     "computer_vision/iou_and_non_max_suppression.html":
         "A detector proposes four boxes for two objects. IoU measures the overlap, and Non-Max Suppression uses that number to throw the duplicates away.",
+    "computer_vision/object_detection_with_bounding_boxes.html":
+        "Drag a predicted box toward the ground truth and watch IoU climb, the loss fall, and the detection flip from a miss to a match at the 0.5 threshold.",
 
     # --- Database ---------------------------------------------------------
     "database/joins_in_sql.html":

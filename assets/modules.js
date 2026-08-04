@@ -404,6 +404,14 @@ window.VIZLEARN_MODULES = [
   "desc": "A detector proposes four boxes for two objects. IoU measures the overlap, and Non-Max Suppression uses that number to throw the duplicates away."
  },
  {
+  "title": "Object Detection with Bounding Boxes",
+  "path": "computer_vision/object_detection_with_bounding_boxes.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": "Drag a predicted box toward the ground truth and watch IoU climb, the loss fall, and the detection flip from a miss to a match at the 0.5 threshold."
+ },
+ {
   "title": "Padding in CNN",
   "path": "computer_vision/padding_in_cnn.html",
   "category": "Computer Vision",

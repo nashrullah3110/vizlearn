@@ -1020,6 +1020,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/object_detection_with_bounding_boxes.html",
+  "title": "Object Detection with Bounding Boxes",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "1 − IoU is a smooth, differentiable signal that a network can actually be trained against. Whether a detection counts as correct at evaluation time is not smooth at all — it's a hard threshold on that same IoU number. A model can make genuine, loss-reducing progress on a box for a long stretch before that progress ever shows up as a correct detection in your metrics."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "An object detector's output head does two jobs per candidate region: classify what's there, and regress four numbers describing where it is precisely — typically a box center, width and height, or the offsets needed to nudge a fixed anchor box onto the real object. The classification half is an ordinary softmax problem."
+   },
+   {
+    "t": "What does this module say about “IoU as loss, IoU as grade”?",
+    "ans": "A natural localization loss is simply 1 − IoU between the predicted box and the ground truth box: 0 when they coincide exactly, approaching 1 as they stop overlapping at all. At evaluation time, the same IoU number gets a different job — a detection is usually scored as a true positive only if its IoU with the matching ground truth box clears a threshold, conventionally 0.5 under the PASCAL VOC convention."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/padding_in_cnn.html",
   "title": "Padding in CNN",
   "cat": "Computer Vision",

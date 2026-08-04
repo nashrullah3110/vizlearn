@@ -214,6 +214,7 @@ SEQUENCE = {
         "computer_vision/image_data_augmentation.html",
         "computer_vision/transfer_learning_with_cnn.html",
         "computer_vision/iou_and_non_max_suppression.html",
+        "computer_vision/object_detection_with_bounding_boxes.html",
     ],
 
     # What a database is -> define -> insert -> query -> aggregate -> advanced.
