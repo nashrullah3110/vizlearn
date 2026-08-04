@@ -278,6 +278,10 @@ DESCRIPTIONS = {
         "Combine two result sets instead of two tables. Pick an operator and watch which "
         "rows survive, and see UNION ALL keep the duplicate UNION would quietly drop.",
 
+    "database/normalization_in_sql.html":
+        "One table with a multi-valued column, split step by step into 1NF, 2NF and 3NF. "
+        "Watch the redundant cells that cause update anomalies drop to zero.",
+
     "database/order_by_in_sql.html":
         "Watch rows slide into their new order as you change the sort key, direction, "
         "tie-breaker and NULLS placement, with the query building live.",

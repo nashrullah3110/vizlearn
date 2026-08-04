@@ -1316,6 +1316,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "database/normalization_in_sql.html",
+  "title": "Normalization (1NF, 2NF, 3NF) in SQL",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "1NF removes multi-valued columns, 2NF removes columns that depend on only part of a composite key, and 3NF removes columns that depend on another non-key column rather than the key itself. Each step moves a fact into the one table where it is defined once, which is what makes update anomalies structurally impossible rather than merely unlikely."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "A denormalized table stores the same fact in more than one place, which means updating it can leave two copies disagreeing. Normalization is a sequence of rules, each one removing a specific kind of redundancy by moving data into its own table."
+   },
+   {
+    "t": "What does this module say about “What usually goes wrong”?",
+    "ans": "Over-normalizing has a cost too: every extra table is another join at query time. Reporting and analytics workloads often deliberately denormalize back down for read speed, accepting the redundancy because the data is written once and read constantly. Normalize for correctness where writes happen; consider denormalizing where reads dominate."
+   }
+  ]
+ },
+ {
   "path": "database/order_by_in_sql.html",
   "title": "ORDER BY in SQL",
   "cat": "Database",

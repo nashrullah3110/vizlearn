@@ -218,6 +218,7 @@ SEQUENCE = {
         "database/what_are_non_relational_databases.html",
         "database/datatypes_in_sql.html",
         "database/ddl_in_sql.html",
+        "database/normalization_in_sql.html",
         "database/dml_in_sql.html",
         "database/where_clause_in_sql.html",
         "database/null_handling_in_sql.html",

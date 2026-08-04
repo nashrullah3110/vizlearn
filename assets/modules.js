@@ -532,6 +532,14 @@ window.VIZLEARN_MODULES = [
   "desc": "NULL is not a value, so nothing about it compares the way you expect. Pick an expression and watch COALESCE, NULLIF and IS NULL treat the same rows differently."
  },
  {
+  "title": "Normalization (1NF, 2NF, 3NF) in SQL",
+  "path": "database/normalization_in_sql.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": "One table with a multi-valued column, split step by step into 1NF, 2NF and 3NF. Watch the redundant cells that cause update anomalies drop to zero."
+ },
+ {
   "title": "ORDER BY in SQL",
   "path": "database/order_by_in_sql.html",
   "category": "Database",
