@@ -94,6 +94,7 @@ SEQUENCE = {
         "deep_learning/gradient_clipping.html",
         "deep_learning/residual_connections.html",
         "deep_learning/batch_normalization.html",
+        "deep_learning/layer_normalization.html",
         "deep_learning/overfitting_vs_underfitting.html",
         "deep_learning/model_training_curve.html",
         "deep_learning/dropout_in_neural_networks.html",

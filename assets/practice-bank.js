@@ -1936,6 +1936,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "deep_learning/layer_normalization.html",
+  "title": "Layer Normalization",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "BatchNorm and LayerNorm are the same normalization idea applied to different axes: BatchNorm down a column, across the batch; LayerNorm across a row, within one sample. That single difference in axis is why LayerNorm works identically at any batch size, including one, while BatchNorm's statistics depend on the batch it happens to see — which is why transformers and RNNs, which often run with small or variable batches..."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "BatchNorm normalizes each feature — each column — using the mean and standard deviation computed across every sample currently in the batch. That is powerful, and it has one structural weakness: its statistics depend on which other examples happen to be in the batch with you, which becomes a real problem at batch size 1 and in architectures like transformers where \"the batch\" is not a stable, meaningful group."
+   },
+   {
+    "t": "What does this module say about “Key Takeaway”?",
+    "ans": "BatchNorm and LayerNorm are the same normalization idea applied to different axes: BatchNorm down a column, across the batch; LayerNorm across a row, within one sample. That single difference in axis is why LayerNorm works identically at any batch size, including one, while BatchNorm's statistics depend on the batch it happens to see — which is why transformers and RNNs, which often run with small or variable batches..."
+   }
+  ]
+ },
+ {
   "path": "deep_learning/learning_rate_scheduling.html",
   "title": "Learning Rate Scheduling",
   "cat": "Deep Learning",

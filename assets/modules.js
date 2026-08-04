@@ -740,6 +740,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Run grid search and random search side by side on the same model and see which finds strong hyperparameters in fewer trials."
  },
  {
+  "title": "Layer Normalization",
+  "path": "deep_learning/layer_normalization.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": "Normalize down each sample's own row instead of across the batch, and watch it keep working when the batch shrinks to a single example - where BatchNorm breaks."
+ },
+ {
   "title": "Learning Rate Scheduling",
   "path": "deep_learning/learning_rate_scheduling.html",
   "category": "Deep Learning",
