@@ -377,6 +377,10 @@ DESCRIPTIONS = {
         "Slide the chunk size down and watch fixed-size splitting cut sentences in half, "
         "while semantic chunking respects paragraph boundaries and never does.",
 
+    "gen_ai/retrieval_evaluation_metrics.html":
+        "The same five relevant documents out of ten retrieved, in three different orders. "
+        "Precision and recall cannot tell them apart - MRR and nDCG can.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "

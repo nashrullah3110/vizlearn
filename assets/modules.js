@@ -1004,6 +1004,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive quantization lab for LLMs - map FP32 weights to INT8 or INT4, see quantization error, outlier effects and real model memory savings."
  },
  {
+  "title": "Retrieval Evaluation Metrics",
+  "path": "gen_ai/retrieval_evaluation_metrics.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "The same five relevant documents out of ten retrieved, in three different orders. Precision and recall cannot tell them apart - MRR and nDCG can."
+ },
+ {
   "title": "Retrieval-Augmented Generation (RAG)",
   "path": "gen_ai/rag.html",
   "category": "Gen AI",

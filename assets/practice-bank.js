@@ -2672,6 +2672,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/retrieval_evaluation_metrics.html",
+  "title": "Retrieval Evaluation Metrics",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Precision@k and Recall@k describe a set — how much of what you returned was right, and how much of what was right did you return — and are blind to the order within that set. MRR and nDCG describe a ranking , and reward relevant results for showing up earlier."
+   },
+   {
+    "t": "What does this module say about “Ranking”?",
+    "ans": "all three rankings retrieve exactly the same 5 relevant / 5 irrelevant documents"
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "Every retrieval method on this site — vector search , BM25 , the two combined — needs a way to say whether it actually worked. That requires a labelled test set: queries with a known correct set of relevant documents, checked against what the system actually returned."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/rag.html",
   "title": "Retrieval-Augmented Generation (RAG)",
   "cat": "Gen AI",
