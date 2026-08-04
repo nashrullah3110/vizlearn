@@ -91,6 +91,7 @@ SEQUENCE = {
         "deep_learning/feature_scaling_in_neural_networks.html",
         "deep_learning/weight_initialization.html",
         "deep_learning/vanishing_vs_exploding_gradient.html",
+        "deep_learning/gradient_clipping.html",
         "deep_learning/batch_normalization.html",
         "deep_learning/overfitting_vs_underfitting.html",
         "deep_learning/model_training_curve.html",

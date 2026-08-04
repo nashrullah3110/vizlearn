@@ -700,6 +700,14 @@ window.VIZLEARN_MODULES = [
   "desc": "See what happens when one feature is measured in thousands and another in decimals, and how scaling rebalances the gradients."
  },
  {
+  "title": "Gradient Clipping",
+  "path": "deep_learning/gradient_clipping.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": "Step a weight down a parabola and inject one exploding gradient. Without clipping the weight flies off; with it, the update is capped and training survives."
+ },
+ {
   "title": "Gradient Descent",
   "path": "deep_learning/gradient_descent_training.html",
   "category": "Deep Learning",

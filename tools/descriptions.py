@@ -332,6 +332,10 @@ DESCRIPTIONS = {
         "One change to the attention mask splits the transformer family in two. See what "
         "each token may look at, and which training objective that permits.",
 
+    "deep_learning/gradient_clipping.html":
+        "Step a weight down a parabola and inject one exploding gradient. Without clipping "
+        "the weight flies off; with it, the update is capped and training survives.",
+
     # --- Gen AI, later additions -------------------------------------------
     "gen_ai/embeddings_and_vector_search.html":
         "Meaning becomes geometry. Run an exact nearest-neighbour search, then a "

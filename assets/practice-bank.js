@@ -1799,6 +1799,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "deep_learning/gradient_clipping.html",
+  "title": "Gradient Clipping",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Gradient clipping rescales an oversized gradient down to a maximum norm before the optimiser applies it, preserving direction while bounding step size. It is cheap insurance against the rare exploding gradient that would otherwise throw training off course, and it is standard practice in RNNs and very deep networks, where long chains of multiplication make the occasional huge gradient close to inevitable."
+   },
+   {
+    "t": "What does this module say about “Run Training”?",
+    "ans": "Steps 1-2 are ordinary. Step 3 injects a spike 50x the real gradient — an exploding gradient, the kind deep or recurrent nets produce on their own."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "Most gradients during training are reasonably sized. Occasionally — a badly scaled batch, a long recurrent chain, a numerically unstable loss — one gradient is enormous. Applied directly, w − lr · g can throw a weight far outside the region the optimiser was making sane progress in, and the next few steps are spent recovering rather than learning."
+   }
+  ]
+ },
+ {
   "path": "deep_learning/gradient_descent_training.html",
   "title": "Gradient Descent",
   "cat": "Deep Learning",
