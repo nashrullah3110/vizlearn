@@ -1278,6 +1278,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "database/null_handling_in_sql.html",
+  "title": "NULL Handling and COALESCE in SQL",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "NULL means unknown, so comparisons involving it are UNKNOWN rather than TRUE or FALSE, and aggregates skip it by default. COALESCE substitutes a default, NULLIF creates a NULL on purpose, and IS NULL is the only comparison that actually works — everything else is a trap that looks like it should work and quietly does not."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "NULL is not zero, not an empty string, and not false. It means the value is unknown, and every comparison that touches it inherits that uncertainty: NULL = NULL is not TRUE, it is UNKNOWN. This is three-valued logic , and COALESCE, NULLIF and IS NULL are the tools for working with it on purpose instead of by accident."
+   },
+   {
+    "t": "What does this module say about “Key Takeaway”?",
+    "ans": "NULL means unknown, so comparisons involving it are UNKNOWN rather than TRUE or FALSE, and aggregates skip it by default. COALESCE substitutes a default, NULLIF creates a NULL on purpose, and IS NULL is the only comparison that actually works — everything else is a trap that looks like it should work and quietly does not."
+   }
+  ]
+ },
+ {
   "path": "database/order_by_in_sql.html",
   "title": "ORDER BY in SQL",
   "cat": "Database",

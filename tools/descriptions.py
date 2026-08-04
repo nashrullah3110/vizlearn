@@ -266,6 +266,10 @@ DESCRIPTIONS = {
         "SQL reads top to bottom but runs FROM first and SELECT second-to-last. Step "
         "through the real order and watch the row count change at every stage.",
 
+    "database/null_handling_in_sql.html":
+        "NULL is not a value, so nothing about it compares the way you expect. Pick an "
+        "expression and watch COALESCE, NULLIF and IS NULL treat the same rows differently.",
+
     "database/order_by_in_sql.html":
         "Watch rows slide into their new order as you change the sort key, direction, "
         "tie-breaker and NULLS placement, with the query building live.",

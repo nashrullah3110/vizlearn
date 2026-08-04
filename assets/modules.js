@@ -516,6 +516,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive SQL LIMIT and OFFSET lab - page through results, see why ORDER BY is mandatory, and understand the cost of deep offsets."
  },
  {
+  "title": "NULL Handling and COALESCE in SQL",
+  "path": "database/null_handling_in_sql.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": "NULL is not a value, so nothing about it compares the way you expect. Pick an expression and watch COALESCE, NULLIF and IS NULL treat the same rows differently."
+ },
+ {
   "title": "ORDER BY in SQL",
   "path": "database/order_by_in_sql.html",
   "category": "Database",
