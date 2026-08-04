@@ -381,6 +381,10 @@ DESCRIPTIONS = {
         "The same five relevant documents out of ten retrieved, in three different orders. "
         "Precision and recall cannot tell them apart - MRR and nDCG can.",
 
+    "gen_ai/hybrid_search_reciprocal_rank_fusion.html":
+        "Run vector search and BM25 side by side and watch them disagree, then fuse the two "
+        "rankings and see a document neither method alone ranked first win on consensus.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "

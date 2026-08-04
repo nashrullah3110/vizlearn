@@ -980,6 +980,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive walkthrough of the LLM text pipeline - tokenization, token IDs, embeddings, positional encoding, self-attention and logits, with live computed values."
  },
  {
+  "title": "Hybrid Search: Dense + Sparse (Reciprocal Rank Fusion)",
+  "path": "gen_ai/hybrid_search_reciprocal_rank_fusion.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Run vector search and BM25 side by side and watch them disagree, then fuse the two rankings and see a document neither method alone ranked first win on consensus."
+ },
+ {
   "title": "Knowledge Distillation in LLMs",
   "path": "gen_ai/knowledge_distillation_in_llms.html",
   "category": "Gen AI",

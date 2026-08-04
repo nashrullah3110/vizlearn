@@ -257,6 +257,7 @@ SEQUENCE = {
         "gen_ai/chunking_strategies_for_rag.html",
         "gen_ai/rag.html",
         "gen_ai/retrieval_evaluation_metrics.html",
+        "gen_ai/hybrid_search_reciprocal_rank_fusion.html",
         "gen_ai/context_window_and_kv_cache.html",
         "gen_ai/fine_tuning_vs_rlhf.html",
         "gen_ai/hallucination_and_grounding.html",

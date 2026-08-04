@@ -2615,6 +2615,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/hybrid_search_reciprocal_rank_fusion.html",
+  "title": "Hybrid Search: Dense + Sparse (Reciprocal Rank Fusion)",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Hybrid search runs dense and sparse retrieval independently and fuses their rankings rather than their scores, because the two methods' raw numbers are not on comparable scales. Reciprocal Rank Fusion rewards documents both methods rank well, which makes the combined system more robust than either retrieval method alone — a document only one method loves can be outranked by one both methods merely like."
+   },
+   {
+    "t": "What does this module say about “Fusion”?",
+    "ans": "small k lets rank-1 dominate; large k (60 is the common default) smooths everything out"
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "Dense retrieval and BM25 fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/knowledge_distillation_in_llms.html",
   "title": "Knowledge Distillation in LLMs",
   "cat": "Gen AI",
