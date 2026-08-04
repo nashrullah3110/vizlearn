@@ -396,6 +396,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Flip, rotate, zoom and add noise to an image, and see how augmentation multiplies a small training set into a larger one."
  },
  {
+  "title": "IoU and Non-Max Suppression",
+  "path": "computer_vision/iou_and_non_max_suppression.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": "A detector proposes four boxes for two objects. IoU measures the overlap, and Non-Max Suppression uses that number to throw the duplicates away."
+ },
+ {
   "title": "Padding in CNN",
   "path": "computer_vision/padding_in_cnn.html",
   "category": "Computer Vision",

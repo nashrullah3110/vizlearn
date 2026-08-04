@@ -213,6 +213,7 @@ SEQUENCE = {
         "computer_vision/data_loaders_in_cnn.html",
         "computer_vision/image_data_augmentation.html",
         "computer_vision/transfer_learning_with_cnn.html",
+        "computer_vision/iou_and_non_max_suppression.html",
     ],
 
     # What a database is -> define -> insert -> query -> aggregate -> advanced.

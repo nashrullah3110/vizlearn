@@ -1001,6 +1001,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/iou_and_non_max_suppression.html",
+  "title": "IoU and Non-Max Suppression",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "IoU is a pure geometry calculation — it knows nothing about confidence or class. NMS is the policy layer that uses it: keep the most confident box, discard anything that overlaps it past a threshold, repeat. Set the threshold too low and it merges distinct nearby objects into one detection; set it too high and duplicate boxes on the same object all survive."
+   },
+   {
+    "t": "What does this module say about “NMS Threshold”?",
+    "ans": "boxes A-D are four raw proposals from one detector pass, four confidence scores, two actual objects"
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "A detector's region proposal stage doesn't stop at one box per object — it scores hundreds of candidate boxes and keeps every one above a confidence floor, which for a single real object usually means a cluster of overlapping, near-duplicate boxes. Intersection over Union (IoU) is the standard way to measure how much two boxes overlap: the area they share, divided by the total area either one covers."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/padding_in_cnn.html",
   "title": "Padding in CNN",
   "cat": "Computer Vision",
