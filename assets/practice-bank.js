@@ -1470,6 +1470,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "database/union_intersect_except_in_sql.html",
+  "title": "UNION, INTERSECT and EXCEPT in SQL",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "UNION, INTERSECT and EXCEPT combine the rows two queries return rather than the tables they read from, and every column has to line up in count and type. UNION removes duplicates and costs a sort or hash to do it; UNION ALL keeps them and is cheaper whenever you already know the two sides do not overlap."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "A JOIN combines two tables sideways, matching rows on a key and producing wider rows. A set operator combines two result sets vertically — both SELECTs must return the same number of columns, in compatible types, and the output is one column of rows, not a wider table."
+   },
+   {
+    "t": "What does this module say about “Key Takeaway”?",
+    "ans": "UNION, INTERSECT and EXCEPT combine the rows two queries return rather than the tables they read from, and every column has to line up in count and type. UNION removes duplicates and costs a sort or hash to do it; UNION ALL keeps them and is cheaper whenever you already know the two sides do not overlap."
+   }
+  ]
+ },
+ {
   "path": "database/what_are_non_relational_databases.html",
   "title": "What are Non Relational Databases?",
   "cat": "Database",

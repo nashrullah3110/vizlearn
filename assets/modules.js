@@ -588,6 +588,14 @@ window.VIZLEARN_MODULES = [
   "desc": "The inner query runs first and hands its answer to the outer one. Scalar, IN-list, derived table, and a correlated subquery re-running once per row."
  },
  {
+  "title": "UNION, INTERSECT and EXCEPT in SQL",
+  "path": "database/union_intersect_except_in_sql.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": "Combine two result sets instead of two tables. Pick an operator and watch which rows survive, and see UNION ALL keep the duplicate UNION would quietly drop."
+ },
+ {
   "title": "What are Non Relational Databases?",
   "path": "database/what_are_non_relational_databases.html",
   "category": "Database",

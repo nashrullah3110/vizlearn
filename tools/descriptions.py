@@ -274,6 +274,10 @@ DESCRIPTIONS = {
         "Build a CASE expression that turns raw numbers into labels, then save the whole "
         "query as a view and watch it stay a live query, not a snapshot.",
 
+    "database/union_intersect_except_in_sql.html":
+        "Combine two result sets instead of two tables. Pick an operator and watch which "
+        "rows survive, and see UNION ALL keep the duplicate UNION would quietly drop.",
+
     "database/order_by_in_sql.html":
         "Watch rows slide into their new order as you change the sort key, direction, "
         "tie-breaker and NULLS placement, with the query building live.",

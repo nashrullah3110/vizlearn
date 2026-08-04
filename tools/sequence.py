@@ -228,6 +228,7 @@ SEQUENCE = {
         "database/having_in_sql.html",
         "database/query_execution_order.html",
         "database/joins_in_sql.html",
+        "database/union_intersect_except_in_sql.html",
         "database/subqueries_in_sql.html",
         "database/common_table_expressions_in_sql.html",
         "database/window_functions_in_sql.html",
