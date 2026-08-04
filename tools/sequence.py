@@ -254,6 +254,7 @@ SEQUENCE = {
         "gen_ai/embeddings_and_vector_search.html",
         "gen_ai/dot_product_vs_cosine_similarity.html",
         "gen_ai/bm25_and_sparse_retrieval.html",
+        "gen_ai/chunking_strategies_for_rag.html",
         "gen_ai/rag.html",
         "gen_ai/context_window_and_kv_cache.html",
         "gen_ai/fine_tuning_vs_rlhf.html",

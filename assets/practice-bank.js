@@ -2442,6 +2442,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/chunking_strategies_for_rag.html",
+  "title": "Chunking Strategies for RAG",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Fixed-size chunking is simple and fast but blind to meaning, and will cut sentences in half whenever the count lands mid-sentence. Semantic chunking respects real boundaries at the cost of variable chunk sizes. Overlap recovers some of the context lost at any boundary by duplicating a small window of text between neighbouring chunks."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "Every piece of RAG downstream of chunking — embedding, indexing, retrieval, reranking — operates on whatever the chunk boundaries produced. Cut a sentence in half and both halves lose the context that made the original sentence meaningful; the embedding of a fragment is not a fragment of the embedding."
+   },
+   {
+    "t": "What does this module say about “Fixed-size vs semantic”?",
+    "ans": "Fixed-size chunking counts a fixed number of words or tokens and cuts there, with no regard for what is at that position — a heading, mid-word, mid-sentence, anywhere. It is simple, predictable, and blind. Semantic chunking respects natural boundaries — sentences, paragraphs, headings — and only splits at those boundaries, accepting some variation in chunk size in exchange for every chunk being a coherent unit."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/context_window_and_kv_cache.html",
   "title": "Context Windows and the KV Cache",
   "cat": "Gen AI",

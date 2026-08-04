@@ -373,6 +373,10 @@ DESCRIPTIONS = {
         "The keyword-matching half of search, computed live. Drag length normalization to "
         "zero and watch a verbose repetitive document dominate purely on term count.",
 
+    "gen_ai/chunking_strategies_for_rag.html":
+        "Slide the chunk size down and watch fixed-size splitting cut sentences in half, "
+        "while semantic chunking respects paragraph boundaries and never does.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "

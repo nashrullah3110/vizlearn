@@ -916,6 +916,14 @@ window.VIZLEARN_MODULES = [
   "desc": "See how predicting the next token, over and over, is all it takes for a model like GPT to produce fluent text."
  },
  {
+  "title": "Chunking Strategies for RAG",
+  "path": "gen_ai/chunking_strategies_for_rag.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Slide the chunk size down and watch fixed-size splitting cut sentences in half, while semantic chunking respects paragraph boundaries and never does."
+ },
+ {
   "title": "Context Windows and the KV Cache",
   "path": "gen_ai/context_window_and_kv_cache.html",
   "category": "Gen AI",
