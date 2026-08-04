@@ -224,6 +224,7 @@ SEQUENCE = {
         "database/limit_and_offset_in_sql.html",
         "database/groupby_in_sql.html",
         "database/having_in_sql.html",
+        "database/query_execution_order.html",
         "database/joins_in_sql.html",
         "database/subqueries_in_sql.html",
         "database/common_table_expressions_in_sql.html",

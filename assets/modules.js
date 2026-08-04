@@ -524,6 +524,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Watch rows slide into their new order as you change the sort key, direction, tie-breaker and NULLS placement, with the query building live."
  },
  {
+  "title": "Query Execution Order in SQL",
+  "path": "database/query_execution_order.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": "SQL reads top to bottom but runs FROM first and SELECT second-to-last. Step through the real order and watch the row count change at every stage."
+ },
+ {
   "title": "Regular Expressions in SQL",
   "path": "database/regular_expressions_in_sql.html",
   "category": "Database",

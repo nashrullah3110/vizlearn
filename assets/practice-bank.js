@@ -1297,6 +1297,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "database/query_execution_order.html",
+  "title": "Query Execution Order in SQL",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "SQL executes FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY, LIMIT — not the order you write it in. A clause can only reference what an earlier stage has already produced, which is the single rule behind every \"that name doesn't exist here\" error SQL ever gives you."
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "SQL is written in one order and executed in another. You write SELECT ... FROM ... WHERE ... GROUP BY ... HAVING ... ORDER BY ... LIMIT , top to bottom. The engine runs"
+   },
+   {
+    "t": "What does this module say about “Key Takeaway”?",
+    "ans": "SQL executes FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY, LIMIT — not the order you write it in. A clause can only reference what an earlier stage has already produced, which is the single rule behind every \"that name doesn't exist here\" error SQL ever gives you."
+   }
+  ]
+ },
+ {
   "path": "database/regular_expressions_in_sql.html",
   "title": "Regular Expressions in SQL",
   "cat": "Database",

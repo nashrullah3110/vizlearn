@@ -262,6 +262,10 @@ DESCRIPTIONS = {
         "while Euclidean, Manhattan and Chebyshev disagree by shape.",
 
     # --- Databases & SQL, later additions ---------------------------------
+    "database/query_execution_order.html":
+        "SQL reads top to bottom but runs FROM first and SELECT second-to-last. Step "
+        "through the real order and watch the row count change at every stage.",
+
     "database/order_by_in_sql.html":
         "Watch rows slide into their new order as you change the sort key, direction, "
         "tie-breaker and NULLS placement, with the query building live.",
