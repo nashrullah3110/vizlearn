@@ -393,6 +393,10 @@ DESCRIPTIONS = {
         "Pick the next document by relevance minus similarity to what you already picked, "
         "and watch three near-duplicate chunks stop crowding out everything else.",
 
+    "gen_ai/query_rewriting_and_hyde.html":
+        "A terse question shares almost no vocabulary with the formal passage that answers it. "
+        "Expand the query, or embed a hypothetical answer instead, and watch it climb the ranking.",
+
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
         "Step forward through a small computational graph, then backward, watching each "

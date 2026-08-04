@@ -1020,6 +1020,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive quantization lab for LLMs - map FP32 weights to INT8 or INT4, see quantization error, outlier effects and real model memory savings."
  },
  {
+  "title": "Query Rewriting and HyDE",
+  "path": "gen_ai/query_rewriting_and_hyde.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "A terse question shares almost no vocabulary with the formal passage that answers it. Expand the query, or embed a hypothetical answer instead, and watch it climb the ranking."
+ },
+ {
   "title": "Re-ranking: Bi-Encoders vs Cross-Encoders",
   "path": "gen_ai/reranking_bi_encoders_vs_cross_encoders.html",
   "category": "Gen AI",

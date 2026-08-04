@@ -260,6 +260,7 @@ SEQUENCE = {
         "gen_ai/hybrid_search_reciprocal_rank_fusion.html",
         "gen_ai/reranking_bi_encoders_vs_cross_encoders.html",
         "gen_ai/maximal_marginal_relevance.html",
+        "gen_ai/query_rewriting_and_hyde.html",
         "gen_ai/context_window_and_kv_cache.html",
         "gen_ai/fine_tuning_vs_rlhf.html",
         "gen_ai/hallucination_and_grounding.html",

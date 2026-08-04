@@ -2710,6 +2710,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/query_rewriting_and_hyde.html",
+  "title": "Query Rewriting and HyDE",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Retrieval quality is not only a property of the index and the similarity metric — it depends on how close the embedded query text sits to the embedded document text in vocabulary and register. Query expansion narrows that gap cheaply by adding terms; HyDE narrows it further by replacing the question with a fabricated answer written in the target register, at the cost of an extra generation step and the risk of chasin..."
+   },
+   {
+    "t": "What does this module say about “What Gets Embedded”?",
+    "ans": "the HyDE passage below is written by hand as a labelled example of what an LLM would draft — no model runs in this page"
+   },
+   {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "A user's question and the passage that answers it are usually written in different registers: short and colloquial versus long-form and technical. Every similarity metric in this batch — cosine , BM25 — depends on shared vocabulary between what is embedded and what is stored."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/reranking_bi_encoders_vs_cross_encoders.html",
   "title": "Re-ranking: Bi-Encoders vs Cross-Encoders",
   "cat": "Gen AI",
