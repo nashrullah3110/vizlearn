@@ -14,11 +14,12 @@ recall cards the modules themselves carry, so the two can never disagree.
 Written whole on every build; there are no hand-edited regions.
 """
 
+import html
 import os
 import sys
 
 import lib_shell as shell
-from lib_catalog import ROOT
+from lib_catalog import ROOT, modules
 from lib_pages import PRACTICE, last_modified, pretty_date
 
 PREFIX = "../"
@@ -151,6 +152,7 @@ BODY = """
                         <select id="scope-select">
                             <option value="visited" selected>modules I have opened</option>
                             <option value="all">every module</option>
+%(tracks)s
                         </select>
                     </div>
                     <div>
@@ -202,6 +204,28 @@ BODY = """
 """
 
 
+def track_options():
+    """One <option> per track, in catalog order, with its module count.
+
+    Generated rather than hard-coded so a new track cannot be missing from
+    the scope list, and the label cannot disagree with the `cat` the question
+    bank actually carries - which is what the runtime filters on.
+    """
+    seen = []
+    counts = {}
+    for m in modules():
+        cat = m["category"]
+        if cat not in counts:
+            seen.append(cat)
+            counts[cat] = 0
+        counts[cat] += 1
+    return "\n".join(
+        '                            <option value="track:%s">%s only (%d)</option>'
+        % (html.escape(cat, quote=True), html.escape(cat), counts[cat])
+        for cat in seen
+    )
+
+
 def build():
     parts = [
         shell.head_top(PRACTICE["title"] + " | VizLearn", PREFIX).replace(
@@ -215,6 +239,7 @@ def build():
             "iso": last_modified(REL),
             "nice": pretty_date(last_modified(REL)),
             "p": PREFIX,
+            "tracks": track_options(),
         },
         shell.close(PREFIX),
     ]

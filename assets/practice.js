@@ -90,16 +90,25 @@
     return chosen;
   }
 
+  /* "track:Deep Learning" -> "Deep Learning", else null. The track name is
+   * the same `cat` the build writes into every bank entry, so this filter
+   * cannot disagree with the option list that offered it. */
+  function trackOf(scope) {
+    return scope.indexOf('track:') === 0 ? scope.slice(6) : null;
+  }
+
   function buildPool(scope) {
     var progress = read(PROGRESS_KEY);
     var checks = read(CHECK_KEY);
     var practice = read(PRACTICE_KEY);
+    var track = trackOf(scope);
 
     var pool = [];
     BANK.forEach(function (mod) {
       if (!mod.q || !mod.q.length) return;
       var visited = progress[mod.path];
       if (scope === 'visited' && !visited) return;
+      if (track && mod.cat !== track) return;
       var entry = {
         mod: mod, path: mod.path, title: mod.title, cat: mod.cat,
         visitedAt: visited && visited.at
@@ -185,13 +194,18 @@
 
   function showEmpty(scope) {
     var box = document.getElementById('practice-empty');
+    var track = trackOf(scope);
     box.hidden = false;
-    box.innerHTML = scope === 'visited'
-      ? '<p>No modules opened yet on this device, so there is nothing personal to ' +
-        'practise. Open a module or two, or switch the scope to <strong>every ' +
-        'module</strong> to draw from the whole site.</p>'
-      : '<p>The question bank is empty, which should not happen &mdash; it is ' +
-        'generated at build time. Try a hard refresh.</p>';
+    if (scope === 'visited') {
+      box.innerHTML = '<p>No modules opened yet on this device, so there is nothing ' +
+        'personal to practise. Open a module or two, or switch the scope to ' +
+        '<strong>every module</strong> to draw from the whole site.</p>';
+    } else if (track) {
+      box.innerHTML = '<p>No questions in the ' + track + ' track yet.</p>';
+    } else {
+      box.innerHTML = '<p>The question bank is empty, which should not happen &mdash; ' +
+        'it is generated at build time. Try a hard refresh.</p>';
+    }
   }
 
   function renderQuestion() {
@@ -365,18 +379,43 @@
     var scope = document.getElementById('scope-select');
     if (scope && !visited) scope.value = 'all';
 
-    var note = document.getElementById('practice-note');
-    if (note) {
-      note.textContent = visited
-        ? 'Drawing from the ' + visited + ' module' + (visited === 1 ? '' : 's') +
+    // Recomputed on every scope change, so the description always matches
+    // what Start would actually draw from.
+    function describe() {
+      var note = document.getElementById('practice-note');
+      if (!note) return;
+      var chosen = scope ? scope.value : 'visited';
+      var track = trackOf(chosen);
+      var text;
+
+      if (track) {
+        var n = buildPool(chosen).length;
+        text = 'Drawing from the ' + n + ' ' + track + ' module' +
+          (n === 1 ? '' : 's') + ' that have questions, whether or not you have ' +
+          'opened them. Still weighted by what you got wrong and how long ago.';
+      } else if (chosen === 'all') {
+        text = 'Drawing from every module on the site, weighted by what you got ' +
+          'wrong and how long ago you saw it.';
+      } else if (visited) {
+        text = 'Drawing from the ' + visited + ' module' + (visited === 1 ? '' : 's') +
           ' you have opened on this device, weighted by what you got wrong and how ' +
-          'long ago you saw it.'
-        : 'Nothing opened on this device yet, so the scope has been set to every ' +
+          'long ago you saw it.';
+      } else {
+        text = 'Nothing opened on this device yet, so the scope has been set to every ' +
           'module. Visit a few and this page will start following you rather than the catalog.';
+      }
+
       if (scoreTotal) {
-        note.textContent += ' Your end-of-module checks so far: ' + scored + ' of ' +
+        text += ' Your end-of-module checks so far: ' + scored + ' of ' +
           scoreTotal + ' correct.';
       }
+      note.textContent = text;
+    }
+
+    describe();
+    if (scope && !scope.dataset.wired) {
+      scope.dataset.wired = '1';
+      scope.addEventListener('change', describe);
     }
   }
 
