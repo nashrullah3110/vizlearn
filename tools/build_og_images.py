@@ -15,7 +15,8 @@ import subprocess
 import sys
 
 from lib_catalog import ROOT, by_topic, modules
-from lib_pages import PRACTICE, STATIC_PAGES, STATIC_TITLES, TOPICS, TOPIC_ORDER
+from lib_pages import (STATIC_PAGES, STATIC_TITLES, TOOL_ORDER, TOOL_PAGES,
+                       TOPICS, TOPIC_ORDER)
 
 OUT_DIR = os.path.join(ROOT, "assets", "og")
 
@@ -188,8 +189,10 @@ def extra_entries():
         out.append({"path": rel, "title": STATIC_TITLES[rel],
                     "category": "VizLearn", "svg": GENERIC_ART})
 
-    out.append({"path": PRACTICE["rel"], "title": PRACTICE["title"],
-                "category": "VizLearn", "svg": GENERIC_ART})
+    for key in TOOL_ORDER:
+        t = TOOL_PAGES[key]
+        out.append({"path": t["rel"], "title": t["title"],
+                    "category": "VizLearn", "svg": GENERIC_ART})
     return out
 
 

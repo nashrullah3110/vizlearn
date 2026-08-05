@@ -9,8 +9,8 @@ import sys
 from collections import Counter
 
 from lib_catalog import ROOT, SITE, modules
-from lib_pages import (STATIC_PAGES, TOPIC_ORDER, is_static_page, is_topic_page,
-                       page_url, topic_rel)
+from lib_pages import (STATIC_PAGES, TOOL_ORDER, TOOL_PAGES, TOPIC_ORDER,
+                       is_static_page, is_topic_page, page_url, topic_rel)
 
 problems = []
 
@@ -253,8 +253,9 @@ def main():
     check(os.path.exists(sm), "sitemap.xml missing")
     if os.path.exists(sm):
         locs = re.findall(r"<loc>([^<]+)</loc>", open(sm, encoding="utf-8").read())
-        # hub + tracks + modules + policy pages + /practice/
-        want = 1 + len(TOPIC_ORDER) + len(modules()) + len(STATIC_PAGES) + 1
+        # hub + tracks + modules + policy pages + the study tools
+        want = (1 + len(TOPIC_ORDER) + len(modules()) + len(STATIC_PAGES)
+                + len(TOOL_ORDER))
         check(len(locs) == want, "sitemap has %d urls (expected %d)" % (len(locs), want))
         for loc in locs:
             p = loc.replace(SITE + "/", "") or "index.html"
@@ -275,6 +276,9 @@ def main():
               "missing topic landing page: %s" % topic_rel(key))
     for p in STATIC_PAGES:
         check(os.path.exists(os.path.join(ROOT, p)), "missing static page: %s" % p)
+    for key in TOOL_ORDER:
+        rel = TOOL_PAGES[key]["rel"]
+        check(os.path.exists(os.path.join(ROOT, rel)), "missing tool page: %s" % rel)
 
     # --- the privacy policy has to describe what the pages really load ---
     priv = os.path.join(ROOT, "privacy.html")

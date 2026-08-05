@@ -205,20 +205,46 @@ def topic_rel(key):
 # --------------------------------------------------------------------------
 
 # --------------------------------------------------------------------------
-# Practice
+# Tool pages
 # --------------------------------------------------------------------------
-# Not a module and not a landing page: a study tool built on the answers the
-# lab layer has been recording all along. Served at /practice/.
+# Neither modules nor landing pages: study tools built on top of the catalog
+# and on what the reader's own browser has recorded. Each is served
+# directory-style (/practice/, /glossary/) and each needs the same wiring -
+# sitemap entry, OG card, breadcrumb, footer link, description - so they are
+# declared once here rather than special-cased in six build steps.
+#
+# `footer` decides whether the page is advertised in the site footer; the
+# policy pages already fill that column, so only the tools a reader has a
+# reason to open twice go in.
 
-PRACTICE = {
-    "rel": "practice/index.html",
-    "title": "Practice",
-    "lead": "Questions drawn from the modules you have actually opened, weighted "
-            "by what you got wrong and how long ago you saw it.",
-    "description": "Spaced practice across every VizLearn module, drawn from the "
-                   "checks you have already answered and weighted by what you got "
-                   "wrong. Runs entirely in your browser.",
+TOOL_PAGES = {
+    "practice": {
+        "dir": "practice",
+        "rel": "practice/index.html",
+        "title": "Practice",
+        "footer": True,
+        "lead": "Questions drawn from the modules you have actually opened, weighted "
+                "by what you got wrong and how long ago you saw it.",
+        "description": "Spaced practice across every VizLearn module, drawn from the "
+                       "checks you have already answered and weighted by what you got "
+                       "wrong. Runs entirely in your browser.",
+    },
 }
+
+TOOL_ORDER = list(TOOL_PAGES)
+TOOL_BY_REL = {t["rel"]: t for t in TOOL_PAGES.values()}
+
+# Kept as a name because build_practice.py reads its copy from here.
+PRACTICE = TOOL_PAGES["practice"]
+
+
+def is_tool_page(rel):
+    return rel in TOOL_BY_REL
+
+
+def tool_page(rel):
+    """The tool-page record for `rel`, or None if it is not one."""
+    return TOOL_BY_REL.get(rel)
 
 
 def is_practice_page(rel):
@@ -260,7 +286,7 @@ def page_url(rel):
     """
     if rel == "index.html":
         return SITE + "/"
-    if is_topic_page(rel) or is_practice_page(rel):
+    if is_topic_page(rel) or is_tool_page(rel):
         return "%s/%s/" % (SITE, rel.split("/")[0])
     return SITE + "/" + rel
 
@@ -332,5 +358,5 @@ def all_routable(mods):
     rels += [topic_rel(k) for k in TOPIC_ORDER]
     rels += [m["path"] for m in mods]
     rels += STATIC_PAGES
-    rels.append(PRACTICE["rel"])
+    rels += [TOOL_PAGES[k]["rel"] for k in TOOL_ORDER]
     return rels

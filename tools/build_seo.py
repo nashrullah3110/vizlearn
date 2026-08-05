@@ -17,7 +17,7 @@ import os
 import re
 
 from lib_catalog import ROOT, SITE, modules, page_description
-from lib_pages import (PRACTICE, is_practice_page,
+from lib_pages import (is_tool_page, tool_page,
                        DIR_TO_TOPIC, STATIC_LD_TYPE, STATIC_PAGES, STATIC_TITLES,
                        TOPICS, first_published, is_static_page, is_topic_page,
                        last_modified, page_url, topic_url)
@@ -106,8 +106,8 @@ def breadcrumbs(rel, short, mod):
         trail.append((TOPICS[key]["title"], topic_url(key)))
     elif is_static_page(rel):
         trail.append((STATIC_TITLES[rel], page_url(rel)))
-    elif is_practice_page(rel):
-        trail.append((PRACTICE["title"], page_url(rel)))
+    elif is_tool_page(rel):
+        trail.append((tool_page(rel)["title"], page_url(rel)))
     else:
         # A module sits under its track, which is now a real page.
         key = DIR_TO_TOPIC.get(mod["dir"]) if mod else None
@@ -292,7 +292,7 @@ def build_block(rel, title, desc, prefix, mod, needs_icons=False):
 
 
 def og_type(rel):
-    if rel == "index.html" or is_topic_page(rel) or is_practice_page(rel):
+    if rel == "index.html" or is_topic_page(rel) or is_tool_page(rel):
         return "website"
     if is_static_page(rel):
         return "website"
@@ -300,8 +300,8 @@ def og_type(rel):
 
 
 def og_alt(rel, short):
-    if is_practice_page(rel):
-        return "Practice mode on VizLearn"
+    if is_tool_page(rel):
+        return "%s on VizLearn" % tool_page(rel)["title"]
     if is_topic_page(rel):
         return "%s track on VizLearn" % short
     if is_static_page(rel):
@@ -324,8 +324,8 @@ def generated_description(rel, mods):
             t["lead"], n)
     if is_static_page(rel):
         return STATIC_COPY[rel]["description"]
-    if is_practice_page(rel):
-        return PRACTICE["description"]
+    if is_tool_page(rel):
+        return tool_page(rel)["description"]
     return None
 
 
