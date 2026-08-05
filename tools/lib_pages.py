@@ -229,6 +229,17 @@ TOOL_PAGES = {
                        "checks you have already answered and weighted by what you got "
                        "wrong. Runs entirely in your browser.",
     },
+    "map": {
+        "dir": "map",
+        "rel": "map/index.html",
+        "title": "Concept Map",
+        "footer": True,
+        "lead": "How the tracks connect - what each module builds on, and where "
+                "you have got to.",
+        "description": "An interactive map of every VizLearn track in teaching "
+                       "order, showing what each module builds on and how the "
+                       "tracks connect to one another.",
+    },
     "whats-new": {
         "dir": "whats-new",
         "rel": "whats-new/index.html",
