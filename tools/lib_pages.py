@@ -229,6 +229,17 @@ TOOL_PAGES = {
                        "checks you have already answered and weighted by what you got "
                        "wrong. Runs entirely in your browser.",
     },
+    "glossary": {
+        "dir": "glossary",
+        "rel": "glossary/index.html",
+        "title": "Glossary",
+        "footer": True,
+        "lead": "Every term the modules assume you already know, defined once "
+                "and linked back to the module that teaches it properly.",
+        "description": "A plain-English glossary of the machine learning, deep "
+                       "learning, retrieval and SQL terms used across VizLearn, "
+                       "each linked to the interactive module that explains it.",
+    },
     "saved": {
         "dir": "saved",
         "rel": "saved/index.html",
