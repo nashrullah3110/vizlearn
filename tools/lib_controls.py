@@ -86,6 +86,8 @@ def _label_before(src, pos):
             # Digits alone are a value being mirrored, not a name for one.
             if re.fullmatch(r"[\d.,%+\-/]+", t):
                 continue
+            if not _usable_label(t):
+                continue
             if best is None or m.end() > best[0]:
                 best = (m.end(), t)
 
@@ -95,6 +97,28 @@ def _label_before(src, pos):
 def _clean_label(t):
     """Strip the leading numbering the SQL pages use ("1. Group By Column")."""
     return re.sub(r"^\s*\d+[.)]\s*", "", t).strip()
+
+
+# Markup that is really source code caught mid-template, or a bare axis
+# figure. Both slip past the length and digit filters and end up printed at
+# the reader as a control name - one page offered the arrow keys a slider
+# called "${inputs[i].toFixed(2)}", another one called "80k".
+_NOT_A_NAME = re.compile(r"\$\{|\{\{|=>|function\s*\(|^\d+(\.\d+)?[kKmMxX%]?$")
+
+
+def _usable_label(t):
+    return bool(t) and not _NOT_A_NAME.search(t)
+
+
+def _real_id(cid):
+    """False for an id that is really a template still waiting to be filled.
+
+    Five controls across four pages are rendered from a JS template literal
+    whose placeholder survives into the static markup - `in-slider-${i}`,
+    `w-${i}-${j}`. There is no element with that id at runtime, so anything
+    built on one (a lab preset, an arrow-key target) silently does nothing.
+    """
+    return bool(cid) and "${" not in cid and "{{" not in cid
 
 
 def controls(src):
@@ -117,7 +141,7 @@ def controls(src):
             continue  # handled as a group below
         if kind not in ("range", "checkbox", "number"):
             continue
-        if not cid or cid in seen:
+        if not _real_id(cid) or cid in seen:
             continue
         seen.add(cid)
 
@@ -138,7 +162,7 @@ def controls(src):
     for m in re.finditer(r"<select\b[^>]*>(.*?)</select>", src, re.S | re.I):
         a = attrs(m.group(0)[:m.group(0).find(">") + 1])
         cid = a.get("id")
-        if not cid or cid in seen:
+        if not _real_id(cid) or cid in seen:
             continue
         seen.add(cid)
 
@@ -182,7 +206,7 @@ def controls(src):
     for m in re.finditer(r"<button\b([^>]*)>(.*?)</button>", src, re.S | re.I):
         a = attrs("<button" + m.group(1) + ">")
         cid = a.get("id")
-        if not cid or cid in seen:
+        if not _real_id(cid) or cid in seen:
             continue
         # Site furniture, not part of the visualisation.
         if cid in ("themeToggle",) or "vz-" in (a.get("class") or ""):
@@ -192,6 +216,79 @@ def controls(src):
             "id": cid, "kind": "button",
             "label": text_of(m.group(2)) or _clean_label(_label_before(src, m.start())),
         })
+
+    return out
+
+
+SITE_BUTTON_CLASSES = ("vz-", "vz-share", "vz-run")
+
+
+def _viz_window(src):
+    """The slice of a page between the site header and the site footer."""
+    start = src.find("</header>")
+    start = start + len("</header>") if start != -1 else src.find("<body")
+    if start == -1:
+        return ""
+
+    end = src.find("<!-- VIZLEARN:FOOTER")
+    if end == -1:
+        end = src.find("<footer")
+    if end == -1 or end <= start:
+        end = len(src)
+    return src[start:end]
+
+
+def action_buttons(src):
+    """The buttons that *drive* the visualisation, addressable by selector.
+
+    `controls()` deliberately only returns buttons carrying an id, because the
+    lab layer clicks them by id and an entry with `id: None` would break it.
+    Eleven pages drive themselves off buttons that only ever had a class -
+    `.viz-btn`, `.chip`, `.mode-btn` - and those pages ended up with no
+    keyboard route in at all.
+
+    This returns both kinds in document order as {label, sel, i}, where `sel`
+    plus `i` resolve to exactly one element via querySelectorAll. An id
+    becomes `#id` with i=0, so the runtime has a single code path.
+
+    The window is everything between the header and the footer, not the
+    contents of <main>: six pages close <main> before their interactive
+    section starts (and one never closes it at all), so anchoring on <main>
+    silently dropped them. Anchoring on the header/footer instead still
+    excludes the site furniture - the theme toggle and share button live in
+    the header - which is the only thing the narrower window was buying.
+    """
+    body = _viz_window(src)
+    if not body:
+        return []
+
+    seen_class = {}
+    out = []
+    for m in re.finditer(r"<button\b([^>]*)>(.*?)</button>", body, re.S | re.I):
+        a = attrs("<button" + m.group(1) + ">")
+        cls = a.get("class") or ""
+        if any(tok in cls for tok in SITE_BUTTON_CLASSES):
+            continue
+        if a.get("disabled") is not None and "disabled" in m.group(1).lower():
+            continue
+
+        label = text_of(m.group(2)) or a.get("aria-label") or ""
+        label = _clean_label(label)
+        if not label or len(label) > 40:
+            continue
+
+        cid = a.get("id")
+        if cid:
+            out.append({"label": label, "sel": "#" + cid, "i": 0})
+            continue
+
+        first = cls.split()[0] if cls.split() else ""
+        if not first:
+            continue
+        # Index within its own class, which is how querySelectorAll will see it.
+        i = seen_class.get(first, 0)
+        seen_class[first] = i + 1
+        out.append({"label": label, "sel": "." + first, "i": i})
 
     return out
 

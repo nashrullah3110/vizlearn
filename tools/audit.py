@@ -206,10 +206,27 @@ def main():
                 # Arrow keys drive real controls; a target that is not on the
                 # page would give a keyboard user a focus stop that does
                 # nothing, which is worse than no focus stop.
-                for role, t in (cfg.get("keys") or {}).items():
+                keys = cfg.get("keys") or {}
+                for role in ("primary", "secondary"):
+                    t = keys.get(role)
+                    if not t:
+                        continue
                     check('id="%s"' % t["id"] in s,
                           "%s: keyboard %s target %s is not on the page"
                           % (rel, role, t["id"]))
+                # Actions are addressed by selector rather than id, because a
+                # third of the button-driven pages never gave their buttons
+                # one. Only the two forms the build emits are checkable here.
+                for a in keys.get("actions", []):
+                    sel = a.get("sel", "")
+                    if sel.startswith("#"):
+                        ok = 'id="%s"' % sel[1:] in s
+                    elif sel.startswith("."):
+                        ok = re.search(r'class="[^"]*\b%s\b' % re.escape(sel[1:]), s) is not None
+                    else:
+                        ok = False
+                    check(ok, "%s: keyboard action %s matches nothing on the page"
+                          % (rel, sel or "(no selector)"))
 
         if "vzIcon(" in s:
             check("assets/icons.js" in s, "%s: uses vzIcon() but does not load icons.js" % rel)
