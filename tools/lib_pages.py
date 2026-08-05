@@ -229,6 +229,16 @@ TOOL_PAGES = {
                        "checks you have already answered and weighted by what you got "
                        "wrong. Runs entirely in your browser.",
     },
+    "whats-new": {
+        "dir": "whats-new",
+        "rel": "whats-new/index.html",
+        "title": "What's New",
+        "footer": True,
+        "lead": "Everything added to VizLearn, newest first.",
+        "description": "A running log of the modules and features added to "
+                       "VizLearn, newest first, read straight from the "
+                       "repository history.",
+    },
     "glossary": {
         "dir": "glossary",
         "rel": "glossary/index.html",
