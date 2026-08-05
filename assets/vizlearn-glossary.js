@@ -116,11 +116,20 @@
 
   function init() {
     var terms = window.VIZLEARN_GLOSSARY;
-    var article = document.querySelector('.vz-article');
-    if (!terms || !terms.length || !article) return;
+    // .vz-article is the newer prose hook; [data-vz-prose] is the one the
+    // build stamps on the 170 older pages, whose prose predates that class
+    // and sits in ad-hoc Tailwind containers. Without the second selector the
+    // glossary silently did nothing on three quarters of the site.
+    var roots = document.querySelectorAll('.vz-article, [data-vz-prose]');
+    if (!terms || !terms.length || !roots.length) return;
 
     var path = currentPath();
-    var prefix = { path: path, up: '../' };
+    // Derived, not hardcoded: "gen_ai/rag.html" is one deep so links need
+    // "../", but a page at the site root needs "". Hardcoding "../" happened
+    // to be right for every page that has prose today and would break silently
+    // the first time one did not.
+    var depth = path ? path.split('/').length - 1 : 0;
+    var prefix = { path: path, up: new Array(depth + 1).join('../') };
 
     var pending = build(terms);
     var done = {};
@@ -133,13 +142,15 @@
       // Do not link a page to itself.
       if (entry.t.where && entry.t.where === path) return;
 
-      var nodes = textNodes(article);
-      for (var i = 0; i < nodes.length; i++) {
-        var m = entry.re.exec(nodes[i].nodeValue);
-        if (!m) continue;
-        mark(nodes[i], m, entry, prefix);
-        done[entry.t.slug] = true;
-        break;
+      for (var r = 0; r < roots.length && !done[entry.t.slug]; r++) {
+        var nodes = textNodes(roots[r]);
+        for (var i = 0; i < nodes.length; i++) {
+          var m = entry.re.exec(nodes[i].nodeValue);
+          if (!m) continue;
+          mark(nodes[i], m, entry, prefix);
+          done[entry.t.slug] = true;
+          break;
+        }
       }
     });
   }

@@ -44,6 +44,10 @@ SAVE_BLOCK = re.compile(
 
 RELATED_COUNT = 4
 
+# build_articles.py already delimits the long-form prose section with this.
+ARTICLE_MARKER = "<!-- auto-article-vizlearn -->"
+PROSE_MAIN = re.compile(r'<main\b[^>]*class="[^"]*\bprose\b[^"]*"[^>]*>')
+
 ICON = {
     "left": '<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>',
     "right": '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
@@ -271,6 +275,8 @@ def main():
     files = [f for f in files
              if os.path.basename(os.path.dirname(f)) not in ("tools", "assets", "node_modules")]
 
+    prose_tagged = 0
+
     injected = shared = bylines = 0
     fallback_used = 0
     missing_anchor = []
@@ -326,6 +332,34 @@ def main():
                 src[hm.end():]
             bylines += 1
 
+        # Tag the long-form prose so the glossary layer can find it.
+        #
+        # 55 modules use .vz-article, which is both a hook and a set of
+        # typography rules. The other 170 predate it and wrap their prose in
+        # ad-hoc Tailwind classes, so the glossary silently did nothing on
+        # them. Adding .vz-article to those pages would restyle 170 published
+        # articles; this adds a styling-free attribute instead, on the section
+        # build_articles.py already marks.
+        am = src.find(ARTICLE_MARKER)
+        if am != -1:
+            sm = src.find("<section", am)
+            if sm != -1:
+                close = src.find(">", sm)
+                tag = src[sm:close]
+                if "data-vz-prose" not in tag:
+                    src = src[:close] + " data-vz-prose" + src[close:]
+                    prose_tagged += 1
+        elif "data-vz-prose" not in src and 'class="vz-article' not in src:
+            # Two pages carry no marker but put their article in a
+            # <main class="... prose">, which is Tailwind Typography's own
+            # name for exactly this. Only those two match site-wide, and the
+            # element holds the article alone - the visualisation is above it.
+            pm = PROSE_MAIN.search(src)
+            if pm:
+                close = pm.end() - 1
+                src = src[:close] + " data-vz-prose" + src[close:]
+                prose_tagged += 1
+
         # Share and save controls, immediately before the theme toggle in
         # the header. Save goes in first so that, inserted at the same
         # anchor, the rendered order reads share-then-save.
@@ -342,6 +376,7 @@ def main():
         open(f, "w", encoding="utf-8").write(src)
 
     print("modules updated        : %d" % injected)
+    print("prose sections tagged  : %d" % prose_tagged)
     print("bylines added          : %d" % bylines)
     print("share controls added   : %d" % shared)
     print("cheat sheets using the meta description as fallback : %d" % fallback_used)
