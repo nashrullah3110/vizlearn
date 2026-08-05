@@ -229,6 +229,15 @@ TOOL_PAGES = {
                        "checks you have already answered and weighted by what you got "
                        "wrong. Runs entirely in your browser.",
     },
+    "saved": {
+        "dir": "saved",
+        "rel": "saved/index.html",
+        "title": "Saved",
+        "footer": True,
+        "lead": "The modules you bookmarked and the notes you left on them.",
+        "description": "Your bookmarked VizLearn modules and the notes you left "
+                       "on them, kept in your browser and nowhere else.",
+    },
 }
 
 TOOL_ORDER = list(TOOL_PAGES)

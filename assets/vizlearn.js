@@ -11,24 +11,52 @@
   'use strict';
 
   var PROGRESS_KEY = 'vizlearn_progress';
+  var SAVED_KEY = 'vizlearn_saved';
   var SITE = 'https://vizlearn.in';
 
   // --- storage -------------------------------------------------------------
 
-  function readProgress() {
+  function readJSON(key) {
     try {
-      return JSON.parse(localStorage.getItem(PROGRESS_KEY)) || {};
+      return JSON.parse(localStorage.getItem(key)) || {};
     } catch (e) {
       return {};
     }
   }
 
-  function writeProgress(store) {
+  function writeJSON(key, store) {
     try {
-      localStorage.setItem(PROGRESS_KEY, JSON.stringify(store));
+      localStorage.setItem(key, JSON.stringify(store));
+      return true;
     } catch (e) {
-      /* private browsing / quota - progress is a nicety, never a hard failure */
+      /* private browsing / quota - this is a nicety, never a hard failure */
+      return false;
     }
+  }
+
+  function readProgress() { return readJSON(PROGRESS_KEY); }
+  function writeProgress(store) { writeJSON(PROGRESS_KEY, store); }
+
+  /* Bookmarks and notes share one record per module, because they are the
+   * same gesture from the reader's side: "I want to come back to this". A
+   * note implies the bookmark, so removing a bookmark that still has a note
+   * keeps the note rather than throwing away something they typed. */
+  function readSaved() { return readJSON(SAVED_KEY); }
+
+  function saveEntry(path, patch) {
+    if (!path) return null;
+    var store = readSaved();
+    var cur = store[path] || {};
+    var next = {
+      marked: patch.marked !== undefined ? patch.marked : !!cur.marked,
+      note: patch.note !== undefined ? patch.note : (cur.note || ''),
+      at: new Date().toISOString(),
+      title: patch.title || cur.title || ''
+    };
+    if (!next.marked && !next.note) delete store[path];
+    else store[path] = next;
+    writeJSON(SAVED_KEY, store);
+    return store[path] || null;
   }
 
   /** This page's catalog path ("dsa/binary_search.html"), from its canonical URL. */
@@ -216,6 +244,88 @@
     });
   }
 
+  // --- bookmark and note ---------------------------------------------------
+
+  function initSave() {
+    var wrap = document.querySelector('.vz-save-wrap');
+    if (!wrap) return;
+
+    var btn = wrap.querySelector('.vz-save-btn');
+    var menu = wrap.querySelector('.vz-save-menu');
+    if (!btn || !menu) return;
+
+    var path = currentPath();
+    if (!path) return;
+
+    var ogTitle = document.querySelector('meta[property="og:title"]');
+    var title = (ogTitle && ogTitle.content) ||
+        document.title.replace(/^VizLearn[\s:-]*/, '');
+
+    menu.innerHTML =
+      '<label class="vz-save-toggle">' +
+        '<input type="checkbox" class="vz-save-check">' +
+        '<span>Bookmark this module</span>' +
+      '</label>' +
+      '<label class="vz-save-note-label" for="vz-save-note">Note</label>' +
+      '<textarea id="vz-save-note" class="vz-save-note" rows="4" ' +
+        'placeholder="Why you came here, what to revisit&hellip;"></textarea>' +
+      '<p class="vz-save-foot">Saved in this browser only. ' +
+        '<a class="vz-save-link" href="">All saved</a></p>';
+
+    var check = menu.querySelector('.vz-save-check');
+    var note = menu.querySelector('.vz-save-note');
+    var link = menu.querySelector('.vz-save-link');
+    // Depth-independent: a module is always one directory down.
+    link.setAttribute('href', '../saved/');
+
+    function paint() {
+      var e = readSaved()[path];
+      check.checked = !!(e && e.marked);
+      note.value = (e && e.note) || '';
+      btn.classList.toggle('is-saved', !!e);
+      btn.setAttribute('aria-label', e ? 'Bookmarked - edit note' :
+                                         'Bookmark this module or add a note');
+    }
+    paint();
+
+    function close() {
+      menu.classList.remove('show');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = menu.classList.toggle('show');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) note.focus();
+    });
+
+    check.addEventListener('change', function () {
+      saveEntry(path, { marked: check.checked, title: title });
+      paint();
+      toast(check.checked ? 'Bookmarked' : 'Bookmark removed');
+    });
+
+    // Written on the way out rather than on every keystroke: one localStorage
+    // write per edit instead of one per character.
+    var pending = null;
+    note.addEventListener('input', function () {
+      clearTimeout(pending);
+      pending = setTimeout(function () {
+        saveEntry(path, { note: note.value.trim(), title: title });
+        paint();
+      }, 400);
+    });
+
+    menu.addEventListener('click', function (e) { e.stopPropagation(); });
+    document.addEventListener('click', function (e) {
+      if (!wrap.contains(e.target)) close();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') close();
+    });
+  }
+
   // --- cheat sheet ---------------------------------------------------------
 
   function initCheatSheet() {
@@ -271,6 +381,8 @@
     progress: readProgress,
     markVisited: markVisited,
     decorateVisited: decorateVisited,
+    saved: readSaved,
+    save: saveEntry,
     icon: svg,
     toast: toast,
     copyText: copyText,
@@ -300,6 +412,7 @@
   function boot() {
     initProgress();
     initShare();
+    initSave();
     initCheatSheet();
     initPointerCancel();
     decorateVisited(document);
