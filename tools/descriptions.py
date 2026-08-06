@@ -401,6 +401,15 @@ DESCRIPTIONS = {
         "Pick the next document by relevance minus similarity to what you already picked, "
         "and watch three near-duplicate chunks stop crowding out everything else.",
 
+    "gen_ai/parent_document_retriever.html":
+        "Search small chunks so the match is precise, then hand the model the whole "
+        "parent document so the answer has enough context to be worth reading.",
+    "gen_ai/multi_query_retriever.html":
+        "One question asked several ways. Each phrasing retrieves separately and the "
+        "union catches the document a single wording would have missed.",
+    "gen_ai/self_query_retriever.html":
+        "Split a question into a semantic query and a metadata filter, so \"after 2020\" "
+        "becomes a rule that is enforced rather than a phrase that is matched.",
     "gen_ai/query_rewriting_and_hyde.html":
         "A terse question shares almost no vocabulary with the formal passage that answers it. "
         "Expand the query, or embed a hypothetical answer instead, and watch it climb the ranking.",

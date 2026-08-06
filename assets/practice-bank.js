@@ -2767,6 +2767,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/multi_query_retriever.html",
+  "title": "Multi-Query Retriever",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "How are the results of the separate queries combined?",
+    "o": [
+     "Union, deduplicated",
+     "Intersection",
+     "Only the best query's results are kept",
+     "Averaged scores"
+    ],
+    "a": 0,
+    "w": "Every document any phrasing found is kept. A document is missed only if EVERY phrasing misses it, which is the whole point."
+   },
+   {
+    "t": "Multi-query retrieval mainly improves:",
+    "o": [
+     "Precision",
+     "Recall",
+     "Latency",
+     "Index size"
+    ],
+    "a": 1,
+    "w": "It trades a longer and noisier candidate list for a much lower chance of missing the right document - recall up, precision down, deliberately."
+   },
+   {
+    "t": "Why is multi-query usually followed by reranking or MMR?",
+    "o": [
+     "To translate the query",
+     "To clean up the larger, noisier list",
+     "To compress the documents",
+     "To generate more queries"
+    ],
+    "a": 1,
+    "w": "Raising recall pulls in irrelevant documents too. Something downstream has to reorder or diversify before the list reaches the model."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/parent_document_retriever.html",
+  "title": "Parent Document Retriever",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "In a parent document retriever, what is actually indexed and scored?",
+    "o": [
+     "The whole parent documents",
+     "The small child chunks",
+     "Both, separately",
+     "Only the document titles"
+    ],
+    "a": 1,
+    "w": "Children are indexed so the match is precise. The parent is what gets returned - the score decides WHICH document, the parent decides how much text the model sees."
+   },
+   {
+    "t": "Two retrieved child chunks belong to the same parent. How many passages go to the model?",
+    "o": [
+     "One",
+     "Two",
+     "Three",
+     "It depends on the scores"
+    ],
+    "a": 0,
+    "w": "Parents are deduplicated. Without that, a document with three good chunks would be sent three times and burn the context window."
+   },
+   {
+    "t": "Why not simply index large chunks instead?",
+    "o": [
+     "They are slower to embed",
+     "The query terms get diluted",
+     "They cannot be embedded",
+     "They break the tokenizer"
+    ],
+    "a": 1,
+    "w": "A large chunk spreads the query's terms among hundreds of unrelated words, so its similarity score drops and it may not be retrieved at all - even though it holds the answer."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/quantization_in_llms.html",
   "title": "Quantization in LLMs",
   "cat": "Gen AI",
@@ -2858,6 +2938,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “The pipeline”?",
     "ans": "Only steps 3 to 5 happen per question. Steps 1 and 2 happen once, when the documents change — which is why RAG updates in the time it takes to re-index rather than the time it takes to retrain."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/self_query_retriever.html",
+  "title": "Self-Query Retriever",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Why can plain similarity search not honour \"published after 2020\"?",
+    "o": [
+     "Dates are not embeddable",
+     "A cosine score has no notion of a constraint",
+     "The index is too small",
+     "Years are stopwords"
+    ],
+    "a": 1,
+    "w": "Embeddings compare meaning. The phrase is treated as more subject matter to match, not as a rule, so a 2017 paper about attention can still win."
+   },
+   {
+    "t": "A self-query retriever splits the question into:",
+    "o": [
+     "Two semantic queries",
+     "A semantic query and a metadata filter",
+     "Keywords and embeddings",
+     "A question and an answer"
+    ],
+    "a": 1,
+    "w": "One half is embedded and compared; the other becomes a structured predicate like year > 2020 that is executed against the metadata."
+   },
+   {
+    "t": "In what order do the two halves run?",
+    "o": [
+     "Filter first, then rank the survivors",
+     "Rank first, then filter the top results",
+     "Both at once, scores averaged",
+     "Whichever is faster"
+    ],
+    "a": 0,
+    "w": "The filter removes documents that break the constraint, and similarity only ranks what survived. Filtering after ranking would let a top-k full of excluded documents leave nothing behind."
    }
   ]
  },

@@ -1064,4 +1064,73 @@ LABS = {
             "value."},
 ]},
 
+"gen_ai/parent_document_retriever.html": {"check": [
+    {"q": "In a parent document retriever, what is actually indexed and scored?",
+     "options": ["The whole parent documents", "The small child chunks",
+                 "Both, separately", "Only the document titles"],
+     "answer": 1,
+     "why": "Children are indexed so the match is precise. The parent is what "
+            "gets returned - the score decides WHICH document, the parent "
+            "decides how much text the model sees."},
+    {"q": "Two retrieved child chunks belong to the same parent. How many "
+          "passages go to the model?",
+     "options": ["One", "Two", "Three", "It depends on the scores"],
+     "answer": 0,
+     "why": "Parents are deduplicated. Without that, a document with three good "
+            "chunks would be sent three times and burn the context window."},
+    {"q": "Why not simply index large chunks instead?",
+     "options": ["They are slower to embed", "The query terms get diluted",
+                 "They cannot be embedded", "They break the tokenizer"],
+     "answer": 1,
+     "why": "A large chunk spreads the query's terms among hundreds of unrelated "
+            "words, so its similarity score drops and it may not be retrieved at "
+            "all - even though it holds the answer."},
+]},
+
+"gen_ai/multi_query_retriever.html": {"check": [
+    {"q": "How are the results of the separate queries combined?",
+     "options": ["Union, deduplicated", "Intersection", "Only the best query's "
+                 "results are kept", "Averaged scores"],
+     "answer": 0,
+     "why": "Every document any phrasing found is kept. A document is missed "
+            "only if EVERY phrasing misses it, which is the whole point."},
+    {"q": "Multi-query retrieval mainly improves:",
+     "options": ["Precision", "Recall", "Latency", "Index size"],
+     "answer": 1,
+     "why": "It trades a longer and noisier candidate list for a much lower "
+            "chance of missing the right document - recall up, precision down, "
+            "deliberately."},
+    {"q": "Why is multi-query usually followed by reranking or MMR?",
+     "options": ["To translate the query", "To clean up the larger, noisier list",
+                 "To compress the documents", "To generate more queries"],
+     "answer": 1,
+     "why": "Raising recall pulls in irrelevant documents too. Something "
+            "downstream has to reorder or diversify before the list reaches the "
+            "model."},
+]},
+
+"gen_ai/self_query_retriever.html": {"check": [
+    {"q": "Why can plain similarity search not honour \"published after 2020\"?",
+     "options": ["Dates are not embeddable", "A cosine score has no notion of a "
+                 "constraint", "The index is too small", "Years are stopwords"],
+     "answer": 1,
+     "why": "Embeddings compare meaning. The phrase is treated as more subject "
+            "matter to match, not as a rule, so a 2017 paper about attention can "
+            "still win."},
+    {"q": "A self-query retriever splits the question into:",
+     "options": ["Two semantic queries", "A semantic query and a metadata filter",
+                 "Keywords and embeddings", "A question and an answer"],
+     "answer": 1,
+     "why": "One half is embedded and compared; the other becomes a structured "
+            "predicate like year > 2020 that is executed against the metadata."},
+    {"q": "In what order do the two halves run?",
+     "options": ["Filter first, then rank the survivors",
+                 "Rank first, then filter the top results",
+                 "Both at once, scores averaged", "Whichever is faster"],
+     "answer": 0,
+     "why": "The filter removes documents that break the constraint, and "
+            "similarity only ranks what survived. Filtering after ranking would "
+            "let a top-k full of excluded documents leave nothing behind."},
+]},
+
 }

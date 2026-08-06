@@ -1044,6 +1044,22 @@ window.VIZLEARN_MODULES = [
   "desc": "Pick the next document by relevance minus similarity to what you already picked, and watch three near-duplicate chunks stop crowding out everything else."
  },
  {
+  "title": "Multi-Query Retriever",
+  "path": "gen_ai/multi_query_retriever.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "One question asked several ways. Each phrasing retrieves separately and the union catches the document a single wording would have missed."
+ },
+ {
+  "title": "Parent Document Retriever",
+  "path": "gen_ai/parent_document_retriever.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Search small chunks so the match is precise, then hand the model the whole parent document so the answer has enough context to be worth reading."
+ },
+ {
   "title": "Quantization in LLMs",
   "path": "gen_ai/quantization_in_llms.html",
   "category": "Gen AI",
@@ -1082,6 +1098,14 @@ window.VIZLEARN_MODULES = [
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "Ask about a product no model has heard of. Watch retrieval score every chunk, paste the winners into the prompt, and turn a guess into a cited answer."
+ },
+ {
+  "title": "Self-Query Retriever",
+  "path": "gen_ai/self_query_retriever.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Split a question into a semantic query and a metadata filter, so \"after 2020\" becomes a rule that is enforced rather than a phrase that is matched."
  },
  {
   "title": "What is Masked Language Modeling?",
