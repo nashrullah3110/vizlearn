@@ -28,18 +28,51 @@
 
   // Runs the student's code inside Pyodide. A single-expression program is
   // evaluated so its value is shown REPL-style; anything longer is exec'd so
-  // it behaves exactly like a .py script. Errors propagate as PythonError and
-  // are surfaced by the main thread.
+  // it behaves exactly like a .py script.
+  //
+  // Three things here are load-bearing and were each a bug:
+  //
+  //   ast.Expression(...)  ast.parse() returns a Module, and compiling a
+  //                        Module in "eval" mode raises "expected Expression
+  //                        node, got Module". Every single-expression program
+  //                        failed - including print("Hello, Python!"), the
+  //                        default code on the first module of the track.
+  //
+  //   the `g` dict         exec(code) with no namespace runs in _viz_run's
+  //                        *locals*, but a function defined by that code
+  //                        resolves names against module globals. So
+  //                        `x = 10` then `def show(): print(x)` raised
+  //                        NameError - the single most common shape of
+  //                        beginner Python there is. Passing one dict as the
+  //                        namespace makes user code behave like a module,
+  //                        which is what a .py file does.
+  //
+  //   the traceback trim   an error otherwise showed five frames of Pyodide
+  //                        internals (_pyodide/_base.py, eval_code_async)
+  //                        above the one line the reader actually wrote.
+  //
+  // `g` is rebuilt per run, so a name left over from a previous Run can never
+  // make a later one appear to work.
   var RUNNER_SRC = [
-    'import ast',
+    'import ast, sys, traceback',
     'def _viz_run(code):',
-    '    tree = ast.parse(code)',
-    '    if len(tree.body) == 1 and isinstance(tree.body[0], ast.Expr):',
-    '        val = eval(compile(tree, "<user>", "eval"))',
-    '        if val is not None:',
-    '            print(repr(val))',
-    '    else:',
-    '        exec(compile(tree, "<user>", "exec"))',
+    '    g = {"__name__": "__main__"}',
+    '    try:',
+    '        tree = ast.parse(code, "<user>", "exec")',
+    '        if len(tree.body) == 1 and isinstance(tree.body[0], ast.Expr):',
+    '            expr = ast.Expression(tree.body[0].value)',
+    '            val = eval(compile(expr, "<user>", "eval"), g)',
+    '            if val is not None:',
+    '                print(repr(val))',
+    '        else:',
+    '            exec(compile(tree, "<user>", "exec"), g)',
+    '    except SyntaxError as e:',
+    '        sys.stderr.write("SyntaxError: %s (line %s)\\n" % (e.msg, e.lineno))',
+    '    except BaseException as e:',
+    '        tb = e.__traceback__',
+    '        while tb is not None and tb.tb_frame.f_code.co_filename != "<user>":',
+    '            tb = tb.tb_next',
+    '        sys.stderr.write("".join(traceback.format_exception(type(e), e, tb)))',
   ].join('\n');
 
   var worker = null;
@@ -176,6 +209,9 @@
     }, RUN_TIMEOUT);
 
     ensureWorker().then(function () {
+      // The timeout may already have fired and terminated the worker while
+      // this promise was still pending; `worker` is null in that case.
+      if (timedOut || !worker) return;
       setStatus(block, 'Running\u2026');
       var finish = function () {
         clearTimeout(timer);
@@ -234,7 +270,10 @@
           runBlock(block, parts.editor.value);
         });
 
-        parts.reset.addEventListener('click', function () {
+        // Guarded: this used to be unconditional, so a block authored without
+        // a Reset button would throw here and, because init() wires blocks in
+        // a plain loop, every *later* block on the page silently stayed dead.
+        if (parts.reset) parts.reset.addEventListener('click', function () {
           if (parts.src) parts.editor.value = (parts.src.textContent || '').trim();
           parts.output.textContent = '';
           parts.output.appendChild(makePlaceholder());
