@@ -1804,6 +1804,38 @@ window.VIZLEARN_MODULES = [
   "desc": "Paste any text and watch a word cloud size each term by how often it appears, exposing what a document is really about."
  },
  {
+  "title": "Booleans and Comparisons",
+  "path": "python/booleans_and_comparisons.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Compare values, combine them with and, or and not, and see which everyday values Python already treats as false."
+ },
+ {
+  "title": "Dictionaries",
+  "path": "python/dictionaries.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Store values under names instead of positions, look them up by key, and handle the key that is not there."
+ },
+ {
+  "title": "For Loops and range()",
+  "path": "python/for_loops_and_range.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Loop over a list, count with range(), and accumulate a result across the passes of a for loop."
+ },
+ {
+  "title": "Functions and Return Values",
+  "path": "python/functions_and_return.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Define a function, pass it arguments, and see why printing a result is not the same as returning one."
+ },
+ {
   "title": "Hello, Python!",
   "path": "python/hello_python.html",
   "category": "Python",
@@ -1812,12 +1844,36 @@ window.VIZLEARN_MODULES = [
   "desc": "Write your first print statement in a real in-browser Python interpreter and watch strings, numbers and newlines come out the other side."
  },
  {
+  "title": "If, Elif and Else",
+  "path": "python/if_elif_else.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Branch on a condition, and watch indentation decide which lines belong to which branch."
+ },
+ {
+  "title": "Lists and Indexing",
+  "path": "python/lists_and_indexing.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Build a list, reach into it by index, and see why Python counts positions from zero."
+ },
+ {
   "title": "Numbers and Operators",
   "path": "python/numbers_and_operators.html",
   "category": "Python",
   "topic": "python",
   "icon": "code",
   "desc": "Run arithmetic live in the browser: the difference between / and //, what modulo returns, and how Python rounds when you mix ints and floats."
+ },
+ {
+  "title": "Reading Errors and Tracebacks",
+  "path": "python/reading_errors.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Read a traceback from the bottom up, recognise the common Python error types, and turn each message into the fix it points at."
  },
  {
   "title": "Strings and Slicing",
@@ -1834,6 +1890,14 @@ window.VIZLEARN_MODULES = [
   "topic": "python",
   "icon": "code",
   "desc": "Assign a name and ask Python what it is. See the types Python tracks for you and why the same value behaves differently depending on what it is."
+ },
+ {
+  "title": "While Loops, break and continue",
+  "path": "python/while_loops_and_control.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Loop while a condition holds, exit early with break, skip a pass with continue, and see what makes a loop run forever."
  }
 ];
 

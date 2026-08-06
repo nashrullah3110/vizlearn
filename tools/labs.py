@@ -900,4 +900,168 @@ LABS = {
             "after the call."},
 ]},
 
+"python/lists_and_indexing.html": {"check": [
+    {"q": "colours = [\"red\", \"green\", \"blue\"]. What is colours[1]?",
+     "options": ["\"red\"", "\"green\"", "\"blue\"", "An error"],
+     "answer": 1,
+     "why": "Indexes count from 0, so index 1 is the SECOND item. Read an "
+            "index as \"how far from the start\" and this stops being a trap."},
+    {"q": "That same three-item list. What does colours[3] do?",
+     "options": ["Returns \"blue\"", "Returns None", "Raises IndexError",
+                 "Adds a fourth item"],
+     "answer": 2,
+     "why": "Three items occupy indexes 0, 1 and 2. Asking for 3 is out of "
+            "range, and Python raises rather than inventing a value."},
+    {"q": "After nums = [3, 1, 2] and sorted(nums), what is nums?",
+     "options": ["[1, 2, 3]", "[3, 1, 2]", "None", "An error"],
+     "answer": 1,
+     "why": "sorted() returns a NEW sorted list and leaves the original "
+            "alone. nums.sort() is the one that reorders in place - and it "
+            "returns None, which is where the confusion usually starts."},
+]},
+
+"python/dictionaries.html": {"check": [
+    {"q": "person = {\"name\": \"Ada\"}. What does person[\"age\"] do?",
+     "options": ["Returns None", "Returns \"\"", "Raises KeyError",
+                 "Creates the key"],
+     "answer": 2,
+     "why": "Square brackets on a missing key raise KeyError. Assigning to a "
+            "missing key creates it, but reading one does not."},
+    {"q": "What does person.get(\"age\", 0) return when there is no age key?",
+     "options": ["0", "None", "KeyError", "\"age\""],
+     "answer": 0,
+     "why": "get() takes an optional fallback and returns it instead of "
+            "raising. With no fallback given it returns None."},
+    {"q": "Looping with `for x in person:` gives you:",
+     "options": ["The keys", "The values", "Key-value pairs", "Nothing"],
+     "answer": 0,
+     "why": "Iterating a dictionary yields its keys. Use .items() when you "
+            "want both halves, or .values() for just the values."},
+]},
+
+"python/booleans_and_comparisons.html": {"check": [
+    {"q": "What does bool(\"\") return?",
+     "options": ["True", "False", "\"\"", "An error"],
+     "answer": 1,
+     "why": "Empty things are falsy: \"\", 0, [], {} and None. Everything "
+            "else is truthy, which is why `if name:` reads as \"if name is "
+            "not empty\"."},
+    {"q": "age = 20. What is the value of `age > 18`?",
+     "options": ["A bool", "A string", "An int", "Nothing - it is a statement"],
+     "answer": 0,
+     "why": "A comparison is an expression that produces a real bool value. "
+            "You can print it, store it, or pass it around - not only put it "
+            "in an if."},
+    {"q": "Which operator asks whether two values are equal?",
+     "options": ["=", "==", ":=", "==="],
+     "answer": 1,
+     "why": "= assigns, == compares. Python raises a SyntaxError if you use "
+            "= inside an if, which catches the typo early."},
+]},
+
+"python/if_elif_else.html": {"check": [
+    {"q": "score = 95, and the branches check >= 70, then >= 80, then >= 90 in "
+          "that order. What prints?",
+     "options": ["The >= 90 branch", "The >= 70 branch", "All three",
+                 "Nothing"],
+     "answer": 1,
+     "why": "Only the FIRST true branch runs. 95 satisfies >= 70, so that one "
+            "wins and the rest are skipped - which is why specific conditions "
+            "must come before general ones."},
+    {"q": "What decides which lines belong to an if branch?",
+     "options": ["Curly braces", "The indentation", "A blank line",
+                 "The end keyword"],
+     "answer": 1,
+     "why": "Python uses indentation as real syntax. Moving a line in or out "
+            "by four spaces genuinely changes which branch it belongs to."},
+    {"q": "How many else clauses can one if statement have?",
+     "options": ["As many as you like", "Exactly one", "At most one", "None"],
+     "answer": 2,
+     "why": "else is optional, and there can be at most one. elif is the "
+            "clause you can repeat."},
+]},
+
+"python/for_loops_and_range.html": {"check": [
+    {"q": "What does range(5) produce?",
+     "options": ["1,2,3,4,5", "0,1,2,3,4", "0,1,2,3,4,5", "5"],
+     "answer": 1,
+     "why": "range stops BEFORE its endpoint, giving five numbers starting at "
+            "0. That lines up with zero-based indexing."},
+    {"q": "You want a running total. Where does `total = 0` belong?",
+     "options": ["Before the loop", "Inside the loop body",
+                 "After the loop", "It does not matter"],
+     "answer": 0,
+     "why": "Inside the body it resets on every pass, so the final answer is "
+            "just the last item. The loop runs, no error appears, and the "
+            "number is quietly wrong."},
+    {"q": "Can you loop over a string with a for loop?",
+     "options": ["Yes - it yields characters", "No - only lists work",
+                 "Only with range()", "Only if you call list() first"],
+     "answer": 0,
+     "why": "Strings are iterable, so a for loop walks them one character at "
+            "a time."},
+]},
+
+"python/while_loops_and_control.html": {"check": [
+    {"q": "A while loop whose condition never becomes false will:",
+     "options": ["Stop after 100 passes", "Run forever",
+                 "Raise an error immediately", "Skip its body"],
+     "answer": 1,
+     "why": "Nothing stops it but you. On this site the interpreter runs in a "
+            "Web Worker and is killed after ten seconds, so the page survives "
+            "the mistake."},
+    {"q": "What does break do?",
+     "options": ["Skips to the next pass", "Leaves the loop entirely",
+                 "Restarts the loop", "Pauses execution"],
+     "answer": 1,
+     "why": "break exits the whole loop immediately. continue is the one that "
+            "skips only the current pass."},
+    {"q": "When is a while loop's condition checked?",
+     "options": ["Before every pass", "After every pass", "Only once",
+                 "Halfway through the body"],
+     "answer": 0,
+     "why": "It is tested before each pass, so a while loop whose condition "
+            "starts false never runs its body at all."},
+]},
+
+"python/functions_and_return.html": {"check": [
+    {"q": "A function that prints but never returns gives its caller:",
+     "options": ["The printed value", "None", "An empty string", "An error"],
+     "answer": 1,
+     "why": "Printing puts characters on the screen; returning hands a value "
+            "back. Without a return the call evaluates to None, which is why "
+            "adding to the result raises TypeError."},
+    {"q": "In `def area(width, height):`, width and height are:",
+     "options": ["Arguments", "Parameters", "Return values", "Globals"],
+     "answer": 1,
+     "why": "The names in the def line are parameters. The values you pass "
+            "when calling are the arguments."},
+    {"q": "What does `def greet(name, greeting=\"Hello\")` let you do?",
+     "options": ["Call greet with one argument", "Call greet with none",
+                 "Return two values", "Skip the return"],
+     "answer": 0,
+     "why": "A default makes that parameter optional, so greet(\"Ada\") works "
+            "and greet(\"Ada\", \"Hi\") overrides it."},
+]},
+
+"python/reading_errors.html": {"check": [
+    {"q": "Which line of a traceback names the actual problem?",
+     "options": ["The first", "The last", "The middle", "It varies"],
+     "answer": 1,
+     "why": "Read bottom-up. The last line is the error type and a "
+            "plain-English description; the line above it points at your code."},
+    {"q": "print(totl) when you meant total raises:",
+     "options": ["TypeError", "ValueError", "NameError", "SyntaxError"],
+     "answer": 2,
+     "why": "NameError means Python has never seen that name. It is almost "
+            "always a typo or a variable used before it was assigned."},
+    {"q": "int(\"twelve\") raises ValueError rather than TypeError because:",
+     "options": ["The type is wrong", "The type is right but the value is not",
+                 "int takes no arguments", "Strings cannot be converted"],
+     "answer": 1,
+     "why": "int() accepts strings, so the type is fine - but \"twelve\" is "
+            "not a string that represents a number. Right type, impossible "
+            "value."},
+]},
+
 }

@@ -428,4 +428,20 @@ DESCRIPTIONS = {
     "python/strings_and_slicing.html":
         "Strings are sequences. Index into them, slice them with start:stop:step, and use "
         "the methods that make text manipulation read like English.",
+    "python/lists_and_indexing.html":
+        "Build a list, reach into it by index, and see why Python counts positions from zero.",
+    "python/dictionaries.html":
+        "Store values under names instead of positions, look them up by key, and handle the key that is not there.",
+    "python/booleans_and_comparisons.html":
+        "Compare values, combine them with and, or and not, and see which everyday values Python already treats as false.",
+    "python/if_elif_else.html":
+        "Branch on a condition, and watch indentation decide which lines belong to which branch.",
+    "python/for_loops_and_range.html":
+        "Loop over a list, count with range(), and accumulate a result across the passes of a for loop.",
+    "python/while_loops_and_control.html":
+        "Loop while a condition holds, exit early with break, skip a pass with continue, and see what makes a loop run forever.",
+    "python/functions_and_return.html":
+        "Define a function, pass it arguments, and see why printing a result is not the same as returning one.",
+    "python/reading_errors.html":
+        "Read a traceback from the bottom up, recognise the common Python error types, and turn each message into the fix it points at.",
 }

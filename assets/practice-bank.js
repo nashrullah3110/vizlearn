@@ -4853,6 +4853,166 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "python/booleans_and_comparisons.html",
+  "title": "Booleans and Comparisons",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does bool(\"\") return?",
+    "o": [
+     "True",
+     "False",
+     "\"\"",
+     "An error"
+    ],
+    "a": 1,
+    "w": "Empty things are falsy: \"\", 0, [], {} and None. Everything else is truthy, which is why `if name:` reads as \"if name is not empty\"."
+   },
+   {
+    "t": "age = 20. What is the value of `age > 18`?",
+    "o": [
+     "A bool",
+     "A string",
+     "An int",
+     "Nothing - it is a statement"
+    ],
+    "a": 0,
+    "w": "A comparison is an expression that produces a real bool value. You can print it, store it, or pass it around - not only put it in an if."
+   },
+   {
+    "t": "Which operator asks whether two values are equal?",
+    "o": [
+     "=",
+     "==",
+     ":=",
+     "==="
+    ],
+    "a": 1,
+    "w": "= assigns, == compares. Python raises a SyntaxError if you use = inside an if, which catches the typo early."
+   }
+  ]
+ },
+ {
+  "path": "python/dictionaries.html",
+  "title": "Dictionaries",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "person = {\"name\": \"Ada\"}. What does person[\"age\"] do?",
+    "o": [
+     "Returns None",
+     "Returns \"\"",
+     "Raises KeyError",
+     "Creates the key"
+    ],
+    "a": 2,
+    "w": "Square brackets on a missing key raise KeyError. Assigning to a missing key creates it, but reading one does not."
+   },
+   {
+    "t": "What does person.get(\"age\", 0) return when there is no age key?",
+    "o": [
+     "0",
+     "None",
+     "KeyError",
+     "\"age\""
+    ],
+    "a": 0,
+    "w": "get() takes an optional fallback and returns it instead of raising. With no fallback given it returns None."
+   },
+   {
+    "t": "Looping with `for x in person:` gives you:",
+    "o": [
+     "The keys",
+     "The values",
+     "Key-value pairs",
+     "Nothing"
+    ],
+    "a": 0,
+    "w": "Iterating a dictionary yields its keys. Use .items() when you want both halves, or .values() for just the values."
+   }
+  ]
+ },
+ {
+  "path": "python/for_loops_and_range.html",
+  "title": "For Loops and range()",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does range(5) produce?",
+    "o": [
+     "1,2,3,4,5",
+     "0,1,2,3,4",
+     "0,1,2,3,4,5",
+     "5"
+    ],
+    "a": 1,
+    "w": "range stops BEFORE its endpoint, giving five numbers starting at 0. That lines up with zero-based indexing."
+   },
+   {
+    "t": "You want a running total. Where does `total = 0` belong?",
+    "o": [
+     "Before the loop",
+     "Inside the loop body",
+     "After the loop",
+     "It does not matter"
+    ],
+    "a": 0,
+    "w": "Inside the body it resets on every pass, so the final answer is just the last item. The loop runs, no error appears, and the number is quietly wrong."
+   },
+   {
+    "t": "Can you loop over a string with a for loop?",
+    "o": [
+     "Yes - it yields characters",
+     "No - only lists work",
+     "Only with range()",
+     "Only if you call list() first"
+    ],
+    "a": 0,
+    "w": "Strings are iterable, so a for loop walks them one character at a time."
+   }
+  ]
+ },
+ {
+  "path": "python/functions_and_return.html",
+  "title": "Functions and Return Values",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "A function that prints but never returns gives its caller:",
+    "o": [
+     "The printed value",
+     "None",
+     "An empty string",
+     "An error"
+    ],
+    "a": 1,
+    "w": "Printing puts characters on the screen; returning hands a value back. Without a return the call evaluates to None, which is why adding to the result raises TypeError."
+   },
+   {
+    "t": "In `def area(width, height):`, width and height are:",
+    "o": [
+     "Arguments",
+     "Parameters",
+     "Return values",
+     "Globals"
+    ],
+    "a": 1,
+    "w": "The names in the def line are parameters. The values you pass when calling are the arguments."
+   },
+   {
+    "t": "What does `def greet(name, greeting=\"Hello\")` let you do?",
+    "o": [
+     "Call greet with one argument",
+     "Call greet with none",
+     "Return two values",
+     "Skip the return"
+    ],
+    "a": 0,
+    "w": "A default makes that parameter optional, so greet(\"Ada\") works and greet(\"Ada\", \"Hi\") overrides it."
+   }
+  ]
+ },
+ {
   "path": "python/hello_python.html",
   "title": "Hello, Python!",
   "cat": "Python",
@@ -4893,6 +5053,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "python/if_elif_else.html",
+  "title": "If, Elif and Else",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "score = 95, and the branches check >= 70, then >= 80, then >= 90 in that order. What prints?",
+    "o": [
+     "The >= 90 branch",
+     "The >= 70 branch",
+     "All three",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "Only the FIRST true branch runs. 95 satisfies >= 70, so that one wins and the rest are skipped - which is why specific conditions must come before general ones."
+   },
+   {
+    "t": "What decides which lines belong to an if branch?",
+    "o": [
+     "Curly braces",
+     "The indentation",
+     "A blank line",
+     "The end keyword"
+    ],
+    "a": 1,
+    "w": "Python uses indentation as real syntax. Moving a line in or out by four spaces genuinely changes which branch it belongs to."
+   },
+   {
+    "t": "How many else clauses can one if statement have?",
+    "o": [
+     "As many as you like",
+     "Exactly one",
+     "At most one",
+     "None"
+    ],
+    "a": 2,
+    "w": "else is optional, and there can be at most one. elif is the clause you can repeat."
+   }
+  ]
+ },
+ {
+  "path": "python/lists_and_indexing.html",
+  "title": "Lists and Indexing",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "colours = [\"red\", \"green\", \"blue\"]. What is colours[1]?",
+    "o": [
+     "\"red\"",
+     "\"green\"",
+     "\"blue\"",
+     "An error"
+    ],
+    "a": 1,
+    "w": "Indexes count from 0, so index 1 is the SECOND item. Read an index as \"how far from the start\" and this stops being a trap."
+   },
+   {
+    "t": "That same three-item list. What does colours[3] do?",
+    "o": [
+     "Returns \"blue\"",
+     "Returns None",
+     "Raises IndexError",
+     "Adds a fourth item"
+    ],
+    "a": 2,
+    "w": "Three items occupy indexes 0, 1 and 2. Asking for 3 is out of range, and Python raises rather than inventing a value."
+   },
+   {
+    "t": "After nums = [3, 1, 2] and sorted(nums), what is nums?",
+    "o": [
+     "[1, 2, 3]",
+     "[3, 1, 2]",
+     "None",
+     "An error"
+    ],
+    "a": 1,
+    "w": "sorted() returns a NEW sorted list and leaves the original alone. nums.sort() is the one that reorders in place - and it returns None, which is where the confusion usually starts."
+   }
+  ]
+ },
+ {
   "path": "python/numbers_and_operators.html",
   "title": "Numbers and Operators",
   "cat": "Python",
@@ -4929,6 +5169,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "** is exponentiation, not multiplication. 2 ** 10 means 2 raised to the power 10, which is 1024."
+   }
+  ]
+ },
+ {
+  "path": "python/reading_errors.html",
+  "title": "Reading Errors and Tracebacks",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "Which line of a traceback names the actual problem?",
+    "o": [
+     "The first",
+     "The last",
+     "The middle",
+     "It varies"
+    ],
+    "a": 1,
+    "w": "Read bottom-up. The last line is the error type and a plain-English description; the line above it points at your code."
+   },
+   {
+    "t": "print(totl) when you meant total raises:",
+    "o": [
+     "TypeError",
+     "ValueError",
+     "NameError",
+     "SyntaxError"
+    ],
+    "a": 2,
+    "w": "NameError means Python has never seen that name. It is almost always a typo or a variable used before it was assigned."
+   },
+   {
+    "t": "int(\"twelve\") raises ValueError rather than TypeError because:",
+    "o": [
+     "The type is wrong",
+     "The type is right but the value is not",
+     "int takes no arguments",
+     "Strings cannot be converted"
+    ],
+    "a": 1,
+    "w": "int() accepts strings, so the type is fine - but \"twelve\" is not a string that represents a number. Right type, impossible value."
    }
   ]
  },
@@ -5009,6 +5289,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "A name is a label pointing at a value. Rebinding it points the label at something else; the old value is discarded once nothing references it. Names do not hold values, they label them."
+   }
+  ]
+ },
+ {
+  "path": "python/while_loops_and_control.html",
+  "title": "While Loops, break and continue",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "A while loop whose condition never becomes false will:",
+    "o": [
+     "Stop after 100 passes",
+     "Run forever",
+     "Raise an error immediately",
+     "Skip its body"
+    ],
+    "a": 1,
+    "w": "Nothing stops it but you. On this site the interpreter runs in a Web Worker and is killed after ten seconds, so the page survives the mistake."
+   },
+   {
+    "t": "What does break do?",
+    "o": [
+     "Skips to the next pass",
+     "Leaves the loop entirely",
+     "Restarts the loop",
+     "Pauses execution"
+    ],
+    "a": 1,
+    "w": "break exits the whole loop immediately. continue is the one that skips only the current pass."
+   },
+   {
+    "t": "When is a while loop's condition checked?",
+    "o": [
+     "Before every pass",
+     "After every pass",
+     "Only once",
+     "Halfway through the body"
+    ],
+    "a": 0,
+    "w": "It is tested before each pass, so a while loop whose condition starts false never runs its body at all."
    }
   ]
  }

@@ -276,6 +276,14 @@ SEQUENCE = {
         "python/variables_and_types.html",
         "python/numbers_and_operators.html",
         "python/strings_and_slicing.html",
+        "python/lists_and_indexing.html",
+        "python/dictionaries.html",
+        "python/booleans_and_comparisons.html",
+        "python/if_elif_else.html",
+        "python/for_loops_and_range.html",
+        "python/while_loops_and_control.html",
+        "python/functions_and_return.html",
+        "python/reading_errors.html",
     ],
 }
 
