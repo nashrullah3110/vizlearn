@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>VizLearn: Interactive 3D CNN Visualizer</title>
+    <title>VizLearn - CNN Architecture</title>
     <meta name="description" content="Explore a convolutional neural network layer by layer in 3D - see how filters, feature maps and pooling turn pixels into predictions.">
     
     <!-- Scripts & Fonts matching VizLearn Theme -->
@@ -39,18 +39,18 @@
     <!-- social preview -->
     <meta property="og:type" content="article">
     <meta property="og:site_name" content="VizLearn">
-    <meta property="og:title" content="VizLearn: Interactive 3D CNN Visualizer">
+    <meta property="og:title" content="CNN Architecture">
     <meta property="og:description" content="Explore a convolutional neural network layer by layer in 3D - see how filters, feature maps and pooling turn pixels into predictions.">
     <meta property="og:url" content="https://vizlearn.in/computer_vision/cnn.html">
     <meta property="og:image" content="https://vizlearn.in/assets/og/computer_vision__cnn.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="VizLearn: Interactive 3D CNN Visualizer - interactive visualization on VizLearn">
+    <meta property="og:image:alt" content="CNN Architecture - interactive visualization on VizLearn">
     <meta property="og:locale" content="en_US">
     <meta property="article:modified_time" content="2026-08-06">
     <meta property="article:published_time" content="2026-06-26">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="VizLearn: Interactive 3D CNN Visualizer">
+    <meta name="twitter:title" content="CNN Architecture">
     <meta name="twitter:description" content="Explore a convolutional neural network layer by layer in 3D - see how filters, feature maps and pooling turn pixels into predictions.">
     <meta name="twitter:image" content="https://vizlearn.in/assets/og/computer_vision__cnn.png">
 
@@ -67,8 +67,8 @@
 {
   "@context": "https://schema.org",
   "@type": "LearningResource",
-  "name": "VizLearn: Interactive 3D CNN Visualizer",
-  "headline": "VizLearn: Interactive 3D CNN Visualizer",
+  "name": "CNN Architecture",
+  "headline": "CNN Architecture",
   "description": "Explore a convolutional neural network layer by layer in 3D - see how filters, feature maps and pooling turn pixels into predictions.",
   "url": "https://vizlearn.in/computer_vision/cnn.html",
   "image": "https://vizlearn.in/assets/og/computer_vision__cnn.png",
@@ -117,7 +117,7 @@
     {
       "@type": "ListItem",
       "position": 3,
-      "name": "VizLearn: Interactive 3D CNN Visualizer",
+      "name": "CNN Architecture",
       "item": "https://vizlearn.in/computer_vision/cnn.html"
     }
   ]
@@ -866,30 +866,28 @@
 
         document.getElementById('recognize-btn').addEventListener('click', () => { triggerInferenceAnimation(); });
 
+        /* Theme.
+         *
+         * This block used to query '.fa-sun' and '.fa-moon'. Those are Font
+         * Awesome classes, and the site replaced Font Awesome with inline SVGs
+         * some time ago - so both lookups returned null and the very next line
+         * threw. Everything below it in this script (the scene population, the
+         * animation loop, the resize handler) never ran, which is why the 3D
+         * view was a blank black panel.
+         *
+         * Now uses the same .dark-icon / .light-icon pair and the same
+         * localStorage key as every other page, so the choice survives a
+         * reload and carries across the site. The 3D recolouring is applied on
+         * load as well as on click, because the shared head script may already
+         * have put the page in light mode before this runs. */
         const themeBtn = document.getElementById('themeToggle');
-        const sunIcon = document.querySelector('.fa-sun');
-        const moonIcon = document.querySelector('.fa-moon');
-        let isLightMode = false;
-        
-        moonIcon.classList.remove('hidden');
+        const sunIcon = themeBtn.querySelector('.dark-icon');
+        const moonIcon = themeBtn.querySelector('.light-icon');
 
-        themeBtn.addEventListener('click', () => {
-            isLightMode = !isLightMode;
-            document.body.classList.toggle('light-mode');
-            
-            if (isLightMode) {
-                sunIcon.classList.remove('hidden');
-                moonIcon.classList.add('hidden');
-                currentTheme = 'light';
-            } else {
-                sunIcon.classList.add('hidden');
-                moonIcon.classList.remove('hidden');
-                currentTheme = 'dark';
-            }
-            
+        function paintSceneTheme() {
             const themeConfig = themes[currentTheme];
             scene.fog.color.setHex(themeConfig.fogColor);
-            renderer.setClearColor(themeConfig.fogColor); // Updated directly to theme background
+            renderer.setClearColor(themeConfig.fogColor);
             connectionMaterial.color.setHex(themeConfig.hoverLineColor);
             highlightMat.color.setHex(themeConfig.hoverLineColor);
             ambientLight.intensity = themeConfig.ambientIntensity;
@@ -902,6 +900,23 @@
                 if (layer.type === '2d' && layer.maps > 0) createBoundingPlanes(layer);
             });
             updateNetworkInput();
+        }
+
+        function applyTheme(theme, repaint) {
+            currentTheme = theme === 'light' ? 'light' : 'dark';
+            const light = currentTheme === 'light';
+            document.body.classList.toggle('light-mode', light);
+            sunIcon.classList.toggle('hidden', light);
+            moonIcon.classList.toggle('hidden', !light);
+            if (repaint) paintSceneTheme();
+        }
+
+        applyTheme(localStorage.getItem('theme') || 'dark', true);
+
+        themeBtn.addEventListener('click', () => {
+            const next = currentTheme === 'light' ? 'dark' : 'light';
+            try { localStorage.setItem('theme', next); } catch (e) { /* private mode */ }
+            applyTheme(next, true);
         });
 
         const raycaster = new THREE.Raycaster();
