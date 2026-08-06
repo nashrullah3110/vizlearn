@@ -269,6 +269,14 @@ SEQUENCE = {
         "gen_ai/fine_tuning_vs_rlhf.html",
         "gen_ai/hallucination_and_grounding.html",
     ],
+
+    # Run it first, then meet the pieces: the track teaches by execution.
+    "python": [
+        "python/hello_python.html",
+        "python/variables_and_types.html",
+        "python/numbers_and_operators.html",
+        "python/strings_and_slicing.html",
+    ],
 }
 
 

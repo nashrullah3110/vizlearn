@@ -134,7 +134,8 @@ def main():
         # --- shared runtime wiring (every page, hub included) ---
         for script in ("assets/modules.js", "assets/search.js", "assets/vizlearn.js",
                        "assets/vizlearn-lab.js", "assets/vizlearn-state.js",
-                       "assets/vizlearn-pwa.js", "assets/vizlearn-keys.js"):
+                       "assets/vizlearn-pwa.js", "assets/vizlearn-keys.js",
+                       "assets/vizlearn-python.js"):
             check(s.count('src="%s%s"' % (prefix, script)) == 1,
                   "%s: expected exactly one <script src> for %s" % (rel, script))
         check("const allCourses" not in s, "%s: still inlines its own catalog" % rel)

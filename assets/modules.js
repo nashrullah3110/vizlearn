@@ -1802,6 +1802,38 @@ window.VIZLEARN_MODULES = [
   "topic": "nlp",
   "icon": "comments",
   "desc": "Paste any text and watch a word cloud size each term by how often it appears, exposing what a document is really about."
+ },
+ {
+  "title": "Hello, Python!",
+  "path": "python/hello_python.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Write your first print statement in a real in-browser Python interpreter and watch strings, numbers and newlines come out the other side."
+ },
+ {
+  "title": "Numbers and Operators",
+  "path": "python/numbers_and_operators.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Run arithmetic live in the browser: the difference between / and //, what modulo returns, and how Python rounds when you mix ints and floats."
+ },
+ {
+  "title": "Strings and Slicing",
+  "path": "python/strings_and_slicing.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Strings are sequences. Index into them, slice them with start:stop:step, and use the methods that make text manipulation read like English."
+ },
+ {
+  "title": "Variables and Types",
+  "path": "python/variables_and_types.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Assign a name and ask Python what it is. See the types Python tracks for you and why the same value behaves differently depending on what it is."
  }
 ];
 

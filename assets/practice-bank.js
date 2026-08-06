@@ -4851,5 +4851,165 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Despite their simplicity, word clouds are widely used in various fields for several reasons:"
    }
   ]
+ },
+ {
+  "path": "python/hello_python.html",
+  "title": "Hello, Python!",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does print(\"Hello\") send to the screen?",
+    "o": [
+     "Hello",
+     "\"Hello\" with quotes",
+     "Hello\\n",
+     "Nothing"
+    ],
+    "a": 0,
+    "w": "print() writes the value, not its source text. The quotes are part of the code that made the string; they are not part of the string."
+   },
+   {
+    "t": "print(2 + 3) prints:",
+    "o": [
+     "2 + 3",
+     "\"2 + 3\"",
+     "5",
+     "23"
+    ],
+    "a": 2,
+    "w": "Python evaluates the expression before printing, so print(2 + 3) is exactly print(5)."
+   },
+   {
+    "t": "A program is just:",
+    "o": [
+     "A text file of instructions the interpreter reads top to bottom",
+     "A compiled binary",
+     "A list of files",
+     "A single function"
+    ],
+    "a": 0,
+    "w": "Python reads your .py file from top to bottom and runs each statement in turn. That ordering matters - a line can use a name only after the line that defined it."
+   }
+  ]
+ },
+ {
+  "path": "python/numbers_and_operators.html",
+  "title": "Numbers and Operators",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "7 / 2 in Python 3 gives:",
+    "o": [
+     "3",
+     "3.5",
+     "3 remainder 1",
+     "An error"
+    ],
+    "a": 1,
+    "w": "Python 3's / is true division and always returns a float when the division is not exact. The old integer-truncating behaviour lives on as //."
+   },
+   {
+    "t": "7 % 3 evaluates to:",
+    "o": [
+     "2",
+     "1",
+     "2.33",
+     "7"
+    ],
+    "a": 1,
+    "w": "The modulo operator returns the remainder after division: 7 = 2×3 + 1, so 7 % 3 is 1. It is the operator behind 'is n even?' checks and clock arithmetic."
+   },
+   {
+    "t": "2 ** 10 evaluates to:",
+    "o": [
+     "20",
+     "1024",
+     "12",
+     "200"
+    ],
+    "a": 1,
+    "w": "** is exponentiation, not multiplication. 2 ** 10 means 2 raised to the power 10, which is 1024."
+   }
+  ]
+ },
+ {
+  "path": "python/strings_and_slicing.html",
+  "title": "Strings and Slicing",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "len(\"hello\") returns:",
+    "o": [
+     "4",
+     "5",
+     "6",
+     "An error"
+    ],
+    "a": 1,
+    "w": "len() counts characters. \"hello\" has five of them. It counts spaces too - len(\"a b\") is 3."
+   },
+   {
+    "t": "s = \"python\"; s[0] is:",
+    "o": [
+     "\"p\"",
+     "\"y\"",
+     "\"t\"",
+     "\"n\""
+    ],
+    "a": 0,
+    "w": "Indexing starts at 0 in Python, not 1. s[0] is the first character, and s[-1] is a convenient way to reach the last one."
+   },
+   {
+    "t": "\"hello\".upper() returns:",
+    "o": [
+     "\"HELLO\"",
+     "\"hello\"",
+     "5",
+     "An error"
+    ],
+    "a": 0,
+    "w": "Strings are objects with methods, and most return a NEW string rather than editing the one in place - \"hello\" is unchanged after the call."
+   }
+  ]
+ },
+ {
+  "path": "python/variables_and_types.html",
+  "title": "Variables and Types",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "x = \"10\" makes x:",
+    "o": [
+     "The number 10",
+     "The string \"10\"",
+     "An error",
+     "A list"
+    ],
+    "a": 1,
+    "w": "Python guesses the type from the value. 10 with quotes is a string; without them it is an integer, and the two behave completely differently even though they look alike."
+   },
+   {
+    "t": "Which of these is NOT a built-in Python type?",
+    "o": [
+     "int",
+     "str",
+     "list",
+     "integer"
+    ],
+    "a": 3,
+    "w": "The type is spelled int, not integer. Being able to ask type(x) and read the answer is a core skill on this track."
+   },
+   {
+    "t": "You reuse a variable name for a new value. The old value:",
+    "o": [
+     "Still exists under that name",
+     "Is gone from that name (unless something else still references it)",
+     "Moves to another variable automatically",
+     "Causes an error"
+    ],
+    "a": 1,
+    "w": "A name is a label pointing at a value. Rebinding it points the label at something else; the old value is discarded once nothing references it. Names do not hold values, they label them."
+   }
+  ]
  }
 ];

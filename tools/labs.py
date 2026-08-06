@@ -809,4 +809,95 @@ LABS = {
             "matter what the data means."},
 ]},
 
+# =========================================================================
+# Python - the language the other tracks assume
+# =========================================================================
+
+"python/hello_python.html": {"check": [
+    {"q": "What does print(\"Hello\") send to the screen?",
+     "options": ["Hello", "\"Hello\" with quotes", "Hello\\n", "Nothing"],
+     "answer": 0,
+     "why": "print() writes the value, not its source text. The quotes are "
+            "part of the code that made the string; they are not part of the "
+            "string."},
+    {"q": "print(2 + 3) prints:",
+     "options": ["2 + 3", "\"2 + 3\"", "5", "23"],
+     "answer": 2,
+     "why": "Python evaluates the expression before printing, so print(2 + 3) "
+            "is exactly print(5)."}, 
+    {"q": "A program is just:",
+     "options": ["A text file of instructions the interpreter reads top to bottom",
+                 "A compiled binary",
+                 "A list of files",
+                 "A single function"],
+     "answer": 0,
+     "why": "Python reads your .py file from top to bottom and runs each "
+            "statement in turn. That ordering matters - a line can use a name "
+            "only after the line that defined it."},
+]},
+
+"python/variables_and_types.html": {"check": [
+    {"q": "x = \"10\" makes x:",
+     "options": ["The number 10", "The string \"10\"",
+                 "An error", "A list"],
+     "answer": 1,
+     "why": "Python guesses the type from the value. 10 with quotes is a "
+            "string; without them it is an integer, and the two behave "
+            "completely differently even though they look alike."},
+    {"q": "Which of these is NOT a built-in Python type?",
+     "options": ["int", "str", "list", "integer"],
+     "answer": 3,
+     "why": "The type is spelled int, not integer. Being able to ask type(x) "
+            "and read the answer is a core skill on this track."},
+    {"q": "You reuse a variable name for a new value. The old value:",
+     "options": ["Still exists under that name",
+                 "Is gone from that name (unless something else still "
+                 "references it)",
+                 "Moves to another variable automatically",
+                 "Causes an error"],
+     "answer": 1,
+     "why": "A name is a label pointing at a value. Rebinding it points the "
+            "label at something else; the old value is discarded once nothing "
+            "references it. Names do not hold values, they label them."},
+]},
+
+"python/numbers_and_operators.html": {"check": [
+    {"q": "7 / 2 in Python 3 gives:",
+     "options": ["3", "3.5", "3 remainder 1", "An error"],
+     "answer": 1,
+     "why": "Python 3's / is true division and always returns a float when "
+            "the division is not exact. The old integer-truncating behaviour "
+            "lives on as //."},
+    {"q": "7 % 3 evaluates to:",
+     "options": ["2", "1", "2.33", "7"],
+     "answer": 1,
+     "why": "The modulo operator returns the remainder after division: 7 = "
+            "2×3 + 1, so 7 % 3 is 1. It is the operator behind 'is n even?' "
+            "checks and clock arithmetic."},
+    {"q": "2 ** 10 evaluates to:",
+     "options": ["20", "1024", "12", "200"],
+     "answer": 1,
+     "why": "** is exponentiation, not multiplication. 2 ** 10 means 2 raised "
+            "to the power 10, which is 1024."},
+]},
+
+"python/strings_and_slicing.html": {"check": [
+    {"q": "len(\"hello\") returns:",
+     "options": ["4", "5", "6", "An error"],
+     "answer": 1,
+     "why": "len() counts characters. \"hello\" has five of them. It counts "
+            "spaces too - len(\"a b\") is 3."},
+    {"q": "s = \"python\"; s[0] is:",
+     "options": ["\"p\"", "\"y\"", "\"t\"", "\"n\""],
+     "answer": 0,
+     "why": "Indexing starts at 0 in Python, not 1. s[0] is the first "
+            "character, and s[-1] is a convenient way to reach the last one."},
+    {"q": "\"hello\".upper() returns:",
+     "options": ["\"HELLO\"", "\"hello\"", "5", "An error"],
+     "answer": 0,
+     "why": "Strings are objects with methods, and most return a NEW string "
+            "rather than editing the one in place - \"hello\" is unchanged "
+            "after the call."},
+]},
+
 }

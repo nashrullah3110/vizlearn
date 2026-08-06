@@ -797,7 +797,12 @@ def process(path, rel, authored):
     src = BLOCK.sub("", src)
     src = RUN_BTN.sub("", src)
 
-    ctrls = controls(src)
+    # Code-editor pages (the python/ track) have no slider or canvas to preset;
+    # the "readout" is the console and the run button is a script launch, not a
+    # step in a visualisation. Suppress experiments and predictions for them,
+    # and keep the authored end-of-module check.
+    is_py_page = "data-vz-py" in src
+    ctrls = [] if is_py_page else controls(src)
 
     # --- experiments --------------------------------------------------
     presets = []
@@ -818,7 +823,7 @@ def process(path, rel, authored):
         src = src[:pos] + markup + src[pos:]
 
     # --- lab block ----------------------------------------------------
-    reads = readouts(src, ctrls)
+    reads = [] if is_py_page else readouts(src, ctrls)
     pieces = []
 
     # Prefer an experiment that moves a slider: a continuous control gives the

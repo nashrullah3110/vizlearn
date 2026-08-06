@@ -23,6 +23,7 @@ DIR_META = {
     "database": ("Database", "database"),
     "gen_ai": ("Gen AI", "robot"),
     "maths": ("Maths", "sigma"),
+    "python": ("Python", "code"),
 }
 
 

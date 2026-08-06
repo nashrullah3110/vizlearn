@@ -42,7 +42,7 @@ for (const rel of htmlFiles()) {
     if (/\bsrc=/.test(attrs)) continue;      // external file
     if (!code.trim()) continue;
     const type = (attrs.match(/type\s*=\s*"([^"]*)"/) || [])[1] || '';
-    if (/json|importmap/i.test(type)) { skipped++; continue; }   // data, not code
+    if (/json|importmap|plain/i.test(type)) { skipped++; continue; }   // data, not code
 
     const isModule = /module/i.test(type);
     try {

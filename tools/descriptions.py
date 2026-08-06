@@ -414,4 +414,18 @@ DESCRIPTIONS = {
     "machine_learning/pca.html":
         "Rotate a line through a point cloud and watch the variance it captures peak on "
         "exactly one angle. That angle is PC1, and the rest is what you lose.",
+
+    # --- Python (in-browser interpreter) ----------------------------------
+    "python/hello_python.html":
+        "Write your first print statement in a real in-browser Python interpreter and watch "
+        "strings, numbers and newlines come out the other side.",
+    "python/variables_and_types.html":
+        "Assign a name and ask Python what it is. See the types Python tracks for you and "
+        "why the same value behaves differently depending on what it is.",
+    "python/numbers_and_operators.html":
+        "Run arithmetic live in the browser: the difference between / and //, what modulo "
+        "returns, and how Python rounds when you mix ints and floats.",
+    "python/strings_and_slicing.html":
+        "Strings are sequences. Index into them, slice them with start:stop:step, and use "
+        "the methods that make text manipulation read like English.",
 }

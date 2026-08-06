@@ -183,10 +183,29 @@ TOPICS = {
             "practical techniques: LoRA, quantization and distillation.",
         ],
     },
+    "python": {
+        "dir": "python",
+        "title": "Python",
+        "h1": "Python, by Running It",
+        "lead": "The language every other track assumes. Real code, run in your "
+                "browser, from your first print to your first functions.",
+        "keywords": "learn python interactively, python basics, python variables, "
+                    "python loops, python functions, run python in browser",
+        "intro": [
+            "Every other track on this site writes Python in its examples, and every one "
+            "of them assumes you already speak it. This is where you learn it - not from "
+            "reading, but from running. Every module embeds a real Python interpreter, "
+            "so the code on the page is not a screenshot: you can change it and press "
+            "Run and see what actually happens.",
+            "The track starts at your first print statement and works up through "
+            "variables, numbers, strings, lists, conditionals and functions - the "
+            "handful of ideas every later module leans on.",
+        ],
+    },
 }
 
 # Display order on the hub and in the footer.
-TOPIC_ORDER = ["maths", "ml", "dl", "dsa", "nlp", "computer-vision", "db", "gen-ai"]
+TOPIC_ORDER = ["maths", "ml", "dl", "dsa", "nlp", "computer-vision", "db", "gen-ai", "python"]
 
 DIR_TO_TOPIC = {t["dir"]: k for k, t in TOPICS.items()}
 
