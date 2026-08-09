@@ -11,6 +11,29 @@ copy-pasted into 167 files now live in one place.
 npm run build
 ```
 
+**Always run the whole pipeline. Never run one generator on its own.**
+
+`build_seo.py` injects `<link rel="stylesheet" href="…/assets/vizlearn.css">`
+into every page, and it runs near the end. Any generator that rewrites a page
+whole — `build_topics.py` is the one to watch — emits it *without* that link,
+and the next step to restore it is `seo`. Stop before then and you are left
+with pages that diff cleanly, pass a glance at the HTML, and render as
+unstyled markup in a browser. This has bitten twice; both times it reached the
+point of nearly being committed.
+
+If you only want to check a generator's output, run it and then `npm run build`
+before looking at or committing anything.
+
+Two related traps when verifying locally:
+
+- The service worker caches under a build-stamped name, so a page edited
+  without a rebuild keeps serving the pre-edit copy. Clearing the cache alone
+  does not help — the page re-registers the worker on load. Rebuild instead.
+- `build_lede.py` *moves* the article's opening section rather than copying it,
+  leaving a `VIZLEARN:LEDE:SLOT` marker behind. It restores the section before
+  recomputing, so it is idempotent — but that also means a partial run can
+  leave a page mid-move. Same rule: finish the pipeline.
+
 That runs, in order:
 
 | Step | Script | Produces |
