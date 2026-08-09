@@ -19,6 +19,8 @@ import re
 import sys
 from html.parser import HTMLParser
 
+from build_seo import AUTHOR
+from references import REFERENCES
 from lib_catalog import ROOT, by_topic, modules
 from lib_pages import DIR_TO_TOPIC, TOPICS, last_modified, pretty_date
 
@@ -187,7 +189,7 @@ def prevnext(prev, nxt, root_prefix):
     return "".join(out)
 
 
-def build_block(mod, summary, related, prev, nxt, root_prefix):
+def build_block(mod, summary, related, prev, nxt, root_prefix, rel):
     cheat = (
         '<section class="vz-cheatsheet" aria-labelledby="vz-cheat-h">'
         '<div class="vz-cheat-top">'
@@ -212,8 +214,9 @@ def build_block(mod, summary, related, prev, nxt, root_prefix):
            "".join(card(r, root_prefix) for r in related))
     )
 
-    return "%s\n<div class=\"vz-extras\">%s%s%s</div>\n%s\n" % (
-        BEGIN, cheat, rail, prevnext(prev, nxt, root_prefix), END
+    return "%s\n<div class=\"vz-extras\">%s%s%s%s%s</div>\n%s\n" % (
+        BEGIN, cheat, rail, further_reading(rel), author_card(root_prefix),
+        prevnext(prev, nxt, root_prefix), END
     )
 
 
@@ -230,15 +233,74 @@ def byline(mod, rel, root_prefix):
     track = TOPICS[key]["title"] if key else mod["category"]
     href = "%s%s/" % (root_prefix, mod["dir"])
 
+    # The author was named in the docstring, in <meta name="author"> and in the
+    # JSON-LD, and nowhere a reader could see it. Who wrote a technical
+    # explainer is the first thing anyone assessing it looks for.
     return (
         BYLINE_BEGIN
         + '<p class="vz-byline">'
           '<a class="vz-byline-track" href="%s">%s</a>'
           '<span class="vz-byline-sep" aria-hidden="true">&middot;</span>'
+          '<span>By <a class="vz-byline-author" rel="author" href="%sabout.html">%s</a></span>'
+          '<span class="vz-byline-sep" aria-hidden="true">&middot;</span>'
           '<span>Updated <time datetime="%s">%s</time></span>'
           "</p>"
-        % (href, html.escape(track), iso, pretty_date(iso))
+        % (href, html.escape(track), root_prefix, html.escape(AUTHOR), iso, pretty_date(iso))
         + BYLINE_END
+    )
+
+
+def further_reading(rel):
+    """Primary sources for this module, where there are genuine ones to cite.
+
+    Pages with nothing real to point at get no section - a filler link is
+    worse than an absent one.
+    """
+    refs = REFERENCES.get(rel)
+    if not refs:
+        return ""
+    items = []
+    for title, source, url in refs:
+        name = html.escape(title)
+        if url:
+            name = '<a href="%s" rel="noopener nofollow">%s</a>' % (html.escape(url), name)
+        items.append('<li><span class="vz-ref-title">%s</span>'
+                     '<span class="vz-ref-src">%s</span></li>'
+                     % (name, html.escape(source)))
+    return (
+        '<section class="vz-refs" aria-labelledby="vz-refs-h">'
+        '<h2 id="vz-refs-h" class="vz-refs-h">Further reading</h2>'
+        '<ul class="vz-ref-list">%s</ul>'
+        "</section>" % "".join(items)
+    )
+
+
+def author_card(root_prefix):
+    """Short bio under the article.
+
+    A named byline says who; this says on what basis. Both are the visible
+    half of what the JSON-LD already claims about authorship.
+    """
+    return (
+        '<section class="vz-author" aria-labelledby="vz-author-h">'
+        '<h2 id="vz-author-h" class="vz-author-h">About the author</h2>'
+        '<p class="vz-author-body"><strong>%s</strong> builds and maintains VizLearn. '
+        'Every module here is written and the visualisation behind it hand-built, '
+        'so the numbers in a readout come from the same code that draws the picture. '
+        'Corrections are genuinely welcome and get priority over everything else &mdash; '
+        'if a page states something wrong, or an animation misrepresents what the '
+        'algorithm does, <a href="%scontact.html">get in touch</a>.</p>'
+        '<p class="vz-author-links">'
+        '<a href="%sabout.html">About VizLearn</a>'
+        '<span class="vz-byline-sep" aria-hidden="true">&middot;</span>'
+        '<a href="https://github.com/AshishJangra27" rel="noopener me">GitHub</a>'
+        '<span class="vz-byline-sep" aria-hidden="true">&middot;</span>'
+        '<a href="https://www.linkedin.com/in/ashish-jangra/" rel="noopener me">LinkedIn</a>'
+        '<span class="vz-byline-sep" aria-hidden="true">&middot;</span>'
+        '<a href="%scontact.html">Contact</a>'
+        "</p>"
+        "</section>"
+        % (html.escape(AUTHOR), root_prefix, root_prefix, root_prefix)
     )
 
 
@@ -309,7 +371,7 @@ def main():
         prev = peers[i - 1] if i > 0 else None
         nxt = peers[i + 1] if i < len(peers) - 1 else None
 
-        block = build_block(mod, summary, related, prev, nxt, root_prefix)
+        block = build_block(mod, summary, related, prev, nxt, root_prefix, rel)
 
         # Anchor on the footer's *marker*, not on "<footer" itself: the footer
         # is generated between VIZLEARN:FOOTER markers, so anchoring on the
