@@ -10,11 +10,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A* (pronounced \"A-star\") is a pathfinding and graph traversal algorithm renowned for its performance and accuracy. It's a cornerstone of game development, robotics, and logistics. Unlike simpler algorithms like Breadth-First Search (BFS) or Dijkstra's, A* uses a \"heuristic\" to intelligently guess the best path to explore, making it significantly faster."
+    "ans": "A* orders its priority queue by f = g + h, where g is the cost so far and h estimates the cost remaining, which focuses the search along the direction of the goal instead of expanding uniformly. Provided h never overestimates, the path returned is still optimal — and the better the estimate, the fewer nodes get expanded."
    },
    {
-    "t": "What does this module say about “Quick Context: What is A*”?",
-    "ans": "A* (pronounced \"A-star\") is a pathfinding and graph traversal algorithm renowned for its performance and accuracy. It's a cornerstone of game development, robotics, and logistics. Unlike simpler algorithms like Breadth-First Search (BFS) or Dijkstra's, A* uses a \"heuristic\" to intelligently guess the best path to explore, making it significantly faster."
+    "t": "What does this module say about “The problem with searching in every direction”?",
+    "ans": "Dijkstra’s algorithm expands outward from the source in rings of equal cost. If the goal is due east, it still explores just as far north, south and west before reaching it. On a large map that is enormous wasted effort — the algorithm has no idea where it is going."
+   },
+   {
+    "t": "What does this module say about “Admissible, consistent, and why it stays optimal”?",
+    "ans": "A heuristic is admissible if it never overestimates the true remaining cost. That single property is what guarantees A* finds an optimal path."
    }
   ]
  },
@@ -25,15 +29,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Backtracking is a problem-solving technique based on a simple, human idea: try one path, and if it doesn’t work, go back and try another. It systematically explores all possible solutions to a problem by building a solution step-by-step. When it hits a dead end, it \"backtracks\" to the last decision point and makes a different choice."
+    "ans": "Backtracking explores the space of partial solutions depth-first, abandoning a branch as soon as it violates a constraint and undoing its state on the way back out. The undo is what makes it correct and the early constraint check is what makes it fast — without pruning it is exhaustive search, and with it, problems with billions of arrangements resolve in thousands of steps."
    },
    {
-    "t": "What does this module say about “Quick Context: What is Backtracking”?",
-    "ans": "Backtracking is a problem-solving technique based on a simple, human idea: try one path, and if it doesn’t work, go back and try another . It systematically explores all possible solutions to a problem by building a solution step-by-step. When it hits a dead end, it \"backtracks\" to the last decision point and makes a different choice."
+    "t": "What does this module say about “Systematic trial and error”?",
+    "ans": "Backtracking builds a solution one decision at a time. At each step it takes a candidate choice and recurses. If that eventually leads to a solution, done. If it leads to a dead end, the algorithm undoes the choice and tries the next candidate. If every candidate fails, it returns failure to the previous level, which then undoes its choice."
    },
    {
-    "t": "What does this module say about “The Core Idea: The Three Steps of Backtracking”?",
-    "ans": "Every backtracking algorithm, including the maze solver you see above, follows a recursive loop:"
+    "t": "What does this module say about “How much pruning buys you”?",
+    "ans": "The eight queens problem asks for eight queens on a chessboard with none attacking another. Placing eight pieces on 64 squares gives about 4.4 billion arrangements. Restricting to one queen per column cuts it to 8 8 = 16.7 million. Checking rows and diagonals as you place each queen — abandoning a branch the moment two queens conflict — brings the actual number of positions examined down to roughly 15,000 ."
    }
   ]
  },
@@ -102,16 +106,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Imagine finding a word in a physical dictionary. You don't start at \"A\" and read every word. Instead, you open it to the middle, see if your word comes before or after, and instantly eliminate half the dictionary. That is binary search. It's an algorithm that finds a target in a sorted array by repeatedly dividing the search interval in half."
+    "t": "What does this module say about “The one assumption that makes it work”?",
+    "ans": "Binary search requires sorted data, and everything it does follows from that. Look at the middle element. If it equals the target, you are done. If it is smaller than the target, then the target cannot be anywhere in the left half either — because everything on the left is smaller still. So discard the entire left half in one comparison, and repeat on the right."
    },
    {
-    "t": "What does this module say about “Quick Context: The Dictionary Analogy”?",
-    "ans": "Imagine finding a word in a physical dictionary. You don't start at \"A\" and read every word. Instead, you open it to the middle, see if your word comes before or after, and instantly eliminate half the dictionary. That is binary search. It's an algorithm that finds a target in a sorted array by repeatedly dividing the search interval in half."
+    "t": "What does this module say about “Work one through by hand”?",
+    "ans": "Search for 23 in [2, 5, 8, 12, 16, 23, 38, 56, 72, 91] , ten elements, indices 0–9."
    },
    {
-    "t": "What does this module say about “Key Takeaways”?",
-    "ans": "Imagine finding a word in a physical dictionary. You don't start at \"A\" and read every word. Instead, you open it to the middle, see if your word comes before or after, and instantly eliminate half the dictionary. That is binary search. It's an algorithm that finds a target in a sorted array by repeatedly dividing the search interval in half."
+    "t": "What does this module say about “Where log n comes from”?",
+    "ans": "The search space starts at n and halves every step: n, n/2, n/4, n/8, and so on. The search ends when one element is left, so the question is how many halvings that takes:"
    }
   ]
  },
@@ -140,16 +144,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What is meant by “Preorder” here?",
-    "ans": "Useful for copying trees. The root is always the first element."
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "All four traversals visit every node once in O(n); they differ only in when a node is handled relative to its children, and breadth-first differs from the rest only in using a queue instead of a stack. Inorder yields sorted output on a BST, preorder serialises, postorder frees, and level order finds the nearest thing first."
    },
    {
-    "t": "What is meant by “Postorder” here?",
-    "ans": "Useful for deleting trees. The root is always the last element."
+    "t": "What does this module say about “Four ways to visit every node”?",
+    "ans": "A traversal visits every node exactly once. A tree is not linear, so there is no single obvious order — and the four standard orders differ only in when a node is processed relative to its children."
    },
    {
-    "t": "What is meant by “Level Order (BFS)” here?",
-    "ans": "Explores level by level. Finds the shortest path from the root to any other node."
+    "t": "What does this module say about “Queue versus stack: the whole difference”?",
+    "ans": "Every traversal keeps a collection of nodes it has discovered but not yet processed. The type of collection determines the order:"
    }
   ]
  },
@@ -159,16 +163,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “Quick Context: What is Bubble Sort”?",
-    "ans": "Bubble Sort is a simple sorting algorithm that repeatedly steps through the list, compares adjacent elements, and swaps them if they are in the wrong order. The pass through the list is repeated until the list is sorted. The algorithm gets its name because smaller or larger elements \"bubble\" to their proper place."
-   },
-   {
     "t": "What does this module say about “The Core Idea: Compare and Swap”?",
     "ans": "The entire algorithm is built on one fundamental operation: comparing two adjacent items and swapping them if the first is larger than the second. This process is repeated from the beginning of the array to the end. After the first full pass, the largest element in the array will have \"bubbled up\" to the very last position. The next pass does the same for the second-largest element, and so on."
    },
    {
     "t": "What does this module say about “Pseudocode”?",
     "ans": "The outer loop `i` tracks how many elements are already sorted at the end. The inner loop `j` performs the adjacent comparisons."
+   },
+   {
+    "t": "What does this module say about “Performance & When to Use It”?",
+    "ans": "Bubble Sort has a time complexity of O(n²) in the average and worst cases, which is very slow for large datasets. Its main advantages are its simplicity and the fact that it requires O(1) extra space."
    }
   ]
  },
@@ -178,12 +182,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “Quick Context: What is Counting Sort”?",
-    "ans": "Counting Sort is a special type of sorting algorithm that doesn't work by comparing elements. Instead, it sorts integers by counting the number of times each distinct value appears in the input array. It's extremely fast, but it only works when the input values are integers within a specific, relatively small range."
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Counting sort tallies occurrences, converts the tallies to positions with a prefix sum, and writes elements straight to their final slots — no comparisons, so the Ω(n log n) bound does not apply. It runs in O(n + k) and is only worth using when the value range k is comparable to n. Its stability, which comes from that backwards final pass, is what makes radix sort possible."
    },
    {
-    "t": "What does this module say about “Performance & Limitations”?",
-    "ans": "Counting Sort is incredibly fast with a time complexity of O(n + k) , where 'n' is the number of elements and 'k' is the range of the input values. This is linear time, much faster than comparison-based sorts like Merge Sort or Quick Sort (O(n log n))."
+    "t": "What does this module say about “Beating the comparison lower bound”?",
+    "ans": "Every comparison-based sort needs Ω(n log n) comparisons in the worst case; that is a proven lower bound, not an engineering limit. Counting sort is faster because it never compares two elements. Instead it uses each value as an index , which is a fundamentally different source of information."
+   },
+   {
+    "t": "What does this module say about “The complexity, and the k that matters”?",
+    "ans": "Counting sort runs in O(n + k) time and O(n + k) space, where n is the number of elements and k is the size of the value range."
    }
   ]
  },
@@ -212,16 +220,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “Quick Context: What is Depth-First Search”?",
-    "ans": "Depth-First Search (DFS) is an algorithm for traversing or searching tree or graph data structures. The algorithm starts at a selected root node and explores as far as possible along each branch before backtracking. It uses a stack (Last-In, First-Out) to keep track of which node to visit next."
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Depth-first search uses a stack to follow one path to exhaustion before backtracking, running in O(V + E) with O(h) stack space. It answers structural questions — cycles, components, topological order — extremely cheaply, and it is the wrong tool for anything involving distance, because it will happily visit a direct neighbour of the start last."
    },
    {
-    "t": "What does this module say about “The Core Idea: Go Deep, Then Backtrack”?",
-    "ans": "Imagine you're in a maze. Using a DFS strategy, you would pick one path and follow it until you hit a dead end. Only then would you backtrack to the last intersection and try a different, unexplored path. This is the essence of DFS."
+    "t": "What does this module say about “Go deep first, backtrack second”?",
+    "ans": "Start at a node and mark it visited. Pick any unvisited neighbour and move there. Repeat. When a node has no unvisited neighbours left, back up to the previous node and try its next neighbour. The search finishes when it has backed all the way out of the start node."
    },
    {
-    "t": "What does this module say about “Use Cases & Comparison to BFS”?",
-    "ans": "DFS is excellent for tasks where you need to explore a path to its conclusion, such as:"
+    "t": "What does this module say about “Trace it on a small graph”?",
+    "ans": "Take the graph with edges A–B, A–C, B–D, C–D, D–E , starting at A and preferring alphabetical order:"
    }
   ]
  },
@@ -231,20 +239,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What is meant by “Greedy Choice” here?",
-    "ans": "Always explores the most promising path first (the one with the lowest total weight so far)."
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Dijkstra’s algorithm repeatedly finalises the cheapest unvisited node and relaxes its edges, giving single-source shortest paths in O((V + E) log V) with a binary heap. Its correctness rests on non-negative weights, so negative edges call for Bellman-Ford instead. Because it expands uniformly in all directions, it does more work than necessary when you only want one destination — which is the gap A* fills."
    },
    {
-    "t": "What is meant by “Priority Queue is Essential” here?",
-    "ans": "Efficiently finding the unvisited node with the minimum distance is crucial for performance."
+    "t": "What does this module say about “Why BFS is not enough”?",
+    "ans": "On an unweighted graph, BFS finds shortest paths because every edge costs the same and the queue naturally orders nodes by hop count. Add weights and that collapses: a route of three cheap edges can beat one expensive edge, so the fewest hops is no longer the lowest cost."
    },
    {
-    "t": "What is meant by “Finalized Paths” here?",
-    "ans": "Once a node is visited, its shortest path from the source is locked in and will not change."
-   },
-   {
-    "t": "What is meant by “Application” here?",
-    "ans": "Perfect for network routing, GPS navigation, and any problem that can be modeled as finding the cheapest path in a graph with non-negative weights."
+    "t": "What does this module say about “The algorithm, and the invariant that makes it correct”?",
+    "ans": "Give the source distance 0 and everything else infinity. Then repeat: take the unvisited node with the smallest tentative distance, mark it visited, and for each neighbour check whether going through this node is cheaper than the neighbour’s current best:"
    }
   ]
  },
@@ -292,20 +296,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What is meant by “Requires Sorted Array” here?",
-    "ans": "Just like Binary Search, the data must be sorted for Fibonacci Search to work."
+    "t": "What does this module say about “Why anyone would avoid the midpoint”?",
+    "ans": "Binary search computes mid = (lo + hi) / 2 . That division — or at least a bit shift — was genuinely expensive on early hardware, and on some architectures it still is. Fibonacci search finds a comparable split point using nothing but addition and subtraction of precomputed Fibonacci numbers."
    },
    {
-    "t": "What is meant by “Uneven Splitting” here?",
-    "ans": "The core mechanism is splitting the array into uneven chunks whose sizes are consecutive Fibonacci numbers."
+    "t": "What does this module say about “The mechanism, step by step”?",
+    "ans": "First find the smallest Fibonacci number that is at least the array length. For an array of 10 elements the sequence runs 1, 1, 2, 3, 5, 8, 13 — so F(7) = 13 , with F(6) = 8 and F(5) = 5 ."
    },
    {
-    "t": "What is meant by “Arithmetic Simplicity” here?",
-    "ans": "Its main strength is replacing costly division/multiplication with simple addition and subtraction."
-   },
-   {
-    "t": "What is meant by “Logarithmic Performance” here?",
-    "ans": "It's an extremely fast search algorithm for large arrays, with performance comparable to Binary Search."
+    "t": "What does this module say about “The complexity, and the honest comparison”?",
+    "ans": "Because consecutive Fibonacci numbers approach the golden ratio φ ≈ 1.618, each step shrinks the search space by a factor of about 1.618 rather than binary search’s 2. So Fibonacci search is O(log n) too, but with a slightly larger constant:"
    }
   ]
  },
@@ -357,12 +357,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Hashing replaces searching with computing an address. Collisions are unavoidable and must be resolved by chaining or probing; the load factor governs how often they happen. Keep it low and lookups stay effectively constant — let it climb and a hash table quietly becomes a linked list."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A hash table stores key–value pairs in an array. A hash function converts each key into an array index, so finding a key requires no searching at all — you compute where it must be and go straight there."
-   },
-   {
     "t": "What does this module say about “What Makes a Good Hash Function”?",
     "ans": "The lab uses a simple polynomial rolling hash, shown live above the buckets. Real implementations use stronger functions, but the mechanism is identical."
+   },
+   {
+    "t": "What does this module say about “Collisions Are Inevitable”?",
+    "ans": "There are infinitely many possible keys and only a finite number of buckets, so two keys will eventually hash to the same index. This is not a flaw to be engineered away — it is a certainty to be handled. Press Force collision to see one."
    }
   ]
  },
@@ -410,20 +410,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What is meant by “In-Place” here?",
-    "ans": "Sorts the array without needing extra storage."
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Insertion sort grows a sorted prefix by sliding each new element back into place, which makes it O(n²) on random data and O(n) on sorted data. Stable, in-place, adaptive and online, it is the sort that real libraries fall back to once a divide-and-conquer sort has chopped the problem small enough — not despite being simple, but because being simple is what makes it fast at that scale."
    },
    {
-    "t": "What is meant by “Adaptive” here?",
-    "ans": "Performance improves as the array becomes more sorted."
+    "t": "What does this module say about “How the sorted region grows”?",
+    "ans": "Treat the first element as a sorted region of length one. Take the next element, and slide it left past every element larger than it until it sits in the right place. The sorted region is now length two. Repeat until the sorted region is the whole array."
    },
    {
-    "t": "What is meant by “Stable” here?",
-    "ans": "It does not change the relative order of elements with equal values."
-   },
-   {
-    "t": "What is meant by “Best for Small or Nearly Sorted Data” here?",
-    "ans": "Its O(n²) complexity makes it unsuitable for large, unsorted lists."
+    "t": "What does this module say about “Why O(n²) worst and O(n) best”?",
+    "ans": "The outer loop runs n−1 times. The inner loop slides the current element back past however many larger elements sit to its left."
    }
   ]
  },
@@ -433,20 +429,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What is meant by “Smarter Than Binary Search” here?",
-    "ans": "It uses the data's values to make a better guess about where the target might be."
+    "t": "What does this module say about “Searching the way a person uses a phone book”?",
+    "ans": "Looking up “Zhang” in a phone book, nobody opens it at the exact middle. You open near the back, because you know where Z falls. Interpolation search formalises that: instead of probing the midpoint, it estimates the target’s position from its value relative to the values at the two ends."
    },
    {
-    "t": "What is meant by “Data Distribution is Key” here?",
-    "ans": "Its incredible speed is only realized when the data is uniformly distributed."
+    "t": "What does this module say about “Why log log n, and when it collapses”?",
+    "ans": "On uniformly distributed data each probe does not merely halve the remaining range — it reduces it to roughly its square root. That gives an average of O(log log n) comparisons, which for a million elements is about 4 rather than binary search’s 20."
    },
    {
-    "t": "What is meant by “No \"Blind\" Probing” here?",
-    "ans": "Unlike Binary Search, it doesn't always check the middle, making it feel more human-like in its approach."
-   },
-   {
-    "t": "What is meant by “A Trade-off” here?",
-    "ans": "You trade the guaranteed O(log n) performance of Binary Search for a potentially much faster O(log(log n)) average time, at the risk of a slow O(n) worst case."
+    "t": "What does this module say about “Common mistakes”?",
+    "ans": "Interpolation search replaces binary search’s fixed midpoint with an estimate of where the value ought to live, and on uniformly distributed data that estimate is good enough to cut the cost from log n to log log n. The catch is that it is an assumption about the data, not a property of the algorithm: when the distribution is skewed the same formula degrades all the way to O(n)."
    }
   ]
  },
@@ -475,20 +467,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What is meant by “No Sorting Required” here?",
-    "ans": "Works on unsorted data, which is a major advantage."
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Linear search trades speed for having no requirements at all. It is O(n) because it may have to look at everything, and it cannot do better because it has no information to exploit — but for unsorted data, a single lookup, or a small array, that is not a weakness. Every faster search on this track buys its speed with a precondition, and linear search is what you use when you cannot pay it."
    },
    {
-    "t": "What is meant by “Simple to Implement” here?",
-    "ans": "It's often the first search algorithm taught because its logic is so clear."
+    "t": "What does this module say about “What linear search actually does”?",
+    "ans": "Start at index 0. Compare the element there against the target. If it matches, return the index and stop. If it does not, move to index 1 and repeat. If you reach the end without a match, the target is not present."
    },
    {
-    "t": "What is meant by “Predictable Performance” here?",
-    "ans": "The time it takes is directly proportional to the size of the list."
-   },
-   {
-    "t": "What is meant by “The Brute-Force Method” here?",
-    "ans": "It's a reliable but often slow \"brute-force\" approach to finding an item."
+    "t": "What does this module say about “Counting the comparisons”?",
+    "ans": "Take the array [42, 17, 8, 91, 5, 63, 29] and search for 91 . The algorithm compares 42, then 17, then 8, then 91 — four comparisons, and it returns index 3."
    }
   ]
  },
@@ -517,20 +505,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What is meant by “Reliable Performance” here?",
-    "ans": "With a guaranteed O(n log n) time complexity, Merge Sort is predictable and efficient, regardless of the initial order of the data."
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Merge sort splits positionally, sorts recursively, and does its real work in a linear merge, giving a guaranteed Θ(n log n) on every input with no pathological case. It is stable, it parallelises cleanly, and it is the natural sort for linked lists and for data too large to fit in memory. The price is O(n) auxiliary space for arrays — which is precisely the trade quick sort makes in the opposite direction."
    },
    {
-    "t": "What is meant by “Not In-Place” here?",
-    "ans": "The need for auxiliary space (O(n)) can be a limiting factor in memory-constrained environments."
+    "t": "What does this module say about “Divide, conquer, combine”?",
+    "ans": "Merge sort is the textbook divide-and-conquer algorithm and it has exactly three steps. Divide: split the array at the midpoint. Conquer: sort each half by calling merge sort on it. Combine: merge the two sorted halves into one sorted array."
    },
    {
-    "t": "What is meant by “Stable Sort” here?",
-    "ans": "It preserves the relative order of equal elements, which is crucial for certain applications, such as sorting data on multiple criteria."
-   },
-   {
-    "t": "What is meant by “Excellent for External Sorting” here?",
-    "ans": "Because it works by processing data in chunks, Merge Sort is well-suited for sorting datasets that are too large to fit into memory."
+    "t": "What does this module say about “The merge is the whole algorithm”?",
+    "ans": "Merging two sorted arrays is linear. Keep a finger on the front of each; repeatedly take the smaller of the two and advance that finger. Merge [2, 5, 9] with [1, 6, 8] :"
    }
   ]
  },
@@ -559,16 +543,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “Quick Context: What is a Dictionary”?",
-    "ans": "A Python dictionary is a collection of key-value pairs . Think of it like a real-world dictionary where you look up a word (the \"key\") to find its definition (the \"value\"). Dictionaries are incredibly fast for retrieving data because they use a technique called hashing . Instead of searching through items one by one, Python can instantly calculate where a value is stored based on its key."
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A Python dict is a hash table giving O(1) average insert, lookup, and delete, with keys required to be hashable so their storage slot cannot move. Since 3.7 it also preserves insertion order. The traps are the asymmetries: keys are O(1) but values are O(n), views are live rather than snapshots, and mutating during iteration is an error rather than undefined behaviour."
    },
    {
-    "t": "What does this module say about “The Core Idea: Hashing and O(1) Access”?",
-    "ans": "The magic of dictionaries is their average O(1) , or \"constant time,\" performance for lookups, insertions, and deletions. This means that no matter how large the dictionary grows, the time it takes to perform these operations stays roughly the same."
+    "t": "What does this module say about “What a dict actually is”?",
+    "ans": "A dictionary maps keys to values. Internally it is a hash table : Python calls hash(key) , reduces the result to an index into an array of slots, and stores the entry there. Looking a key up repeats the computation and goes straight to the slot — no scanning."
    },
    {
-    "t": "What does this module say about “Practical Use Cases”?",
-    "ans": "Dictionaries are one of the most used data structures in Python. They are perfect for:"
+    "t": "What does this module say about “Why keys must be hashable”?",
+    "ans": "A key must be hashable, which in practice means immutable. Strings, numbers and tuples work; lists, dicts and sets do not, and d[[1,2]] = x raises TypeError: unhashable type: 'list' ."
    }
   ]
  },
@@ -578,20 +562,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What is meant by “Mutability is Key” here?",
-    "ans": "Unlike strings or tuples, lists can be modified in-place, making them ideal for collections of data that need to change over time."
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A Python list is a contiguous dynamic array, so indexing is O(1), appending is amortised O(1), and anything touching the front is O(n) because every later element must shift. Slices are always copies, negative indices count from the end, and the stop bound is exclusive. Most list performance bugs are one of two things: treating the front like the back, or slicing inside a loop."
    },
    {
-    "t": "What is meant by “Zero-Based Indexing” here?",
-    "ans": "Always remember that the first element is at index 0. This is a common source of \"off-by-one\" errors for beginners."
+    "t": "What does this module say about “A dynamic array, not a linked list”?",
+    "ans": "Despite the name, a Python list is a contiguous array of pointers. Elements sit next to each other in memory, so indexing is a single address calculation: lst[i] is O(1) regardless of the list’s length or the value of i."
    },
    {
-    "t": "What is meant by “Methods vs. Functions” here?",
-    "ans": "Methods like my_list.sort() modify the list directly. Functions like sorted(my_list) return a new, sorted list without changing the original."
-   },
-   {
-    "t": "What is meant by “Versatility” here?",
-    "ans": "From simple collections of numbers to complex nested structures, lists are the go-to data structure for ordered, mutable data in Python."
+    "t": "What does this module say about “Indexing and slicing”?",
+    "ans": "Indices count from 0, and negative indices count from the end: lst[-1] is the last element, lst[-2] the second-last."
    }
   ]
  },
@@ -643,20 +623,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What is meant by “Fast in Practice” here?",
-    "ans": "Typically one of the fastest sorting algorithms for RAM-based sorting."
+    "t": "What does this module say about “Partitioning, not merging”?",
+    "ans": "Quick sort is divide-and-conquer with the work moved to the front. Choose a pivot element. Rearrange the array so that everything less than the pivot sits to its left and everything greater sits to its right — the pivot is now in its final sorted position, permanently. Recurse on the left part and the right part."
    },
    {
-    "t": "What is meant by “In-Place Sorting” here?",
-    "ans": "Its low space complexity makes it very memory-efficient compared to Merge Sort."
+    "t": "What does this module say about “Best case, worst case, and why the average holds”?",
+    "ans": "When the pivot lands near the median, each partition halves the array, giving log n levels of O(n) partitioning work: O(n log n) ."
    },
    {
-    "t": "What is meant by “Worst-Case Risk” here?",
-    "ans": "Performance degrades significantly on already-sorted or poorly partitioned data. The choice of pivot is critical."
-   },
-   {
-    "t": "What is meant by “Not Stable” here?",
-    "ans": "Quick Sort does not preserve the relative order of equal elements, which can be a disadvantage in some applications."
+    "t": "What does this module say about “Why it beats merge sort in practice”?",
+    "ans": "Both are O(n log n) on average, yet quick sort is usually faster on arrays. Three reasons:"
    }
   ]
  },
@@ -689,12 +665,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The confusing part is that a recursive function does not finish before calling itself again. factorial(5) must pause, wait for factorial(4) , and only then multiply."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Recursion is a function calling itself on a smaller version of the same problem. It needs exactly two things: a base case that stops the descent, and a recursive case that moves toward it."
-   },
-   {
     "t": "What does this module say about “The Call Stack Does the Remembering”?",
     "ans": "The confusing part is that a recursive function does not finish before calling itself again. factorial(5) must pause, wait for factorial(4) , and only then multiply."
+   },
+   {
+    "t": "What does this module say about “Stack Overflow Is Real”?",
+    "ans": "Select countdown — no base case . Frames pile up and never pop, because nothing stops the recursion. Memory reserved for the stack is finite, so eventually the program crashes with a stack overflow ."
    }
   ]
  },
@@ -704,20 +680,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What is meant by “Simple to Understand” here?",
-    "ans": "Its straightforward logic makes it easy to grasp and implement."
+    "t": "What does this module say about “The mechanism”?",
+    "ans": "Scan the entire unsorted region to find its minimum. Swap that minimum with the first unsorted position. That position is now finished and never moves again. Shrink the unsorted region by one and repeat."
    },
    {
-    "t": "What is meant by “Memory Efficient” here?",
-    "ans": "The O(1) space complexity is a significant advantage."
+    "t": "What does this module say about “The one situation where it wins”?",
+    "ans": "When writes are dramatically more expensive than reads, minimising them matters more than minimising comparisons. That is the case for EEPROM and flash memory, where each cell tolerates a limited number of erase cycles, and for any sort where moving an element means copying a large record rather than an integer."
    },
    {
-    "t": "What is meant by “Inefficient for Large Lists” here?",
-    "ans": "The O(n²) time complexity makes it impractical for sorting large datasets compared to algorithms like Merge Sort or Quick Sort."
-   },
-   {
-    "t": "What is meant by “Minimal Swaps” here?",
-    "ans": "It performs at most `n-1` swaps, which can be useful if write operations are costly."
+    "t": "What does this module say about “What trips people up”?",
+    "ans": "Selection sort makes n−1 passes, each finding the minimum of what remains, giving Θ(n²) comparisons on every input and no benefit from partially sorted data. What it does offer is at most n−1 swaps — the fewest writes of any simple comparison sort. On ordinary in-memory data insertion sort beats it on every axis; on write-limited storage that swap count is the reason to choose it anyway."
    }
   ]
  },
@@ -750,12 +722,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A stack restricts you to one end, and that restriction buys O(1) push, pop and peek. It models anything where the most recent item must be handled first: nested brackets, function calls, undo history, and depth-first traversal."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A stack is a collection where you may only touch one end — the top . The last thing you put in is the first thing you take out, which is why it is called LIFO : Last In, First Out. Think of a stack of plates."
-   },
-   {
     "t": "What does this module say about “Three Operations, All O(1)”?",
     "ans": "All three are O(1) because they never touch the rest of the structure. That guarantee is the reason stacks are used in performance-critical places like the call stack."
+   },
+   {
+    "t": "What does this module say about “The Call Stack Is a Stack”?",
+    "ans": "Every time a function is called, the computer pushes a stack frame holding its local variables and where to return. When the function finishes, that frame is popped and execution resumes exactly where it left off."
    }
   ]
  },
@@ -860,16 +832,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Computer Vision",
   "q": [
    {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A convolutional layer holds (k × k × C in × F) + F parameters, with filters spanning every input channel and the image dimensions appearing nowhere. Weight sharing is what buys the enormous reduction against a fully connected layer, along with translation equivariance."
+   },
+   {
+    "t": "What does this module say about “The formula”?",
+    "ans": "For a convolutional layer with kernel size k×k, C in input channels and F filters:"
+   },
+   {
     "t": "What does this module say about “The General Formula”?",
-    "ans": "How to accurately count the trainable weights and biases inside a Convolutional Layer."
-   },
-   {
-    "t": "What does this module say about “The 3D Nature of Filters”?",
-    "ans": "A common misconception is that a filter (kernel) in a CNN is just a 2D grid, like a 3x3 square. While it moves across the image in 2D (up/down, left/right), a filter is actually a 3D block ."
-   },
-   {
-    "t": "What does this module say about “Why does output size not matter”?",
-    "ans": "Notice that the size of the input image (e.g., 1000x1000 vs 28x28) and the resulting output feature map are not in the formula . Because of Parameter Sharing, the same filter is slid across the entire image. The number of parameters depends only on the filter configuration , not the image dimensions!"
+    "ans": "A convolutional layer's parameter count depends on the filter size, the input channels and the number of filters - and not at all on the size of the image. That independence is the whole reason CNNs are practical."
    }
   ]
  },
@@ -972,12 +944,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "is the process of stringing rows of pixels together into a line."
    },
    {
-    "t": "What does this module say about “Preprocessing Parameters”?",
-    "ans": "Neural networks usually compress images to small grids (like 28x28) to manage node count."
-   },
-   {
     "t": "What does this module say about “Quick Context”?",
     "ans": "When you look at an image, you see a 2D grid of colors. However, standard Artificial Neural Networks (specifically Dense or Fully-Connected Layers ) are structured to accept only a one-dimensional (1D) array or vector of numbers as input. Before a network can \"look\" at an image, the image must undergo Flattening ."
+   },
+   {
+    "t": "What does this module say about “Preprocessing Parameters”?",
+    "ans": "Neural networks usually compress images to small grids (like 28x28) to manage node count."
    }
   ]
  },
@@ -991,12 +963,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Data augmentation is one of the most effective and widely used tools for improving the performance of any computer vision model."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Image Data Augmentation is a critical technique in training deep learning models for computer vision. The core idea is to artificially expand your training dataset by creating modified copies of existing images. By showing a model the same image—but rotated, zoomed, shifted, or with altered brightness—we teach it to recognize the core subject matter regardless of these variations."
-   },
-   {
     "t": "What does this module say about “The Core Idea: Invariance and Generalization”?",
     "ans": "Imagine you're training a model to recognize cats. If all your training photos show cats perfectly centered and facing forward, the model might fail to recognize a cat that's slightly off-center or tilted. Data augmentation solves this. It teaches the model the concept of \"cat-ness\" is invariant to changes in position, scale, and orientation."
+   },
+   {
+    "t": "What does this module say about “Key Takeaways”?",
+    "ans": "Data augmentation is one of the most effective and widely used tools for improving the performance of any computer vision model."
    }
   ]
  },
@@ -1010,12 +982,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "IoU is a pure geometry calculation — it knows nothing about confidence or class. NMS is the policy layer that uses it: keep the most confident box, discard anything that overlaps it past a threshold, repeat. Set the threshold too low and it merges distinct nearby objects into one detection; set it too high and duplicate boxes on the same object all survive."
    },
    {
-    "t": "What does this module say about “NMS Threshold”?",
-    "ans": "boxes A-D are four raw proposals from one detector pass, four confidence scores, two actual objects"
-   },
-   {
     "t": "What does this module say about “Quick Context”?",
     "ans": "A detector's region proposal stage doesn't stop at one box per object — it scores hundreds of candidate boxes and keeps every one above a confidence floor, which for a single real object usually means a cluster of overlapping, near-duplicate boxes. Intersection over Union (IoU) is the standard way to measure how much two boxes overlap: the area they share, divided by the total area either one covers."
+   },
+   {
+    "t": "What does this module say about “NMS Threshold”?",
+    "ans": "boxes A-D are four raw proposals from one detector pass, four confidence scores, two actual objects"
    }
   ]
  },
@@ -1079,15 +1051,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "In Convolutional Neural Networks (CNNs), downsampling (or pooling) is the process of reducing the spatial dimensions (width and height) of a feature map. This is a crucial step that helps to make the network more efficient and robust."
+    "ans": "Pooling summarises each neighbourhood into one value, most often taking the maximum of a 2×2 window at stride 2, which quarters the feature map for free — it has no parameters. Its real value is enlarging the receptive field so small filters can eventually see large structures, with computational saving second and a modest, purely local translation tolerance third."
    },
    {
-    "t": "What does this module say about “What is Downsampling”?",
-    "ans": "In Convolutional Neural Networks (CNNs), downsampling (or pooling) is the process of reducing the spatial dimensions (width and height) of a feature map. This is a crucial step that helps to make the network more efficient and robust."
+    "t": "What does this module say about “What pooling does”?",
+    "ans": "A pooling layer slides a window over the feature map and replaces the values inside it with a single summary. With a 2×2 window and stride 2 — by far the most common setting — the windows do not overlap, and the output is half the height and half the width, so a quarter of the values ."
    },
    {
-    "t": "What does this module say about “Max Pooling”?",
-    "ans": "Selects the maximum pixel value from the pooling window. It's effective at capturing the most prominent features, like edges or bright spots, and is the most widely used pooling method."
+    "t": "What does this module say about “The three reasons it is there”?",
+    "ans": "Computation. Quartering the spatial dimensions quarters the work of every subsequent layer. In a deep network that compounds enormously."
    }
   ]
  },
@@ -1139,12 +1111,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Edge detection is the first step in helping a computer make sense of the visual world, turning a sea of pixels into structured information."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Edge detection is a fundamental technique in computer vision and image processing. Its purpose is to identify points in a digital image where the brightness changes sharply. These points are typically organized into a set of curved line segments termed edges . This interactive uses the Sobel operator , a classic and efficient algorithm for this task."
-   },
-   {
     "t": "What does this module say about “The Core Idea: Finding Abrupt Changes”?",
     "ans": "Imagine walking across a flat, grey field that suddenly drops off into a black canyon. Your brain immediately registers that change in elevation. Edge detection algorithms do something similar with pixel values. They \"walk\" across the image and look for sudden jumps in brightness."
+   },
+   {
+    "t": "What does this module say about “Key Takeaways”?",
+    "ans": "Edge detection is the first step in helping a computer make sense of the visual world, turning a sea of pixels into structured information."
    }
   ]
  },
@@ -1158,12 +1130,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A plain stack of layers with a contractive weight matrix shrinks its forward signal geometrically with depth — the same kind of multiplicative decay that causes vanishing gradients on the way back. An identity shortcut adds a nonnegative quantity back onto the running signal at every block, which makes shrinkage below the starting point mathematically impossible."
    },
    {
-    "t": "What does this module say about “Depth”?",
-    "ans": "same fixed weight matrix W applied at every block, ReLU after each one — a stand-in for a stack of identical conv blocks"
-   },
-   {
     "t": "What does this module say about “Quick Context”?",
     "ans": "ResNet's headline idea is the identity shortcut: instead of a block computing x_{i+1} = f(x_i) , it computes x_{i+1} = x_i + f(x_i) , adding the block's own input back onto its output. The usual explanation is about gradients flowing backward through very deep networks."
+   },
+   {
+    "t": "What does this module say about “Depth”?",
+    "ans": "same fixed weight matrix W applied at every block, ReLU after each one — a stand-in for a stack of identical conv blocks"
    }
   ]
  },
@@ -1177,12 +1149,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Downsampling for context and needing pixel-precise output are in direct tension — the same pooling that builds semantic understanding destroys the spatial detail a segmentation mask needs back. Skip connections resolve that tension not by improving the upsampling step, but by making it partly unnecessary: the fine detail rides across the encoder-decoder bridge instead of being reconstructed from a coarse map that no..."
    },
    {
-    "t": "What does this module say about “Downsample Depth”?",
-    "ans": "a 16×16 mask, majority-vote 2×2 pooling per level, nearest-neighbour upsampling back"
-   },
-   {
     "t": "What does this module say about “Quick Context”?",
     "ans": "Semantic segmentation labels every pixel with a class, not just the image as a whole. A CNN classifier's usual move — pool down repeatedly to build up wide receptive fields and semantic context — is exactly what a segmentation decoder then has to undo, pixel by pixel, to produce a full-resolution output mask."
+   },
+   {
+    "t": "What does this module say about “Downsample Depth”?",
+    "ans": "a 16×16 mask, majority-vote 2×2 pooling per level, nearest-neighbour upsampling back"
    }
   ]
  },
@@ -1249,12 +1221,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Use CTEs to turn one unreadable query into several named steps that a colleague can follow. Use WITH RECURSIVE when the data is a hierarchy and you do not know how deep it goes — that is a problem plain SQL simply cannot express."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A Common Table Expression is a named temporary result set defined with WITH , available only to the statement that follows it. Think of it as a variable for a query: compute something once, give it a name, then use that name."
-   },
-   {
     "t": "What does this module say about “Why Not Just Nest Subqueries”?",
     "ans": "You can — the nested example in this lab returns exactly the same rows. But compare how they read. A nested query is evaluated inside out , so you must find the innermost parenthesis and work outward, holding each layer in your head. A chain of CTEs reads top to bottom , like a recipe."
+   },
+   {
+    "t": "What does this module say about “Recursive CTEs: The Real Superpower”?",
+    "ans": "This is the thing subqueries genuinely cannot do. A recursive CTE has two halves joined by UNION ALL :"
    }
   ]
  },
@@ -1306,12 +1278,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Pick the narrowest type that will hold every legitimate value, use DECIMAL for anything monetary, use real date types for dates, and add NOT NULL wherever a missing value would be meaningless. These choices are hard to change later and quietly govern correctness forever."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A datatype declares what a column may contain. The database uses it to reject invalid data, to decide how many bytes each value occupies, and to choose how comparisons and arithmetic behave. Get it wrong and you pay in storage, in speed, or — worst — in silently incorrect numbers."
-   },
-   {
     "t": "What does this module say about “Integers: Pick the Smallest That Fits”?",
     "ans": "Integer types differ only in width, and width sets the range. TINYINT holds −128 to 127 in one byte; INT covers roughly ±2.1 billion in four; BIGINT uses eight."
+   },
+   {
+    "t": "What does this module say about “Never Store Money in FLOAT”?",
+    "ans": "FLOAT and DOUBLE are binary floating point. They cannot represent 0.1 exactly, for the same reason base 10 cannot write 1/3 exactly. Errors are tiny individually and accumulate over millions of rows."
    }
   ]
  },
@@ -1325,12 +1297,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "WHERE filters rows before grouping and HAVING filters groups after, which is why WHERE cannot mention an aggregate and why HAVING is the only place a condition on SUM or COUNT can live. The consequence people miss is that WHERE does not merely remove rows from the output — it changes what every aggregate downstream is computed from, so moving one condition between the two clauses changes the numbers, not just the row..."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A grouped query runs in stages. Rows are read, WHERE discards the ones that fail a per-row test, what is left is collected into groups, each group is boiled down to its aggregates, and only then does HAVING get a look — at the groups, not the rows."
-   },
-   {
     "t": "What does this module say about “Two things people are surprised by”?",
     "ans": "HAVING works without GROUP BY. With no GROUP BY the whole table is one implicit group, so SELECT SUM (amount) FROM sales HAVING SUM (amount) > 5000 returns either one row or none."
+   },
+   {
+    "t": "What does this module say about “Key Takeaway”?",
+    "ans": "WHERE filters rows before grouping and HAVING filters groups after, which is why WHERE cannot mention an aggregate and why HAVING is the only place a condition on SUM or COUNT can live. The consequence people miss is that WHERE does not merely remove rows from the output — it changes what every aggregate downstream is computed from, so moving one condition between the two clauses changes the numbers, not just the row..."
    }
   ]
  },
@@ -1344,12 +1316,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "An index turns a linear scan into a logarithmic descent of a B-tree, which is why an indexed lookup barely notices a table growing a thousand-fold while a scan grows with it exactly. It works only while the query preserves the index's sort order, so a leading wildcard, a function or arithmetic on the column, or an implicit cast will quietly cost you the index and leave the query text looking innocent."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Without an index, finding the rows that match a condition means reading every row and testing it — a full table scan, and its cost grows in a straight line with the size of the table. That is perfectly fine on ten thousand rows and ruinous on ten million."
-   },
-   {
     "t": "What does this module say about “Why a B-tree”?",
     "ans": "Almost every relational index is a B-tree: a balanced tree whose nodes are disk pages holding many keys each. Every leaf sits at the same depth, so every lookup costs the same. Because a page holds hundreds of keys, the tree is astonishingly shallow — with a fanout of a few hundred, three or four levels is enough for hundreds of millions of rows."
+   },
+   {
+    "t": "What does this module say about “The queries an index cannot help”?",
+    "ans": "An index is sorted by the value of the column. Anything that destroys that ordering makes it useless — the term for a condition an index can serve is sargable ."
    }
   ]
  },
@@ -1363,12 +1335,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "LIMIT and OFFSET slice a result set, but only after ORDER BY has made that set deterministic. Offset pagination is fine for the first few pages and quietly quadratic beyond them — reach for keyset pagination when the data gets big."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "LIMIT n returns at most n rows. OFFSET m throws away the first m rows before it starts counting. Together they cut a window out of a result set, which is how page 3 of a product listing gets built."
-   },
-   {
     "t": "What does this module say about “Trap 1: LIMIT Without ORDER BY Is Meaningless”?",
     "ans": "SQL tables are unordered sets . Without an explicit ORDER BY , the database may return rows in any order it finds convenient — and that order can change between runs, after an update, or when the query plan changes."
+   },
+   {
+    "t": "What does this module say about “Trap 2: Deep OFFSET Gets Slower and Slower”?",
+    "ans": "The database cannot jump straight to row 100,000. It must generate and discard every row before the offset. Watch the \"rows scanned\" figure in this lab climb while \"rows returned\" stays fixed — the red portion of the bar is pure wasted work."
    }
   ]
  },
@@ -1420,12 +1392,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A result set has no order unless ORDER BY gives it one, and the order is only deterministic once your keys separate every pair of rows — which is why a unique tie-breaker belongs on anything paginated. Keys apply left to right, each one consulted only for the ties the previous keys left behind. NULL placement is engine-specific, so write NULLS FIRST or NULLS LAST rather than trusting a default."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A table is a set of rows, and a set has no order. Without an ORDER BY the database is free to return rows in whatever order came out of its plan — insertion order, index order, or whatever the parallel workers finished in. It often looks stable for months and then changes the day the table grows an index or the optimiser picks a different plan."
-   },
-   {
     "t": "What does this module say about “Ties, and why a second key is not optional”?",
     "ans": "Sort the sample table by salary and four pairs of rows tie. Those eight rows appear in some order, but nothing in your query asked for it, so nothing guarantees it will be the same order tomorrow. That is what the \"order is decided\" readout is telling you: a sort is only deterministic once the keys you supplied separate every pair of rows."
+   },
+   {
+    "t": "What does this module say about “Where NULLs go”?",
+    "ans": "NULL is not a value, so \"is it bigger or smaller?\" has no natural answer, and engines disagree. PostgreSQL and Oracle treat NULL as the largest value: NULLS LAST for ASC , NULLS FIRST for DESC . MySQL and SQLite treat it as the smallest, so they do the opposite. SQL Server has no NULLS clause at all and sorts NULLs first."
    }
   ]
  },
@@ -1436,15 +1408,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "SQL executes FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY, LIMIT — not the order you write it in. A clause can only reference what an earlier stage has already produced, which is the single rule behind every \"that name doesn't exist here\" error SQL ever gives you."
+    "ans": "SQL executes FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY, LIMIT — not the order it is written in. That single fact explains why SELECT aliases work in ORDER BY but not WHERE, why aggregates belong in HAVING rather than WHERE, and why filtering early is faster. When a query does something surprising, walking it through the execution order usually answers it in one step."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "SQL is written in one order and executed in another. You write SELECT ... FROM ... WHERE ... GROUP BY ... HAVING ... ORDER BY ... LIMIT , top to bottom. The engine runs"
+    "t": "What does this module say about “WHERE and HAVING are not interchangeable”?",
+    "ans": "Both filter, at different stages, and the distinction matters for correctness as well as speed:"
    },
    {
-    "t": "What does this module say about “Key Takeaway”?",
-    "ans": "SQL executes FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY, LIMIT — not the order you write it in. A clause can only reference what an earlier stage has already produced, which is the single rule behind every \"that name doesn't exist here\" error SQL ever gives you."
+    "t": "What does this module say about “What usually goes wrong”?",
+    "ans": "SQL executes FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY, LIMIT — not the order it is written in. That single fact explains why SELECT aliases work in ORDER BY but not WHERE, why aggregates belong in HAVING rather than WHERE, and why filtering early is faster. When a query does something surprising, walking it through the execution order usually answers it in one step."
    }
   ]
  },
@@ -1533,15 +1505,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Go beyond `GROUP BY` to perform calculations across sets of rows while keeping the original rows intact. This guide will make you an expert."
-   },
-   {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Window functions are a powerful feature in SQL that perform a calculation across a set of table rows that are somehow related to the current row. Unlike aggregate functions (`SUM`, `COUNT`), which collapse rows into a single output row, window functions return a value for every single row ."
+    "ans": "Window functions are a powerful feature in SQL that perform a calculation across a set of table rows that are somehow related to the current row. Unlike aggregate functions (`SUM`, `COUNT`), which collapse rows into a single output row, window functions return a value for every single row."
    },
    {
     "t": "What does this module say about “The Core Idea: A \"Window\" into Your Data”?",
     "ans": "The magic of window functions is the `OVER()` clause. This clause defines the \"window\" or set of rows the function should consider for its calculation. It has two key components:"
+   },
+   {
+    "t": "What does this module say about “Common Use Cases”?",
+    "ans": "Window functions are essential for advanced analysis. Here are some classic problems they solve:"
    }
   ]
  },
@@ -1555,12 +1527,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A subquery is just a query whose result another query consumes, and its shape is decided by what it returns: one value (scalar), one column (IN), or a table (derived, which must be aliased). An uncorrelated subquery runs once, before the outer query."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "You cannot write WHERE salary > AVG (salary) — an aggregate over the whole table is not something a row-by-row filter can evaluate. What you can do is compute the average in its own query and use the result: that inner query is a subquery."
+    "t": "What does this module say about “Why correlated is the one to understand”?",
+    "ans": "Compare the two comparisons in the lab. The scalar version asks \"is this person paid more than the company average?\" — one number, computed once, tested against all eight rows. The correlated version asks \"is this person paid more than their own department's average?\" — a different number per row, so the inner query runs eight times."
    },
    {
-    "t": "What does this module say about “The four shapes”?",
-    "ans": "Compare the two comparisons in the lab. The scalar version asks \"is this person paid more than the company average?\" — one number, computed once, tested against all eight rows. The correlated version asks \"is this person paid more than their own department's average?\" — a different number per row, so the inner query runs eight times."
+    "t": "What does this module say about “EXISTS, and when to prefer it”?",
+    "ans": "EXISTS takes a correlated subquery and asks only whether it produced any row at all, so the engine can stop at the first match instead of building the full result. For \"does this customer have any order?\" it is both clearer and cheaper than IN ."
    }
   ]
  },
@@ -1590,15 +1562,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "UNION, INTERSECT and EXCEPT combine the rows two queries return rather than the tables they read from, and every column has to line up in count and type. UNION removes duplicates and costs a sort or hash to do it; UNION ALL keeps them and is cheaper whenever you already know the two sides do not overlap."
+    "ans": "UNION, INTERSECT and EXCEPT combine result sets vertically, requiring the same column count and compatible types matched by position rather than name. All three deduplicate by default, which costs a full sort or hash — so prefer UNION ALL unless you specifically need duplicates removed. EXCEPT is the only one where operand order changes the answer, and none of them is a substitute for a JOIN."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A JOIN combines two tables sideways, matching rows on a key and producing wider rows. A set operator combines two result sets vertically — both SELECTs must return the same number of columns, in compatible types, and the output is one column of rows, not a wider table."
+    "t": "What does this module say about “Stacking, not joining”?",
+    "ans": "A JOIN combines tables horizontally : matching rows are linked and the result has the columns of both. A set operator combines result sets vertically : rows from the second query are stacked under rows from the first, and the column count does not change."
    },
    {
-    "t": "What does this module say about “Key Takeaway”?",
-    "ans": "UNION, INTERSECT and EXCEPT combine the rows two queries return rather than the tables they read from, and every column has to line up in count and type. UNION removes duplicates and costs a sort or hash to do it; UNION ALL keeps them and is cheaper whenever you already know the two sides do not overlap."
+    "t": "What does this module say about “The rules every set operator enforces”?",
+    "ans": "Note that matching is positional , not by name. If the first query selects (id, name) and the second selects (name, id), and both are text-compatible, the query runs and silently returns nonsense."
    }
   ]
  },
@@ -1612,12 +1584,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "There is no \"better\" model, only different bargains. Relational gives you enforced consistency and flexible ad-hoc queries; non-relational gives you speed, scale and schema freedom in exchange for moving integrity into your application. Most real systems today use both."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A non-relational database stores data in a shape other than fixed tables of rows and columns. The name \"NoSQL\" is a historical accident — it is best read as \"not only SQL\" , since many of these systems now support SQL-like query languages."
-   },
-   {
     "t": "What does this module say about “Schema Flexibility Cuts Both Ways”?",
     "ans": "Press \"Add field to one record\" in each model. In a document store, one document simply gains a field — no migration, no downtime. In the relational model the same change is an ALTER TABLE affecting every row."
+   },
+   {
+    "t": "What does this module say about “Denormalisation Is the Point — and the Cost”?",
+    "ans": "Document stores deliberately duplicate data so a page can be served with a single read. That is genuinely faster. But you have re-created the update anomaly from the relational lab: change a customer's name and you must now find every document that copied it."
    }
   ]
  },
@@ -1650,12 +1622,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "WHERE asks one yes/no question of every row — except the answer can also be \"unknown\", and unknown rows are silently dropped. Most WHERE-clause bugs in production are really NULL bugs."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "The WHERE clause is a condition tested against each row independently . If it evaluates to TRUE, the row is kept; anything else and it is dropped. That row-at-a-time model is the key mental picture — the database is not filtering \"the table\", it is asking one question of every row."
-   },
-   {
     "t": "What does this module say about “The NULL Trap: SQL Has Three Truth Values”?",
     "ans": "NULL does not mean zero or empty string — it means unknown . Comparing anything to an unknown gives an unknown result, so manager = 'Ada Lovelace' is neither TRUE nor FALSE for a row where manager is NULL. It is UNKNOWN , and WHERE only keeps TRUE."
+   },
+   {
+    "t": "What does this module say about “WHERE and Performance”?",
+    "ans": "WHERE is also where indexes earn their keep. A condition like salary > 65000 can use an index on salary to skip most of the table. But wrapping the column in a function — WHERE UPPER(name) = 'ADA' — usually defeats the index, because the stored values are no longer what is being compared. Similarly, LIKE 'A%' can use an index while LIKE '%a' cannot, since the leading wildcard gives the engine no prefix to seek on."
    }
   ]
  },
@@ -1709,12 +1681,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Backpropagation is the chain rule applied to a computational graph in reverse order: each operation contributes only its own local derivative, and the gradient arriving from downstream is multiplied by it on the way past. An add passes the gradient through untouched, a multiply scales it by the other input, and a saturating activation shrinks it — which is where vanishing gradients come from."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Gradient descent needs a gradient: for every weight in the network, how much the loss would change if that weight moved a little. Backpropagation is how that number is obtained, for millions of weights, at the cost of roughly one extra forward pass."
-   },
-   {
     "t": "What does this module say about “Everything is a graph”?",
     "ans": "A network is a long expression, and any expression can be drawn as a graph of small operations: multiply, add, apply a function. The graph above is a single neuron with two inputs, which is already enough to show every mechanic that matters."
+   },
+   {
+    "t": "What does this module say about “Each operation knows one thing”?",
+    "ans": "Every node needs only its local derivative: how its output responds to its own inputs. It has no idea what the rest of the network looks like, and does not need to."
    }
   ]
  },
@@ -1728,12 +1700,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Batch Normalization (BatchNorm) was introduced by Ioffe & Szegedy in 2015 and is now a standard building block in virtually every deep network. It normalizes the inputs to each layer so that training is faster and more stable. This page lets you see what happens with and without it."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Batch Normalization (BatchNorm) was introduced by Ioffe & Szegedy in 2015 and is now a standard building block in virtually every deep network. It normalizes the inputs to each layer so that training is faster and more stable. This page lets you see what happens with and without it."
-   },
-   {
     "t": "What does this module say about “The Problem BatchNorm Solves”?",
     "ans": "When you feed raw features with different scales (e.g., Age 18–80 vs. Salary 20k–200k) into a network, the first-layer weights that receive the large feature grow disproportionately. During backpropagation those large weights amplify gradients in early layers ( exploding ), while deeper layers receive progressively smaller updates ( vanishing ). The result: unstable training or very slow convergence."
+   },
+   {
+    "t": "What does this module say about “Key Takeaways”?",
+    "ans": "Batch Normalization (BatchNorm) was introduced by Ioffe & Szegedy in 2015 and is now a standard building block in virtually every deep network. It normalizes the inputs to each layer so that training is faster and more stable. This page lets you see what happens with and without it."
    }
   ]
  },
@@ -1744,15 +1716,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Instead of processing one sample at a time (stochastic) or the entire dataset (batch), we process data in mini-batches — fixed-size subsets of the training data. This is the standard approach in modern deep learning, balancing computational efficiency, memory constraints, and gradient quality."
+    "ans": "Batching turns many small vector-matrix products into one large matrix-matrix product, which is what makes parallel hardware pay off, without changing the model at all. Batch size sets both the number of updates per epoch and the noise in each gradient, so it trades throughput against a regularising effect that favours flat minima."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Instead of processing one sample at a time (stochastic) or the entire dataset (batch), we process data in mini-batches — fixed-size subsets of the training data. This is the standard approach in modern deep learning, balancing computational efficiency, memory constraints, and gradient quality."
+    "t": "What does this module say about “A batch is a matrix, not a loop”?",
+    "ans": "Feeding one sample through a layer is a vector-matrix product. Feeding 32 samples is a matrix -matrix product — stack the 32 input vectors into a 32×n in matrix and multiply once by the same n in ×n out weights."
    },
    {
-    "t": "What does this module say about “Key Takeaways”?",
-    "ans": "Instead of processing one sample at a time (stochastic) or the entire dataset (batch), we process data in mini-batches — fixed-size subsets of the training data. This is the standard approach in modern deep learning, balancing computational efficiency, memory constraints, and gradient quality."
+    "t": "What does this module say about “How batch size affects the result, not just the speed”?",
+    "ans": "Larger batches give a lower-variance estimate of the true gradient, so the path to the minimum is smoother. That sounds strictly good and is not."
    }
   ]
  },
@@ -1763,15 +1735,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Observe how \"sparse\" data (inputs composed mostly of zeros) propagates. Because multiplying by zero yields zero, pathways originating from dormant inputs become entirely inactive. Combining this with ReLU activations forces massive sections of the network into a dormant state, drastically reducing the number of required computations!"
+    "ans": "Sparse data is the norm for one-hot categories, text and recommenders, and it costs memory, wasted arithmetic, and — least obviously — badly uneven learning rates, because a weight only updates when its input is non-zero."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Data sparsity occurs when the majority of values in a feature matrix are zero or missing. This is common in NLP (bag-of-words with 100k+ vocab), recommendation systems (user-item matrices), and one-hot encoded categorical features. Sparse data creates unique challenges for neural networks in terms of memory, computation, and gradient flow."
+    "t": "What does this module say about “What sparsity means, and where it comes from”?",
+    "ans": "A feature vector is sparse when most of its entries are zero. This is not an edge case — it is the default in several of the most common data types:"
    },
    {
-    "t": "What does this module say about “Key Takeaways”?",
-    "ans": "Observe how \"sparse\" data (inputs composed mostly of zeros) propagates. Because multiplying by zero yields zero, pathways originating from dormant inputs become entirely inactive. Combining this with ReLU activations forces massive sections of the network into a dormant state, drastically reducing the number of required computations!"
+    "t": "What does this module say about “Embeddings, the standard fix”?",
+    "ans": "For high-cardinality categorical data the usual answer is not to keep the one-hot vector at all. An embedding layer maps each category to a short dense vector — say 50 dimensions instead of 195 columns — learned during training."
    }
   ]
  },
@@ -1862,15 +1834,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Feature scaling transforms input features to a common range or distribution. Without it, features with large magnitudes (e.g., salary in thousands) dominate the gradient updates while small-scale features (e.g., age 18–80) are effectively ignored. This creates lopsided weight updates that slow or prevent convergence."
+    "ans": "Gradients scale with input magnitude, so unscaled features give some weights enormous gradients and others negligible ones, and no single learning rate serves both. Standardisation is the default for neural networks; min-max suits bounded inputs and breaks on outliers. Fit the scaler on the training split only, keep those statistics for validation, test and production, and leave one-hot columns alone."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Feature scaling transforms input features to a common range or distribution. Without it, features with large magnitudes (e.g., salary in thousands) dominate the gradient updates while small-scale features (e.g., age 18–80) are effectively ignored. This creates lopsided weight updates that slow or prevent convergence."
+    "t": "What does this module say about “Why scale breaks gradient descent”?",
+    "ans": "The gradient of the loss with respect to a weight is proportional to that weight’s input . So a feature measured in hundreds of thousands produces gradients roughly four orders of magnitude larger than a feature measured in tens."
    },
    {
-    "t": "What does this module say about “Why Neural Networks Need Scaling”?",
-    "ans": "Neural networks compute weighted sums: z = w₁x₁ + w₂x₂ + b. If x₁ (age) ranges 18–80 but x₂ (salary) ranges 20,000–200,000, then w₂ needs to be ~1000x smaller than w₁ to produce similar contributions. This creates an extremely elongated loss landscape where gradient descent oscillates along one axis and crawls along the other."
+    "t": "What does this module say about “Work the numbers”?",
+    "ans": "Take age 30 and salary 60,000 with weights of 0.5 each. The salary term contributes 30,000 to the weighted sum and the age term contributes 15 — the age feature is invisible, and it would take a weight around 1000× larger to compete."
    }
   ]
  },
@@ -1884,12 +1856,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Gradient clipping rescales an oversized gradient down to a maximum norm before the optimiser applies it, preserving direction while bounding step size. It is cheap insurance against the rare exploding gradient that would otherwise throw training off course, and it is standard practice in RNNs and very deep networks, where long chains of multiplication make the occasional huge gradient close to inevitable."
    },
    {
-    "t": "What does this module say about “Run Training”?",
-    "ans": "Steps 1-2 are ordinary. Step 3 injects a spike 50x the real gradient — an exploding gradient, the kind deep or recurrent nets produce on their own."
-   },
-   {
     "t": "What does this module say about “Quick Context”?",
     "ans": "Most gradients during training are reasonably sized. Occasionally — a badly scaled batch, a long recurrent chain, a numerically unstable loss — one gradient is enormous. Applied directly, w − lr · g can throw a weight far outside the region the optimiser was making sane progress in, and the next few steps are spent recovering rather than learning."
+   },
+   {
+    "t": "What does this module say about “Run Training”?",
+    "ans": "Steps 1-2 are ordinary. Step 3 injects a spike 50x the real gradient — an exploding gradient, the kind deep or recurrent nets produce on their own."
    }
   ]
  },
@@ -1943,12 +1915,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Batch size trades gradient noise against how many times per epoch you get to move."
    },
    {
-    "t": "What does this module say about “What usually goes wrong”?",
-    "ans": "Raising batch size without touching the learning rate. You get fewer updates per epoch, each no larger than before, so training slows down and people conclude the larger batch \"trains worse\". The usual remedy is the linear scaling rule: double the batch, double the learning rate, within reason."
+    "t": "What does this module say about “Why mini-batch won”?",
+    "ans": "Batch gradient descent computes an exact gradient and needs a full pass over the data for a single update. On a million samples that is a million forward passes to move the weights once — accurate and unusable."
    },
    {
-    "t": "What does this module say about “In one line”?",
-    "ans": "Batch size trades gradient noise against how many times per epoch you get to move."
+    "t": "What does this module say about “Batch size and learning rate move together”?",
+    "ans": "These two cannot be tuned independently. The gradient of a batch is an average , so a larger batch gives a lower-variance estimate — and a more reliable estimate can support a larger step."
    }
   ]
  },
@@ -1999,15 +1971,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Experiment with automated search strategies. Use Grid Search to systematically scan parameters or Random Search to find high-performance zones efficiently."
+    "ans": "Hyperparameters sit outside gradient descent, so the only way to evaluate them is to train and measure — which makes the search strategy itself worth thinking about. Random search beats grid search at equal budget because it spends its samples on more distinct values of whichever hyperparameter actually matters, and anything spanning orders of magnitude should be sampled on a log scale."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Hyperparameters are settings defined before training begins — learning rate, batch size, number of layers, dropout rate, etc. Unlike model parameters (weights), they are not learned via gradient descent. Choosing good hyperparameters can be the difference between a model that converges in 10 minutes and one that never converges at all."
+    "t": "What does this module say about “Two kinds of number”?",
+    "ans": "A parameter is learned: weights and biases move during training because gradient descent moves them. A hyperparameter is fixed before training and never updated by the optimiser — learning rate, number of layers, neurons per layer, batch size, dropout rate, regularisation strength."
    },
    {
-    "t": "What does this module say about “Key Takeaways”?",
-    "ans": "Experiment with automated search strategies. Use Grid Search to systematically scan parameters or Random Search to find high-performance zones efficiently."
+    "t": "What does this module say about “Grid search, random search, and why random usually wins”?",
+    "ans": "Grid search tries every combination on a predefined grid. With 5 learning rates and 5 layer widths that is 25 runs, and adding a third hyperparameter with 5 values makes it 125. The cost is exponential in the number of hyperparameters."
    }
   ]
  },
@@ -2075,15 +2047,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "True reproducibility means fixing the Random Seed controls both the initial network weights and the order in which data is shuffled during training. Change the seed to see the data sequence entirely rearrange, then switch back to Seed 42 to verify identical structural recovery!"
+    "ans": "Training draws randomness from initialisation, shuffling, dropout and augmentation, each from its own generator, so reproducibility means seeding all of them rather than one. Even then GPU reductions are non-deterministic at the level of floating-point rounding, and training amplifies those differences over thousands of steps."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Reproducibility means getting the exact same results when you run the same code with the same data. In deep learning, multiple sources of randomness — weight initialization, data shuffling, dropout masks, GPU floating-point non-determinism — make this surprisingly hard. Ensuring reproducibility is critical for debugging, research, and production deployment."
+    "t": "What does this module say about “Where the randomness comes from”?",
+    "ans": "Neural network training is randomised in at least four independent places, and every one of them changes the final weights:"
    },
    {
-    "t": "What does this module say about “Sources of Randomness”?",
-    "ans": "You must seed all random number generators: Python's built-in, NumPy, and PyTorch (both CPU and CUDA)."
+    "t": "What does this module say about “Seeding, and what a seed actually fixes”?",
+    "ans": "These are all pseudo -random: a deterministic sequence generated from a starting value called the seed. Fix the seed and the sequence is identical every run."
    }
   ]
  },
@@ -2134,15 +2106,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Watch a head-to-head race! The CPU has low latency but processes sequentially. The GPU has a memory-transfer delay, but processes massive batches in parallel. Adjust the batch size to see who wins."
+    "ans": "A GPU trades per-core speed for thousands of cores, which suits neural networks because matrix multiplication is embarrassingly parallel. The speedup is real only when there is enough work in flight to occupy the device, so batch size and layer width matter more than anything else, and the separate memory space means transfers and synchronisations can quietly become the bottleneck."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Deep learning requires massive amounts of mathematical operations (mostly matrix multiplications). To run these efficiently, we use specialized hardware. The choice between a Central Processing Unit (CPU) and a Graphics Processing Unit (GPU) fundamentally changes how data should be batched and processed."
+    "t": "What does this module say about “Latency versus throughput”?",
+    "ans": "A CPU has a handful of cores optimised to finish one instruction stream as fast as possible: high clock speeds, deep pipelines, large caches, aggressive branch prediction. It is built for latency."
    },
    {
-    "t": "What does this module say about “The GPU (Throughput Optimized)”?",
-    "ans": "GPUs were originally designed for rendering graphics but are perfectly suited for deep learning."
+    "t": "What does this module say about “Why batch size is the variable that matters”?",
+    "ans": "Multiplying a 1×512 input by a 512×512 weight matrix uses a tiny fraction of a GPU’s cores; the rest sit idle. Multiply a 256×512 batch by the same weights and the work grows 256-fold while the time barely moves, because that work fills capacity that was already there and already paid for."
    }
   ]
  },
@@ -2349,15 +2321,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Watch how penalties affect the network parameters! Ridge (L2) smoothly shrinks weights toward zero to prevent overfitting. Lasso (L1) drops useless connections EXACTLY to zero (Sparsity). Select both for Elastic Net."
+    "ans": "Regularisation adds a weight-size penalty to the loss so the optimiser trades fit against simplicity, with λ setting the rate. L2 shrinks all weights proportionally and keeps every feature; L1 applies constant pressure and drives weights to exactly zero, producing a sparse, self-selecting model. Use it when the model overfits, scale the features first, and reach for AdamW if the optimiser is Adam."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Regularization is any technique that constrains the model to prevent overfitting — learning the training data too well at the expense of new, unseen data. In neural networks, common regularization methods include L1/L2 weight penalties, dropout, data augmentation, and early stopping."
+    "t": "What does this module say about “Penalising complexity”?",
+    "ans": "An overfitting model has found a way to fit noise, and doing that almost always requires large weights — sharp, wiggly functions need big coefficients. Regularisation exploits that by adding the size of the weights to the loss:"
    },
    {
-    "t": "What does this module say about “Why Overfitting Happens”?",
-    "ans": "Neural networks are extremely flexible function approximators. A network with millions of parameters can easily memorize every sample in the training set, including noise and outliers. The result: near-zero training loss but poor performance on new data. Regularization adds constraints that favor simpler, generalizable solutions."
+    "t": "What does this module say about “Weight decay is not quite L2”?",
+    "ans": "The two are used interchangeably and are only equivalent for plain SGD. Weight decay multiplies the weights by a factor slightly below 1 at each step; L2 adds a term to the loss, so its contribution passes through the optimiser’s gradient machinery."
    }
   ]
  },
@@ -2371,12 +2343,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A residual connection adds the block's input back onto its output, which adds a constant 1 to that layer's local derivative during backpropagation. A chain of derivatives all below 1 shrinks geometrically and vanishes; a chain that includes a guaranteed +1 at every step cannot collapse toward zero regardless of how small the learned part's derivative is."
    },
    {
-    "t": "What does this module say about “The Stack”?",
-    "ans": "every layer squashes its input by the same factor (local derivative 0.55) — realistic for a deep sigmoid/tanh stack"
-   },
-   {
     "t": "What does this module say about “Quick Context”?",
     "ans": "Stack enough layers and, by the chain rule, the gradient reaching an early layer is the product of every local derivative between it and the loss. If each of those derivatives is reliably less than 1 — true of sigmoid and tanh almost everywhere — the product shrinks geometrically."
+   },
+   {
+    "t": "What does this module say about “The Stack”?",
+    "ans": "every layer squashes its input by the same factor (local derivative 0.55) — realistic for a deep sigmoid/tanh stack"
    }
   ]
  },
@@ -2390,12 +2362,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Softmax exponentiates the raw scores and divides by their total, turning any set of logits into a probability distribution — monotonic, so the winner never changes, and shift-invariant, which is what makes it numerically safe. Cross-entropy then reduces to minus the log of the probability given to the true class, so a confident mistake is punished without limit while a hedge is not."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A network's final layer produces one raw number per class. These are called logits , and they can be anything: 8.2, −3.1, 0.0. They are not probabilities — they do not sit between 0 and 1 and they do not add up to anything in particular."
-   },
-   {
     "t": "What does this module say about “Why they are paired”?",
     "ans": "Take the derivative of cross-entropy with respect to the raw logits and almost everything cancels:"
+   },
+   {
+    "t": "What does this module say about “Where you meet it next”?",
+    "ans": "Softmax is not only an output layer. It is the normalising step inside attention : attention scores are logits, and softmax turns them into weights that sum to 1 so they can average the values. Every property above — monotonic, shift-invariant, temperature-controllable — applies there unchanged."
    }
   ]
  },
@@ -2406,15 +2378,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "During backpropagation, gradients are multiplied through each layer via the chain rule. If these multiplied factors are consistently < 1, gradients shrink to near-zero (vanishing). If > 1, they blow up (exploding). Both make training impossible for deep architectures."
+    "ans": "Backpropagation multiplies per-layer derivatives together, so anything consistently below 1 shrinks the gradient exponentially with depth and anything above 1 amplifies it. Sigmoid’s maximum derivative of 0.25 made deep networks untrainable; ReLU’s derivative of 1 fixed it, and initialisation, normalisation and residual connections keep the product near 1 by design."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "During backpropagation, gradients are multiplied through each layer via the chain rule. If these multiplied factors are consistently < 1, gradients shrink to near-zero ( vanishing ). If > 1, they blow up ( exploding ). Both make training impossible for deep architectures."
+    "t": "What does this module say about “Where both problems come from”?",
+    "ans": "Backpropagation computes the gradient at an early layer by multiplying together the local derivatives of every layer above it. For a network of depth L that is a product of L terms."
    },
    {
-    "t": "What does this module say about “The Chain Rule Problem”?",
-    "ans": "For a network with L layers, the gradient of the loss w.r.t. the first layer's weights involves a product of L partial derivatives:"
+    "t": "What does this module say about “Why sigmoid made it worse”?",
+    "ans": "The derivative of the sigmoid is σ(x)(1 − σ(x)) , which peaks at 0.25 when x = 0 and falls toward zero for inputs of large magnitude."
    }
   ]
  },
@@ -2425,15 +2397,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Watch how initialization impacts training flow! Poor choices cause deep networks to die/vanish (Blue) or explode (Red). Select a method below (like He Normal) or use Batch Normalization to lock gradients into a stable variance (Green) even with bad initial weights."
+    "ans": "Initialisation must be random to break symmetry, and scaled to layer width so activation and gradient variance stay roughly constant with depth. He initialisation is the default for ReLU networks because ReLU halves the variance and He’s factor of 2 restores it; Xavier suits tanh and sigmoid. Get this wrong and a deep network either learns nothing or diverges — before the optimiser has had any say in the matter."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Neural network weights must be initialized before training begins. The initialization strategy determines the scale and distribution of starting weights, which directly affects whether gradients flow properly through the network or vanish/explode in the first few iterations."
+    "t": "What does this module say about “Why not zero, and why not all-equal”?",
+    "ans": "Initialising every weight to zero seems harmless and completely breaks the network. If all weights in a layer are identical, every neuron in that layer computes the same output, receives the same gradient, and applies the same update — so they stay identical forever. A layer of 512 such neurons has the expressive power of one."
    },
    {
-    "t": "What does this module say about “Why Not Initialize to Zero”?",
-    "ans": "If all weights are zero (or any constant), every neuron in a layer computes the exact same output . During backpropagation, they all receive the same gradient and update identically. The network never breaks this symmetry — it's equivalent to having a single neuron per layer."
+    "t": "What does this module say about “The variance is what actually matters”?",
+    "ans": "Randomness alone is not enough; the scale of the random values decides whether signal survives depth. Each layer multiplies its input by a weight matrix, so the variance of the activations is multiplied layer by layer."
    }
   ]
  },
@@ -2485,12 +2457,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "BPE is a compression algorithm repurposed as a vocabulary builder: merge what is frequent, leave the rest in pieces. This lab runs the genuine training loop on whatever corpus you paste in — the merge table you see is the actual product of counting pairs, not a stored example. Real tokenizers add byte-level fallbacks and pre-tokenization rules, but the core loop is exactly this."
    },
    {
-    "t": "What does this module say about “The Two Failure Modes It Avoids”?",
-    "ans": "BPE lands in between: frequent words become single tokens, rare words split into meaningful pieces, and nothing is ever out-of-vocabulary."
-   },
-   {
     "t": "What does this module say about “The Algorithm, in Four Lines”?",
     "ans": "That is the entire method. Vocabulary size is simply base characters plus the number of merges — which is why it is an exact dial rather than something you discover after the fact."
+   },
+   {
+    "t": "What does this module say about “Merge Order Is the Model”?",
+    "ans": "The merge list is ordered , and that order matters at encoding time: to tokenize a new word you replay the merges from rank 1 downward, applying each wherever it fits. The \"How it got there\" panel shows this replay step by step — the word starts as loose characters and progressively fuses."
    }
   ]
  },
@@ -2546,12 +2518,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The context window is the model's entire working memory, re-sent on every request, and it is shared between the system prompt, retrieved context, the conversation and the reply being written into it. The KV cache turns generation from quadratic work into linear by storing each token's key and value once, and it is paid for in memory that scales with layers, KV heads and sequence length — half a megabyte per token on..."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A language model holds no state between requests. Everything it appears to remember — your name, the file you pasted, what it said three turns ago — is re-sent on every call, inside the context window. The window is a hard limit on how much can be sent, and everything competes for it: the system prompt, retrieved documents, the conversation so far, and the space the reply needs to be written into."
-   },
-   {
     "t": "What does this module say about “What the KV cache is”?",
     "ans": "Generation is one token at a time, and each new token attends to every token before it. Attention needs a key and a value vector for each earlier position — and those never change once computed, because a token's key and value depend only on the tokens up to it."
+   },
+   {
+    "t": "What does this module say about “Key Takeaway”?",
+    "ans": "The context window is the model's entire working memory, re-sent on every request, and it is shared between the system prompt, retrieved context, the conversation and the reply being written into it. The KV cache turns generation from quadratic work into linear by storing each token's key and value once, and it is paid for in memory that scales with layers, KV heads and sequence length — half a megabyte per token on..."
    }
   ]
  },
@@ -2565,12 +2537,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Cosine similarity divides out vector length and only ever measures direction; dot product does not, so it rewards longer vectors regardless of whether that length means anything. The two metrics agree only when every vector has the same length — true if you normalise your embeddings to unit length, false otherwise."
    },
    {
-    "t": "What does this module say about “Stretch Doc B”?",
-    "ans": "same direction as before, just longer — like a verbose, repetitive document embedding"
-   },
-   {
     "t": "What does this module say about “Quick Context”?",
     "ans": "Cosine similarity asks \"what angle apart are these two vectors\" and ignores length entirely. Dot product asks \"how much do these two vectors agree, weighted by how long they both are\" — length is part of the answer, not discarded."
+   },
+   {
+    "t": "What does this module say about “Stretch Doc B”?",
+    "ans": "same direction as before, just longer — like a verbose, repetitive document embedding"
    }
   ]
  },
@@ -2584,12 +2556,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "An embedding puts meaning somewhere in space, so similarity becomes geometry and retrieval becomes nearest-neighbour search, ranked by cosine because vector length carries length rather than meaning. Exact search costs one comparison per document and does not survive scale, so production indexes partition the space and probe only the nearest few cells — buying a large drop in work for a small, measurable chance of mi..."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "An embedding model maps a piece of text to a point, arranged so that texts about the same thing land near each other. Nothing about the words themselves survives the trip — \"peel a mango\" and \"how to prepare tropical fruit\" share no vocabulary and end up as neighbours anyway."
-   },
-   {
     "t": "What does this module say about “Cosine, and why it is the default”?",
     "ans": "Retrieval almost always ranks by cosine similarity : the angle between the query vector and the document vector, ignoring how long either one is. Length in an embedding tends to carry things like document length or token count rather than meaning, so ignoring it is the point."
+   },
+   {
+    "t": "What does this module say about “Exact search does not scale”?",
+    "ans": "An exact search compares the query against every vector in the index. That is 18 comparisons here and 18 million in a real corpus, per query, and it is why nobody runs exact search at scale."
    }
   ]
  },
@@ -2603,12 +2575,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Pretraining supplies knowledge and fluency, supervised fine-tuning supplies behaviour by imitation, and preference optimisation supplies judgement between answers that are all plausible. RLHF and DPO reach the same optimum — a policy proportional to the reference times the exponentiated reward — with DPO skipping the reward model that RLHF has to train and then defend."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A pretrained model is a text predictor. Ask it a question and it produces something a document containing that question might plausibly continue with — which is not the same as an answer, and certainly not a helpful one."
-   },
-   {
     "t": "What does this module say about “The maths both preference methods share”?",
     "ans": "Every preference method optimises the same objective: get more reward without drifting far from the model you started with. That constraint has a closed form,"
+   },
+   {
+    "t": "What does this module say about “What usually goes wrong”?",
+    "ans": "Pretraining supplies knowledge and fluency, supervised fine-tuning supplies behaviour by imitation, and preference optimisation supplies judgement between answers that are all plausible. RLHF and DPO reach the same optimum — a policy proportional to the reference times the exponentiated reward — with DPO skipping the reward model that RLHF has to train and then defend."
    }
   ]
  },
@@ -2622,12 +2594,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A model hallucinates because it answers by sampling a distribution that has no state for \"I do not know\" — the mass has to go somewhere, and when the true fact is thinly represented it goes onto whatever is most plausible instead."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Ask a model something it has barely seen and it does not go quiet. Next-token prediction produces a distribution over the whole vocabulary, that distribution sums to one, and decoding picks from it. There is no branch in the architecture where \"insufficient evidence\" lives."
-   },
-   {
     "t": "What does this module say about “What actually helps”?",
     "ans": "What does not help: asking the model whether it is sure. Self-reported confidence is generated by the same process that produced the answer, and is largely uncorrelated with being right."
+   },
+   {
+    "t": "What does this module say about “Key Takeaway”?",
+    "ans": "A model hallucinates because it answers by sampling a distribution that has no state for \"I do not know\" — the mass has to go somewhere, and when the true fact is thinly represented it goes onto whatever is most plausible instead."
    }
   ]
  },
@@ -2681,12 +2653,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Text in, integers, vectors, mixed vectors, logits, text out. The embeddings and attention weights in this lab are deterministic stand-ins for learned parameters, but the operations — sinusoidal positions, scaled dot-product attention, softmax — are the real ones. Understanding this pipeline makes context windows, tokenizer quirks and attention costs stop feeling arbitrary."
    },
    {
-    "t": "What does this module say about “Stages 1–3: Text Becomes Integers”?",
-    "ans": "Tokenization splits the string into subword pieces, and each piece is looked up in the vocabulary to get an integer ID. That is the model's entire input: a list of integers. Nothing about the meaning of a word has entered yet — ID 4021 is no closer to ID 4022 than to ID 9. The IDs are arbitrary addresses, not measurements."
-   },
-   {
     "t": "What does this module say about “Stage 4: Embeddings Give IDs Meaning”?",
     "ans": "Each ID indexes into a giant lookup table, pulling out a learned vector of d numbers. These vectors are where meaning lives. Words used in similar contexts end up with similar vectors, and this table is trained along with everything else."
+   },
+   {
+    "t": "What does this module say about “Stage 5: Position Must Be Injected”?",
+    "ans": "Self-attention has no inherent sense of order — it sees a set of vectors, so \"dog bites man\" and \"man bites dog\" would be identical. Position is therefore added directly into the vectors, classically with sinusoids of geometrically increasing wavelength:"
    }
   ]
  },
@@ -2700,12 +2672,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Hybrid search runs dense and sparse retrieval independently and fuses their rankings rather than their scores, because the two methods' raw numbers are not on comparable scales. Reciprocal Rank Fusion rewards documents both methods rank well, which makes the combined system more robust than either retrieval method alone — a document only one method loves can be outranked by one both methods merely like."
    },
    {
-    "t": "What does this module say about “Fusion”?",
-    "ans": "small k lets rank-1 dominate; large k (60 is the common default) smooths everything out"
-   },
-   {
     "t": "What does this module say about “Quick Context”?",
     "ans": "Dense retrieval and BM25 fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously."
+   },
+   {
+    "t": "What does this module say about “Fusion”?",
+    "ans": "small k lets rank-1 dominate; large k (60 is the common default) smooths everything out"
    }
   ]
  },
@@ -2719,12 +2691,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A hard label answers one question. A teacher's full distribution answers every question at once — how likely each alternative is, and therefore how the classes relate. Temperature is the tool that makes that hidden structure large enough to learn from. The student in this lab performs real gradient descent on the combined loss, so the convergence you watch is genuine optimisation, just at a much smaller scale."
    },
    {
-    "t": "What does this module say about “Dark Knowledge: The Central Idea”?",
-    "ans": "A training label says \"this is a dog\" and nothing else. But a trained teacher, shown that same photo, might output dog 0.90, wolf 0.07, cat 0.02, car 0.001 ."
-   },
-   {
     "t": "What does this module say about “Why Temperature Is Essential”?",
     "ans": "There is a catch: a confident teacher's non-target probabilities are so tiny that they contribute almost nothing to the gradient. At T = 1 the distribution is nearly one-hot, so the student learns roughly what the plain label already told it."
+   },
+   {
+    "t": "What does this module say about “Why It Matters for LLMs”?",
+    "ans": "Distillation is how most small production models are made. DistilBERT keeps roughly 97% of BERT's performance at 40% of the size and 60% faster inference. The same recipe produced the compact members of most modern model families."
    }
   ]
  },
@@ -2738,12 +2710,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "LoRA does not make the model smaller — it makes the update smaller. By constraining the change to a low-rank subspace, it converts fine-tuning from an infrastructure project into something that runs on one GPU and ships as a few-megabyte file, with no inference penalty once merged."
    },
    {
-    "t": "What does this module say about “The Insight: Updates Are Low-Rank”?",
-    "ans": "Fine-tuning changes a weight matrix from W to W + ΔW . The observation behind LoRA is that although W is enormously expressive, the change needed to specialise a model for one task has very low intrinsic rank — it does not need the full space."
-   },
-   {
     "t": "What does this module say about “Why the Savings Are So Extreme”?",
     "ans": "A full update on a 4096×4096 layer is 16.7 million parameters. The LoRA version at rank 8 is 8 × (4096 + 4096) = 65,536 — about 0.4% . The saving comes from replacing a product of dimensions with a sum of them."
+   },
+   {
+    "t": "What does this module say about “The Practical Superpower: Swappable Adapters”?",
+    "ans": "Because the base model is untouched, a LoRA adapter is a small standalone file — often just a few megabytes. One copy of a 70B model in memory can serve many specialisations by swapping adapters, and they can be merged into the weights before deployment ( W' = W + BA ) so inference costs nothing extra."
    }
   ]
  },
@@ -2757,12 +2729,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "MMR selects documents one at a time, and after the first pick, every subsequent choice is weighed against how similar it is to what has already been selected — trading some relevance for coverage. λ controls the trade directly: 1.0 is ordinary top-k relevance ranking, 0.0 ignores relevance and maximises spread, and everything between balances the two."
    },
    {
-    "t": "What does this module say about “Selection”?",
-    "ans": "1.0 = pure relevance (same as MMR off). 0.0 = pure diversity, ignores relevance entirely."
-   },
-   {
     "t": "What does this module say about “Quick Context”?",
     "ans": "Plain top-k retrieval picks the k highest-scoring documents independently. If a document collection has several near-identical passages about the same popular sub-topic, all of them can legitimately score near the top — and a naive top-k fills the context with repetition instead of coverage, wasting the retrieval budget on saying the same thing three times."
+   },
+   {
+    "t": "What does this module say about “Selection”?",
+    "ans": "1.0 = pure relevance (same as MMR off). 0.0 = pure diversity, ignores relevance entirely."
    }
   ]
  },
@@ -2856,12 +2828,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Quantization buys memory and speed with precision. The surprise is how cheap the trade is: 8-bit is usually indistinguishable from full precision, and modern 4-bit methods come remarkably close. The size numbers here count weights only — real deployments also need memory for activations and the KV cache, which grows with context length."
    },
    {
-    "t": "What does this module say about “The Core Idea: A Coarser Ruler”?",
-    "ans": "A 32-bit float can express billions of distinct values. An 8-bit integer can express 256, and a 4-bit integer just 16. Quantization finds the range your weights actually occupy and divides it into that many evenly spaced levels:"
-   },
-   {
     "t": "What does this module say about “Symmetric vs Asymmetric”?",
     "ans": "Toggle between them with the outlier enabled and watch the step size and RMS error change."
+   },
+   {
+    "t": "What does this module say about “Outliers Are the Real Enemy”?",
+    "ans": "Quantization error does not grow smoothly with bit-width — it is dominated by range . A single weight far from the others stretches the min-max span, and since the step size is that span divided by a fixed number of levels, every other weight gets a coarser grid."
    }
   ]
  },
@@ -2875,12 +2847,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Retrieval quality is not only a property of the index and the similarity metric — it depends on how close the embedded query text sits to the embedded document text in vocabulary and register. Query expansion narrows that gap cheaply by adding terms; HyDE narrows it further by replacing the question with a fabricated answer written in the target register, at the cost of an extra generation step and the risk of chasin..."
    },
    {
-    "t": "What does this module say about “What Gets Embedded”?",
-    "ans": "the HyDE passage below is written by hand as a labelled example of what an LLM would draft — no model runs in this page"
-   },
-   {
     "t": "What does this module say about “Quick Context”?",
     "ans": "A user's question and the passage that answers it are usually written in different registers: short and colloquial versus long-form and technical. Every similarity metric in this batch — cosine , BM25 — depends on shared vocabulary between what is embedded and what is stored."
+   },
+   {
+    "t": "What does this module say about “What Gets Embedded”?",
+    "ans": "the HyDE passage below is written by hand as a labelled example of what an LLM would draft — no model runs in this page"
    }
   ]
  },
@@ -2910,15 +2882,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Precision@k and Recall@k describe a set — how much of what you returned was right, and how much of what was right did you return — and are blind to the order within that set. MRR and nDCG describe a ranking , and reward relevant results for showing up earlier."
+    "ans": "Retrieval returns a ranking, so metrics are computed at a cutoff k and differ mainly in whether they care about position. Precision@k and recall@k ignore order within the cutoff; MRR looks only at the first relevant result; NDCG discounts by position and handles graded relevance. For RAG, recall@k at your actual context size is the number to optimise, because the model can survive a bad chunk but not a missing one."
+   },
+   {
+    "t": "What does this module say about “Why classification metrics are not enough”?",
+    "ans": "A retriever does not return a yes or no; it returns an ordered list of candidates. Two systems can retrieve exactly the same documents and be very different in quality if one puts the relevant ones first and the other buries them at position 10."
    },
    {
     "t": "What does this module say about “Ranking”?",
     "ans": "all three rankings retrieve exactly the same 5 relevant / 5 irrelevant documents"
-   },
-   {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Every retrieval method on this site — vector search , BM25 , the two combined — needs a way to say whether it actually worked. That requires a labelled test set: queries with a known correct set of relevant documents, checked against what the system actually returned."
    }
   ]
  },
@@ -2932,12 +2904,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "RAG answers questions a model was never trained on by finding relevant passages and putting them in the prompt, so generation becomes reading rather than recall. The retrieval step is ordinary similarity search and it always returns something, which makes the quality of your chunking, your ranking and your \"I could not find it\" path the whole ballgame."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A language model knows what was in its training data, frozen at some cutoff date. It does not know your company's handbook, last week's incident report, or a product invented for a teaching page. Asked anyway, it will answer — fluently, and wrongly."
-   },
-   {
     "t": "What does this module say about “The pipeline”?",
     "ans": "Only steps 3 to 5 happen per question. Steps 1 and 2 happen once, when the documents change — which is why RAG updates in the time it takes to re-index rather than the time it takes to retrain."
+   },
+   {
+    "t": "What does this module say about “Why not just fine-tune”?",
+    "ans": "Fine-tuning changes how a model behaves; retrieval changes what it knows right now. Facts that change weekly, documents with access rules, anything that needs a citation — all of those want retrieval. Tone, format, a domain's vocabulary, a stubborn output schema — those want fine-tuning. They are not competitors, and production systems often use both."
    }
   ]
  },
@@ -2991,12 +2963,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "MLM turns any raw text into supervised training data by deleting parts of it. Because the blank is surrounded rather than trailing, the model learns deep bidirectional understanding — ideal for classification, retrieval and question answering, and unsuitable for generation. That generative job belongs to causal models, which predict strictly forward."
    },
    {
-    "t": "What does this module say about “Why It Must Be Bidirectional”?",
-    "ans": "A causal model reads left to right and predicts what comes next, so it can never look ahead. MLM has no such restriction: the blank sits in the middle , and the model is free to use every token on both sides at once."
-   },
-   {
     "t": "What does this module say about “The Curious 80 / 10 / 10 Split”?",
     "ans": "BERT masks about 15% of tokens, but does not always insert a literal [MASK] . Of the chosen positions:"
+   },
+   {
+    "t": "What does this module say about “Masking Rate Is a Trade-off”?",
+    "ans": "Mask too little and each sentence teaches the model almost nothing — training is slow because most positions carry no loss. Mask too much and you destroy the very context needed to make a prediction. Around 15% is the long-standing sweet spot, though later work has shown much higher rates can work with large enough models."
    }
   ]
  },
@@ -3138,12 +3110,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Gradient boosting fits each new small tree to the residuals left by everything built so far, then adds a fraction of it to the running prediction — which is gradient descent performed in function space, with the learning rate as the step size."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A random forest builds many strong trees independently and averages away their variance. Boosting does close to the opposite: it builds many deliberately weak trees in sequence, each one aimed squarely at the mistakes the previous ones left behind."
-   },
-   {
     "t": "What does this module say about “The loop”?",
     "ans": "The residual panel above is step 2 made visible. Watch it after each tree: the bars shrink, and where they are still tall is exactly where the next tree will spend its capacity."
+   },
+   {
+    "t": "What does this module say about “Why \"gradient\"”?",
+    "ans": "For squared-error loss, the negative gradient of the loss with respect to the prediction is the residual. So fitting a tree to the residuals is the same as taking a gradient descent step in function space — each tree is one step downhill, and the learning rate is the step size, exactly as in ordinary gradient descent ."
    }
   ]
  },
@@ -3212,16 +3184,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What is meant by “Sensitivity to Initialization” here?",
-    "ans": "Since the initial centroids are placed randomly, you might get different final clusters if you run the algorithm multiple times. This is why in practice, K-Means is often run several times with different random initializations."
+    "t": "What does this module say about “Initialisation decides the answer”?",
+    "ans": "Place two initial centroids inside the same true cluster and k-means will happily split that cluster in half while merging two others. The result is stable, self-consistent and wrong."
    },
    {
-    "t": "What is meant by “Speed and Scalability” here?",
-    "ans": "K-Means is very fast and computationally efficient, making it an excellent choice for large datasets."
+    "t": "What does this module say about “Choosing k”?",
+    "ans": "K-means cannot tell you how many clusters there are; k is an input. Two standard ways to choose it:"
    },
    {
-    "t": "What is meant by “Assumptions” here?",
-    "ans": "The algorithm assumes that clusters are spherical, of similar size, and have similar density. When these assumptions are violated (like with the moons or circles), it performs poorly."
+    "t": "What does this module say about “Common mistakes”?",
+    "ans": "K-means alternates assigning points to the nearest centroid and moving each centroid to its points’ mean, which always converges but only to a local optimum determined by the initialisation — so use k-means++ and several restarts. It requires you to choose k, assumes roughly spherical clusters of similar size, and relies on Euclidean distance, which makes feature scaling mandatory rather than advisable."
    }
   ]
  },
@@ -3353,12 +3325,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Logistic regression computes a linear score and squashes it through a sigmoid to get a probability, which makes the decision boundary a straight line and the output something you can actually reason about. It is trained with log loss because that surface is convex and punishes confident mistakes properly."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Linear regression predicts a number. If you need a yes or no, you cannot use it directly: it happily predicts −4 or 17, and neither is a probability. Logistic regression fixes this with one extra step. It computes the same weighted sum, then passes the result through a function that squashes any real number into the range 0 to 1."
-   },
-   {
     "t": "What does this module say about “Work one through by hand”?",
     "ans": "Take weights w = [1.0, 1.0] and bias b = −10 , the values this page starts on. Feed it the point (4, 4) :"
+   },
+   {
+    "t": "What does this module say about “Where the boundary comes from”?",
+    "ans": "The model predicts class B whenever p is above the threshold. With the usual threshold of 0.5, that happens exactly when z is above 0. So the decision boundary is the set of points where w 1 x 1 + w 2 x 2 + b = 0 — a straight line, and in higher dimensions a flat plane."
    }
   ]
  },
@@ -3486,12 +3458,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The ROC curve plots true positive rate against false positive rate across every possible threshold, which separates two questions that accuracy tangles together: how well the model ranks, and where you choose to cut. AUC summarises only the first, and equals the probability that a random positive outscores a random negative — so it is unchanged by the threshold and nearly unchanged by class imbalance."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A classifier does not really output a class. It outputs a score — a probability, usually — and something else turns that into a label by comparing it against a threshold. The confusion matrix describes one such threshold. Change the threshold and you get a different matrix from the very same model."
-   },
-   {
     "t": "What does this module say about “What AUC actually measures”?",
     "ans": "The area under the curve has an interpretation worth memorising, because it is far more intuitive than \"area\":"
+   },
+   {
+    "t": "What does this module say about “The imbalance trap, spelled out”?",
+    "ans": "Suppose 1% of a million people have a disease, and your test catches 90% of them at a 10% false positive rate. That is a respectable ROC point. In absolute numbers: 9,000 true positives, and 99,000 false positives. Over 90% of the people you flag are healthy."
    }
   ]
  },
@@ -3505,12 +3477,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A random forest trains many deep, deliberately different trees and lets them vote, which cancels the variance that makes any single deep tree unreliable. The diversity comes from two places — a bootstrap sample of the rows and a random subset of the features at every split — and without that diversity extra trees buy nothing."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A decision tree grown to full depth will classify every training point correctly. It does this by carving the space into ever smaller rectangles until each one is pure — including rectangles that exist only to accommodate a single mislabelled point. The result has near-perfect training accuracy and a boundary that looks like a staircase drawn during an earthquake."
-   },
-   {
     "t": "What does this module say about “What makes a forest more than bagging”?",
     "ans": "Bagged trees have a weakness: if one feature is strongly predictive, nearly every tree splits on it first, and the trees end up highly correlated. Averaging correlated models buys much less than averaging independent ones."
+   },
+   {
+    "t": "What does this module say about “Why it does not overfit with more trees”?",
+    "ans": "This surprises people: adding trees to a random forest does not cause overfitting. More trees means a more precise estimate of the same average, and the curve flattens rather than turning back up. Past a few hundred trees you are spending compute for no gain, but you are not doing damage."
    }
   ]
  },
@@ -3524,12 +3496,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Both methods add a penalty on coefficient size to the loss, trading a little training accuracy for a lot of stability, with lambda controlling how hard that trade is pushed. Ridge squares the weights, so its pressure fades as a coefficient nears zero and everything merely shrinks; Lasso uses absolute values, so its pressure stays constant and weak coefficients are driven to exactly zero, which makes it a feature sele..."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Give a degree-12 polynomial eighteen noisy points and it will pass through nearly all of them. The fit looks superb on the data it has seen, and it is worthless: between the points the curve swings violently, because the only way to hit every point is to use enormous coefficients that cancel each other out."
-   },
-   {
     "t": "What does this module say about “One extra term”?",
     "ans": "Ordinary least squares minimises the squared error alone. Ridge and Lasso add a penalty on the size of the weights:"
+   },
+   {
+    "t": "What does this module say about “Why Lasso zeroes and Ridge does not”?",
+    "ans": "Look at how each penalty behaves as a coefficient approaches zero. The derivative of w 2 is 2w , which itself goes to zero — so the closer a Ridge coefficient gets to zero, the weaker the force pushing it further. It approaches zero and never arrives."
    }
   ]
  },
@@ -3539,16 +3511,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “What is the Sliding Window Technique”?",
-    "ans": "The sliding window method is a fundamental technique for transforming a time series dataset into a format suitable for supervised machine learning. It involves moving a \"window\" of a fixed size over the data, creating input-output pairs. For each window, the data inside becomes the input (features), and the data point(s) immediately following the window becomes the output (target)."
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A sliding window converts a time series into supervised (input, target) pairs, with the window size encoding how much history you claim is relevant and the stride controlling how much consecutive examples overlap. The modelling choice is straightforward; the discipline is in the split — chronological, with a gap of at least one window between segments, and every scaler fitted on the training period alone."
    },
    {
-    "t": "What does this module say about “Core Parameters Explained”?",
-    "ans": "Two key parameters control how the windows are created. Understanding them is crucial for success:"
+    "t": "What does this module say about “Turning a sequence into a supervised problem”?",
+    "ans": "A model needs examples with features and a label. A time series is a single ordered run of values, so you build examples by sliding a fixed-length window along it: the values inside the window are the input, and the value immediately after it is the target."
    },
    {
-    "t": "What does this module say about “Hands-On with the Interactive Panel”?",
-    "ans": "Use the visualization above to build a concrete understanding of these parameters:"
+    "t": "What does this module say about “Window size and stride”?",
+    "ans": "Window size (W) is how much history the model sees per prediction, and it is a real modelling assumption: it asserts that nothing older than W steps matters. Too small and the model cannot see the pattern — a weekly cycle needs at least seven daily steps. Too large and each example carries mostly irrelevant history, the input dimension grows, and the number of examples shrinks."
    }
   ]
  },
@@ -3558,16 +3530,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “The Core Idea of SVM”?",
-    "ans": "A Support Vector Machine (SVM) is a powerful supervised learning algorithm used for classification and regression. For classification, its primary goal is to find the optimal hyperplane that best separates data points of different classes in a high-dimensional space. The \"best\" hyperplane is the one that has the largest possible margin —the distance between the hyperplane and the nearest data point from either class."
-   },
-   {
     "t": "What does this module say about “Maximizing the Margin”?",
     "ans": "Why is a large margin so important? A larger margin implies a more confident and robust classification model. It means the decision boundary is as far as possible from the data points of both classes, making it less sensitive to small variations in the data and more likely to generalize well to new, unseen data."
    },
    {
     "t": "What does this module say about “What are Support Vectors”?",
     "ans": "The data points that lie exactly on the margin boundaries are called Support Vectors . These are the most critical data points in the dataset because they alone \"support\" or define the position and orientation of the optimal hyperplane."
+   },
+   {
+    "t": "What does this module say about “The Kernel Trick”?",
+    "ans": "What if the data isn't linearly separable? This is where SVMs truly shine. The kernel trick is a powerful technique that allows SVMs to create non-linear decision boundaries. It works by mapping the data into a higher-dimensional space where it becomes linearly separable."
    }
   ]
  },
@@ -3617,16 +3589,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Training on Label Imbalanced Dataset belongs to machine learning . Build intuition first, then precision."
+    "t": "What does this module say about “Why imbalance breaks training”?",
+    "ans": "Standard training minimises average loss over the dataset. When one class holds 99% of the rows, that average is dominated by it: predicting the majority everywhere already achieves very low loss, so there is little gradient pressure to learn the minority class at all."
    },
    {
-    "t": "What does this module say about “What This Topic Is Really About”?",
-    "ans": "This topic explains why models can appear accurate while still failing on the minority class. With imbalance, the model may learn to favor the majority and miss the rare but important cases."
+    "t": "What does this module say about “The three families of fix”?",
+    "ans": "Resample the data. Oversampling duplicates minority rows — simple, and risks overfitting to the few examples you have. SMOTE improves on it by synthesising new minority points along the lines between existing neighbours rather than copying. Undersampling discards majority rows, which balances the classes and throws away real information; it is reasonable when the majority class is genuinely enormous."
    },
    {
-    "t": "What does this module say about “Why This Matters in Real Work”?",
-    "ans": "Fraud detection, disease screening, and safety monitoring all care more about minority detection than raw accuracy. A model with high overall accuracy can still be risky if minority recall is poor."
+    "t": "What does this module say about “What usually goes wrong”?",
+    "ans": "Imbalance is a mismatch between the average loss you are minimising and the rare-class detection you actually want. Fix it by reweighting the loss (usually first), resampling the training data (inside the fold, never before the split), or simply moving the decision threshold. Then change the metric too — accuracy cannot show you whether any of it worked."
    }
   ]
  },
@@ -3640,12 +3612,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A matrix is a record of where the basis vectors land, stored as its columns, and because linear transformations keep grid lines straight and evenly spaced that record determines where every other vector goes. This makes the multiplication rule a derivation rather than a convention: transforming (x, y) means taking x copies of the first column plus y copies of the second."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Most people first meet a matrix as a grid of numbers with rules for multiplying it. The rules work, but they explain nothing, and matrix multiplication in particular looks arbitrary — why rows against columns, and why in that order?"
-   },
-   {
     "t": "What does this module say about “The columns are the whole story”?",
     "ans": "Start with the two basis vectors: î = (1, 0) pointing along x, and ĵ = (0, 1) pointing along y. Every vector is built from them — (3, 2) means \"3 of î plus 2 of ĵ\"."
+   },
+   {
+    "t": "What does this module say about “Why matrix-vector multiplication looks like that”?",
+    "ans": "Now the formula stops being arbitrary. To transform (x, y), take x copies of where î went and y copies of where ĵ went, and add:"
    }
   ]
  },
@@ -3678,12 +3650,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Conditioning on B does not change the outcomes, it discards the ones where B did not happen, so P(A | B) is simply the count of outcomes in both events divided by the count in B. Independence is the special case where that shrinking leaves A's share unchanged, which is exactly when P(A and B) = P(A)P(B) is valid and not before."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Probability counts favourable outcomes against all possible outcomes. Conditional probability changes one thing: it shrinks what counts as possible."
-   },
-   {
     "t": "What does this module say about “P(A|B) is not P(B|A)”?",
     "ans": "This is worth stating in its own section because it causes more real-world damage than any other confusion in probability."
+   },
+   {
+    "t": "What does this module say about “What usually goes wrong”?",
+    "ans": "Conditioning on B does not change the outcomes, it discards the ones where B did not happen, so P(A | B) is simply the count of outcomes in both events divided by the count in B. Independence is the special case where that shrinking leaves A's share unchanged, which is exactly when P(A and B) = P(A)P(B) is valid and not before."
    }
   ]
  },
@@ -3697,12 +3669,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Covariance averages the product of each variable's deviation from its own mean, so it is positive when two variables move together and negative when they move oppositely — but it carries the units of both, which makes its magnitude meaningless on its own. Correlation divides by both standard deviations to strip the units out, giving a number always between −1 and 1 that is unchanged by rescaling."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Variance describes how one variable spreads out. Covariance is the same idea for two: when x is above its mean, is y usually above its mean too?"
-   },
-   {
     "t": "What does this module say about “Why correlation exists”?",
     "ans": "Covariance has a fatal flaw for reporting: it carries the units of both variables multiplied together. Measure height in metres and weight in kilograms and you get one number; switch height to centimetres and the same data gives a number a hundred times larger. Nothing about the relationship changed."
+   },
+   {
+    "t": "What does this module say about “What usually goes wrong”?",
+    "ans": "Covariance averages the product of each variable's deviation from its own mean, so it is positive when two variables move together and negative when they move oppositely — but it carries the units of both, which makes its magnitude meaningless on its own. Correlation divides by both standard deviations to strip the units out, giving a number always between −1 and 1 that is unchanged by rescaling."
    }
   ]
  },
@@ -3716,12 +3688,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Cross-entropy H(p, q) is what your beliefs cost when reality is p, entropy H(p) is the part of that cost no model could avoid, and the KL divergence is the difference — the waste that is genuinely your model's fault. KL is never negative and is zero only when q matches p exactly, so minimising cross-entropy and minimising divergence are the same job."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Entropy is the average surprise of a distribution — the shortest average code length you could achieve if you knew the true probabilities. Cross-entropy asks a harsher question: what does it cost if you build your code for q and the data actually comes from p?"
-   },
-   {
     "t": "What does this module say about “Why classifiers use it”?",
     "ans": "For a single labelled example, p is one-hot: probability 1 on the true class and 0 elsewhere. Every term of the cross-entropy sum vanishes except one, leaving"
+   },
+   {
+    "t": "What does this module say about “Which direction, and why it matters”?",
+    "ans": "KL(p ‖ q) — the \"forward\" direction used in supervised training — punishes assigning low probability to things that actually happen. A q that is too narrow gets an enormous penalty, so the fitted q tends to spread out and cover all of p's mass. It is mean-seeking ."
    }
   ]
  },
@@ -3775,12 +3747,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The determinant is the signed area factor of a transformation: ad − bc is the area of the parallelogram the unit square becomes, its magnitude says how much every region is scaled, and its sign says whether the plane was flipped over."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A matrix is a transformation of space, and the determinant measures one thing about it: how much it scales area. A determinant of 3 means every region comes out three times as large; 0.5 means everything shrinks by half; 1 means area is untouched, however much the shape has been rotated or sheared."
-   },
-   {
     "t": "What does this module say about “What zero means”?",
     "ans": "If the determinant is zero, the parallelogram has no area: the two columns lie on the same line, and the whole plane has been squashed onto that line. Everything that goes wrong with a singular matrix follows from this one picture."
+   },
+   {
+    "t": "What does this module say about “Properties worth knowing”?",
+    "ans": "The determinant is the signed area factor of a transformation: ad − bc is the area of the parallelogram the unit square becomes, its magnitude says how much every region is scaled, and its sign says whether the plane was flipped over."
    }
   ]
  },
@@ -3794,12 +3766,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Euclidean, Manhattan and Chebyshev are the L2, L1 and L∞ norms of the difference between two points, always ordered Chebyshev ≤ Euclidean ≤ Manhattan and agreeing only when a single coordinate differs; their equal-distance rings are a circle, a diamond and a square, which is what makes them disagree."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A surprising number of algorithms do nothing but compare distances. KNN finds the nearest points, k-means assigns each point to the nearest centre, hierarchical clustering merges the closest pair, and a vector database retrieves the closest embeddings."
-   },
-   {
     "t": "What does this module say about “When cosine is the right answer”?",
     "ans": "Cosine dominates text and embedding work, and the reason is specific. In a bag-of-words representation, a long document has larger counts everywhere than a short one on the same subject. Euclidean distance reads that as \"far apart\"; cosine reads the direction of the vector — the mix of words rather than the volume — and correctly calls them similar."
+   },
+   {
+    "t": "What does this module say about “The curse of dimensionality”?",
+    "ans": "In high dimensions, distance stops being informative. As dimensions are added, the gap between the nearest and furthest points in a dataset shrinks relative to their absolute distance, so everything becomes roughly equidistant from everything else and \"nearest neighbour\" loses meaning."
    }
   ]
  },
@@ -3813,12 +3785,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "An eigenvector is a direction a transformation does not rotate, and its eigenvalue is the factor it is stretched by, so along an eigenvector the whole matrix collapses into a single multiplication. For a 2×2 matrix they follow from the trace and determinant alone, and always satisfy λ₁+λ₂ = trace and λ₁λ₂ = det; a negative discriminant means no real eigenvectors exist, which is exactly the case for a rotation."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A matrix moves space . Almost every vector it touches gets both stretched and rotated — it comes out pointing somewhere new."
-   },
-   {
     "t": "What does this module say about “Finding them”?",
     "ans": "For a 2×2 matrix the eigenvalues come straight out of two numbers you can read off by eye:"
+   },
+   {
+    "t": "What does this module say about “Why symmetric matrices are special”?",
+    "ans": "When b = c the matrix is symmetric, and three things become guaranteed rather than lucky: the eigenvalues are always real, the eigenvectors are always perpendicular, and the matrix can always be diagonalised."
    }
   ]
  },
@@ -3832,12 +3804,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Entropy is the average surprise of a distribution, −Σp·log(p), and reads as the number of yes/no questions needed to pin down the outcome. It is maximal when every outcome is equally likely and exactly zero when one outcome is certain, which is why it works as a measure of uncertainty."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Suppose I am about to tell you the outcome of an event, and you want to know how much you are about to learn. If the event is a coin flip, you will learn something. If it is \"will the sun rise tomorrow\", you will learn essentially nothing, because you already knew."
-   },
-   {
     "t": "What does this module say about “Surprise first”?",
     "ans": "Start with a single outcome. How surprising is it? Two things should be true: a certain outcome (p = 1) should carry zero surprise, and rarer outcomes should be more surprising. One function does this cleanly:"
+   },
+   {
+    "t": "What does this module say about “Entropy is average surprise”?",
+    "ans": "Now take the whole distribution and average the surprise, weighting each outcome by how often it actually occurs:"
    }
   ]
  },
@@ -3910,10 +3882,6 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The identity is the matrix that changes nothing, and the inverse is the one that undoes A — defined by A A⁻¹ = I and computed by dividing through by the determinant, which is precisely why a zero determinant means no inverse exists: the transformation destroyed information and no matrix can recover it."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A matrix is a transformation . Once you can do something to space, three questions follow immediately: what does nothing, what puts it back, and what happens if you read the matrix sideways."
-   },
-   {
     "t": "What does this module say about “Key Takeaway”?",
     "ans": "The identity is the matrix that changes nothing, and the inverse is the one that undoes A — defined by A A⁻¹ = I and computed by dividing through by the determinant, which is precisely why a zero determinant means no inverse exists: the transformation destroyed information and no matrix can recover it."
    }
@@ -3929,12 +3897,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Information gain is the drop in entropy a split buys: the parent's entropy minus the size-weighted average of its children's. The weighting is what stops a tiny lucky child from looking impressive, and the gain is zero exactly when the split leaves the label mix unchanged."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Entropy measures how mixed a set of labels is: 1 bit for an even fifty-fifty split of two classes, 0 bits when every label is the same. Information gain is simply how much that number falls when you split the set in two."
-   },
-   {
     "t": "What does this module say about “Gini, and why the choice barely matters”?",
     "ans": "Many implementations measure impurity with the Gini index, 1 − Σ pᵢ² , rather than entropy. Both are zero for a pure node and maximal for an even mix; Gini avoids a logarithm and is marginally cheaper. In practice the two pick the same split the overwhelming majority of the time, and scikit-learn's default of Gini is a performance decision, not a statistical one."
+   },
+   {
+    "t": "What does this module say about “Key Takeaway”?",
+    "ans": "Information gain is the drop in entropy a split buys: the parent's entropy minus the size-weighted average of its children's. The weighting is what stops a tiny lucky child from looking impressive, and the gain is zero exactly when the split leaves the label mix unchanged."
    }
   ]
  },
@@ -3986,12 +3954,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Maximum likelihood picks the distribution that makes the observed data least surprising, by holding the data fixed and varying the parameters — the reverse of a probability question. The likelihood is the product of each point's density, and because that product underflows to zero on any real sample, it is always computed as a sum of logarithms instead, which is safe because the logarithm is monotonic."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "You have some data and a family of distributions that might have produced it. Which member of the family should you pick?"
-   },
-   {
     "t": "What does this module say about “Likelihood is not probability”?",
     "ans": "The two words get used interchangeably in conversation and they are not the same thing."
+   },
+   {
+    "t": "What does this module say about “The calculation”?",
+    "ans": "For each observed point, read off the density of the candidate distribution at that point. Multiply them all together:"
    }
   ]
  },
@@ -4123,12 +4091,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The projection of b onto a is ((a·b)/‖a‖²)a : the point on the line through a that is closest to b, and the only one whose residual is perpendicular to a. Only a's direction matters, so scaling a changes nothing; the scale factor goes negative when the shadow falls behind the origin, zero when the vectors are perpendicular, and equals b exactly when they are parallel."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Projection answers one question: of all the points on the line through a, which is closest to b? The answer is b's shadow, and the line from b down to that shadow is perpendicular. Those two facts — closest point, perpendicular error — are the same fact, and almost every fitting method in machine learning is built on it."
-   },
-   {
     "t": "What does this module say about “Why this is the root of least squares”?",
     "ans": "Fitting a line to data means solving Xw = y when there is no exact solution: y almost never lies in the space that the columns of X can reach. The best you can do is find the point in that space closest to y — which is the projection of y onto the column space of X."
+   },
+   {
+    "t": "What does this module say about “Where else it shows up”?",
+    "ans": "The projection of b onto a is ((a·b)/‖a‖²)a : the point on the line through a that is closest to b, and the only one whose residual is perpendicular to a. Only a's direction matters, so scaling a changes nothing; the scale factor goes negative when the shadow falls behind the origin, zero when the vectors are perpendicular, and equals b exactly when they are parallel."
    }
   ]
  },
@@ -4140,10 +4108,6 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
     "ans": "Rank counts the independent directions a matrix's columns actually provide, which is the dimension of everything they can reach. Full rank means the span is as large as it could be and the matrix is invertible; a drop in rank means one column was a combination of the others, the determinant is zero, and both the inverse and the unique solution to Ax = b disappear together."
-   },
-   {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Two columns are linearly independent when neither one can be built out of the other. When they are, the combinations s·c₁ + t·c₂ sweep out the whole plane. When one is a multiple of the other, everything you can build lies on a single line, no matter how hard you pull on s and t."
    },
    {
     "t": "What does this module say about “Key Takeaway”?",
@@ -4180,12 +4144,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Two parameters describe the entire curve, area equals probability, and 68/95/99.7 holds universally. The central limit theorem is why the shape is so common — but its thin tails mean it is the wrong model whenever extreme events actually matter."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "The normal (or Gaussian) distribution is the familiar bell curve: symmetric, single-peaked, thin-tailed. It is completely specified by just two numbers — the mean μ sets where it sits, and the standard deviation σ sets how wide it is."
-   },
-   {
     "t": "What does this module say about “Two Knobs, Nothing Else”?",
     "ans": "That fixed unit area is what makes it a probability density: area under a stretch of the curve is the probability of landing in that range."
+   },
+   {
+    "t": "What does this module say about “The 68–95–99.7 Rule”?",
+    "ans": "These percentages hold for every normal distribution, whatever μ and σ are. Cycle the region selector and watch the shaded area match — the app integrates the curve numerically rather than quoting the constants."
    }
   ]
  },
@@ -4199,12 +4163,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A norm answers \"how big is this vector\", and L1, L2 and L∞ give three different answers — the sum of absolute values, the straight-line length, and the largest component — always ordered L∞ ≤ L2 ≤ L1, agreeing only on the axes."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "\"How big is this vector?\" sounds like it has one answer. It has several, and machine learning uses at least three of them routinely — often in the same model."
-   },
-   {
     "t": "What does this module say about “The shapes are the point”?",
     "ans": "Draw every vector whose norm equals exactly 1 and you get that norm's unit ball . This is where the three stop being interchangeable:"
+   },
+   {
+    "t": "What does this module say about “Why the corners cause zeros”?",
+    "ans": "Regularised regression solves a constrained problem: find the best fit whose coefficient vector has norm below some budget. Geometrically, you inflate the norm's unit ball until it first touches the set of best-fitting solutions."
    }
   ]
  },
@@ -4258,12 +4222,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "ASCII is the essential bridge between human language and computer processing. It standardizes the representation of text as numbers, a fundamental step for all digital communication and computation. By interacting with the explorer, you can build a solid intuition for this cornerstone of computer science and NLP."
    },
    {
-    "t": "What does this module say about “What is ASCII”?",
-    "ans": "ASCII, which stands for American Standard Code for Information Interchange , is a character encoding standard. In simple terms, it's a universal dictionary that assigns a unique number to every letter, digit, and symbol you can type. Computers don't understand letters like 'A' or 'b'; they only understand numbers. ASCII translates our human-readable characters into a numerical format."
-   },
-   {
     "t": "What does this module say about “How It Works: From Character to Code”?",
     "ans": "The standard ASCII table contains 128 unique codes, numbered from 0 to 127. Each code represents a specific character. For example:"
+   },
+   {
+    "t": "What does this module say about “Why is ASCII Important in NLP”?",
+    "ans": "ASCII is a foundational concept in Natural Language Processing (NLP). While modern systems often use more advanced encodings like UTF-8 to support emojis and multiple languages, the core principle remains the same: text must be converted to numbers for a machine to process it. Understanding ASCII helps you grasp fundamental NLP tasks:"
    }
   ]
  },
@@ -4275,10 +4239,6 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
     "ans": "BPTT = unroll the loop, backpropagate through the chain, sum the shared-weight gradients. It makes RNNs trainable — but it also chains together T multiplications, and a long product of numbers below 1 races toward zero. That arithmetic inevitability is the vanishing gradient problem."
-   },
-   {
-    "t": "What does this module say about “The Problem With a Loop”?",
-    "ans": "Backpropagation works on feed-forward graphs — signals flow one way, gradients flow back the same way. An RNN's feedback loop breaks that picture. The fix, Backpropagation Through Time (BPTT) , is beautifully blunt: unroll the loop into T copies of the cell, one per timestep, and the loop becomes an ordinary (deep) feed-forward chain that standard backprop can handle."
    },
    {
     "t": "What does this module say about “Key Takeaway”?",
@@ -4315,12 +4275,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Encoder-only and decoder-only transformers differ by one thing: whether the attention mask deletes the upper triangle. Bidirectional attention lets every token see the whole sequence, which rules out next-token prediction and demands a masked objective instead, and yields strong representations with no ability to generate."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Both families are stacks of the same block: multi-head attention and a feed-forward layer, repeated. The difference is a mask applied inside self-attention — a matrix of minus infinities that deletes some of the attention scores before the softmax."
-   },
-   {
     "t": "What does this module say about “Why the mask decides the objective”?",
     "ans": "A model that can see the future cannot be trained to predict it. If position 4 can attend to position 5, then \"predict the token at position 5\" is answered by copying it, and nothing is learned. So the two masks admit different training tasks."
+   },
+   {
+    "t": "What does this module say about “Which one to reach for”?",
+    "ans": "The industry has drifted decisively towards decoder-only for general systems, because one model that can be prompted to do anything beats a family of specialists — but for a high-volume classifier or a retrieval encoder, the small bidirectional model is still usually the right engineering answer."
    }
   ]
  },
@@ -4372,12 +4332,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Neural networks process text by first converting words into meaningful numerical vectors (embeddings). These numbers are then passed through a series of hidden layers that extract increasingly complex features. Finally, an output layer makes a prediction based on these learned features."
    },
    {
-    "t": "What does this module say about “The Core Challenge: Computers Don't Read Words”?",
-    "ans": "Neural networks are powerful mathematical machines, but they only operate on numbers. They can't directly understand text like \"hello\" or \"world\". The first and most crucial step in Natural Language Processing (NLP) is to convert text into a numerical format that a network can process. This process is called text vectorization or word embedding ."
-   },
-   {
     "t": "What does this module say about “The Three Main Stages of Processing Text”?",
     "ans": "Our interactive visualization demonstrates the key stages a neural network follows to process text data:"
+   },
+   {
+    "t": "What does this module say about “Tokenization & Embedding (Input Layer)”?",
+    "ans": "First, the input sentence is broken down into individual units called tokens (usually words). Each token is then mapped to a numerical vector called an embedding . This isn't just a random number; it's a multi-dimensional representation that captures the word's meaning and context. Words with similar meanings will have similar embedding vectors."
    }
   ]
  },
@@ -4391,12 +4351,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "RNNs are designed for sequential data like text. Their core feature is the hidden state , a memory that is passed through time, allowing the network to remember previous inputs and understand context. By using shared weights, they can efficiently process sequences of any length, making them a cornerstone of modern Natural Language Processing."
    },
    {
-    "t": "What does this module say about “The Power of Memory in Language”?",
-    "ans": "Standard neural networks have a major limitation: they have no memory of the past. They process each input independently. This is a problem for language, where the order of words is crucial. For example, \"dog bites man\" and \"man bites dog\" use the same words but have completely different meanings."
-   },
-   {
     "t": "What does this module say about “The Unrolled RNN: Step-by-Step Processing”?",
     "ans": "The visualization above \"unrolls\" the RNN loop, showing it as a sequence of identical cells, one for each word (or \"time step\"). Here’s how the information flows:"
+   },
+   {
+    "t": "What does this module say about “Shared Weights: The Key to Learning”?",
+    "ans": "A crucial concept in RNNs is shared weights . The same set of calculations (the same \"brain\") is used at every single time step. This is incredibly efficient. Instead of learning a new set of rules for the first word, second word, etc., the RNN learns a single set of rules for how to update its memory based on a new word and its previous memory."
    }
   ]
  },
@@ -4410,12 +4370,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Word representation is a ladder: IDs are compact but lie about order, one-hot is honest but huge and similarity-blind, and dense embeddings are small, learned, and encode meaning as geometry. Modern NLP starts at the top of that ladder."
    },
    {
-    "t": "What does this module say about “The Chain of Translations”?",
-    "ans": "A neural network is a pile of multiplications and additions — it can only consume numbers. So every word goes through a chain of translations: word → token ID → one-hot vector → dense embedding . Each stage exists to fix a shortcoming of the previous one."
-   },
-   {
     "t": "What does this module say about “Token IDs and Their Trap”?",
     "ans": "The dictionary lookup (\"cat\" → 1, \"dog\" → 3) is compact, but the raw integers smuggle in a false claim: that \"dog\" (3) is somehow three times \"cat\" (1), or that words with adjacent IDs are related. The IDs are arbitrary labels, and arithmetic on labels is meaningless — a network fed raw IDs will happily learn those fake relationships."
+   },
+   {
+    "t": "What does this module say about “One-Hot: Honest but Wasteful”?",
+    "ans": "One-hot encoding fixes the fake-ordering problem: each word becomes a vector of zeros with a single 1 at its index. Now no word is numerically \"bigger\" than another. The costs:"
    }
   ]
  },
@@ -4426,15 +4386,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Nobody writes down that \"cat\" is like \"dog\" — the geometry is learned from co-occurrence statistics alone . Random vectors plus a pull-together/push-apart rule over enough text yields a space where distance encodes meaning. Scale the same principle up and you get the embedding layers inside every modern language model."
+    "ans": "Embeddings are learned by training a deliberately simple model on a proxy task — predict a word from its context, or the context from the word — and keeping the embedding matrix while discarding everything else. Semantic structure emerges because words in similar contexts need similar vectors to make the prediction work."
    },
    {
-    "t": "What does this module say about “The Distributional Hypothesis”?",
-    "ans": "\"You shall know a word by the company it keeps\" (J.R. Firth, 1957). Words that appear in similar contexts tend to mean similar things — \"cat\" and \"dog\" both follow \"the\", precede \"chased\", appear near \"pet\". Embedding training is simply this idea turned into an optimization: make words with shared contexts have similar vectors."
+    "t": "What does this module say about “The distributional hypothesis”?",
+    "ans": "The whole field rests on one claim: a word is characterised by the company it keeps. Words appearing in similar contexts tend to mean similar things."
    },
    {
-    "t": "What does this module say about “The Training Loop”?",
-    "ans": "Methods like word2vec's skip-gram never see a definition of any word. The loop is:"
+    "t": "What does this module say about “Negative sampling”?",
+    "ans": "The naive setup predicts a probability distribution over the whole vocabulary, which means a softmax over 50,000 words for every training example. That is prohibitively expensive."
    }
   ]
  },
@@ -4505,12 +4465,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Multi-head attention runs several attention operations in parallel, each with its own projections, so a layer can represent several relationships at once instead of compromising between them in a single distribution that must sum to 1."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A single self-attention layer produces one set of weights per word, and those weights must sum to 1. That is a hard constraint: attention spent on one word is attention taken from another."
-   },
-   {
     "t": "What does this module say about “The idea”?",
     "ans": "Run several attention operations in parallel. Each gets its own query, key and value projections, so each is free to compare words along a different axis and produce a completely different weighting. Then concatenate their outputs and pass the result through one more linear layer to mix them back together."
+   },
+   {
+    "t": "What does this module say about “The part that surprises people”?",
+    "ans": "Heads are not stacked on top of the model dimension — the model dimension is divided among them. With d model = 512 and 8 heads, each head works in 64 dimensions, not 512."
    }
   ]
  },
@@ -4521,15 +4481,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "N-grams are a simple but effective method for capturing local context in text by breaking it into small, overlapping chunks. While modern deep learning models use more sophisticated techniques, n-grams remain a foundational concept for understanding how machines begin to process and find patterns in human language."
+    "ans": "An n-gram model estimates the next word by counting how often each continuation followed the previous n−1 words, which makes it fast, interpretable, and trainable in a single pass. It is defeated by sparsity: the number of possible n-grams grows exponentially with n, so most sequences are never observed and smoothing is mandatory."
    },
    {
-    "t": "What does this module say about “What are N-grams”?",
-    "ans": "An n-gram is a contiguous sequence of 'n' items from a given sample of text or speech. The \"items\" can be characters, syllables, or, most commonly, words. N-grams are a simple yet powerful way for machines to capture the context and statistical properties of a language."
+    "t": "What does this module say about “Counting, not learning”?",
+    "ans": "An n-gram model estimates the probability of a word from the n−1 words before it, using nothing but counts from a corpus:"
    },
    {
-    "t": "What does this module say about “Types of N-grams”?",
-    "ans": "The 'n' in n-gram determines the size of the sequence. The most common types are:"
+    "t": "What does this module say about “Choosing n”?",
+    "ans": "This is a bias–variance trade in a very concrete form. Small n generalises but ignores context; large n captures context but has seen almost nothing."
    }
   ]
  },
@@ -4539,16 +4499,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "What does this module say about “What is Tokenization”?",
-    "ans": "Tokenization is the fundamental first step in any Natural Language Processing (NLP) pipeline. It's the process of breaking down a stream of raw text into smaller, meaningful units called tokens . These tokens can be words, characters, or sub-word units, depending on the chosen strategy."
-   },
-   {
     "t": "What does this module say about “Why is Tokenization So Important”?",
     "ans": "Imagine trying to understand a sentence by looking at it as one continuous string of letters. It would be nearly impossible. Tokenization provides the structure that machines need. By converting a sentence like \"NLP is fascinating!\" into tokens such as `[\"NLP\", \"is\", \"fascinating\", \"!\"]`, we create a list of items that a model can count, analyze, and assign meaning to."
    },
    {
     "t": "What does this module say about “Exploring Different Tokenization Methods”?",
     "ans": "There's no single \"best\" way to tokenize text; the right method depends on the task and the language. The interactive visualizer above lets you experiment with the most common strategies. Let's explore them:"
+   },
+   {
+    "t": "What does this module say about “Advanced Tokenization: Sub-word Methods”?",
+    "ans": "Modern NLP models like BERT and GPT use more advanced techniques called sub-word tokenization (e.g., Byte-Pair Encoding or WordPiece). These methods break down rare words into smaller, known sub-word units. For example, \"tokenization\" might become `[\"token\", \"##ization\"]`."
    }
   ]
  },
@@ -4558,16 +4518,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Normalize sequential inputs before feeding them to a network: Min-Max when you need a bounded range and trust your extremes, Z-Score when outliers are possible. And always fit the scaler on training data only — for time series, the future must never leak into the past."
+    "t": "What does this module say about “Normalising over the wrong axis”?",
+    "ans": "Every normalisation layer does the same arithmetic — subtract a mean, divide by a standard deviation, then apply a learned scale and shift. What differs is which values are pooled to compute that mean and deviation."
    },
    {
-    "t": "What does this module say about “Why Networks Care About Scale”?",
-    "ans": "Neural networks learn by nudging weights along gradients. When one input ranges over [0, 1] and another over [100, 10000], the loss surface becomes a stretched valley: gradients explode along one axis and vanish along the other, forcing tiny learning rates and slow, unstable training. Normalization reshapes that valley into something closer to a bowl — the same step size works in every direction."
+    "t": "What does this module say about “Why batch norm fails on sequences”?",
+    "ans": "Variable length. Sequences in a batch have different lengths, so timestep 50 might have 32 real values in one batch and 3 in another, with the rest padding. Statistics computed over that are unstable, and computed over padding they are simply wrong."
    },
    {
-    "t": "What does this module say about “Key Takeaway”?",
-    "ans": "Normalize sequential inputs before feeding them to a network: Min-Max when you need a bounded range and trust your extremes, Z-Score when outliers are possible. And always fit the scaler on training data only — for time series, the future must never leak into the past."
+    "t": "What does this module say about “The variants worth knowing”?",
+    "ans": "The placement matters too. Original transformers put layer norm after the residual addition (post-norm); modern ones put it before the sublayer (pre-norm), which makes deep stacks far easier to train and often removes the need for a learning-rate warmup."
    }
   ]
  },
@@ -4600,12 +4560,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Self-attention has no notion of order, so position has to be supplied explicitly, and the naive options fail: raw indices grow without bound and normalised ones mean different things in different-length sentences."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Self-attention computes every position from every other position by dot products and weighted sums. Nowhere in that computation does an index appear. Permute the input and the outputs permute with it, unchanged — the mechanism is permutation-equivariant ."
-   },
-   {
     "t": "What does this module say about “The obvious ideas, and why they fail”?",
     "ans": "Both are available in the Scheme control above. What is wanted is something bounded, unique per position, consistent across sentence lengths, and — ideally — carrying information about relative distance, since \"the adjective three words back\" is a far more useful notion than \"the word at index 17\"."
+   },
+   {
+    "t": "What does this module say about “The sinusoidal answer”?",
+    "ans": "The original transformer used a fixed function of position, with a different frequency in every pair of dimensions:"
    }
   ]
  },
@@ -4619,12 +4579,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Attention is a soft dictionary lookup: the query says what a position is looking for, each key says how well that position matches, and each value says what it contributes once matched, with all three being separate learned projections of the same input. Every key matches to some degree, so the output is a weighted blend rather than a single retrieved entry, and the whole mechanism is softmax(QKᵀ/√d_k)V."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "The previous module described attention as score, normalise, blend. That description works, but it leaves one thing vague: what exactly is being compared against what?"
-   },
-   {
     "t": "What does this module say about “A soft dictionary lookup”?",
     "ans": "Think of a Python dictionary. You supply a key, it matches one stored key exactly, and you get back its value. Attention is the same operation with the hard edges removed:"
+   },
+   {
+    "t": "What does this module say about “Why keys and values are separate”?",
+    "ans": "It is reasonable to ask why we need both — why not match against the values directly and save a matrix?"
    }
   ]
  },
@@ -4634,16 +4594,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "An RNN is one cell unrolled across time, sharing weights at every step, so its parameter count is fixed at dh + h² + h regardless of sequence length. Training backpropagates through the whole unrolled graph, which makes the effective depth equal to the sequence length — hence vanishing gradients, mandatory gradient clipping, and truncated BPTT."
+   },
+   {
+    "t": "What does this module say about “Unrolling”?",
+    "ans": "An RNN is usually drawn as a cell with an arrow looping back to itself. That is compact and slightly misleading. To understand training, unroll it: draw one copy of the cell per timestep, with the hidden state flowing left to right between copies."
+   },
+   {
     "t": "What does this module say about “Internal Flow”?",
-    "ans": "The internal architecture of a standard Recurrent Neural Network block is wonderfully simple. It takes its past memory, merges it with the present, and squashes it through a single neural layer to create the future state."
-   },
-   {
-    "t": "What does this module say about “The Core Idea: The Hidden State”?",
-    "ans": "Unlike standard feed-forward networks, RNNs pass a single vector of context forward through time. This is the Hidden State ($H_t$) ."
-   },
-   {
-    "t": "What does this module say about “Step-by-Step Flow”?",
-    "ans": "When the simulation runs, watch the data flow through these sequential steps inside the cell:"
+    "ans": "Unrolling a recurrent cell across time gives a network as deep as the sequence is long - sharing one set of weights the whole way. That is what makes RNNs efficient, and what makes them hard to train."
    }
   ]
  },
@@ -4657,12 +4617,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Self-attention is attention with queries, keys and values all drawn from the same sequence, so every word is rewritten as a blend of the words it finds relevant — which is how a pronoun can resolve to a noun six words away in a single step."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "In encoder–decoder attention the queries come from one sequence and the keys and values from another. Self-attention is the same machinery with a single change: all three come from the same sequence . The sentence attends to itself."
-   },
-   {
     "t": "What does this module say about “What a word is actually doing”?",
     "ans": "Every position emits a query, a key and a value . Each query is scored against every key — including its own — giving an n × n grid of scores. Softmax each row, and you have the matrix above: row i is how word i distributes its attention across the whole sentence."
+   },
+   {
+    "t": "What does this module say about “The example worth staring at”?",
+    "ans": "\"The animal didn't cross the street because it was too tired.\" What does \"it\" refer to?"
    }
   ]
  },
@@ -4676,12 +4636,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The sliding window is the simplest bridge between sequential data and supervised learning: it manufactures labeled examples from an unlabeled stream. Its fixed width is both its strength (simplicity) and its weakness — the model can never look further back than w steps, which is exactly the limitation that motivates recurrent architectures."
    },
    {
-    "t": "What does this module say about “The Problem It Solves”?",
-    "ans": "Supervised learning needs pairs: an input X and the correct answer y . But a time series or a sentence arrives as one long, unlabeled stream. The sliding window converts that stream into training data by declaring: \"the last w values are the input, and the very next value is the target.\""
-   },
-   {
     "t": "What does this module say about “How It Works”?",
     "ans": "Given a sequence of length N and a window of size w, slide the window one position at a time:"
+   },
+   {
+    "t": "What does this module say about “Key Takeaway”?",
+    "ans": "The sliding window is the simplest bridge between sequential data and supervised learning: it manufactures labeled examples from an unlabeled stream. Its fixed width is both its strength (simplicity) and its weakness — the model can never look further back than w steps, which is exactly the limitation that motivates recurrent architectures."
    }
   ]
  },
@@ -4695,12 +4655,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The choice between stemming and lemmatization is a trade-off. Stemming is fast and good enough for many applications, but it can be inaccurate. Lemmatization is more accurate and provides meaningful root words, but it comes at a higher computational cost. Choose the tool that best fits the needs of your specific NLP task."
    },
    {
-    "t": "What does this module say about “The Goal: Text Normalization”?",
-    "ans": "In Natural Language Processing (NLP), we often need to treat different forms of a word as the same. For example, \"run\", \"running\", and \"ran\" all refer to the same basic concept. The process of reducing these variations down to a common base form is called text normalization . Stemming and lemmatization are two popular techniques for achieving this."
-   },
-   {
     "t": "What does this module say about “Stemming: The Fast and Crude Approach”?",
     "ans": "Stemming is a process that reduces words to their \"stem\" or root form by chopping off prefixes and suffixes. It uses a set of simple, rule-based heuristics and does not care if the resulting stem is a real dictionary word."
+   },
+   {
+    "t": "What does this module say about “Lemmatization: The Smart and Accurate Approach”?",
+    "ans": "Lemmatization is a more sophisticated process that aims to find the true root form of a word, known as the lemma . It uses a dictionary and morphological analysis to consider the context of the word and its part of speech."
    }
   ]
  },
@@ -4729,16 +4689,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "What does this module say about “What is Text Normalization”?",
-    "ans": "Text normalization is the process of transforming raw, unstructured text into a clean, standardized format that can be easily understood and analyzed by machines. Think of it as a \"clean-up\" phase for your text data. Computers are literal and see \"Run\", \"run\", and \"running\" as three completely different words."
-   },
-   {
     "t": "What does this module say about “Why is a Pipeline Necessary”?",
     "ans": "Real-world text is messy. It's filled with inconsistencies like capitalization, punctuation, numbers, and special characters that add little to no semantic value for many NLP tasks. A text normalization pipeline is a series of sequential steps designed to methodically remove this \"noise.\" By applying these steps in a specific order, we can ensure that the final text is clean and ready for more advanced processing, su..."
    },
    {
     "t": "What does this module say about “Exploring the Pipeline Steps”?",
     "ans": "Let's break down the common steps you'll find in a text normalization pipeline, all of which you can toggle in the interactive tool."
+   },
+   {
+    "t": "What does this module say about “Beyond the Basics”?",
+    "ans": "This pipeline covers the fundamentals, but text normalization can also include more advanced techniques like Stemming and Lemmatization , which reduce words to their root forms (e.g., \"running\" -> \"run\"). These methods further help in consolidating the vocabulary and improving model performance."
    }
   ]
  },
@@ -4752,12 +4712,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Attention replaces the single fixed context vector with a fresh weighted average of every encoder state, recomputed at each output step: score the decoder state against each input position, softmax the scores into weights that sum to 1, and blend. Because nothing is compressed, long sentences stop degrading, and because the weights are a proper distribution they can be read as an alignment."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "The encoder–decoder models that came before attention worked like this: an RNN read the whole input sentence and squeezed it into a single fixed-length vector, and a second RNN generated the output from that vector alone."
-   },
-   {
     "t": "What does this module say about “The fix”?",
     "ans": "Attention throws away the assumption that the decoder needs one summary. Instead, keep every encoder state, and at each output step let the decoder build a fresh context vector by weighting them:"
+   },
+   {
+    "t": "What does this module say about “Why the weights are interpretable”?",
+    "ans": "Because they sum to 1 and are all positive, the weights read as a distribution of interest: \"to produce this word, I looked 70% at cat and 20% at the \". Plotting them for every output word against every input word gives the alignment matrix in the second panel, and on a translation task it recovers word alignment without ever having been told what alignment is."
    }
   ]
  },
@@ -4771,12 +4731,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A transformer block is two sublayers, each wrapped in the same add-and-normalise pattern: attention moves information between positions, and a position-wise feed-forward network processes each token on its own. The residual connection is what makes depth possible, giving the gradient a path that skips each sublayer — remove it and a deep stack stops training entirely — while layer normalisation holds the activation s..."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "The previous modules built the parts: query, key and value , self-attention , multiple heads , positional encoding . This module assembles them."
-   },
-   {
     "t": "What does this module say about “What each piece is for”?",
     "ans": "The division of labour between the first two is worth holding on to: attention mixes across tokens, the FFN thinks about each token. A transformer alternates between the two, over and over."
+   },
+   {
+    "t": "What does this module say about “Why residuals matter so much”?",
+    "ans": "Without a residual connection, the gradient reaching layer 1 has to pass back through every layer above it, being multiplied at each step. Multiply twenty-four numbers smaller than one and you get approximately zero — the vanishing gradient problem , arriving from a different direction."
    }
   ]
  },
@@ -4790,11 +4750,11 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The vanishing gradient problem is not a bug or a tuning issue — it is the inescapable arithmetic of multiplying T numbers that aren't exactly 1. It caps how far back a vanilla RNN can learn, and it is the direct reason LSTMs, GRUs, and ultimately attention-based Transformers exist."
    },
    {
-    "t": "What does this module say about “The Arithmetic of Forgetting”?",
-    "ans": "BPTT multiplies the gradient by ∂hₜ/∂hₜ₋₁ once per timestep. Call that factor's typical size w . After travelling back T steps the gradient is scaled by w T — a geometric series. At w = 0.7 and T = 30, that's 0.7³⁰ ≈ 0.00002: the beginning of the sentence receives two hundred-thousandths of the learning signal."
+    "t": "What does this module say about “Vanishing and Exploding: Two Sides of One Coin”?",
+    "ans": "LSTM and GRU cells attack the product itself: they add a cell state with additive updates and learned gates, creating a path where the effective factor stays near 1 for as long as the gates choose. Gradients ride this \"constant error carousel\" across hundreds of steps — which is why LSTMs dominated sequence learning for two decades, until attention offered an even more direct shortcut."
    },
    {
-    "t": "What does this module say about “Vanishing and Exploding: Two Sides of One Coin”?",
+    "t": "What does this module say about “The Way Out: Gates”?",
     "ans": "LSTM and GRU cells attack the product itself: they add a cell state with additive updates and learned gates, creating a path where the effective factor stays near 1 for as long as the gates choose. Gradients ride this \"constant error carousel\" across hundreds of steps — which is why LSTMs dominated sequence learning for two decades, until attention offered an even more direct shortcut."
    }
   ]
@@ -4845,16 +4805,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "What does this module say about “The Core Idea: The Cell State”?",
-    "ans": "The key to LSTMs is the Cell State ($C_t$) , visualized as the horizontal line running across the top of the diagram. It acts like a conveyor belt."
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "An LSTM separates long-term memory (the cell state) from working output (the hidden state) and controls the flow between them with three learned sigmoid gates. Because the cell state is updated by addition and gated multiplication rather than a matrix multiply, the gradient travels back through it multiplied only by the forget gate — so when the model chooses to remember, it genuinely can, for hundreds of steps."
    },
    {
-    "t": "What does this module say about “Step-by-Step Flow”?",
-    "ans": "When the simulation runs, watch the data flow through these sequential steps inside the cell:"
+    "t": "What does this module say about “Two states, not one”?",
+    "ans": "A simple recurrent cell has one hidden state, and it is completely rewritten at every timestep. An LSTM has two:"
    },
    {
-    "t": "What does this module say about “The Parameter Cost”?",
-    "ans": "Because there are four distinct neural network layers inside this one cell (Forget, Input, Candidate, Output), an LSTM is much more computationally heavy than a standard RNN. Check the Parameters button to see how the matrix dimensions are multiplied by 4."
+    "t": "What does this module say about “The three gates”?",
+    "ans": "Each gate is a small sigmoid layer producing values in [0, 1], which then multiply a vector elementwise — 0 blocks completely, 1 passes completely, and everything between is a partial pass."
    }
   ]
  },
@@ -4864,16 +4824,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "What does this module say about “Step-by-Step Architecture”?",
-    "ans": "When you run the simulation, you will see the architecture process the sequence \"The bank of the river\" :"
+    "t": "What does this module say about “Why one direction is not enough”?",
+    "ans": "A forward RNN at position t has seen tokens 1 to t and nothing after. That is a real handicap, because disambiguation frequently depends on what comes next."
    },
    {
-    "t": "What does this module say about “The Parameter Cost (2x)”?",
-    "ans": "It's important to remember that a Bidirectional layer is literally just two standard layers wrapped in a trenchcoat. The forward layer has its own weights ($W^f$), and the backward layer has its own completely separate weights ($W^b$). Because of this, a Bidirectional layer has exactly twice as many parameters as a standard layer of the same size. You can verify this by clicking the Parameters button."
+    "t": "What does this module say about “How the two passes combine”?",
+    "ans": "A bidirectional layer runs two entirely separate recurrent cells with their own weights. The forward cell reads left to right; the backward cell reads the same sequence right to left. At each position their hidden states are concatenated:"
    },
    {
-    "t": "What does this module say about “Bidirectional RNN Shared Parameters”?",
-    "ans": "Calculates 2x parameters because there are independent Forward and Backward networks."
+    "t": "What does this module say about “When you cannot use it”?",
+    "ans": "A bidirectional layer requires the entire sequence before it can produce any output, because the backward pass starts at the end. That rules it out whenever the future genuinely is not available:"
    }
   ]
  },
@@ -4887,12 +4847,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The GRU keeps the essential insight of gating — memory updates as learned, per-dimension decisions — while cutting a gate, a state track, and a quarter of the parameters. Both LSTM and GRU still read strictly left-to-right, though. What if the meaning of a word depends on what comes after it? That is the next module: bidirectional processing."
    },
    {
-    "t": "What does this module say about “Simplify Without Breaking”?",
-    "ans": "The Gated Recurrent Unit (Cho et al., 2014) asked a sharp question: does an LSTM really need three gates and two separate memory tracks? The GRU's answer: merge the cell state and hidden state into one vector, merge forget+input into a single update gate z , and add a reset gate r for proposing new content. Same gating idea, leaner machine."
-   },
-   {
     "t": "What does this module say about “How the Two Gates Cooperate”?",
     "ans": "zₜ = σ(W⃂xₜ + U⃂hₜ₋₁) · rₜ = σ(Wᵣxₜ + Uᵣhₜ₋₁) h̃ₜ = tanh(W·xₜ + U·(rₜ⊙hₜ₋₁)) hₜ = zₜ⊙hₜ₋₁ + (1 − zₜ)⊙h̃ₜ"
+   },
+   {
+    "t": "What does this module say about “LSTM vs GRU at a Glance”?",
+    "ans": "In practice the two trade blows: no consistent winner across tasks. GRUs train faster and overfit less on small datasets; LSTMs sometimes edge ahead when sequences are very long."
    }
   ]
  },
@@ -4902,16 +4862,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "What is meant by “U·hₜ₋₁” here?",
-    "ans": "what the past contributes. This term is the memory."
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A recurrent cell applies one small network at every timestep, combining the current token with a hidden state that summarises everything before it, using the same weights throughout. That gives a fixed-size model the ability to read arbitrary-length sequences and to be sensitive to order."
    },
    {
-    "t": "What is meant by “tanh” here?",
-    "ans": "squashes the result into [-1, 1], keeping the state bounded step after step."
+    "t": "What does this module say about “The problem with feeding a sentence to a normal network”?",
+    "ans": "A feedforward network has a fixed number of inputs. A sentence does not have a fixed number of words. You can pad everything to a maximum length, but then the model has no notion that word 3 comes before word 4 — each position gets its own independent weights, so “dog bites man” and “man bites dog” are unrelated inputs as far as it is concerned."
    },
    {
-    "t": "What is meant by “Same W, U, b at every step” here?",
-    "ans": "the cell handles a 5-word or a 500-word sentence with the identical parameters. Variable-length input solved."
+    "t": "What does this module say about “The recurrence, written out”?",
+    "ans": "At each timestep t the cell takes the current input x t and the previous hidden state h t−1 , and produces a new hidden state:"
    }
   ]
  },
@@ -4925,12 +4885,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A sequence is not just a set of values — it is values plus their order . Any model that throws the order away (like a bag of words) throws information away with it. Everything else in this NLP track — sliding windows, encodings, embeddings, recurrent cells — exists to let neural networks use that ordering information instead of losing it."
    },
    {
-    "t": "What does this module say about “The Core Idea”?",
-    "ans": "A sequence is an ordered collection of items where the position of each item carries meaning. \"Dog bites man\" and \"man bites dog\" contain exactly the same three words, yet they describe opposite events. That difference lives entirely in the order — and order is precisely what ordinary tabular data doesn't have."
-   },
-   {
     "t": "What does this module say about “Sequential vs. Tabular Data”?",
     "ans": "In a classic spreadsheet-style dataset, each row is independent: shuffling the rows of a housing-price table changes nothing about what a model can learn. Sequential data breaks this assumption in two ways:"
+   },
+   {
+    "t": "What does this module say about “Key Takeaway”?",
+    "ans": "A sequence is not just a set of values — it is values plus their order . Any model that throws the order away (like a bag of words) throws information away with it. Everything else in this NLP track — sliding windows, encodings, embeddings, recurrent cells — exists to let neural networks use that ordering information instead of losing it."
    }
   ]
  },
@@ -4944,12 +4904,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Text encoding isn't a preprocessing nicety — it is the bridge without which no NLP is possible. A neural network can no more process the raw word \"cat\" than a calculator can. First we turn language into numbers; everything else in NLP is about turning it into good numbers."
    },
    {
-    "t": "What does this module say about “The One-Sentence Argument”?",
-    "ans": "Every neuron in every network — from a 1958 perceptron to GPT — computes some flavour of w · x + b . Multiplication is only defined for numbers. Therefore, before any text can enter any network, it must be converted into numbers. That conversion is text encoding , and it isn't an optimization — it's a precondition."
-   },
-   {
     "t": "What does this module say about “What \"Feeding Raw Text\" Actually Does”?",
     "ans": "Try to compute 0.5 × \"cat\" + 0.1 in any language and you get an error or NaN — the arithmetic is simply undefined. In practice a framework like PyTorch refuses at the door: tensors hold floats, not strings. The demo above makes this failure visible instead of hiding it in a stack trace."
+   },
+   {
+    "t": "What does this module say about “What the Encoder Buys You”?",
+    "ans": "Insert one stage — a tokenizer plus a lookup table assigning each word an ID — and the identical neuron suddenly works: 0.5 × 2 + 0.1 = 1.1 . Every downstream marvel (embeddings, attention, generation) rests on this humble dictionary lookup. The quality of the numbers matters enormously too, which is why the next modules explore encoding techniques and embeddings."
    }
   ]
  },
@@ -4959,16 +4919,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "What does this module say about “What is a Word Cloud”?",
-    "ans": "A word cloud (or tag cloud) is a visual representation of text data where the size of each word is proportional to its frequency or importance in the source text. In essence, it's a simple yet powerful tool for at-a-glance text analysis . By highlighting the most prominent words, a word cloud allows you to quickly grasp the main themes and key topics within a large body of text without having to read it all."
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A word cloud encodes frequency as font size and nothing else — position, colour and rotation are layout, not data. It needs stopword removal to say anything at all, and TF-IDF rather than raw frequency to show what is distinctive rather than merely common. Treat it as a fast exploratory glance at a corpus, and reach for a bar chart whenever the question is how much bigger one term is than another."
    },
    {
-    "t": "What does this module say about “How Does it Work? The Process Explained”?",
-    "ans": "Creating a word cloud involves a few key steps, most of which happen behind the scenes in the interactive generator above."
+    "t": "What does this module say about “What the picture encodes”?",
+    "ans": "Font size maps to frequency: the most common word is largest, and everything else is scaled relative to it. Position, colour and rotation almost always carry no information — they are chosen by a layout algorithm packing shapes into a space without overlap."
    },
    {
-    "t": "What does this module say about “Why Are Word Clouds Useful”?",
-    "ans": "Despite their simplicity, word clouds are widely used in various fields for several reasons:"
+    "t": "What does this module say about “Why stopwords have to go”?",
+    "ans": "Run a word cloud on raw English text and you get the , of , and , to , a in enormous type. These are the most frequent words in almost any corpus and they tell you nothing about the subject."
    }
   ]
  },
