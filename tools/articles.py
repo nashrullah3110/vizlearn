@@ -458,3 +458,33 @@ ARTICLES = {
    "<p>m tilts, c slides &mdash; and a neuron\u2019s weight and bias are the same two numbers under different names.</p>"),
  ]},
 }
+
+# Written later, split per track so no single file becomes unreviewable.
+from articles_dsa import ARTICLES_DSA
+from articles_dl import ARTICLES_DL, EXTRA_SECTIONS_DL
+from articles_nlp import ARTICLES_NLP
+from articles_misc import ARTICLES_MISC
+
+for _track in (ARTICLES_DSA, ARTICLES_DL, ARTICLES_NLP, ARTICLES_MISC):
+    _clash = ARTICLES.keys() & _track.keys()
+    assert not _clash, "page written twice: %s" % sorted(_clash)
+    ARTICLES.update(_track)
+
+
+def _deepen(path, extra):
+    """Insert extra sections ahead of the page's 'Try this above' block.
+
+    The short entries above are worth keeping as an opening; they just need
+    substance under them. Appending would put new material after the closing
+    takeaway, so the new sections go in front of the experiments instead.
+    """
+    sections = ARTICLES[path]["sections"]
+    at = next(
+        (i for i, (h, _) in enumerate(sections) if h.lower().startswith("try this")),
+        len(sections),
+    )
+    sections[at:at] = extra
+
+
+for _path, _extra in EXTRA_SECTIONS_DL.items():
+    _deepen(_path, _extra)
