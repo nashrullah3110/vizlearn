@@ -18,8 +18,38 @@ import sys
 import lib_shell as shell
 from lib_catalog import ROOT, by_topic
 from lib_pages import TOPICS, TOPIC_ORDER, last_modified, pretty_date, topic_rel
+from topic_copy import TOPIC_SECTIONS
 
 PREFIX = "../"
+
+
+def prose(key):
+    """The three written sections under 'About this track'.
+
+    A track page used to be a lead, two paragraphs and a grid of links. That
+    reads as navigation rather than as a page, so each track now says what it
+    lets you do, what order it goes in and what it assumes, and where it leads.
+    """
+    s = TOPIC_SECTIONS.get(key)
+    if not s:
+        return ""
+    bullets = "".join("<li>%s</li>" % html.escape(b) for b in s["learn"])
+    return """
+        <section class="vz-topic-intro" aria-labelledby="vz-learn-h">
+            <h2 id="vz-learn-h">What you will be able to do</h2>
+            <ul class="vz-topic-learn">%s</ul>
+        </section>
+
+        <section class="vz-topic-intro" aria-labelledby="vz-order-h">
+            <h2 id="vz-order-h">How the track is ordered</h2>
+            <p>%s</p>
+        </section>
+
+        <section class="vz-topic-intro" aria-labelledby="vz-next-h">
+            <h2 id="vz-next-h">Where this leads</h2>
+            <p>%s</p>
+        </section>
+""" % (bullets, html.escape(s["order"]), html.escape(s["next"]))
 
 
 def card(mod):
@@ -56,7 +86,11 @@ def build(key, mods):
     rel = topic_rel(key)
     title = "%s - Interactive Visualizations | VizLearn" % t["title"]
 
-    intro = "".join('<p>%s</p>' % html.escape(p) for p in t["intro"])
+    paras = list(t["intro"])
+    extra = TOPIC_SECTIONS.get(key, {}).get("more")
+    if extra:
+        paras.append(extra)
+    intro = "".join('<p>%s</p>' % html.escape(p) for p in paras)
     first = mods[0]
 
     parts = [shell.head_top(title, PREFIX), shell.header(PREFIX)]
@@ -82,6 +116,7 @@ def build(key, mods):
             <h2 id="vz-about-h">About this track</h2>
             %(intro)s
         </section>
+%(prose)s
 
         <section class="vz-topic-list" aria-labelledby="vz-mods-h">
             <div class="vz-section-head">
@@ -107,6 +142,7 @@ def build(key, mods):
         "firstpath": first["path"],
         "firsttitle": html.escape(first["title"]),
         "intro": intro,
+        "prose": prose(key),
         "cards": "".join(card(m) for m in mods),
         "others": other_tracks(key),
     })
