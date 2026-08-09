@@ -150,7 +150,11 @@ def render(moved, headings):
         BEGIN
         + '<section class="vz-lede" aria-labelledby="vz-lede-h">'
         + '<h2 id="vz-lede-h" class="vz-lede-h">Overview</h2>'
+        # The wrapper is a grid area, so the prose and the contents can sit
+        # side by side on a wide screen instead of stacking.
+        + '<div class="vz-lede-body">'
         + SRC_BEGIN + moved + SRC_END
+        + "</div>"
         + toc
         + "</section>"
         + END
