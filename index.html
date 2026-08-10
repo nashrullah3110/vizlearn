@@ -63,7 +63,7 @@
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7551664560637561" crossorigin="anonymous"></script>
 
     <meta name="author" content="Ashish Jangra">
-    <meta name="last-modified" content="2026-08-10">
+    <meta name="last-modified" content="2026-08-11">
 
     <script type="application/ld+json">
 {
@@ -2696,19 +2696,6 @@
             init();
         });
     </script>
-<!-- VIZLEARN:SCRIPTS:BEGIN -->
-    <script src="assets/modules.js"></script>
-    <script src="assets/search.js"></script>
-    <script src="assets/vizlearn.js"></script>
-    <script src="assets/vizlearn-lab.js"></script>
-    <script src="assets/vizlearn-state.js"></script>
-    <script src="assets/vizlearn-pwa.js"></script>
-    <script src="assets/vizlearn-keys.js"></script>
-    <script src="assets/glossary.js"></script>
-    <script src="assets/vizlearn-glossary.js"></script>
-    <script src="assets/vizlearn-python.js"></script>
-    <script src="assets/vizlearn-rails.js"></script>
-<!-- VIZLEARN:SCRIPTS:END -->
 
 <!--
     Hands-on row behaviour. Hand-written, outside the SCRIPTS markers so the
@@ -2736,9 +2723,12 @@
         };
     }
 
-    // Sum of three uniforms - close enough to a gaussian for a scatter plot,
-    // and it avoids the unbounded tails Box-Muller would give us.
-    function gauss(rnd) { return (rnd() + rnd() + rnd()) / 3 * 2 - 1; }
+    // Sum of three uniforms, scaled to unit standard deviation. The x2 matters:
+    // the raw form has std 0.33, which put the two clusters ~9 sigma apart and
+    // made them perfectly separable - the machine scored 100% every time and
+    // there was nothing to beat. At std 1 the centres are 3 sigma apart, so the
+    // tails genuinely interleave and the optimum sits in the low 90s.
+    function gauss(rnd) { return (rnd() + rnd() + rnd() - 1.5) * 2; }
 
     // ------------------------------------------------------------ the model
     var Y_MAX = 72;
@@ -2747,11 +2737,19 @@
     function makeData(seed) {
         var rnd = mulberry32(seed);
         var pts = [];
-        [[30, 22, 0], [66, 49, 1]].forEach(function (c) {
+        // Centres pulled in and spreads widened from the original (30,22)/(66,49)
+        // at 13x9. Those sat ~3.8 sigma apart along the discriminant, so the
+        // clusters were linearly separable and the machine scored 100% on 5 of
+        // every 6 datasets - there was no contest to win. These sit ~2.4 sigma
+        // apart, which leaves a handful of genuinely ambiguous points and puts
+        // the optimum in the high 80s / low 90s.
+        [[36, 26, 0], [60, 46, 1]].forEach(function (c) {
             for (var i = 0; i < 22; i++) {
                 pts.push({
-                    x: clamp(c[0] + gauss(rnd) * 13, 6, 94),
-                    y: clamp(c[1] + gauss(rnd) * 9, 5, 67),
+                    // Clamps are wide enough not to pile points on the edge:
+                    // clamping near a centre would push the clusters apart again.
+                    x: clamp(c[0] + gauss(rnd) * 14, 4, 96),
+                    y: clamp(c[1] + gauss(rnd) * 11, 4, 68),
                     c: c[2]
                 });
             }
@@ -2988,5 +2986,18 @@
     });
 })();
 </script>
+<!-- VIZLEARN:SCRIPTS:BEGIN -->
+    <script src="assets/modules.js"></script>
+    <script src="assets/search.js"></script>
+    <script src="assets/vizlearn.js"></script>
+    <script src="assets/vizlearn-lab.js"></script>
+    <script src="assets/vizlearn-state.js"></script>
+    <script src="assets/vizlearn-pwa.js"></script>
+    <script src="assets/vizlearn-keys.js"></script>
+    <script src="assets/glossary.js"></script>
+    <script src="assets/vizlearn-glossary.js"></script>
+    <script src="assets/vizlearn-python.js"></script>
+    <script src="assets/vizlearn-rails.js"></script>
+<!-- VIZLEARN:SCRIPTS:END -->
 </body>
 </html>
