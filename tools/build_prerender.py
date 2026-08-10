@@ -64,13 +64,18 @@ def main():
         total += len(topic["courses"])
         sections.append(
             '<section class="course-section mb-12" data-topic="%s" id="%s">'
-            '<div class="flex justify-between items-end mb-5 px-1 border-b border-green-500/10 pb-2">'
+            '<div class="vz-rail-head flex justify-between items-end mb-5 px-1 border-b border-green-500/10 pb-2">'
             '<div class="flex items-center gap-3">'
             '<div class="w-1 h-5 bg-green-500 rounded-full"></div>'
             '<h2 class="text-xl font-bold tracking-wide" style="color: var(--text-main)">%s</h2>'
-            "</div></div>"
+            "</div>"
+            # Matches trackProgressHtml()'s no-progress branch in index.html, so
+            # the crawled copy carries the same size cue as the rendered one.
+            '<span class="vz-track-count">%d modules</span>'
+            "</div>"
             '<div class="flex flex-nowrap overflow-x-auto space-x-5 pb-6 no-scrollbar carousel-wrapper">%s</div>'
-            "</section>" % (key, key, html.escape(topic["title"]), cards)
+            "</section>" % (key, key, html.escape(topic["title"]),
+                            len(topic["courses"]), cards)
         )
 
     block = (
