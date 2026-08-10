@@ -76,10 +76,10 @@ SCRIPTS_BLOCK = re.compile(
 SHARED_SCRIPTS = ("modules.js", "search.js", "vizlearn.js", "vizlearn-lab.js",
                   "vizlearn-state.js", "vizlearn-pwa.js",
                   "vizlearn-keys.js", "glossary.js", "vizlearn-glossary.js",
-                  "vizlearn-python.js")
+                  "vizlearn-python.js", "vizlearn-rails.js")
 # The one-time migration wrote these directly; drop the loose copies.
 LOOSE_SCRIPT = re.compile(
-    r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa|vizlearn-keys|glossary|vizlearn-glossary|vizlearn-python)\.js"></script>\n?')
+    r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa|vizlearn-keys|glossary|vizlearn-glossary|vizlearn-python|vizlearn-rails)\.js"></script>\n?')
 
 META_DESC = re.compile(r'<meta\s+name="description"\s+content="([^"]*)"\s*/?>', re.I)
 TITLE = re.compile(r"<title>(.*?)</title>", re.S)
@@ -224,6 +224,9 @@ def build_block(rel, title, desc, prefix, mod, needs_icons=False):
     lines = [
         BEGIN,
         '    <link rel="canonical" href="%s">' % url,
+    ] + ([
+        '    <meta name="robots" content="noindex, follow">',
+    ] if rel in NOINDEX else []) + [
         "",
         "    <!-- icons -->",
         '    <link rel="icon" type="image/svg+xml" href="%sassets/favicon.svg">' % prefix,
@@ -328,6 +331,19 @@ def generated_description(rel, mods):
     if is_tool_page(rel):
         return tool_page(rel)["description"]
     return None
+
+
+# App pages, not articles. /saved/ is a bookmarks list, /map/ a navigation
+# graph, /practice/ a spaced-repetition queue and /whats-new/ a changelog -
+# between 25 and 139 words of prose each, all of it furniture. Indexed, they
+# only drag down the site's average page quality; /glossary/ is excluded from
+# this list because it is real content.
+NOINDEX = {
+    "saved/index.html",
+    "map/index.html",
+    "practice/index.html",
+    "whats-new/index.html",
+}
 
 
 def main():

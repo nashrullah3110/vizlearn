@@ -13,6 +13,7 @@ as the hub and so could not appear here at all.
 import os
 import xml.sax.saxutils as sx
 
+from build_seo import NOINDEX
 from lib_catalog import ROOT, SITE, modules
 from lib_pages import (STATIC_PAGES, TOOL_ORDER, TOOL_PAGES, TOPIC_ORDER,
                        last_modified, page_url, topic_rel)
@@ -29,9 +30,13 @@ def entries():
     # Policy pages matter for trust and for AdSense review, not for ranking.
     out += [(p, "0.3", "yearly") for p in STATIC_PAGES
             if os.path.exists(os.path.join(ROOT, p))]
-    # The study tools - /practice/, /glossary/, /map/ and friends.
+    # The study tools - /practice/, /glossary/, /map/ and friends. The ones
+    # carrying a noindex are app furniture rather than content; listing a
+    # noindexed URL here only asks Google to crawl something it is then told
+    # to drop.
     out += [(TOOL_PAGES[k]["rel"], "0.7", "weekly") for k in TOOL_ORDER
-            if os.path.exists(os.path.join(ROOT, TOOL_PAGES[k]["rel"]))]
+            if os.path.exists(os.path.join(ROOT, TOOL_PAGES[k]["rel"]))
+            and TOOL_PAGES[k]["rel"] not in NOINDEX]
     return out
 
 

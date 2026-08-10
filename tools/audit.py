@@ -8,6 +8,7 @@ import re
 import sys
 from collections import Counter
 
+from build_seo import NOINDEX
 from lib_catalog import ROOT, SITE, modules
 from lib_pages import (STATIC_PAGES, TOOL_ORDER, TOOL_PAGES, TOPIC_ORDER,
                        is_static_page, is_topic_page, page_url, topic_rel)
@@ -135,7 +136,7 @@ def main():
         for script in ("assets/modules.js", "assets/search.js", "assets/vizlearn.js",
                        "assets/vizlearn-lab.js", "assets/vizlearn-state.js",
                        "assets/vizlearn-pwa.js", "assets/vizlearn-keys.js",
-                       "assets/vizlearn-python.js"):
+                       "assets/vizlearn-python.js", "assets/vizlearn-rails.js"):
             check(s.count('src="%s%s"' % (prefix, script)) == 1,
                   "%s: expected exactly one <script src> for %s" % (rel, script))
         check("const allCourses" not in s, "%s: still inlines its own catalog" % rel)
@@ -271,9 +272,13 @@ def main():
     check(os.path.exists(sm), "sitemap.xml missing")
     if os.path.exists(sm):
         locs = re.findall(r"<loc>([^<]+)</loc>", open(sm, encoding="utf-8").read())
-        # hub + tracks + modules + policy pages + the study tools
+        # hub + tracks + modules + policy pages + the study tools, less the
+        # study tools carrying a noindex - those are app pages (saved, map,
+        # practice, whats-new) that are deliberately kept out of the index,
+        # and a sitemap should not advertise a URL it then tells Google to drop.
+        tools_indexed = [k for k in TOOL_ORDER if TOOL_PAGES[k]["rel"] not in NOINDEX]
         want = (1 + len(TOPIC_ORDER) + len(modules()) + len(STATIC_PAGES)
-                + len(TOOL_ORDER))
+                + len(tools_indexed))
         check(len(locs) == want, "sitemap has %d urls (expected %d)" % (len(locs), want))
         for loc in locs:
             p = loc.replace(SITE + "/", "") or "index.html"
