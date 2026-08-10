@@ -372,7 +372,14 @@ def main():
         src = INIT_TAILWIND.sub("", src)
 
         tm = TITLE.search(src)
-        title = tm.group(1).strip() if tm else "VizLearn"
+        # Unescaped on the way in because everything downstream escapes again.
+        # Without this a title containing "&" ships as "&amp;amp;" in the
+        # social cards - it was doing exactly that on five pages ("Algorithms
+        # &amp; Data Structures", "Optimizers &amp; the 3D Loss Landscape" and
+        # friends), which is what a reader saw in the link preview. `title` is
+        # only ever read here for the meta block, never written back into
+        # <title>, so decoding it cannot corrupt the page's own heading.
+        title = html.unescape(tm.group(1).strip()) if tm else "VizLearn"
 
         dm = META_DESC.search(src)
         override = generated_description(rel, mods)
@@ -390,7 +397,9 @@ def main():
             desc = override
             rewritten_desc += 1
         elif dm:
-            desc = dm.group(1).strip()
+            # Same reason as the title above: read out of an escaped attribute,
+            # re-escaped by e() when it goes into og:/twitter:description.
+            desc = html.unescape(dm.group(1).strip())
         else:
             desc = FALLBACK_DESC.get(rel)
             if not desc:

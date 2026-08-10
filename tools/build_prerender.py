@@ -15,6 +15,7 @@ import os
 import re
 
 from lib_catalog import ROOT, read_course_data
+from lib_pages import TOPIC_ORDER
 
 INDEX = os.path.join(ROOT, "index.html")
 
@@ -48,9 +49,17 @@ def card(course):
 def main():
     data, _, _ = read_course_data()
 
+    # Same order the hub renders in (TRACK_ORDER in index.html, TOPIC_ORDER
+    # here), so the copy a crawler sees matches the copy a reader sees rather
+    # than following courseData's incidental key order. Unlisted keys still
+    # render, at the end, so a new track can never be dropped silently.
+    ordered = ([k for k in TOPIC_ORDER if k in data] +
+               [k for k in data if k not in TOPIC_ORDER])
+
     sections = []
     total = 0
-    for key, topic in data.items():
+    for key in ordered:
+        topic = data[key]
         cards = "".join(card(c) for c in topic["courses"])
         total += len(topic["courses"])
         sections.append(
