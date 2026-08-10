@@ -471,7 +471,9 @@
             grid-template-columns: 1fr;
         }
         @media (min-width: 1024px) {
-            .vz-try { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: stretch; }
+            /* align-items:start, not stretch: the spinner has far less content
+               than the plot, and stretching it left a card of empty space. */
+            .vz-try { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; }
         }
         .vz-try-panel {
             background: var(--card-bg);
@@ -519,7 +521,20 @@
             touch-action: none;
             display: block;
         }
-        .vz-handle-hit { cursor: ns-resize; fill: transparent; }
+        /* Radii live in CSS, not on the elements, because one viewBox has to
+           serve a 698px-wide plot and a 285px-wide one. At 375px a unit is
+           2.85px, so the desktop hit radius of 3.2 rendered an 18px tap target
+           - well under the 44px minimum. */
+        .vz-pt { r: 0.62; }
+        .vz-handle-dot { r: 1.15; stroke-width: 0.35; }
+        .vz-handle-hit { r: 3.2; cursor: ns-resize; fill: transparent; }
+        @media (max-width: 1023px) {
+            .vz-pt { r: 1.25; }
+            .vz-handle-dot { r: 2.2; stroke-width: 0.7; }
+            .vz-handle-hit { r: 8; }          /* ~46px at 375px wide */
+            #vz-user-line { stroke-width: 0.55; }
+            #vz-mach-line { stroke-width: 0.6; stroke-dasharray: 2 1.5; }
+        }
         .vz-handle-hit:focus { outline: none; }
         .vz-handle-hit:focus-visible + .vz-handle-dot {
             stroke: var(--accent-primary);
@@ -795,26 +810,26 @@
             <!-- aria-live sits outside the svg so the score is announced as text -->
             <p class="sr-only" id="vz-try-live" aria-live="polite"></p>
 
-            <svg class="vz-plot" id="vz-plot" viewBox="0 0 100 72" role="img"
+            <svg class="vz-plot" id="vz-plot" viewBox="0 0 100 42" role="img"
                  aria-label="Decision boundary plot. Drag the handles at either edge to split the two classes.">
                 <g id="vz-grid"></g>
                 <line id="vz-mach-line" x1="0" y1="0" x2="100" y2="0"
-                      stroke="var(--accent-primary)" stroke-width="0.8"
-                      stroke-dasharray="2.4 1.8" style="display:none"></line>
-                <line id="vz-user-line" x1="0" y1="18" x2="100" y2="58"
-                      stroke="var(--text-main)" stroke-width="0.7" opacity="0.9"></line>
+                      stroke="var(--accent-primary)" stroke-width="0.32"
+                      stroke-dasharray="1.1 0.8" style="display:none"></line>
+                <line id="vz-user-line" x1="0" y1="11" x2="100" y2="33"
+                      stroke="var(--text-main)" stroke-width="0.28" opacity="0.85"></line>
                 <g id="vz-points"></g>
                 <!-- hit target first so the visible dot is its + sibling for :focus-visible -->
-                <circle class="vz-handle-hit" id="vz-h1-hit" cx="5" cy="18" r="9"
+                <circle class="vz-handle-hit" id="vz-h1-hit" cx="5" cy="11" r="3.2"
                         tabindex="0" role="slider" aria-label="Left end of the boundary"
-                        aria-valuemin="0" aria-valuemax="72" aria-valuenow="18"></circle>
-                <circle class="vz-handle-dot" id="vz-h1-dot" cx="5" cy="18" r="3.6"
-                        fill="var(--text-main)" stroke="var(--accent-primary)" stroke-width="0.9"></circle>
-                <circle class="vz-handle-hit" id="vz-h2-hit" cx="95" cy="58" r="9"
+                        aria-valuemin="0" aria-valuemax="42" aria-valuenow="11"></circle>
+                <circle class="vz-handle-dot" id="vz-h1-dot" cx="5" cy="11" r="1.15"
+                        fill="var(--text-main)" stroke="var(--accent-primary)" stroke-width="0.35"></circle>
+                <circle class="vz-handle-hit" id="vz-h2-hit" cx="95" cy="33" r="3.2"
                         tabindex="0" role="slider" aria-label="Right end of the boundary"
-                        aria-valuemin="0" aria-valuemax="72" aria-valuenow="58"></circle>
-                <circle class="vz-handle-dot" id="vz-h2-dot" cx="95" cy="58" r="3.6"
-                        fill="var(--text-main)" stroke="var(--accent-primary)" stroke-width="0.9"></circle>
+                        aria-valuemin="0" aria-valuemax="42" aria-valuenow="33"></circle>
+                <circle class="vz-handle-dot" id="vz-h2-dot" cx="95" cy="33" r="1.15"
+                        fill="var(--text-main)" stroke="var(--accent-primary)" stroke-width="0.35"></circle>
             </svg>
 
             <div class="vz-try-foot">
@@ -2731,8 +2746,8 @@
     function gauss(rnd) { return (rnd() + rnd() + rnd() - 1.5) * 2; }
 
     // ------------------------------------------------------------ the model
-    var Y_MAX = 72;
-    var state = { y1: 18, y2: 58, points: [], best: null, machineShown: false };
+    var Y_MAX = 42;
+    var state = { y1: 11, y2: 33, points: [], best: null, machineShown: false };
 
     function makeData(seed) {
         var rnd = mulberry32(seed);
@@ -2743,13 +2758,13 @@
         // every 6 datasets - there was no contest to win. These sit ~2.4 sigma
         // apart, which leaves a handful of genuinely ambiguous points and puts
         // the optimum in the high 80s / low 90s.
-        [[36, 26, 0], [60, 46, 1]].forEach(function (c) {
+        [[36, 15, 0], [60, 27, 1]].forEach(function (c) {
             for (var i = 0; i < 22; i++) {
                 pts.push({
                     // Clamps are wide enough not to pile points on the edge:
                     // clamping near a centre would push the clusters apart again.
                     x: clamp(c[0] + gauss(rnd) * 14, 4, 96),
-                    y: clamp(c[1] + gauss(rnd) * 11, 4, 68),
+                    y: clamp(c[1] + gauss(rnd) * 6.4, 2.5, 39.5),
                     c: c[2]
                 });
             }
@@ -2771,8 +2786,8 @@
     // points is trivial, but doing it on click would still stall the tap.
     function solve() {
         var best = { s: -1, y1: 0, y2: 0 };
-        for (var a = 0; a <= Y_MAX; a += 2) {
-            for (var b = 0; b <= Y_MAX; b += 2) {
+        for (var a = 0; a <= Y_MAX; a += 1) {
+            for (var b = 0; b <= Y_MAX; b += 1) {
                 var s = scoreFor(a, b);
                 if (s > best.s) { best = { s: s, y1: a, y2: b }; }
             }
@@ -2797,14 +2812,14 @@
             l = document.createElementNS(NS, 'line');
             l.setAttribute('x1', i); l.setAttribute('y1', 0);
             l.setAttribute('x2', i); l.setAttribute('y2', Y_MAX);
-            l.setAttribute('stroke', 'var(--grid-color)'); l.setAttribute('stroke-width', '0.25');
+            l.setAttribute('stroke', 'var(--grid-color)'); l.setAttribute('stroke-width', '0.09');
             g.appendChild(l);
         }
-        for (i = 10.3; i < Y_MAX; i += 10.3) {
+        for (i = 6; i < Y_MAX; i += 6) {
             l = document.createElementNS(NS, 'line');
             l.setAttribute('x1', 0); l.setAttribute('y1', i);
             l.setAttribute('x2', 100); l.setAttribute('y2', i);
-            l.setAttribute('stroke', 'var(--grid-color)'); l.setAttribute('stroke-width', '0.25');
+            l.setAttribute('stroke', 'var(--grid-color)'); l.setAttribute('stroke-width', '0.09');
             g.appendChild(l);
         }
     })();
@@ -2816,10 +2831,10 @@
             var c = document.createElementNS(NS, 'circle');
             c.setAttribute('cx', p.x.toFixed(2));
             c.setAttribute('cy', p.y.toFixed(2));
-            c.setAttribute('r', '1.9');
+            c.setAttribute('class', 'vz-pt');
             c.setAttribute('fill', p.c ? 'var(--accent-secondary)' : 'var(--accent-primary)');
             c.setAttribute('stroke', 'var(--bg-body)');
-            c.setAttribute('stroke-width', '0.45');
+            c.setAttribute('stroke-width', '0.16');
             g.appendChild(c);
         });
     }
@@ -2853,7 +2868,7 @@
         state.points = makeData(seed);
         state.best = solve();
         state.machineShown = false;
-        state.y1 = 18; state.y2 = 58;
+        state.y1 = 11; state.y2 = 33;
         elMach.style.display = 'none';
         elMachScore.textContent = '—';
         elMachScore.classList.remove('is-set');
@@ -2940,7 +2955,11 @@
             var title = (a.querySelector('.card-title') || a).textContent.trim();
             if (!href || seen[href] || !title || href.indexOf('/') === -1) return;
             seen[href] = 1;
-            out.push({ href: href, title: title });
+            // Take the track name off the section heading. Deriving it from the
+            // directory printed "dsa" and "gen_ai" at the reader.
+            var sec = a.closest('.course-section');
+            var h = sec && sec.querySelector('h2');
+            out.push({ href: href, title: title, track: h ? h.textContent.trim() : '' });
         });
         catalogue = out;
         return out;
@@ -2974,7 +2993,7 @@
                 spinBtn.textContent = 'Spin';
                 spinOpen.href = pick.href;
                 spinOpen.classList.remove('vz-hidden');
-                spinTrack.textContent = pick.href.split('/')[0].replace(/_/g, ' ');
+                spinTrack.textContent = pick.track;
             }
         }, 80);
     });
