@@ -9,6 +9,11 @@
  * to spin forever on a well-formed statement the way a Python `while True`
  * can, so the timeout a worker buys is not worth the message-passing.
  *
+ * A page may hold several blocks - the database articles embed one per page
+ * beside the prose, and the lab has one. They all share a single database, so
+ * a CREATE in one block is visible to the next, which is what makes a page of
+ * worked examples behave like one session.
+ *
  * Markup the page supplies:
  *
  *   <div data-vz-sql>
@@ -28,22 +33,16 @@
 
     var SQL_URL = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/';
 
-    var root = document.querySelector('[data-vz-sql]');
-    if (!root) return;
+    var roots = [].slice.call(document.querySelectorAll('[data-vz-sql]'));
+    if (!roots.length) return;
 
-    var editor = root.querySelector('.sql-editor');
-    var runBtn = root.querySelector('.sql-run-btn');
-    var resetBtn = root.querySelector('.sql-reset-btn');
-    var status = root.querySelector('.sql-status');
-    var result = root.querySelector('.sql-result');
-    var schema = root.querySelector('.sql-schema');
-    var seed = root.querySelector('.sql-seed');
+    // One seed for the page, wherever it is declared. Every block runs against
+    // the same database.
+    var seed = document.querySelector('.sql-seed');
 
     var SQL = null;      // the sql.js module
     var db = null;       // the live database
     var loading = null;  // in-flight load, so two clicks share one download
-
-    function say(msg) { if (status) status.textContent = msg || ''; }
 
     function esc(s) {
         return String(s).replace(/[&<>"]/g, function (c) {
@@ -54,7 +53,6 @@
     function load() {
         if (SQL) return Promise.resolve(SQL);
         if (loading) return loading;
-        say('Loading SQLite…');
         loading = new Promise(function (resolve, reject) {
             var tag = document.createElement('script');
             tag.src = SQL_URL + 'sql-wasm.js';
@@ -63,17 +61,14 @@
             document.head.appendChild(tag);
         }).then(function () {
             return window.initSqlJs({ locateFile: function (f) { return SQL_URL + f; } });
-        }).then(function (mod) {
-            SQL = mod;
-            return SQL;
-        });
+        }).then(function (mod) { SQL = mod; return SQL; });
         return loading;
     }
 
     function fresh() {
         db = new SQL.Database();
         if (seed && seed.textContent.trim()) {
-            try { db.run(seed.textContent); } catch (e) { /* seed is ours; ignore */ }
+            try { db.run(seed.textContent); } catch (e) { /* seed is ours */ }
         }
     }
 
@@ -92,103 +87,112 @@
                '<thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
     }
 
+    // Every schema panel on the page, not just one: blocks share a database, so
+    // a CREATE in the last block has to show up in the first block's panel too.
     function drawSchema() {
-        if (!schema || !db) return;
+        var panels = document.querySelectorAll('.sql-schema');
+        if (!panels.length || !db) return;
         var out = '';
         try {
-            var res = db.exec(
-                "SELECT name FROM sqlite_master WHERE type='table' " +
-                "AND name NOT LIKE 'sqlite_%' ORDER BY name");
+            var res = db.exec("SELECT name FROM sqlite_master WHERE type='table' " +
+                              "AND name NOT LIKE 'sqlite_%' ORDER BY name");
             var names = res.length ? res[0].values.map(function (r) { return r[0]; }) : [];
             if (!names.length) {
-                schema.innerHTML = '<p class="sql-empty">No tables yet. ' +
-                                   'Run a <code>CREATE TABLE</code> to make one.</p>';
-                return;
+                out = '<p class="sql-empty">No tables yet. Run a <code>CREATE TABLE</code> to make one.</p>';
+            } else {
+                names.forEach(function (n) {
+                    var info = db.exec('PRAGMA table_info(' + JSON.stringify(n) + ')');
+                    var count = db.exec('SELECT COUNT(*) FROM ' + JSON.stringify(n));
+                    var rows = count.length ? count[0].values[0][0] : 0;
+                    var cols = info.length ? info[0].values.map(function (c) {
+                        return '<li><span class="sql-col">' + esc(c[1]) + '</span>' +
+                               '<span class="sql-type">' + esc(c[2] || '') + '</span></li>';
+                    }).join('') : '';
+                    out += '<div class="sql-tbl">' +
+                           '<div class="sql-tbl-head"><span class="sql-tbl-name">' + esc(n) + '</span>' +
+                           '<span class="sql-tbl-rows">' + rows + (rows === 1 ? ' row' : ' rows') +
+                           '</span></div><ul class="sql-cols">' + cols + '</ul></div>';
+                });
             }
-            names.forEach(function (n) {
-                var info = db.exec('PRAGMA table_info(' + JSON.stringify(n) + ')');
-                var count = db.exec('SELECT COUNT(*) FROM ' + JSON.stringify(n));
-                var rows = count.length ? count[0].values[0][0] : 0;
-                var cols = info.length ? info[0].values.map(function (c) {
-                    return '<li><span class="sql-col">' + esc(c[1]) + '</span>' +
-                           '<span class="sql-type">' + esc(c[2] || '') + '</span></li>';
-                }).join('') : '';
-                out += '<div class="sql-tbl">' +
-                       '<div class="sql-tbl-head"><span class="sql-tbl-name">' + esc(n) + '</span>' +
-                       '<span class="sql-tbl-rows">' + rows + (rows === 1 ? ' row' : ' rows') + '</span></div>' +
-                       '<ul class="sql-cols">' + cols + '</ul></div>';
-            });
-            schema.innerHTML = out;
         } catch (e) {
-            schema.innerHTML = '<p class="sql-empty">' + esc(e.message) + '</p>';
+            out = '<p class="sql-empty">' + esc(e.message) + '</p>';
         }
+        [].forEach.call(panels, function (el) { el.innerHTML = out; });
     }
 
-    // ------------------------------------------------------------------- run
+    // ----------------------------------------------------------- one block
 
-    function run() {
-        var sql = (editor.value || '').trim();
-        if (!sql) { say('Nothing to run.'); return; }
+    function attach(root) {
+        var editor = root.querySelector('.sql-editor');
+        var runBtn = root.querySelector('.sql-run-btn');
+        var resetBtn = root.querySelector('.sql-reset-btn');
+        var status = root.querySelector('.sql-status');
+        var result = root.querySelector('.sql-result');
+        if (!editor || !runBtn || !result) return;
 
-        load().then(function () {
-            if (!db) fresh();
+        function say(msg) { if (status) status.textContent = msg || ''; }
+
+        function run() {
+            var sql = (editor.value || '').trim();
+            if (!sql) { say('Nothing to run.'); return; }
             say('Running…');
-            var t0 = performance.now();
-            var out = '';
-            try {
-                // exec returns one result set per statement that produced rows.
-                var sets = db.exec(sql);
-                if (!sets.length) {
-                    // DDL/DML: report what changed instead of an empty table.
-                    var n = db.getRowsModified();
-                    out = '<p class="sql-ok">Statement ran. ' +
-                          (n ? n + (n === 1 ? ' row' : ' rows') + ' affected.' : 'No rows returned.') +
-                          '</p>';
-                } else {
-                    out = sets.map(function (s) {
-                        return table(s.columns, s.values) +
-                               '<p class="sql-count">' + s.values.length +
-                               (s.values.length === 1 ? ' row' : ' rows') + '</p>';
-                    }).join('');
+            load().then(function () {
+                if (!db) fresh();
+                var t0 = performance.now(), out = '';
+                try {
+                    var sets = db.exec(sql);
+                    if (!sets.length) {
+                        var n = db.getRowsModified();
+                        out = '<p class="sql-ok">Statement ran. ' +
+                              (n ? n + (n === 1 ? ' row' : ' rows') + ' affected.' : 'No rows returned.') +
+                              '</p>';
+                    } else {
+                        out = sets.map(function (r) {
+                            return table(r.columns, r.values) +
+                                   '<p class="sql-count">' + r.values.length +
+                                   (r.values.length === 1 ? ' row' : ' rows') + '</p>';
+                        }).join('');
+                    }
+                    say('Ran in ' + Math.max(1, Math.round(performance.now() - t0)) + ' ms');
+                } catch (e) {
+                    out = '<pre class="sql-error">' + esc(e.message) + '</pre>';
+                    say('Error');
                 }
-                say('Ran in ' + Math.max(1, Math.round(performance.now() - t0)) + ' ms');
-            } catch (e) {
-                out = '<pre class="sql-error">' + esc(e.message) + '</pre>';
-                say('Error');
-            }
-            result.innerHTML = out;
-            drawSchema();
-        }).catch(function (e) {
-            result.innerHTML = '<pre class="sql-error">' + esc(e.message) + '</pre>';
-            say('Could not start SQLite');
+                result.innerHTML = out;
+                drawSchema();
+            }).catch(function (e) {
+                result.innerHTML = '<pre class="sql-error">' + esc(e.message) + '</pre>';
+                say('Could not start SQLite');
+            });
+        }
+
+        runBtn.addEventListener('click', run);
+        editor.addEventListener('keydown', function (e) {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { run(); e.preventDefault(); }
         });
+
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function () {
+                load().then(function () {
+                    fresh();
+                    result.innerHTML = '';
+                    say('Database reset to the sample tables.');
+                    drawSchema();
+                });
+            });
+        }
+
+        return say;
     }
 
-    runBtn.addEventListener('click', run);
-
-    // Ctrl/Cmd+Enter runs, which is what every SQL client does.
-    editor.addEventListener('keydown', function (e) {
-        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { run(); e.preventDefault(); }
-    });
-
-    resetBtn.addEventListener('click', function () {
-        load().then(function () {
-            fresh();
-            result.innerHTML = '';
-            say('Database reset to the sample tables.');
-            drawSchema();
-        });
-    });
+    var says = roots.map(attach).filter(Boolean);
 
     // Show the starting schema without making anyone press Run first.
     load().then(function () {
         fresh();
-        say('Ready. Ctrl+Enter runs.');
+        says.forEach(function (say) { say('Ready. Ctrl+Enter runs.'); });
         drawSchema();
     }).catch(function () {
-        if (schema) {
-            schema.innerHTML = '<p class="sql-empty">SQLite could not be loaded. ' +
-                               'Check your connection and reload.</p>';
-        }
+        says.forEach(function (say) { say('SQLite could not be loaded.'); });
     });
 })();
