@@ -12,6 +12,14 @@ Each entry is (date, title, [lines]).
 """
 
 CHANGES = [
+    ("2026-08-11", "JavaScript and HTML labs", [
+        "A JavaScript compiler at /js-lab/ runs on your browser's own engine, "
+        "in a worker thread, with the console mirrored back into the page.",
+        "An HTML playground at /html-lab/ renders your markup and inline "
+        "scripts in a sandboxed preview, with console output shown below it.",
+        "Both run entirely offline - no interpreter to download, nothing "
+        "uploaded - joining the Python compiler and SQL playground.",
+    ]),
     ("2026-08-05", "Bookmarks, notes, a glossary and a print stylesheet", [
         "Bookmark any module from its header, with a note if you want one, and "
         "read them all back on /saved/. Stored in your browser only.",

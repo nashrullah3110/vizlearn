@@ -94,6 +94,24 @@ Four now, where there used to be two:
 `tools/lib_pages.py` holds what each of these is, and `tools/lib_shell.py` the
 HTML frame the generated ones share.
 
+## Scratchpads
+
+Four whole-page labs render in the same tool-page frame, each a single large
+editor block plus a sidebar:
+
+- `/python-lab/` — `tools/build_python_lab.py`, real CPython (Pyodide) in a
+  worker;
+- `/sql-lab/` — `tools/build_sql_lab.py`, real SQLite (sql.js) in the tab;
+- `/js-lab/` — `tools/build_js_lab.py`, the browser's own engine in a worker,
+  console mirrored back into the page;
+- `/html-lab/` — `tools/build_html_lab.py`, markup rendered in a sandboxed
+  iframe with console forwarding.
+
+The JS and HTML runtimes need nothing downloaded, so `vizlearn-js.js` and
+`vizlearn-html.js` sit in the shared script block like `vizlearn-python.js`;
+Python and SQL load their interpreters from the CDN on first run. The editor,
+highlighting and console styling are all the shared `.vz-code` system.
+
 ## The lab layer
 
 `tools/build_labs.py` adds three things to every module, driven by JSON it

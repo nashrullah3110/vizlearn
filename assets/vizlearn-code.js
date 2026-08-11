@@ -14,7 +14,7 @@
  *
  * Markup the page supplies:
  *
- *   <div class="vz-code" data-vz-code="python">     (or "sql")
+ *   <div class="vz-code" data-vz-code="python">     (or "sql", "javascript", "html")
  *     <div class="vz-code-gutter" aria-hidden="true"></div>
  *     <div class="vz-code-scroll">
  *       <pre class="vz-code-hl" aria-hidden="true"></pre>
@@ -64,6 +64,25 @@
         'UPPER|TRIM|SUBSTR|REPLACE|ROW_NUMBER|RANK|DENSE_RANK|NTILE|LAG|LEAD|FIRST_VALUE|' +
         'LAST_VALUE|GROUP_CONCAT|STRFTIME|DATE|TOTAL').split('|');
 
+    var JS_KEYWORDS = ('async|await|break|case|catch|class|const|continue|debugger|default|' +
+        'delete|do|else|export|extends|finally|for|function|if|import|in|instanceof|let|new|' +
+        'of|return|static|super|switch|this|throw|try|typeof|var|void|while|with|yield')
+        .split('|');
+
+    var JS_BUILTINS = ('console|Math|JSON|Object|Array|String|Number|Boolean|Promise|Set|Map|' +
+        'Symbol|Date|RegExp|Error|TypeError|RangeError|ReferenceError|SyntaxError|parseInt|' +
+        'parseFloat|isNaN|isFinite|undefined|NaN|Infinity|BigInt|window|document|globalThis')
+        .split('|');
+
+    var HTML_TAGS = ('a|abbr|address|area|article|aside|audio|b|base|bdi|bdo|blockquote|body|' +
+        'br|button|canvas|caption|cite|code|col|colgroup|data|datalist|dd|del|details|dfn|div|' +
+        'dl|dt|em|embed|fieldset|figcaption|figure|footer|form|h1|h2|h3|h4|h5|h6|head|header|' +
+        'hgroup|hr|html|i|iframe|img|input|ins|kbd|label|legend|li|link|main|map|mark|menu|' +
+        'meta|meter|nav|noscript|object|ol|optgroup|option|output|p|picture|pre|progress|q|rp|' +
+        'rt|ruby|s|samp|script|search|section|select|slot|small|source|span|strong|style|sub|' +
+        'summary|sup|table|tbody|td|template|textarea|tfoot|th|thead|time|title|tr|track|u|ul|' +
+        'var|video|wbr|svg|path|circle|rect|g|linearGradient|stop').split('|');
+
     function wordSet(list) {
         var m = {};
         list.forEach(function (w) { m[w.toLowerCase()] = 1; });
@@ -72,6 +91,8 @@
 
     var PY_KW = wordSet(PY_KEYWORDS), PY_BI = wordSet(PY_BUILTINS);
     var SQL_KW = wordSet(SQL_KEYWORDS), SQL_TY = wordSet(SQL_TYPES), SQL_FN = wordSet(SQL_FUNCS);
+    var JS_KW = wordSet(JS_KEYWORDS), JS_BI = wordSet(JS_BUILTINS);
+    var HTML_TAG = wordSet(HTML_TAGS);
 
     // Comments and strings first, then numbers, then bare words.
     var PY_RE = new RegExp([
@@ -89,6 +110,21 @@
         '(\\b\\d+\\.?\\d*\\b)',                              // 3 number
         '\\b([A-Za-z_][\\w]*)\\b'                            // 4 word
     ].join('|'), 'g');
+
+    var JS_RE = new RegExp([
+        '(//[^\\n]*|/\\*[\\s\\S]*?\\*/)',                    // 1 comment
+        '(`(?:\\\\.|[^`\\\\])*`|"(?:\\\\.|[^"\\\\\\n])*"|\'(?:\\\\.|[^\'\\\\\\n])*\')', // 2 string / template
+        '(\\b\\d[\\d_]*(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b)',  // 3 number
+        '\\b([A-Za-z_$][\\w$]*)\\b'                          // 4 word
+    ].join('|'), 'g');
+
+    var HTML_RE = new RegExp([
+        '(<!--[\\s\\S]*?-->)',                               // 1 comment
+        '(<![^>]*>)',                                        // 2 doctype / declaration
+        '(</?[A-Za-z][^>]*>)'                                // 3 tag (name + attributes)
+    ].join('|'), 'g');
+
+    var HTML_ATTR = /([A-Za-z_:][A-Za-z0-9_:.\-]*)(\s*=\s*)?("[^"]*"|'[^']*')?/g;
 
     function tag(cls, text) {
         return '<span class="t-' + cls + '">' + esc(text) + '</span>';
@@ -142,7 +178,73 @@
         return out + esc(src.slice(last));
     }
 
-    var HIGHLIGHT = { python: highlightPython, sql: highlightSql };
+    function highlightJavascript(src) {
+        var out = '', last = 0, m;
+        JS_RE.lastIndex = 0;
+        while ((m = JS_RE.exec(src)) !== null) {
+            out += esc(src.slice(last, m.index));
+            if (m[1]) out += tag('com', m[1]);
+            else if (m[2]) out += tag('str', m[2]);
+            else if (m[3]) out += tag('num', m[3]);
+            else if (m[4]) {
+                var w = m[4];
+                // `console.log` -> `console` is a builtin, `log` is a call.
+                var after = src.slice(m.index + w.length).match(/^\s*\(/);
+                if (JS_KW[w]) out += tag('kw', w);
+                else if (JS_BI[w]) out += tag('bi', w);
+                else if (after) out += tag('fn', w);
+                else out += esc(w);
+            } else {
+                out += esc(m[0]);
+            }
+            last = m.index + m[0].length;
+        }
+        return out + esc(src.slice(last));
+    }
+
+    function highlightAttrs(s) {
+        var out = '', last = 0, m;
+        HTML_ATTR.lastIndex = 0;
+        while ((m = HTML_ATTR.exec(s)) !== null) {
+            out += esc(s.slice(last, m.index));
+            out += tag('bi', m[1]);              // attribute name
+            if (m[2]) out += esc(m[2]);          // the `=` and surrounding spaces
+            if (m[3]) out += tag('str', m[3]);   // quoted value
+            last = m.index + m[0].length;
+        }
+        return out + esc(s.slice(last));
+    }
+
+    function highlightHtml(src) {
+        var out = '', last = 0, m;
+        HTML_RE.lastIndex = 0;
+        while ((m = HTML_RE.exec(src)) !== null) {
+            out += esc(src.slice(last, m.index));
+            if (m[1]) out += tag('com', m[1]);
+            else if (m[2]) out += tag('kw', m[2]);
+            else if (m[3]) {
+                // Split a tag into `<` + optional `/`, the name, the attributes,
+                // and the closing `>` / `/>`, colouring each part.
+                var t = /^(<\/?)([A-Za-z][A-Za-z0-9:-]*)([\s\S]*?)(\/?>)$/.exec(m[3]);
+                if (!t) {
+                    out += esc(m[3]);
+                } else {
+                    out += esc(t[1]) + tag('kw', t[2]) + highlightAttrs(t[3]) + esc(t[4]);
+                }
+            } else {
+                out += esc(m[0]);
+            }
+            last = m.index + m[0].length;
+        }
+        return out + esc(src.slice(last));
+    }
+
+    var HIGHLIGHT = {
+        python: highlightPython,
+        sql: highlightSql,
+        javascript: highlightJavascript,
+        html: highlightHtml,
+    };
 
     // ----------------------------------------------------------------- wiring
 

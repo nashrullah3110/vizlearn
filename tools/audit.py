@@ -21,6 +21,14 @@ def check(cond, msg):
         problems.append(msg)
 
 
+# Contents of <script type="text/plain"> blocks are data the page's runners
+# read verbatim, not markup - a JS starter can legitimately contain "<script>"
+# and an HTML starter a second "<h1>". Strip them before the structural checks,
+# the same way check_inline_js.js skips them as "not code".
+TEXT_PLAIN = re.compile(
+    r'<script\b[^>]*type=["\']text/plain["\'][^>]*>[\s\S]*?</script>')
+
+
 def main():
     files = sorted(glob.glob(os.path.join(ROOT, "*", "*.html")))
     files = [f for f in files
@@ -44,11 +52,12 @@ def main():
         check("ns0:" not in s, "%s: namespaced SVG tag (ns0:) would not render" % rel)
 
         # --- document structure ---
-        h1 = len(re.findall(r"<h1[\s>]", s))
+        s_struct = TEXT_PLAIN.sub("", s)
+        h1 = len(re.findall(r"<h1[\s>]", s_struct))
         check(h1 == 1, "%s: has %d <h1> (expected 1)" % (rel, h1))
-        check(s.count("</html>") == 1, "%s: %d </html> tags" % (rel, s.count("</html>")))
-        check(s.count("</body>") == 1, "%s: %d </body> tags" % (rel, s.count("</body>")))
-        check(s.count("<script") == s.count("</script>"),
+        check(s_struct.count("</html>") == 1, "%s: %d </html> tags" % (rel, s_struct.count("</html>")))
+        check(s_struct.count("</body>") == 1, "%s: %d </body> tags" % (rel, s_struct.count("</body>")))
+        check(s_struct.count("<script") == s_struct.count("</script>"),
               "%s: unbalanced script tags" % rel)
 
         tm = re.search(r"<title>(.*?)</title>", s, re.S)

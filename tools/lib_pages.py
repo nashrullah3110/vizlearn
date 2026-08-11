@@ -302,6 +302,28 @@ TOOL_PAGES = {
                        "against a real SQLite database in your browser, and see the "
                        "tables and query results immediately.",
     },
+    "js-lab": {
+        "dir": "js-lab",
+        "rel": "js-lab/index.html",
+        "title": "JavaScript Compiler",
+        "footer": True,
+        "lead": "Write JavaScript and run it. Your browser's own engine in a worker "
+                "thread - no install, no account, nothing sent to a server.",
+        "description": "A free online JavaScript compiler. Write and run real "
+                       "JavaScript in your browser with no setup - the engine runs "
+                       "in a Web Worker, entirely on your own machine.",
+    },
+    "html-lab": {
+        "dir": "html-lab",
+        "rel": "html-lab/index.html",
+        "title": "HTML Playground",
+        "footer": True,
+        "lead": "Write HTML, CSS and inline scripts and see them render instantly "
+                "in a sandboxed preview - no tooling, nothing uploaded.",
+        "description": "A free online HTML playground. Write HTML with CSS and "
+                       "inline JavaScript, and see a live sandboxed preview in your "
+                       "browser - entirely offline, with console output shown as you go.",
+    },
     "saved": {
         "dir": "saved",
         "rel": "saved/index.html",
