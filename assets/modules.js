@@ -2087,3 +2087,958 @@ window.VIZLEARN_PATH = [
   ]
  }
 ];
+
+window.VIZLEARN_PATHS = [
+ {
+  "key": "start",
+  "title": "Start from scratch",
+  "blurb": "No background assumed. The maths everything leans on, your first models, then enough of each specialism to choose one.",
+  "stages": [
+   {
+    "title": "Groundwork",
+    "blurb": "The handful of maths ideas everything else leans on.",
+    "modules": [
+     {
+      "title": "Equation of a Line (y = mx + c)",
+      "path": "maths/equation_of_line.html",
+      "category": "Maths"
+     },
+     {
+      "title": "Vectors and the Dot Product",
+      "path": "maths/vectors_and_dot_product.html",
+      "category": "Maths"
+     },
+     {
+      "title": "Derivatives and Slope",
+      "path": "maths/derivatives_and_slope.html",
+      "category": "Maths"
+     },
+     {
+      "title": "Mean, Variance and Standard Deviation",
+      "path": "maths/mean_variance_standard_deviation.html",
+      "category": "Maths"
+     },
+     {
+      "title": "Probability Basics",
+      "path": "maths/probability_basics.html",
+      "category": "Maths"
+     }
+    ]
+   },
+   {
+    "title": "Your first models",
+    "blurb": "Split the data, fit something simple, then find out if it worked.",
+    "modules": [
+     {
+      "title": "Train-Test Split Method",
+      "path": "machine_learning/train_test_split.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "One-Hot Encoding",
+      "path": "machine_learning/one_hot_encoding.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Linear Regression with OLS",
+      "path": "machine_learning/linear_regression_with_ols.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "K-Nearest Neighbors",
+      "path": "machine_learning/knn.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Logistic Regression",
+      "path": "machine_learning/logistic_regression.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Confusion Matrix Analysis",
+      "path": "machine_learning/confusion_matrix.html",
+      "category": "Machine Learning"
+     }
+    ]
+   },
+   {
+    "title": "How learning actually works",
+    "blurb": "From one neuron to a network that trains itself downhill.",
+    "modules": [
+     {
+      "title": "Perceptron Classifier",
+      "path": "deep_learning/perceptron.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Activation Functions in DL",
+      "path": "deep_learning/activation_functions.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "How Loss is Calculated",
+      "path": "deep_learning/how_loss_is_calculated.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Gradient Descent",
+      "path": "deep_learning/gradient_descent_training.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Neural Network Visualizer",
+      "path": "deep_learning/neural_network.html",
+      "category": "Deep Learning"
+     }
+    ]
+   },
+   {
+    "title": "Making training behave",
+    "blurb": "The failure modes every practitioner meets, and their fixes.",
+    "modules": [
+     {
+      "title": "Overfitting vs Underfitting",
+      "path": "deep_learning/overfitting_vs_underfitting.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "K-Fold Cross Validation",
+      "path": "machine_learning/cross_validation.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Dropout Regularization",
+      "path": "deep_learning/dropout_in_neural_networks.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Early Stopping",
+      "path": "deep_learning/early_stopping_in_neural_networks.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Model Training Curves",
+      "path": "deep_learning/model_training_curve.html",
+      "category": "Deep Learning"
+     }
+    ]
+   },
+   {
+    "title": "Pick a specialism",
+    "blurb": "Same foundations, four directions. Start wherever you like.",
+    "modules": [
+     {
+      "title": "Convolutional Layer",
+      "path": "computer_vision/feature_map_in_cnn.html",
+      "category": "Computer Vision"
+     },
+     {
+      "title": "What are Embeddings?",
+      "path": "natural_language_processing/what_are_embeddings.html",
+      "category": "NLP"
+     },
+     {
+      "title": "How LLMs Predict the Next Word?",
+      "path": "gen_ai/how_llms_predict_next_word.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "Big-O Notation and Time Complexity",
+      "path": "dsa/big_o_notation.html",
+      "category": "Algorithms"
+     },
+     {
+      "title": "SQL Joins Visualizer",
+      "path": "database/joins_in_sql.html",
+      "category": "Database"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "python",
+  "title": "Python",
+  "blurb": "The language every other track writes its examples in. Real code, run in the browser, from your first print to your own functions.",
+  "stages": [
+   {
+    "title": "First lines",
+    "blurb": "Get something running, then learn what a variable actually holds.",
+    "modules": [
+     {
+      "title": "Hello, Python!",
+      "path": "python/hello_python.html",
+      "category": "Python"
+     },
+     {
+      "title": "Variables and Types",
+      "path": "python/variables_and_types.html",
+      "category": "Python"
+     },
+     {
+      "title": "Numbers and Operators",
+      "path": "python/numbers_and_operators.html",
+      "category": "Python"
+     }
+    ]
+   },
+   {
+    "title": "Working with data",
+    "blurb": "The three containers almost every Python program is built from.",
+    "modules": [
+     {
+      "title": "Strings and Slicing",
+      "path": "python/strings_and_slicing.html",
+      "category": "Python"
+     },
+     {
+      "title": "Lists and Indexing",
+      "path": "python/lists_and_indexing.html",
+      "category": "Python"
+     },
+     {
+      "title": "Dictionaries",
+      "path": "python/dictionaries.html",
+      "category": "Python"
+     }
+    ]
+   },
+   {
+    "title": "Making decisions",
+    "blurb": "Comparisons produce True and False; branches act on them.",
+    "modules": [
+     {
+      "title": "Booleans and Comparisons",
+      "path": "python/booleans_and_comparisons.html",
+      "category": "Python"
+     },
+     {
+      "title": "If, Elif and Else",
+      "path": "python/if_elif_else.html",
+      "category": "Python"
+     }
+    ]
+   },
+   {
+    "title": "Doing it repeatedly",
+    "blurb": "Loops, and knowing which of the two you need.",
+    "modules": [
+     {
+      "title": "For Loops and range()",
+      "path": "python/for_loops_and_range.html",
+      "category": "Python"
+     },
+     {
+      "title": "While Loops, break and continue",
+      "path": "python/while_loops_and_control.html",
+      "category": "Python"
+     }
+    ]
+   },
+   {
+    "title": "Your own building blocks",
+    "blurb": "Package work behind a name, and read the traceback when it breaks.",
+    "modules": [
+     {
+      "title": "Functions and Return Values",
+      "path": "python/functions_and_return.html",
+      "category": "Python"
+     },
+     {
+      "title": "Reading Errors and Tracebacks",
+      "path": "python/reading_errors.html",
+      "category": "Python"
+     },
+     {
+      "title": "Python List Lab",
+      "path": "dsa/lists_in_python.html",
+      "category": "Algorithms"
+     },
+     {
+      "title": "Python Dictionary Lab",
+      "path": "dsa/dictionaries_in_python.html",
+      "category": "Algorithms"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "ml",
+  "title": "Machine Learning",
+  "blurb": "Classical models end to end: prepare the data, fit something, and find out honestly whether it worked.",
+  "stages": [
+   {
+    "title": "The maths you will actually use",
+    "blurb": "Four ideas that turn up in every model on this path.",
+    "modules": [
+     {
+      "title": "Mean, Variance and Standard Deviation",
+      "path": "maths/mean_variance_standard_deviation.html",
+      "category": "Maths"
+     },
+     {
+      "title": "Probability Basics",
+      "path": "maths/probability_basics.html",
+      "category": "Maths"
+     },
+     {
+      "title": "Vectors and the Dot Product",
+      "path": "maths/vectors_and_dot_product.html",
+      "category": "Maths"
+     },
+     {
+      "title": "Distance Metrics",
+      "path": "maths/distance_metrics.html",
+      "category": "Maths"
+     }
+    ]
+   },
+   {
+    "title": "Getting data ready",
+    "blurb": "Everything that has to happen before a model sees a single row.",
+    "modules": [
+     {
+      "title": "Train-Test Split Method",
+      "path": "machine_learning/train_test_split.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Label Encoding Process",
+      "path": "machine_learning/label_encoding.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "One-Hot Encoding",
+      "path": "machine_learning/one_hot_encoding.html",
+      "category": "Machine Learning"
+     }
+    ]
+   },
+   {
+    "title": "Your first models",
+    "blurb": "A line, a probability, and a vote among neighbours.",
+    "modules": [
+     {
+      "title": "Linear Regression with OLS",
+      "path": "machine_learning/linear_regression_with_ols.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Logistic Regression",
+      "path": "machine_learning/logistic_regression.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "K-Nearest Neighbors",
+      "path": "machine_learning/knn.html",
+      "category": "Machine Learning"
+     }
+    ]
+   },
+   {
+    "title": "Did it actually work?",
+    "blurb": "The half of machine learning that decides whether the other half mattered.",
+    "modules": [
+     {
+      "title": "Evaluation Metrics for Regression",
+      "path": "machine_learning/evaluation_metrics_for_regression.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Confusion Matrix Analysis",
+      "path": "machine_learning/confusion_matrix.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "ROC Curve and AUC",
+      "path": "machine_learning/roc_curve_and_auc.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "K-Fold Cross Validation",
+      "path": "machine_learning/cross_validation.html",
+      "category": "Machine Learning"
+     }
+    ]
+   },
+   {
+    "title": "Trees, forests and boosting",
+    "blurb": "The models that win on tabular data, in the order they were invented.",
+    "modules": [
+     {
+      "title": "Decision Tree Analysis",
+      "path": "machine_learning/decision_tree.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Random Forest and Bagging",
+      "path": "machine_learning/random_forest.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Gradient Boosting",
+      "path": "machine_learning/gradient_boosting.html",
+      "category": "Machine Learning"
+     }
+    ]
+   },
+   {
+    "title": "The rest of the toolbox",
+    "blurb": "Margins, probabilities, clusters and dimensions.",
+    "modules": [
+     {
+      "title": "Support Vector Machines",
+      "path": "machine_learning/svm.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Naive Bayes Classifier",
+      "path": "machine_learning/naive_bayes.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "K-Means Clustering",
+      "path": "machine_learning/k_means.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Principal Component Analysis",
+      "path": "machine_learning/pca.html",
+      "category": "Machine Learning"
+     }
+    ]
+   },
+   {
+    "title": "What goes wrong in production",
+    "blurb": "The four failures that account for most disappointing models.",
+    "modules": [
+     {
+      "title": "Bias vs Variance",
+      "path": "machine_learning/bias_vs_variance.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Ridge and Lasso Regression",
+      "path": "machine_learning/ridge_and_lasso_regression.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Training on Imbalanced Dataset",
+      "path": "machine_learning/training_on_label_imbalanced_dataset.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Model and Data Drift",
+      "path": "machine_learning/model_and_data_drift.html",
+      "category": "Machine Learning"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "dl",
+  "title": "Deep Learning",
+  "blurb": "One neuron to a network that trains itself, then everything that makes training behave.",
+  "stages": [
+   {
+    "title": "One neuron",
+    "blurb": "A weighted sum, a bias, an activation. Everything deeper is this repeated.",
+    "modules": [
+     {
+      "title": "Perceptron Classifier",
+      "path": "deep_learning/perceptron.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Weights & Biases",
+      "path": "deep_learning/weights_and_biases.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Activation Functions in DL",
+      "path": "deep_learning/activation_functions.html",
+      "category": "Deep Learning"
+     }
+    ]
+   },
+   {
+    "title": "Learning by going downhill",
+    "blurb": "Measure the error, follow the slope, and push it back through the layers.",
+    "modules": [
+     {
+      "title": "How Loss is Calculated",
+      "path": "deep_learning/how_loss_is_calculated.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Gradient Descent",
+      "path": "deep_learning/gradient_descent_training.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Backpropagation and the Computational Graph",
+      "path": "deep_learning/backpropagation.html",
+      "category": "Deep Learning"
+     }
+    ]
+   },
+   {
+    "title": "A whole network",
+    "blurb": "Stack the neurons and pick an output that suits the task.",
+    "modules": [
+     {
+      "title": "Neural Network Visualizer",
+      "path": "deep_learning/neural_network.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Softmax and Cross-Entropy",
+      "path": "deep_learning/softmax_and_cross_entropy.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Neural Network for Regression",
+      "path": "deep_learning/neural_network_for_regression.html",
+      "category": "Deep Learning"
+     }
+    ]
+   },
+   {
+    "title": "Making training work at all",
+    "blurb": "Scale, initialisation, batches and the optimiser - before any clever tricks.",
+    "modules": [
+     {
+      "title": "Feature Scaling & Weight Bias",
+      "path": "deep_learning/feature_scaling_in_neural_networks.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Weight Initialization Methods",
+      "path": "deep_learning/weight_initialization.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Batch Processing in Networks",
+      "path": "deep_learning/batch_processing_in_neural_networks.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Optimizers in Neural Networks",
+      "path": "deep_learning/optimizers_in_neural_networks.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Learning Rate Scheduling",
+      "path": "deep_learning/learning_rate_scheduling.html",
+      "category": "Deep Learning"
+     }
+    ]
+   },
+   {
+    "title": "When training breaks",
+    "blurb": "Reading the curve, and the two ways gradients fail with depth.",
+    "modules": [
+     {
+      "title": "Model Training Curves",
+      "path": "deep_learning/model_training_curve.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Overfitting vs Underfitting",
+      "path": "deep_learning/overfitting_vs_underfitting.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Vanishing & Exploding Gradients",
+      "path": "deep_learning/vanishing_vs_exploding_gradient.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Gradient Clipping",
+      "path": "deep_learning/gradient_clipping.html",
+      "category": "Deep Learning"
+     }
+    ]
+   },
+   {
+    "title": "The standard fixes",
+    "blurb": "What every modern architecture includes by default, and why.",
+    "modules": [
+     {
+      "title": "Dropout Regularization",
+      "path": "deep_learning/dropout_in_neural_networks.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Regularization Techniques",
+      "path": "deep_learning/regularization_in_neural_networks.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Early Stopping",
+      "path": "deep_learning/early_stopping_in_neural_networks.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Batch Normalization in Deep Networks",
+      "path": "deep_learning/batch_normalization.html",
+      "category": "Deep Learning"
+     },
+     {
+      "title": "Residual and Skip Connections",
+      "path": "deep_learning/residual_connections.html",
+      "category": "Deep Learning"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "genai",
+  "title": "Generative AI & LLMs",
+  "blurb": "How text becomes numbers, how attention replaced recurrence, and what it takes to actually serve a model.",
+  "stages": [
+   {
+    "title": "Text into numbers",
+    "blurb": "A model never sees words. This is what it sees instead.",
+    "modules": [
+     {
+      "title": "How LLMs Process Text?",
+      "path": "gen_ai/how_llms_process_text.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "Byte Pair Encoding Tokenizer",
+      "path": "gen_ai/byte_pair_encoding_tokenizer.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "What are Embeddings?",
+      "path": "natural_language_processing/what_are_embeddings.html",
+      "category": "NLP"
+     },
+     {
+      "title": "How are Embeddings Generated?",
+      "path": "natural_language_processing/how_are_embeddings_generated.html",
+      "category": "NLP"
+     }
+    ]
+   },
+   {
+    "title": "Why sequences were hard",
+    "blurb": "The recurrent approach attention replaced - worth seeing before the fix.",
+    "modules": [
+     {
+      "title": "What is a Sequence?",
+      "path": "natural_language_processing/what_is_a_sequence.html",
+      "category": "NLP"
+     },
+     {
+      "title": "What is a Recurrent Cell?",
+      "path": "natural_language_processing/what_is_a_recurrent_cell.html",
+      "category": "NLP"
+     },
+     {
+      "title": "Vanishing Gradient Problem in RNN",
+      "path": "natural_language_processing/vanishing_gradient_problem_in_rnn.html",
+      "category": "NLP"
+     },
+     {
+      "title": "What is LSTM?",
+      "path": "natural_language_processing/what_is_lstm.html",
+      "category": "NLP"
+     }
+    ]
+   },
+   {
+    "title": "Attention",
+    "blurb": "The mechanism the whole field now rests on, built up one piece at a time.",
+    "modules": [
+     {
+      "title": "The Attention Mechanism",
+      "path": "natural_language_processing/attention_mechanism.html",
+      "category": "NLP"
+     },
+     {
+      "title": "Query, Key and Value",
+      "path": "natural_language_processing/query_key_value.html",
+      "category": "NLP"
+     },
+     {
+      "title": "Self-Attention",
+      "path": "natural_language_processing/self_attention.html",
+      "category": "NLP"
+     },
+     {
+      "title": "Multi-Head Attention",
+      "path": "natural_language_processing/multi_head_attention.html",
+      "category": "NLP"
+     },
+     {
+      "title": "Positional Encoding",
+      "path": "natural_language_processing/positional_encoding.html",
+      "category": "NLP"
+     },
+     {
+      "title": "The Transformer Architecture",
+      "path": "natural_language_processing/transformer_architecture.html",
+      "category": "NLP"
+     }
+    ]
+   },
+   {
+    "title": "How a language model is trained",
+    "blurb": "Two objectives, and the split between the models they produced.",
+    "modules": [
+     {
+      "title": "Causal Language Modeling",
+      "path": "gen_ai/casual_language_modeling.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "What is Masked Language Modeling?",
+      "path": "gen_ai/masked_language_modeling.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "Encoder-only vs Decoder-only (BERT vs GPT)",
+      "path": "natural_language_processing/bert_vs_gpt.html",
+      "category": "NLP"
+     },
+     {
+      "title": "How LLMs Predict the Next Word?",
+      "path": "gen_ai/how_llms_predict_next_word.html",
+      "category": "Gen AI"
+     }
+    ]
+   },
+   {
+    "title": "Retrieval, properly",
+    "blurb": "Most production LLM work is a retrieval problem wearing a generation hat.",
+    "modules": [
+     {
+      "title": "Embeddings and Vector Search",
+      "path": "gen_ai/embeddings_and_vector_search.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "Chunking Strategies for RAG",
+      "path": "gen_ai/chunking_strategies_for_rag.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "Retrieval-Augmented Generation (RAG)",
+      "path": "gen_ai/rag.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "Hybrid Search: Dense + Sparse (Reciprocal Rank Fusion)",
+      "path": "gen_ai/hybrid_search_reciprocal_rank_fusion.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "Re-ranking: Bi-Encoders vs Cross-Encoders",
+      "path": "gen_ai/reranking_bi_encoders_vs_cross_encoders.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "Retrieval Evaluation Metrics",
+      "path": "gen_ai/retrieval_evaluation_metrics.html",
+      "category": "Gen AI"
+     }
+    ]
+   },
+   {
+    "title": "Making it servable",
+    "blurb": "Adaptation and efficiency: what each technique trades away, and for what.",
+    "modules": [
+     {
+      "title": "Context Windows and the KV Cache",
+      "path": "gen_ai/context_window_and_kv_cache.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "Quantization in LLMs",
+      "path": "gen_ai/quantization_in_llms.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "LoRA in LLMs",
+      "path": "gen_ai/lora_in_llms.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "Fine-Tuning vs RLHF and DPO",
+      "path": "gen_ai/fine_tuning_vs_rlhf.html",
+      "category": "Gen AI"
+     },
+     {
+      "title": "Hallucination and Grounding",
+      "path": "gen_ai/hallucination_and_grounding.html",
+      "category": "Gen AI"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "data-analytics",
+  "title": "Data Analytics",
+  "blurb": "Get the data out with SQL, describe it honestly with statistics, and know where analysis stops and prediction starts.",
+  "stages": [
+   {
+    "title": "Reading data with SQL",
+    "blurb": "The clauses that answer most questions anyone will actually ask you.",
+    "modules": [
+     {
+      "title": "What are Relational Databases?",
+      "path": "database/what_are_relational_databases.html",
+      "category": "Database"
+     },
+     {
+      "title": "Datatypes in SQL",
+      "path": "database/datatypes_in_sql.html",
+      "category": "Database"
+     },
+     {
+      "title": "Where Clause in SQL",
+      "path": "database/where_clause_in_sql.html",
+      "category": "Database"
+     },
+     {
+      "title": "ORDER BY in SQL",
+      "path": "database/order_by_in_sql.html",
+      "category": "Database"
+     },
+     {
+      "title": "Limit and Offset in SQL",
+      "path": "database/limit_and_offset_in_sql.html",
+      "category": "Database"
+     }
+    ]
+   },
+   {
+    "title": "Summarising",
+    "blurb": "Grouping, filtering groups, and why the clause order explains the errors.",
+    "modules": [
+     {
+      "title": "SQL GroupBy Visualizer",
+      "path": "database/groupby_in_sql.html",
+      "category": "Database"
+     },
+     {
+      "title": "HAVING in SQL",
+      "path": "database/having_in_sql.html",
+      "category": "Database"
+     },
+     {
+      "title": "Query Execution Order in SQL",
+      "path": "database/query_execution_order.html",
+      "category": "Database"
+     },
+     {
+      "title": "CASE and Views in SQL",
+      "path": "database/case_and_views_in_sql.html",
+      "category": "Database"
+     }
+    ]
+   },
+   {
+    "title": "Combining tables",
+    "blurb": "Where the real data lives: across several tables at once.",
+    "modules": [
+     {
+      "title": "SQL Joins Visualizer",
+      "path": "database/joins_in_sql.html",
+      "category": "Database"
+     },
+     {
+      "title": "UNION, INTERSECT and EXCEPT in SQL",
+      "path": "database/union_intersect_except_in_sql.html",
+      "category": "Database"
+     },
+     {
+      "title": "Subqueries in SQL",
+      "path": "database/subqueries_in_sql.html",
+      "category": "Database"
+     },
+     {
+      "title": "Common Table Expressions in SQL",
+      "path": "database/common_table_expressions_in_sql.html",
+      "category": "Database"
+     }
+    ]
+   },
+   {
+    "title": "Analytical SQL",
+    "blurb": "Window functions, missing data, and why a query suddenly got slow.",
+    "modules": [
+     {
+      "title": "SQL Window Functions",
+      "path": "database/window_functions_in_sql.html",
+      "category": "Database"
+     },
+     {
+      "title": "NULL Handling and COALESCE in SQL",
+      "path": "database/null_handling_in_sql.html",
+      "category": "Database"
+     },
+     {
+      "title": "Indexes and Query Performance",
+      "path": "database/indexes_in_sql.html",
+      "category": "Database"
+     }
+    ]
+   },
+   {
+    "title": "Describing what you found",
+    "blurb": "The statistics that stop a summary from being misleading.",
+    "modules": [
+     {
+      "title": "Mean, Mode and Median",
+      "path": "maths/mean_mode_and_median.html",
+      "category": "Maths"
+     },
+     {
+      "title": "Mean, Variance and Standard Deviation",
+      "path": "maths/mean_variance_standard_deviation.html",
+      "category": "Maths"
+     },
+     {
+      "title": "Covariance and Correlation",
+      "path": "maths/covariance_and_correlation.html",
+      "category": "Maths"
+     },
+     {
+      "title": "The Normal Distribution",
+      "path": "maths/the_normal_distribution.html",
+      "category": "Maths"
+     }
+    ]
+   },
+   {
+    "title": "Where analysis becomes prediction",
+    "blurb": "The smallest honest step from describing the past to modelling it.",
+    "modules": [
+     {
+      "title": "Train-Test Split Method",
+      "path": "machine_learning/train_test_split.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Linear Regression with OLS",
+      "path": "machine_learning/linear_regression_with_ols.html",
+      "category": "Machine Learning"
+     },
+     {
+      "title": "Confusion Matrix Analysis",
+      "path": "machine_learning/confusion_matrix.html",
+      "category": "Machine Learning"
+     }
+    ]
+   }
+  ]
+ }
+];

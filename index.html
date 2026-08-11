@@ -447,6 +447,34 @@
             background: var(--scrollbar-thumb);
             border-radius: 3px;
         }
+        /* Route picker on the learning-path view. */
+        .vz-path-picker {
+            display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px;
+        }
+        .vz-path-tab {
+            display: inline-flex; align-items: center; gap: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11.5px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.06em;
+            padding: 10px 14px; border-radius: 9px;
+            border: 1px solid var(--border-subtle);
+            background: var(--input-bg); color: var(--text-muted);
+            cursor: pointer; transition: border-color .18s, color .18s;
+            min-height: 44px;
+        }
+        .vz-path-tab:hover { border-color: var(--accent-primary); color: var(--text-main); }
+        .vz-path-tab:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+        .vz-path-tab.is-active {
+            background: var(--accent-primary); color: var(--text-inverse);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+        .vz-path-count {
+            font-size: 10px; opacity: .75;
+            padding: 1px 6px; border-radius: 999px;
+            border: 1px solid currentColor;
+        }
+
         ::-webkit-scrollbar-thumb:hover {
             background: var(--accent-primary);
         }
@@ -684,7 +712,7 @@
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="practice/">Practice</a></li><li><a href="map/">Concept Map</a></li><li><a href="whats-new/">What&#x27;s New</a></li><li><a href="glossary/">Glossary</a></li><li><a href="saved/">Saved</a></li><li><a href="about.html">About VizLearn</a></li><li><a href="contact.html">Contact</a></li><li><a href="privacy.html">Privacy Policy</a></li><li><a href="terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="practice/">Practice</a></li><li><a href="map/">Concept Map</a></li><li><a href="whats-new/">What&#x27;s New</a></li><li><a href="glossary/">Glossary</a></li><li><a href="python-lab/">Python Compiler</a></li><li><a href="sql-lab/">SQL Playground</a></li><li><a href="saved/">Saved</a></li><li><a href="about.html">About VizLearn</a></li><li><a href="contact.html">Contact</a></li><li><a href="privacy.html">Privacy Policy</a></li><li><a href="terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
@@ -970,7 +998,14 @@
             // emitted into assets/modules.js. Stages unlock nothing — they are a
             // suggested order, with your own progress shown against each step.
             function renderLearningPath() {
-                const stages = window.VIZLEARN_PATH || [];
+                // Six routes now, not one. The picker below switches between
+                // them; the stage rendering underneath is unchanged.
+                const routes = window.VIZLEARN_PATHS || [];
+                const fallback = { key: 'start', title: 'Learning Path', blurb: '',
+                                   stages: window.VIZLEARN_PATH || [] };
+                const wanted = localStorage.getItem('vizlearn.path');
+                const route = routes.find(r => r.key === wanted) || routes[0] || fallback;
+                const stages = route.stages || [];
                 const seen = visitedSet();
                 const all = stages.flatMap(s => s.modules);
                 const doneAll = all.filter(m => seen[m.path]).length;
@@ -1013,12 +1048,18 @@
                 return `
                     <section class="animate-fade-in vz-path" data-topic="learning-path">
                         <div class="mb-8 border-b border-green-500/20 pb-4">
-                            <span class="mono-font text-xs tracking-[0.2em] uppercase" style="color: var(--accent-primary)">Start Your Journey</span>
-                            <h2 class="text-4xl font-bold mt-2" style="color: var(--text-main)">Learning Path</h2>
-                            <p class="text-base mt-2 max-w-2xl" style="color: var(--text-muted)">
-                                Twenty-five modules, in the order they build on each other &mdash; from the maths
-                                everything assumes, to your first trained model, to picking a specialism.
-                            </p>
+                            <span class="mono-font text-xs tracking-[0.2em] uppercase" style="color: var(--accent-primary)">Choose your route</span>
+                            <h2 class="text-4xl font-bold mt-2" style="color: var(--text-main)">${route.title}</h2>
+                            <p class="text-base mt-2 max-w-2xl" style="color: var(--text-muted)">${route.blurb}</p>
+                            <div class="vz-path-picker" role="tablist" aria-label="Learning routes">
+                                ${routes.map(r => `
+                                    <button type="button" role="tab"
+                                            class="vz-path-tab${r.key === route.key ? ' is-active' : ''}"
+                                            aria-selected="${r.key === route.key}"
+                                            data-vz-path="${r.key}">${r.title}
+                                        <span class="vz-path-count">${r.stages.reduce((n, st) => n + st.modules.length, 0)}</span>
+                                    </button>`).join('')}
+                            </div>
                             <div class="flex items-center gap-4 mt-4 flex-wrap">
                                 <span class="vz-track-progress">
                                     <span>${pctAll}%</span>
@@ -1204,6 +1245,15 @@
             // did nothing, and back/forward through the tabs moved the URL without
             // moving the page.
             window.addEventListener('hashchange', applyHash);
+
+            // Route picker. Delegated, because the tabs are re-rendered every
+            // time the view redraws and a direct listener would be lost.
+            document.addEventListener('click', function (e) {
+                var tab = e.target.closest && e.target.closest('[data-vz-path]');
+                if (!tab) return;
+                localStorage.setItem('vizlearn.path', tab.dataset.vzPath);
+                renderCourses('learning-path');
+            });
 
             // Keep the hero's headline figures honest by counting the
             // catalogue instead of trusting a number someone typed once.

@@ -280,6 +280,28 @@ TOOL_PAGES = {
                        "learning, retrieval and SQL terms used across VizLearn, "
                        "each linked to the interactive module that explains it.",
     },
+    "python-lab": {
+        "dir": "python-lab",
+        "rel": "python-lab/index.html",
+        "title": "Python Compiler",
+        "footer": True,
+        "lead": "Write Python and run it. Real CPython in your browser - no install, "
+                "no account, nothing sent to a server.",
+        "description": "A free online Python compiler. Write and run real Python 3 in "
+                       "your browser with no setup - CPython compiled to WebAssembly, "
+                       "running entirely on your own machine.",
+    },
+    "sql-lab": {
+        "dir": "sql-lab",
+        "rel": "sql-lab/index.html",
+        "title": "SQL Playground",
+        "footer": True,
+        "lead": "Create tables, insert rows and query them. A real SQLite database "
+                "living in your browser tab, with the schema and results shown as you go.",
+        "description": "A free online SQL playground. Run CREATE, INSERT and SELECT "
+                       "against a real SQLite database in your browser, and see the "
+                       "tables and query results immediately.",
+    },
     "saved": {
         "dir": "saved",
         "rel": "saved/index.html",

@@ -9,7 +9,7 @@ import json
 import os
 
 from lib_catalog import ROOT, modules
-from sequence import LEARNING_PATH
+from sequence import LEARNING_PATH, LEARNING_PATHS
 
 OUT = os.path.join(ROOT, "assets", "modules.js")
 
@@ -36,27 +36,39 @@ def main():
     entries.sort(key=lambda e: (e["category"], e["title"]))
     body = json.dumps(entries, indent=1, ensure_ascii=False)
 
-    # The curated beginner route, resolved from paths to titles so the hub can
-    # render it without a second lookup.
+    # Routes resolved from paths to titles so the hub can render one without a
+    # second lookup. A stale reference is a build failure, not a dead link.
     by_path = {m["path"]: m for m in modules()}
-    stages = []
-    for stage in LEARNING_PATH:
-        items = []
-        for p in stage["modules"]:
-            m = by_path.get(p)
-            if m is None:
-                raise SystemExit("learning path references a missing module: %s" % p)
-            items.append({"title": m["title"], "path": p, "category": m["category"]})
-        stages.append({"title": stage["title"], "blurb": stage["blurb"], "modules": items})
+
+    def resolve(path_stages, where):
+        out = []
+        for stage in path_stages:
+            items = []
+            for p in stage["modules"]:
+                m = by_path.get(p)
+                if m is None:
+                    raise SystemExit("%s references a missing module: %s" % (where, p))
+                items.append({"title": m["title"], "path": p, "category": m["category"]})
+            out.append({"title": stage["title"], "blurb": stage["blurb"], "modules": items})
+        return out
+
+    stages = resolve(LEARNING_PATH, "learning path")
+    paths = [{"key": r["key"], "title": r["title"], "blurb": r["blurb"],
+              "stages": resolve(r["stages"], "path %s" % r["key"])}
+             for r in LEARNING_PATHS]
 
     with open(OUT, "w", encoding="utf-8") as fh:
         fh.write(HEADER)
         fh.write("window.VIZLEARN_MODULES = %s;\n\n" % body)
-        fh.write("window.VIZLEARN_PATH = %s;\n"
+        # VIZLEARN_PATH stays for anything still reading the single route.
+        fh.write("window.VIZLEARN_PATH = %s;\n\n"
                  % json.dumps(stages, indent=1, ensure_ascii=False))
+        fh.write("window.VIZLEARN_PATHS = %s;\n"
+                 % json.dumps(paths, indent=1, ensure_ascii=False))
 
-    print("wrote %s (%d modules, %d learning-path stages)"
-          % (os.path.relpath(OUT, ROOT), len(entries), len(stages)))
+    print("wrote %s (%d modules, %d routes, %d module references)"
+          % (os.path.relpath(OUT, ROOT), len(entries), len(paths),
+             sum(len(s["modules"]) for r in paths for s in r["stages"])))
 
 
 if __name__ == "__main__":
