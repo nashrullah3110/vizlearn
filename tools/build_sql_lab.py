@@ -226,7 +226,6 @@ def body():
             </div>
         </div>
 
-        <script src="%(p)sassets/vizlearn-code.js" defer></script>
         <script src="%(p)sassets/vizlearn-sql.js" defer></script>
 """ % {"seed": SEED.strip(), "starter": STARTER.strip(), "p": "%(p)s"}
 

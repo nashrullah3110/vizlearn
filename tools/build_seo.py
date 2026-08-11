@@ -77,10 +77,13 @@ SCRIPTS_BLOCK = re.compile(
 SHARED_SCRIPTS = ("modules.js", "search.js", "vizlearn.js", "vizlearn-lab.js",
                   "vizlearn-state.js", "vizlearn-pwa.js",
                   "vizlearn-keys.js", "glossary.js", "vizlearn-glossary.js",
-                  "vizlearn-python.js", "vizlearn-rails.js")
+                  "vizlearn-python.js", "vizlearn-rails.js",
+                  # Highlights any .vz-code block. Shared rather than per-page:
+                  # the python/ modules carry editors too, not just the labs.
+                  "vizlearn-code.js")
 # The one-time migration wrote these directly; drop the loose copies.
 LOOSE_SCRIPT = re.compile(
-    r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa|vizlearn-keys|glossary|vizlearn-glossary|vizlearn-python|vizlearn-rails)\.js"></script>\n?')
+    r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa|vizlearn-keys|glossary|vizlearn-glossary|vizlearn-python|vizlearn-rails|vizlearn-code)\.js"></script>\n?')
 
 META_DESC = re.compile(r'<meta\s+name="description"\s+content="([^"]*)"\s*/?>', re.I)
 TITLE = re.compile(r"<title>(.*?)</title>", re.S)

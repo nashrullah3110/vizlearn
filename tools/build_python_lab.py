@@ -145,7 +145,6 @@ def body():
             </div>
         </div>
 
-        <script src="%(p)sassets/vizlearn-code.js" defer></script>
 """ % {"starter": STARTER.strip(), "p": "%(p)s"}
 
 
