@@ -25,14 +25,6 @@ CSS = """
             .vz-sql-grid { grid-template-columns: minmax(0, 1fr) 18rem; align-items: start; }
         }
 
-        .sql-editor {
-            width: 100%; min-height: 210px; resize: vertical;
-            font-family: 'JetBrains Mono', monospace; font-size: 0.88rem;
-            line-height: 1.6; padding: 0.9rem 1rem;
-            color: var(--text-main); background: var(--input-bg);
-            border: 1px solid var(--border-subtle); border-radius: 10px;
-        }
-        .sql-editor:focus { outline: none; border-color: var(--accent-primary); }
 
         .sql-controls {
             display: flex; align-items: center; gap: 0.6rem;
@@ -171,8 +163,20 @@ def body():
         <div class="vz-sql-grid" data-vz-sql>
             <div>
                 <script type="text/plain" class="sql-seed">%(seed)s</script>
-                <textarea class="sql-editor" spellcheck="false"
-                          aria-label="SQL editor">%(starter)s</textarea>
+                <div class="vz-code-bar">
+                    <span class="vz-code-dot"></span><span>query.sql</span>
+                    <span class="vz-code-lang">SQLite</span>
+                </div>
+                <!-- .sql-editor stays: assets/vizlearn-sql.js reads .value off it. -->
+                <div class="vz-code" data-vz-code="sql">
+                    <div class="vz-code-gutter" aria-hidden="true"></div>
+                    <div class="vz-code-scroll">
+                        <pre class="vz-code-hl" aria-hidden="true"></pre>
+                        <textarea class="vz-code-input sql-editor" aria-label="SQL editor"
+                                  spellcheck="false" autocapitalize="off"
+                                  autocomplete="off">%(starter)s</textarea>
+                    </div>
+                </div>
                 <div class="sql-controls">
                     <button type="button" class="sql-btn sql-btn-primary sql-run-btn"
                             aria-label="Run the SQL in the editor">Run</button>
@@ -218,6 +222,7 @@ def body():
             </div>
         </div>
 
+        <script src="%(p)sassets/vizlearn-code.js" defer></script>
         <script src="%(p)sassets/vizlearn-sql.js" defer></script>
 """ % {"seed": SEED.strip(), "starter": STARTER.strip(), "p": "%(p)s"}
 

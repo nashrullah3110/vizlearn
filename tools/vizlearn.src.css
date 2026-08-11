@@ -25,6 +25,16 @@
     --border-subtle: rgba(74, 222, 128, 0.15); 
     --border-glow: rgba(74, 222, 128, 0.5);
 
+    /* Editor syntax colours. Kept off the green accent so code reads as code
+       and not as more chrome; tuned for contrast on --input-bg. */
+    --code-comment: #6b7f70;
+    --code-string:  #f0a35e;
+    --code-number:  #d98cf0;
+    --code-keyword: #4ade80;
+    --code-builtin: #67c7f5;
+    --code-func:    #ffd166;
+    --code-type:    #67c7f5;
+
     --accent-primary: #4ade80; /* Neon Green */
     --accent-glow: rgba(74, 222, 128, 0.25);
 
@@ -54,6 +64,15 @@ body.light-mode {
 
     --border-subtle: rgba(22, 163, 74, 0.25); /* Adjusted for contrast */
     --border-glow: rgba(22, 163, 74, 0.4);
+
+    /* Darkened for contrast on a white editor surface. */
+    --code-comment: #6b7280;
+    --code-string:  #b45309;
+    --code-number:  #9333ea;
+    --code-keyword: #15803d;
+    --code-builtin: #0369a1;
+    --code-func:    #b45309;
+    --code-type:    #0369a1;
 
     --accent-primary: #15803d; /* Deep Forest Green */
     --accent-glow: rgba(21, 128, 61, 0.2);
@@ -2596,3 +2615,131 @@ h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; }
 }
 /* Never let the affordance itself break across lines. */
 .view-more-link, .vz-track-count { white-space: nowrap; }
+
+
+/* ---------------------------------------------------------------------------
+   Code editor. Deliberately outside @layer: Tailwind purges anything in its
+   own layers that it cannot find in the content globs, and the .t-* token
+   classes are created at runtime by assets/vizlearn-code.js. The first cut had
+   them inside @layer components and every colour was stripped from the build -
+   tokens rendered in the DOM, styled by nothing.
+
+   Every rule is scoped under .vz-code rather than using the bare class. The
+   Python lab's textarea also carries .py-editor, and `.vz-py .py-editor` is
+   (0,2,0) - it beat the single-class rules and kept its own font, padding and
+   a non-transparent colour, which showed the highlight and the textarea text
+   on top of each other.
+   --------------------------------------------------------------------------- */
+  /* ------------------------------------------------------------------
+     Code editor: a highlighted <pre> under a transparent <textarea>.
+
+     Every metric below is declared once, on the shared .vz-code-layer, and
+     inherited by both layers. That is not tidiness - if the textarea and the
+     <pre> disagree about font, size, line-height, padding, letter-spacing or
+     tab-size by even a fraction, the highlight drifts further out of
+     alignment on every line.
+     ------------------------------------------------------------------ */
+  .vz-code {
+    display: flex;
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    background: var(--input-bg);
+    overflow: hidden;
+    font-size: 0;                 /* kills the inline-block gap between panes */
+  }
+  .vz-code:focus-within { border-color: var(--accent-primary); }
+
+  .vz-code .vz-code-hl,
+  .vz-code .vz-code-input,
+  .vz-code .vz-code-gutter {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.875rem;
+    line-height: 1.65;
+    letter-spacing: 0;
+    tab-size: 4;
+    -moz-tab-size: 4;
+  }
+
+  .vz-code .vz-code-gutter {
+    flex: 0 0 auto;
+    padding: 0.9rem 0.55rem 0.9rem 0.75rem;
+    text-align: right;
+    color: var(--text-muted);
+    opacity: 0.55;
+    background: transparent;
+    border-right: 1px solid var(--border-subtle);
+    white-space: pre;
+    overflow: hidden;
+    user-select: none;
+    min-width: 2.75rem;
+  }
+
+  .vz-code-scroll {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;                 /* lets the textarea shrink inside flex */
+  }
+
+  .vz-code .vz-code-hl,
+  .vz-code .vz-code-input {
+    margin: 0;
+    padding: 0.9rem 1rem;
+    border: 0;
+    white-space: pre;
+    overflow: auto;
+    word-wrap: normal;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 340px;
+  }
+
+  .vz-code .vz-code-hl {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    color: var(--text-main);
+    overflow: hidden;             /* the textarea owns scrolling; JS mirrors it */
+  }
+
+  .vz-code .vz-code-input {
+    position: relative;
+    display: block;
+    resize: vertical;
+    background: transparent;
+    /* Transparent text with a visible caret: the <pre> underneath supplies
+       every glyph the reader sees. */
+    color: transparent;
+    caret-color: var(--accent-primary);
+  }
+  .vz-code .vz-code-input::selection { background: var(--accent-glow); }
+  .vz-code .vz-code-input:focus { outline: none; }
+
+  .t-com { color: var(--code-comment); font-style: italic; }
+  .t-str { color: var(--code-string); }
+  .t-num { color: var(--code-number); }
+  .t-kw  { color: var(--code-keyword); font-weight: 700; }
+  .t-bi  { color: var(--code-builtin); }
+  .t-fn  { color: var(--code-func); }
+  .t-ty  { color: var(--code-type); }
+  .t-dec { color: var(--code-func); font-style: italic; }
+
+  /* Toolbar above the editor, so the page reads as an IDE pane. */
+  .vz-code-bar {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--border-subtle);
+    border-bottom: 0;
+    border-radius: 10px 10px 0 0;
+    background: var(--card-bg);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
+  }
+  .vz-code-bar + .vz-code { border-radius: 0 0 10px 10px; }
+  .vz-code-dot {
+    width: 9px; height: 9px; border-radius: 999px;
+    background: var(--accent-primary); flex: 0 0 auto;
+  }
+  .vz-code-lang { margin-left: auto; color: var(--accent-primary); font-weight: 700; }

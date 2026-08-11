@@ -27,7 +27,6 @@ CSS = """
         }
         /* The editor is the point of the page, so it gets real height rather
            than the few lines a module needs beside its prose. */
-        .vz-lab-grid .py-editor { min-height: 340px; font-size: 0.9rem; }
         .vz-lab-grid .py-output { min-height: 150px; }
 
         .vz-lab-side {
@@ -79,7 +78,20 @@ def body():
         <div class="vz-lab-grid">
             <div class="vz-py" data-vz-py>
                 <script type="text/plain" class="py-src">%(starter)s</script>
-                <textarea class="py-editor" aria-label="Python code editor" spellcheck="false"></textarea>
+                <div class="vz-code-bar">
+                    <span class="vz-code-dot"></span><span>main.py</span>
+                    <span class="vz-code-lang">Python 3</span>
+                </div>
+                <!-- The textarea keeps .py-editor: assets/vizlearn-python.js reads
+                     .value off it. The highlighter only layers a <pre> behind it. -->
+                <div class="vz-code" data-vz-code="python">
+                    <div class="vz-code-gutter" aria-hidden="true"></div>
+                    <div class="vz-code-scroll">
+                        <pre class="vz-code-hl" aria-hidden="true"></pre>
+                        <textarea class="vz-code-input py-editor" aria-label="Python code editor"
+                                  spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+                    </div>
+                </div>
                 <div class="py-controls">
                     <button type="button" class="py-run-btn">Run</button>
                     <button type="button" class="py-reset-btn">Reset</button>
@@ -127,6 +139,8 @@ def body():
                 </section>
             </div>
         </div>
+
+        <script src="%(p)sassets/vizlearn-code.js" defer></script>
 """ % {"starter": STARTER.strip(), "p": "%(p)s"}
 
 
