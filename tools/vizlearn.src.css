@@ -27,6 +27,12 @@
 
     /* Editor syntax colours. Kept off the green accent so code reads as code
        and not as more chrome; tuned for contrast on --input-bg. */
+    /* The editor gets its own surface. Using --input-bg made a green panel on
+       a green page: it read as more chrome, not as a place code lives. */
+    --code-bg: #0d1117;
+    --code-text: #e6edf3;
+    --code-gutter-bg: #010409;
+    --code-border: rgba(240, 246, 252, 0.12);
     --code-comment: #6b7f70;
     --code-string:  #f0a35e;
     --code-number:  #d98cf0;
@@ -66,6 +72,10 @@ body.light-mode {
     --border-glow: rgba(22, 163, 74, 0.4);
 
     /* Darkened for contrast on a white editor surface. */
+    --code-bg: #ffffff;
+    --code-text: #1f2328;
+    --code-gutter-bg: #f6f8fa;
+    --code-border: rgba(27, 31, 36, 0.15);
     --code-comment: #6b7280;
     --code-string:  #b45309;
     --code-number:  #9333ea;
@@ -2641,9 +2651,9 @@ h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; }
      ------------------------------------------------------------------ */
   .vz-code {
     display: flex;
-    border: 1px solid var(--border-subtle);
-    border-radius: 10px;
-    background: var(--input-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 0 0 10px 10px;
+    background: var(--code-bg);
     overflow: hidden;
     font-size: 0;                 /* kills the inline-block gap between panes */
   }
@@ -2664,20 +2674,21 @@ h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; }
     flex: 0 0 auto;
     padding: 0.9rem 0.55rem 0.9rem 0.75rem;
     text-align: right;
-    color: var(--text-muted);
-    opacity: 0.55;
-    background: transparent;
-    border-right: 1px solid var(--border-subtle);
+    color: var(--code-comment);
+    background: var(--code-gutter-bg);
+    border-right: 1px solid var(--code-border);
     white-space: pre;
     overflow: hidden;
     user-select: none;
-    min-width: 2.75rem;
+    min-width: 3rem;
   }
 
   .vz-code-scroll {
     position: relative;
     flex: 1 1 auto;
     min-width: 0;                 /* lets the textarea shrink inside flex */
+    overflow-x: auto;             /* the one scrollbar, under both layers */
+    overflow-y: hidden;
   }
 
   .vz-code .vz-code-hl,
@@ -2686,25 +2697,26 @@ h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; }
     padding: 0.9rem 1rem;
     border: 0;
     white-space: pre;
-    overflow: auto;
+    overflow: hidden;             /* .vz-code-scroll owns scrolling */
     word-wrap: normal;
     box-sizing: border-box;
-    width: 100%;
-    min-height: 340px;
+    min-width: 100%;
+    width: -moz-max-content;
+    width: max-content;
   }
 
   .vz-code .vz-code-hl {
     position: absolute;
-    inset: 0;
+    top: 0; left: 0;
     pointer-events: none;
-    color: var(--text-main);
-    overflow: hidden;             /* the textarea owns scrolling; JS mirrors it */
+    color: var(--code-text);
   }
 
   .vz-code .vz-code-input {
     position: relative;
     display: block;
-    resize: vertical;
+    resize: none;                 /* height tracks the content instead */
+    overflow: hidden;
     background: transparent;
     /* Transparent text with a visible caret: the <pre> underneath supplies
        every glyph the reader sees. */
@@ -2726,11 +2738,11 @@ h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; }
   /* Toolbar above the editor, so the page reads as an IDE pane. */
   .vz-code-bar {
     display: flex; align-items: center; gap: 0.6rem;
-    padding: 0.5rem 0.8rem;
-    border: 1px solid var(--border-subtle);
+    padding: 0.55rem 0.9rem;
+    border: 1px solid var(--code-border);
     border-bottom: 0;
     border-radius: 10px 10px 0 0;
-    background: var(--card-bg);
+    background: var(--code-gutter-bg);
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.68rem;
     text-transform: uppercase;
@@ -2743,3 +2755,40 @@ h1, h2, h3, .brand-font { font-family: 'Space Grotesk', sans-serif; }
     background: var(--accent-primary); flex: 0 0 auto;
   }
   .vz-code-lang { margin-left: auto; color: var(--accent-primary); font-weight: 700; }
+
+/* Console under the editor. Styled as a terminal for the same reason the
+   editor has its own surface: a plain white card did not read as output. */
+.vz-console {
+  margin-top: 0.9rem;
+  border: 1px solid var(--code-border);
+  border-radius: 10px;
+  background: var(--code-bg);
+  overflow: hidden;
+}
+.vz-console-bar {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.9rem;
+  background: var(--code-gutter-bg);
+  border-bottom: 1px solid var(--code-border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--code-comment);
+}
+.vz-console-body {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  min-height: 8rem;
+  max-height: 22rem;
+  overflow: auto;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: var(--code-text);
+  background: var(--code-bg);
+}
+.vz-console-body:empty::before {
+  content: attr(data-empty);
+  color: var(--code-comment);
+}
+

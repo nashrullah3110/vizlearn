@@ -97,7 +97,12 @@ def body():
                     <button type="button" class="py-reset-btn">Reset</button>
                     <span class="py-status"></span>
                 </div>
-                <pre class="py-output" aria-live="polite"></pre>
+                <div class="vz-console">
+                    <div class="vz-console-bar">Output</div>
+                    <!-- .py-output stays: vizlearn-python.js writes into it. -->
+                    <pre class="vz-console-body py-output" aria-live="polite"
+                         data-empty="Press Run to execute this code."></pre>
+                </div>
             </div>
 
             <div>

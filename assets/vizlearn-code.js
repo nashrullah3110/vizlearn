@@ -180,14 +180,27 @@
             }
         }
 
-        function sync() {
-            hl.scrollTop = ta.scrollTop;
-            hl.scrollLeft = ta.scrollLeft;
-            if (gutter) gutter.scrollTop = ta.scrollTop;
+        // The textarea no longer scrolls itself - .vz-code-scroll does, for both
+        // layers at once. Previously each had overflow:auto, so the textarea's
+        // scrollbars shrank its client box by 15px while the <pre> kept its
+        // full height, and the last line rendered under the scrollbar.
+        //
+        // That means the textarea has to be exactly as tall as its content, and
+        // as wide as the widest line, or it clips its own text.
+        function resize() {
+            ta.style.height = 'auto';
+            ta.style.height = hl.scrollHeight + 'px';
+            // Match the highlight's natural width so long lines stay reachable.
+            ta.style.width = 'auto';
+            var w = Math.max(hl.scrollWidth, wrap.clientWidth - (gutter ? gutter.offsetWidth : 0));
+            ta.style.width = w + 'px';
+            if (gutter) gutter.style.height = hl.scrollHeight + 'px';
         }
 
+        function sync() { resize(); }
+
         ta.addEventListener('input', function () { render(); sync(); });
-        ta.addEventListener('scroll', sync);
+        window.addEventListener('resize', sync);
 
         // The editor's contents are also set programmatically, and assigning
         // .value fires no event: the Python runner injects the starter from

@@ -184,7 +184,11 @@ def body():
                             aria-label="Reset the database to the sample tables">Reset database</button>
                     <span class="sql-status" aria-live="polite"></span>
                 </div>
-                <div class="sql-result" aria-live="polite"></div>
+                <div class="vz-console">
+                    <div class="vz-console-bar">Result</div>
+                    <div class="vz-console-body sql-result" aria-live="polite"
+                         data-empty="Run a query to see rows here."></div>
+                </div>
             </div>
 
             <div>
