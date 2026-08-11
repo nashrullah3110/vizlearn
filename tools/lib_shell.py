@@ -80,7 +80,7 @@ def head_top(title, prefix):
                 if(t==='light') document.body.classList.add('light-mode');
                 else document.body.classList.remove('light-mode');
             };
-            const t = localStorage.getItem('theme') || 'dark';
+            const t = localStorage.getItem('theme') || 'light';
             if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
         })();
     </script>
@@ -93,7 +93,12 @@ def head_top(title, prefix):
 
 def header(prefix, back_label="Home"):
     """Sticky header: logo, site search, back link, theme toggle."""
-    return """<body class="flex flex-col min-h-screen">
+    return """<body class="flex flex-col min-h-screen light-mode">
+<!-- Light is the default, so it ships on the tag: the theme script runs at the
+     bottom of the body, and waiting for it would flash dark on every load.
+     This removes the class before any content is parsed for readers who chose
+     dark, so neither theme flashes the other. -->
+<script>if(localStorage.getItem("theme")==="dark")document.body.classList.remove("light-mode");</script>
 
     <!-- Header -->
     <header class="glass-header sticky top-0 z-50">
@@ -146,7 +151,7 @@ THEME_SCRIPT = """
                 }
             }
 
-            paint(localStorage.getItem('theme') || 'dark');
+            paint(localStorage.getItem('theme') || 'light');
 
             btn.addEventListener('click', function () {
                 var next = document.body.classList.contains('light-mode') ? 'dark' : 'light';
