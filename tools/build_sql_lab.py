@@ -22,7 +22,14 @@ KEY = "sql-lab"
 CSS = """
         .vz-sql-grid { display: grid; gap: 1.25rem; grid-template-columns: 1fr; }
         @media (min-width: 1024px) {
-            .vz-sql-grid { grid-template-columns: minmax(0, 1fr) 18rem; align-items: start; }
+            /* Stretch, not start: the sidebar is much taller than the editor,
+               and aligning to the top left a 451px void beside it. The editor
+               column now fills the row and the result panel takes the slack,
+               which is also where extra rows want to go. */
+            .vz-sql-grid { grid-template-columns: minmax(0, 1fr) 18rem; align-items: stretch; }
+            .vz-sql-editor-col { display: flex; flex-direction: column; }
+            .vz-sql-editor-col .vz-console { flex: 1 1 auto; display: flex; flex-direction: column; }
+            .vz-sql-editor-col .vz-console-body { flex: 1 1 auto; max-height: none; }
         }
 
 
@@ -161,7 +168,7 @@ ORDER  BY total_sales DESC;
 def body():
     return """
         <div class="vz-sql-grid" data-vz-sql>
-            <div>
+            <div class="vz-sql-editor-col">
                 <script type="text/plain" class="sql-seed">%(seed)s</script>
                 <div class="vz-code-bar">
                     <span class="vz-code-dot"></span><span>query.sql</span>
