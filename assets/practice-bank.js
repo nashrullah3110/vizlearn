@@ -3929,6 +3929,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/design-an-lru-cache.html",
+  "title": "Design an LRU cache",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why does an LRU cache need a doubly linked list rather than a singly linked one?",
+    "o": [
+     "To iterate backwards",
+     "Removing an arbitrary node in O(1) requires knowing its predecessor",
+     "To store more data",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "With only forward pointers you would have to scan to find the node before, which is O(n) and defeats the requirement."
+   },
+   {
+    "t": "What does the hash map store as its value?",
+    "o": [
+     "The cached value",
+     "The list node holding that value",
+     "The insertion time",
+     "The key again"
+    ],
+    "a": 1,
+    "w": "Storing the node is what lets you go from a key straight to its position in the order and unlink it without walking."
+   },
+   {
+    "t": "Does a successful get change the cache?",
+    "o": [
+     "No, reads are free",
+     "Yes - it makes that entry the most recently used",
+     "Only if the cache is full",
+     "Only for the first read"
+    ],
+    "a": 1,
+    "w": "That is what distinguishes LRU from FIFO. A cache where reads did not count would evict on insertion order instead."
+   }
+  ]
+ },
+ {
   "path": "interview/does-len-count-characters-or-bytes.html",
   "title": "Does len() count characters or bytes?",
   "cat": "Interview",
@@ -3965,6 +4005,86 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Storage and transport limits are byte limits. A 100-code-point string can be 400 bytes in UTF-8."
+   }
+  ]
+ },
+ {
+  "path": "interview/edit-distance.html",
+  "title": "Edit distance (Levenshtein)",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "In the DP table, the cell above dp[i][j] corresponds to which edit?",
+    "o": [
+     "Insert",
+     "Delete a character from the first string",
+     "Substitute",
+     "No edit"
+    ],
+    "a": 1,
+    "w": "Up is delete, left is insert, diagonal is substitute. Naming them is what shows the recurrence is understood rather than memorised."
+   },
+   {
+    "t": "Filling row 0 and column 0 with zeros instead of 0..n gives:",
+    "o": [
+     "The same answer",
+     "Answers that are too small",
+     "An IndexError",
+     "Answers that are too large"
+    ],
+    "a": 1,
+    "w": "The edges encode the cost of reaching the empty string. Zeroing them makes those conversions free."
+   },
+   {
+    "t": "The space can be reduced to O(min(m, n)) because:",
+    "o": [
+     "The strings are short",
+     "Each cell depends only on the previous row and the cell to its left",
+     "The table is symmetric",
+     "Most cells are zero"
+    ],
+    "a": 1,
+    "w": "Two rows suffice. The cost is that you can no longer walk the table back to recover which edits were made."
+   }
+  ]
+ },
+ {
+  "path": "interview/find-the-duplicate-number.html",
+  "title": "Find the duplicate number",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why can the array be treated as a linked list?",
+    "o": [
+     "It is sorted",
+     "Every value is a valid index, so each slot points to another slot",
+     "It contains no zeros",
+     "It is the same length as its values"
+    ],
+    "a": 1,
+    "w": "Values are in 1..n, so no jump leaves the array and index 0 is never re-entered - making it a chain with a guaranteed cycle."
+   },
+   {
+    "t": "The meeting point of the two pointers is:",
+    "o": [
+     "The duplicate",
+     "Somewhere inside the cycle, not necessarily its entrance",
+     "Always index 0",
+     "The array length"
+    ],
+    "a": 1,
+    "w": "Phase one only proves a cycle exists. Phase two walks from the head to find the entrance, which is the duplicate."
+   },
+   {
+    "t": "Which constraint rules out using a set?",
+    "o": [
+     "Do not modify the array",
+     "O(1) space",
+     "O(n) time",
+     "Values are 1..n"
+    ],
+    "a": 1,
+    "w": "A set is O(n) memory. 'Do not modify' is what rules out sorting and index-negation instead."
    }
   ]
  },
@@ -4209,6 +4329,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/longest-consecutive-sequence.html",
+  "title": "Longest consecutive sequence",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "What makes the solution O(n) despite a loop inside a loop?",
+    "o": [
+     "The set is sorted",
+     "Only the start of each run walks forward, so the inner loop does n steps in total",
+     "The inner loop is capped",
+     "It is actually O(n²)"
+    ],
+    "a": 1,
+    "w": "Runs do not overlap, so total inner work is bounded by n. Each element is touched at most twice."
+   },
+   {
+    "t": "How do you know a value starts a run?",
+    "o": [
+     "It is the smallest",
+     "value - 1 is not in the set",
+     "It appears first in the array",
+     "It is even"
+    ],
+    "a": 1,
+    "w": "If the predecessor exists, some other value will walk this run from its true start, so this one can be skipped entirely."
+   },
+   {
+    "t": "Why is sorting not the accepted answer?",
+    "o": [
+     "It gives the wrong result",
+     "It is O(n log n), and the question asks for O(n)",
+     "It cannot handle duplicates",
+     "It uses too much memory"
+    ],
+    "a": 1,
+    "w": "Sorting is correct and simpler - give it first, name its cost, then improve to the set-based version."
+   }
+  ]
+ },
+ {
+  "path": "interview/longest-palindromic-substring.html",
+  "title": "Longest palindromic substring",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "How many centres does the expansion approach try?",
+    "o": [
+     "n",
+     "2n - 1",
+     "n²",
+     "log n"
+    ],
+    "a": 1,
+    "w": "n character centres for odd-length palindromes plus n-1 gap centres for even-length ones. Forgetting the gaps is the classic bug."
+   },
+   {
+    "t": "Compared with the DP table, expanding around centres is:",
+    "o": [
+     "Faster asymptotically",
+     "The same time, but O(1) space instead of O(n²)",
+     "Slower",
+     "Only correct for odd lengths"
+    ],
+    "a": 1,
+    "w": "Both are O(n²) time. The space difference is the reason to prefer expansion, and noticing that is the point of the question."
+   },
+   {
+    "t": "The O(n) algorithm for this problem is:",
+    "o": [
+     "Binary search",
+     "Manacher's algorithm",
+     "KMP",
+     "Kadane's"
+    ],
+    "a": 1,
+    "w": "It reuses already-found palindromes to skip work, in the same spirit as KMP's prefix table. Naming it is usually enough."
+   }
+  ]
+ },
+ {
   "path": "interview/longest-substring-without-repeating-characters.html",
   "title": "Longest substring without repeating characters",
   "cat": "Interview",
@@ -4285,6 +4485,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Two running values and nothing else. The DP table collapses because each step depends only on the previous one."
+   }
+  ]
+ },
+ {
+  "path": "interview/merge-intervals.html",
+  "title": "Merge overlapping intervals",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why does sorting by start make one pass sufficient?",
+    "o": [
+     "It removes duplicates",
+     "An interval can then only overlap the merged block immediately before it",
+     "It makes the list shorter",
+     "Sorting merges them"
+    ],
+    "a": 1,
+    "w": "Everything earlier starts earlier and has already been absorbed, so there is only ever one candidate to compare against."
+   },
+   {
+    "t": "Why must the extend use max(last_end, this_end)?",
+    "o": [
+     "For speed",
+     "A fully contained interval would otherwise shrink the merged block",
+     "To handle negatives",
+     "It does not matter"
+    ],
+    "a": 1,
+    "w": "[1,10] then [2,3] would set the end to 3 and silently lose everything from 3 to 10."
+   },
+   {
+    "t": "The overall complexity is:",
+    "o": [
+     "O(n)",
+     "O(n log n), dominated by the sort",
+     "O(n²)",
+     "O(log n)"
+    ],
+    "a": 1,
+    "w": "The sweep itself is linear. If the input arrives already sorted, the whole thing is O(n)."
    }
   ]
  },

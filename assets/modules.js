@@ -1140,8 +1140,32 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Design an LRU cache",
+  "path": "interview/design-an-lru-cache.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
   "title": "Does len() count characters or bytes?",
   "path": "interview/does-len-count-characters-or-bytes.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Edit distance (Levenshtein)",
+  "path": "interview/edit-distance.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Find the duplicate number",
+  "path": "interview/find-the-duplicate-number.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
@@ -1196,6 +1220,22 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Longest consecutive sequence",
+  "path": "interview/longest-consecutive-sequence.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Longest palindromic substring",
+  "path": "interview/longest-palindromic-substring.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
   "title": "Longest substring without repeating characters",
   "path": "interview/longest-substring-without-repeating-characters.html",
   "category": "Interview",
@@ -1206,6 +1246,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Maximum subarray sum (Kadane)",
   "path": "interview/maximum-subarray-kadane.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Merge overlapping intervals",
+  "path": "interview/merge-intervals.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",

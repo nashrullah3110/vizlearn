@@ -3179,3 +3179,404 @@ print("characters already claimed, which only the reverse map can see.")
                 "basis of their first character alone."},
     ],
 )
+
+
+def _palindrome_expand_frames():
+    text = "babad"
+    out = []
+    best = (0, 1)
+    for centre in range(len(text)):
+        for lo0, hi0 in ((centre, centre), (centre, centre + 1)):
+            lo, hi = lo0, hi0
+            while lo >= 0 and hi < len(text) and text[lo] == text[hi]:
+                lo -= 1
+                hi += 1
+            lo, hi = lo + 1, hi - 1
+            if hi - lo + 1 > best[1] - best[0]:
+                best = (lo, hi + 1)
+            if hi >= lo and len(out) < 7:
+                marks = {i: ("hit" if lo <= i <= hi else "dim")
+                         for i in range(len(text))}
+                out.append(frame(marked(list(text), marks, {centre: "centre"},
+                                        kind="text", label="expand from a centre"),
+                                 "Centre %s: %r expands to %r."
+                                 % ("at %d" % centre if lo0 == hi0
+                                    else "between %d and %d" % (centre, centre + 1),
+                                    text[centre], text[lo:hi + 1]),
+                                 {"centre": centre, "best": best[1] - best[0]}))
+    out.append(frame(marked(list(text), {i: ("hit" if best[0] <= i < best[1] else "dim")
+                                         for i in range(len(text))},
+                            kind="text", label="answer"),
+                     "Longest is %r. Every centre was tried - 2n-1 of them, "
+                     "because a palindrome can sit between two characters."
+                     % text[best[0]:best[1]],
+                     {"centre": len(text) - 1, "best": best[1] - best[0]}))
+    return viz(out)
+
+
+_q(
+    slug="longest-palindromic-substring",
+    kind="coding",
+    level="Medium",
+    title="Longest palindromic substring",
+    asked="Find the longest palindromic substring.",
+    desc="Expand around centres in O(n²) with O(1) space, why there are 2n-1 "
+         "centres rather than n, and where the O(n) algorithm fits.",
+    lead="<strong>Expand around every centre.</strong> A palindrome is symmetric "
+         "about its middle, so try each possible middle and grow outwards while "
+         "the characters match. There are <strong>2n&nbsp;&minus;&nbsp;1</strong> "
+         "centres, not n, because an even-length palindrome is centred between "
+         "two characters. O(n&sup2;) time, O(1) space.",
+    say="\"Expand around centres. 2n-1 centres because even-length palindromes "
+        "sit between characters. O(n²) time but O(1) space, which beats the DP "
+        "table. There's an O(n) algorithm - Manacher's - but I'd only reach for "
+        "it if you want it.\"",
+    notice=[
+        "Each centre grows outwards until the characters stop matching.",
+        "Odd and even centres are tried separately &mdash; that is the 2n&minus;1.",
+        "Nothing is allocated; only indices move.",
+    ],
+    viz=_palindrome_expand_frames(),
+    sections=[
+        ("Why 2n − 1 centres",
+         "<p>An odd-length palindrome like <code>aba</code> is centred on a "
+         "character. An even-length one like <code>abba</code> is centred on the "
+         "gap between two. So there are n character centres and n&nbsp;&minus;&nbsp;1 "
+         "gap centres.</p>"
+         "<p>Forgetting the even case is the classic bug here: the code passes "
+         "on <code>racecar</code> and fails on <code>abba</code>, which is "
+         "exactly the sort of half-correct that survives a quick test.</p>"),
+        ("Why not dynamic programming",
+         "<p>The DP formulation &mdash; <code>dp[i][j]</code> is true when "
+         "<code>s[i:j+1]</code> is a palindrome &mdash; is also O(n&sup2;) time "
+         "and additionally O(n&sup2;) <em>space</em>. Expanding around centres "
+         "gets the same time in O(1) space and is shorter to write.</p>"
+         "<p>Mention the DP version, then say why you are not using it. "
+         "Recognising that two solutions share a time bound and differ on space "
+         "is the judgement being tested.</p>"),
+        ("The O(n) answer, and when to mention it",
+         "<p>Manacher's algorithm is O(n): it reuses the palindromes already "
+         "found to skip work, in the same spirit as KMP's prefix table. It is "
+         "long, fiddly, and almost never expected.</p>"
+         "<p>Name it, say it exists and that you would look it up rather than "
+         "reconstruct it under time pressure. That reads as calibration; "
+         "attempting it from memory and stalling does not.</p>"),
+    ],
+    code={
+        "file": "longest_palindrome.py",
+        "intro": "Expansion from both kinds of centre with each one's result "
+                 "printed, then the odd-only version failing on an even-length "
+                 "palindrome, and a brute-force check for agreement.",
+        "code": '''# Longest palindromic substring: expand around every centre.
+
+def expand(s, lo, hi):
+    """Grow outwards while the ends match. Returns the widest span found."""
+    while lo >= 0 and hi < len(s) and s[lo] == s[hi]:
+        lo -= 1
+        hi += 1
+    return lo + 1, hi - 1          # step back inside the last failed match
+
+
+def longest_palindrome(s):
+    if not s:
+        return ""
+    start, end = 0, 0
+    for centre in range(len(s)):
+        for lo, hi in ((centre, centre),        # odd length: centred on a char
+                       (centre, centre + 1)):   # even length: centred on a gap
+            a, b = expand(s, lo, hi)
+            if b - a > end - start:
+                start, end = a, b
+    return s[start:end + 1]
+
+
+def odd_centres_only(s):
+    """The version that forgets even-length palindromes."""
+    if not s:
+        return ""
+    start, end = 0, 0
+    for centre in range(len(s)):
+        a, b = expand(s, centre, centre)
+        if b - a > end - start:
+            start, end = a, b
+    return s[start:end + 1]
+
+
+def brute_force(s):
+    best = ""
+    for i in range(len(s)):
+        for j in range(i, len(s)):
+            part = s[i:j + 1]
+            if part == part[::-1] and len(part) > len(best):
+                best = part
+    return best
+
+
+for text in ["babad", "cbbd", "abba", "racecar", "a", ""]:
+    fast = longest_palindrome(text)
+    odd = odd_centres_only(text)
+    slow = brute_force(text)
+    flag = "   <-- odd-only is WRONG" if odd != slow else ""
+    print(f"{text!r:>10}: {fast!r:>9} (brute force agrees: {fast == slow}) "
+          f"odd-only={odd!r}{flag}")
+
+print()
+print(f"For a string of length n there are 2n-1 centres, not n:")
+for n in (1, 5, 10):
+    print(f"  n={n:>2} -> {2 * n - 1} centres")
+print()
+print("Time O(n^2), space O(1). The DP table is the same time and O(n^2) space.")
+''',
+        "walk": [
+            ("return lo + 1, hi - 1",
+             "The loop exits one step past the last match, so both indices step "
+             "back inside. Returning <code>lo, hi</code> directly is the "
+             "off-by-one this function exists to contain."),
+            ("(centre, centre) and (centre, centre + 1)",
+             "The two kinds of centre. Odd-length palindromes sit on a "
+             "character, even-length ones between two &mdash; which is where "
+             "2n&nbsp;&minus;&nbsp;1 comes from."),
+            ("odd_centres_only",
+             "Kept to be wrong. It handles <code>racecar</code> correctly and "
+             "misses <code>abba</code> entirely, which is the sort of failure "
+             "that survives a careless test."),
+            ("b - a > end - start",
+             "Compares spans rather than slicing to compare lengths. Slicing "
+             "inside the loop would allocate on every centre for no reason."),
+        ],
+        "try": [
+            "Feed it a string of 2,000 identical characters. Every centre "
+            "expands the whole way, which is the O(n&sup2;) worst case in full.",
+            "Return the span instead of the substring and slice once at the end "
+            "&mdash; the same reasoning as the slicing question.",
+        ],
+    },
+    check=[
+        {"q": "How many centres does the expansion approach try?",
+         "options": ["n", "2n - 1", "n²", "log n"],
+         "answer": 1,
+         "why": "n character centres for odd-length palindromes plus n-1 gap "
+                "centres for even-length ones. Forgetting the gaps is the classic bug."},
+        {"q": "Compared with the DP table, expanding around centres is:",
+         "options": ["Faster asymptotically", "The same time, but O(1) space "
+                     "instead of O(n²)",
+                     "Slower", "Only correct for odd lengths"],
+         "answer": 1,
+         "why": "Both are O(n²) time. The space difference is the reason to "
+                "prefer expansion, and noticing that is the point of the question."},
+        {"q": "The O(n) algorithm for this problem is:",
+         "options": ["Binary search", "Manacher's algorithm", "KMP", "Kadane's"],
+         "answer": 1,
+         "why": "It reuses already-found palindromes to skip work, in the same "
+                "spirit as KMP's prefix table. Naming it is usually enough."},
+    ],
+)
+
+
+def _edit_frames():
+    a, b = "cat", "cut"
+    rows = len(a) + 1
+    cols = len(b) + 1
+    table = [[0] * cols for _ in range(rows)]
+    for i in range(rows):
+        table[i][0] = i
+    for j in range(cols):
+        table[0][j] = j
+    out = [frame(pairs([("row 0", " ".join(str(x) for x in table[0])),
+                        ("col 0", " ".join(str(table[i][0]) for i in range(rows)))],
+                       {"row 0": "lo"}, label="base cases"),
+                 "The edges are free: turning a prefix into the empty string "
+                 "costs one deletion per character.",
+                 {"filled": rows + cols - 1})]
+    for i in range(1, rows):
+        for j in range(1, cols):
+            same = a[i - 1] == b[j - 1]
+            table[i][j] = (table[i - 1][j - 1] if same
+                           else 1 + min(table[i - 1][j - 1], table[i - 1][j],
+                                        table[i][j - 1]))
+            out.append(frame([marked([str(x) for x in table[i]],
+                                     {j: "hit"}, label="row %d (%r)" % (i, a[i - 1])),
+                              pairs([("comparing", "%r vs %r" % (a[i - 1], b[j - 1])),
+                                     ("cost here", table[i][j])],
+                                    {"cost here": "hit"}, label="cell")],
+                             "%s so the cost is %s."
+                             % ("They match," if same else "They differ,",
+                                "whatever the diagonal held" if same
+                                else "1 + the cheapest of the three neighbours"),
+                             {"i": i, "j": j, "cost": table[i][j]}))
+    out.append(frame(marked([str(x) for x in table[-1]], {cols - 1: "hit"},
+                            label="last row"),
+                     "Bottom-right is the answer: %d edit(s) to turn %r into %r."
+                     % (table[-1][-1], a, b),
+                     {"i": rows - 1, "j": cols - 1, "cost": table[-1][-1]}))
+    return viz(out)
+
+
+_q(
+    slug="edit-distance",
+    kind="coding",
+    level="Hard",
+    title="Edit distance (Levenshtein)",
+    asked="What is the minimum number of insertions, deletions and substitutions "
+          "to turn one string into another?",
+    desc="The Levenshtein DP table: what each of the three neighbours means, why "
+         "the base cases are the edges, and how to drop the space to O(min(m, n)).",
+    lead="A <strong>table</strong> where <code>dp[i][j]</code> is the cost of "
+         "turning the first i characters of one string into the first j of the "
+         "other. Each cell is either the diagonal unchanged (characters match) "
+         "or one more than the cheapest of its three neighbours. "
+         "O(m&middot;n) time and space, reducible to O(min(m, n)).",
+    say="\"Classic DP. dp[i][j] is the cost for the two prefixes. If the "
+        "characters match it's the diagonal; otherwise it's 1 plus the min of "
+        "diagonal, left and up - substitute, insert, delete. O(m·n), and you "
+        "only need two rows so space can be O(min(m,n)).\"",
+    notice=[
+        "The edges are free to fill: i deletions to reach the empty string.",
+        "A match copies the diagonal &mdash; no cost added at all.",
+        "Each neighbour corresponds to one specific edit.",
+    ],
+    viz=_edit_frames(),
+    sections=[
+        ("What each neighbour means",
+         "<p>The three options are not arbitrary; each is one edit:</p>"
+         "<p><strong>Diagonal</strong> (<code>dp[i-1][j-1]</code>) &mdash; "
+         "substitute one character for the other. Free when they already "
+         "match.</p>"
+         "<p><strong>Up</strong> (<code>dp[i-1][j]</code>) &mdash; delete a "
+         "character from the first string.</p>"
+         "<p><strong>Left</strong> (<code>dp[i][j-1]</code>) &mdash; insert a "
+         "character into the first string.</p>"
+         "<p>Being able to say which is which is what separates understanding "
+         "the recurrence from having memorised it.</p>"),
+        ("The base cases",
+         "<p>Row 0 and column 0 are the edges: turning a prefix of length i into "
+         "the empty string costs i deletions, and building a prefix of length j "
+         "from nothing costs j insertions. Filling them with zeros instead is the "
+         "most common mistake, and it produces answers that are too small.</p>"),
+        ("Cutting the space",
+         "<p>Each cell depends only on the row above and the cell to its left, "
+         "so the whole table is never needed at once &mdash; two rows suffice, "
+         "and iterating over the shorter string makes it "
+         "O(min(m,&nbsp;n)).</p>"
+         "<p>The trade is that you can no longer walk the table backwards to "
+         "recover the actual sequence of edits. If the question asks which edits, "
+         "keep the full table; if it asks only for the count, the two-row "
+         "version is strictly better.</p>"),
+    ],
+    code={
+        "file": "edit_distance.py",
+        "intro": "The full table printed for a small pair so the shape is "
+                 "visible, the two-row version checked against it, and the "
+                 "zeroed-base-case bug producing a confidently wrong answer.",
+        "code": '''# Edit distance: three neighbours, three edits.
+
+def edit_distance(a, b, show=False):
+    rows, cols = len(a) + 1, len(b) + 1
+    dp = [[0] * cols for _ in range(rows)]
+    for i in range(rows):
+        dp[i][0] = i                      # i deletions to reach ""
+    for j in range(cols):
+        dp[0][j] = j                      # j insertions to build b[:j]
+
+    for i in range(1, rows):
+        for j in range(1, cols):
+            if a[i - 1] == b[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1]           # match: free
+            else:
+                dp[i][j] = 1 + min(dp[i - 1][j - 1],  # substitute
+                                   dp[i - 1][j],      # delete
+                                   dp[i][j - 1])      # insert
+    if show:
+        print("      " + "  ".join(f"{c:>2}" for c in " " + b))
+        for i, row in enumerate(dp):
+            label = " " if i == 0 else a[i - 1]
+            print(f"   {label}  " + "  ".join(f"{v:>2}" for v in row))
+    return dp[-1][-1]
+
+
+def edit_distance_two_rows(a, b):
+    """Same answer in O(min(m, n)) space - but no way to recover the edits."""
+    if len(a) < len(b):
+        a, b = b, a                       # iterate over the shorter one
+    previous = list(range(len(b) + 1))
+    for i, ca in enumerate(a, start=1):
+        current = [i] + [0] * len(b)
+        for j, cb in enumerate(b, start=1):
+            current[j] = (previous[j - 1] if ca == cb
+                          else 1 + min(previous[j - 1], previous[j], current[j - 1]))
+        previous = current
+    return previous[-1]
+
+
+def zeroed_base_cases(a, b):
+    """The version that fills the edges with zeros instead."""
+    rows, cols = len(a) + 1, len(b) + 1
+    dp = [[0] * cols for _ in range(rows)]
+    for i in range(1, rows):
+        for j in range(1, cols):
+            dp[i][j] = (dp[i - 1][j - 1] if a[i - 1] == b[j - 1]
+                        else 1 + min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]))
+    return dp[-1][-1]
+
+
+print("kitten -> sitting")
+print("distance:", edit_distance("kitten", "sitting"))
+print()
+print("the table for cat -> cut:")
+edit_distance("cat", "cut", show=True)
+
+print()
+for a, b in [("kitten", "sitting"), ("cat", "cut"), ("", "abc"), ("same", "same")]:
+    full = edit_distance(a, b)
+    rows2 = edit_distance_two_rows(a, b)
+    zeroed = zeroed_base_cases(a, b)
+    flag = "   <-- zeroed edges is WRONG" if zeroed != full else ""
+    print(f"{a!r:>9} -> {b!r:<9} full={full} two-row={rows2} zeroed={zeroed}{flag}")
+''',
+        "walk": [
+            ("dp[i][0] = i",
+             "The base case people zero out by accident. Turning a prefix into "
+             "the empty string costs one deletion per character, and starting "
+             "from zero makes every answer too small."),
+            ("dp[i][j] = dp[i - 1][j - 1]",
+             "A match costs nothing at all &mdash; it copies the diagonal rather "
+             "than adding to it. Adding 1 here is the other common slip."),
+            ("min(diagonal, up, left)",
+             "Substitute, delete, insert, in that order. Being able to name which "
+             "neighbour is which edit is what shows you understand the "
+             "recurrence rather than remember it."),
+            ("previous = current",
+             "The two-row version. Each cell needs only the row above and the "
+             "cell to its left, so the full table is never required &mdash; "
+             "unless you want to reconstruct the edits."),
+        ],
+        "try": [
+            "Swap the argument order. The distance is symmetric, and watching "
+            "the table transpose is a good check that you have the axes right.",
+            "Add a fourth move for transposition (swapping adjacent characters). "
+            "That turns it into Damerau-Levenshtein, which is what spell "
+            "checkers actually use.",
+        ],
+    },
+    check=[
+        {"q": "In the DP table, the cell above dp[i][j] corresponds to which edit?",
+         "options": ["Insert", "Delete a character from the first string",
+                     "Substitute", "No edit"],
+         "answer": 1,
+         "why": "Up is delete, left is insert, diagonal is substitute. Naming "
+                "them is what shows the recurrence is understood rather than memorised."},
+        {"q": "Filling row 0 and column 0 with zeros instead of 0..n gives:",
+         "options": ["The same answer", "Answers that are too small",
+                     "An IndexError", "Answers that are too large"],
+         "answer": 1,
+         "why": "The edges encode the cost of reaching the empty string. Zeroing "
+                "them makes those conversions free."},
+        {"q": "The space can be reduced to O(min(m, n)) because:",
+         "options": ["The strings are short", "Each cell depends only on the "
+                     "previous row and the cell to its left",
+                     "The table is symmetric", "Most cells are zero"],
+         "answer": 1,
+         "why": "Two rows suffice. The cost is that you can no longer walk the "
+                "table back to recover which edits were made."},
+    ],
+)

@@ -1548,3 +1548,401 @@ print("multiplication. For a sum-based version they would be 0 instead.")
                 "Getting the identity wrong is the standard bug."},
     ],
 )
+
+
+def _intervals_frames():
+    data = [(1, 3), (2, 6), (8, 10), (9, 12), (15, 18)]
+    out = [frame(pairs([("%d-%d" % iv, "unmerged") for iv in data],
+                       {}, label="sorted by start"),
+                 "Sort by start first. That is what makes one pass enough - an "
+                 "interval can only ever overlap the one before it.",
+                 {"merged": 0})]
+    merged = [list(data[0])]
+    for lo, hi in data[1:]:
+        touches = lo <= merged[-1][1]
+        if touches:
+            merged[-1][1] = max(merged[-1][1], hi)
+        else:
+            merged.append([lo, hi])
+        out.append(frame(pairs([("%d-%d" % tuple(m), "kept") for m in merged],
+                               {"%d-%d" % tuple(merged[-1]): "hit" if touches else "lo"},
+                               label="merged so far"),
+                         "%d-%d %s" % (lo, hi,
+                                       "overlaps the last one, so extend it to %d."
+                                       % merged[-1][1] if touches
+                                       else "starts after the last one ends, so open a new interval."),
+                         {"merged": len(merged)}))
+    return viz(out)
+
+
+_q(
+    slug="merge-intervals",
+    kind="coding",
+    level="Medium",
+    title="Merge overlapping intervals",
+    asked="Given a list of intervals, merge the ones that overlap.",
+    desc="Sorting by start turns interval merging into a single pass, why "
+         "comparing against the last kept interval is enough, and the "
+         "touching-versus-overlapping edge case.",
+    lead="<strong>Sort by start.</strong> After that an interval can only "
+         "overlap the one immediately before it, so a single pass merges "
+         "everything: extend the last kept interval if it reaches this one, "
+         "otherwise start a new one. O(n&nbsp;log&nbsp;n) for the sort, O(n) "
+         "after it.",
+    say="\"Sort by start, then sweep. Each interval either extends the last "
+        "merged one or starts a new one. The sort dominates, so O(n log n).\"",
+    notice=[
+        "Sorting is the whole trick &mdash; without it every pair must be compared.",
+        "Only the <em>last</em> merged interval is ever checked.",
+        "Extending takes the larger end, not this interval's end.",
+    ],
+    viz=_intervals_frames(),
+    sections=[
+        ("Why sorting collapses the problem",
+         "<p>Unsorted, any interval can overlap any other, so you are looking at "
+         "pairs &mdash; O(n&sup2;). Sorted by start, an interval's only possible "
+         "overlap is with the merged block immediately behind it, because "
+         "everything earlier starts earlier and has already been absorbed.</p>"
+         "<p>That reduces the whole thing to one comparison per interval. The "
+         "sort costs O(n&nbsp;log&nbsp;n) and dominates.</p>"),
+        ("The line people get wrong",
+         "<p>When extending, take <code>max(last_end, this_end)</code>, not "
+         "<code>this_end</code>. A fully contained interval &mdash; "
+         "<code>[1, 10]</code> then <code>[2, 3]</code> &mdash; would otherwise "
+         "shrink the merged block to 3 and silently lose everything from 3 to "
+         "10.</p>"
+         "<p>The other decision is whether touching counts as overlapping. "
+         "<code>[1, 3]</code> and <code>[3, 5]</code> merge under "
+         "<code>lo &lt;= last_end</code> and stay separate under "
+         "<code>&lt;</code>. Both are defensible; ask which the question "
+         "wants.</p>"),
+        ("What it generalises to",
+         "<p>Meeting rooms, calendar conflicts, genome ranges, IP blocks &mdash; "
+         "all the same sweep. The variants change only the merge rule: count how "
+         "many rooms are needed simultaneously (a sweep line with +1 and "
+         "&minus;1 events), insert one interval into an already-merged list, or "
+         "find the gaps rather than the blocks.</p>"),
+    ],
+    code={
+        "file": "merge_intervals.py",
+        "intro": "The sweep with each decision printed, the contained-interval "
+                 "case that breaks the naive extend, and both answers to the "
+                 "touching question.",
+        "code": '''# Merge overlapping intervals: sort by start, then sweep once.
+
+def merge(intervals, touching_counts=True):
+    if not intervals:
+        return []
+    ordered = sorted(intervals)               # by start, then end
+    merged = [list(ordered[0])]
+    for lo, hi in ordered[1:]:
+        last = merged[-1]
+        overlaps = lo <= last[1] if touching_counts else lo < last[1]
+        if overlaps:
+            last[1] = max(last[1], hi)        # max, NOT hi - see below
+        else:
+            merged.append([lo, hi])
+    return [tuple(m) for m in merged]
+
+
+data = [(1, 3), (2, 6), (8, 10), (9, 12), (15, 18)]
+print("input :", data)
+print("merged:", merge(data))
+
+# --- the contained-interval trap ---------------------------------------
+def merge_wrong(intervals):
+    ordered = sorted(intervals)
+    out = [list(ordered[0])]
+    for lo, hi in ordered[1:]:
+        if lo <= out[-1][1]:
+            out[-1][1] = hi                   # loses a contained interval
+        else:
+            out.append([lo, hi])
+    return [tuple(m) for m in out]
+
+contained = [(1, 10), (2, 3), (4, 5)]
+print()
+print("input        :", contained)
+print("with max()   :", merge(contained))
+print("without max():", merge_wrong(contained), "  <- 10 was thrown away")
+
+# --- does touching count? ----------------------------------------------
+touching = [(1, 3), (3, 5), (6, 8)]
+print()
+print("input                :", touching)
+print("touching merges      :", merge(touching, touching_counts=True))
+print("touching stays apart :", merge(touching, touching_counts=False))
+print("Both are defensible. Ask which the question wants.")
+
+# --- the sweep-line variant: how many rooms at once? -------------------
+def max_overlap(intervals):
+    events = []
+    for lo, hi in intervals:
+        events.append((lo, 1))                # an interval opens
+        events.append((hi, -1))               # and closes
+    events.sort()
+    live = best = 0
+    for _, delta in events:
+        live += delta
+        best = max(best, live)
+    return best
+
+print()
+print("rooms needed for", data, "->", max_overlap(data))
+''',
+        "walk": [
+            ("sorted(intervals)",
+             "The whole reduction. Sorted by start, an interval can only overlap "
+             "the merged block directly behind it, so one comparison per "
+             "interval replaces comparing every pair."),
+            ("last[1] = max(last[1], hi)",
+             "The <code>max</code> is load-bearing. <code>[1, 10]</code> followed "
+             "by <code>[2, 3]</code> would otherwise shrink the block to 3 and "
+             "silently drop everything up to 10."),
+            ("lo <= last[1] versus lo < last[1]",
+             "Whether <code>[1,3]</code> and <code>[3,5]</code> merge. Both "
+             "conventions are used; the question usually implies one, and asking "
+             "is a better move than guessing."),
+            ("events.sort() in max_overlap",
+             "The sweep-line variant: +1 when an interval opens, &minus;1 when it "
+             "closes, and the running total is how many are live at once. Same "
+             "sort, different question."),
+        ],
+        "try": [
+            "Feed it intervals already sorted by <em>end</em> instead. The sweep "
+            "gives wrong answers &mdash; the precondition is specifically sorted "
+            "by start.",
+            "Write <code>insert(intervals, new)</code> for an already-merged "
+            "list. It is O(n) with no sort, and a common follow-up.",
+        ],
+    },
+    check=[
+        {"q": "Why does sorting by start make one pass sufficient?",
+         "options": ["It removes duplicates", "An interval can then only overlap "
+                     "the merged block immediately before it",
+                     "It makes the list shorter", "Sorting merges them"],
+         "answer": 1,
+         "why": "Everything earlier starts earlier and has already been absorbed, "
+                "so there is only ever one candidate to compare against."},
+        {"q": "Why must the extend use max(last_end, this_end)?",
+         "options": ["For speed", "A fully contained interval would otherwise "
+                     "shrink the merged block",
+                     "To handle negatives", "It does not matter"],
+         "answer": 1,
+         "why": "[1,10] then [2,3] would set the end to 3 and silently lose "
+                "everything from 3 to 10."},
+        {"q": "The overall complexity is:",
+         "options": ["O(n)", "O(n log n), dominated by the sort", "O(n²)",
+                     "O(log n)"],
+         "answer": 1,
+         "why": "The sweep itself is linear. If the input arrives already sorted, "
+                "the whole thing is O(n)."},
+    ],
+)
+
+
+def _duplicate_frames():
+    values = [3, 1, 3, 4, 2]
+    out = [frame(marked(values, {i: "dim" for i in range(len(values))},
+                        label="values 1..n in an array of n+1"),
+                 "By pigeonhole there must be a duplicate. The trick is finding "
+                 "it without a set and without modifying the array.",
+                 {"slow": 0, "fast": 0})]
+    slow = fast = 0
+    for step in range(4):
+        slow = values[slow]
+        fast = values[values[fast]]
+        marks = {i: "dim" for i in range(len(values))}
+        marks[slow] = "lo"
+        marks[fast] = "hi" if fast != slow else "hit"
+        out.append(frame(marked(values, marks, {slow: "slow", fast: "fast"},
+                                label="treat each value as a next pointer"),
+                         "slow -> index %d, fast -> index %d.%s"
+                         % (slow, fast, "  They have met." if slow == fast else ""),
+                         {"slow": slow, "fast": fast}))
+        if slow == fast:
+            break
+    finder = 0
+    while finder != slow:
+        finder = values[finder]
+        slow = values[slow]
+    out.append(frame(marked(values, {i: ("hit" if values[i] == finder or i == finder
+                                         else "dim") for i in range(len(values))},
+                            label="values"),
+                     "Phase two walks one pointer from the start; they meet at "
+                     "the duplicate, %d. O(1) memory, array untouched." % finder,
+                     {"slow": slow, "fast": finder}))
+    return viz(out)
+
+
+_q(
+    slug="find-the-duplicate-number",
+    kind="coding",
+    level="Hard",
+    title="Find the duplicate number",
+    asked="An array of n+1 integers holds values from 1 to n. Find the duplicate "
+          "without modifying the array and in O(1) space.",
+    desc="Floyd's cycle detection applied to an array: why treating values as "
+         "pointers creates a linked list with a loop, and why the easy answers "
+         "are ruled out by the constraints.",
+    lead="Treat each value as a <strong>pointer to an index</strong>. Because "
+         "values are in 1..n and there are n+1 of them, following those pointers "
+         "must eventually revisit a node &mdash; and the entrance to that cycle "
+         "is the duplicate. Floyd's tortoise and hare finds it in O(n) time and "
+         "O(1) space.",
+    say="\"The constraints rule out sorting and a set. If you read each value as "
+        "a next-pointer, the array is a linked list that must contain a cycle, "
+        "and the cycle entrance is the duplicate - so it's Floyd's algorithm.\"",
+    notice=[
+        "The two pointers move at different speeds until they meet.",
+        "Meeting is <em>not</em> the answer &mdash; phase two finds the entrance.",
+        "Nothing is written to the array and nothing is allocated.",
+    ],
+    viz=_duplicate_frames(),
+    sections=[
+        ("Read the constraints first",
+         "<p>The easy answers are all excluded on purpose. A <code>set</code> is "
+         "O(n) space. Sorting modifies the array. Marking visited indices by "
+         "negating them modifies it too. Each constraint removes one obvious "
+         "solution, and what is left is the intended one &mdash; which is why "
+         "reading the constraints aloud is a real technique, not a stall.</p>"),
+        ("Turning the array into a linked list",
+         "<p>Start at index 0 and repeatedly jump to the index named by the "
+         "current value. Values are in 1..n, so no jump leaves the array and no "
+         "jump lands on index 0 &mdash; index 0 is the start of the chain and "
+         "never re-entered.</p>"
+         "<p>There are n+1 slots and only n distinct values, so two slots share "
+         "a value, so two different nodes point at the same next node. That "
+         "shared target is where the chain closes into a loop, and it <em>is</em> "
+         "the duplicate value.</p>"),
+        ("Why phase two works",
+         "<p>Once the pointers meet inside the loop, the distance from the head "
+         "to the loop entrance equals the distance from the meeting point to the "
+         "entrance. So walking one pointer from the start and one from the "
+         "meeting point, one step at a time, makes them meet exactly at the "
+         "entrance.</p>"
+         "<p>It looks like magic and falls out of the arithmetic. Say that the "
+         "same two-phase structure detects a cycle in an actual linked list "
+         "&mdash; the interviewer is usually checking whether you recognise the "
+         "algorithm rather than whether you can rederive the proof.</p>"),
+    ],
+    code={
+        "file": "find_duplicate.py",
+        "intro": "Floyd's two phases with the pointer positions printed, checked "
+                 "against a set-based version on random inputs, plus the "
+                 "binary-search-on-value alternative.",
+        "code": '''# Find the duplicate: values are pointers, so the array is a linked list.
+import random
+
+def floyd(values):
+    slow = fast = 0
+    steps = 0
+    while True:                              # phase 1: find a meeting point
+        slow = values[slow]
+        fast = values[values[fast]]
+        steps += 1
+        if slow == fast:
+            break
+    meeting = slow
+
+    finder = 0                               # phase 2: find the entrance
+    while finder != slow:
+        finder = values[finder]
+        slow = values[slow]
+        steps += 1
+    return finder, meeting, steps
+
+
+def with_a_set(values):
+    """Correct, and O(n) space - which the question forbids."""
+    seen = set()
+    for v in values:
+        if v in seen:
+            return v
+        seen.add(v)
+    return None
+
+
+def binary_search_on_value(values):
+    """O(n log n) time, O(1) space. Counts how many values are <= mid."""
+    lo, hi = 1, len(values) - 1
+    while lo < hi:
+        mid = (lo + hi) // 2
+        count = sum(1 for v in values if v <= mid)
+        if count > mid:                      # pigeonhole: the duplicate is <= mid
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo
+
+
+data = [3, 1, 3, 4, 2]
+answer, meeting, steps = floyd(data)
+print("array    :", data)
+print("duplicate:", answer, f"(pointers met at index {meeting}, {steps} steps)")
+print("array unchanged:", data)
+
+# Agreement across random inputs is the real check.
+print()
+random.seed(11)
+for _ in range(6):
+    n = random.randint(4, 12)
+    base = list(range(1, n + 1))
+    values = base + [random.choice(base)]
+    random.shuffle(values)
+    a = floyd(values)[0]
+    b = with_a_set(values)
+    c = binary_search_on_value(values)
+    print(f"  n={n:>2}  floyd={a:>2} set={b:>2} binary={c:>2}  agree={a == b == c}")
+
+print()
+print("A set is O(n) memory. Sorting modifies the array. Negating visited")
+print("indices modifies it too. Each constraint removes one obvious answer.")
+''',
+        "walk": [
+            ("fast = values[values[fast]]",
+             "Two jumps to the tortoise's one. Inside a loop the gap closes by "
+             "one node per step, so they are guaranteed to meet."),
+            ("meeting is not the answer",
+             "Phase one only proves a cycle exists and finds <em>a</em> point "
+             "inside it. Returning <code>slow</code> here is the most common way "
+             "to get this almost right."),
+            ("while finder != slow:",
+             "Phase two. The distance from the head to the entrance equals the "
+             "distance from the meeting point to the entrance, so two pointers "
+             "advancing in step converge exactly on it."),
+            ("binary_search_on_value",
+             "The alternative worth naming: count values &le; mid and use "
+             "pigeonhole to pick a half. O(n&nbsp;log&nbsp;n) time, O(1) space, "
+             "and much easier to derive under pressure."),
+        ],
+        "try": [
+            "Put the duplicate at both ends &mdash; <code>[2, 3, 4, 2]</code>. "
+            "The step count changes and the answer does not.",
+            "Return <code>meeting</code> instead of <code>finder</code>. It is "
+            "right often enough to pass a careless test and wrong in general.",
+        ],
+    },
+    check=[
+        {"q": "Why can the array be treated as a linked list?",
+         "options": ["It is sorted", "Every value is a valid index, so each slot "
+                     "points to another slot",
+                     "It contains no zeros", "It is the same length as its values"],
+         "answer": 1,
+         "why": "Values are in 1..n, so no jump leaves the array and index 0 is "
+                "never re-entered - making it a chain with a guaranteed cycle."},
+        {"q": "The meeting point of the two pointers is:",
+         "options": ["The duplicate", "Somewhere inside the cycle, not "
+                     "necessarily its entrance",
+                     "Always index 0", "The array length"],
+         "answer": 1,
+         "why": "Phase one only proves a cycle exists. Phase two walks from the "
+                "head to find the entrance, which is the duplicate."},
+        {"q": "Which constraint rules out using a set?",
+         "options": ["Do not modify the array", "O(1) space", "O(n) time",
+                     "Values are 1..n"],
+         "answer": 1,
+         "why": "A set is O(n) memory. 'Do not modify' is what rules out sorting "
+                "and index-negation instead."},
+    ],
+)

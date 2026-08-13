@@ -836,3 +836,430 @@ print("Roughly 2x, not 4x. Same answers, one line different in each.")
                 "quadratic roughly quadruples."},
     ],
 )
+
+
+def _lru_frames():
+    out = [frame([pairs([("cache", "empty"), ("capacity", "2")], {},
+                        label="state"),
+                  marked(["(front = newest)", "(back = oldest)"], {},
+                         label="recency order", index=False)],
+                 "A dict for O(1) lookup, and an order for O(1) eviction. "
+                 "Neither alone is enough.",
+                 {"size": 0, "evictions": 0})]
+    order, cache, evictions = [], {}, 0
+    for op, key, value in [("put", "a", 1), ("put", "b", 2), ("get", "a", None),
+                           ("put", "c", 3), ("get", "b", None)]:
+        note = ""
+        if op == "put":
+            if key in cache:
+                order.remove(key)
+            cache[key] = value
+            order.append(key)
+            if len(order) > 2:
+                gone = order.pop(0)
+                del cache[gone]
+                evictions += 1
+                note = "put(%s) - over capacity, so evict %r, the least recently used." % (key, gone)
+            else:
+                note = "put(%s, %s) - added, and it is now the newest." % (key, value)
+        else:
+            hit = key in cache
+            if hit:
+                order.remove(key)
+                order.append(key)
+                note = "get(%s) -> %s, and touching it makes it the newest." % (key, cache[key])
+            else:
+                note = "get(%s) -> miss. It was evicted earlier." % key
+        out.append(frame([pairs([(k, cache[k]) for k in order] or [("cache", "empty")],
+                                {order[-1]: "hit"} if order else {}, label="cache"),
+                          marked(list(reversed(order)) or ["-"],
+                                 {0: "lo"} if order else {},
+                                 label="newest -> oldest", index=False)],
+                         note, {"size": len(cache), "evictions": evictions}))
+    return viz(out)
+
+
+_q(
+    slug="design-an-lru-cache",
+    kind="coding",
+    level="Hard",
+    title="Design an LRU cache",
+    asked="Design a cache with O(1) get and put that evicts the least recently "
+          "used entry.",
+    desc="Why an LRU cache needs both a hash map and a doubly linked list, what "
+         "each one buys, and how OrderedDict does the same job in ten lines.",
+    lead="Two structures, because neither alone gives you both operations in "
+         "O(1). A <strong>hash map</strong> for lookup by key, and a "
+         "<strong>doubly linked list</strong> for recency order &mdash; the map "
+         "stores the node, so touching an entry unlinks and relinks it in "
+         "constant time, and eviction is whatever sits at the tail.",
+    say="\"Hash map plus doubly linked list. The map gives O(1) lookup and holds "
+        "the node itself, so I can unlink it in O(1) without scanning. Most "
+        "recent at the head, evict from the tail. In Python I'd reach for "
+        "OrderedDict and move_to_end.\"",
+    notice=[
+        "A <code>get</code> is not read-only &mdash; it changes the order.",
+        "Eviction always takes the oldest, which is why order must be maintained.",
+        "The map stores the <em>node</em>, which is what makes unlinking O(1).",
+    ],
+    viz=_lru_frames(),
+    sections=[
+        ("Why one structure is not enough",
+         "<p>A dictionary gives O(1) lookup and knows nothing about order. A list "
+         "keeps order and needs O(n) to find and remove an arbitrary element. "
+         "The requirement is both at once, so you carry both.</p>"
+         "<p>The join between them is the important part: the map's value is not "
+         "the cached value, it is the <em>node</em> in the linked list. That is "
+         "what lets you go from a key straight to its position and unlink it "
+         "without walking anything.</p>"),
+        ("Why the list must be doubly linked",
+         "<p>Removing a node in O(1) requires knowing the node before it. A "
+         "singly linked list would need a scan to find the predecessor, which "
+         "puts you back at O(n). The backward pointer is the whole reason for "
+         "the extra memory.</p>"
+         "<p>Most implementations also use sentinel head and tail nodes, so no "
+         "insertion or removal is ever a special case &mdash; the same trick as "
+         "the dummy head in a linked-list delete.</p>"),
+        ("The Python answer",
+         "<p><code>collections.OrderedDict</code> is exactly a dict plus a "
+         "doubly linked list, and it exposes <code>move_to_end</code> and "
+         "<code>popitem(last=False)</code>. That is the version to write in real "
+         "code, and the ten-line implementation is a fine answer if you can also "
+         "explain what it is doing underneath.</p>"
+         "<p>Say which one the interviewer wants. \"Implement it from scratch\" "
+         "means the nodes; \"use it\" means <code>OrderedDict</code>, or "
+         "<code>functools.lru_cache</code> if it is memoisation rather than a "
+         "cache you control.</p>"),
+    ],
+    code={
+        "file": "lru_cache.py",
+        "intro": "The from-scratch version with sentinel nodes, the "
+                 "<code>OrderedDict</code> version, and both run through the same "
+                 "sequence of operations so their answers can be compared.",
+        "code": '''# LRU cache: a hash map for lookup, a doubly linked list for order.
+from collections import OrderedDict
+
+class Node:
+    __slots__ = ("key", "value", "prev", "next")
+    def __init__(self, key=None, value=None):
+        self.key, self.value = key, value
+        self.prev = self.next = None
+
+
+class LRUCache:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.map = {}                        # key -> NODE, not key -> value
+        # Sentinels, so no insert or remove is ever a special case.
+        self.head, self.tail = Node(), Node()
+        self.head.next, self.tail.prev = self.tail, self.head
+        self.evictions = []
+
+    def _unlink(self, node):
+        node.prev.next, node.next.prev = node.next, node.prev
+
+    def _push_front(self, node):
+        node.next, node.prev = self.head.next, self.head
+        self.head.next.prev = self.head.next = node
+
+    def get(self, key):
+        node = self.map.get(key)
+        if node is None:
+            return -1
+        self._unlink(node)                   # a get CHANGES the order
+        self._push_front(node)
+        return node.value
+
+    def put(self, key, value):
+        node = self.map.get(key)
+        if node:
+            node.value = value
+            self._unlink(node)
+            self._push_front(node)
+            return
+        node = Node(key, value)
+        self.map[key] = node
+        self._push_front(node)
+        if len(self.map) > self.capacity:
+            oldest = self.tail.prev          # O(1): no scan needed
+            self._unlink(oldest)
+            del self.map[oldest.key]
+            self.evictions.append(oldest.key)
+
+
+class LRUOrderedDict:
+    """The same thing, using the structure the standard library already has."""
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.data = OrderedDict()
+        self.evictions = []
+
+    def get(self, key):
+        if key not in self.data:
+            return -1
+        self.data.move_to_end(key)
+        return self.data[key]
+
+    def put(self, key, value):
+        if key in self.data:
+            self.data.move_to_end(key)
+        self.data[key] = value
+        if len(self.data) > self.capacity:
+            self.evictions.append(self.data.popitem(last=False)[0])
+
+
+ops = [("put", "a", 1), ("put", "b", 2), ("get", "a", None),
+       ("put", "c", 3), ("get", "b", None), ("get", "c", None), ("get", "a", None)]
+
+for name, cls in (("from scratch", LRUCache), ("OrderedDict", LRUOrderedDict)):
+    cache = cls(2)
+    results = []
+    for op, key, value in ops:
+        results.append(cache.get(key) if op == "get" else (cache.put(key, value) or "-"))
+    print(f"{name:>13}: {results}  evicted {cache.evictions}")
+
+print()
+print("get('b') is -1: putting 'c' evicted it, because 'a' had just been read")
+print("and was therefore more recently used.")
+''',
+        "walk": [
+            ("self.map = {}   # key -> NODE",
+             "The join between the two structures. Storing the node rather than "
+             "the value is what turns \"remove this key from the order\" into a "
+             "pointer update instead of a scan."),
+            ("self.head, self.tail = Node(), Node()",
+             "Sentinels. With a real head and tail always present, unlinking "
+             "never has to check for <code>None</code> &mdash; the same trick as "
+             "the dummy head in a linked-list delete."),
+            ("get() calls _unlink then _push_front",
+             "A read mutates the structure. That surprises people, and it is the "
+             "definition of \"recently used\" &mdash; a cache where reads did not "
+             "count would be FIFO, not LRU."),
+            ("oldest = self.tail.prev",
+             "Eviction in O(1) because the order is maintained continuously. "
+             "Searching for the least recently used at eviction time would be "
+             "O(n) and defeat the whole design."),
+        ],
+        "try": [
+            "Change <code>get</code> so it does not reorder. You now have a FIFO "
+            "cache, and the eviction sequence changes &mdash; run it and see.",
+            "Add a <code>capacity=0</code> case. Every put should evict "
+            "immediately; most implementations crash.",
+        ],
+    },
+    check=[
+        {"q": "Why does an LRU cache need a doubly linked list rather than a "
+              "singly linked one?",
+         "options": ["To iterate backwards", "Removing an arbitrary node in O(1) "
+                     "requires knowing its predecessor",
+                     "To store more data", "It does not"],
+         "answer": 1,
+         "why": "With only forward pointers you would have to scan to find the "
+                "node before, which is O(n) and defeats the requirement."},
+        {"q": "What does the hash map store as its value?",
+         "options": ["The cached value", "The list node holding that value",
+                     "The insertion time", "The key again"],
+         "answer": 1,
+         "why": "Storing the node is what lets you go from a key straight to its "
+                "position in the order and unlink it without walking."},
+        {"q": "Does a successful get change the cache?",
+         "options": ["No, reads are free", "Yes - it makes that entry the most "
+                     "recently used",
+                     "Only if the cache is full", "Only for the first read"],
+         "answer": 1,
+         "why": "That is what distinguishes LRU from FIFO. A cache where reads "
+                "did not count would evict on insertion order instead."},
+    ],
+)
+
+
+def _consecutive_frames():
+    values = [100, 4, 200, 1, 3, 2]
+    pool = set(values)
+    out = [frame([marked(values, {}, label="input (unsorted)"),
+                  pairs([(str(v), "in the set") for v in sorted(pool)], {},
+                        label="set for O(1) membership")],
+                 "Put everything in a set first. Every question from here is a "
+                 "membership test, which is O(1).",
+                 {"checked": 0, "best": 0})]
+    best = 0
+    for v in sorted(pool):
+        is_start = v - 1 not in pool
+        marks = {i: ("hit" if values[i] == v and is_start else
+                     "dim" if values[i] == v else "dim") for i in range(len(values))}
+        if not is_start:
+            out.append(frame(marked(values, marks, label="input"),
+                             "%d has %d before it, so it is not the start of a "
+                             "run - skip it entirely." % (v, v - 1),
+                             {"checked": v, "best": best}))
+            continue
+        length = 1
+        while v + length in pool:
+            length += 1
+        best = max(best, length)
+        out.append(frame(marked(values, {i: ("hit" if v <= values[i] < v + length
+                                             else "dim") for i in range(len(values))},
+                                label="input"),
+                         "%d starts a run (no %d in the set). Walk forward: "
+                         "length %d." % (v, v - 1, length),
+                         {"checked": v, "best": best}))
+    return viz(out)
+
+
+_q(
+    slug="longest-consecutive-sequence",
+    kind="coding",
+    level="Medium",
+    title="Longest consecutive sequence",
+    asked="Find the length of the longest run of consecutive integers in an "
+          "unsorted array, in O(n).",
+    desc="Why a set plus a start-of-run check gives O(n) rather than the O(n²) "
+         "the nested loop suggests, and why sorting is the wrong answer.",
+    lead="Put everything in a <strong>set</strong>, then only start counting "
+         "from a value whose predecessor is absent. That single check is what "
+         "keeps it O(n): every run is walked exactly once, from its start, so "
+         "the inner loop across the whole input does n steps in total rather "
+         "than n per element.",
+    say="\"Set for O(1) membership, then for each value check whether value-1 is "
+        "in the set. If it is, skip - something else starts that run. If it "
+        "isn't, walk forward. Every element is visited at most twice, so O(n).\"",
+    notice=[
+        "Values with a predecessor present are skipped without any work.",
+        "Each run is walked exactly once, from its lowest member.",
+        "The input is never sorted.",
+    ],
+    viz=_consecutive_frames(),
+    sections=[
+        ("Why not just sort",
+         "<p>Sorting makes it trivial &mdash; one pass counting adjacent runs "
+         "&mdash; and costs O(n&nbsp;log&nbsp;n). The question asks for O(n) "
+         "specifically to rule that out, so give the sorting answer, name its "
+         "cost, and then improve it.</p>"),
+        ("The check that makes it linear",
+         "<p>Without the start-of-run test, each value walks its whole run and "
+         "the work is quadratic on a long sequence. With it, a value only walks "
+         "forward when <code>value - 1</code> is absent &mdash; and each run has "
+         "exactly one such value.</p>"
+         "<p>So across the entire input the inner loop takes as many steps as "
+         "there are elements, not as many as elements times run length. Every "
+         "element is touched at most twice: once in the outer loop, once by the "
+         "walk of its own run.</p>"),
+        ("Saying the complexity convincingly",
+         "<p>This is the question where candidates write the right code and then "
+         "call it O(n&sup2;) because there is a loop inside a loop. The argument "
+         "to make out loud is amortised: the inner loop's <em>total</em> work "
+         "across all iterations is bounded by n, because runs do not overlap.</p>"
+         "<p>Same shape as the sliding window, where both pointers only move "
+         "forward. A nested loop is not automatically quadratic; what matters is "
+         "how many times the inner body can run in total.</p>"),
+    ],
+    code={
+        "file": "consecutive.py",
+        "intro": "The O(n) version with its inner-loop steps counted against the "
+                 "version missing the start check, on an input built to make the "
+                 "difference obvious.",
+        "code": '''# Longest run of consecutive integers, in O(n).
+
+def longest_run(values):
+    pool = set(values)                       # O(1) membership from here on
+    best = 0
+    inner_steps = 0
+    for v in pool:
+        if v - 1 in pool:
+            continue                         # not the start of a run - skip
+        length = 1
+        while v + length in pool:            # walk this run, once
+            length += 1
+            inner_steps += 1
+        best = max(best, length)
+    return best, inner_steps
+
+
+def longest_run_no_check(values):
+    """Same idea without the start test: every value walks its whole run."""
+    pool = set(values)
+    best = 0
+    inner_steps = 0
+    for v in pool:
+        length = 1
+        while v + length in pool:
+            length += 1
+            inner_steps += 1
+        best = max(best, length)
+    return best, inner_steps
+
+
+def by_sorting(values):
+    if not values:
+        return 0
+    ordered = sorted(set(values))
+    best = run = 1
+    for a, b in zip(ordered, ordered[1:]):
+        run = run + 1 if b == a + 1 else 1
+        best = max(best, run)
+    return best
+
+
+data = [100, 4, 200, 1, 3, 2]
+best, steps = longest_run(data)
+print("input :", data)
+print("answer:", best, f"({steps} inner steps)")
+print("sorted approach agrees:", by_sorting(data) == best)
+
+# One long run is where the missing check costs you.
+print()
+big = list(range(1, 2001))
+for name, fn in (("with the check", longest_run), ("without it", longest_run_no_check)):
+    answer, steps = fn(big)
+    print(f"  {name:>15}: answer={answer}, inner steps={steps:,}")
+
+print()
+print("Same answer. One does 2,000 steps in total, the other does about two")
+print("million - and the code differs by a single `if`.")
+''',
+        "walk": [
+            ("if v - 1 in pool: continue",
+             "The line the whole complexity rests on. A value with a predecessor "
+             "is somewhere in the middle of a run that another value will walk, "
+             "so doing anything here is pure duplication."),
+            ("while v + length in pool:",
+             "A nested loop that is <em>not</em> quadratic. Runs do not overlap, "
+             "so the total number of inner steps across the whole outer loop is "
+             "bounded by n."),
+            ("pool = set(values)",
+             "Membership has to be O(1) for any of this to work. On a list the "
+             "same code would be O(n&sup2;) at best."),
+            ("for v in pool",
+             "Iterating the set rather than the list also removes duplicate "
+             "work when the input repeats values."),
+        ],
+        "try": [
+            "Iterate <code>values</code> instead of <code>pool</code> on an "
+            "input with many duplicates. Same answer, more work.",
+            "Return the run itself rather than its length by remembering "
+            "<code>v</code> when <code>best</code> improves.",
+        ],
+    },
+    check=[
+        {"q": "What makes the solution O(n) despite a loop inside a loop?",
+         "options": ["The set is sorted", "Only the start of each run walks "
+                     "forward, so the inner loop does n steps in total",
+                     "The inner loop is capped", "It is actually O(n²)"],
+         "answer": 1,
+         "why": "Runs do not overlap, so total inner work is bounded by n. Each "
+                "element is touched at most twice."},
+        {"q": "How do you know a value starts a run?",
+         "options": ["It is the smallest", "value - 1 is not in the set",
+                     "It appears first in the array", "It is even"],
+         "answer": 1,
+         "why": "If the predecessor exists, some other value will walk this run "
+                "from its true start, so this one can be skipped entirely."},
+        {"q": "Why is sorting not the accepted answer?",
+         "options": ["It gives the wrong result", "It is O(n log n), and the "
+                     "question asks for O(n)",
+                     "It cannot handle duplicates", "It uses too much memory"],
+         "answer": 1,
+         "why": "Sorting is correct and simpler - give it first, name its cost, "
+                "then improve to the set-based version."},
+    ],
+)
