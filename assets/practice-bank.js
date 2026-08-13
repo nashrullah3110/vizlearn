@@ -3265,6 +3265,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/ann_indexing_hnsw_and_ivf.html",
+  "title": "ANN indexing: HNSW and IVF",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "What does this module say about “HNSW: skip lists, in vector space”?",
+    "ans": "Take a proximity graph — each vector linked to its nearest neighbours — and stack several, each a random sample of the one below. Search enters at the sparse top layer and greedily moves to whichever neighbour is closer to the query, until no neighbour improves. Then it drops a layer and repeats."
+   },
+   {
+    "t": "What does this module say about “The parameters worth naming”?",
+    "ans": "M — edges per node, fixed at build time. Higher means a better-connected graph, better recall, more memory. The graph itself is a real memory cost on top of the vectors, which is HNSW's main drawback."
+   },
+   {
+    "t": "What does this module say about “How each one fails”?",
+    "ans": "HNSW's search is greedy, so it can settle in a local minimum and return a neighbourhood that is good but not the best. A wider efSearch makes that less likely without eliminating it. Deletion is also awkward — removing a node can disconnect the graph — so most implementations tombstone and rebuild periodically."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/bm25_and_sparse_retrieval.html",
   "title": "BM25 and Sparse Lexical Retrieval",
   "cat": "Gen AI",
@@ -3364,6 +3383,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/context_aware_chunking.html",
+  "title": "Context-aware chunking",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "What does this module say about “The problem is coreference, not boundaries”?",
+    "ans": "Prose is written to be read in order, so it leans on everything before it: \"it\", \"this policy\", \"as described above\", \"the latter\". Cut one paragraph out and those references dangle."
+   },
+   {
+    "t": "What does this module say about “What gets added”?",
+    "ans": "Cheap and free: document title and heading path, prepended. Deterministic, no model call, and usually the largest single improvement."
+   },
+   {
+    "t": "What does this module say about “What it costs, and what to watch”?",
+    "ans": "Index time and money, both once. The subtler cost is dilution: prepending 200 tokens of context to a 300-token chunk means the embedding is largely about the context , so chunks from the same section start looking alike and the retriever loses its ability to distinguish them."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/corrective_rag.html",
   "title": "Corrective RAG (CRAG)",
   "cat": "Gen AI",
@@ -3400,6 +3438,25 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "A pipeline with no way to decline will always fabricate instead, which is worse than an unhelpful but honest answer."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/distributed_retrieval_and_sharding.html",
+  "title": "Distributed retrieval and sharding",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "What does this module say about “Shards and replicas are different things”?",
+    "ans": "A shard holds a slice of the corpus. Sharding handles data that will not fit — memory or index build time — and every query must visit every shard."
+   },
+   {
+    "t": "What does this module say about “Shard randomly”?",
+    "ans": "The instinct is to shard by topic or tenant so a query only touches one shard. For a multi-tenant system where every query is scoped to one tenant, that is right — it is really many small indexes."
+   },
+   {
+    "t": "What does this module say about “Tail latency, and the merge”?",
+    "ans": "Scatter-gather waits for the slowest shard, so p99 response time is roughly the p99 of any shard. Add shards and the chance one is slow rises — the classic result is that latency gets worse as you scale out, not better."
    }
   ]
  },
@@ -3558,6 +3615,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/indexing_in_vector_databases.html",
+  "title": "Indexing in vector databases",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "What does this module say about “Why exact search stops working”?",
+    "ans": "A flat index stores the vectors and compares the query with every one. It is exact, trivially correct, and the right answer for small collections — and the cost is O(n·d) per query, so a million 768-dimensional vectors is around 768 million multiply-adds for a single search."
+   },
+   {
+    "t": "What does this module say about “What an index buys and what it costs”?",
+    "ans": "Every approximate index prunes: it organises vectors so that most can be skipped without being compared. That turns a linear scan into something closer to logarithmic, and introduces the possibility of missing a genuine neighbour because the structure routed the search elsewhere."
+   },
+   {
+    "t": "What does this module say about “The families, briefly”?",
+    "ans": "IVF clusters the vectors and searches only the nearest few clusters. Cheap to build, and it misses neighbours that sit just across a cluster boundary."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/knowledge_distillation_in_llms.html",
   "title": "Knowledge Distillation in LLMs",
   "cat": "Gen AI",
@@ -3695,6 +3771,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/permission_filtering_in_rag.html",
+  "title": "Permission filtering in RAG retrieval",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "What does this module say about “Why post-filtering quietly fails”?",
+    "ans": "Retrieve the top 10 by similarity, then remove what the user may not see. If eight were restricted you return two, and nothing reports that the result set collapsed. The generator answers from thin evidence and sounds no less confident."
+   },
+   {
+    "t": "What does this module say about “Pre-filtering, and why it is harder than it looks”?",
+    "ans": "Pre-filtering restricts the candidate set before ranking, so the top k is k permitted results. That is the correct behaviour and it fights the index: an HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search — you traverse into a region where everything is filtered out and the walk stalls."
+   },
+   {
+    "t": "What does this module say about “Where the permissions live”?",
+    "ans": "Baking an access list into each chunk's metadata at index time is fast and goes stale the moment someone leaves a group — and stale permissions fail open, which is the wrong direction."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/quantization_in_llms.html",
   "title": "Quantization in LLMs",
   "cat": "Gen AI",
@@ -3767,6 +3862,25 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “The two-stage pattern”?",
     "ans": "Cross-encoders are far more accurate but cost too much to run over an entire corpus — a million documents means a million forward passes per query. The standard fix is two stages: a cheap bi-encoder (or BM25, or both) retrieves a shortlist of maybe 20-100 candidates, and only that shortlist is re-scored by the expensive cross-encoder, which then decides the final order."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/recursive_chunking.html",
+  "title": "Recursive chunking",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "What does this module say about “Why not just split every N characters”?",
+    "ans": "Fixed-size splitting is one line and cuts wherever it lands — mid-sentence, mid-word, mid-number. The retrieved chunk then starts halfway through a thought, and the generator has to answer from a fragment."
+   },
+   {
+    "t": "What does this module say about “The separator list is the whole configuration”?",
+    "ans": "The default is roughly [\"\\n\\n\", \"\\n\", \". \", \" \", \"\"] — paragraph, line, sentence, word, character. It descends only when a piece still exceeds the limit, so the last entry fires only on text with no whitespace at all."
+   },
+   {
+    "t": "What does this module say about “Overlap, and what it costs”?",
+    "ans": "Chunks usually overlap by 10–20% so a sentence spanning a boundary appears whole in at least one of them. The cost is real: overlap inflates the index, and duplicated text means near-identical chunks compete in the results, crowding out genuinely different ones."
    }
   ]
  },
@@ -3845,6 +3959,44 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 0,
     "w": "The filter removes documents that break the constraint, and similarity only ranks what survived. Filtering after ranking would let a top-k full of excluded documents leave nothing behind."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/semantic_chunking.html",
+  "title": "Semantic chunking",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "What does this module say about “How the boundary is chosen”?",
+    "ans": "Split into sentences, embed each one, and compute the similarity between each consecutive pair. Where the text stays on topic the similarity is high; where the subject changes it dips. Cut at the dips."
+   },
+   {
+    "t": "What does this module say about “What it costs”?",
+    "ans": "One embedding call per sentence at index time, against one per chunk for the alternatives. On a large corpus that is a real bill and a slow re-index, though it is paid once rather than per query."
+   },
+   {
+    "t": "What does this module say about “When to reach for it”?",
+    "ans": "Worth it for long unstructured prose — transcripts, interviews, reports without headings — where no formatting signal exists and a fixed-size split reliably cuts mid-argument."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/structure_aware_chunking.html",
+  "title": "Structure-aware chunking",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "What does this module say about “Boundaries you do not have to guess”?",
+    "ans": "A Markdown heading, an HTML <section> , a PDF outline entry, a slide break: each is a statement by the author that the subject changes here. Semantic chunking spends an embedding per sentence to infer what the markup already says."
+   },
+   {
+    "t": "What does this module say about “Carrying the heading path”?",
+    "ans": "The half that gets missed. A chunk reading \"must be requested within 14 days\" is useless in isolation — 14 days of what? Prepending the heading path — Refund policy > Exceptions — makes the chunk self-describing."
+   },
+   {
+    "t": "What does this module say about “What it needs from you”?",
+    "ans": "A parser per format. Markdown is easy, HTML is manageable, PDF is genuinely hard — a PDF has no structure, only positioned glyphs, so headings must be inferred from font size and spacing. Most RAG quality problems on PDFs are really extraction problems."
    }
   ]
  },

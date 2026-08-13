@@ -924,6 +924,14 @@ window.VIZLEARN_MODULES = [
   "desc": "See what the numbers a network learns are actually for: weights scale each input, bias shifts where the neuron fires."
  },
  {
+  "title": "ANN indexing: HNSW and IVF",
+  "path": "gen_ai/ann_indexing_hnsw_and_ivf.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
   "title": "BM25 and Sparse Lexical Retrieval",
   "path": "gen_ai/bm25_and_sparse_retrieval.html",
   "category": "Gen AI",
@@ -964,8 +972,24 @@ window.VIZLEARN_MODULES = [
   "desc": "Fill a context window and watch what gets pushed out, then switch off the KV cache and watch the work per token go quadratic."
  },
  {
+  "title": "Context-aware chunking",
+  "path": "gen_ai/context_aware_chunking.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
   "title": "Corrective RAG (CRAG)",
   "path": "gen_ai/corrective_rag.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
+  "title": "Distributed retrieval and sharding",
+  "path": "gen_ai/distributed_retrieval_and_sharding.html",
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
@@ -1028,6 +1052,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Run vector search and BM25 side by side and watch them disagree, then fuse the two rankings and see a document neither method alone ranked first win on consensus."
  },
  {
+  "title": "Indexing in vector databases",
+  "path": "gen_ai/indexing_in_vector_databases.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
   "title": "Knowledge Distillation in LLMs",
   "path": "gen_ai/knowledge_distillation_in_llms.html",
   "category": "Gen AI",
@@ -1068,6 +1100,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Search small chunks so the match is precise, then hand the model the whole parent document so the answer has enough context to be worth reading."
  },
  {
+  "title": "Permission filtering in RAG retrieval",
+  "path": "gen_ai/permission_filtering_in_rag.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
   "title": "Quantization in LLMs",
   "path": "gen_ai/quantization_in_llms.html",
   "category": "Gen AI",
@@ -1084,12 +1124,28 @@ window.VIZLEARN_MODULES = [
   "desc": "A terse question shares almost no vocabulary with the formal passage that answers it. Expand the query, or embed a hypothetical answer instead, and watch it climb the ranking."
  },
  {
+  "title": "Query, embedding and prompt caching",
+  "path": "gen_ai/caching_in_rag_pipelines.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
   "title": "Re-ranking: Bi-Encoders vs Cross-Encoders",
   "path": "gen_ai/reranking_bi_encoders_vs_cross_encoders.html",
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "Retrieve six candidates fast with a bi-encoder, then re-score them with a slower cross-encoder that reads query and document together and catches what was missed."
+ },
+ {
+  "title": "Recursive chunking",
+  "path": "gen_ai/recursive_chunking.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
  },
  {
   "title": "Retrieval Evaluation Metrics",
@@ -1116,8 +1172,32 @@ window.VIZLEARN_MODULES = [
   "desc": "Split a question into a semantic query and a metadata filter, so \"after 2020\" becomes a rule that is enforced rather than a phrase that is matched."
  },
  {
+  "title": "Semantic chunking",
+  "path": "gen_ai/semantic_chunking.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
+  "title": "Structure-aware chunking",
+  "path": "gen_ai/structure_aware_chunking.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
   "title": "TF-IDF",
   "path": "gen_ai/tf_idf.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
+  "title": "What are Queries, Keys and Values in an LLM?",
+  "path": "gen_ai/queries_keys_and_values.html",
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
