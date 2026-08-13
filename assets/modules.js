@@ -1116,12 +1116,100 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive Masked Language Modeling lab - mask tokens in a sentence and see how a bidirectional model like BERT predicts them from left and right context."
  },
  {
+  "title": "Are two strings anagrams?",
+  "path": "interview/valid-anagram.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Are two strings anagrams? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "Check whether a string is a palindrome",
+  "path": "interview/valid-palindrome.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Check whether a string is a palindrome | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
   "title": "Does len() count characters or bytes?",
   "path": "interview/does-len-count-characters-or-bytes.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Does len() count characters or bytes? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "First non-repeating character",
+  "path": "interview/first-non-repeating-character.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn First non-repeating character | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "Group anagrams together",
+  "path": "interview/group-anagrams.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Group anagrams together | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "Implement substring search (strStr)",
+  "path": "interview/implement-substring-search.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Implement substring search (strStr) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "Isomorphic strings",
+  "path": "interview/isomorphic-strings.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Isomorphic strings | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "Longest common prefix",
+  "path": "interview/longest-common-prefix.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Longest common prefix | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "Longest substring without repeating characters",
+  "path": "interview/longest-substring-without-repeating-characters.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Longest substring without repeating characters | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "Reverse a string",
+  "path": "interview/reverse-a-string.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Reverse a string | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "Run-length string compression",
+  "path": "interview/string-compression.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Run-length string compression | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "Valid parentheses",
+  "path": "interview/valid-parentheses.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Valid parentheses | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What does slicing a string cost?",
@@ -1129,7 +1217,15 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What does slicing a string cost? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "What is the difference between str and bytes?",
+  "path": "interview/str-versus-bytes-in-python.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn What is the difference between str and bytes? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why are Python strings immutable?",
@@ -1137,7 +1233,23 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why are Python strings immutable? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "Why does `is` sometimes work on strings?",
+  "path": "interview/string-interning-and-the-is-operator.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Why does `is` sometimes work on strings? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "find() vs index() vs `in` — which one?",
+  "path": "interview/find-versus-index-on-strings.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn find() vs index() vs `in` — which one? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Bias vs Variance",

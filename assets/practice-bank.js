@@ -3809,6 +3809,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/valid-anagram.html",
+  "title": "Are two strings anagrams?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Counting beats sorting for anagram checks because it is:",
+    "o": [
+     "O(1) instead of O(n)",
+     "O(n) instead of O(n log n)",
+     "More readable",
+     "Stable"
+    ],
+    "a": 1,
+    "w": "One pass over each string versus a comparison sort of both. Space goes from O(1) to O(k) in the alphabet size."
+   },
+   {
+    "t": "Why delete a key when its count reaches zero?",
+    "o": [
+     "To save memory",
+     "So the final check is simply 'is the dictionary empty?'",
+     "To avoid negatives",
+     "Counter requires it"
+    ],
+    "a": 1,
+    "w": "Leaving zeros in means comparing against a dict of zeros. Deleting makes the terminal condition trivial."
+   },
+   {
+    "t": "A fixed 26-element array version breaks on:",
+    "o": [
+     "Long strings",
+     "Any character outside a-z, such as an accented letter",
+     "Empty strings",
+     "Repeated letters"
+    ],
+    "a": 1,
+    "w": "ord(ch) - ord('a') indexes out of range. Say the alphabet assumption out loud when you offer that optimisation."
+   }
+  ]
+ },
+ {
+  "path": "interview/valid-palindrome.html",
+  "title": "Check whether a string is a palindrome",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "The main advantage of the two-pointer palindrome check over s == s[::-1] is:",
+    "o": [
+     "It is shorter",
+     "O(1) extra space, and it stops at the first mismatch",
+     "It handles Unicode",
+     "It is the only correct one"
+    ],
+    "a": 1,
+    "w": "The slice builds a full reversed copy and always compares everything. Both are O(n) time in the worst case."
+   },
+   {
+    "t": "Why do the inner skip loops need `lo < hi` in their condition?",
+    "o": [
+     "To count comparisons",
+     "Otherwise a string of pure punctuation runs a pointer off the end",
+     "To handle uppercase",
+     "To make it stable"
+    ],
+    "a": 1,
+    "w": "Nothing else stops the skip. It is the bug the question is really probing."
+   },
+   {
+    "t": "In the 'allow one deletion' variant, why is it still O(n)?",
+    "o": [
+     "The string is short",
+     "The branch happens at most once, so the two sub-checks never nest",
+     "It uses a set",
+     "It is O(n²)"
+    ],
+    "a": 1,
+    "w": "You get exactly one chance to delete, so it is one linear scan plus at most two more - not a recursive explosion."
+   }
+  ]
+ },
+ {
   "path": "interview/does-len-count-characters-or-bytes.html",
   "title": "Does len() count characters or bytes?",
   "cat": "Interview",
@@ -3845,6 +3925,366 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Storage and transport limits are byte limits. A 100-code-point string can be 400 bytes in UTF-8."
+   }
+  ]
+ },
+ {
+  "path": "interview/first-non-repeating-character.html",
+  "title": "First non-repeating character",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why can this not be solved in a single pass?",
+    "o": [
+     "Strings are immutable",
+     "A character's uniqueness is not decidable until the whole string has been read",
+     "Counters are slow",
+     "It can be"
+    ],
+    "a": 1,
+    "w": "The first character might repeat at the very end. A pass can record enough to answer afterwards, which is what the counter is."
+   },
+   {
+    "t": "The second pass walks the string rather than the counter because:",
+    "o": [
+     "It is faster",
+     "'First' is a property of the string's order",
+     "Counters are unordered",
+     "It uses less memory"
+    ],
+    "a": 1,
+    "w": "Walking the dict also works since 3.7, when insertion order became a guarantee - but you should say which you are relying on."
+   },
+   {
+    "t": "In the streaming version, what makes each add O(1) amortised?",
+    "o": [
+     "The counter is O(1)",
+     "Every character is pushed once and popped at most once",
+     "The queue is sorted",
+     "It only stores unique characters"
+    ],
+    "a": 1,
+    "w": "The while loop can run several times on one call, but across the whole stream it does at most n pops in total."
+   }
+  ]
+ },
+ {
+  "path": "interview/group-anagrams.html",
+  "title": "Group anagrams together",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "The key idea in grouping anagrams efficiently is:",
+    "o": [
+     "Sorting the whole list first",
+     "Giving each word a canonical key that all its anagrams share",
+     "Comparing each word to the first",
+     "Using a set"
+    ],
+    "a": 1,
+    "w": "Being anagrams is an equivalence relation, so you group by label rather than testing pairs. That removes the n² entirely."
+   },
+   {
+    "t": "Why must the count key be a tuple rather than a list?",
+    "o": [
+     "Tuples are faster",
+     "Lists are unhashable, so they cannot be dictionary keys",
+     "Tuples are shorter",
+     "It does not matter"
+    ],
+    "a": 1,
+    "w": "A key's hash must stay valid for the life of the entry, so only immutable types are allowed."
+   },
+   {
+    "t": "For n words of length m, grouping by sorted key costs:",
+    "o": [
+     "O(n²·m)",
+     "O(n·m log m)",
+     "O(n log n)",
+     "O(m²)"
+    ],
+    "a": 1,
+    "w": "One sort per word, then O(1) to place it. The count-tuple key drops it to O(n·m)."
+   }
+  ]
+ },
+ {
+  "path": "interview/implement-substring-search.html",
+  "title": "Implement substring search (strStr)",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "In KMP's search loop, which index never moves backwards?",
+    "o": [
+     "j, the pattern index",
+     "i, the text index",
+     "Both",
+     "Neither"
+    ],
+    "a": 1,
+    "w": "That is the O(n + m) guarantee. Naive search restarts at start + 1 and re-reads characters it has already seen."
+   },
+   {
+    "t": "lps[i] stores:",
+    "o": [
+     "The character at i",
+     "The length of the longest proper prefix of pattern[:i+1] that is also its suffix",
+     "How many matches so far",
+     "The next index to check"
+    ],
+    "a": 1,
+    "w": "That overlap is exactly what tells the algorithm how far the pattern may slide without re-reading text."
+   },
+   {
+    "t": "Naive substring search is genuinely quadratic on:",
+    "o": [
+     "Random text",
+     "Highly repetitive text such as 'aaaa...ab' searched for 'aaab'",
+     "Short patterns",
+     "Unicode text"
+    ],
+    "a": 1,
+    "w": "Nearly every alignment matches a long way before failing, so the same characters are read again and again."
+   }
+  ]
+ },
+ {
+  "path": "interview/isomorphic-strings.html",
+  "title": "Isomorphic strings",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why are two maps needed rather than one?",
+    "o": [
+     "For speed",
+     "A single map allows two characters to map onto the same target",
+     "To handle the empty string",
+     "To keep it O(n)"
+    ],
+    "a": 1,
+    "w": "'badc' against 'baba' passes every forward rule and is not isomorphic. The mapping has to be a bijection."
+   },
+   {
+    "t": "The canonical-form approach compares:",
+    "o": [
+     "Sorted characters",
+     "The order in which distinct characters first appear",
+     "Character counts",
+     "String lengths"
+    ],
+    "a": 1,
+    "w": "'paper' and 'title' both become (0,1,2,0,3). It is the same 'canonicalise then compare' move as grouping anagrams."
+   },
+   {
+    "t": "Why must the length check come before zip?",
+    "o": [
+     "zip is slow",
+     "zip stops at the shorter string, so unequal lengths would compare only the overlap",
+     "zip needs equal lengths",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "'ab' and 'a' would otherwise be reported isomorphic on the basis of their first character alone."
+   }
+  ]
+ },
+ {
+  "path": "interview/longest-common-prefix.html",
+  "title": "Longest common prefix",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why does one pass suffice?",
+    "o": [
+     "The list is sorted",
+     "The candidate prefix can only shrink, never grow",
+     "Strings are immutable",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "No word can lengthen a prefix that an earlier word already trimmed, so there is nothing to backtrack over."
+   },
+   {
+    "t": "The longest possible answer is bounded by:",
+    "o": [
+     "The first string",
+     "The shortest string in the list",
+     "The number of strings",
+     "The longest string"
+    ],
+    "a": 1,
+    "w": "The prefix must be a prefix of every string, including the shortest one."
+   },
+   {
+    "t": "Sorting the list and comparing only the first and last works because:",
+    "o": [
+     "Sorting groups similar strings",
+     "In lexicographic order those two are the most different, so their shared prefix bounds every other pair",
+     "It removes duplicates",
+     "It is faster"
+    ],
+    "a": 1,
+    "w": "Neat, and asymptotically worse - O(n log n · m). Offer it as an alternative, not as the main answer."
+   }
+  ]
+ },
+ {
+  "path": "interview/longest-substring-without-repeating-characters.html",
+  "title": "Longest substring without repeating characters",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why is `seen[ch] >= start` needed as well as `ch in seen`?",
+    "o": [
+     "To handle the first character",
+     "A character last seen before the window must not drag the left edge backwards",
+     "To count repeats",
+     "To keep it O(n)"
+    ],
+    "a": 1,
+    "w": "Only repeats inside the current window matter. 'abba' is the shortest input that gets the wrong answer without it."
+   },
+   {
+    "t": "The time complexity is O(n) because:",
+    "o": [
+     "The string is short",
+     "Both pointers only ever move forwards, for at most 2n moves total",
+     "The dictionary is O(1)",
+     "It uses recursion"
+    ],
+    "a": 1,
+    "w": "The right edge advances n times and the left edge never retreats, so the total work is linear despite the nested feel."
+   },
+   {
+    "t": "The space complexity is:",
+    "o": [
+     "O(n)",
+     "O(k), one entry per distinct character",
+     "O(1)",
+     "O(n²)"
+    ],
+    "a": 1,
+    "w": "The map holds distinct characters, so it is bounded by the alphabet - the answer most candidates get wrong."
+   }
+  ]
+ },
+ {
+  "path": "interview/reverse-a-string.html",
+  "title": "Reverse a string",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why can't you reverse a Python string in place?",
+    "o": [
+     "It is too slow",
+     "Strings are immutable - there is no in-place operation at all",
+     "Slicing is required",
+     "You can, with s.reverse()"
+    ],
+    "a": 1,
+    "w": "In-place means working on a character list. str has no reverse() method for exactly this reason."
+   },
+   {
+    "t": "The two-pointer reversal loop uses `while lo < hi` rather than `<=` because:",
+    "o": [
+     "It is faster",
+     "With <= an odd-length string swaps its middle character with itself",
+     "<= causes an index error",
+     "The pointers never meet"
+    ],
+    "a": 1,
+    "w": "Harmless but pointless. The condition is precisely what the question is testing."
+   },
+   {
+    "t": "How many swaps does the in-place reversal make for n characters?",
+    "o": [
+     "n",
+     "n/2",
+     "n log n",
+     "n - 1"
+    ],
+    "a": 1,
+    "w": "Each swap places two characters, and the pointers meet in the middle. Memory is O(1) regardless of n."
+   }
+  ]
+ },
+ {
+  "path": "interview/string-compression.html",
+  "title": "Run-length string compression",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why append to a list rather than build the result with +=?",
+    "o": [
+     "Lists are shorter",
+     "+= allocates a new string per run, making the output building quadratic",
+     "Strings cannot be concatenated",
+     "join is required"
+    ],
+    "a": 1,
+    "w": "The scan is linear either way; the difference is entirely in how the output is assembled."
+   },
+   {
+    "t": "compress('abc') should return:",
+    "o": [
+     "'a1b1c1'",
+     "'abc'",
+     "''",
+     "'abc3'"
+    ],
+    "a": 1,
+    "w": "The compressed form is longer, so the original is returned. That final comparison is the most commonly forgotten line."
+   },
+   {
+    "t": "The in-place variant is safe because:",
+    "o": [
+     "The array is copied first",
+     "The write pointer can never overtake the read pointer when compression wins",
+     "Runs are always long",
+     "It uses recursion"
+    ],
+    "a": 1,
+    "w": "Each run of length k is written as at most k characters, so written output stays behind consumed input."
+   }
+  ]
+ },
+ {
+  "path": "interview/valid-parentheses.html",
+  "title": "Valid parentheses",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why is a counter not enough for multiple bracket types?",
+    "o": [
+     "Counters overflow",
+     "'([)]' has balanced counts but the wrong nesting order",
+     "Counters cannot go negative",
+     "It is enough"
+    ],
+    "a": 1,
+    "w": "A counter records how many are open, not which ones. Nesting is last-in-first-out, so it needs a stack."
+   },
+   {
+    "t": "Which input passes every in-loop check and is still unbalanced?",
+    "o": [
+     "'(]'",
+     "')('",
+     "'((('",
+     "'()'"
+    ],
+    "a": 2,
+    "w": "Nothing inside the loop rejects unclosed openers. The final 'is the stack empty?' test is what catches it."
+   },
+   {
+    "t": "Forgetting the empty-stack check before popping gives you:",
+    "o": [
+     "A wrong answer",
+     "An IndexError",
+     "An infinite loop",
+     "The correct answer"
+    ],
+    "a": 1,
+    "w": "Popping an empty list raises. It is the failure mode most likely to appear live in an interview."
    }
   ]
  },
@@ -3889,6 +4329,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/str-versus-bytes-in-python.html",
+  "title": "What is the difference between str and bytes?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "b[0] where b is a bytes object gives you:",
+    "o": [
+     "A one-character bytes",
+     "An int",
+     "A str",
+     "A TypeError"
+    ],
+    "a": 1,
+    "w": "Indexing bytes yields the numeric value of that byte. Slicing gives bytes back; indexing does not."
+   },
+   {
+    "t": "Decoding UTF-8 data as latin-1 produces:",
+    "o": [
+     "A UnicodeDecodeError",
+     "Wrong text, with no error at all",
+     "The same text",
+     "An empty string"
+    ],
+    "a": 1,
+    "w": "latin-1 maps every possible byte to some character, so it never fails. That silence is what makes mojibake hard to trace."
+   },
+   {
+    "t": "Where should encode and decode happen in a well-structured program?",
+    "o": [
+     "Everywhere, as needed",
+     "Only at the I/O boundaries, with str used throughout the middle",
+     "Only on user input",
+     "Never - Python handles it"
+    ],
+    "a": 1,
+    "w": "The sandwich rule: decode on the way in, encode on the way out, and let every internal layer work in text."
+   }
+  ]
+ },
+ {
   "path": "interview/why-are-python-strings-immutable.html",
   "title": "Why are Python strings immutable?",
   "cat": "Interview",
@@ -3925,6 +4405,86 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "There is nothing to append to, so the accumulated text is copied every time. \"\".join(parts) does one allocation and one copy instead."
+   }
+  ]
+ },
+ {
+  "path": "interview/string-interning-and-the-is-operator.html",
+  "title": "Why does `is` sometimes work on strings?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why is 'hello' is 'hello' often True?",
+    "o": [
+     "Strings are compared by value",
+     "CPython interns identical short literals into one object",
+     "is and == are the same",
+     "Both are empty"
+    ],
+    "a": 1,
+    "w": "Interning reuses one object. It is an optimisation immutability makes legal, not a language guarantee."
+   },
+   {
+    "t": "'hello world' is ('hello' + ' world') is usually False because:",
+    "o": [
+     "The strings differ",
+     "The second is built at runtime, so it is not interned",
+     "Spaces are not allowed",
+     "+ returns a list"
+    ],
+    "a": 1,
+    "w": "The interner sees literals in compiled code. A string assembled while the program runs is a fresh object."
+   },
+   {
+    "t": "The only safe use of `is` is with:",
+    "o": [
+     "Short strings",
+     "None, True and False",
+     "Numbers below 257",
+     "Anything immutable"
+    ],
+    "a": 1,
+    "w": "Those are singletons, so identity is genuinely the test you want. Everything else should use ==."
+   }
+  ]
+ },
+ {
+  "path": "interview/find-versus-index-on-strings.html",
+  "title": "find() vs index() vs `in` — which one?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "s.index('zzz') when 'zzz' is absent:",
+    "o": [
+     "Returns -1",
+     "Raises ValueError",
+     "Returns None",
+     "Returns 0"
+    ],
+    "a": 1,
+    "w": "That is the only difference from find. Use index when a miss means something upstream is broken and you want it to fail loudly."
+   },
+   {
+    "t": "Why is `if s.find(x):` a bug?",
+    "o": [
+     "find is slow",
+     "A match at index 0 is falsy, so it reads as not found",
+     "find returns None",
+     "It only works on lists"
+    ],
+    "a": 1,
+    "w": "0 is a legitimate result and a falsy value. The test must be != -1, which is why `in` is preferred when you only need a bool."
+   },
+   {
+    "t": "To find the second occurrence of a substring, the cheapest approach is:",
+    "o": [
+     "Slice the string and search again",
+     "Pass a start index: s.find(x, first + 1)",
+     "Reverse the string",
+     "Use a regex"
+    ],
+    "a": 1,
+    "w": "The start bound avoids copying the remainder, which slicing in a loop would do on every iteration."
    }
   ]
  },
