@@ -15,9 +15,162 @@ the multi-query retriever (multi_query_retriever.html), the KV cache
 split the search results and the internal links for no gain.
 """
 
-from interview_viz import frame, marked, pairs, viz
 
 TOPICS = []
+
+
+# --------------------------------------------------------------------------
+# The interactive visualisation on each page.
+#
+# The hand-written modules in this track put a Parameters panel beside a
+# visualisation that recomputes as you move a control, and these have to match.
+# Each spec names a model in assets/vizlearn-ragviz.js and supplies its
+# controls and data; the arithmetic happens in the reader's browser, so the
+# numbers on screen are computed rather than baked in here.
+# --------------------------------------------------------------------------
+
+WIDGETS = {
+
+"tf_idf": {"model": "tfidf", "controls": [
+    {"id": "query", "label": "Query", "kind": "select", "value": 0,
+     "options": [{"label": "cat"}, {"label": "the"}, {"label": "the cat"},
+                 {"label": "quantum lab"}]},
+    {"id": "useIdf", "label": "Weight by idf", "kind": "toggle", "value": 1},
+    {"id": "dampTf", "label": "Damp term frequency", "kind": "toggle", "value": 1},
+], "data": {
+    "queries": ["cat", "the", "the cat", "quantum lab"],
+    "docs": [{"text": "the cat sat on the mat"},
+             {"text": "the dog sat on the log"},
+             {"text": "the cat chased the cat"},
+             {"text": "quantum entanglement in the lab"}],
+}},
+
+"corrective_rag": {"model": "crag", "controls": [
+    {"id": "query", "label": "Query", "kind": "select", "value": 0,
+     "options": [{"label": "who wrote the 2019 memo"},
+                 {"label": "what was 2019 revenue"},
+                 {"label": "capital of Peru"}]},
+    {"id": "good", "label": "Relevance threshold", "kind": "range",
+     "min": 0.1, "max": 0.9, "step": 0.05, "value": 0.45},
+    {"id": "poor", "label": "Ambiguous floor", "kind": "range",
+     "min": 0.05, "max": 0.5, "step": 0.05, "value": 0.2},
+], "data": {"queries": [
+    {"results": [{"text": "2019 security policy, authored by Priya Nair", "score": 0.72},
+                 {"text": "2019 revenue grew eleven percent", "score": 0.31},
+                 {"text": "office relocated to Bristol in 2021", "score": 0.12}]},
+    {"results": [{"text": "2019 revenue grew eleven percent", "score": 0.68},
+                 {"text": "2019 security policy, authored by Priya Nair", "score": 0.35},
+                 {"text": "office relocated to Bristol in 2021", "score": 0.10}]},
+    {"results": [{"text": "office relocated to Bristol in 2021", "score": 0.14},
+                 {"text": "2019 revenue grew eleven percent", "score": 0.11},
+                 {"text": "2019 security policy, authored by Priya Nair", "score": 0.09}]},
+]}},
+
+"queries_keys_and_values": {"model": "attention", "controls": [
+    {"id": "focus", "label": "Attending from", "kind": "select", "value": 2,
+     "options": [{"label": "the"}, {"label": "cat"}, {"label": "sat"}, {"label": "mat"}]},
+    {"id": "sharpness", "label": "Score scale (1/sqrt(d))", "kind": "range",
+     "min": 0.5, "max": 4, "step": 0.25, "value": 1},
+], "data": {
+    "tokens": ["the", "cat", "sat", "mat"],
+    "affinity": {"the": {"the": 2.0, "cat": 1.2, "sat": 0.6, "mat": 1.0},
+                 "cat": {"the": 1.1, "cat": 2.0, "sat": 1.6, "mat": 1.3},
+                 "sat": {"the": 0.5, "cat": 2.4, "sat": 1.0, "mat": 1.7},
+                 "mat": {"the": 1.0, "cat": 1.4, "sat": 1.5, "mat": 2.0}},
+}},
+
+"caching_in_rag_pipelines": {"model": "caching", "controls": [
+    {"id": "repeatRate", "label": "Exact repeats (%)", "kind": "range",
+     "min": 0, "max": 80, "step": 5, "value": 30},
+    {"id": "rewordRate", "label": "Reworded repeats (%)", "kind": "range",
+     "min": 0, "max": 60, "step": 5, "value": 30},
+    {"id": "promptCache", "label": "Prompt caching", "kind": "toggle", "value": 1},
+], "data": {"stages": [["embed", 18], ["retrieve", 120], ["rerank", 210],
+                        ["generate", 2100]]}},
+
+"recursive_chunking": {"model": "chunking", "controls": [
+    {"id": "size", "label": "Chunk size (chars)", "kind": "range",
+     "min": 40, "max": 260, "step": 10, "value": 120},
+    {"id": "strategy", "label": "Separators", "kind": "select", "value": 0,
+     "options": [{"label": "recursive"}, {"label": "sentence only"},
+                 {"label": "fixed size"}]},
+], "data": {"text": "Refunds are issued within 14 days of purchase. The item "
+                    "must be unused and in its original packaging.\n\nShipping "
+                    "costs are not refunded. Digital goods are non-refundable "
+                    "once downloaded."}},
+
+"semantic_chunking": {"model": "semantic", "controls": [
+    {"id": "percentile", "label": "Split percentile", "kind": "range",
+     "min": 10, "max": 80, "step": 5, "value": 25},
+], "data": {"sentences": 6, "gaps": [0.81, 0.78, 0.24, 0.85, 0.31]}},
+
+"structure_aware_chunking": {"model": "chunking", "controls": [
+    {"id": "size", "label": "Chunk size (chars)", "kind": "range",
+     "min": 40, "max": 260, "step": 10, "value": 110},
+    {"id": "strategy", "label": "Separators", "kind": "select", "value": 0,
+     "options": [{"label": "structure first"}, {"label": "sentence only"},
+                 {"label": "fixed size"}]},
+], "data": {"text": "# Refund policy\n\nRefunds are issued within 14 days.\n\n"
+                    "## Exceptions\n\nDigital goods are non-refundable once "
+                    "downloaded."}},
+
+"context_aware_chunking": {"model": "enrichment", "controls": [
+    {"id": "title", "label": "Prepend document title", "kind": "toggle", "value": 0},
+    {"id": "path", "label": "Prepend heading path", "kind": "toggle", "value": 0},
+    {"id": "resolve", "label": "Resolve pronouns", "kind": "toggle", "value": 0},
+    {"id": "boilerplate", "label": "Over-enrich", "kind": "toggle", "value": 0},
+], "data": {
+    "chunk": ["it", "must", "be", "requested", "within", "14", "days", "of", "it"],
+    "resolved": ["a", "refund", "must", "be", "requested", "within", "14", "days",
+                 "of", "purchase"],
+    "title": ["customer", "returns", "handbook"],
+    "path": ["refund", "policy", "time", "limits"],
+    "queryTerms": ["how", "long", "to", "return", "an", "item", "for", "a", "refund"],
+    "sibling": ["digital", "goods", "are", "non", "refundable", "once", "downloaded"],
+    "boilerplate": ["customer", "returns", "handbook", "refunds", "exchanges",
+                    "shipping", "warranty", "regions"],
+}},
+
+"indexing_in_vector_databases": {"model": "ivf", "controls": [
+    {"id": "clusters", "label": "Clusters", "kind": "range",
+     "min": 8, "max": 256, "step": 8, "value": 64},
+    {"id": "probe", "label": "Clusters probed", "kind": "range",
+     "min": 1, "max": 64, "step": 1, "value": 4},
+], "data": {"corpus": 1000000}},
+
+"ann_indexing_hnsw_and_ivf": {"model": "hnsw", "controls": [
+    {"id": "ef", "label": "efSearch (query time)", "kind": "range",
+     "min": 8, "max": 512, "step": 8, "value": 128},
+    {"id": "M", "label": "M, edges per node (build time)", "kind": "range",
+     "min": 4, "max": 48, "step": 2, "value": 16},
+], "data": {"corpus": 1000000}},
+
+"permission_filtering_in_rag": {"model": "permissions", "controls": [
+    {"id": "visible", "label": "Corpus visible to this user (%)", "kind": "range",
+     "min": 1, "max": 100, "step": 1, "value": 20},
+    {"id": "k", "label": "Results requested (k)", "kind": "range",
+     "min": 5, "max": 30, "step": 1, "value": 10},
+    {"id": "fetch", "label": "Over-fetch before filtering", "kind": "range",
+     "min": 10, "max": 500, "step": 10, "value": 100},
+], "data": {}},
+
+"distributed_retrieval_and_sharding": {"model": "sharding", "controls": [
+    {"id": "shards", "label": "Shards", "kind": "range",
+     "min": 1, "max": 40, "step": 1, "value": 4},
+    {"id": "perShard", "label": "Per-shard k", "kind": "range",
+     "min": 2, "max": 60, "step": 2, "value": 10},
+    {"id": "strategy", "label": "Sharding strategy", "kind": "select", "value": 0,
+     "options": [{"label": "random"}, {"label": "semantic"}]},
+], "data": {}},
+
+}
+
+# The select controls arrive as an index; the models want the value.
+for _spec in WIDGETS.values():
+    for _c in _spec["controls"]:
+        if _c["kind"] == "select":
+            _c.setdefault("options", [])
+
 
 
 # --------------------------------------------------------------------------
@@ -101,36 +254,6 @@ def _t(**kw):
 # Retrieval scoring
 # =========================================================================
 
-def _tfidf_frames():
-    docs = ["the cat sat on the mat", "the dog sat on the log",
-            "quantum entanglement in the lab"]
-    out = [frame(pairs([("doc %d" % i, d) for i, d in enumerate(docs)], {},
-                       label="corpus"),
-                 "Three documents. 'the' is in all of them; 'quantum' is in one.",
-                 {"docs": 3})]
-    out.append(frame(pairs([("the", "in 3 of 3 docs -> idf 0.00"),
-                            ("sat", "in 2 of 3 docs -> idf 0.18"),
-                            ("quantum", "in 1 of 3 docs -> idf 0.48")],
-                           {"quantum": "hit", "the": "bad"},
-                           label="inverse document frequency"),
-                     "A term in every document carries no information, so its "
-                     "idf is zero. A rare term scores high.",
-                     {"docs": 3}))
-    out.append(frame(pairs([("tf('the', doc0)", "2 occurrences"),
-                            ("x idf('the')", "x 0.00"),
-                            ("= weight", "0.00")],
-                           {"= weight": "bad"}, label="frequent term"),
-                     "'the' appears twice and still contributes nothing. The "
-                     "multiplication is what cancels it.",
-                     {"docs": 3}))
-    out.append(frame(pairs([("tf('quantum', doc2)", "1 occurrence"),
-                            ("x idf('quantum')", "x 0.48"),
-                            ("= weight", "0.48")],
-                           {"= weight": "hit"}, label="rare term"),
-                     "One occurrence of a rare term outweighs two of a common "
-                     "one. That is the whole idea.",
-                     {"docs": 3}))
-    return viz(out)
 
 
 _t(
@@ -157,7 +280,7 @@ _t(
         "One occurrence of a rare word beats two of a common one.",
         "No stopword list is needed; the maths removes them.",
     ],
-    viz=_tfidf_frames(),
+    viz=WIDGETS["tf_idf"],
     sections=[
         ("The two halves",
          "<p><strong>Term frequency</strong> is how often a term occurs in a "
@@ -194,154 +317,15 @@ _t(
          "<p>TF-IDF is also the honest baseline. If a dense retriever cannot "
          "beat it on your evaluation set, the problem is the embedding model or "
          "the chunking, not the ranking.</p>"),
-    ],
-    code={
-        "file": "tf_idf.py",
-        "intro": "TF-IDF built from scratch on a small corpus, with the idf of "
-                 "each term printed so the stopword cancellation is visible, and "
-                 "a query ranked against the documents.",
-        "code": '''# TF-IDF from scratch: frequent here, rare everywhere else.
-import math
-from collections import Counter
-
-corpus = [
-    "the cat sat on the mat",
-    "the dog sat on the log",
-    "the cat chased the dog",
-    "quantum entanglement in the lab",
-]
-docs = [d.split() for d in corpus]
-N = len(docs)
-
-# --- document frequency: how many documents contain each term ----------
-df = Counter()
-for words in docs:
-    for term in set(words):
-        df[term] += 1
-
-def idf(term):
-    return math.log(N / df[term]) if df[term] else 0.0
-
-print(f"{'term':>14} {'df':>4} {'idf':>7}")
-for term in ["the", "sat", "cat", "quantum"]:
-    print(f"{term:>14} {df[term]:>4} {idf(term):>7.3f}")
-print("'the' is in every document, so log(N/N) = 0 - it cancels itself out.")
-
-# --- tf-idf for one document -------------------------------------------
-def tf_idf(words):
-    counts = Counter(words)
-    return {t: (1 + math.log(n)) * idf(t) for t, n in counts.items()}
-
-print()
-print("weights for", corpus[0])
-for term, weight in sorted(tf_idf(docs[0]).items(), key=lambda kv: -kv[1]):
-    print(f"  {term:>6}: {weight:>6.3f}")
-
-# --- ranking a query ---------------------------------------------------
-def score(query, words):
-    weights = tf_idf(words)
-    return sum(weights.get(t, 0.0) for t in query.split())
-
-print()
-for query in ("cat", "the", "quantum lab"):
-    ranked = sorted(((score(query, d), corpus[i]) for i, d in enumerate(docs)),
-                    reverse=True)
-    print(f"query {query!r}:")
-    for s, text in ranked[:2]:
-        print(f"    {s:>6.3f}  {text}")
-
-print()
-print("Querying 'the' scores every document at 0.000 - the ranking is")
-print("undefined, and correctly so: the word distinguishes nothing.")
-''',
-        "walk": [
-            ("math.log(N / df[term])",
-             "The inverse document frequency. When a term is in every document "
-             "the ratio is 1 and the log is 0, so stopwords are removed by "
-             "arithmetic rather than by a list."),
-            ("(1 + math.log(n))",
-             "Damped term frequency. Twenty occurrences are not twenty times as "
-             "relevant, and without the damping one repeated word dominates a "
-             "document's whole vector."),
-            ("sum(weights.get(t, 0.0) for t in query.split())",
-             "The query's score is the sum of the matching terms' weights. "
-             "Nothing about word meaning enters into it &mdash; a synonym scores "
-             "zero."),
-            ("querying 'the'",
-             "Every document scores 0.000. That is the correct answer to a "
-             "query that carries no information, and it is what dense retrieval "
-             "handles differently."),
-        ],
-        "try": [
-            "Add a fifth document that repeats \"cat\" ten times. Its score "
-            "climbs without bound &mdash; the saturation BM25 adds is what stops "
-            "that.",
-            "Search for a synonym: <code>\"feline\"</code> scores zero "
-            "everywhere. That single line is the argument for dense retrieval "
-            "alongside it.",
-        ],
-    },
-    check=[
-        {"q": "Why does a word appearing in every document score zero?",
-         "options": ["It is filtered by a stopword list",
-                     "log(N / df) is log(1) = 0 when df equals N",
-                     "Term frequency is capped", "It is a rounding artefact"],
-         "answer": 1,
-         "why": "The maths removes stopwords without a per-language list, which "
-                "is one of TF-IDF's neatest properties."},
-        {"q": "What does BM25 add that plain TF-IDF lacks?",
-         "options": ["Word meaning", "Saturating term frequency and tunable "
-                     "length normalisation",
-                     "Faster indexing", "Support for multiple languages"],
-         "answer": 1,
-         "why": "The tenth occurrence of a term should add much less than the "
-                "second, and long documents should not win by containing more "
-                "of everything."},
-        {"q": "Why keep a lexical scorer in a modern RAG pipeline?",
-         "options": ["It is cheaper", "Exact terms - error codes, identifiers, "
-                     "rare jargon - are where embeddings are weakest",
-                     "It handles longer documents", "It needs no index"],
-         "answer": 1,
-         "why": "A vector-only pipeline reliably fails on queries like 'error "
-                "TS2345'. It is also the honest baseline for evaluating a dense "
-                "retriever."},
+    
+        ("Things to try",
+         "<ol><li>Turn <strong>idf</strong> off and query <em>the</em>. Every document scores, and the ranking is driven by a word that distinguishes nothing.</li><li>Query <em>the cat</em> with idf on. Only <em>cat</em> contributes &mdash; the stopword cancels itself without a stopword list.</li><li>Turn <strong>tf damping</strong> off and watch the document that repeats a term run away with the score. That runaway is what BM25's saturation fixes.</li></ol>"),
+        ("What to remember",
+         "<p>TF-IDF weights a term by how often it appears here times how rare it is everywhere. A term in every document has an idf of zero and drops out by arithmetic rather than by a list. It knows nothing about meaning, which is why a synonym scores zero and why dense retrieval runs alongside it.</p>"),
     ],
 )
 
 
-def _corrective_frames():
-    out = [frame(pairs([("query", "who wrote the 2019 safety memo?"),
-                        ("retrieved 1", "score 0.31  (off topic)"),
-                        ("retrieved 2", "score 0.28  (off topic)")],
-                       {"retrieved 1": "bad", "retrieved 2": "bad"},
-                       label="first retrieval"),
-                 "Retrieval returned something, as it always does. Nothing here "
-                 "is relevant - but naive RAG would answer from it anyway.",
-                 {"grade": "-", "action": "-"})]
-    out.append(frame(pairs([("grader verdict", "INCORRECT"),
-                            ("confidence", "0.31 - below threshold"),
-                            ("action", "discard and rewrite the query")],
-                           {"grader verdict": "bad", "action": "hit"},
-                           label="grade the evidence"),
-                     "The corrective step: judge the retrieved documents BEFORE "
-                     "generating. Low relevance triggers a different path.",
-                     {"grade": "incorrect", "action": "rewrite"}))
-    out.append(frame(pairs([("rewritten", "2019 internal security policy author"),
-                            ("retrieved 1", "score 0.79  (on topic)"),
-                            ("grader verdict", "CORRECT")],
-                           {"retrieved 1": "hit", "grader verdict": "hit"},
-                           label="second retrieval"),
-                     "Rewritten query, better evidence, grader satisfied. Only "
-                     "now does generation happen.",
-                     {"grade": "correct", "action": "generate"}))
-    out.append(frame(pairs([("all retrievals fail", "-> web search fallback"),
-                            ("still nothing", "-> say 'I don't know'"),
-                            ("never", "-> answer from bad evidence")],
-                           {"never": "bad"}, label="the escape hatches"),
-                     "The point is having a path that is not 'answer anyway'. "
-                     "Abstaining is a valid outcome.",
-                     {"grade": "ambiguous", "action": "fallback"}))
-    return viz(out)
 
 
 _t(
@@ -369,7 +353,7 @@ _t(
         "The grader runs <em>before</em> generation, which is the whole design.",
         "\"I don't know\" is one of the paths, not a failure of the system.",
     ],
-    viz=_corrective_frames(),
+    viz=WIDGETS["corrective_rag"],
     sections=[
         ("The failure it fixes",
          "<p>A vector search returns the k nearest chunks whether or not any of "
@@ -403,177 +387,23 @@ _t(
          "corrected queries pay for a second retrieval. Grade cheaply, and "
          "consider skipping it when the top similarity is already "
          "unambiguous.</p>"),
-    ],
-    code={
-        "file": "corrective_rag.py",
-        "intro": "A miniature pipeline with a similarity threshold as the "
-                 "grader, run over queries that hit, miss and partly match, so "
-                 "you can watch naive RAG answer from evidence the corrective "
-                 "version rejects.",
-        "code": '''# Corrective RAG: grade the evidence before you generate from it.
-
-CORPUS = {
-    "doc1": "The 2019 internal security policy was authored by Priya Nair.",
-    "doc2": "Quarterly revenue for 2019 grew by eleven percent.",
-    "doc3": "The office relocated to the Bristol site in March 2021.",
-}
-
-def similarity(query, text):
-    """Stand-in for an embedding model: overlap of the words involved."""
-    q, t = set(query.lower().split()), set(text.lower().split())
-    return len(q & t) / len(q | t) if q | t else 0.0
-
-
-def retrieve(query, k=2):
-    scored = sorted(((similarity(query, t), name, t)
-                     for name, t in CORPUS.items()), reverse=True)
-    return scored[:k]
-
-
-def grade(results, good=0.20, poor=0.10):
-    """Correct / ambiguous / incorrect, from the best score available."""
-    best = results[0][0] if results else 0.0
-    if best >= good:
-        return "correct"
-    if best >= poor:
-        return "ambiguous"
-    return "incorrect"
-
-
-def rewrite(query):
-    """A real system asks an LLM. This maps user words to corpus words."""
-    swaps = {"memo": "policy", "wrote": "authored", "who": ""}
-    return " ".join(swaps.get(w, w) for w in query.lower().split()).strip()
-
-
-def naive_rag(query):
-    results = retrieve(query)
-    return f"answered from {results[0][1]} (score {results[0][0]:.2f})"
-
-
-def corrective_rag(query, depth=0):
-    results = retrieve(query)
-    verdict = grade(results)
-    print(f"    retrieve {query!r} -> best {results[0][0]:.2f} [{verdict}]")
-
-    if verdict == "correct":
-        keep = [r for r in results if r[0] >= 0.20]     # drop the distractors
-        return f"answered from {[r[1] for r in keep]}"
-    if depth == 0:
-        rewritten = rewrite(query)
-        if rewritten != query:
-            print(f"    rewriting -> {rewritten!r}")
-            return corrective_rag(rewritten, depth + 1)
-    if verdict == "ambiguous":
-        return "answered from partial evidence, flagged as low confidence"
-    return "declined: nothing relevant in the corpus"
-
-
-for query in ["who wrote the 2019 security memo",
-              "what was 2019 revenue",
-              "what is the capital of Peru"]:
-    print(f"query: {query!r}")
-    print("  naive     :", naive_rag(query))
-    print("  corrective:", corrective_rag(query))
-    print()
-
-print("The last query has no answer in the corpus. Naive RAG still cites a")
-print("document; the corrective pipeline declines, which is the correct output.")
-''',
-        "walk": [
-            ("grade(results)",
-             "The step naive RAG lacks entirely. It runs between retrieval and "
-             "generation, and its verdict decides which path the query takes."),
-            ("if verdict == \"correct\": keep = [r for r in results if ...]",
-             "Even on the good path the low-scoring documents are dropped. "
-             "Irrelevant context measurably degrades generation, so passing all "
-             "k through is a mistake of its own."),
-            ("return corrective_rag(rewritten, depth + 1)",
-             "One retry, not unlimited. Without the depth guard a query the "
-             "rewriter cannot fix loops, and each iteration costs a retrieval "
-             "and a model call."),
-            ("\"declined: nothing relevant in the corpus\"",
-             "The output naive RAG cannot produce. Abstaining is a valid answer, "
-             "and a system without that path will always fabricate instead."),
-        ],
-        "try": [
-            "Raise the <code>good</code> threshold to 0.5. More queries take the "
-            "corrective path &mdash; grading is a precision/recall trade like "
-            "any other classifier.",
-            "Remove the <code>depth</code> guard and query something absent. The "
-            "rewrite loop is the failure mode this parameter prevents.",
-        ],
-    },
-    check=[
-        {"q": "What failure is corrective RAG designed to prevent?",
-         "options": ["Slow retrieval", "Generating a confident answer from "
-                     "documents that are not relevant",
-                     "Running out of context window", "Duplicate chunks"],
-         "answer": 1,
-         "why": "Vector search always returns its k nearest chunks, so a query "
-                "with no good match still produces fluent, sourced-looking "
-                "nonsense."},
-        {"q": "Where does the grader run?",
-         "options": ["Before retrieval", "Between retrieval and generation",
-                     "After generation", "During indexing"],
-         "answer": 1,
-         "why": "That position is the whole design: it can still change what "
-                "happens, which a post-generation check cannot."},
-        {"q": "Which corrective action do implementations most often omit?",
-         "options": ["Query rewriting", "Abstaining - answering that the "
-                     "information is not available",
-                     "Web search fallback", "Reranking"],
-         "answer": 1,
-         "why": "A pipeline with no way to decline will always fabricate "
-                "instead, which is worse than an unhelpful but honest answer."},
+    
+        ("Things to try",
+         "<ol><li>Select <em>capital of Peru</em>. Nothing clears the threshold, and the pipeline declines &mdash; the answer naive RAG cannot give.</li><li>Raise the <strong>relevance threshold</strong> to 0.8 on a query that was working. More queries take the corrective path; grading is a precision/recall trade like any other classifier.</li><li>Lower the <strong>ambiguous floor</strong> to 0.05. Weak evidence is now treated as partial rather than absent, which changes which path a borderline query takes.</li></ol>"),
+        ("What to remember",
+         "<p>Corrective RAG grades retrieved documents before generating, and takes a different path when they are poor: rewrite the query, fall back to another source, or decline. Retrieval never fails loudly &mdash; it always returns its nearest k &mdash; so without a grader a query with no answer still produces a confident, sourced-looking one.</p>"),
     ],
 )
 
 
 # --------------------------------------------------------------------------
 
-CHECKS = {
-    "gen_ai/%s.html" % t["slug"]: {"check": t["check"]}
-    for t in TOPICS if t.get("check")
-}
 
 
 # =========================================================================
 # Caching
 # =========================================================================
 
-def _qkv_frames():
-    out = [frame(pairs([("token", "'sat'"),
-                        ("query  (Q)", "what am I looking for?"),
-                        ("key    (K)", "what do I offer to others?"),
-                        ("value  (V)", "what do I actually pass on?")],
-                       {"query  (Q)": "hit"}, label="three projections of one token"),
-                 "Every token produces all three, from three learned weight "
-                 "matrices applied to the same embedding.",
-                 {"tokens": 1})]
-    out.append(frame(pairs([("Q('sat') . K('cat')", "8.2  -> high"),
-                            ("Q('sat') . K('the')", "1.1  -> low"),
-                            ("Q('sat') . K('mat')", "3.4  -> medium")],
-                           {"Q('sat') . K('cat')": "hit", "Q('sat') . K('the')": "bad"},
-                           label="scores: query against every key"),
-                     "The dot product of one query with every key is the "
-                     "attention score. 'sat' is looking for its subject.",
-                     {"tokens": 4}))
-    out.append(frame(pairs([("softmax", "cat 0.71, mat 0.21, the 0.08"),
-                            ("output", "0.71*V(cat) + 0.21*V(mat) + 0.08*V(the)")],
-                           {"output": "hit"}, label="weights, then a weighted sum"),
-                     "Softmax turns scores into weights that sum to 1, and the "
-                     "output is the weighted sum of the VALUES - not the keys.",
-                     {"tokens": 4}))
-    out.append(frame(pairs([("K and V", "depend only on past tokens -> CACHEABLE"),
-                            ("Q", "is new for the token being generated"),
-                            ("consequence", "the KV cache")],
-                           {"K and V": "hit", "consequence": "done"},
-                           label="why this matters at serving time"),
-                     "K and V for a token never change once computed. That single "
-                     "fact is what makes generation O(n) instead of O(n^2).",
-                     {"tokens": 4}))
-    return viz(out)
 
 
 _t(
@@ -602,7 +432,7 @@ _t(
         "The score uses K; the output uses V &mdash; they are deliberately separate.",
         "K and V for a past token are fixed forever, which is the cache's premise.",
     ],
-    viz=_qkv_frames(),
+    viz=WIDGETS["queries_keys_and_values"],
     sections=[
         ("Why three and not one",
          "<p>If a token used the same vector to search with and to be found by, "
@@ -633,166 +463,15 @@ _t(
          "the context length. The cost is memory: the cache grows with sequence "
          "length &times; layers &times; heads, and it is usually what limits how "
          "many requests a GPU can serve at once.</p>"),
-    ],
-    code={
-        "file": "qkv.py",
-        "intro": "Attention computed by hand on a four-token sentence, with the "
-                 "score matrix and the softmax weights printed, then the same "
-                 "computation done twice to show K and V are identical the "
-                 "second time &mdash; which is the cache's whole premise.",
-        "code": '''# Q, K and V: three projections, two roles, one weighted sum.
-import math
-
-# Four tokens, three dimensions each. Real models use thousands.
-EMBED = {
-    "the": [0.1, 0.0, 0.2],
-    "cat": [0.9, 0.2, 0.1],
-    "sat": [0.2, 0.8, 0.3],
-    "mat": [0.7, 0.1, 0.6],
-}
-tokens = ["the", "cat", "sat", "mat"]
-
-# Three DIFFERENT learned matrices. That they differ is the whole point.
-W_Q = [[1.0, 0.2, 0.0], [0.0, 0.9, 0.1], [0.1, 0.0, 0.8]]
-W_K = [[0.8, 0.0, 0.3], [0.2, 1.0, 0.0], [0.0, 0.1, 0.9]]
-W_V = [[0.5, 0.5, 0.0], [0.0, 0.6, 0.4], [0.3, 0.0, 0.7]]
-
-def project(vec, matrix):
-    return [sum(vec[i] * matrix[i][j] for i in range(len(vec)))
-            for j in range(len(matrix[0]))]
-
-def dot(a, b):
-    return sum(x * y for x, y in zip(a, b))
-
-def softmax(scores):
-    top = max(scores)
-    exps = [math.exp(s - top) for s in scores]        # shift: avoids overflow
-    total = sum(exps)
-    return [e / total for e in exps]
-
-
-Q = {t: project(EMBED[t], W_Q) for t in tokens}
-K = {t: project(EMBED[t], W_K) for t in tokens}
-V = {t: project(EMBED[t], W_V) for t in tokens}
-
-focus = "sat"
-d = len(Q[focus])
-scores = [dot(Q[focus], K[t]) / math.sqrt(d) for t in tokens]
-weights = softmax(scores)
-
-print(f"attention from {focus!r}:")
-print(f"{'token':>6} {'Q.K/sqrt(d)':>12} {'weight':>8}")
-for t, s, w in zip(tokens, scores, weights):
-    print(f"{t:>6} {s:>12.3f} {w:>8.3f}")
-print("weights sum to", round(sum(weights), 6))
-
-output = [sum(w * V[t][i] for t, w in zip(tokens, weights)) for i in range(d)]
-print()
-print("output = weighted sum of the VALUES:", [round(x, 3) for x in output])
-print("Note it uses V, not K. Keys decide attention; values carry content.")
-
-# --- why K and V are cacheable -----------------------------------------
-print()
-first_pass = {t: (K[t], V[t]) for t in tokens}
-second_pass = {t: (project(EMBED[t], W_K), project(EMBED[t], W_V)) for t in tokens}
-print("K and V recomputed for the same tokens are identical:",
-      first_pass == second_pass)
-print("They depend only on the token and the weights, never on what comes")
-print("after - which is precisely why they can be cached across steps.")
-
-# --- what separate Q and K buys ----------------------------------------
-print()
-same = [dot(EMBED[focus], EMBED[t]) for t in tokens]
-print("if a token searched with its own embedding:", [round(s, 2) for s in same])
-print("with separate Q and K projections        :", [round(s, 2) for s in scores])
-print("The first is just self-similarity. The second can learn to look for")
-print("something different from itself - a verb seeking its subject.")
-''',
-        "walk": [
-            ("W_Q, W_K, W_V",
-             "Three different matrices applied to the same embedding. If they "
-             "were one matrix, attention would reduce to similarity and a token "
-             "could only attend to tokens like itself."),
-            ("dot(Q[focus], K[t]) / math.sqrt(d)",
-             "The score. The division by &radic;d keeps the values small enough "
-             "that softmax stays in its responsive range &mdash; without it "
-             "large dimensions saturate it and gradients vanish."),
-            ("output uses V[t], not K[t]",
-             "Keys decide <em>how much</em> to attend; values decide "
-             "<em>what</em> is contributed. Collapsing them would tie relevance "
-             "to content."),
-            ("first_pass == second_pass",
-             "K and V for a token depend only on that token and the fixed "
-             "weights. Recomputing gives the identical result, which is the "
-             "argument for the KV cache in one line."),
-        ],
-        "try": [
-            "Set <code>W_Q = W_K</code> and re-run. A token now attends most "
-            "strongly to itself, which is what the separate projections exist to "
-            "avoid.",
-            "Remove the <code>/ sqrt(d)</code> and scale the embeddings up by "
-            "ten. The softmax collapses to nearly one-hot &mdash; the saturation "
-            "the scaling prevents.",
-        ],
-    },
-    check=[
-        {"q": "The output of attention is a weighted sum of:",
-         "options": ["The keys", "The values", "The queries", "The raw embeddings"],
-         "answer": 1,
-         "why": "Keys decide how much to attend; values are what gets "
-                "contributed. Separating the two lets relevance and content be "
-                "learned independently."},
-        {"q": "Why are Q, K and V three separate projections rather than one "
-              "vector?",
-         "options": ["For speed", "So a token can look for something different "
-                     "from itself",
-                     "To reduce memory", "To allow multiple heads"],
-         "answer": 1,
-         "why": "With one vector, attention collapses into self-similarity. A "
-                "verb could not learn to seek its subject."},
-        {"q": "What makes the KV cache possible?",
-         "options": ["Keys and values are small", "K and V for a token depend "
-                     "only on that token, so they never change",
-                     "Queries are cached too", "The softmax is deterministic"],
-         "answer": 1,
-         "why": "Each depends only on tokens up to that point, so once computed "
-                "they are fixed - turning generation from quadratic into linear."},
+    
+        ("Things to try",
+         "<ol><li>Attend from <em>sat</em>. It puts most of its weight on <em>cat</em>, its subject &mdash; which a token searching with its own embedding could never do.</li><li>Raise the <strong>score scale</strong> to 4. The softmax collapses to nearly one-hot; that saturation is what dividing by &radic;d exists to prevent.</li><li>Switch the focus token and watch the whole distribution move. Each token's query is asking a different question of the same keys.</li></ol>"),
+        ("What to remember",
+         "<p>Q, K and V are three learned projections of one embedding. The query is what a token looks for, the key is what it advertises, the value is what it contributes. Scores come from Q&middot;K and the output is a weighted sum of V. Because K and V for a token never change once computed, they can be cached &mdash; which is what makes generation linear rather than quadratic.</p>"),
     ],
 )
 
 
-def _cache_layers_frames():
-    out = [frame(pairs([("prompt cache", "the model's KV for a shared prefix"),
-                        ("query cache", "a finished answer, keyed on the question"),
-                        ("embedding cache", "a vector, keyed on the text")],
-                       {}, label="three different caches, three different keys"),
-                 "All three are called 'caching' and none of them caches the "
-                 "same thing. The key tells them apart.",
-                 {"layer": "-"})]
-    out.append(frame(pairs([("request", "'what is our refund policy?'"),
-                            ("embedding cache", "MISS -> embed (18ms)"),
-                            ("query cache", "MISS -> full pipeline (2.4s)")],
-                           {"embedding cache": "bad", "query cache": "bad"},
-                           label="cold: nothing is cached"),
-                     "First time. Everything is computed, and the total is the "
-                     "sum of every stage.",
-                     {"layer": "cold", "ms": 2400}))
-    out.append(frame(pairs([("request", "'what is our refund policy?'"),
-                            ("query cache", "HIT -> return stored answer (3ms)")],
-                           {"query cache": "hit"}, label="exact repeat"),
-                     "The same question again. The query cache short-circuits "
-                     "the entire pipeline - retrieval, generation, all of it.",
-                     {"layer": "query", "ms": 3}))
-    out.append(frame(pairs([("request", "'how do refunds work?'"),
-                            ("query cache", "MISS - different wording"),
-                            ("embedding cache", "MISS - different text"),
-                            ("prompt cache", "HIT on the shared system prefix")],
-                           {"prompt cache": "hit"}, label="similar, not identical"),
-                     "Different wording defeats the exact-match caches, and the "
-                     "prompt cache still helps because the system prompt is "
-                     "unchanged.",
-                     {"layer": "prompt", "ms": 900}))
-    return viz(out)
 
 
 _t(
@@ -823,7 +502,7 @@ _t(
         "A reworded question misses both exact caches and can still hit the "
         "prompt cache.",
     ],
-    viz=_cache_layers_frames(),
+    viz=WIDGETS["caching_in_rag_pipelines"],
     sections=[
         ("Embedding cache: the easy one",
          "<p>Keyed on a hash of the text and the model name. Embedding is "
@@ -861,145 +540,11 @@ _t(
          "putting the variable part first defeats it entirely. Typical savings "
          "are large on time-to-first-token and on input cost, and nothing about "
          "correctness changes &mdash; the model computes the same thing.</p>"),
-    ],
-    code={
-        "file": "rag_caching.py",
-        "intro": "A pipeline with all three caches and simulated stage timings, "
-                 "run over a realistic traffic pattern so each cache's hit rate "
-                 "and saving are counted &mdash; including the staleness the "
-                 "query cache introduces when a document changes.",
-        "code": '''# Three caches, three keys, three different things saved.
-import hashlib
-
-COST_MS = {"embed": 18, "retrieve": 120, "rerank": 210, "generate": 2100}
-FULL = sum(COST_MS.values())
-
-docs = {"refunds": "Refunds are issued within 14 days."}
-
-embedding_cache, query_cache = {}, {}
-stats = {"embed_hits": 0, "query_hits": 0, "prompt_hits": 0, "ms": 0}
-seen_prefixes = set()
-
-SYSTEM_PROMPT = "You are a support assistant. Answer only from the documents."
-
-
-def key(text, model="embed-v1"):
-    return hashlib.sha256(f"{model}:{text}".encode()).hexdigest()[:12]
-
-
-def embed(text):
-    k = key(text)
-    if k in embedding_cache:
-        stats["embed_hits"] += 1
-        return embedding_cache[k], 0
-    embedding_cache[k] = [len(text) % 7, len(set(text)) % 5]
-    return embedding_cache[k], COST_MS["embed"]
-
-
-def answer(question):
-    # 1. query cache: keyed on the question, skips everything
-    qk = key(question, "query")
-    if qk in query_cache:
-        stats["query_hits"] += 1
-        stats["ms"] += 3
-        return query_cache[qk], 3
-
-    spent = 0
-    _, embed_ms = embed(question)              # 2. embedding cache
-    spent += embed_ms
-    spent += COST_MS["retrieve"] + COST_MS["rerank"]
-
-    # 3. prompt cache: provider-side, and only for a shared PREFIX
-    if SYSTEM_PROMPT in seen_prefixes:
-        stats["prompt_hits"] += 1
-        spent += int(COST_MS["generate"] * 0.55)   # prefill largely skipped
-    else:
-        seen_prefixes.add(SYSTEM_PROMPT)
-        spent += COST_MS["generate"]
-
-    result = f"answer about {list(docs)[0]}"
-    query_cache[qk] = result
-    stats["ms"] += spent
-    return result, spent
-
-
-traffic = ["what is the refund policy",
-           "what is the refund policy",       # exact repeat
-           "how do refunds work",             # same intent, different words
-           "what is the refund policy",
-           "how do refunds work"]
-
-print(f"{'request':>28} {'ms':>7}  cache")
-for q in traffic:
-    before = dict(stats)
-    _, ms = answer(q)
-    hit = ("query" if stats["query_hits"] > before["query_hits"]
-           else "prompt" if stats["prompt_hits"] > before["prompt_hits"]
-           else "cold")
-    print(f"{q:>28} {ms:>7}  {hit}")
-
-print()
-print(f"uncached total would be : {FULL * len(traffic):,} ms")
-print(f"actual total            : {stats['ms']:,} ms")
-print(f"query cache hits        : {stats['query_hits']}/{len(traffic)}")
-print(f"prompt cache hits       : {stats['prompt_hits']}/{len(traffic)}")
-
-# --- the invalidation problem ------------------------------------------
-print()
-docs["refunds"] = "Refunds are issued within 30 days."     # the policy changed
-cached, _ = answer("what is the refund policy")
-print("document updated to 30 days; cached answer still served:", cached)
-print("Nothing in the query cache knows a document changed. A TTL or an")
-print("explicit flush on re-index is the only practical defence.")
-''',
-        "walk": [
-            ("key(text, model=\"embed-v1\")",
-             "The model goes in the cache key. Vectors from two models are not "
-             "comparable, and a cache that mixes them returns results that look "
-             "plausible and mean nothing."),
-            ("if qk in query_cache",
-             "The query cache short-circuits the whole pipeline &mdash; "
-             "retrieval, reranking and generation. The largest saving and the "
-             "riskiest cache, because it stores a conclusion rather than an "
-             "input."),
-            ("if SYSTEM_PROMPT in seen_prefixes",
-             "Prompt caching is prefix-based. It only helps when the shared text "
-             "comes first, which is why the system prompt goes at the front and "
-             "the retrieved chunks after it."),
-            ("docs[\"refunds\"] = ... then answer(...)",
-             "The staleness problem, demonstrated. The document changed and the "
-             "cache has no idea; a TTL or a flush on re-index is the only "
-             "practical defence."),
-        ],
-        "try": [
-            "Add a semantic query cache: embed the question and accept a hit "
-            "above a similarity threshold. The hit rate rises and so does the "
-            "risk of answering a subtly different question.",
-            "Move <code>SYSTEM_PROMPT</code> to the end of the prompt. Prefix "
-            "caching stops firing entirely &mdash; order is the whole "
-            "constraint.",
-        ],
-    },
-    check=[
-        {"q": "Which cache saves the most per hit, and carries the most risk?",
-         "options": ["Embedding cache", "Query cache", "Prompt cache",
-                     "They are equivalent"],
-         "answer": 1,
-         "why": "It skips retrieval, reranking and generation - but it stores a "
-                "conclusion, so any document change can silently invalidate it."},
-        {"q": "Why must the embedding model be part of the embedding cache key?",
-         "options": ["To save space", "Vectors from different models are not "
-                     "comparable",
-                     "Models expire", "For auditing"],
-         "answer": 1,
-         "why": "Mixing them produces retrieval results that look plausible and "
-                "are meaningless."},
-        {"q": "Prompt caching only helps when the shared text is:",
-         "options": ["Short", "At the start of the prompt", "Repeated verbatim "
-                     "anywhere", "Below the token limit"],
-         "answer": 1,
-         "why": "It caches attention state for a prefix, so putting the variable "
-                "part first defeats it entirely."},
+    
+        ("Things to try",
+         "<ol><li>Push <strong>exact repeats</strong> to 70%. The query cache dominates &mdash; and it is the cache that goes stale the moment a document changes.</li><li>Set exact repeats to 0 and reworded to 60%. The exact caches stop helping entirely; only the prompt cache, which keys on the shared prefix, still does.</li><li>Turn <strong>prompt caching</strong> off. Reworded queries lose their only remaining saving, which is why prompt order matters.</li></ol>"),
+        ("What to remember",
+         "<p>Three different caches share the name. The query cache stores a finished answer keyed on the question and saves the most per hit, at the risk of serving a stale one. The embedding cache stores a vector keyed on the text and is permanently valid until the model changes. Prompt caching lives in the provider and only helps when the shared text comes first in the prompt.</p>"),
     ],
 )
 
@@ -1013,17 +558,6 @@ TEXT = ("# Refund policy\n\nRefunds are issued within 14 days of purchase. "
         "non-refundable once downloaded.")
 
 
-def _chunk_frames(rows, note_first, note_last):
-    out = [frame(pairs([("source", TEXT[:52] + "...")], {}, label="input"),
-                 note_first, {"chunks": 0})]
-    for i, (label, body) in enumerate(rows):
-        out.append(frame(pairs(rows[:i + 1], {rows[i][0]: "hit"},
-                               label="chunks so far"),
-                         "%s -> %s" % (label, body[:64]),
-                         {"chunks": i + 1}))
-    out.append(frame(pairs(rows, {r[0]: "done" for r in rows}, label="result"),
-                     note_last, {"chunks": len(rows)}))
-    return viz(out)
 
 
 _t(
@@ -1048,13 +582,7 @@ _t(
         "Fixed-size splitting cuts mid-sentence; this cuts at a boundary.",
         "The separator list is where domain knowledge goes.",
     ],
-    viz=_chunk_frames(
-        [("chunk 1", "# Refund policy / Refunds are issued within 14 days..."),
-         ("chunk 2", "## Exceptions / Digital goods are non-refundable...")],
-        "Recursive splitting starts with the largest separator and only "
-        "descends when a piece is still over the limit.",
-        "Two chunks, both broken at paragraph boundaries. Nothing was cut "
-        "mid-sentence."),
+    viz=WIDGETS["recursive_chunking"],
     sections=[
         ("Why not just split every N characters",
          "<p>Fixed-size splitting is one line and cuts wherever it lands "
@@ -1083,133 +611,11 @@ _t(
          "<p>Recursive chunking is the right default and it is still "
          "structure-blind &mdash; it does not know a heading from a sentence. "
          "That is what the structure-aware and semantic variants address.</p>"),
-    ],
-    code={
-        "file": "recursive_chunking.py",
-        "intro": "A recursive splitter written out in full, run against a "
-                 "fixed-size splitter on the same text so you can see which one "
-                 "cuts mid-sentence, plus what overlap adds to the index.",
-        "code": '''# Recursive chunking: split on the biggest separator that fits.
-
-TEXT = """# Refund policy
-
-Refunds are issued within 14 days of purchase. The item must be unused and in
-its original packaging. Shipping costs are not refunded.
-
-## Exceptions
-
-Digital goods are non-refundable once downloaded."""
-
-SEPARATORS = ["\\n\\n", "\\n", ". ", " ", ""]     # largest to smallest
-
-
-def recursive_split(text, limit=120, separators=None):
-    separators = SEPARATORS if separators is None else separators
-    if len(text) <= limit:
-        return [text]
-    for i, sep in enumerate(separators):
-        if sep == "":
-            return [text[j:j + limit] for j in range(0, len(text), limit)]
-        parts = text.split(sep)
-        if len(parts) == 1:
-            continue                              # this separator is absent
-        out, buffer = [], ""
-        for part in parts:
-            candidate = (buffer + sep + part) if buffer else part
-            if len(candidate) <= limit:
-                buffer = candidate
-            else:
-                if buffer:
-                    out.append(buffer)
-                # still too big on its own: fall to the next separator down
-                buffer = part if len(part) <= limit else None
-                if buffer is None:
-                    out.extend(recursive_split(part, limit, separators[i + 1:]))
-                    buffer = ""
-        if buffer:
-            out.append(buffer)
-        return out
-    return [text]
-
-
-def fixed_split(text, limit=120):
-    return [text[i:i + limit] for i in range(0, len(text), limit)]
-
-
-print("recursive:")
-for i, c in enumerate(recursive_split(TEXT)):
-    print(f"  [{i}] {len(c):>3} chars | {c.strip()[:58]!r}")
-
-print()
-print("fixed size:")
-for i, c in enumerate(fixed_split(TEXT)):
-    print(f"  [{i}] {len(c):>3} chars | {c.strip()[:58]!r}")
-
-print()
-print("The fixed splitter cuts wherever it lands. Look at where chunk 1 begins.")
-
-# --- overlap, and what it costs ----------------------------------------
-def with_overlap(chunks, overlap=25):
-    out = []
-    for i, c in enumerate(chunks):
-        tail = chunks[i - 1][-overlap:] if i else ""
-        out.append((tail + c).strip())
-    return out
-
-base = recursive_split(TEXT)
-overlapped = with_overlap(base)
-print()
-print(f"chunks           : {len(base)}")
-print(f"characters stored: {sum(len(c) for c in base)} without overlap, "
-      f"{sum(len(c) for c in overlapped)} with")
-print("Overlap buys boundary safety and inflates the index. 10-20% is typical.")
-''',
-        "walk": [
-            ("for i, sep in enumerate(separators)",
-             "The priority list. Each level is only reached when the level above "
-             "left a piece over the limit, so most chunks break at paragraphs."),
-            ("recursive_split(part, limit, separators[i + 1:])",
-             "The recursion: a single part that is still too large is re-split "
-             "with the remaining, smaller separators. Passing the tail of the "
-             "list is what stops it retrying a separator that already failed."),
-            ("if sep == \"\": return [text[j:j + limit] ...]",
-             "The last resort, and the only branch that cuts mid-word. It fires "
-             "only on text with no whitespace &mdash; a base64 blob, a minified "
-             "file."),
-            ("with_overlap",
-             "Boundary insurance at the cost of index size and near-duplicate "
-             "chunks competing in the results. 10&ndash;20% is the usual "
-             "compromise."),
-        ],
-        "try": [
-            "Set <code>limit=40</code>. More pieces fall through to sentence and "
-            "word level &mdash; watch the recursion descend.",
-            "Replace the separator list with code-aware ones "
-            "(<code>\"\\nclass \"</code>, <code>\"\\ndef \"</code>) and feed it "
-            "a Python file. Same splitter, far better chunks.",
-        ],
-    },
-    check=[
-        {"q": "Recursive chunking descends to the next separator when:",
-         "options": ["Every time", "A piece is still larger than the limit",
-                     "The text contains headings", "Overlap is enabled"],
-         "answer": 1,
-         "why": "Each fallback loses a little more meaning, so it only happens "
-                "when the larger boundary failed to get under the size limit."},
-        {"q": "The cheapest large improvement to a recursive splitter is usually:",
-         "options": ["A bigger chunk size", "Tailoring the separator list to the "
-                     "document type",
-                     "More overlap", "A better embedding model"],
-         "answer": 1,
-         "why": "Code, Markdown and prose have different natural boundaries, and "
-                "the separator list is almost always left at the default."},
-        {"q": "The cost of chunk overlap is:",
-         "options": ["Slower retrieval only", "A larger index, and near-duplicate "
-                     "chunks competing in the results",
-                     "Lost sentences", "Nothing"],
-         "answer": 1,
-         "why": "Duplicated text can crowd out genuinely different chunks in the "
-                "top-k, which is why 10-20% is the usual ceiling."},
+    
+        ("Things to try",
+         "<ol><li>Drop the <strong>chunk size</strong> to 60. More pieces fall through to sentence and then word level, and chunks start ending mid-sentence.</li><li>Switch <strong>separators</strong> to <em>fixed size</em>. Every boundary lands wherever the character count ran out &mdash; watch the mid-sentence count climb.</li><li>Raise the size to 260 with recursive separators. One chunk holds the whole passage, which retrieves as a single coarse unit.</li></ol>"),
+        ("What to remember",
+         "<p>Recursive chunking splits on the largest natural boundary that fits, descending through a priority list of separators only when a piece is still oversized. The separator list is the whole configuration, and tailoring it to the document type is the cheapest large improvement available to a RAG pipeline.</p>"),
     ],
 )
 
@@ -1235,29 +641,7 @@ _t(
         "Chunk lengths become uneven, which is the point.",
         "The threshold is a percentile of this document, not a global constant.",
     ],
-    viz=viz([
-        frame(pairs([("s1 -> s2", "0.81  same topic"),
-                     ("s2 -> s3", "0.78  same topic"),
-                     ("s3 -> s4", "0.24  TOPIC CHANGE"),
-                     ("s4 -> s5", "0.85  same topic")],
-                    {"s3 -> s4": "hit"}, label="similarity between neighbours"),
-              "Embed each sentence, then compare each with the next. The drop is "
-              "the signal.",
-              {"sentences": 5}),
-        frame(pairs([("chunk 1", "s1 s2 s3"), ("chunk 2", "s4 s5")],
-                    {"chunk 1": "done", "chunk 2": "done"}, label="split at the trough"),
-              "Two chunks of unequal length, each internally coherent. A "
-              "fixed-size splitter would have cut inside one of them.",
-              {"sentences": 5}),
-        frame(pairs([("cost", "one embedding per sentence, at index time"),
-                     ("benefit", "coherent chunks, fewer split answers"),
-                     ("when", "long unstructured prose"),
-                     ("when not", "documents that already have headings")],
-                    {"when not": "bad"}, label="the trade"),
-              "On text that already carries structure, headings are a better and "
-              "free signal.",
-              {"sentences": 5}),
-    ]),
+    viz=WIDGETS["semantic_chunking"],
     sections=[
         ("How the boundary is chosen",
          "<p>Split into sentences, embed each one, and compute the similarity "
@@ -1288,134 +672,11 @@ _t(
          "a fraction of the cost. Measure before adopting: on a retrieval "
          "evaluation set the gain over a well-tuned recursive splitter is often "
          "small.</p>"),
-    ],
-    code={
-        "file": "semantic_chunking.py",
-        "intro": "Semantic chunking on a passage that changes subject halfway, "
-                 "with the similarity between every consecutive sentence printed "
-                 "so you can see the trough the boundary is placed at.",
-        "code": '''# Semantic chunking: cut where the meaning changes.
-import math
-
-SENTENCES = [
-    "Refunds are issued within fourteen days of purchase.",
-    "The item must be unused and in its original packaging.",
-    "Shipping costs are not included in the refund amount.",
-    "Our data centres run on renewable energy contracts.",
-    "Carbon reporting is published each quarter.",
-]
-
-VOCAB_TOPICS = {
-    "refund": 0, "refunds": 0, "purchase": 0, "item": 0, "unused": 0,
-    "packaging": 0, "shipping": 0, "costs": 0, "days": 0, "amount": 0,
-    "data": 1, "centres": 1, "renewable": 1, "energy": 1, "carbon": 1,
-    "reporting": 1, "quarter": 1, "contracts": 1, "published": 1,
-}
-
-
-def embed(sentence):
-    """Stand-in for a real model: a two-dimensional topic histogram."""
-    vec = [0.0, 0.0]
-    for word in sentence.lower().strip(".").split():
-        topic = VOCAB_TOPICS.get(word)
-        if topic is not None:
-            vec[topic] += 1.0
-    norm = math.hypot(*vec) or 1.0
-    return [v / norm for v in vec]
-
-
-def cosine(a, b):
-    return sum(x * y for x, y in zip(a, b))
-
-
-vectors = [embed(s) for s in SENTENCES]
-gaps = [cosine(vectors[i], vectors[i + 1]) for i in range(len(vectors) - 1)]
-
-print("similarity between consecutive sentences:")
-for i, g in enumerate(gaps):
-    marker = "   <-- boundary" if g < 0.5 else ""
-    print(f"  s{i + 1} -> s{i + 2}: {g:.3f}{marker}")
-
-# A percentile of THIS document, not a global constant.
-ordered = sorted(gaps)
-threshold = ordered[max(0, int(len(ordered) * 0.25) - 1)]
-print(f"\\n25th-percentile threshold for this document: {threshold:.3f}")
-
-chunks, current = [], [SENTENCES[0]]
-for i, gap in enumerate(gaps):
-    if gap <= threshold:
-        chunks.append(" ".join(current))
-        current = []
-    current.append(SENTENCES[i + 1])
-chunks.append(" ".join(current))
-
-print()
-for i, c in enumerate(chunks):
-    print(f"chunk {i} ({len(c)} chars): {c[:70]}...")
-
-print()
-print("Two chunks of different lengths, each on one subject. A 120-character")
-print("splitter would have cut inside the refund policy.")
-
-# --- the short-sentence problem ----------------------------------------
-print()
-noisy = ["Yes.", "See above.", "Refunds take fourteen days."]
-for s in noisy:
-    v = embed(s)
-    print(f"  {s!r:>28} -> {[round(x, 2) for x in v]}")
-print("Sentences with no topic words embed to zero and produce meaningless")
-print("similarities. Buffering each sentence with its neighbours is the fix.")
-''',
-        "walk": [
-            ("cosine(vectors[i], vectors[i + 1])",
-             "The signal. High while the text stays on subject, low where it "
-             "turns &mdash; and the turn is exactly where a chunk boundary "
-             "belongs."),
-            ("threshold from a percentile",
-             "Relative, not absolute. A fixed 0.7 means something different in "
-             "every corpus; a percentile of the gaps in <em>this</em> document "
-             "adapts to how varied the writing is."),
-            ("one embed() per sentence",
-             "The cost. Alternatives embed once per chunk; this embeds once per "
-             "sentence, at index time. Paid once, but it is a real bill on a "
-             "large corpus."),
-            ("the noisy short sentences",
-             "\"Yes.\" carries no topic words and embeds to zero, so its "
-             "similarities are meaningless. Real implementations buffer each "
-             "sentence with its neighbours before embedding."),
-        ],
-        "try": [
-            "Add a third topic and a sentence about it. A second boundary "
-            "appears without any threshold being retuned.",
-            "Set the threshold to a fixed 0.5 and add a document where every "
-            "sentence is closely related. It splits nothing, or everything "
-            "&mdash; which is the argument for a percentile.",
-        ],
-    },
-    check=[
-        {"q": "Semantic chunking places a boundary where:",
-         "options": ["The character limit is reached", "The similarity between "
-                     "consecutive sentences drops",
-                     "A heading appears", "A paragraph ends"],
-         "answer": 1,
-         "why": "The dip in similarity is the signal that the subject has "
-                "changed, which is where a chunk should end."},
-        {"q": "Why should the threshold be a percentile rather than a fixed "
-              "number?",
-         "options": ["It is faster", "A fixed value means something different in "
-                     "every corpus",
-                     "Percentiles are more accurate", "To handle short sentences"],
-         "answer": 1,
-         "why": "A percentile of the gaps observed in this document adapts to "
-                "how varied the writing is."},
-        {"q": "When is semantic chunking usually NOT worth the cost?",
-         "options": ["On long documents", "When the document already has "
-                     "headings and structure",
-                     "On technical text", "When using a small embedding model"],
-         "answer": 1,
-         "why": "Headings are an explicit, author-provided topic boundary and "
-                "are free. Structure-aware chunking beats it at a fraction of "
-                "the cost."},
+    
+        ("Things to try",
+         "<ol><li>Raise the <strong>split percentile</strong> to 70. It splits almost everywhere, producing chunks too small to carry an idea.</li><li>Drop it to 10. Only the single largest topic change survives as a boundary.</li><li>Note that the threshold is derived from this document's own gaps &mdash; a fixed number would behave differently on every corpus.</li></ol>"),
+        ("What to remember",
+         "<p>Semantic chunking embeds each sentence and cuts where the similarity between neighbours drops, so boundaries land at topic changes rather than at character counts. It costs one embedding per sentence at index time, and it is usually not worth it on documents that already carry headings.</p>"),
     ],
 )
 
@@ -1444,32 +705,7 @@ _t(
         "Each chunk carries its heading path, so it is self-describing.",
         "Splitting a table or a code block mid-way destroys it.",
     ],
-    viz=viz([
-        frame(pairs([("# Refund policy", "H1"),
-                     ("Refunds are issued...", "body"),
-                     ("## Exceptions", "H2"),
-                     ("Digital goods are...", "body")],
-                    {"# Refund policy": "lo", "## Exceptions": "lo"},
-                    label="the document's own markup"),
-              "Headings are explicit boundaries. No inference and no embedding "
-              "call is needed to find them.",
-              {"chunks": 0}),
-        frame(pairs([("chunk 1", "[Refund policy] Refunds are issued within 14 days..."),
-                     ("chunk 2", "[Refund policy > Exceptions] Digital goods are...")],
-                    {"chunk 2": "hit"}, label="chunks with the heading path"),
-              "The heading path is prepended. Chunk 2 retrieved alone still says "
-              "which section it belongs to.",
-              {"chunks": 2}),
-        frame(pairs([("naive split of a table", "row 3 | row 4  (headers lost)"),
-                     ("structure-aware", "headers + rows kept together"),
-                     ("naive split of code", "half a function"),
-                     ("structure-aware", "whole function")],
-                    {"naive split of a table": "bad", "naive split of code": "bad"},
-                    label="what a character splitter destroys"),
-              "Tables and code are the clearest case: a mid-way cut leaves "
-              "something that cannot be read at all.",
-              {"chunks": 2}),
-    ]),
+    viz=WIDGETS["structure_aware_chunking"],
     sections=[
         ("Boundaries you do not have to guess",
          "<p>A Markdown heading, an HTML <code>&lt;section&gt;</code>, a PDF "
@@ -1498,140 +734,11 @@ _t(
          "usually combined with a recursive splitter: split on structure first, "
          "then recursively split any section still over the limit, keeping the "
          "heading path on every resulting piece.</p>"),
-    ],
-    code={
-        "file": "structure_aware_chunking.py",
-        "intro": "A Markdown-aware chunker that tracks the heading path, run "
-                 "against a character splitter on the same document &mdash; "
-                 "including a table, so you can see what the naive version does "
-                 "to it.",
-        "code": '''# Structure-aware chunking: split on the author's own boundaries.
-
-DOC = """# Refund policy
-
-Refunds are issued within 14 days of purchase.
-
-## Exceptions
-
-Digital goods are non-refundable once downloaded.
-
-## Fees by region
-
-| region | fee |
-| ------ | --- |
-| UK     | 0   |
-| EU     | 5   |
-| US     | 8   |
-"""
-
-
-def structure_chunks(markdown):
-    chunks, path, buffer = [], [], []
-
-    def flush():
-        if buffer and any(line.strip() for line in buffer):
-            heading = " > ".join(path)
-            body = "\\n".join(buffer).strip()
-            chunks.append({"path": heading, "text": f"[{heading}]\\n{body}"})
-        buffer.clear()
-
-    for line in markdown.splitlines():
-        if line.startswith("#"):
-            flush()
-            level = len(line) - len(line.lstrip("#"))
-            del path[level - 1:]                  # pop back to this depth
-            path.append(line.lstrip("# ").strip())
-        else:
-            buffer.append(line)
-    flush()
-    return chunks
-
-
-def character_chunks(text, limit=110):
-    return [text[i:i + limit] for i in range(0, len(text), limit)]
-
-
-print("structure-aware:")
-for i, c in enumerate(structure_chunks(DOC)):
-    preview = c["text"].replace("\\n", " ")[:72]
-    print(f"  [{i}] {preview}")
-
-print()
-print("character splitter:")
-for i, c in enumerate(character_chunks(DOC)):
-    print(f"  [{i}] {c.strip().replace(chr(10), ' ')[:72]!r}")
-
-print()
-print("Look at the table. The character splitter cuts between the header row")
-print("and the data, so a retrieved chunk of '| US | 8 |' has no column names.")
-
-# --- the heading path is why a chunk stands alone ----------------------
-print()
-fragment = "Digital goods are non-refundable once downloaded."
-with_path = "[Refund policy > Exceptions]\\n" + fragment
-print("without a path:", fragment)
-print("with a path   :", with_path.replace("\\n", " "))
-print("The second answers 'exceptions to what?' - and the heading words are")
-print("now in the embedded text, so they match queries too.")
-
-# --- structure first, then recursion for anything oversized ------------
-print()
-for c in structure_chunks(DOC):
-    size = len(c["text"])
-    note = "ok" if size <= 160 else "-> hand to a recursive splitter"
-    print(f"  {c['path']:>28}: {size:>3} chars  {note}")
-''',
-        "walk": [
-            ("del path[level - 1:]",
-             "Maintains the heading stack. An <code>##</code> after an "
-             "<code>###</code> pops back to depth two, which is what keeps the "
-             "path correct through arbitrary nesting."),
-            ("f\"[{heading}]\\n{body}\"",
-             "The path is prepended to the chunk text, not just stored beside "
-             "it. That puts the section's vocabulary into the embedded text, so "
-             "it improves retrieval as well as readability."),
-            ("the table in the output",
-             "The character splitter cuts between the header row and the data. "
-             "A retrieved chunk of <code>| US | 8 |</code> has no column names "
-             "and cannot be interpreted at all."),
-            ("-> hand to a recursive splitter",
-             "Structure gives boundaries, not size control. Sections vary "
-             "wildly, so the two techniques are combined: split on structure "
-             "first, then recursively split anything still oversized."),
-        ],
-        "try": [
-            "Add a <code>###</code> subsection and check the path pops "
-            "correctly when the next <code>##</code> arrives.",
-            "Feed it HTML instead and split on <code>&lt;h1&gt;</code> and "
-            "<code>&lt;h2&gt;</code>. Same algorithm, different parser &mdash; "
-            "which is the whole per-format cost.",
-        ],
-    },
-    check=[
-        {"q": "The main advantage of structure-aware chunking is that the "
-              "boundaries are:",
-         "options": ["Evenly spaced", "Placed by the author, so no inference is "
-                     "needed",
-                     "Smaller", "Computed from embeddings"],
-         "answer": 1,
-         "why": "A heading is an explicit statement that the subject changes. "
-                "Semantic chunking spends an embedding per sentence to infer "
-                "what the markup already says."},
-        {"q": "Why prepend the heading path to each chunk?",
-         "options": ["To make chunks longer", "So a chunk retrieved alone is "
-                     "self-describing, and its section words are searchable",
-                     "To help the splitter", "For deduplication"],
-         "answer": 1,
-         "why": "'Must be requested within 14 days' is useless in isolation. The "
-                "path also puts section vocabulary into the embedded text."},
-        {"q": "Structure-aware chunking is usually combined with recursive "
-              "splitting because:",
-         "options": ["Structure is unreliable", "Sections vary wildly in size, so "
-                     "oversized ones still need splitting",
-                     "Recursion is faster", "It reduces overlap"],
-         "answer": 1,
-         "why": "Structure gives good boundaries but no size control. Split on "
-                "structure first, then recursively, keeping the heading path."},
+    
+        ("Things to try",
+         "<ol><li>Compare <em>structure first</em> with <em>fixed size</em> at the same chunk size. The character splitter cuts through the heading; the structure-aware one does not.</li><li>Lower the <strong>chunk size</strong> until a section still exceeds it. Structure gives boundaries, not size control, so a recursive splitter has to finish the job.</li><li>Note the heading path on each chunk. A fragment retrieved alone still says which section it belongs to.</li></ol>"),
+        ("What to remember",
+         "<p>Structure-aware chunking splits along the document's own markup &mdash; headings, list items, table rows &mdash; because those boundaries were placed by the author and cost nothing to find. Carrying the heading path into each chunk is the half people miss: it makes a fragment self-describing and puts the section's vocabulary into the embedded text.</p>"),
     ],
 )
 
@@ -1660,29 +767,7 @@ _t(
         "Pronouns and back-references are what make a raw chunk unusable.",
         "The enrichment goes into the embedded text, so retrieval improves too.",
     ],
-    viz=viz([
-        frame(pairs([("raw chunk", "It must be requested within 14 days of it."),
-                     ("query", "how long do I have to return an item?"),
-                     ("similarity", "0.11  - will not be retrieved")],
-                    {"similarity": "bad"}, label="the chunk as cut"),
-              "Two pronouns and no nouns. The chunk is about refunds and says so "
-              "nowhere, so it cannot be found.",
-              {"score": 0.11}),
-        frame(pairs([("+ document title", "Customer returns handbook"),
-                     ("+ heading path", "Refund policy > Time limits"),
-                     ("+ resolved text", "A refund must be requested within 14 "
-                                         "days of purchase.")],
-                    {"+ resolved text": "hit"}, label="context added back"),
-              "The same span, enriched. Nothing about the boundary changed.",
-              {"score": 0.11}),
-        frame(pairs([("query", "how long do I have to return an item?"),
-                     ("similarity", "0.68  - retrieved at rank 1"),
-                     ("cost", "one LLM call per chunk, at index time")],
-                    {"similarity": "hit", "cost": "lo"}, label="after enrichment"),
-              "Retrievable now, and usable by the generator without the "
-              "surrounding document.",
-              {"score": 0.68}),
-    ]),
+    viz=WIDGETS["context_aware_chunking"],
     sections=[
         ("The problem is coreference, not boundaries",
          "<p>Prose is written to be read in order, so it leans on everything "
@@ -1717,124 +802,11 @@ _t(
          "retrieval evaluation set rather than assuming. This is the strategy "
          "with the best evidence behind it and it is not free of "
          "trade-offs.</p>"),
-    ],
-    code={
-        "file": "context_aware_chunking.py",
-        "intro": "A chunk full of dangling pronouns scored against a realistic "
-                 "query before and after enrichment, then the dilution effect "
-                 "shown by over-enriching until distinct chunks stop being "
-                 "distinguishable.",
-        "code": '''# Context-aware chunking: fix what the chunk lost, not where it was cut.
-import math
-from collections import Counter
-
-TITLE = "Customer returns handbook"
-PATH = "Refund policy > Time limits"
-
-RAW = "It must be requested within 14 days of it, and it must be unused."
-RESOLVED = ("A refund must be requested within 14 days of purchase, "
-            "and the item must be unused.")
-
-QUERY = "how long do I have to return an item for a refund"
-
-
-def embed(text):
-    return Counter(w.strip(".,").lower() for w in text.split())
-
-
-def cosine(a, b):
-    shared = set(a) & set(b)
-    num = sum(a[w] * b[w] for w in shared)
-    den = math.hypot(*a.values()) * math.hypot(*b.values())
-    return num / den if den else 0.0
-
-
-q = embed(QUERY)
-variants = {
-    "raw chunk": RAW,
-    "+ title": f"{TITLE}\\n{RAW}",
-    "+ title + path": f"{TITLE}\\n{PATH}\\n{RAW}",
-    "+ resolved pronouns": f"{TITLE}\\n{PATH}\\n{RESOLVED}",
-}
-
-print(f"query: {QUERY!r}\\n")
-print(f"{'variant':>22} {'similarity':>11}")
-for name, text in variants.items():
-    print(f"{name:>22} {cosine(q, embed(text)):>11.3f}")
-
-print()
-print("The raw chunk is about refunds and never says so. Resolving 'it' is")
-print("what puts the searchable words into the text.")
-
-# --- dilution: enrichment can go too far -------------------------------
-BOILERPLATE = ("This document is the customer returns handbook covering "
-               "refunds exchanges shipping and warranty for all regions "
-               "and product lines across the company. ") * 3
-
-chunk_a = f"{TITLE}\\n{PATH}\\n{RESOLVED}"
-chunk_b = f"{TITLE}\\nRefund policy > Exceptions\\nDigital goods are non-refundable once downloaded."
-
-print()
-print("distinguishability of two different chunks:")
-print(f"  lightly enriched : {cosine(embed(chunk_a), embed(chunk_b)):.3f}")
-over_a = BOILERPLATE + chunk_a
-over_b = BOILERPLATE + chunk_b
-print(f"  over-enriched    : {cosine(embed(over_a), embed(over_b)):.3f}")
-print()
-print("Two chunks on different subjects now look nearly identical. The")
-print("retriever cannot tell them apart, which is the cost of over-enriching.")
-''',
-        "walk": [
-            ("the raw chunk's similarity",
-             "Near zero against a query it should match perfectly. The chunk is "
-             "about refunds and contains neither \"refund\" nor \"return\" "
-             "&mdash; only pronouns."),
-            ("f\"{TITLE}\\n{PATH}\\n{RAW}\"",
-             "The free enrichment: title and heading path, prepended, no model "
-             "call. Usually the largest single improvement available."),
-            ("RESOLVED",
-             "Pronouns replaced with their referents. This is what an LLM does "
-             "in contextual retrieval, and it is what puts searchable nouns into "
-             "the text."),
-            ("the over-enriched comparison",
-             "Two chunks on different subjects become nearly identical once the "
-             "shared boilerplate dominates. Keep enrichment short relative to "
-             "the chunk."),
-        ],
-        "try": [
-            "Add a third chunk from a different section and compare all three "
-            "lightly and heavily enriched. Dilution gets worse as the corpus "
-            "grows.",
-            "Enrich only the stored text and not the embedded text. Retrieval "
-            "does not improve &mdash; which shows the gain comes from what is "
-            "embedded, not what is displayed.",
-        ],
-    },
-    check=[
-        {"q": "Context-aware chunking differs from the other strategies in that "
-              "it changes:",
-         "options": ["Where the boundaries fall", "What is stored with each "
-                     "chunk, not where it was cut",
-                     "The embedding model", "The retrieval algorithm"],
-         "answer": 1,
-         "why": "The boundary is unchanged. What changes is the context added "
-                "back to compensate for extraction."},
-        {"q": "Why does a chunk full of pronouns fail at retrieval, not just at "
-              "generation?",
-         "options": ["It is too short", "Its embedding lacks the words a user "
-                     "would search for",
-                     "Pronouns are stopwords", "It is deduplicated"],
-         "answer": 1,
-         "why": "The chunk is about refunds and never says 'refund', so nothing "
-                "in its vector matches the query."},
-        {"q": "The risk of over-enriching each chunk is:",
-         "options": ["Slower indexing", "Chunks from the same section become "
-                     "hard to tell apart",
-                     "Larger storage", "Worse generation"],
-         "answer": 1,
-         "why": "If the shared context dominates the embedding, the retriever "
-                "loses the ability to distinguish chunks. Keep it short relative "
-                "to the chunk."},
+    
+        ("Things to try",
+         "<ol><li>Start with everything off. The raw chunk is about refunds, never says so, and cannot be retrieved.</li><li>Turn on <strong>resolve pronouns</strong>. Similarity jumps, because the searchable nouns are now in the text.</li><li>Turn on <strong>over-enrich</strong>. The chunk stays findable and stops being distinguishable from its sibling &mdash; the cost of adding too much shared context.</li></ol>"),
+        ("What to remember",
+         "<p>Context-aware chunking changes what is stored rather than where the cut falls. A chunk full of pronouns and back-references is unusable by the generator and invisible to retrieval, so title, heading path and resolved references are added back. Keep the enrichment short relative to the chunk, or shared context dominates the embedding and chunks stop being distinguishable.</p>"),
     ],
 )
 
@@ -1866,38 +838,7 @@ _t(
         "An index skips most of them, and can miss a true neighbour.",
         "Recall, latency and memory &mdash; pick two.",
     ],
-    viz=viz([
-        frame(pairs([("corpus", "1,000,000 vectors x 768 dims"),
-                     ("exact search", "1,000,000 comparisons per query"),
-                     ("latency", "~600 ms, single-threaded")],
-                    {"latency": "bad"}, label="flat index: no index at all"),
-              "Exact and simple: compare with everything. Correct, and it does "
-              "not survive contact with a real corpus.",
-              {"compared": 1000000}),
-        frame(pairs([("index", "graph or cluster structure"),
-                     ("visited", "~2,000 vectors"),
-                     ("latency", "~3 ms"), ("recall@10", "0.95")],
-                    {"visited": "hit", "recall@10": "lo"},
-                    label="approximate index"),
-              "Two thousand comparisons instead of a million, and one true "
-              "neighbour in twenty is missed.",
-              {"compared": 2000}),
-        frame(pairs([("more accurate", "raise the search effort -> slower"),
-                     ("faster", "lower the effort -> worse recall"),
-                     ("less memory", "compress the vectors -> worse recall")],
-                    {}, label="the three-way trade"),
-              "Every index type exposes these same three knobs under different "
-              "names.",
-              {"compared": 2000}),
-        frame(pairs([("flat", "exact, O(n), small corpora and ground truth"),
-                     ("IVF", "cluster then search a few clusters"),
-                     ("HNSW", "navigable graph, best recall/latency, most memory"),
-                     ("+ PQ", "compress vectors, big memory saving, lower recall")],
-                    {"HNSW": "hit"}, label="the families"),
-              "HNSW is the usual default; IVF and product quantization are what "
-              "you reach for when memory becomes the binding constraint.",
-              {"compared": 2000}),
-    ]),
+    viz=WIDGETS["indexing_in_vector_databases"],
     sections=[
         ("Why exact search stops working",
          "<p>A flat index stores the vectors and compares the query with every "
@@ -1935,124 +876,11 @@ _t(
          "most vector databases differ from each other &mdash; see "
          "<a href=\"permission_filtering_in_rag.html\">permission "
          "filtering</a>.</p>"),
-    ],
-    code={
-        "file": "vector_indexing.py",
-        "intro": "An exact search and a simple cluster-based index over the same "
-                 "vectors, with comparisons counted and recall measured against "
-                 "the exact answer &mdash; so the trade is a number rather than a "
-                 "claim.",
-        "code": '''# Why vector databases index: exact search does not scale.
-import math, random, time
-
-random.seed(7)
-DIM, N, K = 24, 4_000, 10
-corpus = [[random.gauss(0, 1) for _ in range(DIM)] for _ in range(N)]
-query = [random.gauss(0, 1) for _ in range(DIM)]
-
-
-def dot(a, b):
-    return sum(x * y for x, y in zip(a, b))
-
-
-# --- exact: compare with everything ------------------------------------
-start = time.time()
-exact = sorted(range(N), key=lambda i: -dot(query, corpus[i]))[:K]
-exact_ms = (time.time() - start) * 1000
-print(f"exact search   : {N:,} comparisons, {exact_ms:.0f} ms")
-
-# --- a toy IVF: cluster, then search only the nearest clusters ---------
-CLUSTERS = 32
-centroids = [corpus[random.randrange(N)] for _ in range(CLUSTERS)]
-
-def assign(centroids):
-    groups = [[] for _ in centroids]
-    for i, vec in enumerate(corpus):
-        best = max(range(len(centroids)), key=lambda c: dot(vec, centroids[c]))
-        groups[best].append(i)
-    return groups
-
-# A few k-means passes. Random centroids give a poor partition, and a poor
-# partition understates what IVF actually achieves.
-for _ in range(2):
-    assignment = assign(centroids)
-    for c, members in enumerate(assignment):
-        if members:
-            centroids[c] = [sum(corpus[i][d] for i in members) / len(members)
-                            for d in range(DIM)]
-assignment = assign(centroids)
-
-
-def ivf_search(query, probe):
-    """Search only the `probe` nearest clusters."""
-    order = sorted(range(CLUSTERS), key=lambda c: -dot(query, centroids[c]))
-    candidates = [i for c in order[:probe] for i in assignment[c]]
-    ranked = sorted(candidates, key=lambda i: -dot(query, corpus[i]))[:K]
-    return ranked, len(candidates)
-
-
-print()
-print(f"{'probes':>7} {'compared':>10} {'recall@%d' % K:>10} {'ms':>7}")
-for probe in (1, 4, 12, 32):
-    start = time.time()
-    got, compared = ivf_search(query, probe)
-    ms = (time.time() - start) * 1000
-    recall = len(set(got) & set(exact)) / K
-    print(f"{probe:>7} {compared:>10,} {recall:>10.2f} {ms:>7.0f}")
-
-print()
-print("More probes: better recall, more comparisons, more latency. That is the")
-print("entire trade, and every index type exposes it under a different name.")
-print()
-print("At 32 probes it searches every cluster, so recall is 1.0 and it has")
-print("become an exact search with extra steps.")
-''',
-        "walk": [
-            ("exact = sorted(range(N), key=...)",
-             "The ground truth, and the only way to measure any index's recall. "
-             "It is also O(n&middot;d) per query, which is why it does not "
-             "survive a real corpus."),
-            ("assignment[best].append(i)",
-             "The index: each vector is filed under its nearest centroid. "
-             "Building it is a one-off cost; the saving is paid back on every "
-             "query."),
-            ("order[:probe]",
-             "The pruning. Searching one cluster is fast and misses a lot; "
-             "searching more improves recall and costs comparisons. This one "
-             "parameter <em>is</em> the trade-off."),
-            ("recall = len(set(got) & set(exact)) / K",
-             "Recall@k, measured rather than assumed. A vector index is a "
-             "lossy structure and the loss has to be quantified against exact "
-             "results."),
-        ],
-        "try": [
-            "Raise <code>CLUSTERS</code> to 256 with <code>probe=4</code>. "
-            "Finer clusters mean fewer comparisons and lower recall &mdash; the "
-            "same trade from a different direction.",
-            "Set <code>DIM = 512</code>. Every comparison gets more expensive "
-            "and the exact search degrades faster than the index does.",
-        ],
-    },
-    check=[
-        {"q": "A flat (unindexed) vector search is:",
-         "options": ["Approximate and fast", "Exact and O(n) per query",
-                     "Exact and O(log n)", "Approximate and memory-efficient"],
-         "answer": 1,
-         "why": "It compares the query with every vector. That makes it the "
-                "ground truth for measuring recall, and unusable at scale."},
-        {"q": "What does an approximate index trade away?",
-         "options": ["Memory only", "Recall - it may miss true neighbours",
-                     "Precision of the vectors", "Nothing"],
-         "answer": 1,
-         "why": "It prunes most of the corpus without comparing, so a genuine "
-                "neighbour can be routed around. recall@k is how you measure it."},
-        {"q": "recall@10 of 0.95 means:",
-         "options": ["95% of queries succeed", "On average 9.5 of the 10 true "
-                     "nearest neighbours were returned",
-                     "The vectors are 95% accurate", "95% of the corpus was searched"],
-         "answer": 1,
-         "why": "Usually fine for RAG, where a reranker sees the top 50 anyway - "
-                "and not fine for deduplication or exact matching."},
+    
+        ("Things to try",
+         "<ol><li>Set <strong>clusters probed</strong> to 1. Recall collapses &mdash; most true neighbours live in clusters the search never opened.</li><li>Raise probes until recall reaches 1.0. You are now comparing against the whole corpus: an exact search with extra steps.</li><li>Raise <strong>clusters</strong> with probes fixed. Finer clusters mean fewer comparisons and lower recall &mdash; the same trade from the other direction.</li></ol>"),
+        ("What to remember",
+         "<p>Without an index, finding the nearest vector means comparing against every stored vector. An index prunes most of them and pays for it in recall, so the metric is recall@k measured against an exact search. Recall, latency and memory are the three knobs, and every index type exposes them under different names.</p>"),
     ],
 )
 
@@ -2081,37 +909,7 @@ _t(
         "Search is greedy &mdash; it can settle in a local minimum and miss.",
         "<code>efSearch</code> widens the beam: better recall, more time.",
     ],
-    viz=viz([
-        frame(pairs([("layer 2", "8 nodes, long edges"),
-                     ("layer 1", "600 nodes"),
-                     ("layer 0", "1,000,000 nodes, all of them")],
-                    {"layer 2": "lo"}, label="HNSW layers"),
-              "Each node appears in layer 0; a random few also appear higher. "
-              "Sparse at the top, complete at the bottom.",
-              {"layer": 2, "visited": 0}),
-        frame(pairs([("enter at layer 2", "greedy hop to the closest neighbour"),
-                     ("visited", "6 nodes"),
-                     ("effect", "crossed most of the space")],
-                    {"effect": "hit"}, label="descend: coarse"),
-              "Long edges at the top cover distance cheaply - a handful of hops "
-              "gets near the right region.",
-              {"layer": 2, "visited": 6}),
-        frame(pairs([("drop to layer 0", "dense edges, short hops"),
-                     ("visited", "1,840 nodes total"),
-                     ("recall@10", "0.96")],
-                    {"recall@10": "hit"}, label="descend: fine"),
-              "The bottom layer refines within the neighbourhood. Under two "
-              "thousand comparisons out of a million.",
-              {"layer": 0, "visited": 1840}),
-        frame(pairs([("efSearch 32", "recall 0.87, 0.9 ms"),
-                     ("efSearch 128", "recall 0.96, 2.6 ms"),
-                     ("efSearch 512", "recall 0.99, 9.1 ms"),
-                     ("M (edges/node)", "build-time: more memory, better graph")],
-                    {"efSearch 128": "lo"}, label="the knobs"),
-              "efSearch is tuned per query at runtime; M is fixed when the index "
-              "is built.",
-              {"layer": 0, "visited": 1840}),
-    ]),
+    viz=WIDGETS["ann_indexing_hnsw_and_ivf"],
     sections=[
         ("HNSW: skip lists, in vector space",
          "<p>Take a proximity graph &mdash; each vector linked to its nearest "
@@ -2148,154 +946,11 @@ _t(
          "which is why it survives alongside HNSW &mdash; and combined with "
          "product quantization it is what runs when memory, not latency, is the "
          "binding constraint.</p>"),
-    ],
-    code={
-        "file": "ann_indexing.py",
-        "intro": "A miniature HNSW &mdash; layered proximity graph, greedy "
-                 "descent, a real candidate list &mdash; with the nodes visited "
-                 "per layer printed and recall measured against exact search at "
-                 "several efSearch values.",
-        "code": '''# A small HNSW: layered proximity graph, greedy descent.
-import heapq, math, random, time
-
-random.seed(3)
-DIM, N, K = 24, 2_500, 10
-corpus = [[random.gauss(0, 1) for _ in range(DIM)] for _ in range(N)]
-
-
-def dist(a, b):
-    return sum((x - y) ** 2 for x, y in zip(a, b))
-
-
-# --- build: assign layers geometrically, link nearest neighbours -------
-M, LAYERS = 8, 3
-layer_of = [min(LAYERS - 1, int(-math.log(random.random()) * 0.6)) for _ in range(N)]
-members = [[i for i in range(N) if layer_of[i] >= L] for L in range(LAYERS)]
-
-graph = [{} for _ in range(LAYERS)]
-for L in range(LAYERS):
-    pool = members[L]
-    for i in pool:
-        # A real build searches the graph; sampling keeps this readable.
-        sample = random.sample(pool, min(len(pool), 40))
-        near = sorted(sample, key=lambda j: dist(corpus[i], corpus[j]))
-        graph[L][i] = [j for j in near if j != i][:M]
-
-print(f"{N:,} vectors, {LAYERS} layers")
-for L in range(LAYERS - 1, -1, -1):
-    print(f"  layer {L}: {len(members[L]):>5} nodes, {M} edges each")
-
-
-def search(query, ef=64, trace=False):
-    entry = members[LAYERS - 1][0]
-    visited_total = 0
-    current = entry
-    for L in range(LAYERS - 1, 0, -1):           # coarse layers: pure greedy
-        improved, visits = True, 0
-        while improved:
-            improved = False
-            for j in graph[L].get(current, []):
-                visits += 1
-                if dist(query, corpus[j]) < dist(query, corpus[current]):
-                    current, improved = j, True
-        visited_total += visits
-        if trace:
-            print(f"    layer {L}: {visits} nodes visited")
-
-    # bottom layer: a beam of width ef rather than a single greedy walk
-    seen = {current}
-    candidates = [(dist(query, corpus[current]), current)]
-    best = [(-dist(query, corpus[current]), current)]
-    while candidates:
-        d, node = heapq.heappop(candidates)
-        if -best[0][0] < d and len(best) >= ef:
-            break
-        for j in graph[0].get(node, []):
-            if j in seen:
-                continue
-            seen.add(j)
-            visited_total += 1
-            dj = dist(query, corpus[j])
-            if len(best) < ef or dj < -best[0][0]:
-                heapq.heappush(candidates, (dj, j))
-                heapq.heappush(best, (-dj, j))
-                if len(best) > ef:
-                    heapq.heappop(best)
-    if trace:
-        print(f"    layer 0: beam of {ef}")
-    ranked = sorted((-d, i) for d, i in best)[:K]
-    return [i for _, i in ranked], visited_total
-
-
-query = [random.gauss(0, 1) for _ in range(DIM)]
-exact = sorted(range(N), key=lambda i: dist(query, corpus[i]))[:K]
-
-print()
-print("one search, layer by layer:")
-search(query, ef=64, trace=True)
-
-print()
-print(f"{'efSearch':>9} {'visited':>9} {'recall@%d' % K:>10} {'ms':>7}")
-for ef in (8, 32, 128, 512):
-    start = time.time()
-    got, visited = search(query, ef=ef)
-    ms = (time.time() - start) * 1000
-    recall = len(set(got) & set(exact)) / K
-    print(f"{ef:>9} {visited:>9,} {recall:>10.2f} {ms:>7.1f}")
-
-print()
-print(f"exact search compares all {N:,} vectors every time.")
-print("efSearch is the runtime knob: wider beam, better recall, more work.")
-''',
-        "walk": [
-            ("layer_of = ... -log(random()) ...",
-             "Layers are assigned geometrically, so each is a sparse random "
-             "sample of the one below. That is what gives the top layer long "
-             "edges and the bottom layer complete coverage."),
-            ("the greedy loop on coarse layers",
-             "Move to whichever neighbour is closer, until none is. A handful of "
-             "hops at the top crosses most of the space, which is the whole "
-             "reason for the hierarchy."),
-            ("the beam of width ef on layer 0",
-             "The bottom layer keeps a candidate list rather than a single "
-             "position. That is what recovers from a greedy walk heading "
-             "slightly wrong &mdash; and <code>ef</code> is how wide the "
-             "recovery net is."),
-            ("the efSearch table",
-             "The knob you actually tune. Recall and latency both rise with it, "
-             "and it can be set per query &mdash; wide for an important search, "
-             "narrow for an autocomplete."),
-        ],
-        "try": [
-            "Set <code>M = 3</code> and rebuild. A poorly connected graph loses "
-            "recall no matter how large <code>efSearch</code> gets &mdash; "
-            "build-time damage cannot be fixed at query time.",
-            "Set <code>LAYERS = 1</code>. It becomes a flat proximity graph, and "
-            "the visit count rises sharply for the same recall.",
-        ],
-    },
-    check=[
-        {"q": "What do HNSW's upper layers provide?",
-         "options": ["Higher precision", "Long edges, so a few hops cross most "
-                     "of the space",
-                     "Compression", "Deduplication"],
-         "answer": 1,
-         "why": "Sparse upper layers cover distance cheaply; the dense bottom "
-                "layer refines. It is the skip-list idea applied to geometry."},
-        {"q": "Which parameter is tuned at query time?",
-         "options": ["M", "efConstruction", "efSearch", "The number of layers"],
-         "answer": 2,
-         "why": "M and efConstruction are fixed when the index is built. "
-                "efSearch widens the candidate list per query, trading latency "
-                "for recall."},
-        {"q": "IVF's characteristic failure is:",
-         "options": ["Running out of memory", "Missing a neighbour that sits "
-                     "just across a cluster boundary",
-                     "Returning duplicates", "Slow builds"],
-         "answer": 1,
-         "why": "Probing more clusters fixes it at the cost of latency. IVF is "
-                "cheaper to build and update than HNSW, which is why it survives "
-                "alongside it."},
+    
+        ("Things to try",
+         "<ol><li>Sweep <strong>efSearch</strong> from 8 to 512. Recall and latency both climb &mdash; this is the knob you tune in production, and it can differ per query.</li><li>Drop <strong>M</strong> to 4. Recall is capped no matter how large efSearch gets: build-time damage cannot be repaired at query time.</li><li>Raise M to 48 and watch the index memory. The graph is stored alongside the vectors, which is HNSW's main cost.</li></ol>"),
+        ("What to remember",
+         "<p>HNSW stacks proximity graphs: sparse upper layers with long edges to cross the space, a dense bottom layer to refine. Search is greedy with a candidate list of width efSearch, which is the runtime recall/latency knob. M and efConstruction are fixed at build time. IVF is the simpler alternative &mdash; cluster then probe &mdash; cheaper to build and update, and it misses neighbours across cluster boundaries.</p>"),
     ],
 )
 
@@ -2324,36 +979,7 @@ _t(
         "The permitted documents may never have entered the top-k at all.",
         "Filtering after generation is too late &mdash; the model already saw it.",
     ],
-    viz=viz([
-        frame(pairs([("top-10 by similarity", "8 restricted, 2 permitted"),
-                     ("after post-filter", "2 results"),
-                     ("answer quality", "poor - thin evidence")],
-                    {"after post-filter": "bad"}, label="post-filtering"),
-              "Ask for ten, get ten, drop eight. The system did not fail loudly; "
-              "it just answered from two chunks.",
-              {"returned": 2}),
-        frame(pairs([("candidate set", "only documents this user may see"),
-                     ("top-10 within it", "10 permitted results"),
-                     ("answer quality", "full evidence")],
-                    {"top-10 within it": "hit"}, label="pre-filtering"),
-              "The filter is applied before ranking, so the top-k is ten "
-              "permitted documents rather than whatever survived.",
-              {"returned": 10}),
-        frame(pairs([("filter after generation", "the model already read it"),
-                     ("leak surface", "summary, citation, refusal wording"),
-                     ("verdict", "not a control")],
-                    {"verdict": "bad"}, label="the anti-pattern"),
-              "A model that has read a restricted document leaks it through "
-              "paraphrase even when the text is stripped from the response.",
-              {"returned": 0}),
-        frame(pairs([("ACLs in the index", "fast, and stale when access changes"),
-                     ("ACLs at query time", "correct, and needs a fast lookup"),
-                     ("practice", "index a group id, resolve groups per query")],
-                    {"practice": "hit"}, label="where the permissions live"),
-              "Indexing a stable group id and resolving membership per request "
-              "is the usual compromise.",
-              {"returned": 10}),
-    ]),
+    viz=WIDGETS["permission_filtering_in_rag"],
     sections=[
         ("Why post-filtering quietly fails",
          "<p>Retrieve the top 10 by similarity, then remove what the user may "
@@ -2390,131 +1016,11 @@ _t(
          "not just be filtered out. And the filter belongs on the server, "
          "derived from the authenticated session &mdash; never from a "
          "client-supplied user id, which is trivially forged.</p>"),
-    ],
-    code={
-        "file": "permission_filtering.py",
-        "intro": "The same query run three ways over a corpus where most "
-                 "documents are restricted, so the result counts show what "
-                 "post-filtering silently does to a user with narrow access.",
-        "code": '''# Permission filtering: inside the search, not around it.
-import random
-
-random.seed(11)
-
-# 200 chunks; most belong to groups this user is not in.
-CHUNKS = []
-for i in range(200):
-    group = random.choice(["finance", "finance", "finance", "hr", "public"])
-    CHUNKS.append({"id": i, "group": group,
-                   "score": round(random.uniform(0.2, 0.95), 3)})
-
-USER_GROUPS = {"public", "hr"}
-K = 10
-
-
-def post_filter(chunks, k=K):
-    """Rank everything, then drop what the user cannot see."""
-    top = sorted(chunks, key=lambda c: -c["score"])[:k]
-    return [c for c in top if c["group"] in USER_GROUPS]
-
-
-def post_filter_overfetch(chunks, k=K, fetch=100):
-    top = sorted(chunks, key=lambda c: -c["score"])[:fetch]
-    return [c for c in top if c["group"] in USER_GROUPS][:k]
-
-
-def pre_filter(chunks, k=K):
-    """Restrict the candidate set, THEN rank."""
-    allowed = [c for c in chunks if c["group"] in USER_GROUPS]
-    return sorted(allowed, key=lambda c: -c["score"])[:k]
-
-
-visible = sum(1 for c in CHUNKS if c["group"] in USER_GROUPS)
-print(f"corpus: {len(CHUNKS)} chunks, {visible} visible to this user "
-      f"({visible / len(CHUNKS):.0%})")
-print(f"asked for k = {K}\\n")
-
-for name, fn in (("post-filter", post_filter),
-                 ("post-filter, fetch 100", post_filter_overfetch),
-                 ("pre-filter", pre_filter)):
-    got = fn(CHUNKS)
-    print(f"{name:>24}: {len(got):>2} results  "
-          f"top score {got[0]['score'] if got else 0:.3f}")
-
-print()
-print("Post-filtering asked for 10 and returned fewer. Nothing raised an")
-print("error - the generator simply answered from less evidence.")
-
-# --- the failure is worst for the most restricted user -----------------
-print()
-print(f"{'user sees':>12} {'post-filter':>12} {'pre-filter':>11}")
-for groups in ({"public"}, {"public", "hr"}, {"public", "hr", "finance"}):
-    USER_GROUPS = groups
-    print(f"{'+'.join(sorted(groups)):>12} "
-          f"{len(post_filter(CHUNKS)):>12} {len(pre_filter(CHUNKS)):>11}")
-
-print()
-print("The narrower the access, the worse post-filtering gets - which is the")
-print("opposite of what a security control should do.")
-
-# --- permissions must be resolved at query time ------------------------
-print()
-indexed_acl = {"alice", "bob"}                  # baked in at index time
-current_members = {"alice"}                     # bob left the team today
-print("chunk ACL as indexed :", sorted(indexed_acl))
-print("group membership now  :", sorted(current_members))
-print("bob still passes an indexed-ACL filter:", "bob" in indexed_acl)
-print("Indexing a GROUP id and resolving membership per request avoids this;")
-print("stale permissions fail open, which is the wrong direction to fail.")
-''',
-        "walk": [
-            ("post_filter",
-             "Ranks first, filters second. It asked for ten and returned "
-             "fewer, with nothing raised &mdash; the result set collapsed "
-             "silently."),
-            ("post_filter_overfetch",
-             "Fetching 100 makes the failure less likely and cannot remove it. "
-             "A user with access to a tiny slice of the corpus still comes up "
-             "short."),
-            ("pre_filter",
-             "Restricts the candidate set before ranking, so k means k "
-             "permitted results. This is the correct behaviour and the one that "
-             "fights the ANN index."),
-            ("the per-user table",
-             "Post-filtering degrades fastest for the most restricted user, "
-             "which is the opposite of how a security control should behave."),
-        ],
-        "try": [
-            "Give the user only <code>public</code> and re-run. Post-filtering "
-            "can return nothing at all while the corpus contains perfectly good "
-            "permitted chunks.",
-            "Add a <code>deleted</code> flag and filter on it. Note that "
-            "filtering is not deletion &mdash; a removed document has to leave "
-            "the index.",
-        ],
-    },
-    check=[
-        {"q": "Why does post-filtering break recall?",
-         "options": ["It is slower", "Permitted documents may never have entered "
-                     "the top-k, so the result set silently shrinks",
-                     "It filters the wrong field", "It duplicates results"],
-         "answer": 1,
-         "why": "You ask for 10, get 10, drop 8, and answer from 2 - with no "
-                "error raised. Over-fetching reduces the odds without fixing it."},
-        {"q": "Filtering restricted content out of the model's response is:",
-         "options": ["Equivalent to pre-filtering", "Not a control - the model "
-                     "already read it and can paraphrase it",
-                     "The recommended approach", "Sufficient with a good prompt"],
-         "answer": 1,
-         "why": "Leakage survives through summaries, citations and even the "
-                "wording of a refusal. The document must never reach the model."},
-        {"q": "Why index a group id rather than a resolved list of users?",
-         "options": ["It is smaller", "Membership can be resolved per request, "
-                     "so access changes take effect without re-indexing",
-                     "Groups are hashable", "It improves recall"],
-         "answer": 1,
-         "why": "A baked-in user list goes stale the moment someone leaves a "
-                "team, and stale permissions fail open."},
+    
+        ("Things to try",
+         "<ol><li>Drop <strong>corpus visible</strong> to 5%. Post-filtering returns almost nothing while pre-filtering still returns k &mdash; the control fails worst for the most restricted user.</li><li>Raise <strong>over-fetch</strong> to 500. The shortfall shrinks and never disappears, which is why over-fetching is a mitigation rather than a fix.</li><li>Set visibility to 100%. All three strategies agree, which is exactly why this bug survives testing on an admin account.</li></ol>"),
+        ("What to remember",
+         "<p>Permission filtering has to happen inside the search, not around it. Post-filtering ranks first and drops afterwards, so it silently returns fewer results than requested and degrades worst for the most restricted users. Filtering after generation is not a control at all &mdash; the model has already read the text. Index a group id and resolve membership per request, because stale permissions fail open.</p>"),
     ],
 )
 
@@ -2544,38 +1050,7 @@ _t(
         "Random sharding spreads relevant documents evenly &mdash; that is the point.",
         "Latency is the <em>slowest</em> shard, not the average.",
     ],
-    viz=viz([
-        frame(pairs([("shard 1", "returns local top-5"),
-                     ("shard 2", "returns local top-5"),
-                     ("shard 3", "returns local top-5"),
-                     ("coordinator", "merges 15 -> global top-5")],
-                    {"coordinator": "hit"}, label="scatter-gather"),
-              "Each shard ranks its own slice. The coordinator only has to merge "
-              "already-sorted lists.",
-              {"shards": 3, "returned": 5}),
-        frame(pairs([("random sharding", "relevant docs spread across shards"),
-                     ("each shard's top-5", "contains some of them"),
-                     ("recall", "0.98")],
-                    {"recall": "hit"}, label="sharding at random"),
-              "Spreading the corpus evenly means no single shard holds all the "
-              "answers, so a per-shard k is enough.",
-              {"shards": 3, "returned": 5}),
-        frame(pairs([("semantic sharding", "all finance docs on shard 2"),
-                     ("shard 2's top-5", "holds ranks 1-40 of the true results"),
-                     ("recall", "0.40 - the rest were truncated")],
-                    {"recall": "bad"}, label="sharding by topic"),
-              "A finance query concentrates every good document in one shard, "
-              "and its local k throws most of them away.",
-              {"shards": 3, "returned": 5}),
-        frame(pairs([("shard latency", "40, 45, 210 ms"),
-                     ("response", "210 ms - the slowest"),
-                     ("more shards", "more chances of a slow one"),
-                     ("mitigation", "hedged requests, or ignore a late shard")],
-                    {"response": "bad"}, label="tail latency"),
-              "Scatter-gather waits for everyone. Adding shards adds tail risk, "
-              "which is the cost nobody mentions.",
-              {"shards": 3, "returned": 5}),
-    ]),
+    viz=WIDGETS["distributed_retrieval_and_sharding"],
     sections=[
         ("Shards and replicas are different things",
          "<p>A <strong>shard</strong> holds a slice of the corpus. Sharding "
@@ -2614,125 +1089,10 @@ _t(
          "IDF depends on corpus statistics that differ per shard unless they "
          "are shared globally. That is a real bug in hand-rolled distributed "
          "lexical search.</p>"),
-    ],
-    code={
-        "file": "distributed_retrieval.py",
-        "intro": "Scatter-gather over three shards, with recall measured against "
-                 "a single-index search, run once with random sharding and once "
-                 "with semantic sharding so the recall collapse is a number.",
-        "code": '''# Scatter-gather retrieval, and why sharding strategy decides recall.
-import random
-
-random.seed(5)
-
-TOPICS_ = ["finance", "hr", "legal"]
-CORPUS = []
-for i in range(900):
-    topic = TOPICS_[i % 3]
-    CORPUS.append({"id": i, "topic": topic,
-                   # documents on the query's topic score higher
-                   "score": round(random.uniform(0.6, 0.99) if topic == "finance"
-                                  else random.uniform(0.1, 0.55), 4)})
-
-K = 10
-ground_truth = [c["id"] for c in sorted(CORPUS, key=lambda c: -c["score"])[:K]]
-
-
-def scatter_gather(shards, k=K, per_shard=None):
-    per_shard = per_shard or k
-    local = []
-    for shard in shards:
-        local += sorted(shard, key=lambda c: -c["score"])[:per_shard]
-    merged = sorted(local, key=lambda c: -c["score"])[:k]
-    return [c["id"] for c in merged]
-
-
-def recall(got):
-    return len(set(got) & set(ground_truth)) / len(ground_truth)
-
-
-random_shards = [[] for _ in range(3)]
-for c in CORPUS:
-    random_shards[random.randrange(3)].append(c)
-
-semantic_shards = [[c for c in CORPUS if c["topic"] == t] for t in TOPICS_]
-
-print(f"corpus {len(CORPUS)}, 3 shards, k={K}, query is finance-flavoured\\n")
-print(f"{'strategy':>20} {'per-shard k':>12} {'recall@%d' % K:>10}")
-for name, shards in (("random", random_shards), ("semantic", semantic_shards)):
-    for per_shard in (K, K * 5):
-        got = scatter_gather(shards, per_shard=per_shard)
-        print(f"{name:>20} {per_shard:>12} {recall(got):>10.2f}")
-
-print()
-print("Semantic sharding puts every good document on one shard, and that")
-print("shard's local top-10 throws the rest away. Over-fetching recovers it,")
-print("at the bandwidth cost the routing was supposed to save.")
-
-# --- tail latency ------------------------------------------------------
-print()
-random.seed(2)
-def response_time(n_shards):
-    latencies = [random.gauss(40, 8) if random.random() > 0.02
-                 else random.gauss(220, 30) for _ in range(n_shards)]
-    return max(latencies)                        # you wait for the slowest
-
-for n in (1, 3, 10, 30):
-    runs = [response_time(n) for _ in range(2000)]
-    runs.sort()
-    print(f"  {n:>2} shards: median {runs[len(runs)//2]:>6.0f} ms   "
-          f"p99 {runs[int(len(runs) * 0.99)]:>6.0f} ms")
-
-print()
-print("The median barely moves; p99 climbs with every shard added, because")
-print("scatter-gather waits for whichever shard happened to be slow.")
-''',
-        "walk": [
-            ("sorted(shard, ...)[:per_shard]",
-             "Each shard ranks only its own slice. The coordinator never sees "
-             "the corpus, which is what makes this scale &mdash; and what makes "
-             "the per-shard k a real decision."),
-            ("semantic_shards",
-             "All finance documents on one shard. Its local top-10 holds ranks "
-             "1&ndash;40 of the true results and discards thirty of them, which "
-             "the recall column shows."),
-            ("per_shard = K * 5",
-             "Over-fetching recovers the recall lost to semantic sharding, at "
-             "the bandwidth and latency the topic routing was meant to save."),
-            ("max(latencies)",
-             "Scatter-gather waits for everyone, so response time is the maximum "
-             "not the mean. The p99 column is why adding shards can make a "
-             "system slower."),
-        ],
-        "try": [
-            "Raise the slow-shard probability from 2% to 10%. The p99 column "
-            "degrades sharply while the median barely moves &mdash; which is why "
-            "averages hide this.",
-            "Shard by tenant and query within one tenant only. Semantic sharding "
-            "is correct there, because the query never needs the other shards.",
-        ],
-    },
-    check=[
-        {"q": "The difference between a shard and a replica is:",
-         "options": ["Replicas are smaller", "A shard holds a slice of the data; "
-                     "a replica holds a full copy",
-                     "Shards are read-only", "There is none"],
-         "answer": 1,
-         "why": "Sharding solves data that will not fit; replication solves "
-                "query volume and failure. If the index fits on one machine you "
-                "want replicas and no sharding."},
-        {"q": "Why does semantic sharding hurt recall?",
-         "options": ["Topics overlap", "Relevant documents concentrate in one "
-                     "shard, whose local top-k discards most of them",
-                     "Scores become incomparable", "It needs more machines"],
-         "answer": 1,
-         "why": "Random sharding spreads them evenly, so a modest per-shard k "
-                "captures nearly all of them."},
-        {"q": "In scatter-gather, the query's latency is:",
-         "options": ["The average shard latency", "The slowest shard's latency",
-                     "The fastest shard's latency", "Independent of shard count"],
-         "answer": 1,
-         "why": "You wait for everyone, so p99 climbs as shards are added. "
-                "Hedged requests and deadlines are the usual mitigations."},
+    
+        ("Things to try",
+         "<ol><li>Switch to <em>semantic</em> sharding. Recall collapses: every relevant document is on one shard, whose local top-k discards the rest.</li><li>With semantic sharding, raise <strong>per-shard k</strong> until recall recovers. You have paid back the bandwidth the topic routing was meant to save.</li><li>Raise <strong>shards</strong> to 40 with random sharding. Recall is fine and p99 latency climbs, because scatter-gather waits for whichever shard was slow.</li></ol>"),
+        ("What to remember",
+         "<p>Scatter-gather sends the query to every shard, takes a local top-k from each and merges. Shard randomly rather than by topic, or the relevant documents concentrate in one shard and its local k throws most of them away. Latency becomes the slowest shard's, not the average, so p99 gets worse with every shard added. Shards solve data that will not fit; replicas solve query volume.</p>"),
     ],
 )

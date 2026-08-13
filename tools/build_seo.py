@@ -86,10 +86,12 @@ SHARED_SCRIPTS = ("modules.js", "search.js", "vizlearn.js", "vizlearn-lab.js",
                   # binds only to .vz-iv blocks, so it costs nothing on a page
                   # that has none, and shipping it per-page would put a second
                   # copy of the script list in the build.
-                  "vizlearn-interview.js")
+                  "vizlearn-interview.js",
+                  # The interactive widget on the generated gen_ai/ pages.
+                  "vizlearn-ragviz.js")
 # The one-time migration wrote these directly; drop the loose copies.
 LOOSE_SCRIPT = re.compile(
-    r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa|vizlearn-keys|glossary|vizlearn-glossary|vizlearn-python|vizlearn-rails|vizlearn-js|vizlearn-html|vizlearn-code|vizlearn-interview)\.js"></script>\n?')
+    r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa|vizlearn-keys|glossary|vizlearn-glossary|vizlearn-python|vizlearn-rails|vizlearn-js|vizlearn-html|vizlearn-code|vizlearn-interview|vizlearn-ragviz)\.js"></script>\n?')
 
 META_DESC = re.compile(r'<meta\s+name="description"\s+content="([^"]*)"\s*/?>', re.I)
 TITLE = re.compile(r"<title>(.*?)</title>", re.S)
