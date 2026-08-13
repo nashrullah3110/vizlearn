@@ -1263,3 +1263,398 @@ print("million - and the code differs by a single `if`.")
                 "then improve to the set-based version."},
     ],
 )
+
+
+def _subarray_frames():
+    values = [3, 4, 7, 2, -3, 1, 4, 2]
+    target = 7
+    out = []
+    seen = {0: 1}
+    running = count = 0
+    for i, v in enumerate(values):
+        running += v
+        need = running - target
+        found = seen.get(need, 0)
+        count += found
+        marks = {j: ("done" if j < i else "dim") for j in range(len(values))}
+        marks[i] = "hit" if found else "lo"
+        out.append(frame([marked(values, marks, {i: "i"}, label="values"),
+                          pairs(sorted((str(k), str(n)) for k, n in seen.items()),
+                                {str(need): "hit"} if found else {},
+                                label="prefix sum -> how many times seen")],
+                         "Running sum %d. Looking for %d: %s"
+                         % (running, need,
+                            "seen %d time(s), so %d new subarray(s) end here."
+                            % (found, found) if found
+                            else "not seen, so nothing ends here."),
+                         {"running": running, "count": count}))
+        seen[running] = seen.get(running, 0) + 1
+    return viz(out)
+
+
+_q(
+    slug="subarray-sum-equals-k",
+    kind="coding",
+    level="Medium",
+    title="Subarray sum equals k",
+    asked="Count the contiguous subarrays that sum to k.",
+    desc="Prefix sums in a dictionary turn an O(n²) scan into one pass, why the "
+         "map starts with {0: 1}, and why the sliding window does not work here.",
+    lead="Carry a <strong>running sum</strong> and a dictionary of how often each "
+         "running sum has been seen. A subarray ending here sums to k exactly "
+         "when <code>running &minus; k</code> appeared earlier &mdash; so the "
+         "count is a lookup, not a search. O(n) time and space.",
+    say="\"Prefix sums in a dict. At each index I've got the running sum, and any "
+        "earlier prefix equal to running minus k marks the start of a qualifying "
+        "subarray. Seed the map with {0: 1} so subarrays starting at index 0 are "
+        "counted. O(n).\"",
+    notice=[
+        "The map counts <em>occurrences</em>, not positions &mdash; duplicates matter.",
+        "The lookup happens before the current sum is recorded.",
+        "Negative numbers are why a sliding window cannot be used.",
+    ],
+    viz=_subarray_frames(),
+    sections=[
+        ("From a difference to a lookup",
+         "<p>Let <code>P(i)</code> be the sum of everything up to index i. The "
+         "subarray from j+1 to i sums to <code>P(i) &minus; P(j)</code>, so it "
+         "equals k exactly when <code>P(j) = P(i) &minus; k</code>.</p>"
+         "<p>That converts \"search backwards for a matching start\" into \"have "
+         "I seen this value before?\", which a dictionary answers in O(1). It is "
+         "the same move as Two Sum &mdash; compute the thing you need rather "
+         "than hunting for it.</p>"),
+        ("Why {0: 1} and not an empty map",
+         "<p>The empty prefix has sum 0, and it must be in the map before the "
+         "loop starts. Otherwise a subarray beginning at index 0 &mdash; where "
+         "<code>running</code> itself already equals k &mdash; has no earlier "
+         "prefix to match against and is never counted.</p>"
+         "<p>Seeding with <code>{0: 1}</code> is the single most commonly missed "
+         "line in this problem, and it fails on the simplest possible input: "
+         "<code>[k]</code>.</p>"),
+        ("Why not a sliding window",
+         "<p>A sliding window needs the sum to grow when the window grows, so "
+         "shrinking from the left is a sound response to overshooting. With "
+         "negative numbers that monotonicity is gone: extending the window can "
+         "make the sum smaller, so there is nothing to slide on.</p>"
+         "<p>If the question guarantees all-positive values, say so and use the "
+         "window &mdash; O(1) space instead of O(n). Noticing that the "
+         "constraint changes the right answer is worth as much as the code.</p>"),
+    ],
+    code={
+        "file": "subarray_sum.py",
+        "intro": "The prefix-sum count against brute force with both operation "
+                 "counts, the missing-seed bug failing on a one-element array, "
+                 "and the sliding window breaking on a negative number.",
+        "code": '''# Count subarrays summing to k: prefix sums in a dictionary.
+from collections import defaultdict
+
+def count_subarrays(values, k):
+    seen = defaultdict(int)
+    seen[0] = 1                       # the empty prefix - see below
+    running = count = ops = 0
+    for v in values:
+        running += v
+        ops += 1
+        count += seen[running - k]    # look up BEFORE recording this prefix
+        seen[running] += 1
+    return count, ops
+
+
+def count_no_seed(values, k):
+    """The same code without seed {0: 1}."""
+    seen = defaultdict(int)
+    running = count = 0
+    for v in values:
+        running += v
+        count += seen[running - k]
+        seen[running] += 1
+    return count
+
+
+def brute_force(values, k):
+    count = ops = 0
+    for i in range(len(values)):
+        total = 0
+        for j in range(i, len(values)):
+            total += values[j]
+            ops += 1
+            if total == k:
+                count += 1
+    return count, ops
+
+
+def sliding_window(values, k):
+    """Only valid when every value is positive."""
+    lo = total = count = 0
+    for hi, v in enumerate(values):
+        total += v
+        while total > k and lo <= hi:
+            total -= values[lo]
+            lo += 1
+        if total == k:
+            count += 1
+    return count
+
+
+data = [3, 4, 7, 2, -3, 1, 4, 2]
+k = 7
+fast, fast_ops = count_subarrays(data, k)
+slow, slow_ops = brute_force(data, k)
+print("values:", data, " k =", k)
+print(f"  prefix sums : {fast} subarrays in {fast_ops} operations")
+print(f"  brute force : {slow} subarrays in {slow_ops} operations")
+
+# --- the seed ----------------------------------------------------------
+print()
+for sample in ([7], [7, 1], [1, 2, 4]):
+    with_seed = count_subarrays(sample, 7)[0]
+    without = count_no_seed(sample, 7)
+    flag = "   <-- missing {0: 1} undercounts" if with_seed != without else ""
+    print(f"  {str(sample):>12} k=7: seeded={with_seed} unseeded={without}{flag}")
+
+# --- why the window fails ----------------------------------------------
+print()
+positive = [1, 2, 3, 4, 3]
+mixed = [3, 4, -7, 7]
+for sample in (positive, mixed):
+    correct = count_subarrays(sample, 7)[0]
+    window = sliding_window(sample, 7)
+    flag = "   <-- window is WRONG (negatives)" if window != correct else ""
+    print(f"  {str(sample):>18} k=7: prefix={correct} window={window}{flag}")
+print()
+print("A window assumes extending it can only increase the sum. One negative")
+print("number destroys that, and with it the reason sliding is valid at all.")
+''',
+        "walk": [
+            ("seen[0] = 1",
+             "The empty prefix. Without it, a subarray starting at index 0 has "
+             "no earlier prefix to match and is never counted &mdash; and "
+             "<code>[7]</code> with k=7 returns 0."),
+            ("count += seen[running - k]",
+             "Adds the <em>number of times</em> that prefix occurred, not one. "
+             "Several earlier positions can produce the same running sum, and "
+             "each is a distinct subarray."),
+            ("the lookup precedes seen[running] += 1",
+             "Recording first would let the current prefix match itself when "
+             "k is 0, counting an empty subarray that does not exist."),
+            ("sliding_window",
+             "Kept to be broken. It needs the sum to rise monotonically as the "
+             "window grows, which one negative number destroys &mdash; the last "
+             "block shows it giving the wrong count."),
+        ],
+        "try": [
+            "Set <code>k = 0</code> on an array containing a <code>[2, -2]</code> "
+            "pair. The count includes it, which is why the lookup must come "
+            "before the record.",
+            "Make every value positive and compare the window with the prefix "
+            "map. Same answers, and the window uses O(1) space.",
+        ],
+    },
+    check=[
+        {"q": "Why is the prefix map seeded with {0: 1}?",
+         "options": ["To avoid a KeyError", "So subarrays starting at index 0 "
+                     "are counted",
+                     "To count the empty subarray", "It is not needed"],
+         "answer": 1,
+         "why": "The empty prefix has sum 0. Without it, [7] with k=7 returns 0 - "
+                "the simplest possible input fails."},
+        {"q": "The map stores, for each prefix sum:",
+         "options": ["Its index", "How many times it has occurred", "True or "
+                     "False", "The subarray"],
+         "answer": 1,
+         "why": "Several earlier positions can share a running sum, and each is "
+                "a distinct qualifying subarray, so counts are needed rather than positions."},
+        {"q": "Why can't a sliding window be used here?",
+         "options": ["The array is unsorted", "Negative values mean extending "
+                     "the window can decrease the sum",
+                     "k might be zero", "It is too slow"],
+         "answer": 1,
+         "why": "A window relies on the sum growing monotonically as it grows. "
+                "If everything is positive, the window works and uses O(1) space."},
+    ],
+)
+
+
+def _set_frames():
+    a = [3, 1, 4, 1, 5]
+    out = [frame([marked(a, {1: "bad", 3: "bad"}, label="list (order, duplicates)"),
+                  pairs([("len", len(a)), ("x in list", "O(n) scan")],
+                        {"x in list": "bad"}, label="properties")],
+                 "A list keeps order and duplicates, and answers membership by "
+                 "scanning.",
+                 {"items": len(a), "distinct": len(set(a))})]
+    out.append(frame([marked(sorted(set(a)), {i: "done" for i in range(len(set(a)))},
+                             label="set (no order, no duplicates)"),
+                      pairs([("len", len(set(a))), ("x in set", "O(1) probe")],
+                            {"x in set": "hit"}, label="properties")],
+                     "A set drops both, and answers membership by computing "
+                     "where the value would be.",
+                     {"items": len(a), "distinct": len(set(a))}))
+    out.append(frame([marked(list(dict.fromkeys(a)),
+                             {i: "hit" for i in range(len(dict.fromkeys(a)))},
+                             label="dict.fromkeys (order kept, duplicates gone)"),
+                      pairs([("len", len(dict.fromkeys(a))),
+                             ("x in dict", "O(1) probe")],
+                            {"x in dict": "hit"}, label="properties")],
+                     "A dict gives O(1) membership AND insertion order, which is "
+                     "the deduplication most people actually want.",
+                     {"items": len(a), "distinct": len(set(a))}))
+    return viz(out)
+
+
+_q(
+    slug="sets-versus-lists-and-deduplication",
+    kind="concept",
+    level="Easy",
+    title="When should you use a set instead of a list?",
+    asked="What does a set give you that a list does not, and how do you "
+          "deduplicate while keeping order?",
+    desc="Sets buy O(1) membership and lose order and duplicates; dict.fromkeys "
+         "keeps order while deduplicating; and the set operators that replace "
+         "whole loops.",
+    lead="A set buys <strong>O(1) membership</strong> and pays for it by losing "
+         "order and duplicates, and by requiring hashable elements. When you "
+         "need the speed <em>and</em> the order, "
+         "<code>dict.fromkeys(seq)</code> deduplicates in one pass and keeps "
+         "insertion order.",
+    say="\"Sets are for membership and uniqueness - O(1) instead of O(n). They "
+        "lose order and need hashable elements. If I need dedup with order I use "
+        "dict.fromkeys, since dicts have kept insertion order since 3.7.\"",
+    notice=[
+        "The set is smaller: duplicates are gone, and so is the order.",
+        "<code>dict.fromkeys</code> keeps both the order and the O(1) lookup.",
+        "All three hold the same distinct values.",
+    ],
+    viz=_set_frames(),
+    sections=[
+        ("What you gain and what you give up",
+         "<p><strong>Gain:</strong> membership in O(1) rather than O(n), and "
+         "uniqueness enforced for free.</p>"
+         "<p><strong>Give up:</strong> order, duplicates, indexing "
+         "(<code>s[0]</code> is a <code>TypeError</code>), and the ability to "
+         "hold unhashable elements. You cannot put a list in a set, though you "
+         "can put a tuple.</p>"
+         "<p>Converting costs O(n), so a single membership test on a small list "
+         "is not worth it. More than a couple of tests, or a large collection, "
+         "and it is.</p>"),
+        ("Deduplicating three ways",
+         "<p><code>set(seq)</code> &mdash; fastest, order destroyed.</p>"
+         "<p><code>sorted(set(seq))</code> &mdash; deduplicated and in sorted "
+         "order, which is not the same as original order and is often what "
+         "people accidentally ship.</p>"
+         "<p><code>list(dict.fromkeys(seq))</code> &mdash; deduplicated in "
+         "<em>first-seen</em> order, one pass, and the one to remember. Dicts "
+         "have preserved insertion order since 3.7, so this is a guarantee "
+         "rather than a trick.</p>"),
+        ("The operators that replace loops",
+         "<p><code>a &amp; b</code> intersection, <code>a | b</code> union, "
+         "<code>a - b</code> difference, <code>a ^ b</code> symmetric "
+         "difference, <code>a &lt;= b</code> subset. Each replaces a loop with a "
+         "membership test inside it &mdash; which is to say, each replaces an "
+         "accidental O(n&middot;m) with an O(n + m).</p>"
+         "<p>\"Which users are in A but not B\" is <code>a - b</code>. Writing "
+         "that as a comprehension over a list is the most common form of the "
+         "quadratic trap.</p>"),
+    ],
+    code={
+        "file": "sets.py",
+        "intro": "The three deduplication idioms and what each does to order, "
+                 "the set operators against their loop equivalents, and the "
+                 "membership timing that motivates all of it.",
+        "code": '''# Sets: O(1) membership, at the price of order and duplicates.
+import time
+
+items = ["b", "a", "c", "a", "b", "d"]
+print("original           :", items)
+print("set()              :", sorted(set(items)), "  order destroyed")
+print("sorted(set())      :", sorted(set(items)), "  sorted, not original order")
+print("dict.fromkeys()    :", list(dict.fromkeys(items)), "  first-seen order kept")
+
+# --- what a set refuses ------------------------------------------------
+print()
+try:
+    {[1, 2]}
+except TypeError as e:
+    print("a list in a set ->", e)
+print("a tuple in a set ->", {(1, 2)})
+try:
+    sorted(set(items))[0]
+    set(items)[0]
+except TypeError as e:
+    print("indexing a set  ->", e)
+
+# --- the operators, and the loops they replace -------------------------
+a = {"alice", "bob", "carol", "dave"}
+b = {"carol", "dave", "erin"}
+print()
+print("a & b (in both)        :", sorted(a & b))
+print("a | b (in either)      :", sorted(a | b))
+print("a - b (in a only)      :", sorted(a - b))
+print("a ^ b (in exactly one) :", sorted(a ^ b))
+print("{'carol'} <= a         :", {"carol"} <= a)
+
+# --- why it matters ----------------------------------------------------
+big_a = list(range(6_000))
+big_b = list(range(3_000, 9_000))
+
+start = time.time()
+loop = [x for x in big_a if x in big_b]            # O(n * m)
+loop_time = time.time() - start
+
+start = time.time()
+operator = sorted(set(big_a) & set(big_b))         # O(n + m)
+op_time = time.time() - start
+
+print()
+print(f"intersection of two {len(big_a):,}-item collections:")
+print(f"  list comprehension : {loop_time:.4f}s")
+print(f"  set operator       : {op_time:.4f}s   ({loop_time / op_time:.0f}x faster)")
+print(f"  same answer        : {loop == operator}")
+''',
+        "walk": [
+            ("list(dict.fromkeys(items))",
+             "Deduplicates in first-seen order, in one pass. The idiom worth "
+             "memorising, and a language guarantee rather than an implementation "
+             "detail since 3.7."),
+            ("sorted(set(items))",
+             "Deduplicated <em>and reordered</em>. It looks like a tidy version "
+             "of the previous line and quietly changes the output order, which "
+             "is a real bug when the order carried meaning."),
+            ("{[1, 2]}",
+             "A <code>TypeError</code>: set elements must be hashable for the "
+             "same reason dictionary keys must be. A tuple works."),
+            ("set(big_a) & set(big_b)",
+             "Two O(n) conversions and an O(min) intersection, against a "
+             "comprehension that scans one list for every element of the other. "
+             "The timing at the end is that difference."),
+        ],
+        "try": [
+            "Deduplicate a list of dictionaries. It raises &mdash; and the usual "
+            "fix is to key on something hashable, such as an id or a tuple of "
+            "fields.",
+            "Compare <code>a.isdisjoint(b)</code> with <code>not (a &amp; b)</code>. "
+            "The first can stop at the first shared element instead of building "
+            "the whole intersection.",
+        ],
+    },
+    check=[
+        {"q": "Which deduplicates a list while preserving the original order?",
+         "options": ["set(items)", "list(dict.fromkeys(items))",
+                     "sorted(set(items))", "items.unique()"],
+         "answer": 1,
+         "why": "Dicts have preserved insertion order since 3.7. sorted(set(...)) "
+                "deduplicates and reorders, which is often shipped by accident."},
+        {"q": "What can a list hold that a set cannot?",
+         "options": ["Strings", "Unhashable elements such as lists", "Integers",
+                     "None"],
+         "answer": 1,
+         "why": "Set elements must be hashable, for the same reason dictionary "
+                "keys must be. A tuple works where a list does not."},
+        {"q": "'Which items are in A but not in B' is best written as:",
+         "options": ["A loop with `if x not in b`", "set_a - set_b",
+                     "sorted(a) != sorted(b)", "a.remove(b)"],
+         "answer": 1,
+         "why": "The loop is O(n·m) when b is a list. The difference operator is "
+                "O(n + m) and says what it means."},
+    ],
+)

@@ -1946,3 +1946,618 @@ print("indices modifies it too. Each constraint removes one obvious answer.")
                 "and index-negation instead."},
     ],
 )
+
+
+def _kth_largest_frames():
+    values = [17, 4, 92, 8, 55, 23]
+    k = 3
+    out = []
+    heap = []
+    for i, v in enumerate(values):
+        if len(heap) < k:
+            heap.append(v)
+            heap.sort()
+            note = "Heap not full yet, so %d goes in." % v
+            state = "hit"
+        elif v > heap[0]:
+            dropped = heap[0]
+            heap = sorted(heap[1:] + [v])
+            note = "%d beats the smallest kept (%d), so swap them." % (v, dropped)
+            state = "hit"
+        else:
+            note = "%d loses to the smallest kept (%d) - discard it." % (v, heap[0])
+            state = "bad"
+        marks = {j: ("dim" if j > i else "done") for j in range(len(values))}
+        marks[i] = state
+        out.append(frame([marked(values, marks, {i: "reading"}, label="input"),
+                          marked(heap, {0: "lo"}, label="heap of %d (smallest first)" % k)],
+                         note, {"kept": len(heap), "kth": heap[0]}))
+    out.append(frame(marked(heap, {0: "hit"}, label="final heap"),
+                     "The heap holds the %d largest, and its smallest member is "
+                     "the %drd largest overall: %d. Only %d values were ever "
+                     "stored." % (k, k, heap[0], k),
+                     {"kept": len(heap), "kth": heap[0]}))
+    return viz(out)
+
+
+_q(
+    slug="kth-largest-element",
+    kind="coding",
+    level="Medium",
+    title="Kth largest element",
+    asked="Find the kth largest element in an unsorted array.",
+    desc="A min-heap of size k gives O(n log k) and O(k) memory; quickselect "
+         "gives O(n) average; sorting gives O(n log n). Which to pick, and why.",
+    lead="Keep a <strong>min-heap of size k</strong>. Each value either beats "
+         "the smallest kept one and replaces it, or is discarded immediately. "
+         "The heap's root is the answer. O(n&nbsp;log&nbsp;k) time and O(k) "
+         "memory &mdash; which matters when n is enormous and k is ten.",
+    say="\"Min-heap of size k: O(n log k) time, O(k) space. Sorting is O(n log n) "
+        "and quickselect is O(n) average but O(n²) worst case. For a stream, or "
+        "when n doesn't fit in memory, the heap is the only one that works.\"",
+    notice=[
+        "The heap never grows beyond k &mdash; that is the memory bound.",
+        "A value smaller than the root is discarded without being stored.",
+        "The root is always the smallest of the k largest.",
+    ],
+    viz=_kth_largest_frames(),
+    sections=[
+        ("Three answers, and the reason to choose",
+         "<p><strong>Sort and index.</strong> <code>sorted(a)[-k]</code>. "
+         "O(n&nbsp;log&nbsp;n), one line, and the right answer in real code for "
+         "any array that fits in memory.</p>"
+         "<p><strong>Min-heap of size k.</strong> O(n&nbsp;log&nbsp;k) time and "
+         "O(k) memory. The only one that works on a stream, or when n is far "
+         "larger than memory.</p>"
+         "<p><strong>Quickselect.</strong> O(n) average by partitioning and "
+         "recursing into one side only. O(n&sup2;) worst case with a bad pivot, "
+         "fixable with a random one.</p>"
+         "<p>Interviewers are usually listening for whether you notice the heap "
+         "is bounded by k rather than n.</p>"),
+        ("Why a min-heap for the largest",
+         "<p>It feels backwards and it is the key idea. To keep the k "
+         "<em>largest</em> values you need constant-time access to the "
+         "<em>smallest</em> of the ones you kept, because that is the one to "
+         "evict when something better arrives. A min-heap puts exactly that at "
+         "the root.</p>"
+         "<p>Once the heap is full, a value below the root cannot be in the top "
+         "k, so it is discarded without being stored at all.</p>"),
+        ("Quickselect, briefly",
+         "<p>Partition around a pivot as quicksort does, then recurse into only "
+         "the side containing position k. Because one side is discarded each "
+         "time, the expected work is n + n/2 + n/4 + ... = O(n).</p>"
+         "<p>Its worst case is O(n&sup2;) on a bad pivot sequence, so pick the "
+         "pivot at random. Say that explicitly &mdash; \"quickselect, with a "
+         "random pivot\" is a complete answer, and \"quickselect\" alone invites "
+         "the follow-up about sorted input.</p>"),
+    ],
+    code={
+        "file": "kth_largest.py",
+        "intro": "All three approaches with the number of elements each one "
+                 "stores, then timed on a large array so the O(k) memory claim "
+                 "and the O(n) average are both visible.",
+        "code": '''# Kth largest: sort it, heap it, or partition it.
+import heapq, random, time
+
+def by_sorting(values, k):
+    return sorted(values)[-k]                    # O(n log n), stores n
+
+
+def by_heap(values, k):
+    """A MIN-heap of size k: its root is the smallest of the k largest."""
+    heap = []
+    for v in values:
+        if len(heap) < k:
+            heapq.heappush(heap, v)
+        elif v > heap[0]:                        # beats the weakest kept
+            heapq.heapreplace(heap, v)           # pop and push in one step
+    return heap[0], len(heap)
+
+
+def quickselect(values, k):
+    """O(n) average. Recurse into one side only."""
+    target = len(values) - k                     # kth largest = this index sorted
+    a = list(values)
+    lo, hi = 0, len(a) - 1
+    while lo < hi:
+        pivot = a[random.randint(lo, hi)]        # random: avoids the O(n^2) case
+        i, j = lo, hi
+        while i <= j:
+            while a[i] < pivot:
+                i += 1
+            while a[j] > pivot:
+                j -= 1
+            if i <= j:
+                a[i], a[j] = a[j], a[i]
+                i, j = i + 1, j - 1
+        if target <= j:
+            hi = j
+        elif target >= i:
+            lo = i
+        else:
+            break
+    return a[target]
+
+
+random.seed(5)
+data = [17, 4, 92, 8, 55, 23]
+k = 3
+answer, kept = by_heap(data, k)
+print("data:", data, " k =", k)
+print(f"  sorting     : {by_sorting(data, k)}   (stores {len(data)} values)")
+print(f"  min-heap    : {answer}   (stores {kept} values)")
+print(f"  quickselect : {quickselect(data, k)}")
+
+# --- the memory claim, at scale ----------------------------------------
+big = [random.randint(0, 10_000_000) for _ in range(400_000)]
+k = 10
+print()
+print(f"n = {len(big):,}, k = {k}")
+for name, fn in (("sorting", lambda: by_sorting(big, k)),
+                 ("min-heap", lambda: by_heap(big, k)[0]),
+                 ("quickselect", lambda: quickselect(big, k))):
+    start = time.time()
+    result = fn()
+    print(f"  {name:>12}: {result:>9}  in {time.time() - start:.3f}s")
+
+print()
+print(f"The heap held {k} values the whole way. Sorting held {len(big):,},")
+print("which is the difference that matters when n does not fit in memory.")
+''',
+        "walk": [
+            ("heapq.heapreplace(heap, v)",
+             "Pop the root and push the new value in one operation. Doing it as "
+             "a pop then a push costs two sift operations instead of one and is "
+             "the usual way to write this slightly wrong."),
+            ("elif v > heap[0]",
+             "A value below the root cannot be in the top k, so it is discarded "
+             "without ever being stored. That test is what keeps the memory at "
+             "O(k)."),
+            ("a MIN-heap for the LARGEST k",
+             "The counterintuitive part. Keeping the k largest requires "
+             "constant-time access to the weakest of them, so it can be evicted "
+             "&mdash; and a min-heap puts exactly that at the root."),
+            ("pivot = a[random.randint(lo, hi)]",
+             "Quickselect's worst case is O(n&sup2;) on an adversarial pivot "
+             "sequence. Choosing at random makes that vanishingly unlikely, and "
+             "saying so out loud is part of the answer."),
+        ],
+        "try": [
+            "Set <code>k = len(big)</code>. The heap now stores everything and "
+            "the approach collapses back to sorting &mdash; the win is entirely "
+            "in k being small.",
+            "Replace <code>heapreplace</code> with a push followed by a pop and "
+            "compare the timings. Same answer, more sifting.",
+        ],
+    },
+    check=[
+        {"q": "Why a MIN-heap when you want the k LARGEST elements?",
+         "options": ["It is faster to build", "Its root is the weakest kept "
+                     "value, which is the one to evict",
+                     "Max-heaps do not exist in Python", "It sorts as it goes"],
+         "answer": 1,
+         "why": "You need O(1) access to the smallest of the ones you are "
+                "keeping, so a new larger value can replace it immediately."},
+        {"q": "The heap approach uses how much memory?",
+         "options": ["O(n)", "O(k)", "O(log n)", "O(n log k)"],
+         "answer": 1,
+         "why": "The heap never exceeds k entries. That is the whole reason to "
+                "prefer it when n is huge or arrives as a stream."},
+        {"q": "Quickselect's worst case is:",
+         "options": ["O(n)", "O(n²), which a random pivot makes very unlikely",
+                     "O(n log n)", "O(log n)"],
+         "answer": 1,
+         "why": "A consistently bad pivot peels off one element at a time. "
+                "Saying 'quickselect with a random pivot' pre-empts the follow-up."},
+    ],
+)
+
+
+def _rain_frames():
+    heights = [0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1]
+    out = []
+    lo, hi = 0, len(heights) - 1
+    left_max = right_max = total = 0
+    steps = 0
+    while lo < hi and steps < 6:
+        if heights[lo] < heights[hi]:
+            left_max = max(left_max, heights[lo])
+            total += left_max - heights[lo]
+            side, idx, gained = "left", lo, left_max - heights[lo]
+            lo += 1
+        else:
+            right_max = max(right_max, heights[hi])
+            total += right_max - heights[hi]
+            side, idx, gained = "right", hi, right_max - heights[hi]
+            hi -= 1
+        marks = {i: ("dim" if i < lo or i > hi else "lo") for i in range(len(heights))}
+        marks[idx] = "hit" if gained else "done"
+        out.append(frame(marked(heights, marks, {lo: "lo", hi: "hi"}, label="bar heights"),
+                         "The %s bar is shorter, so its side is the binding "
+                         "constraint: it holds %d unit(s). Running total %d."
+                         % (side, gained, total),
+                         {"lo": lo, "hi": hi, "water": total}))
+        steps += 1
+    out.append(frame(marked(heights, {i: "done" for i in range(len(heights))},
+                            label="bar heights"),
+                     "Each bar was visited once and its water settled "
+                     "immediately - no second array of maxima was ever built.",
+                     {"lo": lo, "hi": hi, "water": total}))
+    return viz(out)
+
+
+_q(
+    slug="trapping-rain-water",
+    kind="coding",
+    level="Hard",
+    title="Trapping rain water",
+    asked="Given bar heights, how much water is trapped between them?",
+    desc="Water above a bar is set by the smaller of the tallest bars either "
+         "side; two pointers compute that in one pass with O(1) space.",
+    lead="Water above one bar is <code>min(tallest left, tallest right) &minus; "
+         "its own height</code>. The two-pointer version exploits one fact: "
+         "whichever side is <strong>shorter</strong> is the binding constraint, "
+         "so that side's water can be settled immediately. One pass, O(1) space.",
+    say="\"Per bar it's min of the max to the left and the max to the right, "
+        "minus its height. Two pointers from both ends: always move the shorter "
+        "side, because that side's maximum is what limits it. O(n) time, O(1) "
+        "space.\"",
+    notice=[
+        "Only the shorter side is advanced, and only that side's water is settled.",
+        "The running maxima are two integers, not two arrays.",
+        "Each bar is visited exactly once.",
+    ],
+    viz=_rain_frames(),
+    sections=[
+        ("The per-bar formula",
+         "<p>Water sits above a bar up to the level of the lower of the two "
+         "walls containing it: <code>min(max to the left, max to the right) "
+         "&minus; height</code>, or zero if that is negative.</p>"
+         "<p>The direct implementation precomputes both arrays of running "
+         "maxima and then sums. That is O(n) time and O(n) space, perfectly "
+         "correct, and the right first answer. The two-pointer version removes "
+         "the arrays.</p>"),
+        ("Why moving the shorter side is safe",
+         "<p>Suppose <code>height[lo] &lt; height[hi]</code>. Then whatever the "
+         "maxima turn out to be, the left side's is the smaller of the two "
+         "&mdash; because there is already a bar at least as tall as "
+         "<code>height[hi]</code> on the right. So the water above "
+         "<code>lo</code> is decided by <code>left_max</code> alone and can be "
+         "settled now, without knowing anything more about the right.</p>"
+         "<p>That is the whole argument, and it is worth stating explicitly. "
+         "Candidates who write this from memory usually cannot say why moving "
+         "the shorter side is the correct choice.</p>"),
+        ("The stack alternative",
+         "<p>A monotonic decreasing stack also solves it in O(n), filling water "
+         "horizontally layer by layer rather than column by column. It is "
+         "harder to get right under pressure and worth naming as an "
+         "alternative.</p>"
+         "<p>The same \"maximum to the left and right of each element\" shape "
+         "appears in largest-rectangle-in-a-histogram and stock-span, so "
+         "recognising it is worth more than memorising this one solution.</p>"),
+    ],
+    code={
+        "file": "rain_water.py",
+        "intro": "The two-pointer sweep against the precomputed-arrays version "
+                 "and a brute force, with the extra memory each one uses printed "
+                 "&mdash; all three agreeing on every test.",
+        "code": '''# Trapping rain water: the shorter side is always the binding constraint.
+
+def brute_force(heights):
+    """For each bar, scan both ways for the tallest. O(n^2)."""
+    total = 0
+    for i in range(len(heights)):
+        left = max(heights[:i + 1])
+        right = max(heights[i:])
+        total += min(left, right) - heights[i]
+    return total
+
+
+def with_arrays(heights):
+    """Precompute both running maxima. O(n) time, O(n) space."""
+    n = len(heights)
+    if not n:
+        return 0, 0
+    left = [0] * n
+    right = [0] * n
+    left[0] = heights[0]
+    for i in range(1, n):
+        left[i] = max(left[i - 1], heights[i])
+    right[-1] = heights[-1]
+    for i in range(n - 2, -1, -1):
+        right[i] = max(right[i + 1], heights[i])
+    total = sum(min(left[i], right[i]) - heights[i] for i in range(n))
+    return total, 2 * n                       # extra values stored
+
+
+def two_pointers(heights):
+    """O(n) time, O(1) space. Move whichever side is shorter."""
+    lo, hi = 0, len(heights) - 1
+    left_max = right_max = total = 0
+    while lo < hi:
+        if heights[lo] < heights[hi]:
+            # The left is the smaller wall, so left_max alone decides this bar.
+            left_max = max(left_max, heights[lo])
+            total += left_max - heights[lo]
+            lo += 1
+        else:
+            right_max = max(right_max, heights[hi])
+            total += right_max - heights[hi]
+            hi -= 1
+    return total, 2                            # two running maxima
+
+
+data = [0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1]
+print("heights:", data)
+print()
+brute = brute_force(data)
+arrays, arr_mem = with_arrays(data)
+pointers, ptr_mem = two_pointers(data)
+print(f"  brute force  : {brute:>2}   O(n^2) time")
+print(f"  two arrays   : {arrays:>2}   O(n) time, {arr_mem} extra values stored")
+print(f"  two pointers : {pointers:>2}   O(n) time, {ptr_mem} extra values stored")
+print("  all agree    :", brute == arrays == pointers)
+
+print()
+for sample in ([4, 2, 0, 3, 2, 5], [3, 3, 3], [5], [], [2, 1]):
+    if not sample:
+        print(f"  {str(sample):>18}: 0 (empty)")
+        continue
+    print(f"  {str(sample):>18}: {two_pointers(sample)[0]}")
+print()
+print("A flat or descending profile traps nothing - there is no wall to hold it.")
+''',
+        "walk": [
+            ("if heights[lo] < heights[hi]:",
+             "The decision the whole approach rests on. The shorter side is "
+             "necessarily the smaller of the two maxima, so its water is already "
+             "determined."),
+            ("total += left_max - heights[lo]",
+             "Settled immediately, with no knowledge of the right side. That is "
+             "only valid because of the comparison above &mdash; be ready to say "
+             "why."),
+            ("left_max = max(left_max, heights[lo])",
+             "Two integers replace the two arrays of the previous version. The "
+             "algorithm is the same; only the bookkeeping shrank."),
+            ("while lo < hi",
+             "Strictly less than. The two pointers meeting means every bar has "
+             "been settled exactly once."),
+        ],
+        "try": [
+            "Feed it a strictly increasing list. The answer is zero &mdash; "
+            "there is no right wall to hold anything.",
+            "Print <code>lo</code>, <code>hi</code> and both maxima each "
+            "iteration and check that the shorter side is always the one that "
+            "moves.",
+        ],
+    },
+    check=[
+        {"q": "The water above a single bar equals:",
+         "options": ["The tallest bar minus its height",
+                     "min(tallest to the left, tallest to the right) minus its height",
+                     "Its height", "The average of its neighbours"],
+         "answer": 1,
+         "why": "Water is held by the lower of the two containing walls. Anything "
+                "above that level runs off."},
+        {"q": "Why is it safe to settle the shorter side's water immediately?",
+         "options": ["It is an approximation", "The shorter side is necessarily "
+                     "the smaller of the two maxima, so it alone decides",
+                     "Water flows left", "It is not safe"],
+         "answer": 1,
+         "why": "A bar at least as tall already exists on the other side, so the "
+                "min is on this side and nothing further can change it."},
+        {"q": "The two-pointer version improves on the precomputed-arrays "
+              "version in:",
+         "options": ["Time", "Space - O(1) instead of O(n)", "Correctness",
+                     "Both time and space"],
+         "answer": 1,
+         "why": "Both are O(n) time. Two running maxima replace two full arrays."},
+    ],
+)
+
+
+def _dutch_frames():
+    values = [2, 0, 2, 1, 1, 0]
+    out = []
+    lo, mid, hi = 0, 0, len(values) - 1
+    while mid <= hi and len(out) < 7:
+        v = values[mid]
+        if v == 0:
+            values[lo], values[mid] = values[mid], values[lo]
+            note = "0 at mid - swap it into the low region and advance both."
+            lo, mid = lo + 1, mid + 1
+        elif v == 2:
+            values[mid], values[hi] = values[hi], values[mid]
+            note = ("2 at mid - swap it to the high region. mid does NOT advance: "
+                    "the value swapped in has not been looked at.")
+            hi -= 1
+        else:
+            note = "1 at mid - already in the middle region, so just advance."
+            mid += 1
+        marks = {i: ("done" if i < lo else "bad" if i > hi else "lo")
+                 for i in range(len(values))}
+        if mid < len(values):
+            marks[mid] = "hit"
+        out.append(frame(marked(list(values), marks,
+                                {lo: "lo", hi: "hi"}, label="array"),
+                         note, {"lo": lo, "mid": mid, "hi": hi}))
+    out.append(frame(marked(list(values), {i: "done" for i in range(len(values))},
+                            label="array"),
+                     "Sorted in one pass with three pointers and no counting "
+                     "array. Every element was moved at most once.",
+                     {"lo": lo, "mid": mid, "hi": hi}))
+    return viz(out)
+
+
+_q(
+    slug="sort-colors-dutch-national-flag",
+    kind="coding",
+    level="Medium",
+    title="Sort an array of 0s, 1s and 2s",
+    asked="Sort an array containing only 0, 1 and 2 in a single pass, in place.",
+    desc="The Dutch national flag partition: three pointers, one pass, and the "
+         "one case where the middle pointer must not advance.",
+    lead="Three pointers carve the array into four regions: settled 0s, settled "
+         "1s, unexamined, and settled 2s. A 0 swaps down, a 2 swaps up, a 1 "
+         "stays. One pass, O(1) space &mdash; and the one subtlety is that after "
+         "swapping a 2 the middle pointer <strong>must not advance</strong>.",
+    say="\"Dutch national flag. Three pointers - low, mid, high. 0 swaps to the "
+        "low region and both advance, 2 swaps to the high region and only high "
+        "moves, 1 just advances mid. One pass, O(1) space.\"",
+    notice=[
+        "Four regions: settled 0s, settled 1s, unexamined, settled 2s.",
+        "After swapping a 2 down, <code>mid</code> stays &mdash; the incoming "
+        "value is unseen.",
+        "The loop ends when <code>mid</code> passes <code>hi</code>, not the array end.",
+    ],
+    viz=_dutch_frames(),
+    sections=[
+        ("The counting alternative",
+         "<p>Count the 0s, 1s and 2s, then overwrite the array. Two passes, "
+         "trivially correct, and usually the first answer. The question asks for "
+         "one pass to rule it out &mdash; and because counting sort does not "
+         "generalise to sorting objects by a three-way key, which the partition "
+         "does.</p>"),
+        ("The invariant",
+         "<p>Everything before <code>lo</code> is 0. Everything from "
+         "<code>lo</code> to <code>mid</code> is 1. Everything after "
+         "<code>hi</code> is 2. Between <code>mid</code> and <code>hi</code> is "
+         "unexamined. The loop restores that invariant on every step and stops "
+         "when the unexamined region is empty.</p>"
+         "<p>Being able to state the invariant is most of the answer here. "
+         "Writing the three branches from memory without it is how the "
+         "<code>mid</code> bug appears.</p>"),
+        ("The one asymmetry",
+         "<p>After swapping a 0 into the low region, the value that came back is "
+         "from the region already known to be 1s, so <code>mid</code> can safely "
+         "advance. After swapping a 2 into the high region, the value that came "
+         "back is from the <em>unexamined</em> region &mdash; so "
+         "<code>mid</code> must stay and look at it.</p>"
+         "<p>Advancing in both cases is the classic bug: the array comes out "
+         "almost sorted, with stray 2s left in the middle. It is exactly what "
+         "the question is testing.</p>"),
+    ],
+    code={
+        "file": "sort_colors.py",
+        "intro": "The three-way partition with its invariant asserted on every "
+                 "iteration, the buggy version that advances mid in both "
+                 "branches, and both checked against sorted() on random input.",
+        "code": '''# Dutch national flag: three pointers, one pass, four regions.
+import random
+
+def sort_colors(values):
+    lo, mid, hi = 0, 0, len(values) - 1
+    while mid <= hi:
+        if values[mid] == 0:
+            values[lo], values[mid] = values[mid], values[lo]
+            lo += 1
+            mid += 1                 # what came back is a known 1 - safe to pass
+        elif values[mid] == 2:
+            values[mid], values[hi] = values[hi], values[mid]
+            hi -= 1                  # mid does NOT move: the new value is unseen
+        else:
+            mid += 1
+        # invariant: [0, lo) is 0s, [lo, mid) is 1s, (hi, end) is 2s
+        assert all(v == 0 for v in values[:lo])
+        assert all(v == 1 for v in values[lo:mid])
+        assert all(v == 2 for v in values[hi + 1:])
+    return values
+
+
+def sort_colors_buggy(values):
+    """Advances mid in both swap branches. Almost right."""
+    lo, mid, hi = 0, 0, len(values) - 1
+    while mid <= hi:
+        if values[mid] == 0:
+            values[lo], values[mid] = values[mid], values[lo]
+            lo += 1
+            mid += 1
+        elif values[mid] == 2:
+            values[mid], values[hi] = values[hi], values[mid]
+            hi -= 1
+            mid += 1                 # <- the bug
+        else:
+            mid += 1
+    return values
+
+
+def by_counting(values):
+    """Two passes, and it does not generalise to sorting objects by a key."""
+    counts = [0, 0, 0]
+    for v in values:
+        counts[v] += 1
+    out = []
+    for colour, n in enumerate(counts):
+        out.extend([colour] * n)
+    return out
+
+
+data = [2, 0, 2, 1, 1, 0]
+print("input       :", data)
+print("partitioned :", sort_colors(list(data)))
+print("by counting :", by_counting(data))
+
+print()
+random.seed(3)
+failures = 0
+for _ in range(200):
+    sample = [random.randint(0, 2) for _ in range(random.randint(0, 12))]
+    good = sort_colors(list(sample))
+    bad = sort_colors_buggy(list(sample))
+    if bad != sorted(sample):
+        failures += 1
+        if failures == 1:
+            print(f"first buggy case: {sample} -> {bad} (want {sorted(sample)})")
+    assert good == sorted(sample), sample
+
+print(f"correct version: 200/200 random cases pass")
+print(f"buggy version  : {failures}/200 cases wrong - it leaves stray 2s behind")
+''',
+        "walk": [
+            ("mid += 1 after a 0 swap",
+             "Safe, because the value swapped back comes from the region already "
+             "known to hold 1s. Nothing unexamined arrives at "
+             "<code>mid</code>."),
+            ("no mid += 1 after a 2 swap",
+             "The value swapped back comes from the <em>unexamined</em> region, "
+             "so it has to be looked at. Advancing here is the bug the second "
+             "function demonstrates on real input."),
+            ("while mid <= hi",
+             "The loop ends when the unexamined region is empty, not at the end "
+             "of the array &mdash; everything past <code>hi</code> is already "
+             "settled."),
+            ("the three assert lines",
+             "The invariant, checked rather than described. Stating it is most "
+             "of the answer to this question; writing the branches without it is "
+             "how the bug appears."),
+        ],
+        "try": [
+            "Delete the asserts and add a fourth colour. The approach does not "
+            "extend &mdash; three-way partitioning is specifically three-way.",
+            "Sort objects by a three-way key instead of raw integers. The "
+            "partition still works; counting does not.",
+        ],
+    },
+    check=[
+        {"q": "After swapping a 2 from mid to the high region, why must mid stay?",
+         "options": ["To recount", "The value swapped back is from the "
+                     "unexamined region and has not been looked at",
+                     "To keep it stable", "It should advance"],
+         "answer": 1,
+         "why": "After a 0 swap the incoming value is a known 1, so mid can pass "
+                "it. After a 2 swap it is unexamined - advancing leaves stray 2s."},
+        {"q": "The regions maintained by the invariant are:",
+         "options": ["Two", "Four: settled 0s, settled 1s, unexamined, settled 2s",
+                     "Three, all settled", "One"],
+         "answer": 1,
+         "why": "The unexamined region between mid and hi is the one people "
+                "forget, and it is why the loop condition is mid <= hi."},
+        {"q": "Why is the counting approach not the accepted answer?",
+         "options": ["It is wrong", "It takes two passes, and does not "
+                     "generalise to sorting objects by a key",
+                     "It uses too much memory", "It is slower"],
+         "answer": 1,
+         "why": "It is correct and simple - give it first. The partition is asked "
+                "for because it works on real records, not just on integers."},
+    ],
+)

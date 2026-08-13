@@ -1212,6 +1212,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Kth largest element",
+  "path": "interview/kth-largest-element.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
   "title": "Longest common prefix",
   "path": "interview/longest-common-prefix.html",
   "category": "Interview",
@@ -1300,6 +1308,30 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Sort an array of 0s, 1s and 2s",
+  "path": "interview/sort-colors-dutch-national-flag.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Subarray sum equals k",
+  "path": "interview/subarray-sum-equals-k.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Trapping rain water",
+  "path": "interview/trapping-rain-water.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
   "title": "Two Sum",
   "path": "interview/two-sum.html",
   "category": "Interview",
@@ -1342,6 +1374,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "What is the difference between str and bytes?",
   "path": "interview/str-versus-bytes-in-python.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "When should you use a set instead of a list?",
+  "path": "interview/sets-versus-lists-and-deduplication.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",

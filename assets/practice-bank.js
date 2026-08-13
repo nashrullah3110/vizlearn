@@ -4289,6 +4289,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/kth-largest-element.html",
+  "title": "Kth largest element",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why a MIN-heap when you want the k LARGEST elements?",
+    "o": [
+     "It is faster to build",
+     "Its root is the weakest kept value, which is the one to evict",
+     "Max-heaps do not exist in Python",
+     "It sorts as it goes"
+    ],
+    "a": 1,
+    "w": "You need O(1) access to the smallest of the ones you are keeping, so a new larger value can replace it immediately."
+   },
+   {
+    "t": "The heap approach uses how much memory?",
+    "o": [
+     "O(n)",
+     "O(k)",
+     "O(log n)",
+     "O(n log k)"
+    ],
+    "a": 1,
+    "w": "The heap never exceeds k entries. That is the whole reason to prefer it when n is huge or arrives as a stream."
+   },
+   {
+    "t": "Quickselect's worst case is:",
+    "o": [
+     "O(n)",
+     "O(n²), which a random pivot makes very unlikely",
+     "O(n log n)",
+     "O(log n)"
+    ],
+    "a": 1,
+    "w": "A consistently bad pivot peels off one element at a time. Saying 'quickselect with a random pivot' pre-empts the follow-up."
+   }
+  ]
+ },
+ {
   "path": "interview/longest-common-prefix.html",
   "title": "Longest common prefix",
   "cat": "Interview",
@@ -4729,6 +4769,126 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/sort-colors-dutch-national-flag.html",
+  "title": "Sort an array of 0s, 1s and 2s",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "After swapping a 2 from mid to the high region, why must mid stay?",
+    "o": [
+     "To recount",
+     "The value swapped back is from the unexamined region and has not been looked at",
+     "To keep it stable",
+     "It should advance"
+    ],
+    "a": 1,
+    "w": "After a 0 swap the incoming value is a known 1, so mid can pass it. After a 2 swap it is unexamined - advancing leaves stray 2s."
+   },
+   {
+    "t": "The regions maintained by the invariant are:",
+    "o": [
+     "Two",
+     "Four: settled 0s, settled 1s, unexamined, settled 2s",
+     "Three, all settled",
+     "One"
+    ],
+    "a": 1,
+    "w": "The unexamined region between mid and hi is the one people forget, and it is why the loop condition is mid <= hi."
+   },
+   {
+    "t": "Why is the counting approach not the accepted answer?",
+    "o": [
+     "It is wrong",
+     "It takes two passes, and does not generalise to sorting objects by a key",
+     "It uses too much memory",
+     "It is slower"
+    ],
+    "a": 1,
+    "w": "It is correct and simple - give it first. The partition is asked for because it works on real records, not just on integers."
+   }
+  ]
+ },
+ {
+  "path": "interview/subarray-sum-equals-k.html",
+  "title": "Subarray sum equals k",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why is the prefix map seeded with {0: 1}?",
+    "o": [
+     "To avoid a KeyError",
+     "So subarrays starting at index 0 are counted",
+     "To count the empty subarray",
+     "It is not needed"
+    ],
+    "a": 1,
+    "w": "The empty prefix has sum 0. Without it, [7] with k=7 returns 0 - the simplest possible input fails."
+   },
+   {
+    "t": "The map stores, for each prefix sum:",
+    "o": [
+     "Its index",
+     "How many times it has occurred",
+     "True or False",
+     "The subarray"
+    ],
+    "a": 1,
+    "w": "Several earlier positions can share a running sum, and each is a distinct qualifying subarray, so counts are needed rather than positions."
+   },
+   {
+    "t": "Why can't a sliding window be used here?",
+    "o": [
+     "The array is unsorted",
+     "Negative values mean extending the window can decrease the sum",
+     "k might be zero",
+     "It is too slow"
+    ],
+    "a": 1,
+    "w": "A window relies on the sum growing monotonically as it grows. If everything is positive, the window works and uses O(1) space."
+   }
+  ]
+ },
+ {
+  "path": "interview/trapping-rain-water.html",
+  "title": "Trapping rain water",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "The water above a single bar equals:",
+    "o": [
+     "The tallest bar minus its height",
+     "min(tallest to the left, tallest to the right) minus its height",
+     "Its height",
+     "The average of its neighbours"
+    ],
+    "a": 1,
+    "w": "Water is held by the lower of the two containing walls. Anything above that level runs off."
+   },
+   {
+    "t": "Why is it safe to settle the shorter side's water immediately?",
+    "o": [
+     "It is an approximation",
+     "The shorter side is necessarily the smaller of the two maxima, so it alone decides",
+     "Water flows left",
+     "It is not safe"
+    ],
+    "a": 1,
+    "w": "A bar at least as tall already exists on the other side, so the min is on this side and nothing further can change it."
+   },
+   {
+    "t": "The two-pointer version improves on the precomputed-arrays version in:",
+    "o": [
+     "Time",
+     "Space - O(1) instead of O(n)",
+     "Correctness",
+     "Both time and space"
+    ],
+    "a": 1,
+    "w": "Both are O(n) time. Two running maxima replace two full arrays."
+   }
+  ]
+ },
+ {
   "path": "interview/two-sum.html",
   "title": "Two Sum",
   "cat": "Interview",
@@ -4965,6 +5125,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "The sandwich rule: decode on the way in, encode on the way out, and let every internal layer work in text."
+   }
+  ]
+ },
+ {
+  "path": "interview/sets-versus-lists-and-deduplication.html",
+  "title": "When should you use a set instead of a list?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Which deduplicates a list while preserving the original order?",
+    "o": [
+     "set(items)",
+     "list(dict.fromkeys(items))",
+     "sorted(set(items))",
+     "items.unique()"
+    ],
+    "a": 1,
+    "w": "Dicts have preserved insertion order since 3.7. sorted(set(...)) deduplicates and reorders, which is often shipped by accident."
+   },
+   {
+    "t": "What can a list hold that a set cannot?",
+    "o": [
+     "Strings",
+     "Unhashable elements such as lists",
+     "Integers",
+     "None"
+    ],
+    "a": 1,
+    "w": "Set elements must be hashable, for the same reason dictionary keys must be. A tuple works where a list does not."
+   },
+   {
+    "t": "'Which items are in A but not in B' is best written as:",
+    "o": [
+     "A loop with `if x not in b`",
+     "set_a - set_b",
+     "sorted(a) != sorted(b)",
+     "a.remove(b)"
+    ],
+    "a": 1,
+    "w": "The loop is O(n·m) when b is a list. The difference operator is O(n + m) and says what it means."
    }
   ]
  },
