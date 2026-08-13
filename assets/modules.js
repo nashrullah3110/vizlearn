@@ -1284,6 +1284,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Minimum window substring",
+  "path": "interview/minimum-window-substring.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
   "title": "Product of array except self",
   "path": "interview/product-of-array-except-self.html",
   "category": "Interview",
@@ -1326,6 +1334,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Search in a rotated sorted array",
   "path": "interview/search-in-rotated-sorted-array.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Sliding window maximum",
+  "path": "interview/sliding-window-maximum.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
@@ -1462,6 +1478,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "find() vs index() vs `in` — which one?",
   "path": "interview/find-versus-index-on-strings.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "list vs tuple vs deque vs array — which and why?",
+  "path": "interview/list-versus-tuple-versus-deque.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",

@@ -4649,6 +4649,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/minimum-window-substring.html",
+  "title": "Minimum window substring",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why is the shrink step a while loop rather than an if?",
+    "o": [
+     "To avoid an index error",
+     "The window must keep shrinking while it stays valid, to find the minimum",
+     "To count characters",
+     "It could be an if"
+    ],
+    "a": 1,
+    "w": "Stopping after one contraction records a valid window but not the smallest one ending at that right edge."
+   },
+   {
+    "t": "Why update the missing counter on == rather than >=?",
+    "o": [
+     "It is faster",
+     "With >= a surplus copy decrements it again, declaring the window valid too early",
+     "== handles duplicates",
+     "There is no difference"
+    ],
+    "a": 1,
+    "w": "The counter tracks how many requirements are unmet, so it must change only when one crosses its threshold."
+   },
+   {
+    "t": "The overall complexity is O(n) because:",
+    "o": [
+     "The window is small",
+     "Each pointer only moves forward, so the total moves are bounded by 2n",
+     "The counter is O(1)",
+     "It is actually O(n²)"
+    ],
+    "a": 1,
+    "w": "Same amortised argument as the other sliding-window problems - a nested loop is not automatically quadratic."
+   }
+  ]
+ },
+ {
   "path": "interview/product-of-array-except-self.html",
   "title": "Product of array except self",
   "cat": "Interview",
@@ -4885,6 +4925,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "The only safe move is to shrink the window by one. This is a genuine lower bound and the standard follow-up question."
+   }
+  ]
+ },
+ {
+  "path": "interview/sliding-window-maximum.html",
+  "title": "Sliding window maximum",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why can a smaller value behind a larger one be discarded?",
+    "o": [
+     "To save memory",
+     "Every future window containing it also contains the larger, later value",
+     "It is already counted",
+     "It cannot be"
+    ],
+    "a": 1,
+    "w": "It can never be a maximum again, so keeping it is pure waste. That observation is the whole algorithm."
+   },
+   {
+    "t": "Why store indices in the deque rather than values?",
+    "o": [
+     "Indices are smaller",
+     "The front must be expired once it falls outside the window, which needs its position",
+     "Values are not hashable",
+     "It makes no difference"
+    ],
+    "a": 1,
+    "w": "Without positions there is no way to distinguish a stale maximum from a current one."
+   },
+   {
+    "t": "The algorithm is O(n) rather than O(n·k) because:",
+    "o": [
+     "k is small",
+     "Each index is pushed once and popped at most once across the whole run",
+     "The deque is sorted",
+     "max() is O(1)"
+    ],
+    "a": 1,
+    "w": "The inner while loop can pop several entries at once, but the total pops are bounded by n."
    }
   ]
  },
@@ -5565,6 +5645,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "The start bound avoids copying the remainder, which slicing in a loop would do on every iteration."
+   }
+  ]
+ },
+ {
+  "path": "interview/list-versus-tuple-versus-deque.html",
+  "title": "list vs tuple vs deque vs array — which and why?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "The most practical difference between a tuple and a list is that a tuple:",
+    "o": [
+     "Is faster",
+     "Is hashable, so it can be a dict key or set member",
+     "Uses less memory",
+     "Cannot hold mixed types"
+    ],
+    "a": 1,
+    "w": "Immutability is the mechanism; hashability is the consequence you actually reach for. It is why coordinates and cache keys are tuples."
+   },
+   {
+    "t": "You need a queue. Which container?",
+    "o": [
+     "list, using pop(0)",
+     "deque, using popleft()",
+     "tuple",
+     "set"
+    ],
+    "a": 1,
+    "w": "pop(0) shifts every remaining element, so it is O(n) each and O(n²) overall. deque is O(1) at both ends."
+   },
+   {
+    "t": "array.array uses less memory than a list of the same integers because it:",
+    "o": [
+     "Compresses them",
+     "Stores the values inline rather than references to objects",
+     "Uses fewer bits per number",
+     "Shares objects"
+    ],
+    "a": 1,
+    "w": "A list of a million numbers is a million pointers plus a million objects. The trade is that an array holds one type only."
    }
   ]
  },

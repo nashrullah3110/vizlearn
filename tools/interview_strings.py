@@ -3580,3 +3580,253 @@ for a, b in [("kitten", "sitting"), ("cat", "cut"), ("", "abc"), ("same", "same"
                 "table back to recover which edits were made."},
     ],
 )
+
+
+def _min_window_frames():
+    text, need_str = "ADOBECODEBANC", "ABC"
+    from collections import Counter
+    need = Counter(need_str)
+    have = {}
+    missing = len(need)
+    lo = 0
+    best = None
+    out = []
+    for hi, ch in enumerate(text):
+        if ch in need:
+            have[ch] = have.get(ch, 0) + 1
+            if have[ch] == need[ch]:
+                missing -= 1
+        while missing == 0:
+            if best is None or hi - lo < best[1] - best[0]:
+                best = (lo, hi)
+            marks = {i: ("hit" if lo <= i <= hi else "dim") for i in range(len(text))}
+            out.append(frame(marked(list(text), marks, {lo: "lo", hi: "hi"},
+                                    kind="text", label="text"),
+                             "Window %r has every needed character. Shrink from "
+                             "the left while that stays true." % text[lo:hi + 1],
+                             {"lo": lo, "hi": hi, "best": best[1] - best[0] + 1}))
+            out_ch = text[lo]
+            if out_ch in need:
+                have[out_ch] -= 1
+                if have[out_ch] < need[out_ch]:
+                    missing += 1
+            lo += 1
+            if len(out) >= 6:
+                break
+        if len(out) >= 6:
+            break
+    out.append(frame(marked(list(text),
+                            {i: ("hit" if best[0] <= i <= best[1] else "dim")
+                             for i in range(len(text))},
+                            kind="text", label="answer"),
+                     "Smallest window containing %r is %r. Both pointers only "
+                     "ever moved right." % (need_str, text[best[0]:best[1] + 1]),
+                     {"lo": best[0], "hi": best[1], "best": best[1] - best[0] + 1}))
+    return viz(out)
+
+
+_q(
+    slug="minimum-window-substring",
+    kind="coding",
+    level="Hard",
+    title="Minimum window substring",
+    asked="Find the smallest substring of s that contains every character of t, "
+          "including duplicates.",
+    desc="Grow-then-shrink sliding window with a counter of what is still "
+         "missing, and why a single integer beats comparing two dictionaries "
+         "every step.",
+    lead="Grow the window on the right until it contains everything, then shrink "
+         "it from the left while it still does. The trick that keeps it O(n) is "
+         "tracking a single <strong>count of unsatisfied characters</strong> "
+         "rather than comparing two dictionaries on every step.",
+    say="\"Sliding window: expand right until the window is valid, then contract "
+        "left while it stays valid, recording the best. I keep a counter of how "
+        "many required characters are still short, so checking validity is one "
+        "integer comparison rather than a dict comparison. O(n).\"",
+    notice=[
+        "The window grows on the right and shrinks on the left &mdash; never the "
+        "reverse.",
+        "Shrinking continues while the window is still valid, not just once.",
+        "Both pointers move forward only, which is what makes it linear.",
+    ],
+    viz=_min_window_frames(),
+    sections=[
+        ("The grow-then-shrink shape",
+         "<p>Two phases alternating. Extend <code>hi</code> until the window "
+         "satisfies the requirement; then advance <code>lo</code> as far as "
+         "possible while it still does, recording the best window each time. "
+         "When it stops being valid, go back to growing.</p>"
+         "<p>Every index is entered once by <code>hi</code> and left once by "
+         "<code>lo</code>, so the total work is O(n) despite the nested loop. "
+         "That is the same amortised argument as longest-substring-without-repeats "
+         "and longest-consecutive-sequence &mdash; a nested loop is not "
+         "automatically quadratic.</p>"),
+        ("The counter that makes it cheap",
+         "<p>The naive validity test compares the window's counts against the "
+         "requirement's, which is O(k) on every single step. Instead keep "
+         "<code>missing</code>: the number of distinct required characters whose "
+         "quota is not yet met.</p>"
+         "<p>Increment or decrement it only when a character's count crosses "
+         "<em>exactly</em> its requirement &mdash; <code>have[c] == "
+         "need[c]</code> on the way in, <code>have[c] &lt; need[c]</code> on the "
+         "way out. Using <code>&gt;=</code> there is the classic bug, because "
+         "surplus copies then decrement the counter repeatedly.</p>"),
+        ("Duplicates, and the empty cases",
+         "<p>If <code>t</code> is <code>\"AABC\"</code> the window needs two "
+         "<code>A</code>s. Counting rather than set membership handles that for "
+         "free, and a set-based solution silently accepts one.</p>"
+         "<p>Handle <code>t</code> longer than <code>s</code>, either being "
+         "empty, and no valid window existing &mdash; the last returns the empty "
+         "string, which needs a sentinel that cannot be confused with a real "
+         "window of length zero.</p>"),
+    ],
+    code={
+        "file": "min_window.py",
+        "intro": "The window with each valid state printed, its operation count "
+                 "against a brute force over every substring, and the "
+                 "<code>&gt;=</code> variant of the counter update getting a "
+                 "duplicate case wrong.",
+        "code": '''# Minimum window substring: grow right, shrink left, count what is missing.
+from collections import Counter
+
+def min_window(s, t, show=False):
+    if not s or not t or len(t) > len(s):
+        return "", 0
+    need = Counter(t)
+    have = {}
+    missing = len(need)                     # distinct chars not yet satisfied
+    lo = 0
+    best = (0, -1)                          # a sentinel shorter than any window
+    ops = 0
+
+    for hi, ch in enumerate(s):
+        ops += 1
+        if ch in need:
+            have[ch] = have.get(ch, 0) + 1
+            if have[ch] == need[ch]:        # == , not >= : only on crossing
+                missing -= 1
+
+        while missing == 0:                 # valid: record, then shrink
+            if best[1] < best[0] or hi - lo < best[1] - best[0]:
+                best = (lo, hi)
+            if show:
+                print(f"    valid window {s[lo:hi+1]!r}")
+            out_ch = s[lo]
+            if out_ch in need:
+                have[out_ch] -= 1
+                if have[out_ch] < need[out_ch]:
+                    missing += 1
+            lo += 1
+            ops += 1
+
+    return (s[best[0]:best[1] + 1] if best[1] >= best[0] else ""), ops
+
+
+def brute_force(s, t):
+    need = Counter(t)
+    best, ops = "", 0
+    for i in range(len(s)):
+        for j in range(i, len(s)):
+            ops += 1
+            window = s[i:j + 1]
+            if not (need - Counter(window)):
+                if not best or len(window) < len(best):
+                    best = window
+                break
+    return best, ops
+
+
+s, t = "ADOBECODEBANC", "ABC"
+print(f"s = {s!r}, t = {t!r}")
+answer, ops = min_window(s, t, show=True)
+brute, brute_ops = brute_force(s, t)
+print(f"  window: {answer!r}   ({ops} operations)")
+print(f"  brute : {brute!r}   ({brute_ops} substrings examined)")
+
+# --- duplicates in t ---------------------------------------------------
+print()
+for s2, t2 in [("AAABC", "AABC"), ("ADOBECODEBANC", "ABC"),
+               ("a", "aa"), ("", "a"), ("abc", "")]:
+    got = min_window(s2, t2)[0]
+    want = brute_force(s2, t2)[0] if s2 and t2 else ""
+    print(f"  s={s2!r:>16} t={t2!r:>6} -> {got!r:>8}  (brute force: {want!r})")
+
+# --- the counter update that looks equivalent and is not ---------------
+def min_window_ge(s, t):
+    need = Counter(t)
+    have = {}
+    missing = len(need)
+    lo, best = 0, (0, -1)
+    for hi, ch in enumerate(s):
+        if ch in need:
+            have[ch] = have.get(ch, 0) + 1
+            if have[ch] >= need[ch]:        # >= fires on every surplus copy
+                missing -= 1
+        while missing == 0:
+            if best[1] < best[0] or hi - lo < best[1] - best[0]:
+                best = (lo, hi)
+            out_ch = s[lo]
+            if out_ch in need:
+                have[out_ch] -= 1
+                if have[out_ch] < need[out_ch]:
+                    missing += 1
+            lo += 1
+    return s[best[0]:best[1] + 1] if best[1] >= best[0] else ""
+
+print()
+sample = "AAABC"
+print(f"s={sample!r} t='AABC':  with == -> {min_window(sample, 'AABC')[0]!r}"
+      f"   with >= -> {min_window_ge(sample, 'AABC')!r}")
+print("A surplus 'A' decrements the counter again, so the window is declared")
+print("valid before it actually is.")
+''',
+        "walk": [
+            ("if have[ch] == need[ch]: missing -= 1",
+             "Only when the count crosses the requirement exactly. Using "
+             "<code>&gt;=</code> fires again on every surplus copy, so the "
+             "window is declared valid too early &mdash; the last block shows "
+             "it."),
+            ("while missing == 0:",
+             "A <code>while</code>, not an <code>if</code>. After recording a "
+             "valid window you keep shrinking as long as it stays valid, which "
+             "is where the <em>minimum</em> comes from."),
+            ("best = (0, -1)",
+             "A sentinel that cannot be confused with a real window. Using the "
+             "empty string instead makes \"no window found\" and \"window of "
+             "length zero\" indistinguishable."),
+            ("Counter rather than a set",
+             "<code>t = \"AABC\"</code> needs two <code>A</code>s. A set-based "
+             "check accepts one and is wrong on exactly the input the question "
+             "will use."),
+        ],
+        "try": [
+            "Set <code>t = s</code>. The only valid window is the whole string, "
+            "and the shrink loop never fires.",
+            "Print <code>missing</code> each iteration. Watching it fall to zero "
+            "and bounce back is the clearest picture of the two phases.",
+        ],
+    },
+    check=[
+        {"q": "Why is the shrink step a while loop rather than an if?",
+         "options": ["To avoid an index error", "The window must keep shrinking "
+                     "while it stays valid, to find the minimum",
+                     "To count characters", "It could be an if"],
+         "answer": 1,
+         "why": "Stopping after one contraction records a valid window but not "
+                "the smallest one ending at that right edge."},
+        {"q": "Why update the missing counter on == rather than >=?",
+         "options": ["It is faster", "With >= a surplus copy decrements it "
+                     "again, declaring the window valid too early",
+                     "== handles duplicates", "There is no difference"],
+         "answer": 1,
+         "why": "The counter tracks how many requirements are unmet, so it must "
+                "change only when one crosses its threshold."},
+        {"q": "The overall complexity is O(n) because:",
+         "options": ["The window is small", "Each pointer only moves forward, so "
+                     "the total moves are bounded by 2n",
+                     "The counter is O(1)", "It is actually O(n²)"],
+         "answer": 1,
+         "why": "Same amortised argument as the other sliding-window problems - "
+                "a nested loop is not automatically quadratic."},
+    ],
+)

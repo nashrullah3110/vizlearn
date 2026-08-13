@@ -3009,3 +3009,404 @@ print("a[lo] == a[mid] == a[hi] tells you nothing about where the pivot is.")
                 "genuine lower bound and the standard follow-up question."},
     ],
 )
+
+
+def _window_max_frames():
+    values = [1, 3, -1, -3, 5, 3, 6, 7]
+    k = 3
+    from collections import deque
+    dq = deque()
+    out = []
+    for i, v in enumerate(values):
+        dropped = []
+        while dq and values[dq[-1]] <= v:
+            dropped.append(values[dq.pop()])
+        dq.append(i)
+        if dq[0] <= i - k:
+            dq.popleft()
+        marks = {j: ("dim" if j > i or j <= i - k else "lo") for j in range(len(values))}
+        if dq:
+            marks[dq[0]] = "hit"
+        note = ("%d arrives. " % v) + (
+            "It beats %s, which can never be a maximum again - drop them. "
+            % dropped if dropped else "Nothing smaller behind it. ")
+        if i >= k - 1:
+            note += "Window max is %d." % values[dq[0]]
+        out.append(frame([marked(values, marks, {i: "i"}, label="values"),
+                          marked([str(values[j]) for j in dq],
+                                 {0: "hit"}, label="deque (indices, decreasing)")],
+                         note, {"i": i, "max": values[dq[0]] if i >= k - 1 else "-"}))
+        if len(out) >= 7:
+            break
+    return viz(out)
+
+
+_q(
+    slug="sliding-window-maximum",
+    kind="coding",
+    level="Hard",
+    title="Sliding window maximum",
+    asked="Return the maximum of every window of size k as it slides along the "
+          "array.",
+    desc="A monotonic deque keeps the answer at its front in O(n) total, and the "
+         "insight is that a smaller value behind a larger one can never be a "
+         "maximum again.",
+    lead="Keep a <strong>deque of indices whose values are decreasing</strong>. "
+         "When a new value arrives, everything smaller behind it is discarded "
+         "&mdash; those can never be a maximum again, because the newcomer is "
+         "bigger and outlives them. The front is always the current window's "
+         "maximum. O(n) total.",
+    say="\"Monotonic deque of indices, values decreasing. A new value evicts "
+        "everything smaller from the back, because they can never win again. The "
+        "front is the answer, and I drop it once it falls out of the window. "
+        "Every index is pushed and popped once, so O(n).\"",
+    notice=[
+        "Smaller values behind a larger one are discarded immediately.",
+        "The front is the answer without any scanning.",
+        "Indices are stored, not values &mdash; that is how expiry is detected.",
+    ],
+    viz=_window_max_frames(),
+    sections=[
+        ("The observation that does the work",
+         "<p>If <code>a[j]</code> comes before <code>a[i]</code> and "
+         "<code>a[j] &le; a[i]</code>, then <code>a[j]</code> can never be the "
+         "maximum of any future window &mdash; every window containing it from "
+         "now on also contains the bigger, later <code>a[i]</code>. So it can be "
+         "thrown away the moment <code>a[i]</code> arrives.</p>"
+         "<p>What survives is a decreasing sequence, and its front is the "
+         "maximum of the current window by construction. No scan is ever "
+         "needed.</p>"),
+        ("Why indices rather than values",
+         "<p>The front must be discarded once it falls out of the window, and "
+         "that needs its position. Storing values leaves no way to tell an "
+         "expired maximum from a current one.</p>"
+         "<p>The expiry check is <code>dq[0] &lt;= i - k</code> &mdash; the "
+         "front is older than the window's left edge. This is the other place "
+         "an off-by-one lives, and it is worth writing out the first window's "
+         "indices to check it.</p>"),
+        ("Why it is O(n), not O(n·k)",
+         "<p>The inner <code>while</code> can pop several entries in one "
+         "iteration, which looks quadratic. But each index is pushed exactly "
+         "once and popped at most once across the entire run, so the total pops "
+         "are bounded by n.</p>"
+         "<p>The alternatives are worth naming: recomputing <code>max</code> per "
+         "window is O(n&middot;k), and a heap is O(n&nbsp;log&nbsp;k) and needs "
+         "lazy deletion because you cannot remove an arbitrary element. The "
+         "deque beats both.</p>"),
+    ],
+    code={
+        "file": "window_max.py",
+        "intro": "The deque version with its total push and pop counts against "
+                 "the recompute-every-window version, on an input sized to make "
+                 "O(n) against O(n&middot;k) unmistakable.",
+        "code": '''# Sliding window maximum: a deque of indices with decreasing values.
+from collections import deque
+import time
+
+def window_max(values, k, show=False):
+    dq = deque()                             # indices, values decreasing
+    out, pushes, pops = [], 0, 0
+    for i, v in enumerate(values):
+        while dq and values[dq[-1]] <= v:    # smaller behind: can never win
+            dq.pop()
+            pops += 1
+        dq.append(i)
+        pushes += 1
+        if dq[0] <= i - k:                   # the front has expired
+            dq.popleft()
+            pops += 1
+        if i >= k - 1:
+            out.append(values[dq[0]])        # the front IS the maximum
+            if show:
+                print(f"    window {values[i-k+1:i+1]} -> max {values[dq[0]]}")
+    return out, pushes, pops
+
+
+def recompute(values, k):
+    out, comparisons = [], 0
+    for i in range(len(values) - k + 1):
+        window = values[i:i + k]
+        comparisons += len(window)
+        out.append(max(window))
+    return out, comparisons
+
+
+values, k = [1, 3, -1, -3, 5, 3, 6, 7], 3
+print(f"values {values}, k={k}")
+answer, pushes, pops = window_max(values, k, show=True)
+print("  maxima:", answer)
+print(f"  {pushes} pushes, {pops} pops for {len(values)} elements")
+print("  recompute agrees:", recompute(values, k)[0] == answer)
+
+# --- how the two costs diverge as k grows ------------------------------
+import random
+random.seed(9)
+big = [random.randint(0, 1000) for _ in range(15_000)]
+print()
+print(f"n = {len(big):,}")
+for k in (10, 100, 400):
+    start = time.time()
+    a, pushes, pops = window_max(big, k)
+    deque_time = time.time() - start
+
+    start = time.time()
+    b, comparisons = recompute(big, k)
+    naive_time = time.time() - start
+
+    print(f"  k={k:>4}: deque {deque_time:.3f}s ({pushes + pops:,} ops)   "
+          f"recompute {naive_time:.3f}s ({comparisons:,} ops)   same: {a == b}")
+
+print()
+print("The deque's operation count barely moves with k. The naive one is")
+print("proportional to it, because every window is rebuilt from scratch.")
+''',
+        "walk": [
+            ("while dq and values[dq[-1]] <= v: dq.pop()",
+             "The eviction. Anything smaller sitting behind a newer, larger "
+             "value is permanently useless, because every future window holding "
+             "it also holds the newcomer."),
+            ("dq[0] <= i - k",
+             "Expiry by position, which is why indices are stored rather than "
+             "values. Storing values leaves no way to tell a stale maximum from "
+             "a live one."),
+            ("out.append(values[dq[0]])",
+             "No scan. The deque is decreasing by construction, so its front is "
+             "the window maximum &mdash; that is the entire payoff."),
+            ("pushes and pops",
+             "Each index enters once and leaves at most once, so the totals are "
+             "bounded by n however aggressive the inner loop looks. That is the "
+             "amortised argument, measured."),
+        ],
+        "try": [
+            "Set <code>k = 1</code>. The deque never holds more than one entry "
+            "and the answer is the input &mdash; a good sanity check on the "
+            "expiry condition.",
+            "Change <code>&lt;=</code> to <code>&lt;</code> in the eviction. "
+            "Equal values are now kept, which is still correct and grows the "
+            "deque for no benefit.",
+        ],
+    },
+    check=[
+        {"q": "Why can a smaller value behind a larger one be discarded?",
+         "options": ["To save memory", "Every future window containing it also "
+                     "contains the larger, later value",
+                     "It is already counted", "It cannot be"],
+         "answer": 1,
+         "why": "It can never be a maximum again, so keeping it is pure waste. "
+                "That observation is the whole algorithm."},
+        {"q": "Why store indices in the deque rather than values?",
+         "options": ["Indices are smaller", "The front must be expired once it "
+                     "falls outside the window, which needs its position",
+                     "Values are not hashable", "It makes no difference"],
+         "answer": 1,
+         "why": "Without positions there is no way to distinguish a stale "
+                "maximum from a current one."},
+        {"q": "The algorithm is O(n) rather than O(n·k) because:",
+         "options": ["k is small", "Each index is pushed once and popped at most "
+                     "once across the whole run",
+                     "The deque is sorted", "max() is O(1)"],
+         "answer": 1,
+         "why": "The inner while loop can pop several entries at once, but the "
+                "total pops are bounded by n."},
+    ],
+)
+
+
+def _containers_frames():
+    return viz([
+        frame(pairs([("list", "ordered, mutable, O(1) index, O(n) at the front"),
+                     ("tuple", "ordered, immutable, hashable if its items are"),
+                     ("deque", "O(1) at BOTH ends, O(n) index"),
+                     ("array", "packed values, not pointers - far less memory"),
+                     ("set", "O(1) membership, no order, no duplicates")],
+                    {"list": "lo"}, label="the five"),
+              "Five containers, five different trade-offs. The question is "
+              "always which operation you do most.",
+              {"choices": 5}),
+        frame(pairs([("append / pop at the end", "list or deque"),
+                     ("insert / pop at the FRONT", "deque - a list is O(n)"),
+                     ("random access by index", "list - a deque is O(n)"),
+                     ("membership testing", "set or dict"),
+                     ("a dictionary key", "tuple - a list is unhashable"),
+                     ("millions of numbers", "array or numpy")],
+                    {"insert / pop at the FRONT": "hit"}, label="pick by operation"),
+              "Choose by the operation you repeat, not by habit. The front of a "
+              "list is the one people get wrong.",
+              {"choices": 6}),
+        frame(pairs([("list of 1000 ints", "~8 KB of pointers + the ints"),
+                     ("array('i', ...)", "~4 KB, values packed inline"),
+                     ("tuple", "slightly smaller than the list, fixed size")],
+                    {"array('i', ...)": "hit"}, label="memory"),
+              "A list stores references. An array stores the values themselves, "
+              "which is why it is smaller and why it can only hold one type.",
+              {"choices": 3}),
+    ])
+
+
+_q(
+    slug="list-versus-tuple-versus-deque",
+    kind="concept",
+    level="Easy",
+    title="list vs tuple vs deque vs array — which and why?",
+    asked="When would you use a tuple instead of a list? What about deque or "
+          "array?",
+    desc="Choosing a Python container by the operation you repeat: mutability, "
+         "hashability, which end you touch, and where the memory goes.",
+    lead="Pick by the operation you do most. <strong>list</strong> for ordered "
+         "mutable data with random access; <strong>tuple</strong> when it must "
+         "not change or must be a dict key; <strong>deque</strong> when you touch "
+         "the front; <strong>array</strong> when you have millions of numbers; "
+         "<strong>set</strong> when you only ask \"is it in there?\".",
+    say="\"Tuple if it's fixed or needs to be hashable - it can be a dict key, a "
+        "list can't. deque if I'm touching the front, because list.pop(0) is "
+        "O(n). array or numpy for large numeric data, since a list stores "
+        "pointers rather than values.\"",
+    notice=[
+        "The front of a list is the trap &mdash; O(n), where a deque is O(1).",
+        "Hashability is the real tuple/list distinction, not immutability for "
+        "its own sake.",
+        "An array stores values; a list stores references to them.",
+    ],
+    viz=_containers_frames(),
+    sections=[
+        ("tuple versus list",
+         "<p>The textbook answer is \"tuples are immutable\", which is true and "
+         "not the point. The consequence is that a tuple is <strong>hashable</strong> "
+         "(if its contents are), so it can be a dictionary key or a set member "
+         "&mdash; which is why coordinates, database rows and cache keys are "
+         "tuples.</p>"
+         "<p>The secondary signal is meaning. A list is a homogeneous sequence "
+         "of unknown length; a tuple is a fixed-size record where position "
+         "carries meaning. <code>(x, y)</code> is a point; "
+         "<code>[x, y]</code> is two numbers.</p>"),
+        ("deque versus list",
+         "<p><code>collections.deque</code> is a doubly linked list of blocks, "
+         "so <code>appendleft</code> and <code>popleft</code> are O(1) where the "
+         "list equivalents are O(n). Any queue, BFS frontier or "
+         "\"last N items\" buffer should be a deque.</p>"
+         "<p>The trade is random access: <code>d[5000]</code> walks the blocks, "
+         "so it is O(n). If you index into the middle, keep the list. A deque "
+         "also takes <code>maxlen</code>, which turns it into a fixed-size ring "
+         "buffer that discards the oldest entry automatically.</p>"),
+        ("array and the memory question",
+         "<p>A list holds <em>references</em>, so a list of a million integers is "
+         "a million pointers plus a million integer objects. "
+         "<code>array.array</code> packs the values inline in one typed block, "
+         "which is several times smaller and much friendlier to the cache.</p>"
+         "<p>For real numeric work the answer is <code>numpy</code>, which adds "
+         "vectorised operations on top of the same packed layout. Mentioning "
+         "that a list of numbers is a list of pointers is usually the specific "
+         "thing an interviewer is listening for.</p>"),
+    ],
+    code={
+        "file": "containers.py",
+        "intro": "The five containers measured rather than described: the "
+                 "operation each is fast at, the memory each uses for the same "
+                 "thousand integers, and the two errors that pick the container "
+                 "for you.",
+        "code": '''# Choosing a container: measure the operation you actually repeat.
+import sys, time
+from array import array
+from collections import deque
+
+N = 30_000
+print(f"{'operation':>28} {'list':>10} {'deque':>10}")
+for label, action_list, action_deque in [
+    ("append at the end",  lambda c: c.append(1),   lambda c: c.append(1)),
+    ("insert at the front", lambda c: c.insert(0, 1), lambda c: c.appendleft(1)),
+]:
+    lst, dq = [], deque()
+    start = time.time(); [action_list(lst) for _ in range(N)]
+    list_time = time.time() - start
+    start = time.time(); [action_deque(dq) for _ in range(N)]
+    deque_time = time.time() - start
+    print(f"{label:>28} {list_time:>9.4f}s {deque_time:>9.4f}s")
+
+# Random access is the other direction.
+lst = list(range(N)); dq = deque(range(N))
+start = time.time(); [lst[N // 2] for _ in range(100_000)]
+print(f"{'index the middle':>28} {time.time() - start:>9.4f}s", end="")
+start = time.time(); [dq[N // 2] for _ in range(100_000)]
+print(f" {time.time() - start:>9.4f}s   <- deque loses here")
+
+# --- memory: references versus packed values ---------------------------
+numbers = list(range(1000))
+packed = array("i", range(1000))
+as_tuple = tuple(range(1000))
+print()
+print(f"list  of 1000 ints : {sys.getsizeof(numbers):>6} bytes (references)")
+print(f"tuple of 1000 ints : {sys.getsizeof(as_tuple):>6} bytes")
+print(f"array of 1000 ints : {sys.getsizeof(packed):>6} bytes (values, packed)")
+print("The list does not include the integer objects it points at.")
+
+# --- the two errors that decide it for you -----------------------------
+print()
+try:
+    {[1, 2]: "point"}
+except TypeError as e:
+    print("list as a dict key  ->", e)
+print("tuple as a dict key ->", {(1, 2): "point"})
+
+try:
+    (1, 2).append(3)
+except AttributeError as e:
+    print("tuple.append        ->", e)
+
+# --- deque with maxlen is a ring buffer --------------------------------
+print()
+recent = deque(maxlen=3)
+for event in "abcde":
+    recent.append(event)
+print("deque(maxlen=3) after abcde:", list(recent), "- oldest dropped for free")
+''',
+        "walk": [
+            ("lst.insert(0, 1) versus dq.appendleft(1)",
+             "The same logical operation, O(n) against O(1). Doing it in a loop "
+             "is the most common accidental quadratic in Python, and it usually "
+             "appears as a hand-rolled queue."),
+            ("dq[N // 2]",
+             "Where the deque loses. It is a linked list of blocks, so indexing "
+             "into the middle walks them. If you index, keep the list."),
+            ("sys.getsizeof(numbers) versus the array",
+             "A list stores references; an array stores the values. That is why "
+             "the array is smaller and why it can hold only one type &mdash; and "
+             "it is the specific point interviewers listen for."),
+            ("deque(maxlen=3)",
+             "A fixed-size ring buffer for free: appending past the limit drops "
+             "the oldest. That is the \"last N events\" structure, without any "
+             "bookkeeping."),
+        ],
+        "try": [
+            "Compare <code>sys.getsizeof</code> for a list and a tuple of the "
+            "same items. The tuple is smaller because it never has to leave "
+            "growth room.",
+            "Build a numpy array of a million floats and compare with a list. "
+            "The gap is much larger than the array module's.",
+        ],
+    },
+    check=[
+        {"q": "The most practical difference between a tuple and a list is that "
+              "a tuple:",
+         "options": ["Is faster", "Is hashable, so it can be a dict key or set "
+                     "member",
+                     "Uses less memory", "Cannot hold mixed types"],
+         "answer": 1,
+         "why": "Immutability is the mechanism; hashability is the consequence "
+                "you actually reach for. It is why coordinates and cache keys "
+                "are tuples."},
+        {"q": "You need a queue. Which container?",
+         "options": ["list, using pop(0)", "deque, using popleft()", "tuple",
+                     "set"],
+         "answer": 1,
+         "why": "pop(0) shifts every remaining element, so it is O(n) each and "
+                "O(n²) overall. deque is O(1) at both ends."},
+        {"q": "array.array uses less memory than a list of the same integers "
+              "because it:",
+         "options": ["Compresses them", "Stores the values inline rather than "
+                     "references to objects",
+                     "Uses fewer bits per number", "Shares objects"],
+         "answer": 1,
+         "why": "A list of a million numbers is a million pointers plus a "
+                "million objects. The trade is that an array holds one type only."},
+    ],
+)
