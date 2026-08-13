@@ -15,7 +15,6 @@ Copy lives here rather than in the generators so the wording is reviewable in
 one place.
 """
 
-import html
 import os
 import subprocess
 
@@ -424,52 +423,6 @@ def page_url(rel):
 # --------------------------------------------------------------------------
 
 _date_cache = {}
-
-
-# --------------------------------------------------------------------------
-# The Tracks menu in the header
-#
-# The header carried no track navigation at all: logo, search, back-to-home,
-# theme. Every track was reachable only from the hub or the footer, so a new
-# one was effectively invisible to anyone already reading a module - which is
-# exactly how the interview track went unnoticed.
-#
-# One button rather than ten links, because the header is deliberately narrow
-# and has to survive a 375px phone. The links are rendered here rather than
-# built in JavaScript so they are real anchors: crawlable, and working before
-# any script runs.
-# --------------------------------------------------------------------------
-
-TRACKS_BEGIN = "<!-- VIZLEARN:TRACKS:BEGIN -->"
-TRACKS_END = "<!-- VIZLEARN:TRACKS:END -->"
-
-_TRACKS_ICON = (
-    '<svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-    'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" '
-    'aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>'
-)
-
-
-def tracks_menu(prefix):
-    """The header's Tracks button and its dropdown, for a page at `prefix`."""
-    items = []
-    for key in TOPIC_ORDER:
-        topic = TOPICS[key]
-        items.append(
-            '<a class="vz-tracks-item" href="%s%s/" role="menuitem">%s</a>'
-            % (prefix, topic["dir"], html.escape(topic["title"])))
-
-    return (
-        TRACKS_BEGIN
-        + '<div class="vz-tracks-wrap">'
-          '<button type="button" class="vz-tracks-btn" aria-label="Browse tracks" '
-          'aria-haspopup="true" aria-expanded="false">'
-        + _TRACKS_ICON
-        + '<span class="vz-tracks-label">Tracks</span></button>'
-          '<div class="vz-tracks-menu" role="menu">%s</div>'
-          "</div>" % "".join(items)
-        + TRACKS_END
-    )
 
 
 def last_modified(rel):

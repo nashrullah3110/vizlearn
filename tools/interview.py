@@ -68,8 +68,7 @@ def _art_strings(v):
             'stroke="var(--accent-primary)" stroke-width="2" opacity="%s"/>'
             % (26 + i * 24, "var(--accent-primary)" if on else "var(--input-bg)",
                "0.85" if on else "1"))
-    return ('<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" '
-            'viewBox="0 0 160 90" class="w-full h-full">%s'
+    return ('<svg aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full">%s'
             '<text x="80" y="76" text-anchor="middle" font-size="9" '
             'font-family="monospace" fill="var(--text-muted)">str</text></svg>'
             % "".join(cells))
@@ -83,8 +82,7 @@ def _art_lists(v):
             '<rect x="%d" y="%d" width="16" height="%d" rx="2" '
             'fill="var(--accent-primary)" opacity="%.2f"/>'
             % (20 + i * 21, 62 - h, h, 0.35 + 0.1 * (i % 5)))
-    return ('<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" '
-            'viewBox="0 0 160 90" class="w-full h-full">%s'
+    return ('<svg aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full">%s'
             '<line x1="14" y1="64" x2="146" y2="64" stroke="var(--border-subtle)" '
             'stroke-width="2"/></svg>' % "".join(bars))
 
@@ -96,8 +94,7 @@ def _art_dicts(v):
         rows.append(
             '<rect x="86" y="%d" width="52" height="11" rx="2" fill="var(--accent-primary)" '
             'opacity="%s"/>' % (22 + i * 15, "0.8" if on else "0.2"))
-    return ('<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" '
-            'viewBox="0 0 160 90" class="w-full h-full">'
+    return ('<svg aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full">'
             '<rect x="16" y="34" width="40" height="18" rx="3" fill="var(--input-bg)" '
             'stroke="var(--text-muted)" stroke-width="2"/>'
             '<text x="36" y="47" text-anchor="middle" font-size="9" font-family="monospace" '
@@ -106,6 +103,12 @@ def _art_dicts(v):
             '<polygon points="82,43 74,39 74,47" fill="var(--accent-primary)"/>'
             '%s</svg>' % "".join(rows))
 
+
+# The opening tag matters: index.html inlines card art only when it starts
+# with `<svg aria-hidden="true"`, and otherwise wraps it in a data-URI
+# <img>. Inside an <img> the SVG is a separate document, so var(--accent-
+# primary) resolves to nothing and every shape renders black. xmlns is
+# added by whichever inliner uses it.
 
 ART = {"strings": _art_strings, "lists": _art_lists, "dicts": _art_dicts}
 
