@@ -182,6 +182,46 @@
     return html;
   }
 
+  // The header's Tracks dropdown. The links are real anchors rendered by
+  // tools/lib_pages.py, so this only opens and closes the panel - with the
+  // menu working as a plain list of links if the script never runs.
+  function initTracks() {
+    var wrap = document.querySelector('.vz-tracks-wrap');
+    if (!wrap) return;
+
+    var btn = wrap.querySelector('.vz-tracks-btn');
+    var menu = wrap.querySelector('.vz-tracks-menu');
+    if (!btn || !menu) return;
+
+    // Mark the track this page belongs to, so the menu says where you are.
+    var dir = (location.pathname.split('/').filter(Boolean)[0] || '');
+    var items = menu.querySelectorAll('.vz-tracks-item');
+    for (var i = 0; i < items.length; i++) {
+      var href = items[i].getAttribute('href') || '';
+      if (dir && href.replace(/\.\.\//g, '').replace(/\/$/, '') === dir) {
+        items[i].setAttribute('aria-current', 'true');
+      }
+    }
+
+    function close() {
+      menu.classList.remove('show');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = menu.classList.toggle('show');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!wrap.contains(e.target)) close();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') close();
+    });
+  }
+
   function initShare() {
     var wrap = document.querySelector('.vz-share-wrap');
     if (!wrap) return;
@@ -411,6 +451,7 @@
 
   function boot() {
     initProgress();
+    initTracks();
     initShare();
     initSave();
     initCheatSheet();

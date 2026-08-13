@@ -19,7 +19,7 @@
  *
  * Third-party requests - analytics, ads, fonts - are not touched at all.
  */
-const CACHE = 'vizlearn-f820b1257c';
+const CACHE = 'vizlearn-b8a48a9e52';
 const SHELL = [
   "./",
   "./index.html",

@@ -11,7 +11,7 @@ produces the frame it writes into.
 
 import html
 
-from lib_pages import GITHUB, KAGGLE, LINKEDIN
+from lib_pages import GITHUB, KAGGLE, LINKEDIN, tracks_menu
 
 # The site's own icons, inlined (Font Awesome was removed from the project).
 SEARCH_ICON = (
@@ -116,6 +116,7 @@ def header(prefix, back_label="Home"):
                 </div>
 
                 <div class="flex items-center gap-3">
+                    %(tracks)s
                     <a href="%(p)sindex.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)" aria-label="Back to %(back)s">
                         %(backicon)s
                     </a>
@@ -128,7 +129,8 @@ def header(prefix, back_label="Home"):
         </div>
     </header>
 """ % {"p": prefix, "search": SEARCH_ICON, "back": html.escape(back_label),
-       "backicon": BACK_ICON, "sun": SUN_ICON, "moon": MOON_ICON}
+       "backicon": BACK_ICON, "sun": SUN_ICON, "moon": MOON_ICON,
+       "tracks": tracks_menu(prefix)}
 
 
 THEME_SCRIPT = """
