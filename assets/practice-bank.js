@@ -3364,6 +3364,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/corrective_rag.html",
+  "title": "Corrective RAG (CRAG)",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "What failure is corrective RAG designed to prevent?",
+    "o": [
+     "Slow retrieval",
+     "Generating a confident answer from documents that are not relevant",
+     "Running out of context window",
+     "Duplicate chunks"
+    ],
+    "a": 1,
+    "w": "Vector search always returns its k nearest chunks, so a query with no good match still produces fluent, sourced-looking nonsense."
+   },
+   {
+    "t": "Where does the grader run?",
+    "o": [
+     "Before retrieval",
+     "Between retrieval and generation",
+     "After generation",
+     "During indexing"
+    ],
+    "a": 1,
+    "w": "That position is the whole design: it can still change what happens, which a post-generation check cannot."
+   },
+   {
+    "t": "Which corrective action do implementations most often omit?",
+    "o": [
+     "Query rewriting",
+     "Abstaining - answering that the information is not available",
+     "Web search fallback",
+     "Reranking"
+    ],
+    "a": 1,
+    "w": "A pipeline with no way to decline will always fabricate instead, which is worse than an unhelpful but honest answer."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/dot_product_vs_cosine_similarity.html",
   "title": "Dot Product vs Cosine Similarity for Retrieval",
   "cat": "Gen AI",
@@ -3693,6 +3733,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/caching_in_rag_pipelines.html",
+  "title": "Query, embedding and prompt caching",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "What does this module say about “Embedding cache: the easy one”?",
+    "ans": "Keyed on a hash of the text and the model name. Embedding is deterministic, so the same text always gives the same vector — which makes this cache both trivially correct and permanently valid, until you change models."
+   },
+   {
+    "t": "What does this module say about “Query cache: the highest saving, and the highest risk”?",
+    "ans": "Keyed on the question, storing the final answer. A hit skips retrieval, reranking and generation — often seconds and most of the cost. Real traffic is heavily repetitive, so hit rates can be high."
+   },
+   {
+    "t": "What does this module say about “Prompt caching: inside the model”?",
+    "ans": "Provider-side, and a different mechanism entirely: the model keeps the attention state (the KV cache ) for a prefix it has already processed. Send the same long system prompt and the prefill for that portion is skipped."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/reranking_bi_encoders_vs_cross_encoders.html",
   "title": "Re-ranking: Bi-Encoders vs Cross-Encoders",
   "cat": "Gen AI",
@@ -3786,6 +3845,65 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 0,
     "w": "The filter removes documents that break the constraint, and similarity only ranks what survived. Filtering after ranking would let a top-k full of excluded documents leave nothing behind."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/tf_idf.html",
+  "title": "TF-IDF",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Why does a word appearing in every document score zero?",
+    "o": [
+     "It is filtered by a stopword list",
+     "log(N / df) is log(1) = 0 when df equals N",
+     "Term frequency is capped",
+     "It is a rounding artefact"
+    ],
+    "a": 1,
+    "w": "The maths removes stopwords without a per-language list, which is one of TF-IDF's neatest properties."
+   },
+   {
+    "t": "What does BM25 add that plain TF-IDF lacks?",
+    "o": [
+     "Word meaning",
+     "Saturating term frequency and tunable length normalisation",
+     "Faster indexing",
+     "Support for multiple languages"
+    ],
+    "a": 1,
+    "w": "The tenth occurrence of a term should add much less than the second, and long documents should not win by containing more of everything."
+   },
+   {
+    "t": "Why keep a lexical scorer in a modern RAG pipeline?",
+    "o": [
+     "It is cheaper",
+     "Exact terms - error codes, identifiers, rare jargon - are where embeddings are weakest",
+     "It handles longer documents",
+     "It needs no index"
+    ],
+    "a": 1,
+    "w": "A vector-only pipeline reliably fails on queries like 'error TS2345'. It is also the honest baseline for evaluating a dense retriever."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/queries_keys_and_values.html",
+  "title": "What are Queries, Keys and Values in an LLM?",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "softmax(QK T / √d) V . The dot products score every query against every key; the division keeps the softmax out of its saturated region, where gradients vanish; softmax turns scores into weights summing to one; and those weights are applied to the values."
+   },
+   {
+    "t": "What does this module say about “Why three and not one”?",
+    "ans": "If a token used the same vector to search with and to be found by, attention would collapse into plain similarity: tokens would attend to tokens like themselves. Separating query from key lets a token look for something different from itself — a verb seeking its subject, a pronoun seeking its referent."
+   },
+   {
+    "t": "What does this module say about “The mechanism in one line”?",
+    "ans": "softmax(QK T / √d) V . The dot products score every query against every key; the division keeps the softmax out of its saturated region, where gradients vanish; softmax turns scores into weights summing to one; and those weights are applied to the values."
    }
   ]
  },

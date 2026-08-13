@@ -2130,5 +2130,7 @@ LABS = {
 # program and visualisation on that page. Merged in here so build_labs.py and
 # the practice bank see one dictionary rather than two sources.
 from interview import CHECKS as _INTERVIEW_CHECKS  # noqa: E402
+from rag_topics import CHECKS as _RAG_CHECKS  # noqa: E402
 
 LABS.update(_INTERVIEW_CHECKS)
+LABS.update(_RAG_CHECKS)
