@@ -39,7 +39,8 @@
     sigma: '<path d="M18 5H6l6 7-6 7h12"/>',
     book: '<path d="M4 4a2 2 0 0 1 2-2h13v18H6a2 2 0 0 0-2 2V4Z"/><path d="M4 20a2 2 0 0 0 2 2h13"/>',
     arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
-    check: '<path d="m20 6-11 11-5-5"/>'
+    check: '<path d="m20 6-11 11-5-5"/>',
+    interview: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>'
   };
 
   function icon(name, cls) {

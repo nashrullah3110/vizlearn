@@ -202,10 +202,33 @@ TOPICS = {
             "handful of ideas every later module leans on.",
         ],
     },
+    "interview": {
+        "dir": "interview",
+        "title": "Interview Questions",
+        "h1": "Interview Questions, Answered by Running Them",
+        "lead": "The questions actually asked about strings, lists and "
+                "dictionaries - each with the code, run in your browser.",
+        "keywords": "python interview questions, dsa interview questions, string "
+                    "interview questions, list interview questions, dictionary "
+                    "interview questions, two pointers, sliding window, time complexity",
+        "intro": [
+            "Interview answers are not recall problems. \"Why is this O(n²)?\" is "
+            "answered properly by showing the count, and \"which is faster?\" by "
+            "measuring both - which is what every page here does. Each question "
+            "gets its own page: the answer in prose, a visualisation that steps "
+            "through the mechanism, and a real Python interpreter with the "
+            "implementation already in it.",
+            "The track is organised the way the questions are asked - strings, "
+            "then lists and arrays, then dictionaries, hashing and the "
+            "complexity traps that catch most candidates. Conceptual questions "
+            "and coding problems sit side by side, because interviews mix them.",
+        ],
+    },
 }
 
 # Display order on the hub and in the footer.
-TOPIC_ORDER = ["maths", "ml", "dl", "dsa", "nlp", "computer-vision", "db", "gen-ai", "python"]
+TOPIC_ORDER = ["maths", "ml", "dl", "dsa", "nlp", "computer-vision", "db",
+               "gen-ai", "python", "interview"]
 
 DIR_TO_TOPIC = {t["dir"]: k for k, t in TOPICS.items()}
 

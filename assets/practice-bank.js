@@ -9,16 +9,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A* orders its priority queue by f = g + h, where g is the cost so far and h estimates the cost remaining, which focuses the search along the direction of the goal instead of expanding uniformly. Provided h never overestimates, the path returned is still optimal — and the better the estimate, the fewer nodes get expanded."
+    "t": "Setting the heuristic to zero turns A* into:",
+    "o": [
+     "BFS",
+     "Dijkstra",
+     "Greedy best-first search",
+     "DFS"
+    ],
+    "a": 1,
+    "w": "f = g + h collapses to f = g, which is Dijkstra's priority exactly. The program runs the identical function both ways to show it."
    },
    {
-    "t": "What does this module say about “The problem with searching in every direction”?",
-    "ans": "Dijkstra’s algorithm expands outward from the source in rings of equal cost. If the goal is due east, it still explores just as far north, south and west before reaching it. On a large map that is enormous wasted effort — the algorithm has no idea where it is going."
+    "t": "An admissible heuristic is one that:",
+    "o": [
+     "Is fast to compute",
+     "Never overestimates the remaining cost",
+     "Is always exact",
+     "Ignores obstacles"
+    ],
+    "a": 1,
+    "w": "Overestimating lets A* commit to a route before a cheaper one is examined, so the path it returns can be longer than the shortest."
    },
    {
-    "t": "What does this module say about “Admissible, consistent, and why it stays optimal”?",
-    "ans": "A heuristic is admissible if it never overestimates the true remaining cost. That single property is what guarantees A* finds an optimal path."
+    "t": "Both searches in the program return a path of the same length. What differs?",
+    "o": [
+     "The path itself",
+     "The number of cells expanded",
+     "The memory used",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "136 cells against 90 on this grid. A* is not more correct - it is the same answer reached without looking away from the goal."
    }
   ]
  },
@@ -28,16 +49,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Backtracking explores the space of partial solutions depth-first, abandoning a branch as soon as it violates a constraint and undoing its state on the way back out. The undo is what makes it correct and the early constraint check is what makes it fast — without pruning it is exhaustive search, and with it, problems with billions of arrangements resolve in thousands of steps."
+    "t": "What is the 'backtrack' in the N-queens program?",
+    "o": [
+     "The recursive call",
+     "queens.pop() - undoing the placement",
+     "The safe() check",
+     "Returning the solution"
+    ],
+    "a": 1,
+    "w": "Place, explore, undo. Delete the pop and the state leaks into sibling branches, so the search finds nothing while looking like an optimisation."
    },
    {
-    "t": "What does this module say about “Systematic trial and error”?",
-    "ans": "Backtracking builds a solution one decision at a time. At each step it takes a candidate choice and recurses. If that eventually leads to a solution, done. If it leads to a dead end, the algorithm undoes the choice and tries the next candidate. If every candidate fails, it returns failure to the previous level, which then undoes its choice."
+    "t": "Why is state stored as one column per row rather than as a board?",
+    "o": [
+     "It is smaller",
+     "It makes 'two queens in the same row' impossible by construction",
+     "It is faster to print",
+     "The board would be too large"
+    ],
+    "a": 1,
+    "w": "Encoding removes an entire class of conflict for free, and the recursion depth becomes the row being filled."
    },
    {
-    "t": "What does this module say about “How much pruning buys you”?",
-    "ans": "The eight queens problem asks for eight queens on a chessboard with none attacking another. Placing eight pieces on 64 squares gives about 4.4 billion arrangements. Restricting to one queen per column cuts it to 8 8 = 16.7 million. Checking rows and diagonals as you place each queen — abandoning a branch the moment two queens conflict — brings the actual number of positions examined down to roughly 15,000 ."
+    "t": "Backtracking beats brute force because it:",
+    "o": [
+     "Is not exponential",
+     "Abandons a partial placement before generating any of its completions",
+     "Uses less memory",
+     "Checks solutions in a better order"
+    ],
+    "a": 1,
+    "w": "It is still exponential in the worst case, just over a far smaller space - the program prints the percentage of positions pruned."
    }
   ]
  },
@@ -47,16 +89,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Bellman-Ford relaxes every edge V−1 times instead of committing greedily, so it survives negative weights at O(V·E). One extra pass turns it into a negative-cycle detector. Use Dijkstra when all weights are non-negative; reach for this when they are not."
+    "t": "Why exactly V - 1 rounds?",
+    "o": [
+     "It is a safety margin",
+     "A shortest path visits each node once, so it has at most V - 1 edges",
+     "It matches the edge count",
+     "To detect cycles"
+    ],
+    "a": 1,
+    "w": "Each round settles at least one more edge of any shortest path, so V - 1 rounds is enough and one more would be wasted."
    },
    {
-    "t": "What does this module say about “The idea in brief”?",
-    "ans": "Bellman-Ford finds shortest paths from one source, like Dijkstra — but it works with negative edge weights, and it can detect when no shortest path exists at all."
+    "t": "How does the algorithm detect a negative cycle?",
+    "o": [
+     "It counts the edges",
+     "It checks for negative weights up front",
+     "One extra relaxation round still improves something",
+     "The distances go to negative infinity"
+    ],
+    "a": 2,
+    "w": "After V - 1 rounds the distances are final if they exist. A further improvement proves you can keep going round and getting cheaper, so no shortest path exists."
    },
    {
-    "t": "What does this module say about “Why Dijkstra Fails on Negative Edges”?",
-    "ans": "Dijkstra is greedy: once it finalises a vertex's distance, it never revisits it. That relies on an assumption — that adding more edges can only make a path longer."
+    "t": "Compared with Dijkstra, Bellman-Ford is:",
+    "o": [
+     "Faster and more general",
+     "Slower but handles negative weights",
+     "Faster but needs sorted edges",
+     "The same algorithm"
+    ],
+    "a": 1,
+    "w": "O(V·E) against O(E log V). You pay for the generality, which is why Dijkstra remains the default when weights are non-negative."
    }
   ]
  },
@@ -106,16 +169,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “The one assumption that makes it work”?",
-    "ans": "Binary search requires sorted data, and everything it does follows from that. Look at the middle element. If it equals the target, you are done. If it is smaller than the target, then the target cannot be anywhere in the left half either — because everything on the left is smaller still. So discard the entire left half in one comparison, and repeat on the right."
+    "t": "Binary search on unsorted data:",
+    "o": [
+     "Raises an error",
+     "Returns the wrong answer without complaining",
+     "Falls back to a linear scan",
+     "Sorts the data first"
+    ],
+    "a": 1,
+    "w": "Nothing checks the precondition. It compares against the middle, discards a half on the strength of that comparison, and returns something plausible - which is far more dangerous than a crash."
    },
    {
-    "t": "What does this module say about “Work one through by hand”?",
-    "ans": "Search for 23 in [2, 5, 8, 12, 16, 23, 38, 56, 72, 91] , ten elements, indices 0–9."
+    "t": "Why is the midpoint written mid = lo + (hi - lo) // 2?",
+    "o": [
+     "It is faster",
+     "It avoids overflow when lo + hi is large",
+     "It rounds differently",
+     "It handles empty lists"
+    ],
+    "a": 1,
+    "w": "Arithmetically identical to (lo + hi) // 2, but that form overflows in fixed-width integers. The bug lived in the JDK's binary search for nine years."
    },
    {
-    "t": "What does this module say about “Where log n comes from”?",
-    "ans": "The search space starts at n and halves every step: n, n/2, n/4, n/8, and so on. The search ends when one element is left, so the question is how many halvings that takes:"
+    "t": "Change hi = mid - 1 to hi = mid and run the program. What happens?",
+    "o": [
+     "It returns the wrong index",
+     "It skips the last element",
+     "It loops forever and the interpreter kills it",
+     "Nothing - both are correct"
+    ],
+    "a": 2,
+    "w": "mid has already been compared and ruled out. Leaving it in the window means a two-item window stops shrinking, so the loop never ends."
    }
   ]
  },
@@ -125,16 +209,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A BST turns the binary-search idea into a living structure with O(log n) search, insert and delete — but only while it stays bushy. Sorted input degenerates it to a linked list, which is precisely why self-balancing variants exist and why they, not plain BSTs, are what production libraries ship."
+    "t": "Inserting sorted keys into a plain BST produces:",
+    "o": [
+     "A balanced tree",
+     "A tree of height n - effectively a linked list",
+     "An error",
+     "A heap"
+    ],
+    "a": 1,
+    "w": "Every key goes right, so the tree is one spine and search degrades to O(n). The program prints height 7 for seven sorted keys."
    },
    {
-    "t": "What does this module say about “The problem it solves”?",
-    "ans": "A binary search tree keeps its values in sorted order by position. At every node: the entire left subtree is smaller, the entire right subtree is larger. Searching then works exactly like binary search — compare, discard half, repeat."
+    "t": "An in-order traversal of a BST emits the keys:",
+    "o": [
+     "In insertion order",
+     "In sorted order",
+     "Level by level",
+     "In reverse"
+    ],
+    "a": 1,
+    "w": "Left, self, right. It comes out sorted for free, without sorting anything - which is the structure's whole selling point over a hash table."
    },
    {
-    "t": "What does this module say about “Search, Insert, Delete”?",
-    "ans": "Searching is a walk: compare with the current node, go left if smaller, right if larger, stop when equal or when you fall off the tree. Insertion follows the same walk and attaches the new node where the search failed."
+    "t": "Deleting a node with two children works by:",
+    "o": [
+     "Deleting both subtrees",
+     "Copying up the in-order successor and deleting that instead",
+     "Rotating the tree",
+     "Marking it deleted"
+    ],
+    "a": 1,
+    "w": "The leftmost node of the right subtree has at most one child, so the hard case reduces to an easy one."
    }
   ]
  },
@@ -144,16 +249,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "All four traversals visit every node once in O(n); they differ only in when a node is handled relative to its children, and breadth-first differs from the rest only in using a queue instead of a stack. Inorder yields sorted output on a BST, preorder serialises, postorder frees, and level order finds the nearest thing first."
+    "t": "Turning BFS into DFS requires changing:",
+    "o": [
+     "The visited set",
+     "popleft() to pop() - the container",
+     "The graph representation",
+     "The order of the neighbour list"
+    ],
+    "a": 1,
+    "w": "FIFO gives breadth-first, LIFO gives depth-first. The rest of the loop is identical, which is the clearest way to see that the container is the algorithm."
    },
    {
-    "t": "What does this module say about “Four ways to visit every node”?",
-    "ans": "A traversal visits every node exactly once. A tree is not linear, so there is no single obvious order — and the four standard orders differ only in when a node is processed relative to its children."
+    "t": "Why does the code mark a node visited when it is enqueued rather than when it is dequeued?",
+    "o": [
+     "It is tidier",
+     "Otherwise a node with several neighbours already queued gets added more than once",
+     "To keep distances correct",
+     "To detect cycles"
+    ],
+    "a": 1,
+    "w": "Marking late lets the same node be queued repeatedly before it is ever processed, which blows up the queue on dense graphs."
    },
    {
-    "t": "What does this module say about “Queue versus stack: the whole difference”?",
-    "ans": "Every traversal keeps a collection of nodes it has discovered but not yet processed. The type of collection determines the order:"
+    "t": "BFS gives shortest paths on an unweighted graph because:",
+    "o": [
+     "It uses a priority queue",
+     "Nodes are dequeued in order of distance, so the first arrival is by a shortest path",
+     "It visits every node",
+     "It sorts the neighbours"
+    ],
+    "a": 1,
+    "w": "The frontier expands one full level at a time. On weighted graphs that no longer holds and you need Dijkstra."
    }
   ]
  },
@@ -163,16 +289,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “The Core Idea: Compare and Swap”?",
-    "ans": "The entire algorithm is built on one fundamental operation: comparing two adjacent items and swapping them if the first is larger than the second. This process is repeated from the beginning of the array to the end. After the first full pass, the largest element in the array will have \"bubbled up\" to the very last position. The next pass does the same for the second-largest element, and so on."
+    "t": "What does the swapped flag buy?",
+    "o": [
+     "Fewer swaps",
+     "A best case of O(n) on sorted input",
+     "Stability",
+     "Less memory"
+    ],
+    "a": 1,
+    "w": "A pass with no swaps proves the list is sorted, so it stops. Without it, sorted input still costs the full n passes."
    },
    {
-    "t": "What does this module say about “Pseudocode”?",
-    "ans": "The outer loop `i` tracks how many elements are already sorted at the end. The inner loop `j` performs the adjacent comparisons."
+    "t": "Why does the inner loop run to n - 1 - i rather than n - 1?",
+    "o": [
+     "To avoid an index error",
+     "Because after pass i the last i items are already final",
+     "To keep it stable",
+     "It makes it O(n)"
+    ],
+    "a": 1,
+    "w": "Each pass carries the largest remaining value to the end, so that tail never needs looking at again. It saves comparisons, not complexity."
    },
    {
-    "t": "What does this module say about “Performance & When to Use It”?",
-    "ans": "Bubble Sort has a time complexity of O(n²) in the average and worst cases, which is very slow for large datasets. Its main advantages are its simplicity and the fact that it requires O(1) extra space."
+    "t": "The program's swap count for a given list equals:",
+    "o": [
+     "The number of items",
+     "The number of passes",
+     "The number of inversions in the input",
+     "n log n"
+    ],
+    "a": 2,
+    "w": "Each swap fixes exactly one inverted pair, so the totals match exactly. That is why [1,2,3,4,5,0] is so expensive - one item out of place at the wrong end is five inversions."
    }
   ]
  },
@@ -182,16 +329,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Counting sort tallies occurrences, converts the tallies to positions with a prefix sum, and writes elements straight to their final slots — no comparisons, so the Ω(n log n) bound does not apply. It runs in O(n + k) and is only worth using when the value range k is comparable to n. Its stability, which comes from that backwards final pass, is what makes radix sort possible."
+    "t": "How does counting sort beat the O(n log n) lower bound?",
+    "o": [
+     "It is parallel",
+     "It never compares two elements",
+     "It uses more memory",
+     "It only works on small lists"
+    ],
+    "a": 1,
+    "w": "The bound applies to comparison sorts. Counting sort uses the value as an array index, so the proof simply does not cover it."
    },
    {
-    "t": "What does this module say about “Beating the comparison lower bound”?",
-    "ans": "Every comparison-based sort needs Ω(n log n) comparisons in the worst case; that is a proven lower bound, not an engineering limit. Counting sort is faster because it never compares two elements. Instead it uses each value as an index , which is a fundamentally different source of information."
+    "t": "Why does the final loop iterate over reversed(a)?",
+    "o": [
+     "It is faster",
+     "To keep the sort stable",
+     "To handle negatives",
+     "To avoid an off-by-one"
+    ],
+    "a": 1,
+    "w": "Walking backwards while decrementing before writing keeps equal items in their original order. Radix sort depends on that, so getting it wrong breaks the algorithm built on top."
    },
    {
-    "t": "What does this module say about “The complexity, and the k that matters”?",
-    "ans": "Counting sort runs in O(n + k) time and O(n + k) space, where n is the number of elements and k is the size of the value range."
+    "t": "The program sorts [5, 100000, 3]. What is the problem?",
+    "o": [
+     "The list is too short",
+     "The values are too far apart, so k dwarfs n",
+     "It is not sorted first",
+     "Counting sort cannot handle 100000"
+    ],
+    "a": 1,
+    "w": "O(n + k) is linear only when k is comparable to n. Three items and a hundred thousand counters is the case that makes the cost obvious."
    }
   ]
  },
@@ -201,16 +369,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Floyd's algorithm detects a loop in O(n) time and O(1) space, because inside a cycle the gap between a one-step and a two-step pointer shrinks by exactly one each iteration and must hit zero. A second phase from the head then locates where the cycle begins."
+    "t": "Floyd's tortoise and hare uses how much extra memory?",
+    "o": [
+     "O(n) for a visited set",
+     "O(log n)",
+     "O(1) - two pointers",
+     "O(n) for the path"
+    ],
+    "a": 2,
+    "w": "That is the entire point of it. A visited set also works and is easier, but it costs memory proportional to the list."
    },
    {
-    "t": "What does this module say about “The problem it solves”?",
-    "ans": "Floyd's cycle detection — the tortoise and hare — determines whether a linked structure contains a loop, using two pointers moving at different speeds and constant extra memory."
+    "t": "Why does the comparison use 'slow is fast' rather than '==' ?",
+    "o": [
+     "It is faster",
+     "Two different nodes holding equal values would fool ==",
+     "== does not work on objects",
+     "To avoid a type error"
+    ],
+    "a": 1,
+    "w": "The question is whether the two pointers are on the same node, which is identity, not equality of contents."
    },
    {
-    "t": "What does this module say about “The Obvious Solution and Its Cost”?",
-    "ans": "You could store every visited node in a hash set and check each new one. That works and is O(n) time — but it needs O(n) memory ."
+    "t": "Why does directed-graph cycle detection need three colours rather than a plain visited set?",
+    "o": [
+     "To find the cycle's length",
+     "Because reaching an already-finished node is fine, while reaching one still on the current path is a cycle",
+     "To handle disconnected graphs",
+     "To make it iterative"
+    ],
+    "a": 1,
+    "w": "With two states, any diamond shape - two paths meeting at one node - is reported as a cycle. GREY versus BLACK is what distinguishes them."
    }
   ]
  },
@@ -220,16 +409,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Depth-first search uses a stack to follow one path to exhaustion before backtracking, running in O(V + E) with O(h) stack space. It answers structural questions — cycles, components, topological order — extremely cheaply, and it is the wrong tool for anything involving distance, because it will happily visit a direct neighbour of the start last."
+    "t": "Without the visited set, DFS on a graph containing a cycle:",
+    "o": [
+     "Returns the wrong order",
+     "Recurses forever",
+     "Skips some nodes",
+     "Works fine"
+    ],
+    "a": 1,
+    "w": "A graph is not a tree. The visited set is the only thing that terminates the traversal - the program adds a G to A edge to demonstrate exactly this."
    },
    {
-    "t": "What does this module say about “Go deep first, backtrack second”?",
-    "ans": "Start at a node and mark it visited. Pick any unvisited neighbour and move there. Repeat. When a node has no unvisited neighbours left, back up to the previous node and try its next neighbour. The search finishes when it has backed all the way out of the start node."
+    "t": "Why does the iterative version also check 'if node in visited' after popping?",
+    "o": [
+     "To avoid infinite loops",
+     "A node can be pushed by several neighbours before it is popped",
+     "To match the recursive order",
+     "To count the nodes"
+    ],
+    "a": 1,
+    "w": "Duplicates on the stack are harmless but wasteful; without the check the same node is expanded twice."
    },
    {
-    "t": "What does this module say about “Trace it on a small graph”?",
-    "ans": "Take the graph with edges A–B, A–C, B–D, C–D, D–E , starting at A and preferring alphabetical order:"
+    "t": "Work that belongs on the \"leave\" line - after the recursive calls return - includes:",
+    "o": [
+     "Marking visited",
+     "Printing the node",
+     "Topological ordering and subtree sizes",
+     "Choosing the start"
+    ],
+    "a": 2,
+    "w": "Post-order work needs the whole subtree already processed. Topological sort by DFS is exactly this, reversed."
    }
   ]
  },
@@ -239,16 +449,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Dijkstra’s algorithm repeatedly finalises the cheapest unvisited node and relaxes its edges, giving single-source shortest paths in O((V + E) log V) with a binary heap. Its correctness rests on non-negative weights, so negative edges call for Bellman-Ford instead. Because it expands uniformly in all directions, it does more work than necessary when you only want one destination — which is the gap A* fills."
+    "t": "With one negative edge, Dijkstra:",
+    "o": [
+     "Raises an error",
+     "Loops forever",
+     "Returns a wrong answer without complaining",
+     "Still works"
+    ],
+    "a": 2,
+    "w": "The program finalises C at 2, then discovers a route through B worth -2 and never revisits it. Correctness rests on no edge ever making a finalised node cheaper."
    },
    {
-    "t": "What does this module say about “Why BFS is not enough”?",
-    "ans": "On an unweighted graph, BFS finds shortest paths because every edge costs the same and the queue naturally orders nodes by hop count. Add weights and that collapses: a route of three cheap edges can beat one expensive edge, so the fewest hops is no longer the lowest cost."
+    "t": "Why does the code push a new heap entry instead of updating an existing one?",
+    "o": [
+     "It is more accurate",
+     "heapq cannot decrease a key in place, so stale entries are skipped when popped",
+     "To keep the heap sorted",
+     "To count relaxations"
+    ],
+    "a": 1,
+    "w": "Lazy deletion: cheaper and far easier to get right than a decrease-key structure, at the cost of a heap larger than the node count."
    },
    {
-    "t": "What does this module say about “The algorithm, and the invariant that makes it correct”?",
-    "ans": "Give the source distance 0 and everything else infinity. Then repeat: take the unvisited node with the smallest tentative distance, mark it visited, and for each neighbour check whether going through this node is cheaper than the neighbour’s current best:"
+    "t": "Replacing the heap with a linear scan for the nearest node gives:",
+    "o": [
+     "Wrong answers",
+     "The same answers at O(V²) instead of O(E log V)",
+     "A faster algorithm",
+     "Bellman-Ford"
+    ],
+    "a": 1,
+    "w": "The heap is an accelerator, not part of the logic. On a dense graph the O(V²) version is actually competitive."
    }
   ]
  },
@@ -258,16 +489,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “The problem it solves”?",
-    "ans": "Divide and conquer solves a problem by splitting it into smaller instances of itself, solving those recursively, and combining the results. Three phases: divide, conquer, combine."
+    "t": "Why does exponentiation by squaring make ONE recursive call and reuse the result?",
+    "o": [
+     "It is tidier",
+     "Two calls would recompute the same value and lose the entire saving",
+     "It avoids overflow",
+     "Python requires it"
+    ],
+    "a": 1,
+    "w": "power(b, n//2) * power(b, n//2) looks identical and is exponentially slower. The saving is in reusing the value, not in the halving."
    },
    {
-    "t": "What does this module say about “Where log n Comes From”?",
-    "ans": "The recursion tree makes it obvious. Each level halves the problem size, so it takes log₂n levels to reach size 1 — that is the height of the tree."
+    "t": "Counting inversions during a merge is O(n log n) because, when an item from the right half wins:",
+    "o": [
+     "It is discarded",
+     "Every remaining item on the left is counted in one addition",
+     "The halves are swapped",
+     "The count is estimated"
+    ],
+    "a": 1,
+    "w": "The left half is sorted, so all of its remainder is greater. Counting in blocks rather than pairs is the whole trick."
    },
    {
-    "t": "What does this module say about “The Master Theorem”?",
-    "ans": "For recurrences of the form T(n) = a·T(n/b) + f(n) — a subproblems of size n/b, plus f(n) to combine — the answer depends on which dominates:"
+    "t": "Divide and conquer proves its answer complete by showing every case falls into:",
+    "o": [
+     "The base case",
+     "Left, right, or across the split",
+     "A sorted region",
+     "One recursive call"
+    ],
+    "a": 1,
+    "w": "Every inversion is within one half or spans both, and never anything else. That decomposition is the pattern in general, not just here."
    }
   ]
  },
@@ -277,16 +529,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Dynamic programming is recursion plus memory. Spot repeated subproblems, define a recurrence, fill a table in dependency order, and exponential work collapses to polynomial. The difficulty is never the code — it is finding the recurrence."
+    "t": "Dynamic programming needs subproblems that:",
+    "o": [
+     "Are independent",
+     "Overlap, so an answer is reused many times",
+     "Are all the same size",
+     "Can be sorted"
+    ],
+    "a": 1,
+    "w": "If each subproblem were needed once, a table would buy nothing over plain recursion. The reuse is what pays for the storage."
    },
    {
-    "t": "What does this module say about “What this is”?",
-    "ans": "Dynamic programming solves a problem by breaking it into subproblems, solving each once , and storing the answers. It applies when the same subproblems keep reappearing — which is exactly when plain recursion wastes enormous effort."
+    "t": "Top-down memoisation and bottom-up tabulation differ in that tabulation:",
+    "o": [
+     "Gives different answers",
+     "Is always faster",
+     "Fills the small cases first and uses no call stack",
+     "Needs less memory"
+    ],
+    "a": 2,
+    "w": "Same complexity, no recursion limit, and usually a better constant. Memoisation is normally the easier one to write, because the code still mirrors the recurrence."
    },
    {
-    "t": "What does this module say about “The Two Conditions”?",
-    "ans": "If only the first holds you can still memoise for speed. If neither holds, DP is the wrong tool."
+    "t": "For coins [1, 3, 4] and target 6, greedy takes 4+1+1. What does the DP table give?",
+    "o": [
+     "The same 3 coins",
+     "2 coins - two 3s",
+     "4 coins",
+     "It cannot be made"
+    ],
+    "a": 1,
+    "w": "The table computes every amount up to the target, so it finds the combination greedy's one-way choice never considers."
    }
   ]
  },
@@ -296,16 +569,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “Why anyone would avoid the midpoint”?",
-    "ans": "Binary search computes mid = (lo + hi) / 2 . That division — or at least a bit shift — was genuinely expensive on early hardware, and on some architectures it still is. Fibonacci search finds a comparable split point using nothing but addition and subtraction of precomputed Fibonacci numbers."
+    "t": "What does Fibonacci search avoid that binary search needs?",
+    "o": [
+     "Sorted input",
+     "Division",
+     "Extra memory",
+     "Comparisons"
+    ],
+    "a": 1,
+    "w": "The split points come from adding and subtracting Fibonacci numbers, so no division or bit-shift is required. On hardware without cheap division that mattered."
    },
    {
-    "t": "What does this module say about “The mechanism, step by step”?",
-    "ans": "First find the smallest Fibonacci number that is at least the array length. For an array of 10 elements the sequence runs 1, 1, 2, 3, 5, 8, 13 — so F(7) = 13 , with F(6) = 8 and F(5) = 5 ."
+    "t": "Its step count compared with binary search is:",
+    "o": [
+     "Much better",
+     "About the same - both O(log n)",
+     "Much worse",
+     "Depends on the target"
+    ],
+    "a": 1,
+    "w": "Both are logarithmic and Fibonacci search is slightly worse by a constant. The win was never the step count."
    },
    {
-    "t": "What does this module say about “The complexity, and the honest comparison”?",
-    "ans": "Because consecutive Fibonacci numbers approach the golden ratio φ ≈ 1.618, each step shrinks the search space by a factor of about 1.618 rather than binary search’s 2. So Fibonacci search is O(log n) too, but with a slightly larger constant:"
+    "t": "Why does the probe use min(offset + f2, n - 1)?",
+    "o": [
+     "To skip duplicates",
+     "Because the covering Fibonacci number overshoots the array",
+     "To keep the search stable",
+     "To handle negative numbers"
+    ],
+    "a": 1,
+    "w": "The sequence jumps 8, 13, 21 - it rarely equals the array length, so the first probe can point past the end and has to be clamped."
    }
   ]
  },
@@ -315,16 +609,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A matrix buys O(1) edge lookup with O(V²) memory; a list buys O(V+E) memory with O(degree) lookup. Because real graphs are sparse, adjacency lists are the default — and that choice is what makes BFS and DFS O(V+E) rather than O(V²)."
+    "t": "For a sparse graph, an adjacency matrix wastes space because it stores:",
+    "o": [
+     "Every node twice",
+     "V² cells regardless of how many edges exist",
+     "The edge weights",
+     "A copy of each edge list"
+    ],
+    "a": 1,
+    "w": "The grid is allocated up front. A million users with a few hundred million friendships would need 10¹² cells to hold them."
    },
    {
-    "t": "What does this module say about “What this is”?",
-    "ans": "A graph is a set of vertices connected by edges . Every graph algorithm on this site — BFS, DFS, Dijkstra, A* — assumes some way of storing those edges, and that choice quietly determines their performance."
+    "t": "\"Is there an edge between A and D?\" is answered fastest by:",
+    "o": [
+     "An adjacency list",
+     "An adjacency matrix",
+     "An edge list",
+     "All three are the same"
+    ],
+    "a": 1,
+    "w": "One indexed read. The list has to scan A's neighbours and the edge list has to scan everything."
    },
    {
-    "t": "What does this module say about “It Changes Algorithm Complexity”?",
-    "ans": "This is not just a storage detail. BFS and DFS are O(V + E) with an adjacency list but O(V²) with a matrix, because each vertex must scan a whole row. On a sparse graph with a million vertices that is the difference between seconds and hours."
+    "t": "BFS, DFS and Dijkstra all assume an adjacency list because they ask:",
+    "o": [
+     "\"Are these two connected?\"",
+     "\"Who does this node reach?\"",
+     "\"How many edges are there?\"",
+     "\"Is the graph directed?\""
+    ],
+    "a": 1,
+    "w": "Traversals iterate a node's neighbours, which a list returns directly and a matrix only finds by scanning a whole row of V cells."
    }
   ]
  },
@@ -334,16 +649,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Greedy algorithms are fast and elegant when the greedy choice property holds — and silently wrong when it does not. Always ask whether a locally best move can ever block a globally better one. If it can, reach for dynamic programming instead."
+    "t": "Greedy coin change works for [1, 5, 10, 25] but fails for [1, 3, 4]. What does that show?",
+    "o": [
+     "Greedy never works",
+     "Correctness depends on the denominations, not on the algorithm",
+     "The coins must be sorted",
+     "It only fails on small targets"
+    ],
+    "a": 1,
+    "w": "Familiarity with real currency is why people assume greedy is generally optimal. Nothing about the code changed - only the input."
    },
    {
-    "t": "What does this module say about “Before the details”?",
-    "ans": "A greedy algorithm builds a solution one step at a time, always taking whatever looks best at that moment , and never revisiting a decision. No backtracking, no lookahead."
+    "t": "Activity selection is provably optimal when the meetings are sorted by:",
+    "o": [
+     "Start time",
+     "Finish time",
+     "Duration",
+     "Number of attendees"
+    ],
+    "a": 1,
+    "w": "Taking the meeting that frees the room earliest can never shut out a better schedule. Sorted by start time, one long early meeting blocks several short ones."
    },
    {
-    "t": "What does this module say about “Activity Selection: Greedy Wins”?",
-    "ans": "Given activities with start and finish times, pick the most that do not overlap. The greedy rule is: always take the one that finishes earliest among those still compatible."
+    "t": "The practical way to test a greedy idea is to:",
+    "o": [
+     "Prove it formally first",
+     "Compare it with brute force on small inputs",
+     "Try it on the largest case",
+     "Check the complexity"
+    ],
+    "a": 1,
+    "w": "The program runs a DP check alongside so the verdict is computed rather than asserted. A counterexample is usually small when it exists at all."
    }
   ]
  },
@@ -353,16 +689,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Hashing replaces searching with computing an address. Collisions are unavoidable and must be resolved by chaining or probing; the load factor governs how often they happen. Keep it low and lookups stay effectively constant — let it climb and a hash table quietly becomes a linked list."
+    "t": "The program replaces the hash function with 'lambda k: 1'. What happens?",
+    "o": [
+     "It raises an error",
+     "Keys are lost",
+     "Everything lands in one bucket and every lookup becomes O(n)",
+     "It gets faster"
+    ],
+    "a": 2,
+    "w": "The structure still works perfectly and every guarantee evaporates. O(1) was always conditional on the hash spreading keys out."
    },
    {
-    "t": "What does this module say about “What Makes a Good Hash Function”?",
-    "ans": "The lab uses a simple polynomial rolling hash, shown live above the buckets. Real implementations use stronger functions, but the mechanism is identical."
+    "t": "Why does a resize have to rehash every key?",
+    "o": [
+     "The hashes change",
+     "The index is hash % size, and size just changed",
+     "To keep insertion order",
+     "To free memory"
+    ],
+    "a": 1,
+    "w": "The hash is stable; the fold into a bucket index is not. Doubling the table moves nearly everything."
    },
    {
-    "t": "What does this module say about “Collisions Are Inevitable”?",
-    "ans": "There are infinitely many possible keys and only a finite number of buckets, so two keys will eventually hash to the same index. This is not a flaw to be engineered away — it is a certainty to be handled. Press Force collision to see one."
+    "t": "The load factor threshold exists because:",
+    "o": [
+     "Memory is limited",
+     "Collisions rise sharply as the table fills, so it grows before that happens",
+     "Python requires it",
+     "It keeps buckets sorted"
+    ],
+    "a": 1,
+    "w": "Past about three-quarters full the chains get long fast. Resizing is O(n), but amortised over the inserts that caused it it is O(1) each."
    }
   ]
  },
@@ -372,16 +729,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “Before the details”?",
-    "ans": "Heap sort turns the array into a max-heap, then repeatedly moves the largest element to the end. It sorts in place with a guaranteed O(n log n) in every case — best, average and worst."
+    "t": "After the heapify phase, the list is:",
+    "o": [
+     "Sorted",
+     "Reverse sorted",
+     "A valid heap, which is a much weaker ordering than sorted",
+     "Unchanged"
+    ],
+    "a": 2,
+    "w": "A heap only promises each parent beats its children. Nothing is claimed about siblings - and that weakness is why it can be built in O(n)."
    },
    {
-    "t": "What does this module say about “Phase 1: Heapify in O(n)”?",
-    "ans": "Starting from the last non-leaf node and working backwards, sift each element down. Leaves are already valid heaps of size one, so half the array needs no work at all."
+    "t": "Building the heap bottom-up, starting at the last parent, costs:",
+    "o": [
+     "O(n log n)",
+     "O(n)",
+     "O(log n)",
+     "O(n²)"
+    ],
+    "a": 1,
+    "w": "Most nodes are near the leaves and sift down barely at all. The sum works out linear, which surprises people who expect n sifts of log n each."
    },
    {
-    "t": "What does this module say about “Phase 2: Extract n Times”?",
-    "ans": "The maximum is always at index 0. Swap it with the last element of the heap, shrink the heap by one, and sift the new root down to restore the heap property."
+    "t": "Why does the extraction phase swap the root with the last item?",
+    "o": [
+     "To keep the sort stable",
+     "It both removes the maximum and puts it in its final position, with no extra memory",
+     "To rebalance the tree",
+     "To avoid recursion"
+    ],
+    "a": 1,
+    "w": "One swap does both jobs, which is how heap sort sorts in place. The heap then shrinks by one and is repaired with a single sift."
    }
   ]
  },
@@ -391,16 +769,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “The problem it solves”?",
-    "ans": "A heap is a complete binary tree obeying one rule: every parent is smaller than both its children (a min-heap ) or larger than both (a max-heap ). It says nothing about siblings — the tree is only partially ordered."
+    "t": "In an array-backed heap, the children of index i are at:",
+    "o": [
+     "i-1 and i+1",
+     "2i+1 and 2i+2",
+     "i/2 and i/2+1",
+     "0 and n-1"
+    ],
+    "a": 1,
+    "w": "The tree is arithmetic, not structure. No node objects and no pointers are stored at all."
    },
    {
-    "t": "What does this module say about “Why Partial Ordering Is Better Here”?",
-    "ans": "A BST fully sorts its data, which costs effort to maintain. A heap only guarantees the extreme value sits at the root. If all you ever ask is \"what is the smallest item?\", full sorting is wasted work."
+    "t": "After several pushes, the underlying list is:",
+    "o": [
+     "Sorted",
+     "Sorted except the last item",
+     "Only guaranteed to have the smallest item at index 0",
+     "In insertion order"
+    ],
+    "a": 2,
+    "w": "A heap promises each parent beats its children and nothing about siblings. Expecting more is the usual misunderstanding."
    },
    {
-    "t": "What does this module say about “An Array Pretending to Be a Tree”?",
-    "ans": "Heaps need no pointers at all. Because the tree is complete — every level full except possibly the last, filled left to right — positions can be computed with arithmetic:"
+    "t": "heapq.nlargest(k, data) is O(n log k) rather than O(n log n) because it:",
+    "o": [
+     "Sorts first",
+     "Keeps a heap of only k items",
+     "Uses C code",
+     "Samples the data"
+    ],
+    "a": 1,
+    "w": "For \"top 10 of a billion\" that is the difference between practical and not."
    }
   ]
  },
@@ -410,16 +809,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Insertion sort grows a sorted prefix by sliding each new element back into place, which makes it O(n²) on random data and O(n) on sorted data. Stable, in-place, adaptive and online, it is the sort that real libraries fall back to once a divide-and-conquer sort has chopped the problem small enough — not despite being simple, but because being simple is what makes it fast at that scale."
+    "t": "Insertion sort's running time is driven by:",
+    "o": [
+     "The size of the list alone",
+     "How many inversions the input has",
+     "The largest value",
+     "Whether the values are unique"
+    ],
+    "a": 1,
+    "w": "Each shift fixes one inversion, so a nearly sorted list is nearly free. \"Nearly sorted\" is a measurable quantity here, not a vague description."
    },
    {
-    "t": "What does this module say about “How the sorted region grows”?",
-    "ans": "Treat the first element as a sorted region of length one. Take the next element, and slide it left past every element larger than it until it sits in the right place. The sorted region is now length two. Repeat until the sorted region is the whole array."
+    "t": "Why does the inner loop shift items rather than swap them?",
+    "o": [
+     "Swapping would be wrong",
+     "A shift is one write instead of three",
+     "It keeps the sort stable",
+     "It avoids recursion"
+    ],
+    "a": 1,
+    "w": "The item being placed is held in key, so the hole can simply be moved. That constant-factor saving is why insertion sort beats bubble sort in practice."
    },
    {
-    "t": "What does this module say about “Why O(n²) worst and O(n) best”?",
-    "ans": "The outer loop runs n−1 times. The inner loop slides the current element back past however many larger elements sit to its left."
+    "t": "Real sort implementations switch to insertion sort for small partitions because:",
+    "o": [
+     "It is stable",
+     "It uses no extra memory",
+     "Its constant factor is small, and big-O ignores constants",
+     "It is easier to write"
+    ],
+    "a": 2,
+    "w": "At n around 16 the O(n²) with a tiny constant beats the O(n log n) with a heavier one. CPython's own sort does exactly this."
    }
   ]
  },
@@ -429,16 +849,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “Searching the way a person uses a phone book”?",
-    "ans": "Looking up “Zhang” in a phone book, nobody opens it at the exact middle. You open near the back, because you know where Z falls. Interpolation search formalises that: instead of probing the midpoint, it estimates the target’s position from its value relative to the values at the two ends."
+    "t": "Interpolation search improves on binary search by:",
+    "o": [
+     "Sorting as it goes",
+     "Guessing where the target should be from its value",
+     "Checking both ends first",
+     "Using a hash of the target"
+    ],
+    "a": 1,
+    "w": "It interpolates a position from the value's distance between the endpoints, instead of always probing the middle. That one line is the whole difference."
    },
    {
-    "t": "What does this module say about “Why log log n, and when it collapses”?",
-    "ans": "On uniformly distributed data each probe does not merely halve the remaining range — it reduces it to roughly its square root. That gives an average of O(log log n) comparisons, which for a million elements is about 4 rather than binary search’s 20."
+    "t": "The program runs it on [1,2,3,4,5,6,7,8,9,5000] looking for 9. Why does it take so many steps?",
+    "o": [
+     "The list is too short",
+     "9 is not in the list",
+     "The outlier flattens the estimate, so the probe advances one index at a time",
+     "It has to sort first"
+    ],
+    "a": 2,
+    "w": "The computed fraction is nearly zero because 5000 dominates the value range, so each probe lands next to the previous one and the search degenerates to O(n)."
    },
    {
-    "t": "What does this module say about “Common mistakes”?",
-    "ans": "Interpolation search replaces binary search’s fixed midpoint with an estimate of where the value ought to live, and on uniformly distributed data that estimate is good enough to cut the cost from log n to log log n. The catch is that it is an assumption about the data, not a property of the algorithm: when the distribution is skewed the same formula degrades all the way to O(n)."
+    "t": "Its O(log log n) figure assumes the data is:",
+    "o": [
+     "Sorted only",
+     "Sorted and roughly uniformly distributed",
+     "All positive",
+     "In a contiguous array"
+    ],
+    "a": 1,
+    "w": "Sortedness alone is not enough - the estimate is a straight-line guess, so it needs the values to rise at a roughly steady rate."
    }
   ]
  },
@@ -448,16 +889,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "KMP precomputes an LPS table describing the pattern's self-overlap, then uses it to shift intelligently after a mismatch. Because the text pointer never moves backwards, matching is O(n+m) with a worst-case guarantee — and it works on streams that can never be rewound."
+    "t": "What does lps[i] store?",
+    "o": [
+     "The character at i",
+     "The length of the longest proper prefix of pattern[:i+1] that is also its suffix",
+     "The number of matches so far",
+     "The next index to check"
+    ],
+    "a": 1,
+    "w": "That overlap is the only information needed to know how far the pattern may safely slide after a mismatch."
    },
    {
-    "t": "What does this module say about “What this is”?",
-    "ans": "Knuth–Morris–Pratt finds a pattern inside a text in O(n + m) , where naive search can take O(n·m). The insight: a partial match already tells you something, so there is no need to start over."
+    "t": "In the search loop, what never happens?",
+    "o": [
+     "j decreases",
+     "i decreases",
+     "The pattern slides",
+     "A hit"
+    ],
+    "a": 1,
+    "w": "The text index only moves forward, which is the O(n + m) guarantee. Naive matching restarts at i - j + 1 and re-reads characters."
    },
    {
-    "t": "What does this module say about “What Naive Search Wastes”?",
-    "ans": "Naive search compares the pattern at position 0. On a mismatch it shifts by one and restarts from the beginning of the pattern , re-reading text characters it has already examined."
+    "t": "After a full match, the code sets j = lps[j - 1] rather than 0. Why?",
+    "o": [
+     "To reset faster",
+     "To find overlapping occurrences",
+     "To avoid an index error",
+     "To count the matches"
+    ],
+    "a": 1,
+    "w": "Set it to 0 and searching \"aa\" in \"aaaa\" reports fewer matches than there are."
    }
   ]
  },
@@ -467,16 +929,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Linear search trades speed for having no requirements at all. It is O(n) because it may have to look at everything, and it cannot do better because it has no information to exploit — but for unsorted data, a single lookup, or a small array, that is not a weakness. Every faster search on this track buys its speed with a precondition, and linear search is what you use when you cannot pay it."
+    "t": "Linear search needs the data to be:",
+    "o": [
+     "Sorted",
+     "Numeric",
+     "Nothing in particular - any sequence",
+     "Stored in a hash table"
+    ],
+    "a": 2,
+    "w": "It compares each item in turn, so it has no precondition at all. That is its one real advantage: every faster search buys its speed with an assumption about the data."
    },
    {
-    "t": "What does this module say about “What linear search actually does”?",
-    "ans": "Start at index 0. Compare the element there against the target. If it matches, return the index and stop. If it does not, move to index 1 and repeat. If you reach the end without a match, the target is not present."
+    "t": "The program prints an average of comparisons over every value in the list. What does it land on?",
+    "o": [
+     "n",
+     "(n + 1) / 2",
+     "log n",
+     "n / 4"
+    ],
+    "a": 1,
+    "w": "Finding item i takes i + 1 comparisons, and averaged over all positions that is (n + 1) / 2 - about half the list, which is where the usual rule of thumb comes from."
    },
    {
-    "t": "What does this module say about “Counting the comparisons”?",
-    "ans": "Take the array [42, 17, 8, 91, 5, 63, 29] and search for 91 . The algorithm compares 42, then 17, then 8, then 91 — four comparisons, and it returns index 3."
+    "t": "Which case costs the full n comparisons?",
+    "o": [
+     "Only the last item",
+     "Only a missing item",
+     "Both the last item and a missing item",
+     "Neither"
+    ],
+    "a": 2,
+    "w": "The loop only stops early on a hit. A miss has to rule out every element, so failure always costs the worst case."
    }
   ]
  },
@@ -486,16 +969,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “The Fundamental Trade-off”?",
-    "ans": "An array gives you arr[500] in O(1) because the address is pure arithmetic: start + 500 × itemsize. A linked list has no such shortcut — you must start at the head and follow 500 pointers. That is O(n) ."
+    "t": "In reverse(), why is 'nxt = node.next' saved before 'node.next = prev'?",
+    "o": [
+     "For readability",
+     "Otherwise the rest of the list becomes unreachable",
+     "To count the nodes",
+     "To handle the empty list"
+    ],
+    "a": 1,
+    "w": "Overwriting the only pointer to the remainder loses it - not corrupted, just gone. Delete the line and the list comes back one node long."
    },
    {
-    "t": "What does this module say about “Singly vs Doubly Linked”?",
-    "ans": "That last property is why LRU caches use a doubly linked list: when a hash lookup hands you a node, you can unlink and re-insert it at the front in constant time."
+    "t": "What is the dummy head in delete() for?",
+    "o": [
+     "Marking the end",
+     "Removing the special case of deleting the first node",
+     "Counting nodes",
+     "Making it doubly linked"
+    ],
+    "a": 1,
+    "w": "Without a previous node to re-point, deleting the head needs its own branch - and that branch is where the bug always is."
    },
    {
-    "t": "What does this module say about “Why Arrays Often Win Anyway”?",
-    "ans": "Big-O says linked lists should beat arrays for insertion-heavy work. In practice arrays frequently win regardless, because of cache locality . Array elements sit contiguously in memory, so the CPU loads many at once. Linked-list nodes are scattered, and each pointer hop risks a cache miss costing hundreds of cycles."
+    "t": "Compared with a Python list, a linked list is better at:",
+    "o": [
+     "Random access",
+     "Inserting at the front",
+     "Memory use",
+     "Cache behaviour"
+    ],
+    "a": 1,
+    "w": "O(1) with no shifting. It loses on everything else, including sequential scans, because the nodes are scattered in memory."
    }
   ]
  },
@@ -505,16 +1009,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Merge sort splits positionally, sorts recursively, and does its real work in a linear merge, giving a guaranteed Θ(n log n) on every input with no pathological case. It is stable, it parallelises cleanly, and it is the natural sort for linked lists and for data too large to fit in memory. The price is O(n) auxiliary space for arrays — which is precisely the trade quick sort makes in the opposite direction."
+    "t": "Where does the actual sorting happen in merge sort?",
+    "o": [
+     "In the split",
+     "In the merge",
+     "In the base case",
+     "In the recursion"
+    ],
+    "a": 1,
+    "w": "Splitting a list in half is positional and does no comparing. All the ordering work is in combining two sorted halves."
    },
    {
-    "t": "What does this module say about “Divide, conquer, combine”?",
-    "ans": "Merge sort is the textbook divide-and-conquer algorithm and it has exactly three steps. Divide: split the array at the midpoint. Conquer: sort each half by calling merge sort on it. Combine: merge the two sorted halves into one sorted array."
+    "t": "In merge, why is the comparison left[i] <= right[j] rather than < ?",
+    "o": [
+     "It is faster",
+     "It keeps the sort stable",
+     "It avoids an index error",
+     "It handles empty lists"
+    ],
+    "a": 1,
+    "w": "On a tie the left half wins, and the left half held the earlier items. Changing it to < breaks stability silently, with no other visible symptom."
    },
    {
-    "t": "What does this module say about “The merge is the whole algorithm”?",
-    "ans": "Merging two sorted arrays is linear. Keep a finger on the front of each; repeatedly take the smaller of the two and advance that finger. Merge [2, 5, 9] with [1, 6, 8] :"
+    "t": "Merge sort's worst case compared with its best case:",
+    "o": [
+     "Much worse",
+     "Slightly worse",
+     "The same - O(n log n) either way",
+     "Depends on the pivot"
+    ],
+    "a": 2,
+    "w": "It has no pivot to choose badly and no early exit to hit. That predictability is exactly why it is used where worst-case latency matters."
    }
   ]
  },
@@ -524,16 +1049,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "An MST connects everything with V−1 edges at minimum cost. Kruskal sorts all edges and uses union-find to reject cycles; Prim grows one tree using a priority queue. The cut property proves both greedy strategies optimal, so neither ever needs to reconsider."
+    "t": "A spanning tree of a graph with V nodes always has:",
+    "o": [
+     "V edges",
+     "V - 1 edges",
+     "E - V edges",
+     "As few as possible"
+    ],
+    "a": 1,
+    "w": "Exactly enough to connect everything with no cycle. Both Kruskal and Prim stop at that count in the program."
    },
    {
-    "t": "What does this module say about “Start here”?",
-    "ans": "A spanning tree connects every vertex of a graph using exactly V−1 edges and no cycles. The minimum spanning tree is the one with the smallest total edge weight — the cheapest way to keep everything connected."
+    "t": "The difference between Kruskal and Prim is that Kruskal:",
+    "o": [
+     "Is faster",
+     "Sorts all edges globally, while Prim only considers edges leaving the tree it has grown",
+     "Handles negative weights",
+     "Needs a starting node"
+    ],
+    "a": 1,
+    "w": "Kruskal works from a global sort and needs union-find to reject cycles; Prim grows locally from one node with a priority queue."
    },
    {
-    "t": "What does this module say about “Kruskal: Sort Globally, Add Safely”?",
-    "ans": "The connectivity check is exactly what union-find is for — a near-constant-time \"same group?\" query. Kruskal is the headline application of that structure."
+    "t": "Kruskal uses union-find to:",
+    "o": [
+     "Sort the edges",
+     "Track the tree's weight",
+     "Check in near-constant time whether an edge would close a cycle",
+     "Find the starting node"
+    ],
+    "a": 2,
+    "w": "Both endpoints already in the same component means the edge adds only a cycle. Without union-find that check would need a traversal per edge."
    }
   ]
  },
@@ -543,16 +1089,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A Python dict is a hash table giving O(1) average insert, lookup, and delete, with keys required to be hashable so their storage slot cannot move. Since 3.7 it also preserves insertion order. The traps are the asymmetries: keys are O(1) but values are O(n), views are live rather than snapshots, and mutating during iteration is an error rather than undefined behaviour."
+    "t": "Why must dictionary keys be hashable?",
+    "o": [
+     "To keep them sorted",
+     "Because a key that changed after insertion would no longer hash to the slot it lives in",
+     "To save memory",
+     "To allow duplicates"
+    ],
+    "a": 1,
+    "w": "It would become unreachable. In practice this means immutable: tuples work as keys, lists do not."
    },
    {
-    "t": "What does this module say about “What a dict actually is”?",
-    "ans": "A dictionary maps keys to values. Internally it is a hash table : Python calls hash(key) , reduces the result to an index into an array of slots, and stores the entry there. Looking a key up repeats the computation and goes straight to the slot — no scanning."
+    "t": "{1: 'a', 1.0: 'b', True: 'c'} produces a dict with how many entries?",
+    "o": [
+     "3",
+     "2",
+     "1",
+     "It raises an error"
+    ],
+    "a": 2,
+    "w": "1 == 1.0 == True and all three hash identically, so each assignment overwrites the previous value while the first key object stays."
    },
    {
-    "t": "What does this module say about “Why keys must be hashable”?",
-    "ans": "A key must be hashable, which in practice means immutable. Strings, numbers and tuples work; lists, dicts and sets do not, and d[[1,2]] = x raises TypeError: unhashable type: 'list' ."
+    "t": "Replacing 'x in a_big_list' with 'x in a_big_set' changes the cost from:",
+    "o": [
+     "O(1) to O(n)",
+     "O(n) to roughly O(1)",
+     "O(log n) to O(1)",
+     "Nothing changes"
+    ],
+    "a": 1,
+    "w": "The list compares against every element; the hash table computes where the answer would be. It is the highest-value one-line optimisation in most beginner Python."
    }
   ]
  },
@@ -562,16 +1129,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A Python list is a contiguous dynamic array, so indexing is O(1), appending is amortised O(1), and anything touching the front is O(n) because every later element must shift. Slices are always copies, negative indices count from the end, and the stop bound is exclusive. Most list performance bugs are one of two things: treating the front like the back, or slicing inside a loop."
+    "t": "Indexing a Python list is O(1) because the list stores:",
+    "o": [
+     "A hash of each item",
+     "References contiguously, so the address is computed",
+     "The items in sorted order",
+     "A linked chain of nodes"
+    ],
+    "a": 1,
+    "w": "One multiplication and one read. This is the whole difference between a list and a linked list."
    },
    {
-    "t": "What does this module say about “A dynamic array, not a linked list”?",
-    "ans": "Despite the name, a Python list is a contiguous array of pointers. Elements sit next to each other in memory, so indexing is a single address calculation: lst[i] is O(1) regardless of the list’s length or the value of i."
+    "t": "What does [[0] * 3] * 3 build?",
+    "o": [
+     "A 3x3 grid of independent rows",
+     "Three references to one row, so writing to one writes to all",
+     "A flat list of nine zeros",
+     "An error"
+    ],
+    "a": 1,
+    "w": "Multiplying repeats the reference, not the object. This is the most common Python bug in grid and matrix code."
    },
    {
-    "t": "What does this module say about “Indexing and slicing”?",
-    "ans": "Indices count from 0, and negative indices count from the end: lst[-1] is the last element, lst[-2] the second-last."
+    "t": "sys.getsizeof shows a list's size jumping in steps rather than per item because:",
+    "o": [
+     "The report is approximate",
+     "CPython over-allocates on growth so most appends need no reallocation",
+     "Items vary in size",
+     "Small lists are cached"
+    ],
+    "a": 1,
+    "w": "That is what \"amortised O(1) append\" means concretely: most appends are free, and occasionally one pays for a copy."
    }
   ]
  },
@@ -581,16 +1169,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “Quick Context: The Immutable Sequence”?",
-    "ans": "The most critical concept to understand about Python strings is that they are immutable . This means that once a string is created, it cannot be changed. Every time you see a string method that appears to \"modify\" a string (like .upper() or .replace() ), it is actually creating and returning a new string with the changes. The original string remains untouched."
+    "t": "Building a string by += in a loop is O(n²) because each step:",
+    "o": [
+     "Reallocates the list",
+     "Allocates a new string and copies everything so far",
+     "Re-encodes to UTF-8",
+     "Sorts the characters"
+    ],
+    "a": 1,
+    "w": "Strings are immutable, so there is nothing to append to. \"\".join(parts) does one length calculation, one allocation and one copy."
    },
    {
-    "t": "What does this module say about “Core Idea: Indexing, Slicing, and Methods”?",
-    "ans": "Working with strings involves three main techniques, all of which you can explore in this lab:"
+    "t": "The program accumulates into an object attribute rather than a local variable. Why?",
+    "o": [
+     "It is more realistic",
+     "CPython has an in-place resize special case for locals that would hide the quadratic",
+     "Locals are faster",
+     "To avoid a NameError"
+    ],
+    "a": 1,
+    "w": "The optimisation only fires under specific conditions and varies by build - which is itself the argument for using join rather than relying on it."
    },
    {
-    "t": "What does this module say about “Indexing”?",
-    "ans": "Access a single character using its position in square brackets, like my_string[0] . Python also supports negative indexing, where my_string[-1] accesses the last character."
+    "t": "Immutability is also what allows strings to be:",
+    "o": [
+     "Sliced",
+     "Used as dictionary keys",
+     "Concatenated",
+     "Iterated"
+    ],
+    "a": 1,
+    "w": "Hashability requires that the value cannot change underneath the table. A mutable string could not be a key."
    }
   ]
  },
@@ -600,16 +1209,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A queue preserves arrival order with O(1) work at both ends, provided you move pointers rather than data. Its most important property in algorithms is level-by-level processing — swapping a stack for a queue turns depth-first search into breadth-first search and nothing else changes."
+    "t": "Why is a queue built on list.pop(0) slow?",
+    "o": [
+     "Lists cannot grow",
+     "Removing the first item shifts every remaining item one place left",
+     "It copies the list",
+     "It is not slow"
+    ],
+    "a": 1,
+    "w": "O(n) per dequeue, so O(n²) to drain the queue. The program times 30,000 dequeues both ways."
    },
    {
-    "t": "What does this module say about “Context first”?",
-    "ans": "A queue serves items in the order they arrived: FIFO , First In, First Out. You add at the back ( enqueue ) and remove from the front ( dequeue ). It is the queue at a shop, modelled exactly."
+    "t": "collections.deque gives O(1) at both ends because it is:",
+    "o": [
+     "A sorted array",
+     "A doubly linked list of blocks",
+     "A hash table",
+     "A binary heap"
+    ],
+    "a": 1,
+    "w": "There is no contiguous array to shift, so appending or popping at either end is a pointer update."
    },
    {
-    "t": "What does this module say about “Why the Naive Implementation Is Wrong”?",
-    "ans": "If you implement a queue as a plain array and dequeue by removing element 0, every dequeue shifts all remaining elements down one position — that is O(n) , not O(1)."
+    "t": "A circular buffer must track its size separately because:",
+    "o": [
+     "It grows",
+     "Head meeting tail is ambiguous between full and empty",
+     "The modulo is expensive",
+     "It stores None"
+    ],
+    "a": 1,
+    "w": "Both states have head == tail. Getting this wrong silently overwrites the oldest entry."
    }
   ]
  },
@@ -619,16 +1249,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “Partitioning, not merging”?",
-    "ans": "Quick sort is divide-and-conquer with the work moved to the front. Choose a pivot element. Rearrange the array so that everything less than the pivot sits to its left and everything greater sits to its right — the pivot is now in its final sorted position, permanently. Recurse on the left part and the right part."
+    "t": "With a last-element pivot, which input is quicksort's worst case?",
+    "o": [
+     "Random data",
+     "Already sorted data",
+     "Data with duplicates",
+     "Very short lists"
+    ],
+    "a": 1,
+    "w": "Each partition peels off one element instead of halving, so the recursion goes n deep. The program prints depth 8 for a sorted 9-item list against 4 for a shuffled one."
    },
    {
-    "t": "What does this module say about “Best case, worst case, and why the average holds”?",
-    "ans": "When the pivot lands near the median, each partition halves the array, giving log n levels of O(n) partitioning work: O(n log n) ."
+    "t": "After partition returns p, why do the recursive calls skip index p?",
+    "o": [
+     "To save a comparison",
+     "The pivot is already in its final sorted position",
+     "To keep the sort stable",
+     "To avoid infinite recursion"
+    ],
+    "a": 1,
+    "w": "Everything left of p is smaller and everything right is larger, so p cannot move again. That is the one guaranteed piece of progress each partition makes."
    },
    {
-    "t": "What does this module say about “Why it beats merge sort in practice”?",
-    "ans": "Both are O(n log n) on average, yet quick sort is usually faster on arrays. Three reasons:"
+    "t": "Quicksort's advantage over merge sort is mainly:",
+    "o": [
+     "Better worst case",
+     "Stability",
+     "It sorts in place, needing O(log n) extra space rather than O(n)",
+     "Fewer comparisons"
+    ],
+    "a": 2,
+    "w": "Its worst case is worse and it is not stable. The memory profile, plus good cache behaviour, is what keeps it in use."
    }
   ]
  },
@@ -638,16 +1289,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “The idea in brief”?",
-    "ans": "Radix sort processes numbers one digit at a time, distributing them into buckets by that digit and collecting them back. Repeat for every digit position — least significant first — and the array emerges sorted, with zero comparisons ."
+    "t": "Why must each digit pass be stable?",
+    "o": [
+     "To keep it fast",
+     "Otherwise the previous pass's ordering is destroyed",
+     "To handle negative numbers",
+     "It does not have to be"
+    ],
+    "a": 1,
+    "w": "Sorting by tens must preserve the ones ordering among items with equal tens digits. An unstable pass silently produces a wrong final answer."
    },
    {
-    "t": "What does this module say about “Why Stability Is Non-Negotiable”?",
-    "ans": "This is the crux. When sorting by the tens digit, two numbers with the same tens digit must retain the order they got from the units pass — otherwise that earlier work is destroyed."
+    "t": "Radix sort's cost is O(d · n), where d is:",
+    "o": [
+     "The number of items",
+     "The number of digits in the largest value",
+     "The number of distinct values",
+     "log n"
+    ],
+    "a": 1,
+    "w": "One pass per digit position, each pass linear in n. Adding a single very wide value adds passes over the entire list."
    },
    {
-    "t": "What does this module say about “Least Significant Digit First”?",
-    "ans": "It feels backwards to start with the last digit, but it is what makes stability sufficient. After the units pass, the array is sorted by units. After the tens pass, it is sorted by tens with units breaking ties — because stability preserved them. After the hundreds pass, fully sorted."
+    "t": "After only the ones-digit pass, the list:",
+    "o": [
+     "Is sorted",
+     "Is sorted by last digit and otherwise scrambled",
+     "Is unchanged",
+     "Is reverse sorted"
+    ],
+    "a": 1,
+    "w": "Every intermediate state looks broken, which is what makes LSD radix sort hard to debug by eye. Only the final pass makes it correct."
    }
   ]
  },
@@ -657,16 +1329,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "The confusing part is that a recursive function does not finish before calling itself again. factorial(5) must pause, wait for factorial(4) , and only then multiply."
+    "t": "What does a stack frame hold?",
+    "o": [
+     "The function's source",
+     "Its arguments, its locals and where to return to",
+     "The whole call tree",
+     "Only the return value"
+    ],
+    "a": 1,
+    "w": "That is why recursion depth is a memory cost: a thousand pending calls means a thousand of these alive at once."
    },
    {
-    "t": "What does this module say about “The Call Stack Does the Remembering”?",
-    "ans": "The confusing part is that a recursive function does not finish before calling itself again. factorial(5) must pause, wait for factorial(4) , and only then multiply."
+    "t": "In 'return n * factorial(n - 1)', why can the frame not be discarded at the recursive call?",
+    "o": [
+     "Python does not support it",
+     "The multiplication still has to happen after the call returns",
+     "The argument might change",
+     "It is discarded"
+    ],
+    "a": 1,
+    "w": "Pending work after the call is exactly what keeps a frame alive. Writing it so the call is the last thing done is tail recursion - which CPython still will not optimise away."
    },
    {
-    "t": "What does this module say about “Stack Overflow Is Real”?",
-    "ans": "Select countdown — no base case . Frames pile up and never pop, because nothing stops the recursion. Memory reserved for the stack is finite, so eventually the program crashes with a stack overflow ."
+    "t": "The program prints call counts for naive fib. What is the shape?",
+    "o": [
+     "Linear in n",
+     "Roughly doubling for each +1 in n",
+     "n log n",
+     "Constant"
+    ],
+    "a": 1,
+    "w": "177 calls for fib(10) and 242,785 for fib(25). Recursion is not slow; recursion that recomputes the same subproblems is."
    }
   ]
  },
@@ -676,16 +1369,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “The mechanism”?",
-    "ans": "Scan the entire unsorted region to find its minimum. Swap that minimum with the first unsorted position. That position is now finished and never moves again. Shrink the unsorted region by one and repeat."
+    "t": "How many comparisons does selection sort make on an already sorted list of n items?",
+    "o": [
+     "n - 1",
+     "About n log n",
+     "The same n(n-1)/2 as always",
+     "0"
+    ],
+    "a": 2,
+    "w": "There is no early exit available: you cannot know an item is the minimum without checking every remaining one. The count is fixed by n alone."
    },
    {
-    "t": "What does this module say about “The one situation where it wins”?",
-    "ans": "When writes are dramatically more expensive than reads, minimising them matters more than minimising comparisons. That is the case for EEPROM and flash memory, where each cell tolerates a limited number of erase cycles, and for any sort where moving an element means copying a large record rather than an integer."
+    "t": "What selection sort is genuinely good at:",
+    "o": [
+     "Nearly sorted data",
+     "Making at most n - 1 swaps",
+     "Being stable",
+     "Large datasets"
+    ],
+    "a": 1,
+    "w": "One swap per position, whatever the input. Where writes are expensive - flash memory, or records much larger than the key - that is a real advantage."
    },
    {
-    "t": "What does this module say about “What trips people up”?",
-    "ans": "Selection sort makes n−1 passes, each finding the minimum of what remains, giving Θ(n²) comparisons on every input and no benefit from partially sorted data. What it does offer is at most n−1 swaps — the fewest writes of any simple comparison sort. On ordinary in-memory data insertion sort beats it on every axis; on write-limited storage that swap count is the reason to choose it anyway."
+    "t": "Sorting [2, 2, 1] with this implementation:",
+    "o": [
+     "Keeps the two 2s in their original order",
+     "Swaps their order, so the sort is not stable",
+     "Raises an error",
+     "Skips the duplicate"
+    ],
+    "a": 1,
+    "w": "The first 2 is swapped with the 1 at the far end, jumping it past the second 2. Selection sort is not stable; insertion sort is."
    }
   ]
  },
@@ -695,16 +1409,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “The problem it solves”?",
-    "ans": "The sliding window technique maintains a contiguous range over an array or string and moves it along, updating a running summary incrementally rather than rebuilding it. It turns O(n·k) into O(n)."
+    "t": "The fixed-size window updates its sum with one line. Which?",
+    "o": [
+     "total = sum(window)",
+     "total += a[i] - a[i - k]",
+     "total = max(total, a[i])",
+     "total *= 2"
+    ],
+    "a": 1,
+    "w": "Add what entered, subtract what left. Carrying the value forward instead of rebuilding it is what turns O(n·k) into O(n)."
    },
    {
-    "t": "What does this module say about “Fixed Windows: Add One, Remove One”?",
-    "ans": "To find the maximum sum of k consecutive elements, the naive approach sums every window from scratch — k additions per position, O(n·k) overall."
+    "t": "In the longest-unique-substring window, why is the check 'ch in seen and seen[ch] >= start' rather than just 'ch in seen'?",
+    "o": [
+     "To handle the first character",
+     "An earlier occurrence may already have fallen off the left edge",
+     "To count repeats",
+     "To keep it O(n)"
+    ],
+    "a": 1,
+    "w": "Only a repeat inside the current window matters. Drop the second condition and \"abba\" gives the wrong answer."
    },
    {
-    "t": "What does this module say about “Longest Substring Without Repeats”?",
-    "ans": "Expand right, adding characters to a set. If the new character is already inside, contract from the left until it is not. Record the longest window seen."
+    "t": "Storing the last index of each character rather than a count lets the left edge:",
+    "o": [
+     "Move backwards",
+     "Jump straight past the previous occurrence",
+     "Stay fixed",
+     "Be recomputed"
+    ],
+    "a": 1,
+    "w": "Both approaches are correct; jumping keeps the scan clearly linear and the code short."
    }
   ]
  },
@@ -714,16 +1449,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A stack restricts you to one end, and that restriction buys O(1) push, pop and peek. It models anything where the most recent item must be handled first: nested brackets, function calls, undo history, and depth-first traversal."
+    "t": "Why does the balanced-brackets check test that the stack is empty at the end?",
+    "o": [
+     "To free memory",
+     "To catch openers that were never closed",
+     "To reset for the next call",
+     "It is not necessary"
+    ],
+    "a": 1,
+    "w": "\"((()\" has every closer matched and is still unbalanced. Without the final check it passes."
    },
    {
-    "t": "What does this module say about “Three Operations, All O(1)”?",
-    "ans": "All three are O(1) because they never touch the rest of the structure. That guarantee is the reason stacks are used in performance-critical places like the call stack."
+    "t": "In the postfix evaluator, why is it 'b, a = stack.pop(), stack.pop()' in that order?",
+    "o": [
+     "It reads better",
+     "The second operand was pushed last, so it comes off first",
+     "To avoid an index error",
+     "The order does not matter"
+    ],
+    "a": 1,
+    "w": "Swap the names and + and * still look right while - and / silently invert - the worst kind of bug to find."
    },
    {
-    "t": "What does this module say about “The Call Stack Is a Stack”?",
-    "ans": "Every time a function is called, the computer pushes a stack frame holding its local variables and where to return. When the function finishes, that frame is popped and execution resumes exactly where it left off."
+    "t": "A stack built on a Python list uses append and pop with no index because:",
+    "o": [
+     "It is more readable",
+     "Both act on the end, so both are O(1)",
+     "pop(0) is not allowed",
+     "It keeps the order correct"
+    ],
+    "a": 1,
+    "w": "insert(0, x) and pop(0) shift every other element. Same stack, every operation turned into O(n)."
    }
   ]
  },
@@ -733,16 +1489,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “The problem it solves”?",
-    "ans": "A topological sort orders the vertices of a directed graph so that every edge points forwards: if A must happen before B, A appears earlier. It answers \"in what order can I do these dependent tasks?\""
+    "t": "Kahn's algorithm starts from the nodes whose in-degree is:",
+    "o": [
+     "Highest",
+     "Zero",
+     "One",
+     "Equal to their out-degree"
+    ],
+    "a": 1,
+    "w": "In-degree zero means nothing has to happen first, so those can be taken immediately - and in any order among themselves."
    },
    {
-    "t": "What does this module say about “It Requires a DAG”?",
-    "ans": "A valid ordering exists if and only if the graph is a directed acyclic graph — directed edges, no cycles. If A depends on B and B depends on A, no order can satisfy both."
+    "t": "The program detects a cycle by noticing that:",
+    "o": [
+     "A node repeats",
+     "The output is shorter than the node count",
+     "The queue empties",
+     "An in-degree goes negative"
+    ],
+    "a": 1,
+    "w": "Nodes in a cycle wait on each other forever, so their in-degree never reaches zero and they never enter the queue. The short output is the detection - it costs nothing extra."
    },
    {
-    "t": "What does this module say about “Kahn's Algorithm”?",
-    "ans": "If you output every node, you have a valid order. If the queue empties early, the remainder are locked in a cycle."
+    "t": "A directed acyclic graph has:",
+    "o": [
+     "Exactly one topological order",
+     "Usually many valid topological orders",
+     "None unless it is a tree",
+     "One per starting node"
+    ],
+    "a": 1,
+    "w": "Swapping popleft() for pop() produces a different, equally correct order. Where a specific one is needed, a heap gives the lexicographically smallest."
    }
   ]
  },
@@ -752,16 +1529,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A trie stores strings as paths, sharing common prefixes. Lookup is O(word length) regardless of dictionary size, and prefix queries fall out of the structure for free — which no hash table can match. The price is memory, mitigated by hash-map children or radix compression."
+    "t": "What does the is_word flag distinguish?",
+    "o": [
+     "Leaves from internal nodes",
+     "\"ca\", which is only a prefix, from \"do\", which is a stored word with more beyond it",
+     "Uppercase from lowercase",
+     "Full from partial branches"
+    ],
+    "a": 1,
+    "w": "Without it a trie can only answer prefix questions - and \"do\" being a word while \"dog\" continues past it has nothing to do with being a leaf."
    },
    {
-    "t": "What does this module say about “Before the details”?",
-    "ans": "A trie (from re trie val, usually pronounced \"try\") stores strings as paths through a tree. Each edge carries a character, so following a path from the root spells out a prefix. Words sharing a prefix share those nodes."
+    "t": "Trie lookup costs O(length of the word) because:",
+    "o": [
+     "The words are sorted",
+     "It walks one node per character, and the number of stored words never enters into it",
+     "Hashing is O(1)",
+     "It is a balanced tree"
+    ],
+    "a": 1,
+    "w": "A million stored words cost the same as ten. A hash table is also roughly O(length), because it must hash the whole string."
    },
    {
-    "t": "What does this module say about “Lookup Does Not Care How Many Words You Have”?",
-    "ans": "Searching for a word of length L costs O(L) — one step per character. Crucially, that is independent of how many words the trie contains. A dictionary of ten words and one of ten million both answer a five-letter query in five steps."
+    "t": "The operation a hash table cannot do at all is:",
+    "o": [
+     "Exact lookup",
+     "Insert",
+     "List everything starting with \"car\"",
+     "Delete"
+    ],
+    "a": 2,
+    "w": "Hashing destroys the relationship between \"car\" and \"card\". Autocomplete is a DFS from the prefix node, which needs the shared structure a trie keeps."
    }
   ]
  },
@@ -771,16 +1569,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "What does this module say about “What this is”?",
-    "ans": "The two pointers technique uses two indices moving through a sequence in a coordinated way. It typically replaces a nested loop, turning O(n²) into O(n) with no extra memory."
+    "t": "Pair-sum with two pointers requires the list to be:",
+    "o": [
+     "Unique",
+     "Sorted",
+     "Positive",
+     "Even length"
+    ],
+    "a": 1,
+    "w": "Moving a pointer is only justified because sortedness proves the discarded element cannot be part of any solution. Shuffle the input and it returns None for a pair that exists."
    },
    {
-    "t": "What does this module say about “The Classic: Pair Sum”?",
-    "ans": "Find two numbers in a sorted array that sum to a target. Brute force checks all pairs: O(n²). Two pointers starts one at each end:"
+    "t": "When the sum is too small, why is it safe to move lo right rather than hi left?",
+    "o": [
+     "It is arbitrary",
+     "a[hi] is the largest available partner, so a[lo] cannot work with anything",
+     "It keeps the loop terminating",
+     "hi might be negative"
+    ],
+    "a": 1,
+    "w": "Each step eliminates a whole row or column of the pair table, which is how n² candidates are covered in n steps."
    },
    {
-    "t": "What does this module say about “Why Sorting Is Essential”?",
-    "ans": "The technique depends on knowing what moving a pointer does . On a sorted array, moving left rightwards can only increase the sum — that guarantee is what makes it safe to discard everything you skipped."
+    "t": "In the in-place dedupe, why does the function return a length instead of a list?",
+    "o": [
+     "It is faster",
+     "Nothing was reallocated, so the tail still holds stale data",
+     "The list is sorted",
+     "To avoid copying"
+    ],
+    "a": 1,
+    "w": "The point of the technique is O(1) extra memory. The caller uses a[:n] and ignores whatever is past it."
    }
   ]
  },
@@ -790,16 +1609,37 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Algorithms",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Union-Find answers \"same group?\" and \"merge groups\" in effectively constant time, using union by rank to keep trees shallow and path compression to flatten them on the way. It is the structure that makes Kruskal's algorithm and fast connected-component queries possible."
+    "t": "What does path compression do?",
+    "o": [
+     "Removes duplicate elements",
+     "Re-points every node touched on the way up straight at the root",
+     "Merges the two smallest trees",
+     "Sorts the parent array"
+    ],
+    "a": 1,
+    "w": "The walk pays for the next walk. Every node on the path becomes one hop from the root, so repeat queries are effectively free."
    },
    {
-    "t": "What does this module say about “Start here”?",
-    "ans": "Union-Find maintains a collection of non-overlapping sets and supports two operations: find(x) — which set does x belong to? — and union(a, b) — merge the two sets containing a and b."
+    "t": "Union by rank exists to prevent:",
+    "o": [
+     "Duplicate unions",
+     "Trees degenerating into long chains",
+     "Cycles",
+     "Memory growth"
+    ],
+    "a": 1,
+    "w": "Attaching blindly, as the naive version does, builds a linked list wearing a tree's name - and find degrades to O(n), which the program's hop counts show directly."
    },
    {
-    "t": "What does this module say about “The Structure”?",
-    "ans": "Each set is stored as a tree, with every element pointing to a parent. The root represents the whole set. Two elements are in the same set exactly when they have the same root."
+    "t": "With both optimisations, the amortised cost per operation is:",
+    "o": [
+     "O(log n)",
+     "O(1) exactly",
+     "O(α(n)), which is below 5 for any real n",
+     "O(n)"
+    ],
+    "a": 2,
+    "w": "The inverse Ackermann function grows so slowly that it is a constant for practical purposes - but it is not literally O(1)."
    }
   ]
  },
@@ -1054,12 +1894,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Pooling summarises each neighbourhood into one value, most often taking the maximum of a 2×2 window at stride 2, which quarters the feature map for free — it has no parameters. Its real value is enlarging the receptive field so small filters can eventually see large structures, with computational saving second and a modest, purely local translation tolerance third."
    },
    {
-    "t": "What does this module say about “What pooling does”?",
-    "ans": "A pooling layer slides a window over the feature map and replaces the values inside it with a single summary. With a 2×2 window and stride 2 — by far the most common setting — the windows do not overlap, and the output is half the height and half the width, so a quarter of the values ."
-   },
-   {
     "t": "What does this module say about “The three reasons it is there”?",
     "ans": "Computation. Quartering the spatial dimensions quarters the work of every subsequent layer. In a deep network that compounds enormously."
+   },
+   {
+    "t": "What does this module say about “Why some architectures drop it”?",
+    "ans": "Pooling is a fixed rule, and a strided convolution achieves the same downsampling while learning how to summarise. Many modern architectures use stride-2 convolutions instead, and all-convolutional networks remove pooling entirely."
    }
   ]
  },
@@ -1358,7 +2198,7 @@ window.VIZLEARN_PRACTICE = [
     "ans": "NULL is not zero, not an empty string, and not false. It means the value is unknown, and every comparison that touches it inherits that uncertainty: NULL = NULL is not TRUE, it is UNKNOWN. This is three-valued logic , and COALESCE, NULLIF and IS NULL are the tools for working with it on purpose instead of by accident."
    },
    {
-    "t": "What does this module say about “Worth remembering”?",
+    "t": "What does this module say about “Try it yourself”?",
     "ans": "NULL means unknown, so comparisons involving it are UNKNOWN rather than TRUE or FALSE, and aggregates skip it by default. COALESCE substitutes a default, NULLIF creates a NULL on purpose, and IS NULL is the only comparison that actually works — everything else is a trap that looks like it should work and quietly does not."
    }
   ]
@@ -1719,8 +2559,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Batching turns many small vector-matrix products into one large matrix-matrix product, which is what makes parallel hardware pay off, without changing the model at all. Batch size sets both the number of updates per epoch and the noise in each gradient, so it trades throughput against a regularising effect that favours flat minima."
    },
    {
-    "t": "What does this module say about “A batch is a matrix, not a loop”?",
-    "ans": "Feeding one sample through a layer is a vector-matrix product. Feeding 32 samples is a matrix -matrix product — stack the 32 input vectors into a 32×n in matrix and multiply once by the same n in ×n out weights."
+    "t": "What does this module say about “Things to try”?",
+    "ans": "Larger batches give a lower-variance estimate of the true gradient, so the path to the minimum is smoother. That sounds strictly good and is not."
    },
    {
     "t": "What does this module say about “How batch size affects the result, not just the speed”?",
@@ -1738,12 +2578,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Sparse data is the norm for one-hot categories, text and recommenders, and it costs memory, wasted arithmetic, and — least obviously — badly uneven learning rates, because a weight only updates when its input is non-zero."
    },
    {
-    "t": "What does this module say about “What sparsity means, and where it comes from”?",
-    "ans": "A feature vector is sparse when most of its entries are zero. This is not an edge case — it is the default in several of the most common data types:"
-   },
-   {
     "t": "What does this module say about “Embeddings, the standard fix”?",
     "ans": "For high-cardinality categorical data the usual answer is not to keep the one-hot vector at all. An embedding layer maps each category to a short dense vector — say 50 dimensions instead of 195 columns — learned during training."
+   },
+   {
+    "t": "What does this module say about “Where this goes wrong”?",
+    "ans": "Sparse data is the norm for one-hot categories, text and recommenders, and it costs memory, wasted arithmetic, and — least obviously — badly uneven learning rates, because a weight only updates when its input is non-zero."
    }
   ]
  },
@@ -1837,12 +2677,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Gradients scale with input magnitude, so unscaled features give some weights enormous gradients and others negligible ones, and no single learning rate serves both. Standardisation is the default for neural networks; min-max suits bounded inputs and breaks on outliers. Fit the scaler on the training split only, keep those statistics for validation, test and production, and leave one-hot columns alone."
    },
    {
-    "t": "What does this module say about “Why scale breaks gradient descent”?",
-    "ans": "The gradient of the loss with respect to a weight is proportional to that weight’s input . So a feature measured in hundreds of thousands produces gradients roughly four orders of magnitude larger than a feature measured in tens."
-   },
-   {
     "t": "What does this module say about “Work the numbers”?",
     "ans": "Take age 30 and salary 60,000 with weights of 0.5 each. The salary term contributes 30,000 to the weighted sum and the age term contributes 15 — the age feature is invisible, and it would take a weight around 1000× larger to compete."
+   },
+   {
+    "t": "What does this module say about “Where this goes wrong”?",
+    "ans": "Gradients scale with input magnitude, so unscaled features give some weights enormous gradients and others negligible ones, and no single learning rate serves both. Standardisation is the default for neural networks; min-max suits bounded inputs and breaks on outliers. Fit the scaler on the training split only, keep those statistics for validation, test and production, and leave one-hot columns alone."
    }
   ]
  },
@@ -1974,12 +2814,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Hyperparameters sit outside gradient descent, so the only way to evaluate them is to train and measure — which makes the search strategy itself worth thinking about. Random search beats grid search at equal budget because it spends its samples on more distinct values of whichever hyperparameter actually matters, and anything spanning orders of magnitude should be sampled on a log scale."
    },
    {
-    "t": "What does this module say about “Two kinds of number”?",
-    "ans": "A parameter is learned: weights and biases move during training because gradient descent moves them. A hyperparameter is fixed before training and never updated by the optimiser — learning rate, number of layers, neurons per layer, batch size, dropout rate, regularisation strength."
-   },
-   {
     "t": "What does this module say about “Grid search, random search, and why random usually wins”?",
     "ans": "Grid search tries every combination on a predefined grid. With 5 learning rates and 5 layer widths that is 25 runs, and adding a third hyperparameter with 5 values makes it 125. The cost is exponential in the number of hyperparameters."
+   },
+   {
+    "t": "What does this module say about “Things to try”?",
+    "ans": "Learning rate should be sampled logarithmically, not uniformly. Sampling uniformly from 0.0001 to 0.1 puts 90% of the samples above 0.01, leaving the small-rate region — where the answer usually is — almost untested."
    }
   ]
  },
@@ -2008,12 +2848,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Big steps to travel, small steps to arrive — and get the starting size right before tuning the decay."
    },
    {
-    "t": "What does this module say about “Why one value cannot serve both phases”?",
-    "ans": "Early in training you are far from any good solution and want large steps. Late in training you are close, and large steps make you bounce around the minimum without ever landing in it. A fixed rate forces a compromise that is wrong at both ends."
-   },
-   {
     "t": "What does this module say about “What usually goes wrong”?",
     "ans": "Decaying too early. Shrink the step before the model has reached a good region and it will crawl the rest of the way, converging neatly to somewhere mediocre."
+   },
+   {
+    "t": "What does this module say about “In one line”?",
+    "ans": "Big steps to travel, small steps to arrive — and get the starting size right before tuning the decay."
    }
   ]
  },
@@ -2027,12 +2867,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Two parameters, the same optimiser as a deep network, and slow enough to watch every step."
    },
    {
-    "t": "What does this module say about “The two gradients”?",
-    "ans": "You are fitting y = mx + c by minimising mean squared error. The partial derivatives are:"
-   },
-   {
     "t": "What does this module say about “One step, worked out”?",
     "ans": "Three points: (1, 2), (2, 4), (3, 6). The answer is obviously m = 2, c = 0, but start from m = 0, c = 0 and let the maths find it."
+   },
+   {
+    "t": "What does this module say about “What usually goes wrong”?",
+    "ans": "Divergence from too high a learning rate is the classic failure, and its signature is unmistakable: the loss increases every step, often to infinity within a dozen iterations. If you see that, the fix is almost always η, not the model."
    }
   ]
  },
@@ -2046,12 +2886,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Training draws randomness from initialisation, shuffling, dropout and augmentation, each from its own generator, so reproducibility means seeding all of them rather than one. Even then GPU reductions are non-deterministic at the level of floating-point rounding, and training amplifies those differences over thousands of steps."
    },
    {
-    "t": "What does this module say about “Where the randomness comes from”?",
-    "ans": "Neural network training is randomised in at least four independent places, and every one of them changes the final weights:"
-   },
-   {
     "t": "What does this module say about “Seeding, and what a seed actually fixes”?",
     "ans": "These are all pseudo -random: a deterministic sequence generated from a starting value called the seed. Fix the seed and the sequence is identical every run."
+   },
+   {
+    "t": "What does this module say about “Why the GPU can still be non-deterministic”?",
+    "ans": "Seeding every generator can still leave runs that differ, and the reason is floating-point arithmetic rather than randomness. GPU kernels parallelise reductions across thousands of threads, and the order in which partial sums combine varies between runs. Floating-point addition is not associative — (a + b) + c can differ from a + (b + c) in the last bits — so identical inputs can give slightly different outputs."
    }
   ]
  },
@@ -2164,12 +3004,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Classifier body, linear head, distance-based loss — and scale your targets."
    },
    {
-    "t": "What does this module say about “The two differences that matter”?",
-    "ans": "Everything else — hidden layers, ReLU, backpropagation, the optimiser — is unchanged from a classifier."
-   },
-   {
     "t": "What does this module say about “A concrete architecture”?",
     "ans": "Predicting house price from three features: 3 inputs → 16 hidden with ReLU → 1 linear output. That is (3×16 + 16) + (16×1 + 1) = 81 parameters."
+   },
+   {
+    "t": "What does this module say about “Why the output layer has no activation”?",
+    "ans": "A classification network ends in softmax or sigmoid because the output must be a probability, bounded in [0, 1]. A regression network predicts an unbounded quantity — a price, a temperature, a duration — so squashing the output would put a ceiling on what it can ever predict."
    }
   ]
  },
@@ -2183,12 +3023,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "No labels needed — make the input the target and let a narrow layer decide what was worth keeping."
    },
    {
-    "t": "What does this module say about “The autoencoder trick”?",
-    "ans": "An autoencoder is trained to reproduce its own input. On its own that is trivial — copy the input to the output and the loss is zero. The trick is the bottleneck: a hidden layer narrower than the input, which the data must pass through."
-   },
-   {
     "t": "What does this module say about “A worked shape”?",
     "ans": "8 input features → 3-unit bottleneck → 8 reconstruction outputs. The encoder must express 8 numbers using 3, and the decoder must rebuild all 8 from those 3."
+   },
+   {
+    "t": "What does this module say about “What usually goes wrong”?",
+    "ans": "A bottleneck as wide as the input. The network learns the identity function, the loss looks excellent, and you have learned nothing about the data. If reconstruction is perfect, suspect this first."
    }
   ]
  },
@@ -2202,12 +3042,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The shape of the surface, not the cleverness of the algorithm, decides which optimiser looks good."
    },
    {
-    "t": "What does this module say about “What the terrain is made of”?",
+    "t": "What does this module say about “Saddles matter more than local minima”?",
     "ans": "The folk explanation of training failure is \"it got stuck in a local minimum\". In high dimensions that is mostly wrong. For a point to be a local minimum, the surface must curve upward in every direction at once — and with millions of parameters that is vanishingly unlikely. Saddle points, where it curves up in some directions and down in others, are enormously more common."
    },
    {
-    "t": "What does this module say about “Saddles matter more than local minima”?",
-    "ans": "The folk explanation of training failure is \"it got stuck in a local minimum\". In high dimensions that is mostly wrong. For a point to be a local minimum, the surface must curve upward in every direction at once — and with millions of parameters that is vanishingly unlikely. Saddle points, where it curves up in some directions and down in others, are enormously more common."
+    "t": "What does this module say about “What usually goes wrong”?",
+    "ans": "Over-reading the picture. This surface has two parameters. A real network has millions, and its loss landscape has properties that genuinely do not exist in 3D. Use this to build intuition about momentum and adaptive step sizes; do not use it to conclude anything about how many minima a real network has."
    }
   ]
  },
@@ -2221,12 +3061,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Same downhill direction, different memory — and memory is what stops you bouncing off the walls."
    },
    {
-    "t": "What does this module say about “What each one adds”?",
+    "t": "What does this module say about “Why plain SGD zig-zags”?",
     "ans": "Picture a long narrow valley where the gradient across the valley is 10 and along it is 0.1. With η = 0.01, SGD steps 0.1 across and 0.001 along — a hundred to one. It bounces off the steep walls while creeping toward the actual minimum."
    },
    {
-    "t": "What does this module say about “Why plain SGD zig-zags”?",
-    "ans": "Picture a long narrow valley where the gradient across the valley is 10 and along it is 0.1. With η = 0.01, SGD steps 0.1 across and 0.001 along — a hundred to one. It bounces off the steep walls while creeping toward the actual minimum."
+    "t": "What does this module say about “Momentum, precisely”?",
+    "ans": "Plain SGD steps in the direction of the current gradient and forgets everything before it. Momentum keeps a running average of past gradients and steps along that instead:"
    }
   ]
  },
@@ -2320,12 +3160,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Regularisation adds a weight-size penalty to the loss so the optimiser trades fit against simplicity, with λ setting the rate. L2 shrinks all weights proportionally and keeps every feature; L1 applies constant pressure and drives weights to exactly zero, producing a sparse, self-selecting model. Use it when the model overfits, scale the features first, and reach for AdamW if the optimiser is Adam."
    },
    {
-    "t": "What does this module say about “Penalising complexity”?",
-    "ans": "An overfitting model has found a way to fit noise, and doing that almost always requires large weights — sharp, wiggly functions need big coefficients. Regularisation exploits that by adding the size of the weights to the loss:"
-   },
-   {
     "t": "What does this module say about “Weight decay is not quite L2”?",
     "ans": "The two are used interchangeably and are only equivalent for plain SGD. Weight decay multiplies the weights by a factor slightly below 1 at each step; L2 adds a term to the loss, so its contribution passes through the optimiser’s gradient machinery."
+   },
+   {
+    "t": "What does this module say about “What usually goes wrong”?",
+    "ans": "Regularisation adds a weight-size penalty to the loss so the optimiser trades fit against simplicity, with λ setting the rate. L2 shrinks all weights proportionally and keeps every feature; L1 applies constant pressure and drives weights to exactly zero, producing a sparse, self-selecting model. Use it when the model overfits, scale the features first, and reach for AdamW if the optimiser is Adam."
    }
   ]
  },
@@ -2377,12 +3217,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Backpropagation multiplies per-layer derivatives together, so anything consistently below 1 shrinks the gradient exponentially with depth and anything above 1 amplifies it. Sigmoid’s maximum derivative of 0.25 made deep networks untrainable; ReLU’s derivative of 1 fixed it, and initialisation, normalisation and residual connections keep the product near 1 by design."
    },
    {
-    "t": "What does this module say about “Where both problems come from”?",
-    "ans": "Backpropagation computes the gradient at an early layer by multiplying together the local derivatives of every layer above it. For a network of depth L that is a product of L terms."
-   },
-   {
     "t": "What does this module say about “Why sigmoid made it worse”?",
     "ans": "The derivative of the sigmoid is σ(x)(1 − σ(x)) , which peaks at 0.25 when x = 0 and falls toward zero for inputs of large magnitude."
+   },
+   {
+    "t": "What does this module say about “What trips people up”?",
+    "ans": "Backpropagation multiplies per-layer derivatives together, so anything consistently below 1 shrinks the gradient exponentially with depth and anything above 1 amplifies it. Sigmoid’s maximum derivative of 0.25 made deep networks untrainable; ReLU’s derivative of 1 fixed it, and initialisation, normalisation and residual connections keep the product near 1 by design."
    }
   ]
  },
@@ -2396,12 +3236,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Initialisation must be random to break symmetry, and scaled to layer width so activation and gradient variance stay roughly constant with depth. He initialisation is the default for ReLU networks because ReLU halves the variance and He’s factor of 2 restores it; Xavier suits tanh and sigmoid. Get this wrong and a deep network either learns nothing or diverges — before the optimiser has had any say in the matter."
    },
    {
-    "t": "What does this module say about “Why not zero, and why not all-equal”?",
-    "ans": "Initialising every weight to zero seems harmless and completely breaks the network. If all weights in a layer are identical, every neuron in that layer computes the same output, receives the same gradient, and applies the same update — so they stay identical forever. A layer of 512 such neurons has the expressive power of one."
-   },
-   {
     "t": "What does this module say about “The variance is what actually matters”?",
     "ans": "Randomness alone is not enough; the scale of the random values decides whether signal survives depth. Each layer multiplies its input by a weight matrix, so the variance of the activations is multiplied layer by layer."
+   },
+   {
+    "t": "What does this module say about “Traps worth knowing”?",
+    "ans": "Initialisation must be random to break symmetry, and scaled to layer width so activation and gradient variance stay roughly constant with depth. He initialisation is the default for ReLU networks because ReLU halves the variance and He’s factor of 2 restores it; Xavier suits tanh and sigmoid. Get this wrong and a deep network either learns nothing or diverges — before the optimiser has had any say in the matter."
    }
   ]
  },
@@ -2415,12 +3255,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Weights decide direction and strength; the bias decides where the threshold sits."
    },
    {
-    "t": "What does this module say about “What each one does geometrically”?",
-    "ans": "A neuron computes z = w · x + b . Those two terms do different jobs, and it is worth separating them:"
-   },
-   {
     "t": "What does this module say about “A concrete example”?",
     "ans": "One input, weight w = 2.0 , bias b = 0 . At x = 0.5 you get z = 1.0 — the neuron fires."
+   },
+   {
+    "t": "What does this module say about “Why the bias cannot be dropped”?",
+    "ans": "Without a bias, the weighted sum is zero whenever every input is zero, so the decision boundary is forced through the origin. That is a severe restriction: a neuron that should fire only when its input exceeds 5 cannot express that threshold at all, because it has no way to shift its output independently of the inputs."
    }
   ]
  },
@@ -2969,6 +3809,126 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/does-len-count-characters-or-bytes.html",
+  "title": "Does len() count characters or bytes?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "len(s) on a Python 3 string counts:",
+    "o": [
+     "Bytes",
+     "Code points",
+     "Grapheme clusters",
+     "UTF-16 units"
+    ],
+    "a": 1,
+    "w": "A str is a sequence of code points. Bytes depend on an encoding, and graphemes need a library the standard library does not ship."
+   },
+   {
+    "t": "Two strings render identically but compare unequal. The most likely cause is:",
+    "o": [
+     "A trailing space",
+     "One uses a combining accent and the other a precomposed character",
+     "Different encodings",
+     "One is bytes"
+    ],
+    "a": 1,
+    "w": "é can be one code point or 'e' plus a combining mark. unicodedata.normalize('NFC', s) collapses them before comparison."
+   },
+   {
+    "t": "You need to enforce a 100-character database limit. You should measure:",
+    "o": [
+     "len(s)",
+     "len(s.encode('utf-8')) if the column is measured in bytes",
+     "The number of words",
+     "sys.getsizeof(s)"
+    ],
+    "a": 1,
+    "w": "Storage and transport limits are byte limits. A 100-code-point string can be 400 bytes in UTF-8."
+   }
+  ]
+ },
+ {
+  "path": "interview/what-does-string-slicing-cost.html",
+  "title": "What does slicing a string cost?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "s[2:6] returns:",
+    "o": [
+     "A view into s",
+     "A new string holding a copy of four characters",
+     "A list of characters",
+     "A generator"
+    ],
+    "a": 1,
+    "w": "Python string slices always copy. The cost is O(k) in the length of the slice, in both time and memory."
+   },
+   {
+    "t": "Why does peeling characters off the front with s = s[1:] go quadratic?",
+    "o": [
+     "The loop runs twice",
+     "Each iteration copies the whole remaining string",
+     "Strings are re-encoded",
+     "len() is O(n)"
+    ],
+    "a": 1,
+    "w": "n iterations copying an average of n/2 characters each is O(n²). Carrying an index copies nothing."
+   },
+   {
+    "t": "Which type gives you a genuine zero-copy slice?",
+    "o": [
+     "str",
+     "memoryview over bytes",
+     "list",
+     "tuple"
+    ],
+    "a": 1,
+    "w": "memoryview shares the underlying buffer, so slicing it is O(1). It works on bytes-like objects, not on str."
+   }
+  ]
+ },
+ {
+  "path": "interview/why-are-python-strings-immutable.html",
+  "title": "Why are Python strings immutable?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why can a string be a dictionary key when a list cannot?",
+    "o": [
+     "Strings are shorter",
+     "A string's value cannot change, so its hash cannot go stale",
+     "Lists are not comparable",
+     "Dictionaries only accept text"
+    ],
+    "a": 1,
+    "w": "A key is stored in a slot chosen from its hash. If the value could change afterwards the entry would sit in the wrong slot and become unreachable, so only immutable types are allowed."
+   },
+   {
+    "t": "What does s.upper() do to s?",
+    "o": [
+     "Uppercases it in place",
+     "Nothing - it returns a new string",
+     "Raises unless you assign it",
+     "Depends on the encoding"
+    ],
+    "a": 1,
+    "w": "Every string method returns a new object. Forgetting to assign the result is one of the most common beginner bugs in Python."
+   },
+   {
+    "t": "Building a string with += in a loop is O(n²) because each step:",
+    "o": [
+     "Re-encodes to UTF-8",
+     "Allocates a new string and copies everything so far",
+     "Sorts the characters",
+     "Grows the underlying list"
+    ],
+    "a": 1,
+    "w": "There is nothing to append to, so the accumulated text is copied every time. \"\".join(parts) does one allocation and one copy instead."
+   }
+  ]
+ },
+ {
   "path": "machine_learning/bias_vs_variance.html",
   "title": "Bias vs Variance",
   "cat": "Machine Learning",
@@ -3503,12 +4463,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A sliding window converts a time series into supervised (input, target) pairs, with the window size encoding how much history you claim is relevant and the stride controlling how much consecutive examples overlap. The modelling choice is straightforward; the discipline is in the split — chronological, with a gap of at least one window between segments, and every scaler fitted on the training period alone."
    },
    {
-    "t": "What does this module say about “Turning a sequence into a supervised problem”?",
-    "ans": "A model needs examples with features and a label. A time series is a single ordered run of values, so you build examples by sliding a fixed-length window along it: the values inside the window are the input, and the value immediately after it is the target."
-   },
-   {
     "t": "What does this module say about “Window size and stride”?",
     "ans": "Window size (W) is how much history the model sees per prediction, and it is a real modelling assumption: it asserts that nothing older than W steps matters. Too small and the model cannot see the pattern — a weekly cycle needs at least seven daily steps. Too large and each example carries mostly irrelevant history, the input dimension grows, and the number of examples shrinks."
+   },
+   {
+    "t": "What does this module say about “Splitting without leaking”?",
+    "ans": "This is the part that matters most and is most often got wrong. Random train-test splitting is invalid for time series: it puts future windows in the training set and past windows in the test set, so the model is trained on the future to predict the past."
    }
   ]
  },
@@ -3577,15 +4537,15 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “Why imbalance breaks training”?",
-    "ans": "Standard training minimises average loss over the dataset. When one class holds 99% of the rows, that average is dominated by it: predicting the majority everywhere already achieves very low loss, so there is little gradient pressure to learn the minority class at all."
-   },
-   {
     "t": "What does this module say about “The three families of fix”?",
     "ans": "Resample the data. Oversampling duplicates minority rows — simple, and risks overfitting to the few examples you have. SMOTE improves on it by synthesising new minority points along the lines between existing neighbours rather than copying. Undersampling discards majority rows, which balances the classes and throws away real information; it is reasonable when the majority class is genuinely enormous."
    },
    {
     "t": "What does this module say about “What usually goes wrong”?",
+    "ans": "Imbalance is a mismatch between the average loss you are minimising and the rare-class detection you actually want. Fix it by reweighting the loss (usually first), resampling the training data (inside the fold, never before the split), or simply moving the decision threshold. Then change the metric too — accuracy cannot show you whether any of it worked."
+   },
+   {
+    "t": "What does this module say about “The short version”?",
     "ans": "Imbalance is a mismatch between the average loss you are minimising and the rare-class detection you actually want. Fix it by reweighting the loss (usually first), resampling the training data (inside the fold, never before the split), or simply moving the decision threshold. Then change the metric too — accuracy cannot show you whether any of it worked."
    }
   ]
@@ -3638,12 +4598,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Conditioning on B does not change the outcomes, it discards the ones where B did not happen, so P(A | B) is simply the count of outcomes in both events divided by the count in B. Independence is the special case where that shrinking leaves A's share unchanged, which is exactly when P(A and B) = P(A)P(B) is valid and not before."
    },
    {
-    "t": "What does this module say about “P(A|B) is not P(B|A)”?",
+    "t": "What does this module say about “Try it yourself”?",
     "ans": "This is worth stating in its own section because it causes more real-world damage than any other confusion in probability."
    },
    {
-    "t": "What does this module say about “Where this goes wrong”?",
-    "ans": "Conditioning on B does not change the outcomes, it discards the ones where B did not happen, so P(A | B) is simply the count of outcomes in both events divided by the count in B. Independence is the special case where that shrinking leaves A's share unchanged, which is exactly when P(A and B) = P(A)P(B) is valid and not before."
+    "t": "What does this module say about “P(A|B) is not P(B|A)”?",
+    "ans": "This is worth stating in its own section because it causes more real-world damage than any other confusion in probability."
    }
   ]
  },
@@ -3672,16 +4632,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
+    "t": "What does this module say about “Things to try”?",
+    "ans": "For a single labelled example, p is one-hot: probability 1 on the true class and 0 elsewhere. Every term of the cross-entropy sum vanishes except one, leaving"
+   },
+   {
     "t": "What does this module say about “Why classifiers use it”?",
     "ans": "For a single labelled example, p is one-hot: probability 1 on the true class and 0 elsewhere. Every term of the cross-entropy sum vanishes except one, leaving"
    },
    {
     "t": "What does this module say about “Which direction, and why it matters”?",
     "ans": "KL(p ‖ q) — the \"forward\" direction used in supervised training — punishes assigning low probability to things that actually happen. A q that is too narrow gets an enormous penalty, so the fitted q tends to spread out and cover all of p's mass. It is mean-seeking ."
-   },
-   {
-    "t": "What does this module say about “What trips people up”?",
-    "ans": "Cross-entropy H(p, q) is what your beliefs cost when reality is p, entropy H(p) is the part of that cost no model could avoid, and the KL divergence is the difference — the waste that is genuinely your model's fault. KL is never negative and is zero only when q matches p exactly, so minimising cross-entropy and minimising divergence are the same job."
    }
   ]
  },
@@ -4373,12 +5333,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Embeddings are learned by training a deliberately simple model on a proxy task — predict a word from its context, or the context from the word — and keeping the embedding matrix while discarding everything else. Semantic structure emerges because words in similar contexts need similar vectors to make the prediction work."
    },
    {
-    "t": "What does this module say about “The distributional hypothesis”?",
-    "ans": "The whole field rests on one claim: a word is characterised by the company it keeps. Words appearing in similar contexts tend to mean similar things."
-   },
-   {
     "t": "What does this module say about “Negative sampling”?",
     "ans": "The naive setup predicts a probability distribution over the whole vocabulary, which means a softmax over 50,000 words for every training example. That is prohibitively expensive."
+   },
+   {
+    "t": "What does this module say about “Common mistakes”?",
+    "ans": "Embeddings are learned by training a deliberately simple model on a proxy task — predict a word from its context, or the context from the word — and keeping the embedding matrix while discarding everything else. Semantic structure emerges because words in similar contexts need similar vectors to make the prediction work."
    }
   ]
  },
@@ -4468,12 +5428,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "An n-gram model estimates the next word by counting how often each continuation followed the previous n−1 words, which makes it fast, interpretable, and trainable in a single pass. It is defeated by sparsity: the number of possible n-grams grows exponentially with n, so most sequences are never observed and smoothing is mandatory."
    },
    {
-    "t": "What does this module say about “Counting, not learning”?",
-    "ans": "An n-gram model estimates the probability of a word from the n−1 words before it, using nothing but counts from a corpus:"
-   },
-   {
     "t": "What does this module say about “Choosing n”?",
     "ans": "This is a bias–variance trade in a very concrete form. Small n generalises but ignores context; large n captures context but has seen almost nothing."
+   },
+   {
+    "t": "What does this module say about “The sparsity wall”?",
+    "ans": "The counts grow catastrophically. With a 50,000-word vocabulary there are 2.5 billion possible bigrams, 1.25 × 10 14 trigrams, and 3 × 10 23 5-grams. No corpus covers a meaningful fraction of them."
    }
   ]
  },
@@ -4502,16 +5462,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "What does this module say about “Normalising over the wrong axis”?",
-    "ans": "Every normalisation layer does the same arithmetic — subtract a mean, divide by a standard deviation, then apply a learned scale and shift. What differs is which values are pooled to compute that mean and deviation."
-   },
-   {
     "t": "What does this module say about “Why batch norm fails on sequences”?",
     "ans": "Variable length. Sequences in a batch have different lengths, so timestep 50 might have 32 real values in one batch and 3 in another, with the rest padding. Statistics computed over that are unstable, and computed over padding they are simply wrong."
    },
    {
     "t": "What does this module say about “The variants worth knowing”?",
     "ans": "The placement matters too. Original transformers put layer norm after the residual addition (post-norm); modern ones put it before the sublayer (pre-norm), which makes deep stacks far easier to train and often removes the need for a learning-rate warmup."
+   },
+   {
+    "t": "What does this module say about “Where this goes wrong”?",
+    "ans": "All normalisation layers subtract a mean and divide by a deviation; they differ only in which values are pooled. Batch norm pools across the batch, which makes it unusable for sequences of varying length and inference on single examples. Layer norm pools across each sample’s own features, so it is independent of batch size and identical at training and inference — which is why every transformer uses it."
    }
   ]
  },
@@ -4624,7 +5584,7 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Given a sequence of length N and a window of size w, slide the window one position at a time:"
    },
    {
-    "t": "What does this module say about “In one line”?",
+    "t": "What does this module say about “Experiments to try”?",
     "ans": "The sliding window is the simplest bridge between sequential data and supervised learning: it manufactures labeled examples from an unlabeled stream. Its fixed width is both its strength (simplicity) and its weakness — the model can never look further back than w steps, which is exactly the limitation that motivates recurrent architectures."
    }
   ]
@@ -4850,12 +5810,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A recurrent cell applies one small network at every timestep, combining the current token with a hidden state that summarises everything before it, using the same weights throughout. That gives a fixed-size model the ability to read arbitrary-length sequences and to be sensitive to order."
    },
    {
-    "t": "What does this module say about “The problem with feeding a sentence to a normal network”?",
-    "ans": "A feedforward network has a fixed number of inputs. A sentence does not have a fixed number of words. You can pad everything to a maximum length, but then the model has no notion that word 3 comes before word 4 — each position gets its own independent weights, so “dog bites man” and “man bites dog” are unrelated inputs as far as it is concerned."
-   },
-   {
     "t": "What does this module say about “The recurrence, written out”?",
     "ans": "At each timestep t the cell takes the current input x t and the previous hidden state h t−1 , and produces a new hidden state:"
+   },
+   {
+    "t": "What does this module say about “Things to try”?",
+    "ans": "The hidden state is overwritten at every step. Information from token 1 survives to token 50 only by passing through 49 successive multiplications by W h and 49 tanh nonlinearities."
    }
   ]
  },
@@ -4907,12 +5867,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A word cloud encodes frequency as font size and nothing else — position, colour and rotation are layout, not data. It needs stopword removal to say anything at all, and TF-IDF rather than raw frequency to show what is distinctive rather than merely common. Treat it as a fast exploratory glance at a corpus, and reach for a bar chart whenever the question is how much bigger one term is than another."
    },
    {
-    "t": "What does this module say about “What the picture encodes”?",
-    "ans": "Font size maps to frequency: the most common word is largest, and everything else is scaled relative to it. Position, colour and rotation almost always carry no information — they are chosen by a layout algorithm packing shapes into a space without overlap."
-   },
-   {
     "t": "What does this module say about “Why stopwords have to go”?",
     "ans": "Run a word cloud on raw English text and you get the , of , and , to , a in enormous type. These are the most frequent words in almost any corpus and they tell you nothing about the subject."
+   },
+   {
+    "t": "What does this module say about “Where raw frequency misleads, and what to use instead”?",
+    "ans": "Frequency alone conflates “important in this document” with “common in general”. The standard correction is TF-IDF , which weights a word by how often it appears in this document and divides by how many documents contain it at all:"
    }
   ]
  },

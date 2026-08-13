@@ -1116,6 +1116,30 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive Masked Language Modeling lab - mask tokens in a sentence and see how a bidirectional model like BERT predicts them from left and right context."
  },
  {
+  "title": "Does len() count characters or bytes?",
+  "path": "interview/does-len-count-characters-or-bytes.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "What does slicing a string cost?",
+  "path": "interview/what-does-string-slicing-cost.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Why are Python strings immutable?",
+  "path": "interview/why-are-python-strings-immutable.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
   "title": "Bias vs Variance",
   "path": "machine_learning/bias_vs_variance.html",
   "category": "Machine Learning",

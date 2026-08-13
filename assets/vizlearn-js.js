@@ -56,7 +56,11 @@
     'console.debug = pipe("");',
     'console.warn = pipe("warn");',
     'console.error = pipe("err");',
-    'console.clear = function () { emit("", "clear"); };',
+    // "clear" and "done" are control messages, not output. They have to be
+    // posted directly: emit() wraps everything as {type:"out"}, and the main
+    // thread switches on `type`, so routing them through emit() sends a blank
+    // output line and the control message is never seen.
+    'console.clear = function () { postMessage({ type: "clear" }); };',
     'var print = function () { console.log.apply(null, arguments); };',
     'self.onerror = function (e) {',
     '  emit(e && (e.message || e.error) ? String(e.message || e.error) : "Uncaught error", "err");',
@@ -70,7 +74,7 @@
     '  } catch (err) {',
     '    emit(String((err && err.stack) || err), "err");',
     '  }',
-    '  emit("", "done");',
+    '  postMessage({ type: "done" });',
     '};'
   ].join('\n');
 
@@ -168,8 +172,8 @@
     var timer = setTimeout(function () {
       timedOut = true;
       killWorker();
-      appendOut(block, 'Execution timed out', 'js-out-err');
-      appendOut(block, 'The engine was stopped \u2014 the code probably looped forever.', 'js-out-hint');
+      appendOut(block, 'Execution timed out', 'err');
+      appendOut(block, 'The engine was stopped \u2014 the code probably looped forever.', 'hint');
       setStatus(block, 'Timed out');
       parts.run.disabled = false;
     }, RUN_TIMEOUT);
@@ -195,13 +199,13 @@
       };
       w.onerror = function (e) {
         if (timedOut) return;
-        appendOut(block, (e && e.message) || 'worker error', 'js-out-err');
+        appendOut(block, (e && e.message) || 'worker error', 'err');
         finish();
       };
       w.postMessage({ type: 'run', code: code });
     } catch (err) {
       clearTimeout(timer);
-      appendOut(block, String(err), 'js-out-err');
+      appendOut(block, String(err), 'err');
       finish();
     }
   }

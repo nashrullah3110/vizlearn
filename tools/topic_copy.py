@@ -229,3 +229,28 @@ TOPIC_SECTIONS = {
 },
 
 }
+
+TOPIC_SECTIONS["interview"] = {
+ "more": "Every other track is organised around ideas. This one is organised around "
+         "questions, because that is the shape the pressure arrives in: someone asks "
+         "why your loop is quadratic, and you have thirty seconds. Each page is one "
+         "question, answered in full and then demonstrated by code you can run.",
+ "learn": [
+  "Answer the immutability, hashability and complexity questions without hedging.",
+  "Reach for the right technique on sight - two pointers, sliding window, prefix sums, a counter.",
+  "State the time and space cost of your own solution before being asked for it.",
+  "Recognise the traps: `in` on a list, `+=` on a string, `pop(0)` as a queue.",
+  "Show your working - the pages measure their claims, and so can you.",
+ ],
+ "order": "The track runs strings, then lists and arrays, then dictionaries, hashing and "
+          "the crossover problems, finishing on the complexity traps. Within each group "
+          "the conceptual questions come before the coding problems that lean on them, "
+          "because \"why is `in` slow on a list?\" is the answer to half the coding "
+          "questions that follow it. Nothing here assumes you have read the rest of the "
+          "site, though the algorithms track covers the same techniques at more length.",
+ "next": "The Algorithms and Data Structures track is the long-form version of this one: "
+         "same techniques, one page per algorithm rather than one page per question, with "
+         "the visualisation carrying more of the explanation. If a question here lands on "
+         "something unfamiliar - binary search bounds, hash collisions, dynamic programming "
+         "- that track has the full treatment.",
+}

@@ -163,7 +163,7 @@
     try {
       parts.preview.srcdoc = doc;
     } catch (err) {
-      appendOut(block, String(err), 'html-out-err');
+      appendOut(block, String(err), 'err');
     }
     setStatus(block, '');
     parts.run.disabled = false;

@@ -21,6 +21,22 @@
     return new URL('./', location.href).href;
   }
 
+  // Whether this page was already being served by a worker when it loaded.
+  // Read now, before clients.claim() can change it: a first-ever visit has no
+  // controller and must not reload, but a returning visit does and must.
+  var hadController = !!navigator.serviceWorker.controller;
+  var reloading = false;
+
+  // The new worker calls clients.claim(), which fires this. Until it does, the
+  // page is holding assets the previous build handed it - and a navigation is
+  // network first while assets are cache first, so those two can disagree:
+  // new markup, old stylesheet. One reload puts the whole page on one build.
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
+
   window.addEventListener('load', function () {
     var base = root();
     navigator.serviceWorker.register(base + 'sw.js', { scope: base })

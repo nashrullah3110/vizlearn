@@ -22,7 +22,12 @@ CSS = """
         @media (min-width: 1024px) {
             .vz-lab-grid { grid-template-columns: minmax(0, 1fr) 19rem; align-items: start; }
         }
-        .vz-lab-grid .html-editor { min-height: 16rem; }
+        /* No floor on the editor. The .vz-code system sizes the textarea to
+           its own content, so a min-height here does not grow the code - it
+           strands empty box below it (16rem left 204px of dead space under a
+           one-line document). The python and js labs floor their output panel
+           instead, and the preview iframe below already gives this page its
+           height. */
 
         .vz-lab-side {
             border: 1px solid var(--border-subtle);

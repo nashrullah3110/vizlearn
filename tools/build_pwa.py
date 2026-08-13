@@ -41,6 +41,7 @@ SHELL = [
     "./assets/vizlearn-python.js",
     "./assets/vizlearn-js.js",
     "./assets/vizlearn-html.js",
+    "./assets/vizlearn-interview.js",
     "./assets/practice-bank.js",
     "./assets/practice.js",
     "./assets/icons.js",
@@ -106,9 +107,15 @@ SW_TEMPLATE = """/* GENERATED FILE - do not edit by hand.
  *                offline.html. Content stays fresh when there is a connection
  *                and a page you have already read stays readable when there
  *                is not.
- *   assets       stale-while-revalidate. The stylesheet and scripts are
- *                versioned by the cache name, so a stale one is never wrong
- *                for long and never blocks a paint.
+ *   assets       stale-while-revalidate, but only ever against the CURRENT
+ *                cache. The lookup used to be a bare caches.match(), which
+ *                searches every cache in storage - so the first load after a
+ *                deploy paired the new HTML (navigations are network first)
+ *                with the previous build's stylesheet, and a page using a
+ *                class the old CSS had never heard of rendered unstyled. It
+ *                corrected itself on the next reload, which is exactly what
+ *                made it hard to believe. Scoping the match to CACHE means a
+ *                hit can only ever come from this build.
  *
  * Third-party requests - analytics, ads, fonts - are not touched at all.
  */
@@ -171,14 +178,13 @@ self.addEventListener('fetch', (event) => {
 
   if (isAsset(url)) {
     event.respondWith(
-      caches.match(req).then((hit) => {
+      caches.open(CACHE).then((cache) => cache.match(req).then((hit) => {
         const network = fetch(req).then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
+          cache.put(req, res.clone());
           return res;
         }).catch(() => hit);
         return hit || network;
-      })
+      }))
     );
   }
 });
