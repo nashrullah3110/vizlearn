@@ -3889,6 +3889,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/counting-with-dictionaries.html",
+  "title": "Count things with a dictionary",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Reading a missing key from a defaultdict:",
+    "o": [
+     "Returns None",
+     "Creates it with the default value",
+     "Raises KeyError",
+     "Returns 0 without inserting"
+    ],
+    "a": 1,
+    "w": "A read can grow the dictionary. Counter returns 0 without inserting, which is why it is safer for inspection."
+   },
+   {
+    "t": "Finding the k most common items is best done with:",
+    "o": [
+     "Sorting all counts, O(m log m)",
+     "A heap of size k, O(m log k)",
+     "A linear scan, O(m²)",
+     "Binary search"
+    ],
+    "a": 1,
+    "w": "heapq.nlargest and Counter.most_common(k) both do this. For 'top 10 of a billion' it is the whole question."
+   },
+   {
+    "t": "Counting n items with a dictionary costs:",
+    "o": [
+     "O(n log n)",
+     "O(n)",
+     "O(n²)",
+     "O(k) in the distinct count"
+    ],
+    "a": 1,
+    "w": "One lookup and one write per item, each O(1) on average. Space is O(k) in the number of distinct items."
+   }
+  ]
+ },
+ {
   "path": "interview/does-len-count-characters-or-bytes.html",
   "title": "Does len() count characters or bytes?",
   "cat": "Interview",
@@ -4005,6 +4045,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "One sort per word, then O(1) to place it. The count-tuple key drops it to O(n·m)."
+   }
+  ]
+ },
+ {
+  "path": "interview/how-does-a-python-dict-work.html",
+  "title": "How does a Python dict work?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Dictionary lookup is O(1) because:",
+    "o": [
+     "Dictionaries are sorted",
+     "The slot is computed from the key's hash rather than searched for",
+     "Keys are unique",
+     "It uses binary search"
+    ],
+    "a": 1,
+    "w": "Neither hashing nor indexing depends on the number of entries. The key comparison at the slot is what makes it correct."
+   },
+   {
+    "t": "Why does a resize have to rehash every key?",
+    "o": [
+     "Hashes change over time",
+     "The index is hash % size, and size just changed",
+     "To sort them",
+     "To free memory"
+    ],
+    "a": 1,
+    "w": "The hash is stable; the fold into a slot is not. Doubling the table moves nearly everything."
+   },
+   {
+    "t": "Python randomises string hashes per process in order to:",
+    "o": [
+     "Improve distribution",
+     "Stop an attacker crafting keys that all collide",
+     "Save memory",
+     "Preserve insertion order"
+    ],
+    "a": 1,
+    "w": "Deliberately collided input turns every operation into a linear scan - a real denial-of-service attack. It is also why hash() differs between runs."
    }
   ]
  },
@@ -4169,6 +4249,126 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/maximum-subarray-kadane.html",
+  "title": "Maximum subarray sum (Kadane)",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "At each element, Kadane chooses between:",
+    "o": [
+     "Sorting or not",
+     "Extending the current run or starting fresh from this element",
+     "Left half or right half",
+     "Adding or multiplying"
+    ],
+    "a": 1,
+    "w": "Only those two can be the best subarray ending here. It is dynamic programming with the table reduced to one variable."
+   },
+   {
+    "t": "Initialising best to 0 rather than values[0] breaks:",
+    "o": [
+     "Long arrays",
+     "An all-negative array, which returns 0 - the empty subarray",
+     "Arrays with duplicates",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "Zero is only reachable by choosing nothing at all. Ask whether the empty subarray is allowed before you commit."
+   },
+   {
+    "t": "The space complexity of Kadane is:",
+    "o": [
+     "O(n)",
+     "O(1)",
+     "O(log n)",
+     "O(n²)"
+    ],
+    "a": 1,
+    "w": "Two running values and nothing else. The DP table collapses because each step depends only on the previous one."
+   }
+  ]
+ },
+ {
+  "path": "interview/product-of-array-except-self.html",
+  "title": "Product of array except self",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why is division ruled out?",
+    "o": [
+     "It is slow",
+     "A single zero makes every other answer a division by zero",
+     "It loses precision",
+     "It needs an extra array"
+    ],
+    "a": 1,
+    "w": "Two zeros is worse still. You can special-case the zero count, but the question is really about the prefix/suffix decomposition."
+   },
+   {
+    "t": "The extra space beyond the output array is:",
+    "o": [
+     "O(n) for the suffix array",
+     "O(1) - the running product is a single variable",
+     "O(log n)",
+     "O(n²)"
+    ],
+    "a": 1,
+    "w": "The left products are stored in the output array itself and the right product is carried in one variable."
+   },
+   {
+    "t": "Why is the running product initialised to 1?",
+    "o": [
+     "To avoid zeros",
+     "It is the identity for multiplication, so the first prefix contributes nothing",
+     "To count elements",
+     "It could be anything"
+    ],
+    "a": 1,
+    "w": "A sum-based version of the same pattern would initialise to 0. Getting the identity wrong is the standard bug."
+   }
+  ]
+ },
+ {
+  "path": "interview/remove-duplicates-in-place.html",
+  "title": "Remove duplicates from a sorted array in place",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why does the function return a length rather than a list?",
+    "o": [
+     "Lists are slow",
+     "Nothing was reallocated, so the tail still holds stale data",
+     "To save memory",
+     "It returns both"
+    ],
+    "a": 1,
+    "w": "The point of the question is O(1) extra space. Building a new list would defeat it."
+   },
+   {
+    "t": "The current element is compared against:",
+    "o": [
+     "values[read - 1]",
+     "values[write - 1], the last element kept",
+     "values[0]",
+     "The next element"
+    ],
+    "a": 1,
+    "w": "The last kept value is the invariant. The other comparison agrees on sorted input and is the wrong idea to carry forward."
+   },
+   {
+    "t": "Writing into the array while reading it is safe because:",
+    "o": [
+     "The array is copied",
+     "write never overtakes read, so only already-consumed slots are overwritten",
+     "The array is sorted",
+     "Python protects it"
+    ],
+    "a": 1,
+    "w": "write lags behind by exactly the number of duplicates skipped, so it can never clobber unread input."
+   }
+  ]
+ },
+ {
   "path": "interview/reverse-a-string.html",
   "title": "Reverse a string",
   "cat": "Interview",
@@ -4209,6 +4409,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/rotate-an-array.html",
+  "title": "Rotate an array by k",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "The three-reversal rotation uses how much extra space?",
+    "o": [
+     "O(n)",
+     "O(1)",
+     "O(k)",
+     "O(log n)"
+    ],
+    "a": 1,
+    "w": "Only a couple of index variables. The slice version allocates a whole second array."
+   },
+   {
+    "t": "Why is `k %= n` needed before the reversals?",
+    "o": [
+     "To handle negatives only",
+     "A k larger than the array puts the block boundary out of range",
+     "To make it faster",
+     "It is not needed"
+    ],
+    "a": 1,
+    "w": "Rotating by k and by k % n are the same operation, and without the modulo the second reversal is given invalid bounds."
+   },
+   {
+    "t": "After reversing the whole array, why reverse each block again?",
+    "o": [
+     "To undo the rotation",
+     "The blocks are in the right places but internally backwards",
+     "To sort them",
+     "To save memory"
+    ],
+    "a": 1,
+    "w": "One reversal gets the two groups to the correct sides; the other two restore the order inside each group."
+   }
+  ]
+ },
+ {
   "path": "interview/string-compression.html",
   "title": "Run-length string compression",
   "cat": "Interview",
@@ -4245,6 +4485,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Each run of length k is written as at most k characters, so written output stays behind consumed input."
+   }
+  ]
+ },
+ {
+  "path": "interview/two-sum.html",
+  "title": "Two Sum",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "The one-pass solution works by:",
+    "o": [
+     "Sorting first",
+     "Looking up the complement target - value in a dictionary",
+     "Comparing every pair",
+     "Using binary search"
+    ],
+    "a": 1,
+    "w": "You know exactly which number you need, so it becomes a lookup rather than a search. That removes the inner loop."
+   },
+   {
+    "t": "Why must you check before storing the current value?",
+    "o": [
+     "For speed",
+     "Otherwise an element can pair with itself when the target is double it",
+     "Dictionaries reject duplicates",
+     "It does not matter"
+    ],
+    "a": 1,
+    "w": "[3] with target 6 returns (0, 0) if you store first - a pair that does not exist."
+   },
+   {
+    "t": "When is the two-pointer version preferable to the dictionary?",
+    "o": [
+     "Always",
+     "When the input is already sorted and O(1) space matters",
+     "When there are duplicates",
+     "When the list is short"
+    ],
+    "a": 1,
+    "w": "It needs no extra memory, but sorting just to enable it costs O(n log n) and destroys the original indices the question wants."
    }
   ]
  },
@@ -4329,6 +4609,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/what-is-a-python-list-underneath.html",
+  "title": "What is a Python list underneath?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "A Python list is implemented as:",
+    "o": [
+     "A linked list of nodes",
+     "A dynamic array of references",
+     "A hash table",
+     "A balanced tree"
+    ],
+    "a": 1,
+    "w": "Contiguous, equally sized references, over-allocated. That is why indexing is O(1) and why the references can point at objects of any type."
+   },
+   {
+    "t": "Why is append 'amortised' O(1) rather than simply O(1)?",
+    "o": [
+     "It is always O(1)",
+     "Occasionally it reallocates and copies everything, which is O(n)",
+     "It depends on the item",
+     "Because lists are sorted"
+    ],
+    "a": 1,
+    "w": "Growth is geometric, so the copies are rare enough to average out - but any individual append can be the expensive one."
+   },
+   {
+    "t": "insert(0, x) is O(n) because:",
+    "o": [
+     "The list is copied",
+     "Every existing element shifts one slot right",
+     "Python checks the type",
+     "It reallocates every time"
+    ],
+    "a": 1,
+    "w": "Contiguous storage means making room at the front costs a move of everything after it. deque avoids this entirely."
+   }
+  ]
+ },
+ {
+  "path": "interview/accidental-quadratic-complexity.html",
+  "title": "What is the complexity of this code?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "for x in items: if x in a_list: ... has complexity:",
+    "o": [
+     "O(n)",
+     "O(n²)",
+     "O(n log n)",
+     "O(1)"
+    ],
+    "a": 1,
+    "w": "n iterations times an O(n) membership scan. Building a set before the loop makes it O(n)."
+   },
+   {
+    "t": "Which fixes a queue built on list.pop(0)?",
+    "o": [
+     "Sorting the list",
+     "collections.deque",
+     "A set",
+     "A tuple"
+    ],
+    "a": 1,
+    "w": "pop(0) shifts every remaining element, so it is O(n) each and O(n²) overall. deque is O(1) at both ends."
+   },
+   {
+    "t": "How do you demonstrate a quadratic without arguing about it?",
+    "o": [
+     "Read the source",
+     "Double the input and show the time going up about fourfold",
+     "Count the lines",
+     "Profile one call"
+    ],
+    "a": 1,
+    "w": "Growth is the observable property. Linear roughly doubles; quadratic roughly quadruples."
+   }
+  ]
+ },
+ {
   "path": "interview/str-versus-bytes-in-python.html",
   "title": "What is the difference between str and bytes?",
   "cat": "Interview",
@@ -4409,6 +4769,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/the-nested-list-multiplication-bug.html",
+  "title": "Why does [[0]*3]*3 break?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "[[0] * 3] * 3 creates:",
+    "o": [
+     "Three independent rows",
+     "One row, referenced three times",
+     "A 3x3 tuple",
+     "An error"
+    ],
+    "a": 1,
+    "w": "Multiplication repeats the reference. Writing through any of the three names is writing to the one object."
+   },
+   {
+    "t": "a[:] on a list of lists gives you:",
+    "o": [
+     "A full independent copy",
+     "A new outer list holding the same inner lists",
+     "The same object",
+     "A tuple"
+    ],
+    "a": 1,
+    "w": "That is a shallow copy. Nested mutation is still shared; only copy.deepcopy duplicates all the way down."
+   },
+   {
+    "t": "def f(x, acc=[]) misbehaves because the default is evaluated:",
+    "o": [
+     "On every call",
+     "Once, when the function is defined",
+     "Only on the first call that omits it",
+     "Never"
+    ],
+    "a": 1,
+    "w": "One list is created at definition time and shared by every call that omits the argument. Use None and build inside the function."
+   }
+  ]
+ },
+ {
   "path": "interview/string-interning-and-the-is-operator.html",
   "title": "Why does `is` sometimes work on strings?",
   "cat": "Interview",
@@ -4445,6 +4845,86 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Those are singletons, so identity is genuinely the test you want. Everything else should use ==."
+   }
+  ]
+ },
+ {
+  "path": "interview/why-is-in-slow-on-a-list.html",
+  "title": "Why is `in` slow on a list but fast on a set?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "x in my_list has complexity:",
+    "o": [
+     "O(1)",
+     "O(n)",
+     "O(log n)",
+     "O(n log n)"
+    ],
+    "a": 1,
+    "w": "A list has no index of its contents, so membership is a linear scan. A miss always costs the full length."
+   },
+   {
+    "t": "Testing membership repeatedly against a large list is best fixed by:",
+    "o": [
+     "Sorting the list first",
+     "Building a set once, before the loop",
+     "Using a tuple",
+     "Using enumerate"
+    ],
+    "a": 1,
+    "w": "O(n) once plus O(1) per lookup, instead of O(n) per lookup. Building it inside the loop would be worse than not bothering."
+   },
+   {
+    "t": "Which deduplicates a list while preserving order?",
+    "o": [
+     "set(items)",
+     "list(dict.fromkeys(items))",
+     "sorted(set(items))",
+     "items.unique()"
+    ],
+    "a": 1,
+    "w": "Dicts have preserved insertion order since 3.7, so their keys act as an ordered set. A set makes no ordering promise."
+   }
+  ]
+ },
+ {
+  "path": "interview/why-must-dict-keys-be-hashable.html",
+  "title": "Why must dictionary keys be hashable?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "A list cannot be a dictionary key because:",
+    "o": [
+     "Lists are too large",
+     "Mutating it would change its hash and orphan the entry",
+     "Lists are not comparable",
+     "Lists have no order"
+    ],
+    "a": 1,
+    "w": "The hash is the address. A moving hash means a moving address, and the entry becomes unreachable."
+   },
+   {
+    "t": "Is (1, [2]) hashable?",
+    "o": [
+     "Yes, tuples are always hashable",
+     "No - a tuple's hash comes from its contents, and a list is mutable",
+     "Only if the list is empty",
+     "Yes, but slowly"
+    ],
+    "a": 1,
+    "w": "Immutability has to hold all the way down. frozenset exists so that set-like values can be keys."
+   },
+   {
+    "t": "Defining __eq__ on a class without __hash__ makes instances:",
+    "o": [
+     "Hash by identity",
+     "Unhashable - Python sets __hash__ to None",
+     "Hash by value automatically",
+     "Immutable"
+    ],
+    "a": 1,
+    "w": "You redefined equality, so the identity-based default hash no longer agrees with it. @dataclass(frozen=True) does both correctly."
    }
   ]
  },

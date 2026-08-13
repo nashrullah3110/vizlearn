@@ -137,8 +137,12 @@ def visual(q):
     notice_block = ('<section class="vz-iq-note"><h3>What to watch</h3>'
                     '<ul>%s</ul></section>' % notice) if notice else ""
 
+    # Its own class rather than .vz-codelab, which it originally borrowed for
+    # the sizing. Sharing the class meant `document.querySelector('.vz-codelab')`
+    # found the visualisation instead of the editor - harmless on the page and
+    # confusing for anything scripting it.
     return """
-        <section class="vz-codelab" aria-labelledby="vz-iq-viz-h">
+        <section class="vz-ivsec" aria-labelledby="vz-iq-viz-h">
             <div class="vz-section-head">%(eye)s<h2 id="vz-iq-viz-h">Step through it</h2>
             <span class="vz-rule"></span></div>
             <div class="vz-iq-grid">
