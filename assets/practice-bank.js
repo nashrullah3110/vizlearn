@@ -4209,6 +4209,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/grouping-and-inverting-dictionaries.html",
+  "title": "Group records and invert a dictionary",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "itertools.groupby differs from SQL's GROUP BY in that it:",
+    "o": [
+     "Is faster",
+     "Only groups consecutive equal keys, so the input must be sorted first",
+     "Returns a dict",
+     "Cannot take a key function"
+    ],
+    "a": 1,
+    "w": "On unsorted input you get one group per run, and later runs overwrite earlier ones when collected into a dict."
+   },
+   {
+    "t": "Inverting a dict with a comprehension when two keys share a value:",
+    "o": [
+     "Raises ValueError",
+     "Silently keeps only the last key",
+     "Keeps both in a list",
+     "Skips the duplicates"
+    ],
+    "a": 1,
+    "w": "No error is raised and an entry disappears. If duplicates are possible, invert to lists - which is grouping by value."
+   },
+   {
+    "t": "A dict mapping names to lists of scores cannot be inverted directly because:",
+    "o": [
+     "It is too large",
+     "Lists are unhashable and so cannot be keys",
+     "The names repeat",
+     "Comprehensions do not allow it"
+    ],
+    "a": 1,
+    "w": "Converting each value to a tuple makes it hashable and the inversion legal."
+   }
+  ]
+ },
+ {
   "path": "interview/how-does-a-python-dict-work.html",
   "title": "How does a Python dict work?",
   "cat": "Interview",
@@ -4245,6 +4285,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Deliberately collided input turns every operation into a linear scan - a real denial-of-service attack. It is also why hash() differs between runs."
+   }
+  ]
+ },
+ {
+  "path": "interview/design-a-hashmap.html",
+  "title": "Implement a hash map from scratch",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "In separate chaining, a collision means:",
+    "o": [
+     "An error",
+     "Both entries live in the same bucket's list",
+     "The table resizes",
+     "One key is overwritten"
+    ],
+    "a": 1,
+    "w": "Collisions are expected. The lookup then compares keys along the chain, which is why the key comparison is not optional."
+   },
+   {
+    "t": "Why does a resize have to rehash every key?",
+    "o": [
+     "Hashes expire",
+     "The bucket index is hash % size, and the size just changed",
+     "To sort the keys",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "The hash is stable; the fold into a bucket is not. That single resize is O(n), amortised to O(1) per insert."
+   },
+   {
+    "t": "Why is deletion harder in open addressing than in chaining?",
+    "o": [
+     "It needs more memory",
+     "Blanking a slot breaks probe chains that ran through it, so tombstones are needed",
+     "Keys become unhashable",
+     "It is not harder"
+    ],
+    "a": 1,
+    "w": "A later entry reached by probing past the deleted slot becomes unreachable. Tombstones let probes continue while allowing reuse."
    }
   ]
  },

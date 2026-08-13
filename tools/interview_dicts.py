@@ -2073,3 +2073,428 @@ print("Arguments become dict keys, so they have to be hashable.")
                 "expect lists - the constraint comes from the cache."},
     ],
 )
+
+
+def _hashmap_frames():
+    out = [frame([marked(["[]", "[]", "[]", "[]", "[]", "[]", "[]", "[]"],
+                         {}, label="8 buckets, each a list"),
+                  pairs([("put('a', 1)", "hash % 8 -> bucket 3")],
+                        {"put('a', 1)": "hit"}, label="step")],
+                 "Every bucket is a list of (key, value) pairs. Chaining: a "
+                 "collision appends rather than probing elsewhere.",
+                 {"entries": 0, "buckets": 8})]
+    out.append(frame(marked(["[]", "[]", "[]", "[('a',1)]", "[]", "[]", "[]", "[]"],
+                            {3: "hit"}, label="buckets"),
+                     "Appended to bucket 3. One list, one entry.",
+                     {"entries": 1, "buckets": 8}))
+    out.append(frame(marked(["[]", "[]", "[]", "[('a',1),('i',9)]", "[]", "[]",
+                             "[]", "[]"], {3: "bad"}, label="buckets"),
+                     "'i' hashes to bucket 3 as well - a collision. Both live in "
+                     "the same list, and a lookup now compares keys along it.",
+                     {"entries": 2, "buckets": 8}))
+    out.append(frame(marked(["[]"] * 16, {}, label="16 buckets, all rehashed"),
+                     "Past the load factor the table doubles and every key is "
+                     "reinserted, because the bucket index is hash % size.",
+                     {"entries": 6, "buckets": 16}))
+    return viz(out)
+
+
+_q(
+    slug="design-a-hashmap",
+    kind="coding",
+    level="Medium",
+    title="Implement a hash map from scratch",
+    asked="Implement a hash map with put, get and remove, without using a dict.",
+    desc="Separate chaining, the load factor, why deletion is the hard part of "
+         "open addressing, and what has to happen on a resize.",
+    lead="An array of <strong>buckets</strong>, each a small list of "
+         "<code>(key, value)</code> pairs. The key's hash picks the bucket; "
+         "collisions append to that bucket's list and lookups compare keys along "
+         "it. Grow and rehash once the average bucket stops being short &mdash; "
+         "that is what keeps operations O(1).",
+    say="\"Array of buckets with separate chaining. hash(key) % size picks the "
+        "bucket, and I compare keys within it because collisions are expected. "
+        "Resize when the load factor passes about 0.75, rehashing everything - "
+        "the index depends on the size, so it all moves.\"",
+    notice=[
+        "A collision is normal, not an error &mdash; both entries share a bucket.",
+        "Lookups compare <em>keys</em>, never just hashes.",
+        "A resize invalidates every bucket index at once.",
+    ],
+    viz=_hashmap_frames(),
+    sections=[
+        ("Chaining versus open addressing",
+         "<p><strong>Separate chaining</strong> puts colliding entries in a list "
+         "per bucket. Simple, deletion is trivial, and it tolerates a high load "
+         "factor. This is what to implement under time pressure.</p>"
+         "<p><strong>Open addressing</strong> stores everything in the array "
+         "itself and probes for the next free slot on a collision. Better cache "
+         "behaviour and less pointer chasing &mdash; it is what CPython actually "
+         "uses &mdash; but deletion is genuinely hard.</p>"),
+        ("Why deletion is hard in open addressing",
+         "<p>Removing an entry leaves a hole, and a probe sequence that ran "
+         "<em>through</em> that slot to reach a later entry now stops at the "
+         "hole and reports the later entry missing.</p>"
+         "<p>The fix is a <strong>tombstone</strong>: mark the slot deleted "
+         "rather than empty, so probes continue past it but inserts may reuse "
+         "it. Tombstones accumulate and eventually force a rehash even without "
+         "growth. Being able to say that is usually what the question is really "
+         "checking.</p>"),
+        ("The load factor and the resize",
+         "<p>Lookup is O(1) only while buckets stay short. Once entries divided "
+         "by buckets passes roughly 0.75, chains lengthen and every operation "
+         "drifts towards O(n).</p>"
+         "<p>So the table doubles and <em>every key is rehashed</em>, because "
+         "the index is <code>hash(key) % size</code> and the size just changed. "
+         "That single resize is O(n), and amortised over the insertions that "
+         "caused it each insert is still O(1) &mdash; but any individual insert "
+         "can be the expensive one.</p>"),
+    ],
+    code={
+        "file": "hashmap.py",
+        "intro": "A working hash map with chaining, its bucket distribution "
+                 "printed before and after a resize, and the tombstone problem "
+                 "demonstrated on a small open-addressing version.",
+        "code": '''# A hash map, from scratch. Separate chaining.
+
+class HashMap:
+    def __init__(self, buckets=8):
+        self.buckets = [[] for _ in range(buckets)]
+        self.count = 0
+        self.resizes = 0
+
+    def _index(self, key):
+        return hash(key) % len(self.buckets)      # hash picks the bucket
+
+    def put(self, key, value):
+        bucket = self.buckets[self._index(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:                          # compare KEYS, not hashes
+                bucket[i] = (key, value)
+                return
+        bucket.append((key, value))
+        self.count += 1
+        if self.count / len(self.buckets) > 0.75:
+            self._resize()
+
+    def get(self, key, default=None):
+        for k, v in self.buckets[self._index(key)]:
+            if k == key:
+                return v
+        return default
+
+    def remove(self, key):
+        bucket = self.buckets[self._index(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:
+                bucket.pop(i)                     # trivial with chaining
+                self.count -= 1
+                return True
+        return False
+
+    def _resize(self):
+        old = self.buckets
+        self.buckets = [[] for _ in range(len(old) * 2)]
+        for bucket in old:
+            for k, v in bucket:                   # every key moves
+                self.buckets[self._index(k)].append((k, v))
+        self.resizes += 1
+
+    def spread(self):
+        sizes = [len(b) for b in self.buckets]
+        return f"{len(self.buckets)} buckets, longest chain {max(sizes)}, empty {sizes.count(0)}"
+
+
+m = HashMap()
+for i, word in enumerate("alpha bravo charlie delta echo foxtrot golf hotel".split()):
+    m.put(word, i)
+    if i in (3, 7):
+        print(f"after {i + 1} puts: {m.spread()}  (resizes so far: {m.resizes})")
+
+print()
+print("get('charlie') :", m.get("charlie"))
+print("get('missing') :", m.get("missing", "default"))
+print("remove('delta'):", m.remove("delta"), " get now:", m.get("delta", "gone"))
+
+# --- why open addressing needs tombstones ------------------------------
+print()
+class NaiveOpenAddressing:
+    """Deletes by blanking the slot. Watch what that does to a probe."""
+    def __init__(self, size=8):
+        self.slots = [None] * size
+
+    def _probe(self, key):
+        i = hash(key) % len(self.slots)
+        while self.slots[i] is not None and self.slots[i][0] != key:
+            i = (i + 1) % len(self.slots)         # linear probing
+        return i
+
+    def put(self, key, value):
+        self.slots[self._probe(key)] = (key, value)
+
+    def get(self, key):
+        i = hash(key) % len(self.slots)
+        while self.slots[i] is not None:
+            if self.slots[i][0] == key:
+                return self.slots[i][1]
+            i = (i + 1) % len(self.slots)
+        return "NOT FOUND"
+
+    def delete(self, key):
+        self.slots[self._probe(key)] = None       # a hole, not a tombstone
+
+
+# Force a collision by using keys we control the hash of.
+class Fixed:
+    def __init__(self, name, h):
+        self.name, self.h = name, h
+    def __hash__(self):
+        return self.h
+    def __eq__(self, other):
+        return isinstance(other, Fixed) and self.name == other.name
+    def __repr__(self):
+        return self.name
+
+a, b = Fixed("a", 1), Fixed("b", 1)               # same hash on purpose
+table = NaiveOpenAddressing()
+table.put(a, "first")
+table.put(b, "second")
+print("before delete: b ->", table.get(b))
+table.delete(a)
+print("after deleting a: b ->", table.get(b), " <- the probe stopped at the hole")
+print("A tombstone would let the probe continue past the deleted slot.")
+''',
+        "walk": [
+            ("hash(key) % len(self.buckets)",
+             "Two jobs. The hash turns a key into a number; the modulo folds it "
+             "into a valid index. Change the bucket count and every index "
+             "changes, which is why a resize rehashes."),
+            ("if k == key",
+             "Keys are compared, not hashes. Two different keys can share a "
+             "bucket, so this comparison is what makes the answer correct rather "
+             "than merely probable."),
+            ("if self.count / len(self.buckets) > 0.75",
+             "The load factor. O(1) holds only while chains stay short, so the "
+             "table grows before they lengthen rather than after."),
+            ("self.slots[...] = None in the naive version",
+             "Deleting by blanking breaks the probe chain: the lookup for "
+             "<code>b</code> stops at the hole left by <code>a</code> and "
+             "reports it missing. That is what tombstones exist to prevent."),
+        ],
+        "try": [
+            "Print <code>spread()</code> after every put. The longest chain "
+            "creeps up and drops back to 1 at each resize.",
+            "Add a tombstone marker to the open-addressing version so probes "
+            "continue past deletions. Then count how many accumulate before a "
+            "rehash is needed anyway.",
+        ],
+    },
+    check=[
+        {"q": "In separate chaining, a collision means:",
+         "options": ["An error", "Both entries live in the same bucket's list",
+                     "The table resizes", "One key is overwritten"],
+         "answer": 1,
+         "why": "Collisions are expected. The lookup then compares keys along "
+                "the chain, which is why the key comparison is not optional."},
+        {"q": "Why does a resize have to rehash every key?",
+         "options": ["Hashes expire", "The bucket index is hash % size, and the "
+                     "size just changed",
+                     "To sort the keys", "It does not"],
+         "answer": 1,
+         "why": "The hash is stable; the fold into a bucket is not. That single "
+                "resize is O(n), amortised to O(1) per insert."},
+        {"q": "Why is deletion harder in open addressing than in chaining?",
+         "options": ["It needs more memory", "Blanking a slot breaks probe "
+                     "chains that ran through it, so tombstones are needed",
+                     "Keys become unhashable", "It is not harder"],
+         "answer": 1,
+         "why": "A later entry reached by probing past the deleted slot becomes "
+                "unreachable. Tombstones let probes continue while allowing reuse."},
+    ],
+)
+
+
+def _grouping_frames():
+    people = [("ana", "eng"), ("bo", "sales"), ("cy", "eng"), ("di", "sales"),
+              ("ed", "eng")]
+    out = []
+    groups = {}
+    for i, (name, team) in enumerate(people):
+        groups.setdefault(team, []).append(name)
+        marks = {j: ("hit" if j == i else "done" if j < i else "dim")
+                 for j in range(len(people))}
+        out.append(frame([marked(["%s/%s" % p for p in people], marks,
+                                 label="records"),
+                          pairs([(k, ", ".join(v)) for k, v in sorted(groups.items())],
+                                {team: "hit"}, label="team -> members")],
+                         "%s joins %r. One lookup, one append - no scanning for "
+                         "an existing group." % (name, team),
+                         {"seen": i + 1, "groups": len(groups)}))
+    out.append(frame(pairs([(v[0] if len(v) == 1 else "%d people" % len(v), k)
+                            for k, v in sorted(groups.items())],
+                           {}, label="inverted: value -> key"),
+                     "Inverting is a comprehension - but only safe when the "
+                     "values are unique and hashable.",
+                     {"seen": len(people), "groups": len(groups)}))
+    return viz(out)
+
+
+_q(
+    slug="grouping-and-inverting-dictionaries",
+    kind="coding",
+    level="Easy",
+    title="Group records and invert a dictionary",
+    asked="Group a list of records by a field. Then invert a dictionary so the "
+          "values become keys.",
+    desc="setdefault, defaultdict and itertools.groupby compared for grouping, "
+         "and the two things that break a naive dictionary inversion.",
+    lead="Group with <code>setdefault</code> or <code>defaultdict(list)</code> "
+         "&mdash; one pass, one lookup per record, no scanning for an existing "
+         "group. Inverting is a one-line comprehension, with two traps: "
+         "<strong>duplicate values silently collapse</strong>, and unhashable "
+         "values raise.",
+    say="\"defaultdict(list) and append - one pass, O(n). For inverting, a dict "
+        "comprehension, but I'd check the values are unique first, because "
+        "duplicates silently overwrite and you lose entries without an error.\"",
+    notice=[
+        "Each record costs one lookup and one append.",
+        "Groups appear as they are first encountered.",
+        "Inversion assumes the values are unique &mdash; watch what happens when "
+        "they are not.",
+    ],
+    viz=_grouping_frames(),
+    sections=[
+        ("Three ways to group",
+         "<p><code>setdefault(key, []).append(x)</code> &mdash; no import, and "
+         "it makes the default explicit. It does construct an empty list on "
+         "every call, which is why the next form is usually preferred.</p>"
+         "<p><code>defaultdict(list)</code> &mdash; the idiomatic answer. "
+         "Remember that <em>reading</em> a missing key creates it, so it is not "
+         "safe to inspect casually.</p>"
+         "<p><code>itertools.groupby</code> &mdash; the one that catches people. "
+         "It groups <em>consecutive</em> equal keys only, so it needs the input "
+         "sorted by the same key first. It is not the SQL GROUP BY its name "
+         "suggests.</p>"),
+        ("Two ways inversion breaks",
+         "<p><strong>Duplicate values.</strong> <code>{v: k for k, v in "
+         "d.items()}</code> keeps only the last key for each repeated value, "
+         "silently. If duplicates are possible, invert to lists instead &mdash; "
+         "which is just grouping again, by value.</p>"
+         "<p><strong>Unhashable values.</strong> A value that was fine as a "
+         "value cannot necessarily be a key: a dict mapping names to lists of "
+         "scores cannot be inverted directly, because a list is unhashable.</p>"),
+        ("Where this shows up",
+         "<p>Grouping is the shape behind most \"organise this data\" questions: "
+         "anagram groups keyed on sorted letters, files keyed on their hash, log "
+         "lines keyed on their level. Recognising it saves you from writing a "
+         "nested loop that scans for an existing group &mdash; the accidental "
+         "O(n&sup2;) this idiom exists to avoid.</p>"),
+    ],
+    code={
+        "file": "grouping.py",
+        "intro": "The three grouping idioms agreeing, groupby getting it wrong "
+                 "on unsorted input, and both inversion failures caught in the "
+                 "act.",
+        "code": '''# Grouping and inverting: one pass each, and two traps in the inversion.
+from collections import defaultdict
+from itertools import groupby
+
+people = [("ana", "eng"), ("bo", "sales"), ("cy", "eng"),
+          ("di", "sales"), ("ed", "eng")]
+
+by_setdefault = {}
+for name, team in people:
+    by_setdefault.setdefault(team, []).append(name)
+
+by_default = defaultdict(list)
+for name, team in people:
+    by_default[team].append(name)
+
+print("setdefault :", dict(by_setdefault))
+print("defaultdict:", dict(by_default))
+print("agree      :", by_setdefault == dict(by_default))
+
+# --- groupby groups CONSECUTIVE keys only ------------------------------
+unsorted_groups = {k: [n for n, _ in g] for k, g in
+                   groupby(people, key=lambda p: p[1])}
+sorted_groups = {k: [n for n, _ in g] for k, g in
+                 groupby(sorted(people, key=lambda p: p[1]), key=lambda p: p[1])}
+print()
+print("groupby, unsorted:", unsorted_groups, " <- 'eng' appears twice, last wins")
+print("groupby, sorted  :", sorted_groups)
+print("It is not SQL's GROUP BY. Sort by the same key first, or use a dict.")
+
+# --- inverting ---------------------------------------------------------
+capital = {"france": "paris", "japan": "tokyo", "italy": "rome"}
+print()
+print("inverted:", {v: k for k, v in capital.items()})
+
+# Trap 1: duplicate values collapse, silently.
+sizes = {"ana": "medium", "bo": "large", "cy": "medium"}
+naive = {v: k for k, v in sizes.items()}
+grouped = defaultdict(list)
+for k, v in sizes.items():
+    grouped[v].append(k)
+print()
+print("input          :", sizes)
+print("naive inversion:", naive, "  <- 'ana' vanished")
+print("inverted safely:", dict(grouped))
+
+# Trap 2: values that cannot be keys.
+scores = {"ana": [90, 80], "bo": [70]}
+try:
+    {v: k for k, v in scores.items()}
+except TypeError as e:
+    print()
+    print("inverting list values ->", e)
+print("A tuple would work:", {tuple(v): k for k, v in scores.items()})
+''',
+        "walk": [
+            ("setdefault(team, []).append(name)",
+             "One lookup and one append per record. The alternative &mdash; "
+             "scanning existing groups for a match &mdash; is the O(n&sup2;) "
+             "this idiom exists to avoid."),
+            ("groupby(people, key=...)",
+             "Groups only <em>consecutive</em> equal keys, so unsorted input "
+             "produces a group per run and later runs overwrite earlier ones. "
+             "Sorting first is mandatory."),
+            ("{v: k for k, v in sizes.items()}",
+             "Silently loses <code>ana</code>, because two names share a size "
+             "and the later key wins. No error, one entry gone."),
+            ("{v: k for k, v in scores.items()}",
+             "A <code>TypeError</code>: the values are lists, and a key must be "
+             "hashable. Converting to tuples is the usual fix."),
+        ],
+        "try": [
+            "Group by two fields at once using a tuple key. It works because "
+            "tuples are hashable &mdash; the same reason they can be dict keys "
+            "at all.",
+            "Read a missing key from the <code>defaultdict</code> and print it "
+            "again. The read created an entry, which is the trap that idiom "
+            "carries.",
+        ],
+    },
+    check=[
+        {"q": "itertools.groupby differs from SQL's GROUP BY in that it:",
+         "options": ["Is faster", "Only groups consecutive equal keys, so the "
+                     "input must be sorted first",
+                     "Returns a dict", "Cannot take a key function"],
+         "answer": 1,
+         "why": "On unsorted input you get one group per run, and later runs "
+                "overwrite earlier ones when collected into a dict."},
+        {"q": "Inverting a dict with a comprehension when two keys share a value:",
+         "options": ["Raises ValueError", "Silently keeps only the last key",
+                     "Keeps both in a list", "Skips the duplicates"],
+         "answer": 1,
+         "why": "No error is raised and an entry disappears. If duplicates are "
+                "possible, invert to lists - which is grouping by value."},
+        {"q": "A dict mapping names to lists of scores cannot be inverted "
+              "directly because:",
+         "options": ["It is too large", "Lists are unhashable and so cannot be "
+                     "keys",
+                     "The names repeat", "Comprehensions do not allow it"],
+         "answer": 1,
+         "why": "Converting each value to a tuple makes it hashable and the "
+                "inversion legal."},
+    ],
+)

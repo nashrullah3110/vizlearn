@@ -1196,8 +1196,24 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Group records and invert a dictionary",
+  "path": "interview/grouping-and-inverting-dictionaries.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
   "title": "How does a Python dict work?",
   "path": "interview/how-does-a-python-dict-work.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Implement a hash map from scratch",
+  "path": "interview/design-a-hashmap.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
