@@ -25,6 +25,12 @@
   var PYODIDE_VERSION = '0.26.4';
   var PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide/v' + PYODIDE_VERSION + '/full/';
   var RUN_TIMEOUT = 10000;
+  // The interpreter is a multi-megabyte download on the first Run of a visit,
+  // and on a slow connection that alone can outlast anything a run is allowed.
+  // The two are timed separately: sharing one budget meant a first Run on a
+  // heavy page reported "the code probably looped forever" while the code had
+  // not started.
+  var LOAD_TIMEOUT = 60000;
 
   // Runs the student's code inside Pyodide. A single-expression program is
   // evaluated so its value is shown REPL-style; anything longer is exec'd so
@@ -196,22 +202,32 @@
     var out = parts.output;
     out.textContent = '';
     parts.run.disabled = true;
-    setStatus(block, 'Running\u2026');
+    setStatus(block, worker ? 'Running\u2026' : 'Loading Python\u2026');
 
     var timedOut = false;
-    var timer = setTimeout(function () {
+
+    function giveUp(hint) {
       timedOut = true;
       killWorker();
       appendOut(block, 'Execution timed out', 'py-out-err');
-      appendOut(block, 'The interpreter was stopped \u2014 the code probably looped forever.', 'py-out-hint');
+      appendOut(block, hint, 'py-out-hint');
       setStatus(block, 'Timed out');
       parts.run.disabled = false;
-    }, RUN_TIMEOUT);
+    }
+
+    var timer = setTimeout(function () {
+      giveUp('The interpreter did not finish downloading \u2014 check the connection and try again.');
+    }, LOAD_TIMEOUT);
 
     ensureWorker().then(function () {
       // The timeout may already have fired and terminated the worker while
       // this promise was still pending; `worker` is null in that case.
       if (timedOut || !worker) return;
+      // The interpreter is up, so the run's own budget starts here.
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        giveUp('The interpreter was stopped \u2014 the code probably looped forever.');
+      }, RUN_TIMEOUT);
       setStatus(block, 'Running\u2026');
       var finish = function () {
         clearTimeout(timer);

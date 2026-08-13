@@ -1133,4 +1133,1002 @@ LABS = {
             "let a top-k full of excluded documents leave nothing behind."},
 ]},
 
+# =========================================================================
+# Algorithms and data structures
+#
+# Every module on this track carries a runnable implementation of its own
+# algorithm (tools/code_dsa.py). Where a question can be settled by reading
+# or running that program rather than by recalling a sentence, it is written
+# that way - a reader who has actually pressed Run should have an advantage
+# over one who has only scrolled.
+# =========================================================================
+
+"dsa/linear_search.html": {"check": [
+    {"q": "Linear search needs the data to be:",
+     "options": ["Sorted", "Numeric", "Nothing in particular - any sequence",
+                 "Stored in a hash table"],
+     "answer": 2,
+     "why": "It compares each item in turn, so it has no precondition at all. "
+            "That is its one real advantage: every faster search buys its speed "
+            "with an assumption about the data."},
+    {"q": "The program prints an average of comparisons over every value in the "
+          "list. What does it land on?",
+     "options": ["n", "(n + 1) / 2", "log n", "n / 4"],
+     "answer": 1,
+     "why": "Finding item i takes i + 1 comparisons, and averaged over all "
+            "positions that is (n + 1) / 2 - about half the list, which is where "
+            "the usual rule of thumb comes from."},
+    {"q": "Which case costs the full n comparisons?",
+     "options": ["Only the last item", "Only a missing item",
+                 "Both the last item and a missing item", "Neither"],
+     "answer": 2,
+     "why": "The loop only stops early on a hit. A miss has to rule out every "
+            "element, so failure always costs the worst case."},
+]},
+
+"dsa/binary_search.html": {"check": [
+    {"q": "Binary search on unsorted data:",
+     "options": ["Raises an error", "Returns the wrong answer without complaining",
+                 "Falls back to a linear scan", "Sorts the data first"],
+     "answer": 1,
+     "why": "Nothing checks the precondition. It compares against the middle, "
+            "discards a half on the strength of that comparison, and returns "
+            "something plausible - which is far more dangerous than a crash."},
+    {"q": "Why is the midpoint written mid = lo + (hi - lo) // 2?",
+     "options": ["It is faster", "It avoids overflow when lo + hi is large",
+                 "It rounds differently", "It handles empty lists"],
+     "answer": 1,
+     "why": "Arithmetically identical to (lo + hi) // 2, but that form overflows "
+            "in fixed-width integers. The bug lived in the JDK's binary search "
+            "for nine years."},
+    {"q": "Change hi = mid - 1 to hi = mid and run the program. What happens?",
+     "options": ["It returns the wrong index", "It skips the last element",
+                 "It loops forever and the interpreter kills it",
+                 "Nothing - both are correct"],
+     "answer": 2,
+     "why": "mid has already been compared and ruled out. Leaving it in the "
+            "window means a two-item window stops shrinking, so the loop never "
+            "ends."},
+]},
+
+"dsa/interpolation_search.html": {"check": [
+    {"q": "Interpolation search improves on binary search by:",
+     "options": ["Sorting as it goes",
+                 "Guessing where the target should be from its value",
+                 "Checking both ends first", "Using a hash of the target"],
+     "answer": 1,
+     "why": "It interpolates a position from the value's distance between the "
+            "endpoints, instead of always probing the middle. That one line is "
+            "the whole difference."},
+    {"q": "The program runs it on [1,2,3,4,5,6,7,8,9,5000] looking for 9. Why "
+          "does it take so many steps?",
+     "options": ["The list is too short", "9 is not in the list",
+                 "The outlier flattens the estimate, so the probe advances one "
+                 "index at a time",
+                 "It has to sort first"],
+     "answer": 2,
+     "why": "The computed fraction is nearly zero because 5000 dominates the "
+            "value range, so each probe lands next to the previous one and the "
+            "search degenerates to O(n)."},
+    {"q": "Its O(log log n) figure assumes the data is:",
+     "options": ["Sorted only", "Sorted and roughly uniformly distributed",
+                 "All positive", "In a contiguous array"],
+     "answer": 1,
+     "why": "Sortedness alone is not enough - the estimate is a straight-line "
+            "guess, so it needs the values to rise at a roughly steady rate."},
+]},
+
+"dsa/fibonacci_search.html": {"check": [
+    {"q": "What does Fibonacci search avoid that binary search needs?",
+     "options": ["Sorted input", "Division", "Extra memory", "Comparisons"],
+     "answer": 1,
+     "why": "The split points come from adding and subtracting Fibonacci "
+            "numbers, so no division or bit-shift is required. On hardware "
+            "without cheap division that mattered."},
+    {"q": "Its step count compared with binary search is:",
+     "options": ["Much better", "About the same - both O(log n)",
+                 "Much worse", "Depends on the target"],
+     "answer": 1,
+     "why": "Both are logarithmic and Fibonacci search is slightly worse by a "
+            "constant. The win was never the step count."},
+    {"q": "Why does the probe use min(offset + f2, n - 1)?",
+     "options": ["To skip duplicates",
+                 "Because the covering Fibonacci number overshoots the array",
+                 "To keep the search stable", "To handle negative numbers"],
+     "answer": 1,
+     "why": "The sequence jumps 8, 13, 21 - it rarely equals the array length, "
+            "so the first probe can point past the end and has to be clamped."},
+]},
+
+"dsa/bubble_sort.html": {"check": [
+    {"q": "What does the swapped flag buy?",
+     "options": ["Fewer swaps", "A best case of O(n) on sorted input",
+                 "Stability", "Less memory"],
+     "answer": 1,
+     "why": "A pass with no swaps proves the list is sorted, so it stops. "
+            "Without it, sorted input still costs the full n passes."},
+    {"q": "Why does the inner loop run to n - 1 - i rather than n - 1?",
+     "options": ["To avoid an index error",
+                 "Because after pass i the last i items are already final",
+                 "To keep it stable", "It makes it O(n)"],
+     "answer": 1,
+     "why": "Each pass carries the largest remaining value to the end, so that "
+            "tail never needs looking at again. It saves comparisons, not "
+            "complexity."},
+    {"q": "The program's swap count for a given list equals:",
+     "options": ["The number of items", "The number of passes",
+                 "The number of inversions in the input", "n log n"],
+     "answer": 2,
+     "why": "Each swap fixes exactly one inverted pair, so the totals match "
+            "exactly. That is why [1,2,3,4,5,0] is so expensive - one item out "
+            "of place at the wrong end is five inversions."},
+]},
+
+"dsa/selection_sort.html": {"check": [
+    {"q": "How many comparisons does selection sort make on an already sorted "
+          "list of n items?",
+     "options": ["n - 1", "About n log n", "The same n(n-1)/2 as always", "0"],
+     "answer": 2,
+     "why": "There is no early exit available: you cannot know an item is the "
+            "minimum without checking every remaining one. The count is fixed by "
+            "n alone."},
+    {"q": "What selection sort is genuinely good at:",
+     "options": ["Nearly sorted data", "Making at most n - 1 swaps",
+                 "Being stable", "Large datasets"],
+     "answer": 1,
+     "why": "One swap per position, whatever the input. Where writes are "
+            "expensive - flash memory, or records much larger than the key - "
+            "that is a real advantage."},
+    {"q": "Sorting [2, 2, 1] with this implementation:",
+     "options": ["Keeps the two 2s in their original order",
+                 "Swaps their order, so the sort is not stable",
+                 "Raises an error", "Skips the duplicate"],
+     "answer": 1,
+     "why": "The first 2 is swapped with the 1 at the far end, jumping it past "
+            "the second 2. Selection sort is not stable; insertion sort is."},
+]},
+
+"dsa/insertion_sort.html": {"check": [
+    {"q": "Insertion sort's running time is driven by:",
+     "options": ["The size of the list alone",
+                 "How many inversions the input has",
+                 "The largest value", "Whether the values are unique"],
+     "answer": 1,
+     "why": "Each shift fixes one inversion, so a nearly sorted list is nearly "
+            "free. \"Nearly sorted\" is a measurable quantity here, not a vague "
+            "description."},
+    {"q": "Why does the inner loop shift items rather than swap them?",
+     "options": ["Swapping would be wrong",
+                 "A shift is one write instead of three",
+                 "It keeps the sort stable", "It avoids recursion"],
+     "answer": 1,
+     "why": "The item being placed is held in key, so the hole can simply be "
+            "moved. That constant-factor saving is why insertion sort beats "
+            "bubble sort in practice."},
+    {"q": "Real sort implementations switch to insertion sort for small "
+          "partitions because:",
+     "options": ["It is stable", "It uses no extra memory",
+                 "Its constant factor is small, and big-O ignores constants",
+                 "It is easier to write"],
+     "answer": 2,
+     "why": "At n around 16 the O(n²) with a tiny constant beats the O(n log n) "
+            "with a heavier one. CPython's own sort does exactly this."},
+]},
+
+"dsa/merge_sort.html": {"check": [
+    {"q": "Where does the actual sorting happen in merge sort?",
+     "options": ["In the split", "In the merge",
+                 "In the base case", "In the recursion"],
+     "answer": 1,
+     "why": "Splitting a list in half is positional and does no comparing. All "
+            "the ordering work is in combining two sorted halves."},
+    {"q": "In merge, why is the comparison left[i] <= right[j] rather than < ?",
+     "options": ["It is faster", "It keeps the sort stable",
+                 "It avoids an index error", "It handles empty lists"],
+     "answer": 1,
+     "why": "On a tie the left half wins, and the left half held the earlier "
+            "items. Changing it to < breaks stability silently, with no other "
+            "visible symptom."},
+    {"q": "Merge sort's worst case compared with its best case:",
+     "options": ["Much worse", "Slightly worse",
+                 "The same - O(n log n) either way", "Depends on the pivot"],
+     "answer": 2,
+     "why": "It has no pivot to choose badly and no early exit to hit. That "
+            "predictability is exactly why it is used where worst-case latency "
+            "matters."},
+]},
+
+"dsa/quick_sort.html": {"check": [
+    {"q": "With a last-element pivot, which input is quicksort's worst case?",
+     "options": ["Random data", "Already sorted data",
+                 "Data with duplicates", "Very short lists"],
+     "answer": 1,
+     "why": "Each partition peels off one element instead of halving, so the "
+            "recursion goes n deep. The program prints depth 8 for a sorted "
+            "9-item list against 4 for a shuffled one."},
+    {"q": "After partition returns p, why do the recursive calls skip index p?",
+     "options": ["To save a comparison",
+                 "The pivot is already in its final sorted position",
+                 "To keep the sort stable", "To avoid infinite recursion"],
+     "answer": 1,
+     "why": "Everything left of p is smaller and everything right is larger, so "
+            "p cannot move again. That is the one guaranteed piece of progress "
+            "each partition makes."},
+    {"q": "Quicksort's advantage over merge sort is mainly:",
+     "options": ["Better worst case", "Stability",
+                 "It sorts in place, needing O(log n) extra space rather than O(n)",
+                 "Fewer comparisons"],
+     "answer": 2,
+     "why": "Its worst case is worse and it is not stable. The memory profile, "
+            "plus good cache behaviour, is what keeps it in use."},
+]},
+
+"dsa/heap_sort.html": {"check": [
+    {"q": "After the heapify phase, the list is:",
+     "options": ["Sorted", "Reverse sorted",
+                 "A valid heap, which is a much weaker ordering than sorted",
+                 "Unchanged"],
+     "answer": 2,
+     "why": "A heap only promises each parent beats its children. Nothing is "
+            "claimed about siblings - and that weakness is why it can be built "
+            "in O(n)."},
+    {"q": "Building the heap bottom-up, starting at the last parent, costs:",
+     "options": ["O(n log n)", "O(n)", "O(log n)", "O(n²)"],
+     "answer": 1,
+     "why": "Most nodes are near the leaves and sift down barely at all. The "
+            "sum works out linear, which surprises people who expect n sifts of "
+            "log n each."},
+    {"q": "Why does the extraction phase swap the root with the last item?",
+     "options": ["To keep the sort stable",
+                 "It both removes the maximum and puts it in its final position, "
+                 "with no extra memory",
+                 "To rebalance the tree", "To avoid recursion"],
+     "answer": 1,
+     "why": "One swap does both jobs, which is how heap sort sorts in place. "
+            "The heap then shrinks by one and is repaired with a single sift."},
+]},
+
+"dsa/counting_sort.html": {"check": [
+    {"q": "How does counting sort beat the O(n log n) lower bound?",
+     "options": ["It is parallel", "It never compares two elements",
+                 "It uses more memory", "It only works on small lists"],
+     "answer": 1,
+     "why": "The bound applies to comparison sorts. Counting sort uses the value "
+            "as an array index, so the proof simply does not cover it."},
+    {"q": "Why does the final loop iterate over reversed(a)?",
+     "options": ["It is faster", "To keep the sort stable",
+                 "To handle negatives", "To avoid an off-by-one"],
+     "answer": 1,
+     "why": "Walking backwards while decrementing before writing keeps equal "
+            "items in their original order. Radix sort depends on that, so "
+            "getting it wrong breaks the algorithm built on top."},
+    {"q": "The program sorts [5, 100000, 3]. What is the problem?",
+     "options": ["The list is too short", "The values are too far apart, so k "
+                 "dwarfs n",
+                 "It is not sorted first", "Counting sort cannot handle 100000"],
+     "answer": 1,
+     "why": "O(n + k) is linear only when k is comparable to n. Three items and "
+            "a hundred thousand counters is the case that makes the cost "
+            "obvious."},
+]},
+
+"dsa/radix_sort.html": {"check": [
+    {"q": "Why must each digit pass be stable?",
+     "options": ["To keep it fast", "Otherwise the previous pass's ordering is "
+                 "destroyed",
+                 "To handle negative numbers", "It does not have to be"],
+     "answer": 1,
+     "why": "Sorting by tens must preserve the ones ordering among items with "
+            "equal tens digits. An unstable pass silently produces a wrong "
+            "final answer."},
+    {"q": "Radix sort's cost is O(d · n), where d is:",
+     "options": ["The number of items", "The number of digits in the largest value",
+                 "The number of distinct values", "log n"],
+     "answer": 1,
+     "why": "One pass per digit position, each pass linear in n. Adding a single "
+            "very wide value adds passes over the entire list."},
+    {"q": "After only the ones-digit pass, the list:",
+     "options": ["Is sorted", "Is sorted by last digit and otherwise scrambled",
+                 "Is unchanged", "Is reverse sorted"],
+     "answer": 1,
+     "why": "Every intermediate state looks broken, which is what makes LSD "
+            "radix sort hard to debug by eye. Only the final pass makes it "
+            "correct."},
+]},
+
+"dsa/graph_representations.html": {"check": [
+    {"q": "For a sparse graph, an adjacency matrix wastes space because it "
+          "stores:",
+     "options": ["Every node twice", "V² cells regardless of how many edges exist",
+                 "The edge weights", "A copy of each edge list"],
+     "answer": 1,
+     "why": "The grid is allocated up front. A million users with a few hundred "
+            "million friendships would need 10¹² cells to hold them."},
+    {"q": "\"Is there an edge between A and D?\" is answered fastest by:",
+     "options": ["An adjacency list", "An adjacency matrix",
+                 "An edge list", "All three are the same"],
+     "answer": 1,
+     "why": "One indexed read. The list has to scan A's neighbours and the edge "
+            "list has to scan everything."},
+    {"q": "BFS, DFS and Dijkstra all assume an adjacency list because they ask:",
+     "options": ["\"Are these two connected?\"",
+                 "\"Who does this node reach?\"",
+                 "\"How many edges are there?\"", "\"Is the graph directed?\""],
+     "answer": 1,
+     "why": "Traversals iterate a node's neighbours, which a list returns "
+            "directly and a matrix only finds by scanning a whole row of V "
+            "cells."},
+]},
+
+"dsa/breadth_first_search.html": {"check": [
+    {"q": "Turning BFS into DFS requires changing:",
+     "options": ["The visited set", "popleft() to pop() - the container",
+                 "The graph representation", "The order of the neighbour list"],
+     "answer": 1,
+     "why": "FIFO gives breadth-first, LIFO gives depth-first. The rest of the "
+            "loop is identical, which is the clearest way to see that the "
+            "container is the algorithm."},
+    {"q": "Why does the code mark a node visited when it is enqueued rather "
+          "than when it is dequeued?",
+     "options": ["It is tidier", "Otherwise a node with several neighbours "
+                 "already queued gets added more than once",
+                 "To keep distances correct", "To detect cycles"],
+     "answer": 1,
+     "why": "Marking late lets the same node be queued repeatedly before it is "
+            "ever processed, which blows up the queue on dense graphs."},
+    {"q": "BFS gives shortest paths on an unweighted graph because:",
+     "options": ["It uses a priority queue",
+                 "Nodes are dequeued in order of distance, so the first arrival "
+                 "is by a shortest path",
+                 "It visits every node", "It sorts the neighbours"],
+     "answer": 1,
+     "why": "The frontier expands one full level at a time. On weighted graphs "
+            "that no longer holds and you need Dijkstra."},
+]},
+
+"dsa/depth_first_search.html": {"check": [
+    {"q": "Without the visited set, DFS on a graph containing a cycle:",
+     "options": ["Returns the wrong order", "Recurses forever",
+                 "Skips some nodes", "Works fine"],
+     "answer": 1,
+     "why": "A graph is not a tree. The visited set is the only thing that "
+            "terminates the traversal - the program adds a G to A edge to "
+            "demonstrate exactly this."},
+    {"q": "Why does the iterative version also check 'if node in visited' after "
+          "popping?",
+     "options": ["To avoid infinite loops",
+                 "A node can be pushed by several neighbours before it is popped",
+                 "To match the recursive order", "To count the nodes"],
+     "answer": 1,
+     "why": "Duplicates on the stack are harmless but wasteful; without the "
+            "check the same node is expanded twice."},
+    {"q": "Work that belongs on the \"leave\" line - after the recursive calls "
+          "return - includes:",
+     "options": ["Marking visited", "Printing the node",
+                 "Topological ordering and subtree sizes", "Choosing the start"],
+     "answer": 2,
+     "why": "Post-order work needs the whole subtree already processed. "
+            "Topological sort by DFS is exactly this, reversed."},
+]},
+
+"dsa/dijkstras.html": {"check": [
+    {"q": "With one negative edge, Dijkstra:",
+     "options": ["Raises an error", "Loops forever",
+                 "Returns a wrong answer without complaining", "Still works"],
+     "answer": 2,
+     "why": "The program finalises C at 2, then discovers a route through B "
+            "worth -2 and never revisits it. Correctness rests on no edge ever "
+            "making a finalised node cheaper."},
+    {"q": "Why does the code push a new heap entry instead of updating an "
+          "existing one?",
+     "options": ["It is more accurate", "heapq cannot decrease a key in place, "
+                 "so stale entries are skipped when popped",
+                 "To keep the heap sorted", "To count relaxations"],
+     "answer": 1,
+     "why": "Lazy deletion: cheaper and far easier to get right than a "
+            "decrease-key structure, at the cost of a heap larger than the node "
+            "count."},
+    {"q": "Replacing the heap with a linear scan for the nearest node gives:",
+     "options": ["Wrong answers", "The same answers at O(V²) instead of "
+                 "O(E log V)",
+                 "A faster algorithm", "Bellman-Ford"],
+     "answer": 1,
+     "why": "The heap is an accelerator, not part of the logic. On a dense "
+            "graph the O(V²) version is actually competitive."},
+]},
+
+"dsa/bellman_ford.html": {"check": [
+    {"q": "Why exactly V - 1 rounds?",
+     "options": ["It is a safety margin",
+                 "A shortest path visits each node once, so it has at most V - 1 "
+                 "edges",
+                 "It matches the edge count", "To detect cycles"],
+     "answer": 1,
+     "why": "Each round settles at least one more edge of any shortest path, so "
+            "V - 1 rounds is enough and one more would be wasted."},
+    {"q": "How does the algorithm detect a negative cycle?",
+     "options": ["It counts the edges", "It checks for negative weights up front",
+                 "One extra relaxation round still improves something",
+                 "The distances go to negative infinity"],
+     "answer": 2,
+     "why": "After V - 1 rounds the distances are final if they exist. A further "
+            "improvement proves you can keep going round and getting cheaper, so "
+            "no shortest path exists."},
+    {"q": "Compared with Dijkstra, Bellman-Ford is:",
+     "options": ["Faster and more general", "Slower but handles negative weights",
+                 "Faster but needs sorted edges", "The same algorithm"],
+     "answer": 1,
+     "why": "O(V·E) against O(E log V). You pay for the generality, which is why "
+            "Dijkstra remains the default when weights are non-negative."},
+]},
+
+"dsa/a_star.html": {"check": [
+    {"q": "Setting the heuristic to zero turns A* into:",
+     "options": ["BFS", "Dijkstra", "Greedy best-first search", "DFS"],
+     "answer": 1,
+     "why": "f = g + h collapses to f = g, which is Dijkstra's priority exactly. "
+            "The program runs the identical function both ways to show it."},
+    {"q": "An admissible heuristic is one that:",
+     "options": ["Is fast to compute", "Never overestimates the remaining cost",
+                 "Is always exact", "Ignores obstacles"],
+     "answer": 1,
+     "why": "Overestimating lets A* commit to a route before a cheaper one is "
+            "examined, so the path it returns can be longer than the shortest."},
+    {"q": "Both searches in the program return a path of the same length. What "
+          "differs?",
+     "options": ["The path itself", "The number of cells expanded",
+                 "The memory used", "Nothing"],
+     "answer": 1,
+     "why": "136 cells against 90 on this grid. A* is not more correct - it is "
+            "the same answer reached without looking away from the goal."},
+]},
+
+"dsa/topological_sort.html": {"check": [
+    {"q": "Kahn's algorithm starts from the nodes whose in-degree is:",
+     "options": ["Highest", "Zero", "One", "Equal to their out-degree"],
+     "answer": 1,
+     "why": "In-degree zero means nothing has to happen first, so those can be "
+            "taken immediately - and in any order among themselves."},
+    {"q": "The program detects a cycle by noticing that:",
+     "options": ["A node repeats", "The output is shorter than the node count",
+                 "The queue empties", "An in-degree goes negative"],
+     "answer": 1,
+     "why": "Nodes in a cycle wait on each other forever, so their in-degree "
+            "never reaches zero and they never enter the queue. The short output "
+            "is the detection - it costs nothing extra."},
+    {"q": "A directed acyclic graph has:",
+     "options": ["Exactly one topological order",
+                 "Usually many valid topological orders",
+                 "None unless it is a tree", "One per starting node"],
+     "answer": 1,
+     "why": "Swapping popleft() for pop() produces a different, equally correct "
+            "order. Where a specific one is needed, a heap gives the "
+            "lexicographically smallest."},
+]},
+
+"dsa/cycle_detection.html": {"check": [
+    {"q": "Floyd's tortoise and hare uses how much extra memory?",
+     "options": ["O(n) for a visited set", "O(log n)", "O(1) - two pointers",
+                 "O(n) for the path"],
+     "answer": 2,
+     "why": "That is the entire point of it. A visited set also works and is "
+            "easier, but it costs memory proportional to the list."},
+    {"q": "Why does the comparison use 'slow is fast' rather than '==' ?",
+     "options": ["It is faster", "Two different nodes holding equal values would "
+                 "fool ==",
+                 "== does not work on objects", "To avoid a type error"],
+     "answer": 1,
+     "why": "The question is whether the two pointers are on the same node, "
+            "which is identity, not equality of contents."},
+    {"q": "Why does directed-graph cycle detection need three colours rather "
+          "than a plain visited set?",
+     "options": ["To find the cycle's length",
+                 "Because reaching an already-finished node is fine, while "
+                 "reaching one still on the current path is a cycle",
+                 "To handle disconnected graphs", "To make it iterative"],
+     "answer": 1,
+     "why": "With two states, any diamond shape - two paths meeting at one node - "
+            "is reported as a cycle. GREY versus BLACK is what distinguishes "
+            "them."},
+]},
+
+"dsa/minimum_spanning_tree.html": {"check": [
+    {"q": "A spanning tree of a graph with V nodes always has:",
+     "options": ["V edges", "V - 1 edges", "E - V edges", "As few as possible"],
+     "answer": 1,
+     "why": "Exactly enough to connect everything with no cycle. Both Kruskal "
+            "and Prim stop at that count in the program."},
+    {"q": "The difference between Kruskal and Prim is that Kruskal:",
+     "options": ["Is faster", "Sorts all edges globally, while Prim only "
+                 "considers edges leaving the tree it has grown",
+                 "Handles negative weights", "Needs a starting node"],
+     "answer": 1,
+     "why": "Kruskal works from a global sort and needs union-find to reject "
+            "cycles; Prim grows locally from one node with a priority queue."},
+    {"q": "Kruskal uses union-find to:",
+     "options": ["Sort the edges", "Track the tree's weight",
+                 "Check in near-constant time whether an edge would close a cycle",
+                 "Find the starting node"],
+     "answer": 2,
+     "why": "Both endpoints already in the same component means the edge adds "
+            "only a cycle. Without union-find that check would need a traversal "
+            "per edge."},
+]},
+
+"dsa/union_find.html": {"check": [
+    {"q": "What does path compression do?",
+     "options": ["Removes duplicate elements",
+                 "Re-points every node touched on the way up straight at the root",
+                 "Merges the two smallest trees", "Sorts the parent array"],
+     "answer": 1,
+     "why": "The walk pays for the next walk. Every node on the path becomes one "
+            "hop from the root, so repeat queries are effectively free."},
+    {"q": "Union by rank exists to prevent:",
+     "options": ["Duplicate unions", "Trees degenerating into long chains",
+                 "Cycles", "Memory growth"],
+     "answer": 1,
+     "why": "Attaching blindly, as the naive version does, builds a linked list "
+            "wearing a tree's name - and find degrades to O(n), which the "
+            "program's hop counts show directly."},
+    {"q": "With both optimisations, the amortised cost per operation is:",
+     "options": ["O(log n)", "O(1) exactly",
+                 "O(α(n)), which is below 5 for any real n", "O(n)"],
+     "answer": 2,
+     "why": "The inverse Ackermann function grows so slowly that it is a "
+            "constant for practical purposes - but it is not literally O(1)."},
+]},
+
+"dsa/stacks.html": {"check": [
+    {"q": "Why does the balanced-brackets check test that the stack is empty at "
+          "the end?",
+     "options": ["To free memory", "To catch openers that were never closed",
+                 "To reset for the next call", "It is not necessary"],
+     "answer": 1,
+     "why": "\"((()\" has every closer matched and is still unbalanced. Without "
+            "the final check it passes."},
+    {"q": "In the postfix evaluator, why is it 'b, a = stack.pop(), stack.pop()' "
+          "in that order?",
+     "options": ["It reads better", "The second operand was pushed last, so it "
+                 "comes off first",
+                 "To avoid an index error", "The order does not matter"],
+     "answer": 1,
+     "why": "Swap the names and + and * still look right while - and / silently "
+            "invert - the worst kind of bug to find."},
+    {"q": "A stack built on a Python list uses append and pop with no index "
+          "because:",
+     "options": ["It is more readable", "Both act on the end, so both are O(1)",
+                 "pop(0) is not allowed", "It keeps the order correct"],
+     "answer": 1,
+     "why": "insert(0, x) and pop(0) shift every other element. Same stack, every "
+            "operation turned into O(n)."},
+]},
+
+"dsa/queues.html": {"check": [
+    {"q": "Why is a queue built on list.pop(0) slow?",
+     "options": ["Lists cannot grow", "Removing the first item shifts every "
+                 "remaining item one place left",
+                 "It copies the list", "It is not slow"],
+     "answer": 1,
+     "why": "O(n) per dequeue, so O(n²) to drain the queue. The program times "
+            "30,000 dequeues both ways."},
+    {"q": "collections.deque gives O(1) at both ends because it is:",
+     "options": ["A sorted array", "A doubly linked list of blocks",
+                 "A hash table", "A binary heap"],
+     "answer": 1,
+     "why": "There is no contiguous array to shift, so appending or popping at "
+            "either end is a pointer update."},
+    {"q": "A circular buffer must track its size separately because:",
+     "options": ["It grows", "Head meeting tail is ambiguous between full and "
+                 "empty",
+                 "The modulo is expensive", "It stores None"],
+     "answer": 1,
+     "why": "Both states have head == tail. Getting this wrong silently "
+            "overwrites the oldest entry."},
+]},
+
+"dsa/linked_lists.html": {"check": [
+    {"q": "In reverse(), why is 'nxt = node.next' saved before 'node.next = "
+          "prev'?",
+     "options": ["For readability", "Otherwise the rest of the list becomes "
+                 "unreachable",
+                 "To count the nodes", "To handle the empty list"],
+     "answer": 1,
+     "why": "Overwriting the only pointer to the remainder loses it - not "
+            "corrupted, just gone. Delete the line and the list comes back one "
+            "node long."},
+    {"q": "What is the dummy head in delete() for?",
+     "options": ["Marking the end", "Removing the special case of deleting the "
+                 "first node",
+                 "Counting nodes", "Making it doubly linked"],
+     "answer": 1,
+     "why": "Without a previous node to re-point, deleting the head needs its own "
+            "branch - and that branch is where the bug always is."},
+    {"q": "Compared with a Python list, a linked list is better at:",
+     "options": ["Random access", "Inserting at the front",
+                 "Memory use", "Cache behaviour"],
+     "answer": 1,
+     "why": "O(1) with no shifting. It loses on everything else, including "
+            "sequential scans, because the nodes are scattered in memory."},
+]},
+
+"dsa/hash_tables.html": {"check": [
+    {"q": "The program replaces the hash function with 'lambda k: 1'. What "
+          "happens?",
+     "options": ["It raises an error", "Keys are lost",
+                 "Everything lands in one bucket and every lookup becomes O(n)",
+                 "It gets faster"],
+     "answer": 2,
+     "why": "The structure still works perfectly and every guarantee evaporates. "
+            "O(1) was always conditional on the hash spreading keys out."},
+    {"q": "Why does a resize have to rehash every key?",
+     "options": ["The hashes change", "The index is hash % size, and size just "
+                 "changed",
+                 "To keep insertion order", "To free memory"],
+     "answer": 1,
+     "why": "The hash is stable; the fold into a bucket index is not. Doubling "
+            "the table moves nearly everything."},
+    {"q": "The load factor threshold exists because:",
+     "options": ["Memory is limited", "Collisions rise sharply as the table "
+                 "fills, so it grows before that happens",
+                 "Python requires it", "It keeps buckets sorted"],
+     "answer": 1,
+     "why": "Past about three-quarters full the chains get long fast. Resizing "
+            "is O(n), but amortised over the inserts that caused it it is O(1) "
+            "each."},
+]},
+
+"dsa/binary_search_trees.html": {"check": [
+    {"q": "Inserting sorted keys into a plain BST produces:",
+     "options": ["A balanced tree", "A tree of height n - effectively a linked "
+                 "list",
+                 "An error", "A heap"],
+     "answer": 1,
+     "why": "Every key goes right, so the tree is one spine and search degrades "
+            "to O(n). The program prints height 7 for seven sorted keys."},
+    {"q": "An in-order traversal of a BST emits the keys:",
+     "options": ["In insertion order", "In sorted order",
+                 "Level by level", "In reverse"],
+     "answer": 1,
+     "why": "Left, self, right. It comes out sorted for free, without sorting "
+            "anything - which is the structure's whole selling point over a hash "
+            "table."},
+    {"q": "Deleting a node with two children works by:",
+     "options": ["Deleting both subtrees",
+                 "Copying up the in-order successor and deleting that instead",
+                 "Rotating the tree", "Marking it deleted"],
+     "answer": 1,
+     "why": "The leftmost node of the right subtree has at most one child, so "
+            "the hard case reduces to an easy one."},
+]},
+
+"dsa/heaps_and_priority_queues.html": {"check": [
+    {"q": "In an array-backed heap, the children of index i are at:",
+     "options": ["i-1 and i+1", "2i+1 and 2i+2", "i/2 and i/2+1", "0 and n-1"],
+     "answer": 1,
+     "why": "The tree is arithmetic, not structure. No node objects and no "
+            "pointers are stored at all."},
+    {"q": "After several pushes, the underlying list is:",
+     "options": ["Sorted", "Sorted except the last item",
+                 "Only guaranteed to have the smallest item at index 0",
+                 "In insertion order"],
+     "answer": 2,
+     "why": "A heap promises each parent beats its children and nothing about "
+            "siblings. Expecting more is the usual misunderstanding."},
+    {"q": "heapq.nlargest(k, data) is O(n log k) rather than O(n log n) because "
+          "it:",
+     "options": ["Sorts first", "Keeps a heap of only k items",
+                 "Uses C code", "Samples the data"],
+     "answer": 1,
+     "why": "For \"top 10 of a billion\" that is the difference between "
+            "practical and not."},
+]},
+
+"dsa/trie_prefix_tree.html": {"check": [
+    {"q": "What does the is_word flag distinguish?",
+     "options": ["Leaves from internal nodes",
+                 "\"ca\", which is only a prefix, from \"do\", which is a stored "
+                 "word with more beyond it",
+                 "Uppercase from lowercase", "Full from partial branches"],
+     "answer": 1,
+     "why": "Without it a trie can only answer prefix questions - and \"do\" "
+            "being a word while \"dog\" continues past it has nothing to do with "
+            "being a leaf."},
+    {"q": "Trie lookup costs O(length of the word) because:",
+     "options": ["The words are sorted",
+                 "It walks one node per character, and the number of stored "
+                 "words never enters into it",
+                 "Hashing is O(1)", "It is a balanced tree"],
+     "answer": 1,
+     "why": "A million stored words cost the same as ten. A hash table is also "
+            "roughly O(length), because it must hash the whole string."},
+    {"q": "The operation a hash table cannot do at all is:",
+     "options": ["Exact lookup", "Insert", "List everything starting with \"car\"",
+                 "Delete"],
+     "answer": 2,
+     "why": "Hashing destroys the relationship between \"car\" and \"card\". "
+            "Autocomplete is a DFS from the prefix node, which needs the shared "
+            "structure a trie keeps."},
+]},
+
+"dsa/recursion_and_call_stack.html": {"check": [
+    {"q": "What does a stack frame hold?",
+     "options": ["The function's source",
+                 "Its arguments, its locals and where to return to",
+                 "The whole call tree", "Only the return value"],
+     "answer": 1,
+     "why": "That is why recursion depth is a memory cost: a thousand pending "
+            "calls means a thousand of these alive at once."},
+    {"q": "In 'return n * factorial(n - 1)', why can the frame not be discarded "
+          "at the recursive call?",
+     "options": ["Python does not support it",
+                 "The multiplication still has to happen after the call returns",
+                 "The argument might change", "It is discarded"],
+     "answer": 1,
+     "why": "Pending work after the call is exactly what keeps a frame alive. "
+            "Writing it so the call is the last thing done is tail recursion - "
+            "which CPython still will not optimise away."},
+    {"q": "The program prints call counts for naive fib. What is the shape?",
+     "options": ["Linear in n", "Roughly doubling for each +1 in n",
+                 "n log n", "Constant"],
+     "answer": 1,
+     "why": "177 calls for fib(10) and 242,785 for fib(25). Recursion is not "
+            "slow; recursion that recomputes the same subproblems is."},
+]},
+
+"dsa/dynamic_programming.html": {"check": [
+    {"q": "Dynamic programming needs subproblems that:",
+     "options": ["Are independent", "Overlap, so an answer is reused many times",
+                 "Are all the same size", "Can be sorted"],
+     "answer": 1,
+     "why": "If each subproblem were needed once, a table would buy nothing over "
+            "plain recursion. The reuse is what pays for the storage."},
+    {"q": "Top-down memoisation and bottom-up tabulation differ in that "
+          "tabulation:",
+     "options": ["Gives different answers", "Is always faster",
+                 "Fills the small cases first and uses no call stack",
+                 "Needs less memory"],
+     "answer": 2,
+     "why": "Same complexity, no recursion limit, and usually a better constant. "
+            "Memoisation is normally the easier one to write, because the code "
+            "still mirrors the recurrence."},
+    {"q": "For coins [1, 3, 4] and target 6, greedy takes 4+1+1. What does the "
+          "DP table give?",
+     "options": ["The same 3 coins", "2 coins - two 3s",
+                 "4 coins", "It cannot be made"],
+     "answer": 1,
+     "why": "The table computes every amount up to the target, so it finds the "
+            "combination greedy's one-way choice never considers."},
+]},
+
+"dsa/greedy_algorithms.html": {"check": [
+    {"q": "Greedy coin change works for [1, 5, 10, 25] but fails for [1, 3, 4]. "
+          "What does that show?",
+     "options": ["Greedy never works",
+                 "Correctness depends on the denominations, not on the algorithm",
+                 "The coins must be sorted", "It only fails on small targets"],
+     "answer": 1,
+     "why": "Familiarity with real currency is why people assume greedy is "
+            "generally optimal. Nothing about the code changed - only the input."},
+    {"q": "Activity selection is provably optimal when the meetings are sorted "
+          "by:",
+     "options": ["Start time", "Finish time", "Duration", "Number of attendees"],
+     "answer": 1,
+     "why": "Taking the meeting that frees the room earliest can never shut out "
+            "a better schedule. Sorted by start time, one long early meeting "
+            "blocks several short ones."},
+    {"q": "The practical way to test a greedy idea is to:",
+     "options": ["Prove it formally first", "Compare it with brute force on "
+                 "small inputs",
+                 "Try it on the largest case", "Check the complexity"],
+     "answer": 1,
+     "why": "The program runs a DP check alongside so the verdict is computed "
+            "rather than asserted. A counterexample is usually small when it "
+            "exists at all."},
+]},
+
+"dsa/divide_and_conquer.html": {"check": [
+    {"q": "Why does exponentiation by squaring make ONE recursive call and reuse "
+          "the result?",
+     "options": ["It is tidier", "Two calls would recompute the same value and "
+                 "lose the entire saving",
+                 "It avoids overflow", "Python requires it"],
+     "answer": 1,
+     "why": "power(b, n//2) * power(b, n//2) looks identical and is exponentially "
+            "slower. The saving is in reusing the value, not in the halving."},
+    {"q": "Counting inversions during a merge is O(n log n) because, when an "
+          "item from the right half wins:",
+     "options": ["It is discarded", "Every remaining item on the left is counted "
+                 "in one addition",
+                 "The halves are swapped", "The count is estimated"],
+     "answer": 1,
+     "why": "The left half is sorted, so all of its remainder is greater. "
+            "Counting in blocks rather than pairs is the whole trick."},
+    {"q": "Divide and conquer proves its answer complete by showing every case "
+          "falls into:",
+     "options": ["The base case", "Left, right, or across the split",
+                 "A sorted region", "One recursive call"],
+     "answer": 1,
+     "why": "Every inversion is within one half or spans both, and never "
+            "anything else. That decomposition is the pattern in general, not "
+            "just here."},
+]},
+
+"dsa/backtracking.html": {"check": [
+    {"q": "What is the 'backtrack' in the N-queens program?",
+     "options": ["The recursive call", "queens.pop() - undoing the placement",
+                 "The safe() check", "Returning the solution"],
+     "answer": 1,
+     "why": "Place, explore, undo. Delete the pop and the state leaks into "
+            "sibling branches, so the search finds nothing while looking like an "
+            "optimisation."},
+    {"q": "Why is state stored as one column per row rather than as a board?",
+     "options": ["It is smaller", "It makes 'two queens in the same row' "
+                 "impossible by construction",
+                 "It is faster to print", "The board would be too large"],
+     "answer": 1,
+     "why": "Encoding removes an entire class of conflict for free, and the "
+            "recursion depth becomes the row being filled."},
+    {"q": "Backtracking beats brute force because it:",
+     "options": ["Is not exponential",
+                 "Abandons a partial placement before generating any of its "
+                 "completions",
+                 "Uses less memory", "Checks solutions in a better order"],
+     "answer": 1,
+     "why": "It is still exponential in the worst case, just over a far smaller "
+            "space - the program prints the percentage of positions pruned."},
+]},
+
+"dsa/two_pointers.html": {"check": [
+    {"q": "Pair-sum with two pointers requires the list to be:",
+     "options": ["Unique", "Sorted", "Positive", "Even length"],
+     "answer": 1,
+     "why": "Moving a pointer is only justified because sortedness proves the "
+            "discarded element cannot be part of any solution. Shuffle the input "
+            "and it returns None for a pair that exists."},
+    {"q": "When the sum is too small, why is it safe to move lo right rather "
+          "than hi left?",
+     "options": ["It is arbitrary", "a[hi] is the largest available partner, so "
+                 "a[lo] cannot work with anything",
+                 "It keeps the loop terminating", "hi might be negative"],
+     "answer": 1,
+     "why": "Each step eliminates a whole row or column of the pair table, which "
+            "is how n² candidates are covered in n steps."},
+    {"q": "In the in-place dedupe, why does the function return a length instead "
+          "of a list?",
+     "options": ["It is faster", "Nothing was reallocated, so the tail still "
+                 "holds stale data",
+                 "The list is sorted", "To avoid copying"],
+     "answer": 1,
+     "why": "The point of the technique is O(1) extra memory. The caller uses "
+            "a[:n] and ignores whatever is past it."},
+]},
+
+"dsa/sliding_window.html": {"check": [
+    {"q": "The fixed-size window updates its sum with one line. Which?",
+     "options": ["total = sum(window)", "total += a[i] - a[i - k]",
+                 "total = max(total, a[i])", "total *= 2"],
+     "answer": 1,
+     "why": "Add what entered, subtract what left. Carrying the value forward "
+            "instead of rebuilding it is what turns O(n·k) into O(n)."},
+    {"q": "In the longest-unique-substring window, why is the check 'ch in seen "
+          "and seen[ch] >= start' rather than just 'ch in seen'?",
+     "options": ["To handle the first character",
+                 "An earlier occurrence may already have fallen off the left edge",
+                 "To count repeats", "To keep it O(n)"],
+     "answer": 1,
+     "why": "Only a repeat inside the current window matters. Drop the second "
+            "condition and \"abba\" gives the wrong answer."},
+    {"q": "Storing the last index of each character rather than a count lets the "
+          "left edge:",
+     "options": ["Move backwards", "Jump straight past the previous occurrence",
+                 "Stay fixed", "Be recomputed"],
+     "answer": 1,
+     "why": "Both approaches are correct; jumping keeps the scan clearly linear "
+            "and the code short."},
+]},
+
+"dsa/kmp_string_matching.html": {"check": [
+    {"q": "What does lps[i] store?",
+     "options": ["The character at i",
+                 "The length of the longest proper prefix of pattern[:i+1] that "
+                 "is also its suffix",
+                 "The number of matches so far", "The next index to check"],
+     "answer": 1,
+     "why": "That overlap is the only information needed to know how far the "
+            "pattern may safely slide after a mismatch."},
+    {"q": "In the search loop, what never happens?",
+     "options": ["j decreases", "i decreases", "The pattern slides", "A hit"],
+     "answer": 1,
+     "why": "The text index only moves forward, which is the O(n + m) guarantee. "
+            "Naive matching restarts at i - j + 1 and re-reads characters."},
+    {"q": "After a full match, the code sets j = lps[j - 1] rather than 0. Why?",
+     "options": ["To reset faster", "To find overlapping occurrences",
+                 "To avoid an index error", "To count the matches"],
+     "answer": 1,
+     "why": "Set it to 0 and searching \"aa\" in \"aaaa\" reports fewer matches "
+            "than there are."},
+]},
+
+"dsa/lists_in_python.html": {"check": [
+    {"q": "Indexing a Python list is O(1) because the list stores:",
+     "options": ["A hash of each item", "References contiguously, so the address "
+                 "is computed",
+                 "The items in sorted order", "A linked chain of nodes"],
+     "answer": 1,
+     "why": "One multiplication and one read. This is the whole difference "
+            "between a list and a linked list."},
+    {"q": "What does [[0] * 3] * 3 build?",
+     "options": ["A 3x3 grid of independent rows",
+                 "Three references to one row, so writing to one writes to all",
+                 "A flat list of nine zeros", "An error"],
+     "answer": 1,
+     "why": "Multiplying repeats the reference, not the object. This is the most "
+            "common Python bug in grid and matrix code."},
+    {"q": "sys.getsizeof shows a list's size jumping in steps rather than per "
+          "item because:",
+     "options": ["The report is approximate", "CPython over-allocates on growth "
+                 "so most appends need no reallocation",
+                 "Items vary in size", "Small lists are cached"],
+     "answer": 1,
+     "why": "That is what \"amortised O(1) append\" means concretely: most "
+            "appends are free, and occasionally one pays for a copy."},
+]},
+
+"dsa/dictionaries_in_python.html": {"check": [
+    {"q": "Why must dictionary keys be hashable?",
+     "options": ["To keep them sorted", "Because a key that changed after "
+                 "insertion would no longer hash to the slot it lives in",
+                 "To save memory", "To allow duplicates"],
+     "answer": 1,
+     "why": "It would become unreachable. In practice this means immutable: "
+            "tuples work as keys, lists do not."},
+    {"q": "{1: 'a', 1.0: 'b', True: 'c'} produces a dict with how many entries?",
+     "options": ["3", "2", "1", "It raises an error"],
+     "answer": 2,
+     "why": "1 == 1.0 == True and all three hash identically, so each assignment "
+            "overwrites the previous value while the first key object stays."},
+    {"q": "Replacing 'x in a_big_list' with 'x in a_big_set' changes the cost "
+          "from:",
+     "options": ["O(1) to O(n)", "O(n) to roughly O(1)",
+                 "O(log n) to O(1)", "Nothing changes"],
+     "answer": 1,
+     "why": "The list compares against every element; the hash table computes "
+            "where the answer would be. It is the highest-value one-line "
+            "optimisation in most beginner Python."},
+]},
+
+"dsa/strings_in_python.html": {"check": [
+    {"q": "Building a string by += in a loop is O(n²) because each step:",
+     "options": ["Reallocates the list", "Allocates a new string and copies "
+                 "everything so far",
+                 "Re-encodes to UTF-8", "Sorts the characters"],
+     "answer": 1,
+     "why": "Strings are immutable, so there is nothing to append to. "
+            "\"\".join(parts) does one length calculation, one allocation and "
+            "one copy."},
+    {"q": "The program accumulates into an object attribute rather than a local "
+          "variable. Why?",
+     "options": ["It is more realistic", "CPython has an in-place resize "
+                 "special case for locals that would hide the quadratic",
+                 "Locals are faster", "To avoid a NameError"],
+     "answer": 1,
+     "why": "The optimisation only fires under specific conditions and varies by "
+            "build - which is itself the argument for using join rather than "
+            "relying on it."},
+    {"q": "Immutability is also what allows strings to be:",
+     "options": ["Sliced", "Used as dictionary keys", "Concatenated", "Iterated"],
+     "answer": 1,
+     "why": "Hashability requires that the value cannot change underneath the "
+            "table. A mutable string could not be a key."},
+]},
+
 }
+
+
+# The /interview/ track authors its questions alongside the rest of each page
+# (tools/interview.py), because a question there is written against the exact
+# program and visualisation on that page. Merged in here so build_labs.py and
+# the practice bank see one dictionary rather than two sources.
+from interview import CHECKS as _INTERVIEW_CHECKS  # noqa: E402
+
+LABS.update(_INTERVIEW_CHECKS)

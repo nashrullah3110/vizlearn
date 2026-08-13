@@ -38,6 +38,11 @@ END = "<!-- VIZLEARN:LAB:END -->"
 BLOCK = re.compile(r"[ \t]*" + re.escape(BEGIN) + r".*?" + re.escape(END) + r"\n?", re.S)
 RUN_BTN = re.compile(r'<button class="vz-run"[^>]*>.*?</button>', re.S)
 
+# The embedded Python editor written by tools/build_dsa_code.py. Read out of
+# the page before anything here inspects it - see process().
+CODE_BLOCK = re.compile(
+    r"[ \t]*<!-- VIZLEARN:CODE:BEGIN.*?<!-- VIZLEARN:CODE:END -->\n?", re.S)
+
 TAG = re.compile(r"<[^>]+>")
 
 ICON = {
@@ -797,12 +802,25 @@ def process(path, rel, authored):
     src = BLOCK.sub("", src)
     src = RUN_BTN.sub("", src)
 
+    # Everything that only *reads* the page reads this copy instead, with the
+    # generated Python editor (tools/build_dsa_code.py) taken out. It carries a
+    # Run button, a Reset button and a console, none of which are controls on
+    # the visualisation - left in, they were offered as experiment steps and as
+    # keyboard targets, so a preset could "run the experiment" by launching a
+    # Python script. Its headings would also have been mined for flashcards.
+    #
+    # Only the derived values come from here. Insert positions are still
+    # computed against `src`, which is what gets written back.
+    page = CODE_BLOCK.sub("", src)
+
     # Code-editor pages (the python/ track) have no slider or canvas to preset;
     # the "readout" is the console and the run button is a script launch, not a
     # step in a visualisation. Suppress experiments and predictions for them,
-    # and keep the authored end-of-module check.
-    is_py_page = "data-vz-py" in src
-    ctrls = [] if is_py_page else controls(src)
+    # and keep the authored end-of-module check. A dsa/ page with an embedded
+    # editor is not one of these - its editor is gone from `page`, so it is
+    # correctly treated as the visualisation page it is.
+    is_py_page = "data-vz-py" in page
+    ctrls = [] if is_py_page else controls(page)
 
     # --- experiments --------------------------------------------------
     presets = []
@@ -823,7 +841,7 @@ def process(path, rel, authored):
         src = src[:pos] + markup + src[pos:]
 
     # --- lab block ----------------------------------------------------
-    reads = [] if is_py_page else readouts(src, ctrls)
+    reads = [] if is_py_page else readouts(page, ctrls)
     pieces = []
 
     # Prefer an experiment that moves a slider: a continuous control gives the
@@ -849,15 +867,15 @@ def process(path, rel, authored):
         pieces.append(predict_markup(best, presets[best]["title"]))
 
     questions = authored.get("check") or []
-    cards = [] if questions else flashcards(src)
+    cards = [] if questions else flashcards(page)
     if questions or cards:
         pieces.append(check_markup(questions, cards))
 
     config = {
         "presets": [{"set": p["set"], "click": p["click"]} for p in presets],
         "readouts": reads,
-        "viz": viz_container_id(src),
-        "keys": key_targets(ctrls, src),
+        "viz": viz_container_id(page),
+        "keys": key_targets(ctrls, page),
     }
 
     block = (
