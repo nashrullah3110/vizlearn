@@ -2561,3 +2561,451 @@ print(f"buggy version  : {failures}/200 cases wrong - it leaves stray 2s behind"
                 "for because it works on real records, not just on integers."},
     ],
 )
+
+
+def _three_sum_frames():
+    values = sorted([-1, 0, 1, 2, -1, -4])
+    out = [frame(marked(values, {i: "dim" for i in range(len(values))},
+                        label="sorted first"),
+                 "Sort first. That is what makes the inner search two pointers "
+                 "instead of another loop, and what makes duplicates adjacent.",
+                 {"fixed": "-", "found": 0})]
+    found = 0
+    for i in range(len(values) - 2):
+        if i and values[i] == values[i - 1]:
+            out.append(frame(marked(values, {j: ("bad" if j == i else "dim")
+                                             for j in range(len(values))},
+                                    {i: "i"}, label="values"),
+                             "values[%d] repeats the previous fixed value - skip "
+                             "it, or the same triple is reported twice." % i,
+                             {"fixed": values[i], "found": found}))
+            continue
+        lo, hi = i + 1, len(values) - 1
+        while lo < hi and len(out) < 8:
+            total = values[i] + values[lo] + values[hi]
+            marks = {j: "dim" for j in range(len(values))}
+            marks[i] = "lo"
+            marks[lo] = marks[hi] = "hi"
+            if total == 0:
+                marks[i] = marks[lo] = marks[hi] = "hit"
+                found += 1
+                note = "%d + %d + %d = 0 - a triple." % (values[i], values[lo], values[hi])
+                lo, hi = lo + 1, hi - 1
+            elif total < 0:
+                note = "sum %d is too small, so move lo right." % total
+                lo += 1
+            else:
+                note = "sum %d is too big, so move hi left." % total
+                hi -= 1
+            out.append(frame(marked(values, marks, {i: "i", lo if lo < len(values) else i: "lo"},
+                                    label="values"),
+                             note, {"fixed": values[i], "found": found}))
+    return viz(out)
+
+
+_q(
+    slug="three-sum",
+    kind="coding",
+    level="Medium",
+    title="3Sum",
+    asked="Find all unique triples in an array that sum to zero.",
+    desc="Fixing one element and two-pointering the rest gives O(n²) instead of "
+         "O(n³), and sorting is what makes deduplication a skip rather than a set.",
+    lead="<strong>Sort, then fix one element and two-pointer the rest.</strong> "
+         "That turns the third loop into a linear scan, so the whole thing is "
+         "O(n&sup2;) rather than O(n&sup3;). Sorting also puts duplicates next to "
+         "each other, which is what makes deduplication a cheap skip instead of "
+         "a set of tuples.",
+    say="\"Sort, then for each index run two pointers over the rest looking for "
+        "the complement. O(n²) time, O(1) extra space. Sorting also means "
+        "duplicates are adjacent, so I skip them rather than deduplicating at "
+        "the end.\"",
+    notice=[
+        "One element is fixed; the other two converge.",
+        "A repeated fixed value is skipped, or the same triple is reported twice.",
+        "The pointers only ever move inwards &mdash; that is the linear inner scan.",
+    ],
+    viz=_three_sum_frames(),
+    sections=[
+        ("Reducing the third loop",
+         "<p>The brute force is three nested loops, O(n&sup3;). Fix the first "
+         "element and the problem becomes \"find two numbers summing to "
+         "<code>-values[i]</code>\" &mdash; which is Two Sum, and on sorted "
+         "input Two Sum is two pointers in O(n).</p>"
+         "<p>n iterations of an O(n) inner scan is O(n&sup2;), and the sort is "
+         "O(n&nbsp;log&nbsp;n) so it disappears into that. Using a hash map for "
+         "the inner search is also O(n&sup2;), and then deduplication is much "
+         "harder &mdash; which is the argument for sorting.</p>"),
+        ("Deduplication is the real difficulty",
+         "<p>Two places need it. Skip a fixed element equal to the previous one, "
+         "or every triple starting with that value is emitted twice. And after "
+         "recording a triple, advance past any repeats of both pointer values, "
+         "or the same triple is found again inside the same scan.</p>"
+         "<p>Sorting is what makes both a simple adjacency check. Without it you "
+         "would collect triples into a set of sorted tuples &mdash; correct, and "
+         "it allocates for every candidate.</p>"),
+        ("The early exits worth mentioning",
+         "<p>Once <code>values[i] &gt; 0</code> the smallest possible triple is "
+         "already positive, so the scan can stop entirely. That is not a "
+         "complexity improvement and it is a large constant on real input.</p>"
+         "<p>The generalisation is kSum: fix an element and recurse down to the "
+         "two-pointer base case, giving O(n^(k&minus;1)). Naming that shows you "
+         "see the pattern rather than the single problem.</p>"),
+    ],
+    code={
+        "file": "three_sum.py",
+        "intro": "The two-pointer version against brute force with both "
+                 "operation counts, and the deduplication removed so you can see "
+                 "the duplicate triples it produces.",
+        "code": '''# 3Sum: sort, fix one, two-pointer the rest.
+
+def three_sum(values):
+    values = sorted(values)
+    out, ops = [], 0
+    for i in range(len(values) - 2):
+        if values[i] > 0:
+            break                              # smallest triple already positive
+        if i and values[i] == values[i - 1]:
+            continue                           # skip a repeated fixed value
+        lo, hi = i + 1, len(values) - 1
+        while lo < hi:
+            ops += 1
+            total = values[i] + values[lo] + values[hi]
+            if total < 0:
+                lo += 1
+            elif total > 0:
+                hi -= 1
+            else:
+                out.append((values[i], values[lo], values[hi]))
+                lo, hi = lo + 1, hi - 1
+                while lo < hi and values[lo] == values[lo - 1]:
+                    lo += 1                    # and skip repeated pointer values
+                while lo < hi and values[hi] == values[hi + 1]:
+                    hi -= 1
+    return out, ops
+
+
+def no_dedup(values):
+    """The same scan without any of the skips."""
+    values = sorted(values)
+    out = []
+    for i in range(len(values) - 2):
+        lo, hi = i + 1, len(values) - 1
+        while lo < hi:
+            total = values[i] + values[lo] + values[hi]
+            if total < 0:
+                lo += 1
+            elif total > 0:
+                hi -= 1
+            else:
+                out.append((values[i], values[lo], values[hi]))
+                lo, hi = lo + 1, hi - 1
+    return out
+
+
+def brute_force(values):
+    out, ops = set(), 0
+    n = len(values)
+    for i in range(n):
+        for j in range(i + 1, n):
+            for k in range(j + 1, n):
+                ops += 1
+                if values[i] + values[j] + values[k] == 0:
+                    out.add(tuple(sorted((values[i], values[j], values[k]))))
+    return sorted(out), ops
+
+
+data = [-1, 0, 1, 2, -1, -4]
+triples, ops = three_sum(data)
+brute, brute_ops = brute_force(data)
+print("input :", data)
+print("triples:", triples, f"({ops} pointer steps)")
+print("brute  :", brute, f"({brute_ops} triples examined)")
+print("agree  :", sorted(triples) == brute)
+
+print()
+dupes = [-2, 0, 0, 2, 2, -2, 0]
+print("input with repeats :", dupes)
+print("with dedup         :", three_sum(dupes)[0])
+print("without dedup      :", no_dedup(dupes))
+print("The same triple comes out several times once the skips are gone.")
+
+# --- how the two costs diverge -----------------------------------------
+print()
+import random
+random.seed(4)
+for n in (60, 120, 240):
+    sample = [random.randint(-50, 50) for _ in range(n)]
+    _, fast_ops = three_sum(sample)
+    _, slow_ops = brute_force(sample)
+    print(f"  n={n:>3}: two pointers {fast_ops:>6,} steps   brute force {slow_ops:>9,}")
+''',
+        "walk": [
+            ("if i and values[i] == values[i - 1]: continue",
+             "The first deduplication. Without it, every triple beginning with a "
+             "repeated value is emitted once per repeat."),
+            ("while lo < hi and values[lo] == values[lo - 1]: lo += 1",
+             "The second. After recording a triple, both pointers must move past "
+             "any repeats or the same triple is found again in the same scan."),
+            ("if values[i] > 0: break",
+             "On sorted input, once the fixed element is positive the smallest "
+             "possible triple already exceeds zero. Not a complexity change, and "
+             "a large constant."),
+            ("lo, hi = i + 1, len(values) - 1",
+             "The inner search is Two Sum on a sorted range, which is why fixing "
+             "one element removes an entire loop rather than just reordering the "
+             "work."),
+        ],
+        "try": [
+            "Change the target from 0 to 6 by adjusting the comparisons. The "
+            "structure is unchanged; only the constant moves.",
+            "Extend it to 4Sum by fixing two elements. O(n&sup3;), and the "
+            "deduplication now needs a skip at both fixed levels.",
+        ],
+    },
+    check=[
+        {"q": "Fixing one element reduces 3Sum from O(n³) to O(n²) because the "
+              "inner search becomes:",
+         "options": ["A binary search", "Two Sum, which is O(n) on sorted input",
+                     "A hash lookup", "A sort"],
+         "answer": 1,
+         "why": "n iterations of a linear inner scan is O(n²). The sort is "
+                "O(n log n) and disappears into that."},
+        {"q": "Why sort rather than use a hash map for the inner search?",
+         "options": ["It is faster", "Sorting makes duplicates adjacent, so "
+                     "deduplication is a skip rather than a set of tuples",
+                     "Hash maps do not work here", "It uses less memory"],
+         "answer": 1,
+         "why": "Both are O(n²). Deduplication is the real difficulty of this "
+                "problem, and adjacency is what makes it cheap."},
+        {"q": "How many places need a duplicate skip?",
+         "options": ["One - the fixed element", "Two - the fixed element and "
+                     "both pointers after a hit",
+                     "Three", "None, if you use a set"],
+         "answer": 1,
+         "why": "Skipping only the fixed value still finds the same triple twice "
+                "within one inner scan."},
+    ],
+)
+
+
+def _rotated_frames():
+    values = [4, 5, 6, 7, 0, 1, 2]
+    target = 0
+    out = []
+    lo, hi = 0, len(values) - 1
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        marks = {i: ("dim" if i < lo or i > hi else "lo") for i in range(len(values))}
+        marks[mid] = "hit" if values[mid] == target else "bad"
+        left_sorted = values[lo] <= values[mid]
+        if values[mid] == target:
+            out.append(frame(marked(values, marks, {mid: "mid"}, label="rotated"),
+                             "a[mid] = %d is the target." % target,
+                             {"lo": lo, "hi": hi, "mid": mid}))
+            break
+        if left_sorted:
+            takes_left = values[lo] <= target < values[mid]
+            note = ("Left half %s is sorted, and %d %s in its range - so search %s."
+                    % (values[lo:mid + 1], target,
+                       "is" if takes_left else "is not",
+                       "left" if takes_left else "right"))
+            if takes_left:
+                hi = mid - 1
+            else:
+                lo = mid + 1
+        else:
+            takes_right = values[mid] < target <= values[hi]
+            note = ("Right half %s is sorted, and %d %s in its range - so search %s."
+                    % (values[mid:hi + 1], target,
+                       "is" if takes_right else "is not",
+                       "right" if takes_right else "left"))
+            if takes_right:
+                lo = mid + 1
+            else:
+                hi = mid - 1
+        out.append(frame(marked(values, marks, {mid: "mid"}, label="rotated"),
+                         note, {"lo": lo, "hi": hi, "mid": mid}))
+    return viz(out)
+
+
+_q(
+    slug="search-in-rotated-sorted-array",
+    kind="coding",
+    level="Medium",
+    title="Search in a rotated sorted array",
+    asked="A sorted array has been rotated at an unknown pivot. Find a target in "
+          "O(log n).",
+    desc="Binary search still applies because one half is always sorted - the "
+         "trick is deciding which half, and whether the target lies inside it.",
+    lead="Binary search still works, because after any rotation <strong>at least "
+         "one half is still sorted</strong>. Compare the ends to find which, "
+         "then check whether the target falls inside that half's range: if it "
+         "does, search there; if not, search the other. Still O(log n).",
+    say="\"One half is always sorted - compare a[lo] with a[mid] to see which. "
+        "Then check if the target is inside that sorted half's range and discard "
+        "accordingly. O(log n), no pre-pass to find the pivot.\"",
+    notice=[
+        "One side of <code>mid</code> is always in order.",
+        "The decision is about the sorted half's <em>range</em>, not about mid alone.",
+        "The window halves every step, exactly as in plain binary search.",
+    ],
+    viz=_rotated_frames(),
+    sections=[
+        ("Why binary search survives rotation",
+         "<p>A rotation splits the array into two sorted runs. Wherever "
+         "<code>mid</code> lands, it is inside one of them &mdash; so at least "
+         "one of <code>[lo, mid]</code> and <code>[mid, hi]</code> is entirely "
+         "in order. That is the invariant the whole solution rests on, and it "
+         "holds for any rotation amount including zero.</p>"
+         "<p><code>values[lo] &lt;= values[mid]</code> identifies which. Use "
+         "<code>&lt;=</code>, not <code>&lt;</code>: when <code>lo == mid</code> "
+         "the left half is a single element and is trivially sorted.</p>"),
+        ("The decision that follows",
+         "<p>Having found a sorted half, you can test membership by range rather "
+         "than by searching. If the target lies between that half's endpoints, "
+         "it can only be there. If it does not, it can only be in the other "
+         "half. Either way one half is discarded per step.</p>"
+         "<p>The bounds matter: <code>values[lo] &lt;= target &lt; "
+         "values[mid]</code> on the left, and <code>values[mid] &lt; target "
+         "&lt;= values[hi]</code> on the right. <code>mid</code> has already "
+         "been compared, so it is excluded on both sides.</p>"),
+        ("The duplicates variant",
+         "<p>With duplicates allowed, <code>values[lo] == values[mid] == "
+         "values[hi]</code> tells you nothing about which half is sorted, and "
+         "the only safe move is to shrink the window by one. That makes the "
+         "worst case O(n) &mdash; and it is a genuine lower bound, not a lazy "
+         "implementation.</p>"
+         "<p>Saying \"O(log n), but O(n) worst case if duplicates are allowed\" "
+         "is the complete answer, and the follow-up interviewers reach for when "
+         "the first part goes smoothly.</p>"),
+    ],
+    code={
+        "file": "rotated_search.py",
+        "intro": "The search with each decision printed, checked against a "
+                 "linear scan at every rotation of the same array, plus the "
+                 "duplicates variant and its O(n) case.",
+        "code": '''# Search a rotated sorted array: one half is always in order.
+
+def search(values, target, show=False):
+    lo, hi = 0, len(values) - 1
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        if values[mid] == target:
+            return mid
+        if values[lo] <= values[mid]:                 # left half is sorted
+            if values[lo] <= target < values[mid]:
+                if show: print(f"    target in sorted left {values[lo:mid+1]}")
+                hi = mid - 1
+            else:
+                if show: print(f"    not in sorted left {values[lo:mid+1]}")
+                lo = mid + 1
+        else:                                          # right half is sorted
+            if values[mid] < target <= values[hi]:
+                if show: print(f"    target in sorted right {values[mid:hi+1]}")
+                lo = mid + 1
+            else:
+                if show: print(f"    not in sorted right {values[mid:hi+1]}")
+                hi = mid - 1
+    return -1
+
+
+data = [4, 5, 6, 7, 0, 1, 2]
+print("array:", data, " looking for 0")
+print("index:", search(data, 0, show=True))
+
+# Correct at every rotation, for every value, including absent ones.
+print()
+base = [0, 1, 2, 4, 5, 6, 7]
+failures = 0
+for r in range(len(base)):
+    rotated = base[r:] + base[:r]
+    for target in base + [3, 99]:
+        got = search(rotated, target)
+        want = rotated.index(target) if target in rotated else -1
+        if got != want:
+            failures += 1
+            print("  MISMATCH", rotated, target, got, want)
+print(f"all rotations x all targets: {failures} mismatches")
+
+# --- with duplicates, the guarantee weakens ----------------------------
+def search_with_duplicates(values, target):
+    lo, hi = 0, len(values) - 1
+    steps = 0
+    while lo <= hi:
+        steps += 1
+        mid = (lo + hi) // 2
+        if values[mid] == target:
+            return mid, steps
+        if values[lo] == values[mid] == values[hi]:
+            lo += 1                      # cannot tell which half is sorted
+            hi -= 1
+        elif values[lo] <= values[mid]:
+            if values[lo] <= target < values[mid]:
+                hi = mid - 1
+            else:
+                lo = mid + 1
+        else:
+            if values[mid] < target <= values[hi]:
+                lo = mid + 1
+            else:
+                hi = mid - 1
+    return -1, steps
+
+print()
+nasty = [2] * 12 + [1] + [2] * 12
+index, steps = search_with_duplicates(nasty, 1)
+print(f"25 elements, almost all equal: found at {index} after {steps} steps")
+print("That is O(n), not O(log n) - and it is a real lower bound, because")
+print("a[lo] == a[mid] == a[hi] tells you nothing about where the pivot is.")
+''',
+        "walk": [
+            ("if values[lo] <= values[mid]:",
+             "Identifies the sorted half. <code>&lt;=</code> rather than "
+             "<code>&lt;</code> because when <code>lo == mid</code> the left half "
+             "is one element, which is sorted."),
+            ("values[lo] <= target < values[mid]",
+             "Membership by range, not by search. If the target is inside the "
+             "sorted half's endpoints it can only be there; otherwise it can "
+             "only be in the other half."),
+            ("mid excluded on both sides",
+             "<code>hi = mid - 1</code> and <code>lo = mid + 1</code>. "
+             "<code>mid</code> has already been compared, and leaving it in the "
+             "window is the usual way to write an infinite loop here."),
+            ("values[lo] == values[mid] == values[hi]",
+             "The duplicates case, where nothing can be deduced and the only "
+             "safe move is to shrink by one. That is what makes the worst case "
+             "O(n)."),
+        ],
+        "try": [
+            "Rotate by zero &mdash; a plain sorted array. The left half is "
+            "always the sorted one and it degenerates to ordinary binary search.",
+            "Find the pivot first with its own binary search, then do a normal "
+            "search in the right run. Two passes, same complexity, and easier to "
+            "reason about.",
+        ],
+    },
+    check=[
+        {"q": "Why does binary search still apply after rotation?",
+         "options": ["The array is still sorted", "At least one half of the "
+                     "window is always in order",
+                     "Rotation preserves indices", "It does not - you must sort first"],
+         "answer": 1,
+         "why": "A rotation makes two sorted runs, so mid always falls inside "
+                "one of them. Identifying which is the whole trick."},
+        {"q": "Having identified the sorted half, you decide where to search by:",
+         "options": ["Comparing the target with mid", "Checking whether the "
+                     "target lies within that half's endpoint range",
+                     "Searching both halves", "Comparing with a[0]"],
+         "answer": 1,
+         "why": "In a sorted range, membership is a range check. If it is not in "
+                "there, it can only be in the other half."},
+        {"q": "With duplicates allowed, the worst case becomes:",
+         "options": ["Still O(log n)", "O(n), because a[lo] == a[mid] == a[hi] "
+                     "reveals nothing",
+                     "O(n log n)", "Impossible"],
+         "answer": 1,
+         "why": "The only safe move is to shrink the window by one. This is a "
+                "genuine lower bound and the standard follow-up question."},
+    ],
+)

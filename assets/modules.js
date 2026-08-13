@@ -1116,6 +1116,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive Masked Language Modeling lab - mask tokens in a sentence and see how a bidirectional model like BERT predicts them from left and right context."
  },
  {
+  "title": "3Sum",
+  "path": "interview/three-sum.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
   "title": "Are two strings anagrams?",
   "path": "interview/valid-anagram.html",
   "category": "Interview",
@@ -1260,6 +1268,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Memoisation: caching with a dictionary",
+  "path": "interview/memoisation-with-a-dictionary.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
   "title": "Merge overlapping intervals",
   "path": "interview/merge-intervals.html",
   "category": "Interview",
@@ -1308,6 +1324,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Search in a rotated sorted array",
+  "path": "interview/search-in-rotated-sorted-array.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
   "title": "Sort an array of 0s, 1s and 2s",
   "path": "interview/sort-colors-dutch-national-flag.html",
   "category": "Interview",
@@ -1350,6 +1374,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "What does slicing a string cost?",
   "path": "interview/what-does-string-slicing-cost.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "What happens if you modify a collection while looping over it?",
+  "path": "interview/modifying-a-collection-while-iterating.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",

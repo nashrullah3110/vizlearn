@@ -3809,6 +3809,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/three-sum.html",
+  "title": "3Sum",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Fixing one element reduces 3Sum from O(n³) to O(n²) because the inner search becomes:",
+    "o": [
+     "A binary search",
+     "Two Sum, which is O(n) on sorted input",
+     "A hash lookup",
+     "A sort"
+    ],
+    "a": 1,
+    "w": "n iterations of a linear inner scan is O(n²). The sort is O(n log n) and disappears into that."
+   },
+   {
+    "t": "Why sort rather than use a hash map for the inner search?",
+    "o": [
+     "It is faster",
+     "Sorting makes duplicates adjacent, so deduplication is a skip rather than a set of tuples",
+     "Hash maps do not work here",
+     "It uses less memory"
+    ],
+    "a": 1,
+    "w": "Both are O(n²). Deduplication is the real difficulty of this problem, and adjacency is what makes it cheap."
+   },
+   {
+    "t": "How many places need a duplicate skip?",
+    "o": [
+     "One - the fixed element",
+     "Two - the fixed element and both pointers after a hit",
+     "Three",
+     "None, if you use a set"
+    ],
+    "a": 1,
+    "w": "Skipping only the fixed value still finds the same triple twice within one inner scan."
+   }
+  ]
+ },
+ {
   "path": "interview/valid-anagram.html",
   "title": "Are two strings anagrams?",
   "cat": "Interview",
@@ -4529,6 +4569,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/memoisation-with-a-dictionary.html",
+  "title": "Memoisation: caching with a dictionary",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Memoisation speeds up recursion by:",
+    "o": [
+     "Making each call faster",
+     "Removing repeated calls for subproblems already solved",
+     "Using less memory",
+     "Avoiding recursion"
+    ],
+    "a": 1,
+    "w": "The work drops to the number of distinct subproblems. The recurrence itself is unchanged."
+   },
+   {
+    "t": "Caching a function that reads the current time gives you:",
+    "o": [
+     "A TypeError",
+     "A stale answer returned forever",
+     "A slower function",
+     "Correct behaviour"
+    ],
+    "a": 1,
+    "w": "The cache assumes purity. The bug then looks like wrong data rather than a wrong cache, which is what makes it nasty."
+   },
+   {
+    "t": "Why must a cached function's arguments be hashable?",
+    "o": [
+     "For speed",
+     "They are used as dictionary keys",
+     "To allow recursion",
+     "They need not be"
+    ],
+    "a": 1,
+    "w": "That is why such functions often take tuples where you would expect lists - the constraint comes from the cache."
+   }
+  ]
+ },
+ {
   "path": "interview/merge-intervals.html",
   "title": "Merge overlapping intervals",
   "cat": "Interview",
@@ -4769,6 +4849,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/search-in-rotated-sorted-array.html",
+  "title": "Search in a rotated sorted array",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why does binary search still apply after rotation?",
+    "o": [
+     "The array is still sorted",
+     "At least one half of the window is always in order",
+     "Rotation preserves indices",
+     "It does not - you must sort first"
+    ],
+    "a": 1,
+    "w": "A rotation makes two sorted runs, so mid always falls inside one of them. Identifying which is the whole trick."
+   },
+   {
+    "t": "Having identified the sorted half, you decide where to search by:",
+    "o": [
+     "Comparing the target with mid",
+     "Checking whether the target lies within that half's endpoint range",
+     "Searching both halves",
+     "Comparing with a[0]"
+    ],
+    "a": 1,
+    "w": "In a sorted range, membership is a range check. If it is not in there, it can only be in the other half."
+   },
+   {
+    "t": "With duplicates allowed, the worst case becomes:",
+    "o": [
+     "Still O(log n)",
+     "O(n), because a[lo] == a[mid] == a[hi] reveals nothing",
+     "O(n log n)",
+     "Impossible"
+    ],
+    "a": 1,
+    "w": "The only safe move is to shrink the window by one. This is a genuine lower bound and the standard follow-up question."
+   }
+  ]
+ },
+ {
   "path": "interview/sort-colors-dutch-national-flag.html",
   "title": "Sort an array of 0s, 1s and 2s",
   "cat": "Interview",
@@ -5005,6 +5125,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "memoryview shares the underlying buffer, so slicing it is O(1). It works on bytes-like objects, not on str."
+   }
+  ]
+ },
+ {
+  "path": "interview/modifying-a-collection-while-iterating.html",
+  "title": "What happens if you modify a collection while looping over it?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Deleting from a list while iterating over it:",
+    "o": [
+     "Raises RuntimeError",
+     "Silently skips elements",
+     "Works correctly",
+     "Raises IndexError"
+    ],
+    "a": 1,
+    "w": "Removing an element shifts the rest left while the loop index advances, so the shifted-in element is never visited. No error is raised, which makes it worse than the dict's behaviour."
+   },
+   {
+    "t": "Which dict operation during iteration is legal?",
+    "o": [
+     "Deleting a key",
+     "Adding a key",
+     "Assigning to a key that already exists",
+     "None of them"
+    ],
+    "a": 2,
+    "w": "Only a size change trips the check. Reassigning an existing key leaves the size alone, so it is allowed."
+   },
+   {
+    "t": "The preferred fix is:",
+    "o": [
+     "Iterate backwards",
+     "Build a new collection with a comprehension",
+     "Use a while loop",
+     "Catch the RuntimeError"
+    ],
+    "a": 1,
+    "w": "It mutates nothing, states the intent, and avoids the repeated O(n) removals. Iterating a copy is for when in-place mutation is genuinely required."
    }
   ]
  },

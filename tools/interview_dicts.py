@@ -1658,3 +1658,418 @@ print(f"  same answer        : {loop == operator}")
                 "O(n + m) and says what it means."},
     ],
 )
+
+
+def _mutation_frames():
+    out = [frame([marked(["a:1", "b:2", "c:3"], {0: "lo"}, label="dict"),
+                  pairs([("iterating", "position 0"), ("size", "3")],
+                        {"size": "done"}, label="state")],
+                 "Iteration starts. The dict records its size, and every step "
+                 "checks that it has not moved.",
+                 {"size": 3, "step": 0})]
+    out.append(frame([marked(["a:1", "b:2", "c:3"], {1: "lo", 0: "done"}, label="dict"),
+                      pairs([("iterating", "position 1"), ("size", "3")],
+                            {}, label="state")],
+                     "Second key. Still consistent.",
+                     {"size": 3, "step": 1}))
+    out.append(frame([marked(["a:1", "c:3"], {0: "bad"}, label="dict after del d['b']"),
+                      pairs([("iterating", "position 1"), ("size", "2"),
+                             ("verdict", "RuntimeError")],
+                            {"verdict": "bad"}, label="state")],
+                     "Deleting during the loop changes the size, so the next "
+                     "step raises: dictionary changed size during iteration.",
+                     {"size": 2, "step": 2}))
+    out.append(frame([marked(["a:1", "c:3"], {0: "done", 1: "done"},
+                             label="iterate over a COPY"),
+                      pairs([("for k in list(d)", "safe"),
+                             ("d = {k: v for ...}", "safer still")],
+                            {"d = {k: v for ...}": "hit"}, label="the two fixes"),
+                      ],
+                     "Iterate a snapshot, or build a new dict and rebind. The "
+                     "second says what it means and never mutates at all.",
+                     {"size": 2, "step": 3}))
+    return viz(out)
+
+
+_q(
+    slug="modifying-a-collection-while-iterating",
+    kind="concept",
+    level="Easy",
+    title="What happens if you modify a collection while looping over it?",
+    asked="Why can't you delete from a dict or a list while iterating it, and "
+          "what should you do instead?",
+    desc="Dicts raise RuntimeError on a size change during iteration; lists "
+         "silently skip elements instead - and why the silent one is worse.",
+    lead="A dict <strong>raises</strong> <code>RuntimeError: dictionary changed "
+         "size during iteration</code>. A list does something worse: it "
+         "<strong>silently skips</strong> elements, because removing one shifts "
+         "everything left while the index keeps advancing. Iterate over a copy, "
+         "or build a new collection.",
+    say="\"Dicts raise RuntimeError. Lists don't - they silently skip elements, "
+        "because deleting shifts the rest left while the index moves right. I "
+        "iterate over list(d) or a slice copy, or better, build a new collection "
+        "with a comprehension.\"",
+    notice=[
+        "The dict records its size and checks it on every step.",
+        "The error names the real cause &mdash; a <em>size</em> change.",
+        "Rebuilding rather than mutating avoids the question entirely.",
+    ],
+    viz=_mutation_frames(),
+    sections=[
+        ("Two different failures",
+         "<p>A dictionary keeps a version counter and compares it on each step, "
+         "so a size change during iteration is caught immediately and loudly. "
+         "That is a feature: the alternative is undefined behaviour, because a "
+         "resize can move every entry to a different slot.</p>"
+         "<p>A list has no such check. Deleting element i shifts everything "
+         "after it one place left, while the loop's internal index advances "
+         "&mdash; so the element that moved into position i is never visited. "
+         "You get a wrong answer and no error at all, which is the harder bug to "
+         "find.</p>"),
+        ("The fixes, in order of preference",
+         "<p><strong>Build a new collection.</strong> "
+         "<code>[x for x in items if keep(x)]</code> or "
+         "<code>{k: v for k, v in d.items() if keep(k)}</code>. Nothing is "
+         "mutated, the intent is explicit, and it is usually faster than "
+         "repeated deletion.</p>"
+         "<p><strong>Iterate over a snapshot.</strong> "
+         "<code>for k in list(d):</code> or <code>for x in items[:]:</code>. "
+         "Necessary when you genuinely must mutate in place &mdash; because "
+         "other references to the object are watching.</p>"
+         "<p><strong>Filter in place backwards.</strong> Walking from the end "
+         "means deletions only shift elements you have already passed. Correct, "
+         "and worth knowing for when memory matters.</p>"),
+        ("What counts as a change",
+         "<p>For a dict, only a <em>size</em> change trips the check. Assigning "
+         "to an existing key is fine, which surprises people who expect any "
+         "mutation to raise. Adding a key raises just as deletion does.</p>"
+         "<p>Sets behave like dicts. <code>collections.deque</code> also raises. "
+         "And modifying the object a variable points to &mdash; appending to a "
+         "list stored as a dict value &mdash; is not a change to the dict, so it "
+         "is perfectly legal.</p>"),
+    ],
+    code={
+        "file": "mutating.py",
+        "intro": "The dict raising, the list silently skipping on the same "
+                 "logical operation, and the three fixes all producing the "
+                 "answer the broken loop was supposed to give.",
+        "code": '''# Mutating while iterating: one raises, the other lies.
+
+# --- the dict: a loud failure ------------------------------------------
+d = {"a": 1, "b": 2, "c": 3, "d": 4}
+try:
+    for key in d:
+        if d[key] % 2 == 0:
+            del d[key]
+except RuntimeError as e:
+    print("dict  ->", e)
+
+# Assigning to an EXISTING key is fine - only the size is checked.
+d = {"a": 1, "b": 2}
+for key in d:
+    d[key] = 0
+print("assigning to existing keys is fine:", d)
+
+# --- the list: a silent one --------------------------------------------
+items = [1, 2, 4, 6, 7, 8, 9]
+broken = list(items)
+for x in broken:
+    if x % 2 == 0:
+        broken.remove(x)
+
+print()
+print("input          :", items)
+print("removing evens :", broken, " <- 6 survived, and no error was raised")
+print("expected       :", [x for x in items if x % 2])
+
+# 6 is skipped because removing 4 shifted it into the index just visited.
+
+# --- the three fixes ---------------------------------------------------
+print()
+rebuilt = [x for x in items if x % 2]                  # 1. build a new list
+print("comprehension  :", rebuilt)
+
+snapshot = list(items)
+for x in snapshot[:]:                                  # 2. iterate a copy
+    if x % 2 == 0:
+        snapshot.remove(x)
+print("iterate a copy :", snapshot)
+
+backwards = list(items)
+for i in range(len(backwards) - 1, -1, -1):            # 3. walk backwards
+    if backwards[i] % 2 == 0:
+        del backwards[i]
+print("backwards      :", backwards)
+
+print()
+counts = {"a": 0, "b": 3, "c": 0}
+cleaned = {k: v for k, v in counts.items() if v}       # the dict equivalent
+print("dict rebuilt   :", cleaned)
+
+# A change to a VALUE is not a change to the dict.
+nested = {"x": [1], "y": [2]}
+for key in nested:
+    nested[key].append(0)
+print("mutating values is legal:", nested)
+''',
+        "walk": [
+            ("del d[key] inside for key in d",
+             "Raises immediately. The dict compares its recorded size on every "
+             "step, because a resize can move every entry and iteration would "
+             "otherwise be undefined."),
+            ("broken.remove(x) inside for x in broken",
+             "No error, and 6 survives. Removing 4 shifts 6 into the slot the "
+             "loop has already passed, so it is never examined &mdash; the "
+             "silent failure is the dangerous one."),
+            ("[x for x in items if x % 2]",
+             "The fix to reach for first. Nothing is mutated, the intent is "
+             "visible, and it is usually faster than repeated "
+             "<code>remove</code>, which is O(n) each."),
+            ("nested[key].append(0)",
+             "Legal. Mutating a value does not change the dictionary's size or "
+             "its keys, so the version check never fires."),
+        ],
+        "try": [
+            "Add a key inside the loop instead of deleting one. Same "
+            "<code>RuntimeError</code> &mdash; it is the size that matters, not "
+            "the direction.",
+            "Try the same removal on a <code>set</code>. It raises like the "
+            "dict, which is a good reminder that only the list fails quietly.",
+        ],
+    },
+    check=[
+        {"q": "Deleting from a list while iterating over it:",
+         "options": ["Raises RuntimeError", "Silently skips elements",
+                     "Works correctly", "Raises IndexError"],
+         "answer": 1,
+         "why": "Removing an element shifts the rest left while the loop index "
+                "advances, so the shifted-in element is never visited. No error "
+                "is raised, which makes it worse than the dict's behaviour."},
+        {"q": "Which dict operation during iteration is legal?",
+         "options": ["Deleting a key", "Adding a key",
+                     "Assigning to a key that already exists", "None of them"],
+         "answer": 2,
+         "why": "Only a size change trips the check. Reassigning an existing key "
+                "leaves the size alone, so it is allowed."},
+        {"q": "The preferred fix is:",
+         "options": ["Iterate backwards", "Build a new collection with a "
+                     "comprehension",
+                     "Use a while loop", "Catch the RuntimeError"],
+         "answer": 1,
+         "why": "It mutates nothing, states the intent, and avoids the repeated "
+                "O(n) removals. Iterating a copy is for when in-place mutation "
+                "is genuinely required."},
+    ],
+)
+
+
+def _memo_frames():
+    out = []
+    calls = {"plain": 0, "memo": 0}
+
+    def plain(n):
+        calls["plain"] += 1
+        return n if n < 2 else plain(n - 1) + plain(n - 2)
+
+    cache = {}
+
+    def memo(n):
+        calls["memo"] += 1
+        if n in cache:
+            return cache[n]
+        cache[n] = n if n < 2 else memo(n - 1) + memo(n - 2)
+        return cache[n]
+
+    for n in (5, 10, 20, 25):
+        calls["plain"] = calls["memo"] = 0
+        cache.clear()
+        plain(n)
+        memo(n)
+        out.append(frame(pairs([("fib(%d)" % n, ""),
+                                ("no cache", "%d calls" % calls["plain"]),
+                                ("with a dict", "%d calls" % calls["memo"])],
+                               {"no cache": "bad", "with a dict": "hit"},
+                               label="calls made"),
+                         "At n=%d the cache turns %d calls into %d. The "
+                         "recursion is unchanged - only the repeats are gone."
+                         % (n, calls["plain"], calls["memo"]),
+                         {"n": n, "saved": calls["plain"] - calls["memo"]}))
+    return viz(out)
+
+
+_q(
+    slug="memoisation-with-a-dictionary",
+    kind="coding",
+    level="Medium",
+    title="Memoisation: caching with a dictionary",
+    asked="How would you speed up a recursive function that recomputes the same "
+          "values? What does functools.lru_cache do?",
+    desc="Memoisation as a dictionary lookup in front of a function, what "
+         "lru_cache adds, and the two conditions a function must meet before "
+         "caching is safe.",
+    lead="Put a <strong>dictionary in front of the function</strong>: if the "
+         "arguments have been seen, return the stored answer. That collapses an "
+         "exponential call tree into a linear walk without changing the "
+         "recurrence at all. <code>functools.lru_cache</code> is this, with a "
+         "size bound and thread safety.",
+    say="\"Memoise it - a dict keyed on the arguments. The recursion is "
+        "unchanged; it just stops descending into subtrees it has already "
+        "solved. In Python that's @lru_cache, which also bounds the size so it "
+        "can't grow forever.\"",
+    notice=[
+        "Call counts diverge fast &mdash; the gap is exponential against linear.",
+        "The recurrence is identical in both versions.",
+        "The cache is what turns repeated subproblems into one lookup.",
+    ],
+    viz=_memo_frames(),
+    sections=[
+        ("Why it works at all",
+         "<p>Naive recursion on overlapping subproblems recomputes the same "
+         "values an exponential number of times. Memoisation does not make each "
+         "call faster; it makes the repeated ones disappear, so the work drops "
+         "to the number of <em>distinct</em> subproblems.</p>"
+         "<p>This is dynamic programming from the top down. The bottom-up table "
+         "computes the same values in a loop with no call stack &mdash; same "
+         "complexity, and see "
+         "<a href=\"../dsa/dynamic_programming.html\">dynamic programming</a> "
+         "for both directions side by side.</p>"),
+        ("The two conditions",
+         "<p><strong>The function must be pure.</strong> Same arguments, same "
+         "answer, no side effects. Caching a function that reads a file or the "
+         "clock returns a stale answer forever, and the bug looks like the data "
+         "being wrong rather than the cache being wrong.</p>"
+         "<p><strong>The arguments must be hashable.</strong> They become "
+         "dictionary keys, so a list argument raises. That is why cached "
+         "functions take tuples where you might expect lists &mdash; the "
+         "constraint comes from the cache, not the algorithm.</p>"),
+        ("What lru_cache adds",
+         "<p><code>@lru_cache(maxsize=None)</code> is an unbounded dictionary "
+         "and is what you want for a recursion. A finite "
+         "<code>maxsize</code> evicts least-recently-used entries, which matters "
+         "when the key space is large and unbounded &mdash; an in-memory cache "
+         "with no eviction is a memory leak with good manners.</p>"
+         "<p>It also gives you <code>cache_info()</code> for hits and misses, "
+         "and <code>cache_clear()</code>. <code>functools.cache</code> is the "
+         "unbounded alias added in 3.9. Mention that a manual dict is fine and "
+         "the decorator is what you would actually ship.</p>"),
+    ],
+    code={
+        "file": "memoisation.py",
+        "intro": "The same recurrence three ways with call counts, then "
+                 "<code>cache_info()</code> showing the hit rate, then the two "
+                 "conditions broken on purpose &mdash; an impure function and an "
+                 "unhashable argument.",
+        "code": '''# Memoisation: a dictionary in front of a function.
+from functools import lru_cache
+import time
+
+calls = {"plain": 0, "manual": 0}
+
+def fib_plain(n):
+    calls["plain"] += 1
+    return n if n < 2 else fib_plain(n - 1) + fib_plain(n - 2)
+
+
+cache = {}
+def fib_manual(n):
+    calls["manual"] += 1
+    if n in cache:
+        return cache[n]                      # the whole optimisation
+    cache[n] = n if n < 2 else fib_manual(n - 1) + fib_manual(n - 2)
+    return cache[n]
+
+
+@lru_cache(maxsize=None)                     # the same thing, shipped
+def fib_cached(n):
+    return n if n < 2 else fib_cached(n - 1) + fib_cached(n - 2)
+
+
+for n in (10, 20, 28):
+    calls["plain"] = calls["manual"] = 0
+    cache.clear()
+    start = time.time()
+    fib_plain(n)
+    plain_time = time.time() - start
+    fib_manual(n)
+    print(f"fib({n:>2}): no cache {calls['plain']:>7,} calls ({plain_time:.3f}s)"
+          f"   memoised {calls['manual']:>3} calls")
+
+fib_cached.cache_clear()
+fib_cached(60)
+print()
+print("lru_cache after fib(60):", fib_cached.cache_info())
+print("fib(60) =", fib_cached(60), "- instant, and unreachable without a cache")
+
+# --- condition 1: the function must be pure ----------------------------
+counter = {"n": 0}
+
+@lru_cache(maxsize=None)
+def impure():
+    counter["n"] += 1
+    return counter["n"]
+
+print()
+print("impure() three times:", impure(), impure(), impure())
+print("It ran once and returned the same stale answer twice.")
+
+# --- condition 2: arguments must be hashable ---------------------------
+@lru_cache(maxsize=None)
+def total(numbers):
+    return sum(numbers)
+
+print()
+print("total((1, 2, 3)) ->", total((1, 2, 3)))
+try:
+    total([1, 2, 3])
+except TypeError as e:
+    print("total([1, 2, 3]) ->", e)
+print("Arguments become dict keys, so they have to be hashable.")
+''',
+        "walk": [
+            ("if n in cache: return cache[n]",
+             "The entire optimisation. The recurrence below it is untouched "
+             "&mdash; memoisation does not make calls faster, it removes the "
+             "repeated ones."),
+            ("@lru_cache(maxsize=None)",
+             "Unbounded, which is what a recursion wants. A finite size evicts "
+             "least-recently-used entries and is what you want when the key "
+             "space is large enough to be a leak."),
+            ("impure()",
+             "Cached once and stale forever. The failure looks like wrong data "
+             "rather than a wrong cache, which is why purity is stated as a "
+             "precondition rather than a nicety."),
+            ("total([1, 2, 3])",
+             "A <code>TypeError</code>: arguments become dictionary keys. That "
+             "is why cached functions so often take tuples &mdash; the "
+             "constraint comes from the cache, not the algorithm."),
+        ],
+        "try": [
+            "Call <code>fib_plain(35)</code>. It is the same recurrence and it "
+            "stops being a demonstration and starts being a wait.",
+            "Set <code>maxsize=2</code> on <code>fib_cached</code> and check "
+            "<code>cache_info()</code>. Eviction destroys the benefit for a "
+            "recursion that revisits old values.",
+        ],
+    },
+    check=[
+        {"q": "Memoisation speeds up recursion by:",
+         "options": ["Making each call faster", "Removing repeated calls for "
+                     "subproblems already solved",
+                     "Using less memory", "Avoiding recursion"],
+         "answer": 1,
+         "why": "The work drops to the number of distinct subproblems. The "
+                "recurrence itself is unchanged."},
+        {"q": "Caching a function that reads the current time gives you:",
+         "options": ["A TypeError", "A stale answer returned forever",
+                     "A slower function", "Correct behaviour"],
+         "answer": 1,
+         "why": "The cache assumes purity. The bug then looks like wrong data "
+                "rather than a wrong cache, which is what makes it nasty."},
+        {"q": "Why must a cached function's arguments be hashable?",
+         "options": ["For speed", "They are used as dictionary keys",
+                     "To allow recursion", "They need not be"],
+         "answer": 1,
+         "why": "That is why such functions often take tuples where you would "
+                "expect lists - the constraint comes from the cache."},
+    ],
+)
