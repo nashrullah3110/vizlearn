@@ -2141,3 +2141,543 @@ _t(
          + _SHARED_JUDGE),
     ],
 )
+
+
+# =========================================================================
+# Depth added to the first twelve pages.
+#
+# They shipped at 330-455 words against 400-1000 for the hand-written modules
+# in this track, which made them read as stubs beside their neighbours. These
+# sections are inserted before "Things to try" so the closing shape - try it,
+# then remember it - is preserved.
+# =========================================================================
+
+_EXTRA = {
+
+"tf_idf": [
+ ("Working one score out by hand",
+  "<p>Take a four-document corpus where <em>cat</em> appears in two documents "
+  "and <em>the</em> in all four. For the query <em>cat</em>:</p>"
+  "<p class=\"mono-font\">idf(cat) = log(4 / 2) = 0.69<br>"
+  "idf(the) = log(4 / 4) = 0.00</p>"
+  "<p>A document containing <em>cat</em> twice scores "
+  "(1 + log 2) &times; 0.69 = 1.17. A document containing it once scores 0.69. "
+  "And a document containing <em>the</em> ten times still scores zero for that "
+  "term, because anything multiplied by zero is zero.</p>"
+  "<p>That last line is the one worth internalising. The stopword is not "
+  "filtered, thresholded or special-cased anywhere. It is removed because the "
+  "logarithm of one is zero, which is a much more satisfying reason than a "
+  "hand-maintained list, and it adapts automatically to a corpus where "
+  "<em>patient</em> or <em>invoice</em> is effectively a stopword.</p>"),
+ ("The variants you will actually meet",
+  "<p><strong>Sublinear tf.</strong> <code>1 + log(count)</code> rather than "
+  "the raw count, which is what the visualisation's damping toggle switches. "
+  "Almost always on.</p>"
+  "<p><strong>Smoothed idf.</strong> <code>log(1 + N/df)</code> or "
+  "<code>log((N+1)/(df+1)) + 1</code>, which scikit-learn uses by default. It "
+  "avoids a zero weight and a division by zero for unseen terms, and it means "
+  "scikit-learn's numbers will not match a textbook's.</p>"
+  "<p><strong>L2 normalisation.</strong> Each document vector scaled to unit "
+  "length, so cosine similarity between documents is a dot product and long "
+  "documents stop winning by having more of everything.</p>"
+  "<p>When someone says two TF-IDF implementations disagree, it is nearly "
+  "always one of these three, not a bug.</p>"),
+],
+
+"corrective_rag": [
+ ("What the grader can actually be",
+  "<p><strong>A similarity threshold.</strong> Free, and the crudest: reject "
+  "when the top score is below a cutoff. It works badly on its own because "
+  "embedding similarity is not calibrated &mdash; 0.7 means different things "
+  "for different queries, so a fixed threshold rejects good evidence for some "
+  "queries and accepts noise for others.</p>"
+  "<p><strong>A cross-encoder.</strong> The reranker you may already run scores "
+  "query-document pairs jointly and is far better calibrated than a bi-encoder "
+  "similarity. If a reranker is in the pipeline, its score is the natural "
+  "grader and costs nothing extra.</p>"
+  "<p><strong>A small LLM.</strong> \"Does this document help answer this "
+  "question? yes/no.\" Most accurate, most expensive, and the latency lands on "
+  "every query rather than only the corrected ones.</p>"
+  "<p>The usual production shape is a cheap filter that rejects the obviously "
+  "bad, with a model consulted only in the ambiguous band.</p>"),
+ ("The costs, and when to skip the grader entirely",
+  "<p>Grading is not free. Every query pays for it, and corrected queries pay "
+  "for a second retrieval and sometimes a second generation &mdash; so a "
+  "pipeline that corrects aggressively can double its p95 latency.</p>"
+  "<p>Two mitigations are worth knowing. <strong>Skip when unambiguous:</strong> "
+  "if the top result scores far above anything else, grading tells you nothing "
+  "you did not already know, so gate it on a margin rather than running it "
+  "always. <strong>Cap the retries:</strong> one rewrite, then fall back. "
+  "Without a depth limit, a query the rewriter cannot fix loops until something "
+  "times out, and each iteration costs a retrieval and a model call.</p>"
+  "<p>Measure the benefit rather than assuming it. The number that matters is "
+  "how often the corrective path fires and how often it then produces a better "
+  "answer &mdash; on a corpus with good coverage, that can be rare enough that "
+  "the latency is not worth paying.</p>"),
+],
+
+"queries_keys_and_values": [
+ ("Where the shapes come from",
+  "<p>For a sequence of n tokens with model dimension d, the three projections "
+  "are matrices of shape d&times;d<sub>k</sub>, so Q, K and V each come out "
+  "n&times;d<sub>k</sub>. QK<sup>T</sup> is then n&times;n &mdash; every token "
+  "scored against every token &mdash; and multiplying that by V returns to "
+  "n&times;d<sub>k</sub>.</p>"
+  "<p>That n&times;n matrix is why attention is quadratic in sequence length, "
+  "and why context windows were hard to extend. It is also why flash attention "
+  "and its relatives matter: they compute the same result without ever "
+  "materialising the full matrix in memory.</p>"
+  "<p>In multi-head attention the projections are split into h heads of "
+  "dimension d/h, each computing its own attention, with the outputs "
+  "concatenated. Same arithmetic, run in parallel over subspaces, so different "
+  "heads can specialise &mdash; some track syntax, some track position, some "
+  "appear to do very little.</p>"),
+ ("Masking, and what it has to do with the cache",
+  "<p>A decoder must not attend to tokens it has not generated yet, so the "
+  "scores above the diagonal are set to negative infinity before the softmax, "
+  "which drives their weights to zero. That is causal masking, and it is what "
+  "makes the KV cache correct rather than merely convenient: since token "
+  "<em>i</em> can only ever attend to tokens up to <em>i</em>, its keys and "
+  "values can never be affected by anything generated later.</p>"
+  "<p>The cache's cost is memory, and it is the usual limit on how many "
+  "requests a GPU can serve at once: roughly 2 &times; layers &times; heads "
+  "&times; head dimension &times; sequence length &times; batch, per precision "
+  "byte. Grouped-query and multi-query attention exist mostly to shrink it, by "
+  "sharing K and V across heads while keeping separate queries &mdash; a large "
+  "memory saving for a small quality cost.</p>"),
+],
+
+"caching_in_rag_pipelines": [
+ ("Semantic caching, and the risk it introduces",
+  "<p>An exact-match query cache misses on any rewording, and real users "
+  "reword constantly. Semantic caching keys on the question's embedding instead "
+  "and returns a stored answer when a previous question is close enough.</p>"
+  "<p>It raises the hit rate substantially and introduces a failure the exact "
+  "cache cannot have: returning the answer to a <em>similar but different</em> "
+  "question. \"What is the refund policy for digital goods?\" and \"What is the "
+  "refund policy?\" are close in embedding space and have different answers. "
+  "The threshold is the whole design, and it should be set from measured "
+  "false-hit rate on real traffic, not chosen.</p>"
+  "<p>Two safeguards are worth the effort: exclude anything user-specific or "
+  "permission-scoped from the cache entirely, and log hits so a wrong answer "
+  "can be traced back to the question that seeded it.</p>"),
+ ("Invalidation, which is where these systems actually break",
+  "<p>The embedding cache never goes stale &mdash; embedding is deterministic, "
+  "so the same text and model always give the same vector. Include the model "
+  "name in the key and it is correct forever.</p>"
+  "<p>The query cache is the opposite. It stores a conclusion drawn from a "
+  "corpus at a moment in time, and nothing in it knows when a document changed. "
+  "The practical options are all imperfect: a short TTL, which trades hit rate "
+  "for staleness; a flush on re-index, which is coarse but honest; or tracking "
+  "which chunks contributed to each cached answer and invalidating precisely, "
+  "which is correct and rarely worth the bookkeeping.</p>"
+  "<p>Prompt caching sidesteps the question because it caches computation "
+  "rather than conclusions. The model recomputes the same thing it would have "
+  "anyway, so there is nothing to go stale &mdash; which is why it is the "
+  "safest of the three and the one to reach for first.</p>"),
+],
+
+}
+
+_EXTRA.update({
+
+"recursive_chunking": [
+ ("Choosing the size, and why there is no default",
+  "<p>Chunk size is a trade between two failures. Too small and a chunk lacks "
+  "the context to be understood alone &mdash; a sentence about \"the second "
+  "condition\" without the first. Too large and the chunk covers several topics, "
+  "so its embedding is an average of all of them and matches none precisely, "
+  "while also burning context budget on material the query did not need.</p>"
+  "<p>The useful framing is that a chunk should be <strong>one retrievable "
+  "idea</strong>. For dense prose that is often a paragraph, 200&ndash;500 "
+  "tokens. For reference material with short entries it is much smaller. For "
+  "code it is a function, whatever that costs in tokens.</p>"
+  "<p>Do not pick from a blog post. Build a small evaluation set of real "
+  "questions, measure <a href=\"recall_at_k.html\">recall@k</a> at three or "
+  "four sizes, and take the winner. The difference between 200 and 800 tokens "
+  "on a real corpus is routinely larger than the difference between two "
+  "embedding models.</p>"),
+ ("Overlap, and the deduplication it forces",
+  "<p>Overlap exists because a boundary can fall mid-argument however carefully "
+  "it is chosen. Repeating the last 10&ndash;20% of each chunk at the start of "
+  "the next means a straddling sentence appears whole somewhere.</p>"
+  "<p>It costs more than index size. Overlapping chunks are near-duplicates, so "
+  "a query matching the overlapped region retrieves both, and your top 5 is "
+  "really a top 3 with two copies. That crowds out genuinely different "
+  "evidence, and it is the reason "
+  "<a href=\"maximal_marginal_relevance.html\">maximal marginal relevance</a> "
+  "and other diversity-aware selection strategies exist.</p>"
+  "<p>If overlap is doing a lot of work for you, that is usually a signal the "
+  "separators are wrong rather than that more overlap is needed. Fixing the "
+  "boundaries is cheaper than paying for redundancy on every query.</p>"),
+],
+
+"semantic_chunking": [
+ ("Making the similarity signal usable",
+  "<p>Raw sentence-to-sentence similarity is noisy. Short sentences &mdash; "
+  "\"Yes.\", \"See above.\", a heading fragment &mdash; have unstable "
+  "embeddings, so the gap sequence contains dips that are artefacts rather than "
+  "topic changes.</p>"
+  "<p>Two standard mitigations. <strong>Buffering:</strong> embed each sentence "
+  "together with its neighbours, so a short sentence inherits context and its "
+  "vector stops swinging. <strong>Smoothing:</strong> take a rolling mean over "
+  "the gap sequence before looking for troughs, so a single anomalous sentence "
+  "cannot open a boundary on its own.</p>"
+  "<p>Both trade sensitivity for stability, and both are worth having. Without "
+  "them the technique looks impressive on a clean essay and falls apart on a "
+  "support transcript, which is exactly the sort of unstructured text it was "
+  "supposed to be good at.</p>"),
+ ("Is it worth it? Measure before adopting",
+  "<p>Semantic chunking is the most cited of the strategies and the hardest to "
+  "justify on evidence. It costs an embedding call per sentence at index time, "
+  "produces chunks of unpredictable size that complicate context budgeting, and "
+  "on published comparisons its advantage over a well-tuned recursive splitter "
+  "is often small or absent.</p>"
+  "<p>Where it does earn its cost: long unstructured prose with no formatting "
+  "signal &mdash; interview transcripts, meeting notes, scanned reports &mdash; "
+  "and corpora where topics shift within a paragraph, so paragraph boundaries "
+  "mislead.</p>"
+  "<p>The honest order of operations is to tune the separators and the size "
+  "first, measure, and only then try semantic chunking against that baseline. "
+  "It is a real technique that is frequently adopted before the cheap options "
+  "have been exhausted.</p>"),
+],
+
+"structure_aware_chunking": [
+ ("Extraction is the hard part, not splitting",
+  "<p>The splitting is easy once the structure is known. Knowing it is the "
+  "problem, and it varies enormously by format.</p>"
+  "<p><strong>Markdown and HTML</strong> carry structure explicitly; a parser "
+  "gives you the tree.</p>"
+  "<p><strong>PDF</strong> has no structure at all &mdash; only positioned "
+  "glyphs. Headings must be inferred from font size, weight and spacing, "
+  "multi-column layouts interleave text if read naively, and tables lose their "
+  "rows. Most RAG quality complaints about PDFs are extraction failures rather "
+  "than retrieval failures, and swapping the embedding model will not touch "
+  "them.</p>"
+  "<p><strong>Office documents and slides</strong> sit in between: real "
+  "structure exists in the file format, and most extraction libraries flatten "
+  "it away before you see it.</p>"
+  "<p>Budget for extraction seriously. It is unglamorous and it decides the "
+  "ceiling on everything downstream.</p>"),
+ ("Tables, code and the things that must not be split",
+  "<p>Some structures are atomic. A table cut between its header row and its "
+  "data leaves rows of unlabelled numbers; a code block cut in half is not "
+  "code; a numbered list split mid-way loses the numbering that made it "
+  "readable.</p>"
+  "<p>The usual handling is to keep these whole even when they exceed the size "
+  "limit, and to accept the occasional oversized chunk. For a genuinely large "
+  "table, the better answer is often to store a generated summary for retrieval "
+  "and the full table for generation &mdash; the summary is what matches the "
+  "query, the table is what answers it.</p>"
+  "<p>The same reasoning applies to images and diagrams: retrieve on a caption "
+  "or description, return the artefact. Once you separate what is embedded from "
+  "what is returned, you are already at the "
+  "<a href=\"parent_document_retriever.html\">parent-document</a> pattern.</p>"),
+],
+
+"context_aware_chunking": [
+ ("Contextual retrieval, and what it costs",
+  "<p>The strongest published form of this is to have an LLM write a short "
+  "sentence situating each chunk inside its document &mdash; what it is about, "
+  "what it follows &mdash; and prepend that before embedding. Reported "
+  "reductions in retrieval failure are large, and the technique is simple "
+  "enough to implement in an afternoon.</p>"
+  "<p>The cost is one model call per chunk at index time, which sounds "
+  "prohibitive on a large corpus and mostly is not: the document is the same "
+  "for every chunk in it, so <a href=\"caching_in_rag_pipelines.html\">prompt "
+  "caching</a> over that shared prefix makes the marginal call cheap. It is the "
+  "clearest practical example of two of these techniques composing.</p>"
+  "<p>It is still an index-time cost paid on every re-index, so it belongs in "
+  "your pipeline design rather than being bolted on: changing the chunker means "
+  "regenerating every context sentence.</p>"),
+ ("Embedded text and returned text can differ",
+  "<p>The enrichment does not have to be what the model reads. You can embed "
+  "the enriched text &mdash; so the chunk is findable &mdash; while storing and "
+  "returning the original, so the generator is not fed repetitive boilerplate.</p>"
+  "<p>Separating the two is the general form of a pattern that appears "
+  "everywhere in retrieval: embed something optimised for matching, return "
+  "something optimised for reading. Parent-document retrieval embeds a small "
+  "chunk and returns its parent. Summary indexing embeds a summary and returns "
+  "the document. Contextual retrieval embeds chunk-plus-context and can return "
+  "either.</p>"
+  "<p>Once you see the pattern, the design question stops being \"how should I "
+  "chunk?\" and becomes two questions with different answers: what should be "
+  "<em>matched</em> against, and what should be <em>read</em>?</p>"),
+],
+
+})
+
+_EXTRA.update({
+
+"indexing_in_vector_databases": [
+ ("Measuring recall, which needs a ground truth",
+  "<p>An approximate index is a lossy structure, so \"is it working?\" is a "
+  "measurement rather than an assumption. The measurement needs the true "
+  "answers, which means a flat exact search over a sample &mdash; typically a "
+  "few hundred held-out queries, run once, stored.</p>"
+  "<p>Then recall@k is the overlap between what the index returned and what the "
+  "exact search returned. Track it as a deployment check: an index rebuilt with "
+  "different parameters, or a library upgraded, can quietly lose recall while "
+  "every latency dashboard stays green.</p>"
+  "<p>What counts as good depends on what sits downstream. For RAG feeding a "
+  "reranker that sees the top 50, 0.9 is comfortable &mdash; a missed neighbour "
+  "at rank 40 changes nothing. For deduplication, near-duplicate detection or "
+  "anything where a miss is a correctness bug rather than a quality one, "
+  "approximate search is the wrong tool and a flat index over a filtered subset "
+  "is usually fast enough.</p>"),
+ ("Filtering, updates and the parts that are not the ANN algorithm",
+  "<p>Two problems decide most real vector-database choices, and neither is "
+  "about nearest-neighbour search.</p>"
+  "<p><strong>Metadata filtering.</strong> Restricting to a tenant, a date "
+  "range or a permission set fights the index, because the graph or the "
+  "clustering was built over everything. Pre-filtering can disconnect a graph "
+  "traversal; post-filtering silently returns fewer results. How a database "
+  "handles this is the main thing that distinguishes them &mdash; see "
+  "<a href=\"permission_filtering_in_rag.html\">permission filtering</a>.</p>"
+  "<p><strong>Updates and deletes.</strong> HNSW does not delete gracefully: "
+  "removing a node can disconnect the graph, so implementations tombstone and "
+  "rebuild periodically. If your corpus changes hourly, the rebuild cost may "
+  "matter more than query latency, and IVF's cheaper updates start to look "
+  "attractive despite worse recall-for-latency.</p>"
+  "<p>Benchmarks almost always measure static-corpus query performance, which "
+  "is the easy half.</p>"),
+],
+
+"ann_indexing_hnsw_and_ivf": [
+ ("Product quantization, and when memory is the constraint",
+  "<p>HNSW keeps every vector in memory plus the graph, so a million "
+  "768-dimensional float32 vectors is about 3&nbsp;GB before the graph. Past "
+  "some scale that, not latency, is what stops you.</p>"
+  "<p>Product quantization splits each vector into subvectors, clusters each "
+  "subspace, and stores the cluster ids instead of the values &mdash; typically "
+  "a 10&ndash;30&times; reduction. Distances are then computed against the "
+  "codes using a precomputed lookup table, which is also faster.</p>"
+  "<p>The cost is precision: distances become approximate on top of the search "
+  "already being approximate, so recall drops. The standard mitigation is "
+  "<strong>rerank with the real vectors</strong> &mdash; retrieve a generous "
+  "candidate set from the compressed index, then rescore the top few hundred "
+  "against the originals held on disk. IVF-PQ with reranking is what most "
+  "billion-scale deployments actually run.</p>"),
+ ("Choosing between them, and what to measure",
+  "<p><strong>HNSW</strong> when the index fits in memory and query latency "
+  "matters most. Best recall-for-latency, worst memory, awkward deletes.</p>"
+  "<p><strong>IVF</strong> when builds and updates need to be cheap, or as the "
+  "base for quantization. Simpler to reason about; recall depends on probing "
+  "enough clusters.</p>"
+  "<p><strong>IVF-PQ</strong> when memory is binding. Accept lower raw recall "
+  "and recover it with a rerank pass.</p>"
+  "<p><strong>Flat</strong> when the corpus is small or a miss is a correctness "
+  "bug. Under a hundred thousand vectors, a brute-force scan is often a few "
+  "milliseconds and needs no tuning at all &mdash; which is worth checking "
+  "before adopting anything else.</p>"
+  "<p>Measure on your own data. Recall/latency curves depend on the intrinsic "
+  "dimensionality and clustering of your embeddings, and published benchmarks "
+  "on academic datasets transfer poorly.</p>"),
+],
+
+"permission_filtering_in_rag": [
+ ("Why pre-filtering fights the index",
+  "<p>Pre-filtering is the correct behaviour and it is genuinely hard to "
+  "implement, because an ANN index was built over the whole corpus and does not "
+  "know about your predicate.</p>"
+  "<p>Walking an HNSW graph while skipping most nodes can <strong>disconnect "
+  "the traversal</strong>: the search reaches a region where every neighbour is "
+  "filtered out and stalls, returning far fewer results than asked for even "
+  "though plenty of permitted documents exist elsewhere in the graph.</p>"
+  "<p>The strategies databases use, all with trade-offs: filtered traversal "
+  "that keeps searching past excluded nodes; per-tenant sub-indexes, which are "
+  "clean and expensive once tenants number in the thousands; and falling back "
+  "to a flat scan when the filter is selective &mdash; which is often genuinely "
+  "fastest, since a user with access to 0.1% of a million documents is a "
+  "thousand-vector brute force.</p>"),
+ ("Getting the model right, and failing closed",
+  "<p>Two design rules cover most of the damage.</p>"
+  "<p><strong>Derive the filter from the session, never the request.</strong> A "
+  "client-supplied user or group id is trivially forged. The filter must be "
+  "built server-side from the authenticated identity.</p>"
+  "<p><strong>Index groups, resolve membership per query.</strong> Baking a "
+  "user list into each chunk means a departure leaves the index granting access "
+  "until the next re-index &mdash; and stale permissions fail <em>open</em>, "
+  "which is the wrong direction. Indexing a stable group id and resolving the "
+  "user's groups per request makes revocation immediate.</p>"
+  "<p>Also: filtering is not deletion. A document removed for legal or privacy "
+  "reasons must leave the index and any cached answers derived from it, or it "
+  "remains recoverable by anyone who can still see it &mdash; which is a "
+  "different and worse problem than a missing result.</p>"),
+],
+
+"distributed_retrieval_and_sharding": [
+ ("The merge, and the scores that do not survive it",
+  "<p>Merging local top-k lists assumes the scores are comparable across "
+  "shards, and that assumption quietly fails for lexical retrieval.</p>"
+  "<p>BM25's idf term depends on corpus statistics &mdash; document frequency "
+  "and average document length &mdash; which differ per shard. A term that is "
+  "rare on shard 1 and common on shard 3 gets different weights, so a merged "
+  "ranking is comparing numbers computed on different scales. The fix is global "
+  "statistics: compute df and avgdl across the whole corpus and distribute "
+  "them, which is an extra coordination step people discover only after the "
+  "rankings look wrong.</p>"
+  "<p>Dense retrieval escapes this. Cosine similarity between a query and a "
+  "document vector involves no corpus statistics at all, so shard-local scores "
+  "are directly comparable. It is one of the underrated operational advantages "
+  "of vector search.</p>"),
+ ("Replication, failure and the degraded answer",
+  "<p>Sharding splits data; replication copies it. They solve different "
+  "problems, and conflating them is the most common design error here: if the "
+  "index fits on one machine and you are simply serving too many queries, you "
+  "want replicas and no sharding at all, and there is then nothing to merge.</p>"
+  "<p>Once shards exist, so does partial failure. Scatter-gather waits for "
+  "everyone, so a single slow or dead shard degrades every query. The practical "
+  "answers are a <strong>deadline</strong> &mdash; serve what returned in time "
+  "and mark the result degraded &mdash; and <strong>hedged requests</strong>, "
+  "asking two replicas and taking whichever answers first, which trades a few "
+  "percent extra load for a much better tail.</p>"
+  "<p>Decide explicitly whether a degraded answer is acceptable. For search it "
+  "usually is. For a RAG answer that will be presented as authoritative, "
+  "silently dropping a shard means silently dropping evidence, and the user has "
+  "no way to know.</p>"),
+],
+
+})
+
+
+# Insert the extra sections before "Things to try", so each page still closes
+# on try-it-then-remember-it like the hand-written modules do.
+for _entry in TOPICS:
+    _extra = _EXTRA.get(_entry["slug"])
+    if not _extra:
+        continue
+    _sections = _entry["sections"]
+    _at = next((i for i, (h, _) in enumerate(_sections) if h == "Things to try"),
+               len(_sections))
+    _entry["sections"] = _sections[:_at] + list(_extra) + _sections[_at:]
+
+
+# A second pass on the five that were still short of the rest.
+_EXTRA2 = {
+
+"tf_idf": ("Where it sits in a modern stack",
+  "<p>TF-IDF is rarely the ranker any more &mdash; "
+  "<a href=\"bm25_and_sparse_retrieval.html\">BM25</a> supersedes it by "
+  "saturating term frequency and normalising length properly &mdash; but it is "
+  "still the thing to reach for in three situations.</p>"
+  "<p><strong>As a baseline.</strong> If a dense retriever cannot beat TF-IDF "
+  "on your evaluation set, the problem is the embedding model, the chunking or "
+  "the evaluation set itself. It costs minutes to run and it has saved a great "
+  "many people from tuning the wrong thing.</p>"
+  "<p><strong>As a feature.</strong> TF-IDF vectors feed classical classifiers "
+  "&mdash; spam filtering, topic labelling, near-duplicate detection &mdash; "
+  "where a sparse interpretable representation beats a dense one and trains in "
+  "seconds.</p>"
+  "<p><strong>As the explanation.</strong> Every score decomposes into per-term "
+  "contributions, so you can say exactly why a document ranked where it did. "
+  "No dense retriever can do that, and in regulated settings it is sometimes "
+  "the deciding factor.</p>"),
+
+"recursive_chunking": ("Tuning the separator list per format",
+  "<p>The default list &mdash; paragraph, line, sentence, word, character "
+  "&mdash; assumes prose. Changing it for the document type is the single "
+  "cheapest improvement available, and it is almost always left alone.</p>"
+  "<p><strong>Code:</strong> lead with <code>\\nclass </code>, "
+  "<code>\\ndef </code>, <code>\\n\\n</code>, so a function stays whole and a "
+  "chunk is a unit someone could actually read.</p>"
+  "<p><strong>Markdown:</strong> lead with heading markers, which turns the "
+  "recursive splitter into a cheap approximation of "
+  "<a href=\"structure_aware_chunking.html\">structure-aware chunking</a>.</p>"
+  "<p><strong>Transcripts:</strong> split on speaker turns before sentences, "
+  "so a chunk holds one person's contribution rather than half of two.</p>"
+  "<p><strong>CSV and logs:</strong> split on lines and never below, because a "
+  "half-row is meaningless.</p>"
+  "<p>Every one of these is a few characters of configuration against an "
+  "embedding-model migration, and they routinely produce more improvement.</p>"),
+
+"semantic_chunking": ("How it relates to the other three strategies",
+  "<p>The four strategies answer genuinely different questions, which is why "
+  "they compose rather than compete.</p>"
+  "<p><strong>Recursive</strong> asks where the safest boundary is given a size "
+  "budget. It is the default and the baseline.</p>"
+  "<p><strong>Structure-aware</strong> asks what boundaries the author already "
+  "marked. Free when the format carries them, and strictly better than guessing "
+  "when it does.</p>"
+  "<p><strong>Semantic</strong> asks where the meaning changes. It is the only "
+  "one that can find a boundary the author did not mark, which is why it is for "
+  "unstructured prose specifically.</p>"
+  "<p><strong>Context-aware</strong> asks what the chunk lost by being cut, and "
+  "is orthogonal to all three &mdash; you can enrich chunks produced by any "
+  "splitter.</p>"
+  "<p>A sensible production pipeline is usually structure first, recursive to "
+  "enforce the size limit, and context enrichment on the result. Semantic "
+  "chunking enters when the documents have no structure to exploit.</p>"),
+
+"structure_aware_chunking": ("What the heading path does to retrieval",
+  "<p>Prepending <code>Refund policy &gt; Exceptions</code> to a chunk is often "
+  "described as a readability improvement, and its larger effect is on "
+  "retrieval.</p>"
+  "<p>The section's vocabulary is now inside the embedded text. A query using "
+  "the words of the section &mdash; \"refund exceptions\" &mdash; matches a "
+  "chunk whose body never uses either word, because the body says \"digital "
+  "goods are non-refundable once downloaded\". Without the path, that chunk is "
+  "close to unfindable by its own section's name.</p>"
+  "<p>Store the path as metadata as well as prepending it. As metadata it "
+  "supports filtering (\"only search the exceptions\"), it gives you a citation "
+  "to display, and it lets you reconstruct the document's hierarchy for a "
+  "parent-document lookup.</p>"
+  "<p>One caution: on a deep hierarchy the path can grow long enough to "
+  "dominate a short chunk's embedding, which is the dilution problem described "
+  "under <a href=\"context_aware_chunking.html\">context-aware chunking</a>. "
+  "Two or three levels is usually the useful limit.</p>"),
+
+"context_aware_chunking": ("Measuring whether the enrichment helped",
+  "<p>Enrichment is easy to add and easy to overdo, and the only way to tell "
+  "which you have done is to measure both halves.</p>"
+  "<p><strong>Did findability improve?</strong> "
+  "<a href=\"recall_at_k.html\">Recall@k</a> on a fixed query set, before and "
+  "after. This is the number the technique is supposed to move, and it usually "
+  "does.</p>"
+  "<p><strong>Did distinguishability degrade?</strong> The failure mode is "
+  "chunks from one section becoming interchangeable. A cheap proxy is the mean "
+  "pairwise similarity between chunks that share a parent: if it climbs "
+  "sharply after enrichment, the shared context is dominating and the retriever "
+  "is losing its ability to pick between them.</p>"
+  "<p>Watching only the first will lead you to enrich more and more, because "
+  "recall keeps improving right up until the point where the top-k fills with "
+  "near-identical chunks from the same section &mdash; at which point recall "
+  "still looks fine and answers get worse.</p>"),
+
+}
+
+for _entry in TOPICS:
+    _one = _EXTRA2.get(_entry["slug"])
+    if not _one:
+        continue
+    _sections = _entry["sections"]
+    _at = next((i for i, (h, _) in enumerate(_sections) if h == "Things to try"),
+               len(_sections))
+    _entry["sections"] = _sections[:_at] + [_one] + _sections[_at:]
+
+
+# corrective_rag was still the shortest after the first two passes.
+for _entry in TOPICS:
+    if _entry["slug"] != "corrective_rag":
+        continue
+    _at = next(i for i, (h, _) in enumerate(_entry["sections"])
+               if h == "Things to try")
+    _entry["sections"].insert(_at, ("Where it sits among the adaptive patterns",
+  "<p>Corrective RAG is one of a family that all add a decision point to the "
+  "straight-line retrieve-then-generate pipeline, and they are easy to "
+  "confuse.</p>"
+  "<p><strong>Self-RAG</strong> trains the model to emit retrieval and critique "
+  "tokens itself, so the decision to retrieve and the judgement of what came "
+  "back are part of generation rather than a separate step. More elegant, and "
+  "it needs a fine-tuned model.</p>"
+  "<p><strong>Adaptive RAG</strong> decides <em>whether to retrieve at all</em> "
+  "based on the query. \"What is 2+2\" needs no corpus, and a pipeline that "
+  "retrieves unconditionally wastes latency and pollutes the context.</p>"
+  "<p><strong>Agentic RAG</strong> lets a loop plan several retrievals, "
+  "decomposing a compound question into sub-questions. Strictly more powerful "
+  "and much harder to bound &mdash; without a step limit it can run for a long "
+  "time on a query it cannot satisfy.</p>"
+  "<p>CRAG is the cheapest of the four and needs no training, which is why it "
+  "is usually the first one to add. The others are what you reach for once you "
+  "have measured that grading alone is not enough.</p>"))
