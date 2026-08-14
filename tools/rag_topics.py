@@ -31,6 +31,118 @@ TOPICS = []
 
 WIDGETS = {
 
+"hit_rate_at_k": {"model": "ranking", "controls": [
+    {"id": "k", "label": "k (results examined)", "kind": "range",
+     "min": 1, "max": 10, "step": 1, "value": 3},
+], "data": {"focus": "hit", "results": [
+        {"text": "Refund window is 14 days from delivery", "relevant": True},
+        {"text": "Returns portal user guide", "relevant": False},
+        {"text": "Exchanges are processed within 14 days", "relevant": True},
+        {"text": "Shipping rates by region", "relevant": False},
+        {"text": "Warranty claims take 30 days", "relevant": False},
+        {"text": "Refunds for digital goods: not available", "relevant": True},
+        {"text": "Office relocation notice, 2021", "relevant": False},
+        {"text": "Payment methods accepted", "relevant": False},
+        {"text": "Late refund escalation process", "relevant": True},
+        {"text": "Careers page", "relevant": False}]}},
+
+"recall_at_k": {"model": "ranking", "controls": [
+    {"id": "k", "label": "k (results examined)", "kind": "range",
+     "min": 1, "max": 10, "step": 1, "value": 5},
+], "data": {"focus": "recall", "results": [
+        {"text": "Refund window is 14 days from delivery", "relevant": True},
+        {"text": "Returns portal user guide", "relevant": False},
+        {"text": "Exchanges are processed within 14 days", "relevant": True},
+        {"text": "Shipping rates by region", "relevant": False},
+        {"text": "Warranty claims take 30 days", "relevant": False},
+        {"text": "Refunds for digital goods: not available", "relevant": True},
+        {"text": "Office relocation notice, 2021", "relevant": False},
+        {"text": "Payment methods accepted", "relevant": False},
+        {"text": "Late refund escalation process", "relevant": True},
+        {"text": "Careers page", "relevant": False}]}},
+
+"precision_at_k": {"model": "ranking", "controls": [
+    {"id": "k", "label": "k (results examined)", "kind": "range",
+     "min": 1, "max": 10, "step": 1, "value": 5},
+], "data": {"focus": "precision", "results": [
+        {"text": "Refund window is 14 days from delivery", "relevant": True},
+        {"text": "Returns portal user guide", "relevant": False},
+        {"text": "Exchanges are processed within 14 days", "relevant": True},
+        {"text": "Shipping rates by region", "relevant": False},
+        {"text": "Warranty claims take 30 days", "relevant": False},
+        {"text": "Refunds for digital goods: not available", "relevant": True},
+        {"text": "Office relocation notice, 2021", "relevant": False},
+        {"text": "Payment methods accepted", "relevant": False},
+        {"text": "Late refund escalation process", "relevant": True},
+        {"text": "Careers page", "relevant": False}]}},
+
+"mean_reciprocal_rank": {"model": "ranking", "controls": [
+    {"id": "k", "label": "k (results examined)", "kind": "range",
+     "min": 1, "max": 10, "step": 1, "value": 10},
+], "data": {"focus": "mrr", "results": [
+        {"text": "Refund window is 14 days from delivery", "relevant": True},
+        {"text": "Returns portal user guide", "relevant": False},
+        {"text": "Exchanges are processed within 14 days", "relevant": True},
+        {"text": "Shipping rates by region", "relevant": False},
+        {"text": "Warranty claims take 30 days", "relevant": False},
+        {"text": "Refunds for digital goods: not available", "relevant": True},
+        {"text": "Office relocation notice, 2021", "relevant": False},
+        {"text": "Payment methods accepted", "relevant": False},
+        {"text": "Late refund escalation process", "relevant": True},
+        {"text": "Careers page", "relevant": False}]}},
+
+"correctness_in_llm_evaluation": {"model": "judge", "controls": [], "data": {
+    "focus": "correctness", "requiredPoints": 4, "claims": [
+        {"text": "Refunds are issued within 14 days of delivery.",
+         "supported": True, "correct": True, "onTopic": True, "required": True},
+        {"text": "The item must be unused and in its original packaging.",
+         "supported": True, "correct": True, "onTopic": True, "required": True},
+        {"text": "Digital goods are refundable within 30 days.",
+         "supported": False, "correct": False, "onTopic": True, "required": False},
+        {"text": "Our returns team is available 24/7 by phone.",
+         "supported": False, "correct": True, "onTopic": False, "required": False},
+        {"text": "Refunds are returned to the original payment method.",
+         "supported": True, "correct": True, "onTopic": True, "required": True}]}},
+
+"groundedness_in_llm_evaluation": {"model": "judge", "controls": [], "data": {
+    "focus": "groundedness", "requiredPoints": 4, "claims": [
+        {"text": "Refunds are issued within 14 days of delivery.",
+         "supported": True, "correct": True, "onTopic": True, "required": True},
+        {"text": "The item must be unused and in its original packaging.",
+         "supported": True, "correct": True, "onTopic": True, "required": True},
+        {"text": "Digital goods are refundable within 30 days.",
+         "supported": False, "correct": False, "onTopic": True, "required": False},
+        {"text": "Our returns team is available 24/7 by phone.",
+         "supported": False, "correct": True, "onTopic": False, "required": False},
+        {"text": "Refunds are returned to the original payment method.",
+         "supported": True, "correct": True, "onTopic": True, "required": True}]}},
+
+"relevance_in_llm_evaluation": {"model": "judge", "controls": [], "data": {
+    "focus": "relevance", "requiredPoints": 4, "claims": [
+        {"text": "Refunds are issued within 14 days of delivery.",
+         "supported": True, "correct": True, "onTopic": True, "required": True},
+        {"text": "The item must be unused and in its original packaging.",
+         "supported": True, "correct": True, "onTopic": True, "required": True},
+        {"text": "Digital goods are refundable within 30 days.",
+         "supported": False, "correct": False, "onTopic": True, "required": False},
+        {"text": "Our returns team is available 24/7 by phone.",
+         "supported": False, "correct": True, "onTopic": False, "required": False},
+        {"text": "Refunds are returned to the original payment method.",
+         "supported": True, "correct": True, "onTopic": True, "required": True}]}},
+
+"completeness_in_llm_evaluation": {"model": "judge", "controls": [], "data": {
+    "focus": "completeness", "requiredPoints": 4, "claims": [
+        {"text": "Refunds are issued within 14 days of delivery.",
+         "supported": True, "correct": True, "onTopic": True, "required": True},
+        {"text": "The item must be unused and in its original packaging.",
+         "supported": True, "correct": True, "onTopic": True, "required": True},
+        {"text": "Digital goods are refundable within 30 days.",
+         "supported": False, "correct": False, "onTopic": True, "required": False},
+        {"text": "Our returns team is available 24/7 by phone.",
+         "supported": False, "correct": True, "onTopic": False, "required": False},
+        {"text": "Refunds are returned to the original payment method.",
+         "supported": True, "correct": True, "onTopic": True, "required": True}]}},
+
 "tf_idf": {"model": "tfidf", "controls": [
     {"id": "query", "label": "Query", "kind": "select", "value": 0,
      "options": [{"label": "cat"}, {"label": "the"}, {"label": "the cat"},
@@ -236,8 +348,40 @@ def _art_scale(v):
             'stroke="var(--text-muted)" stroke-width="2"/>%s</svg>' % "".join(nodes))
 
 
+def _art_eval(v):
+    bars = []
+    for i in range(6):
+        hit = (i + v) % 4 != 2
+        bars.append('<rect x="%d" y="%d" width="15" height="%d" rx="2" fill="%s" '
+                    'opacity="%s"/>'
+                    % (22 + i * 21, 30 if hit else 44, 26 if hit else 12,
+                       "var(--accent-primary)" if hit else "var(--text-muted)",
+                       "0.85" if hit else "0.35"))
+    return ('<svg aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full">%s'
+            '<line x1="14" y1="62" x2="146" y2="62" stroke="var(--border-subtle)" '
+            'stroke-width="2"/>'
+            '<text x="80" y="76" text-anchor="middle" font-size="8" '
+            'font-family="monospace" fill="var(--text-muted)">@k</text></svg>'
+            % "".join(bars))
+
+
+def _art_judge(v):
+    rows = []
+    for i in range(4):
+        ok = (i + v) % 4 != 1
+        rows.append('<rect x="40" y="%d" width="80" height="10" rx="2" '
+                    'fill="var(--accent-primary)" opacity="%s"/>'
+                    % (22 + i * 15, "0.8" if ok else "0.2"))
+        rows.append('<circle cx="28" cy="%d" r="4" fill="%s"/>'
+                    % (27 + i * 15,
+                       "var(--accent-primary)" if ok else "var(--text-muted)"))
+    return ('<svg aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full">'
+            '%s</svg>' % "".join(rows))
+
+
 ART = {"Retrieval": _art_retrieval, "Chunking": _art_chunking,
-       "Caching": _art_cache, "Scale": _art_scale}
+       "Caching": _art_cache, "Scale": _art_scale,
+       "Evaluation": _art_eval, "LLM evaluation": _art_judge}
 
 
 def _t(**kw):
@@ -1094,5 +1238,906 @@ _t(
          "<ol><li>Switch to <em>semantic</em> sharding. Recall collapses: every relevant document is on one shard, whose local top-k discards the rest.</li><li>With semantic sharding, raise <strong>per-shard k</strong> until recall recovers. You have paid back the bandwidth the topic routing was meant to save.</li><li>Raise <strong>shards</strong> to 40 with random sharding. Recall is fine and p99 latency climbs, because scatter-gather waits for whichever shard was slow.</li></ol>"),
         ("What to remember",
          "<p>Scatter-gather sends the query to every shard, takes a local top-k from each and merges. Shard randomly rather than by topic, or the relevant documents concentrate in one shard and its local k throws most of them away. Latency becomes the slowest shard's, not the average, so p99 gets worse with every shard added. Shards solve data that will not fit; replicas solve query volume.</p>"),
+    ],
+)
+
+
+# =========================================================================
+# Ranking metrics
+# =========================================================================
+
+_SHARED_RANKING = (
+    "<p>All four of these read the same object: an ordered list of retrieved "
+    "results, with each one labelled relevant or not by a human or a strong "
+    "model. They differ only in what they choose to notice about it &mdash; "
+    "which is why quoting one without saying which is close to meaningless, and "
+    "why the visualisation above shows all four at once.</p>"
+    "<p>The labels are the expensive part. A relevance judgement per "
+    "query-document pair is human work, and an evaluation set of fifty queries "
+    "with judged results is worth more than any amount of metric sophistication "
+    "on top of unjudged data. Build the set first.</p>")
+
+_t(
+    slug="hit_rate_at_k",
+    group_label="Evaluation",
+    level="Beginner",
+    title="What is Hit Rate@k?",
+    asked="What does Hit Rate@k measure, and when is it the right metric for a "
+          "retriever?",
+    desc="Hit Rate@k asks one binary question - was anything relevant in the top "
+         "k? - which makes it the right first metric for a RAG retriever and a "
+         "poor one for ranking quality.",
+    lead="The bluntest of the ranking metrics, and often the most useful one to "
+         "start with. <strong>Hit Rate@k is 1 if at least one relevant document "
+         "appears in the top k, and 0 otherwise.</strong> It does not care how "
+         "many relevant documents there were, or where in the top k they landed. "
+         "Averaged over a query set, it answers a single question: how often "
+         "does retrieval put <em>something</em> useful in front of the "
+         "generator?",
+    notice=[
+        "Click any result to flip whether it is relevant.",
+        "Hit Rate jumps to 1 the moment one relevant item enters the top k.",
+        "Move k below the first relevant rank and it collapses to 0.",
+    ],
+    viz=WIDGETS["hit_rate_at_k"],
+    sections=[
+        ("The definition, and the averaging that hides in it",
+         "<p>For a single query, Hit Rate@k is binary: 1 if any of the top k "
+         "results is relevant, 0 if none is. There is no partial credit. A query "
+         "whose top 3 contains five relevant documents and a query whose top 3 "
+         "contains exactly one both score 1.</p>"
+         "<p>What people usually mean by \"our hit rate is 0.82\" is the mean of "
+         "that binary value across an evaluation set: 82% of queries had "
+         "something useful in the top k. That framing is worth saying out loud, "
+         "because it makes the metric's shape obvious &mdash; it is a proportion "
+         "of queries, not a proportion of documents.</p>"
+         "<p>You will also see it called <em>recall@k with a single relevant "
+         "document</em>, and in recommender literature simply <em>hit "
+         "rate</em>. When every query has exactly one correct answer, Hit "
+         "Rate@k and Recall@k are the same number, which is why the two get "
+         "confused.</p>"),
+        ("Why it is the right first metric for RAG",
+         "<p>A RAG generator does not need every relevant document. It needs "
+         "enough grounding to answer, and for most factual questions one good "
+         "chunk is enough. If the answer is in the context, the model can use "
+         "it; if it is not, no amount of prompt engineering will recover it.</p>"
+         "<p>That makes Hit Rate@k a measure of the <strong>ceiling</strong> on "
+         "your whole pipeline. A hit rate of 0.7 at your context budget means "
+         "30% of queries are unanswerable no matter how good the generator is, "
+         "and every hour spent tuning prompts against those queries is wasted. "
+         "It is the number to establish before anything else, because it tells "
+         "you whether your problem is retrieval or generation.</p>"
+         "<p>It is also cheap to label. Deciding \"is there anything useful "
+         "here?\" is much faster for a human annotator than grading every "
+         "document on a five-point scale, so a hit-rate evaluation set can be "
+         "built in an afternoon.</p>"),
+        ("What it deliberately ignores",
+         "<p><strong>Position.</strong> A relevant document at rank 1 and at "
+         "rank k score identically. That matters more than it sounds: models "
+         "attend unevenly across a long context, and evidence buried at the "
+         "bottom of ten chunks is measurably less likely to be used. Hit rate "
+         "will not show you that; MRR will.</p>"
+         "<p><strong>Quantity.</strong> One relevant document scores the same "
+         "as five. For a question needing several sources &mdash; \"compare our "
+         "refund policy across regions\" &mdash; hit rate can be 1.0 while the "
+         "answer is hopelessly incomplete. Recall@k is the metric that "
+         "notices.</p>"
+         "<p><strong>Noise.</strong> Nine irrelevant results alongside one good "
+         "one still scores 1. Irrelevant context measurably degrades generation "
+         "and inflates cost, so a high hit rate with low precision is a real "
+         "failure mode that this metric reports as success.</p>"),
+        ("Choosing k, and reading the curve",
+         "<p>k should be the number of chunks you actually put in the prompt. "
+         "Evaluating at k=10 when you pass 3 to the model measures a system you "
+         "are not running. This is the single most common mistake with @k "
+         "metrics.</p>"
+         "<p>Plotting hit rate against k is more informative than any single "
+         "value. If it climbs steeply from k=1 to k=5 and then flattens, your "
+         "retriever finds the right documents but ranks them poorly &mdash; a "
+         "reranker will help a lot. If it is flat and low from the start, the "
+         "documents are not being retrieved at all, and the problem is your "
+         "embeddings, your chunking, or the fact that the answer is not in the "
+         "corpus.</p>"
+         "<p>That diagnostic split is the most valuable thing hit rate gives "
+         "you, and it costs one evaluation run.</p>"),
+        ("Things to try",
+         "<ol><li>Set <strong>k</strong> to 1. Hit rate is 1 only if the very "
+         "first result is relevant &mdash; this is the strictest possible "
+         "reading, and the closest to what a single-chunk pipeline "
+         "experiences.</li>"
+         "<li>Click the top result to mark it irrelevant, then lower k to 2. "
+         "Watch hit rate fall to 0 while recall and precision degrade "
+         "gradually &mdash; the binary metric is far more brittle.</li>"
+         "<li>Mark every result irrelevant, then mark just the last one "
+         "relevant. Hit rate stays 0 until k reaches 10, then snaps to 1: no "
+         "partial credit anywhere along the way.</li></ol>"),
+        ("What to remember",
+         "<p>Hit Rate@k is the proportion of queries with at least one relevant "
+         "result in the top k. It is binary per query, ignores position and "
+         "quantity, and measures the ceiling on your pipeline &mdash; if the "
+         "evidence never reaches the model, nothing downstream can fix it. Use "
+         "it as the first number you establish, set k to the number of chunks "
+         "you actually pass to the generator, and plot it against k to tell a "
+         "ranking problem from a retrieval problem. Then reach for "
+         "<a href=\"recall_at_k.html\">Recall@k</a> when queries need several "
+         "documents, and <a href=\"mean_reciprocal_rank.html\">MRR</a> when "
+         "position matters.</p>" + _SHARED_RANKING),
+    ],
+)
+
+_t(
+    slug="recall_at_k",
+    group_label="Evaluation",
+    level="Beginner",
+    title="What is Recall@k?",
+    asked="What does Recall@k measure, and why is it usually the metric that "
+          "matters most for a RAG retriever?",
+    desc="Recall@k is the fraction of all relevant documents that made it into "
+         "the top k - the metric that decides whether the generator has the "
+         "evidence it needs.",
+    lead="Of all the documents that <em>should</em> have been retrieved, what "
+         "fraction actually made the top k? <strong>Recall@k = relevant "
+         "retrieved in top k &divide; total relevant in the corpus.</strong> It "
+         "is the metric that answers the question a RAG pipeline actually cares "
+         "about &mdash; did the evidence reach the model? &mdash; and the only "
+         "one of the four that can be improved simply by looking deeper.",
+    notice=[
+        "Click results to change which are relevant; the denominator moves too.",
+        "Raising k can only ever increase recall, never decrease it.",
+        "Recall reaches 1.0 only when every relevant document is inside k.",
+    ],
+    viz=WIDGETS["recall_at_k"],
+    sections=[
+        ("The definition, and the denominator people forget",
+         "<p>Recall@k is the number of relevant documents in the top k divided "
+         "by the <strong>total number of relevant documents that exist</strong>. "
+         "The numerator is easy; the denominator is where the difficulty "
+         "lives.</p>"
+         "<p>Knowing it requires knowing every relevant document in the corpus "
+         "for every evaluation query. On a corpus of a hundred documents you can "
+         "label exhaustively. On a million you cannot, so the denominator is "
+         "estimated &mdash; usually by pooling: run several different retrievers, "
+         "judge the union of everything any of them returned, and treat that "
+         "pool as the ground truth. It is the standard approach and it is "
+         "biased, because a document no retriever surfaced is silently counted "
+         "as irrelevant.</p>"
+         "<p>Be honest about this when you report recall. \"Recall@5 is 0.83 "
+         "against a pooled judgement set\" is a defensible claim; \"recall@5 is "
+         "0.83\" without qualification implies exhaustive labelling you almost "
+         "certainly do not have.</p>"),
+        ("Why it is the retrieval metric for RAG",
+         "<p>The generator can ignore an irrelevant chunk. It cannot invent a "
+         "relevant one that was never retrieved. That asymmetry is the whole "
+         "argument: <strong>recall failures are unrecoverable, precision "
+         "failures are merely expensive</strong>.</p>"
+         "<p>So the usual configuration is to retrieve generously &mdash; a "
+         "large k, favouring recall &mdash; and then let a reranker or the "
+         "model's own attention handle precision. Retrieve 50, rerank to 5, pass "
+         "5. Recall@50 is the number that bounds what the reranker can possibly "
+         "achieve, and precision@5 is what the generator actually sees.</p>"
+         "<p>This is also why hybrid search exists. Dense and sparse retrievers "
+         "fail on different queries, so taking the union of both raises recall "
+         "well above either alone &mdash; see "
+         "<a href=\"hybrid_search_reciprocal_rank_fusion.html\">hybrid "
+         "search</a>. Fusing two retrievers is a recall strategy first and a "
+         "ranking strategy second.</p>"),
+        ("The monotonicity that makes it easy to game",
+         "<p>Recall@k never decreases as k grows. Retrieve the entire corpus "
+         "and recall is exactly 1.0. That makes it trivially gameable and means "
+         "a recall number without its k is not a number at all.</p>"
+         "<p>It also means recall must always be read alongside a cost. In "
+         "classical IR that partner is precision, and the two are combined into "
+         "F1. In RAG the more meaningful partner is your context budget: recall "
+         "at the k you can actually afford to put in the prompt. Recall@100 is "
+         "irrelevant if you pass three chunks.</p>"
+         "<p>The useful diagnostic is the gap between recall at a large k and "
+         "recall at your real k. A large gap means the documents are being "
+         "found but ranked badly, which is exactly what a cross-encoder "
+         "reranker fixes. A small gap means better ranking will not help and the "
+         "problem is upstream &mdash; embeddings, chunking, or coverage.</p>"),
+        ("Where recall is the wrong metric",
+         "<p><strong>When one document suffices.</strong> If a query has a "
+         "single correct answer, recall@k collapses into "
+         "<a href=\"hit_rate_at_k.html\">Hit Rate@k</a> and the extra machinery "
+         "buys nothing.</p>"
+         "<p><strong>When context is tight.</strong> Optimising recall pushes k "
+         "up, and a long context of mostly-irrelevant chunks measurably degrades "
+         "generation quality and inflates cost. Past a point, more recall makes "
+         "answers worse.</p>"
+         "<p><strong>When relevance is graded rather than binary.</strong> "
+         "Recall treats a perfect document and a marginally useful one "
+         "identically. If your judgements have degrees, nDCG uses them and "
+         "recall throws them away.</p>"),
+        ("Things to try",
+         "<ol><li>Drag <strong>k</strong> from 1 to 10 and watch recall climb "
+         "and never fall. That monotonicity is why a recall figure without its k "
+         "means nothing.</li>"
+         "<li>Mark one more result relevant. Recall <em>drops</em> even though "
+         "nothing about the ranking changed &mdash; the denominator grew. This "
+         "is what makes an incomplete judgement set flatter your system.</li>"
+         "<li>Set k to 3 and compare recall with precision. They move in "
+         "opposite directions as k changes, which is the trade the whole field "
+         "is organised around.</li></ol>"),
+        ("What to remember",
+         "<p>Recall@k is the fraction of all relevant documents that reached the "
+         "top k. It is the metric that bounds a RAG pipeline, because a document "
+         "that was never retrieved cannot be used, while an irrelevant one can "
+         "be ignored. It rises monotonically with k, so it is meaningless "
+         "without its k and must be read against a cost &mdash; usually your "
+         "context budget. Its denominator requires knowing every relevant "
+         "document, which on a real corpus means pooled judgements and an "
+         "honest caveat.</p>" + _SHARED_RANKING),
+    ],
+)
+
+
+_t(
+    slug="precision_at_k",
+    group_label="Evaluation",
+    level="Beginner",
+    title="What is Precision@k?",
+    asked="What does Precision@k measure, and why does it matter more in RAG "
+          "than people expect?",
+    desc="Precision@k is the fraction of the top k results that are relevant - "
+         "the metric that measures how much noise you are paying to send to the "
+         "generator.",
+    lead="Of the k documents you returned, what fraction were actually useful? "
+         "<strong>Precision@k = relevant in top k &divide; k.</strong> Where "
+         "recall asks whether the evidence arrived, precision asks how much "
+         "rubbish arrived with it &mdash; and in a RAG system that rubbish costs "
+         "tokens, latency, and measurable answer quality.",
+    notice=[
+        "The denominator is always k, whatever the corpus contains.",
+        "Precision usually falls as k rises &mdash; the best results are at the top.",
+        "Click results to see precision and recall move in opposite directions.",
+    ],
+    viz=WIDGETS["precision_at_k"],
+    sections=[
+        ("The definition, and the denominator that never moves",
+         "<p>Precision@k is the number of relevant documents in the top k "
+         "divided by k. Not by the number of relevant documents in the corpus, "
+         "and not by the number retrieved &mdash; by k, always.</p>"
+         "<p>That fixed denominator is what makes precision cheap to measure. "
+         "You only need judgements for the k results you actually returned, not "
+         "for the whole corpus. An evaluation set for precision can be built by "
+         "judging a few hundred query-document pairs; one for recall needs "
+         "exhaustive or pooled labelling. If you can only afford one, precision "
+         "is the affordable one.</p>"
+         "<p>The consequence of the fixed denominator: if fewer than k documents "
+         "are relevant in total, precision@k <em>cannot</em> reach 1.0. With two "
+         "relevant documents and k=5, the ceiling is 0.4. A low precision score "
+         "is sometimes a property of the query, not a failure of the "
+         "retriever.</p>"),
+        ("Why noise is not free in a RAG pipeline",
+         "<p>The old intuition &mdash; \"the model can just ignore irrelevant "
+         "chunks\" &mdash; is not quite true, and the ways it fails are "
+         "worth naming.</p>"
+         "<p><strong>Cost and latency.</strong> Every retrieved chunk is input "
+         "tokens on every request. Halving the number of chunks halves that bill "
+         "and shortens time to first token.</p>"
+         "<p><strong>Distraction.</strong> Irrelevant context measurably reduces "
+         "answer quality. A plausible-but-wrong passage is worse than no passage "
+         "&mdash; the model has been handed a reason to be confidently "
+         "incorrect, and it is grounded in a real retrieved document, which "
+         "makes the error harder to spot.</p>"
+         "<p><strong>Position effects.</strong> Attention over a long context is "
+         "uneven, with the middle attended least. Padding the prompt with "
+         "irrelevant chunks pushes good evidence into that dead zone.</p>"
+         "<p>So precision is not merely an efficiency metric here. Past a point, "
+         "improving precision improves the answers.</p>"),
+        ("The trade with recall, and where each belongs",
+         "<p>Precision and recall pull against each other as k moves. Raising k "
+         "can only help recall and usually hurts precision, because the highest-"
+         "scoring results were already at the top and what follows is "
+         "progressively worse.</p>"
+         "<p>The standard combination is F1, the harmonic mean, which punishes "
+         "an imbalance &mdash; a system with precision 1.0 and recall 0.1 scores "
+         "0.18, not 0.55. The harmonic mean is used precisely because it refuses "
+         "to let one strong number hide a weak one.</p>"
+         "<p>In a modern RAG stack the two are usually optimised at different "
+         "stages. The retriever runs at high k for recall; the "
+         "<a href=\"reranking_bi_encoders_vs_cross_encoders.html\">reranker</a> "
+         "cuts that to a handful for precision. Measuring recall@50 and "
+         "precision@5 in the same evaluation tells you which of the two stages "
+         "is failing, and they are fixed by completely different work.</p>"),
+        ("What precision cannot see",
+         "<p><strong>Order within k.</strong> Relevant documents at ranks 1 and "
+         "2 score the same as relevant documents at ranks 4 and 5. For a "
+         "generator, that difference is real; precision is blind to it and "
+         "<a href=\"mean_reciprocal_rank.html\">MRR</a> or nDCG is not.</p>"
+         "<p><strong>What was missed.</strong> A retriever that returns three "
+         "perfect documents and misses seven more scores precision 1.0. The "
+         "metric is silent about the corpus it did not touch, which is exactly "
+         "why it is never reported alone.</p>"
+         "<p><strong>Degrees of usefulness.</strong> Binary relevance forces a "
+         "yes/no on documents that are genuinely partial. If your judgements are "
+         "graded, nDCG uses that information and precision discards it.</p>"),
+        ("Things to try",
+         "<ol><li>Drag <strong>k</strong> up from 1. Precision generally falls "
+         "while recall rises &mdash; that opposition is the whole reason both "
+         "numbers are quoted together.</li>"
+         "<li>Set k to 10 with four relevant documents. Precision cannot exceed "
+         "0.4 however good the ranking is; the ceiling is set by the query, not "
+         "the retriever.</li>"
+         "<li>Mark the two lowest results relevant and watch precision@5 stay "
+         "put. Improving what sits below k does nothing for it &mdash; which is "
+         "why k must match what you actually send to the model.</li></ol>"),
+        ("What to remember",
+         "<p>Precision@k is the fraction of the returned k that was relevant, "
+         "with k always as the denominator. It is the cheap metric to label, "
+         "because it needs judgements only for what you returned. In a RAG "
+         "pipeline it is not just about efficiency: irrelevant context costs "
+         "tokens, pushes good evidence into the least-attended part of the "
+         "prompt, and gives the model plausible material to be wrong with. "
+         "Optimise recall at the retriever and precision at the reranker, and "
+         "report both with their k.</p>" + _SHARED_RANKING),
+    ],
+)
+
+_t(
+    slug="mean_reciprocal_rank",
+    group_label="Evaluation",
+    level="Intermediate",
+    title="What is MRR (Mean Reciprocal Rank)?",
+    asked="What does MRR measure, and when is the position of the first correct "
+          "result the thing that matters?",
+    desc="MRR averages 1/rank of the first relevant result across queries - the "
+         "metric for systems where the user or the model looks at the top of the "
+         "list and stops.",
+    lead="For one query, find the rank of the <strong>first</strong> relevant "
+         "result and take its reciprocal: rank 1 scores 1.0, rank 2 scores 0.5, "
+         "rank 5 scores 0.2, nothing relevant scores 0. Average that across your "
+         "queries and you have MRR. Everything after the first hit is ignored "
+         "entirely &mdash; which is the point, and the limitation.",
+    notice=[
+        "Only the first relevant result contributes; the rest are ignored.",
+        "The reciprocal drops steeply: rank 1 to rank 2 halves the score.",
+        "Click the top result on and off to see the whole metric swing.",
+    ],
+    viz=WIDGETS["mean_reciprocal_rank"],
+    sections=[
+        ("The definition, and the shape of the curve",
+         "<p>Reciprocal rank for a query is 1/(rank of the first relevant "
+         "result). MRR is the mean of that over an evaluation set. The name is "
+         "worth reading literally: it is a <em>mean</em> of <em>reciprocal</em> "
+         "<em>ranks</em>, and each word matters.</p>"
+         "<p>The reciprocal makes the curve steep at the top and flat at the "
+         "bottom. Moving a result from rank 2 to rank 1 gains 0.5. Moving one "
+         "from rank 10 to rank 9 gains about 0.011 &mdash; forty-five times "
+         "less. That shape encodes an assumption: users and models care "
+         "enormously about the top of the list and barely at all about the "
+         "bottom.</p>"
+         "<p>Because it is a mean of per-query scores, a single query can move "
+         "it noticeably on a small evaluation set. Report the number of queries "
+         "alongside it, and be suspicious of MRR differences on fewer than a "
+         "hundred.</p>"),
+        ("When position is the whole question",
+         "<p>MRR is the right metric when the consumer stops at the first good "
+         "result. Question answering with a single correct answer, "
+         "\"I'm feeling lucky\" search, entity lookup, a code assistant jumping "
+         "to a definition &mdash; in all of these the second correct result is "
+         "worth nothing.</p>"
+         "<p>It also matters inside RAG more than it first appears. Attention "
+         "over a long context is uneven, and evidence placed first is more "
+         "likely to be used than evidence placed eighth. Two retrievers with "
+         "identical recall@5 can produce measurably different answers if one "
+         "puts the key chunk at the top and the other buries it. Recall cannot "
+         "see that difference; MRR can.</p>"
+         "<p>The practical use: track recall@k to know whether the evidence "
+         "arrives, and MRR to know whether it arrives somewhere the model will "
+         "actually look. A reranker that leaves recall unchanged while lifting "
+         "MRR is doing real work.</p>"),
+        ("What it ignores, and when that is wrong",
+         "<p><strong>Every relevant result after the first.</strong> A query "
+         "with one relevant document at rank 1 and a query with ten relevant "
+         "documents at ranks 1 to 10 both score 1.0. If your questions need "
+         "multiple sources &mdash; comparisons, summaries, anything aggregative "
+         "&mdash; MRR is close to blind to what you care about, and "
+         "<a href=\"recall_at_k.html\">Recall@k</a> is the metric to use.</p>"
+         "<p><strong>Degrees of relevance.</strong> A marginally useful document "
+         "at rank 1 outscores a perfect one at rank 2. MAP averages precision "
+         "over every relevant position and nDCG additionally uses graded "
+         "judgements; both are strictly more informative and both cost more to "
+         "label.</p>"
+         "<p><strong>The zero.</strong> Queries with no relevant result "
+         "contribute 0, which is correct and worth watching: a system with "
+         "excellent MRR on the queries it answers and a large silent tail of "
+         "zeros has a coverage problem that the average partially conceals. "
+         "Report the proportion of zero-score queries next to it.</p>"),
+        ("Reading MRR against the alternatives",
+         "<p>The family is easiest to keep straight by what each one uses:</p>"
+         "<p><strong>Hit Rate@k</strong> &mdash; is there anything relevant in "
+         "the top k? Binary, ignores position entirely.</p>"
+         "<p><strong>MRR</strong> &mdash; where is the <em>first</em> relevant "
+         "result? Uses position, ignores everything after it.</p>"
+         "<p><strong>MAP</strong> &mdash; where is <em>every</em> relevant "
+         "result? Uses all positions, still binary relevance.</p>"
+         "<p><strong>nDCG</strong> &mdash; where is every relevant result, and "
+         "how relevant is each? Uses positions and grades, and is the most "
+         "informative and most expensive.</p>"
+         "<p>They are a ladder of increasing information and increasing "
+         "labelling cost. Climb it only as far as your judgements can honestly "
+         "support: nDCG computed from binary labels guessed by a weak model is "
+         "not better than a hit rate from careful human ones.</p>"),
+        ("Things to try",
+         "<ol><li>Click result #1 on and off. MRR swings between 1.0 and 0.33 "
+         "on a single change, while recall moves a fraction &mdash; MRR is by "
+         "far the most position-sensitive of the four.</li>"
+         "<li>Mark only the last result relevant. RR is 0.1, and no amount of "
+         "additional relevant documents further down would improve it.</li>"
+         "<li>Mark results 1 and 2 both relevant, then mark only result 1. MRR "
+         "is identical either way &mdash; everything after the first hit is "
+         "invisible to it.</li></ol>"),
+        ("What to remember",
+         "<p>MRR averages 1/rank of the first relevant result. It is the metric "
+         "for systems where the consumer stops at the first good answer, and it "
+         "is far more sensitive to the top of the ranking than recall or "
+         "precision. It ignores every relevant result after the first, so it is "
+         "the wrong choice for questions needing several sources. Inside RAG it "
+         "is a useful companion to recall: recall says the evidence arrived, MRR "
+         "says whether it arrived where the model will actually attend to "
+         "it.</p>" + _SHARED_RANKING),
+    ],
+)
+
+
+# =========================================================================
+# LLM answer-quality dimensions
+# =========================================================================
+
+_SHARED_JUDGE = (
+    "<p>These four are usually measured with an <strong>LLM as judge</strong>: a "
+    "strong model is shown the question, the retrieved context, the answer and "
+    "sometimes a reference, and asked to score one dimension at a time. Judging "
+    "one dimension per call is not a stylistic choice &mdash; a single prompt "
+    "asking for all four produces correlated, mushy scores, because the model "
+    "settles on a general impression and applies it everywhere.</p>"
+    "<p>Two habits make judge scores trustworthy. Ask for a decision and a "
+    "justification, so a human can audit disagreements. And calibrate against a "
+    "small human-labelled set before believing any of it &mdash; a judge that "
+    "agrees with your annotators 70% of the time is not measuring what you think "
+    "it is measuring.</p>")
+
+_t(
+    slug="groundedness_in_llm_evaluation",
+    group_label="LLM evaluation",
+    level="Intermediate",
+    title="Groundedness in LLM evaluation",
+    asked="What is groundedness, and how is it different from correctness?",
+    desc="Groundedness measures whether every claim in an answer is supported by "
+         "the retrieved context - the direct measure of hallucination in a RAG "
+         "system, and independent of whether the claims are true.",
+    lead="Every claim in the answer should trace back to something in the "
+         "retrieved context. <strong>Groundedness measures how much of the "
+         "answer is actually supported by the evidence the model was given.</strong> "
+         "It is the direct, automatable measure of hallucination &mdash; and it "
+         "is deliberately blind to whether those claims are true, which is what "
+         "separates it from correctness.",
+    notice=[
+        "Click a claim to flip whether the context supports it.",
+        "A claim can be true and ungrounded &mdash; the model knew it, the "
+        "context did not say it.",
+        "Groundedness needs no reference answer, only the context.",
+    ],
+    viz=WIDGETS["groundedness_in_llm_evaluation"],
+    sections=[
+        ("What it measures, claim by claim",
+         "<p>The answer is decomposed into atomic claims &mdash; individual "
+         "assertions that could each be checked independently &mdash; and each "
+         "is tested against the retrieved context. Groundedness is the "
+         "proportion that are supported.</p>"
+         "<p>The decomposition matters. Scoring a whole paragraph as \"grounded "
+         "or not\" throws away the most useful information a groundedness "
+         "evaluation produces: <em>which</em> sentence was invented. A per-claim "
+         "score points you at the exact span to investigate, and lets you "
+         "distinguish an answer that is 90% supported with one fabricated detail "
+         "from one that is wholly invented.</p>"
+         "<p>\"Supported\" should mean entailed by the context, not merely "
+         "consistent with it. A claim the context neither states nor contradicts "
+         "is ungrounded, even if it is plausible and even if it is true. That "
+         "strictness is the whole value of the metric.</p>"),
+        ("Why it is independent of correctness",
+         "<p>This is the distinction people collapse, and the four combinations "
+         "are all real:</p>"
+         "<p><strong>Grounded and correct.</strong> The context said it and it "
+         "is true. What you want.</p>"
+         "<p><strong>Grounded and wrong.</strong> The context said it and the "
+         "context is out of date or simply incorrect. The model behaved "
+         "perfectly; your corpus is the problem. Groundedness scores 1.0 and the "
+         "user is misinformed.</p>"
+         "<p><strong>Ungrounded and correct.</strong> The model knew the answer "
+         "from pretraining and the context never mentioned it. Harmless-looking, "
+         "and it is the failure mode that erodes trust in a RAG system: you have "
+         "no idea which answers came from your documents and which came from the "
+         "model's memory, so the citations mean nothing.</p>"
+         "<p><strong>Ungrounded and wrong.</strong> A hallucination, in the "
+         "ordinary sense.</p>"
+         "<p>Groundedness catches rows three and four without needing to know "
+         "the truth of anything. That is why it is cheap: it requires the "
+         "context and the answer, and no reference and no domain expert.</p>"),
+        ("How it is measured in practice",
+         "<p><strong>LLM-as-judge, per claim.</strong> Split the answer into "
+         "claims, then for each ask a strong model whether the context entails "
+         "it, with the answer justified. This is the standard approach and it "
+         "works well, because entailment against a supplied passage is a much "
+         "easier task than open-ended judgement.</p>"
+         "<p><strong>Natural-language inference models.</strong> A dedicated NLI "
+         "classifier scores entailment between context and claim. Cheaper and "
+         "faster than a large judge, weaker on long or technical passages.</p>"
+         "<p><strong>Citation checking.</strong> Require the model to cite a "
+         "chunk id per sentence, then verify the cited chunk actually supports "
+         "it. This has the useful property of being auditable by a human in "
+         "seconds, and it changes the generator's behaviour for the better even "
+         "before you measure anything.</p>"),
+        ("What a low score is actually telling you",
+         "<p>A groundedness problem is often a retrieval problem wearing a "
+         "generation costume. If the context did not contain the answer, a model "
+         "asked to answer anyway will fill the gap from memory &mdash; so low "
+         "groundedness correlates with low "
+         "<a href=\"recall_at_k.html\">recall@k</a>, and the fix is upstream.</p>"
+         "<p>The other common cause is a prompt that does not permit abstention. "
+         "A model told to \"answer the question using the context\" will answer; "
+         "one told \"if the context does not contain the answer, say so\" will "
+         "often decline correctly. That single sentence moves groundedness more "
+         "than most model changes, and it is why "
+         "<a href=\"corrective_rag.html\">corrective RAG</a> treats declining as "
+         "a first-class outcome.</p>"
+         "<p>Watch for the degenerate optimum, too. An answer that quotes the "
+         "context verbatim and says nothing else scores 1.0 on groundedness and "
+         "may be useless. Groundedness has to be read next to "
+         "<a href=\"completeness_in_llm_evaluation.html\">completeness</a> and "
+         "<a href=\"relevance_in_llm_evaluation.html\">relevance</a>, or you "
+         "will optimise your way into a system that recites.</p>"),
+        ("Things to try",
+         "<ol><li>Click the digital-goods claim, which the context does not "
+         "support. Groundedness falls while correctness is unaffected &mdash; "
+         "the two dimensions move independently.</li>"
+         "<li>Flip every claim to supported. Groundedness reaches 1.0 while "
+         "relevance and completeness stay where they were: a perfectly grounded "
+         "answer can still be padded and incomplete.</li>"
+         "<li>Note that the 24/7 phone claim is marked correct but off topic. "
+         "True, plausible, and not what was asked &mdash; groundedness alone "
+         "would not catch it.</li></ol>"),
+        ("What to remember",
+         "<p>Groundedness is the proportion of an answer's claims that the "
+         "retrieved context actually supports. It is the direct measure of "
+         "hallucination, it needs no reference answer, and it is independent of "
+         "truth &mdash; a claim can be grounded and wrong, or true and "
+         "ungrounded. Measure it per claim rather than per answer so it tells "
+         "you which span to look at. A low score usually means a retrieval "
+         "failure or a prompt that does not allow the model to decline. Never "
+         "optimise it alone, because verbatim quotation scores perfectly.</p>"
+         + _SHARED_JUDGE),
+    ],
+)
+
+_t(
+    slug="correctness_in_llm_evaluation",
+    group_label="LLM evaluation",
+    level="Intermediate",
+    title="Correctness in LLM evaluation",
+    asked="What is correctness, and why is it the most expensive dimension to "
+          "measure?",
+    desc="Correctness compares an answer against a reference or the world - the "
+         "dimension that needs ground truth, and the one that cannot be inferred "
+         "from the retrieved context alone.",
+    lead="Is the answer <em>right</em>? <strong>Correctness compares the "
+         "answer's claims against a reference answer or against verifiable "
+         "fact.</strong> It is the dimension users care about most and the one "
+         "that is hardest to automate, because unlike groundedness it cannot be "
+         "checked against the context &mdash; it needs a ground truth that "
+         "someone has to produce.",
+    notice=[
+        "Correctness is judged against a reference, not against the context.",
+        "A grounded claim can still be wrong if the source document is wrong.",
+        "Click claims to see correctness and groundedness diverge.",
+    ],
+    viz=WIDGETS["correctness_in_llm_evaluation"],
+    sections=[
+        ("Correct against what, exactly",
+         "<p>Correctness is only defined relative to a reference, and choosing "
+         "that reference is most of the work:</p>"
+         "<p><strong>A written gold answer.</strong> The usual approach. A human "
+         "writes the ideal answer per evaluation query and a judge compares. "
+         "Precise, and expensive enough that evaluation sets stay small &mdash; "
+         "which is why fifty carefully written references beat five hundred "
+         "sloppy ones.</p>"
+         "<p><strong>A key-facts list.</strong> Rather than prose, the reference "
+         "is a set of facts the answer must state. Easier to write, much easier "
+         "to judge consistently, and it composes naturally with "
+         "<a href=\"completeness_in_llm_evaluation.html\">completeness</a>.</p>"
+         "<p><strong>Verifiable computation.</strong> Where the answer is code, "
+         "a number or a query, correctness can be executed rather than judged. "
+         "This is the gold standard when it is available and it almost never is "
+         "for open-ended questions.</p>"),
+        ("Why exact match fails, and what replaces it",
+         "<p>The obvious automation &mdash; string comparison against the "
+         "reference &mdash; fails immediately on natural language. \"14 days\", "
+         "\"fourteen days\" and \"two weeks\" are the same answer and share no "
+         "characters. Exact match systematically punishes fluent phrasing.</p>"
+         "<p>The n-gram metrics inherited from translation (BLEU, ROUGE) are "
+         "only a partial improvement: they reward surface overlap, so a wrong "
+         "answer phrased like the reference can outscore a right answer phrased "
+         "differently. They remain in use because they are cheap and "
+         "deterministic, and they should not be trusted as a primary signal for "
+         "factual correctness.</p>"
+         "<p>What works is claim-level judging: decompose both the answer and "
+         "the reference into atomic facts, then check each answer claim against "
+         "the reference. That handles paraphrase, gives partial credit, and "
+         "tells you <em>which</em> fact was wrong &mdash; which a single "
+         "similarity score never will.</p>"),
+        ("The failure this dimension exists to catch",
+         "<p>The important case is the <strong>grounded but wrong</strong> "
+         "answer. The model faithfully reports what a retrieved document says, "
+         "and that document is out of date, contradicted by a newer one, or "
+         "simply mistaken.</p>"
+         "<p>Groundedness scores this perfectly. Relevance scores it perfectly. "
+         "The answer is fluent, cited, and misinforms the user. No amount of "
+         "prompt engineering fixes it, because the model did exactly what it was "
+         "asked; the corpus is the defect.</p>"
+         "<p>That makes correctness the dimension that audits your <em>data</em> "
+         "rather than your model. When correctness is low while groundedness is "
+         "high, stop looking at the pipeline and go and look at the documents: "
+         "stale versions, superseded policies, and duplicate chunks disagreeing "
+         "with each other are the usual culprits.</p>"),
+        ("Judging it without fooling yourself",
+         "<p><strong>Show the judge the reference.</strong> A model asked "
+         "\"is this answer correct?\" with no ground truth is being asked to "
+         "recall the fact itself, and will confidently score wrong answers as "
+         "right in exactly the domains where you needed evaluation most.</p>"
+         "<p><strong>Ask for partial credit.</strong> Binary correct/incorrect "
+         "throws away the difference between an answer with one wrong detail and "
+         "one that is entirely wrong. Per-claim scoring gives a proportion.</p>"
+         "<p><strong>Calibrate against humans.</strong> Have annotators label a "
+         "sample and measure agreement with your judge. If the judge agrees 70% "
+         "of the time, a 3-point movement in your correctness score is "
+         "noise.</p>"
+         "<p><strong>Watch for self-preference.</strong> A judge tends to favour "
+         "answers written in its own style, and to prefer longer answers. Both "
+         "biases are documented and both inflate scores in ways that have "
+         "nothing to do with being right.</p>"),
+        ("Things to try",
+         "<ol><li>Click the digital-goods claim to mark it supported by the "
+         "context. Groundedness rises to 1.0 and correctness does not move "
+         "&mdash; it is still contradicted by the reference.</li>"
+         "<li>That single claim is the grounded-but-wrong case: cited, "
+         "confident, and misinforming. It is why correctness cannot be inferred "
+         "from the context.</li>"
+         "<li>Compare correctness with completeness. An answer can state only "
+         "true things and still omit half of what was asked.</li></ol>"),
+        ("What to remember",
+         "<p>Correctness compares the answer against a reference or verifiable "
+         "fact, which makes it the only one of the four dimensions that requires "
+         "ground truth someone has to write. Exact match and n-gram overlap fail "
+         "on paraphrase; claim-level judging against a key-facts reference is "
+         "what works. Its distinctive value is catching the grounded-but-wrong "
+         "answer, where the model faithfully reports a document that is itself "
+         "out of date &mdash; a defect in your corpus that every other dimension "
+         "scores as a success.</p>" + _SHARED_JUDGE),
+    ],
+)
+
+
+_t(
+    slug="relevance_in_llm_evaluation",
+    group_label="LLM evaluation",
+    level="Intermediate",
+    title="Relevance in LLM evaluation",
+    asked="What is answer relevance, and how does it differ from context "
+          "relevance?",
+    desc="Relevance measures whether the answer addresses the question that was "
+         "actually asked - the dimension that catches padding, hedging and "
+         "confident answers to a different question.",
+    lead="Does the answer address <em>the question that was asked</em>? "
+         "<strong>Relevance measures how much of the answer is on point</strong> "
+         "&mdash; and it is the dimension that catches the failure the other "
+         "three are blind to: a response that is entirely true, fully grounded, "
+         "and quietly about something else.",
+    notice=[
+        "The 24/7 phone claim is true and grounded and still off topic.",
+        "Padding is scored here and nowhere else.",
+        "Click claims to see relevance move independently of the rest.",
+    ],
+    viz=WIDGETS["relevance_in_llm_evaluation"],
+    sections=[
+        ("Two different things are called relevance",
+         "<p>The word is used for two distinct measurements and conflating them "
+         "makes evaluation results incomparable.</p>"
+         "<p><strong>Context relevance</strong> scores the retrieved chunks "
+         "against the query. It is a <em>retrieval</em> metric, closely related "
+         "to <a href=\"precision_at_k.html\">precision@k</a>, and it tells you "
+         "whether your retriever is sending noise to the generator.</p>"
+         "<p><strong>Answer relevance</strong> scores the generated answer "
+         "against the query. It is a <em>generation</em> metric, and it is what "
+         "this page is about.</p>"
+         "<p>They fail independently. Perfect context and an irrelevant answer "
+         "means the generator wandered; irrelevant context and a relevant answer "
+         "usually means the model answered from memory, which "
+         "<a href=\"groundedness_in_llm_evaluation.html\">groundedness</a> will "
+         "catch. Always say which one you mean.</p>"),
+        ("The failures it exists to catch",
+         "<p><strong>Padding.</strong> The answer contains the requested "
+         "information plus three paragraphs of adjacent context nobody asked "
+         "for. Every claim is true and grounded, and the user has to hunt for "
+         "the answer. Models trained to be helpful pad heavily, and no other "
+         "dimension penalises it.</p>"
+         "<p><strong>Answering a nearby question.</strong> Asked how long "
+         "refunds take, the answer explains how to request one. Fluent, "
+         "grounded, correct, and not responsive.</p>"
+         "<p><strong>Hedging.</strong> Several paragraphs of caveats and "
+         "conditions with no actual answer inside them. Technically nothing is "
+         "wrong; nothing is useful either.</p>"
+         "<p><strong>Restating the question.</strong> The degenerate answer that "
+         "echoes the query back. It scores oddly well on naive similarity-based "
+         "relevance measures, which is a good reason not to use them.</p>"),
+        ("How to measure it without measuring similarity",
+         "<p>The tempting approach &mdash; embed the question and the answer and "
+         "take cosine similarity &mdash; is bad. It rewards vocabulary overlap, "
+         "so restating the question scores highly and a correct answer that "
+         "shares no words with the question scores poorly. \"When are refunds "
+         "issued?\" answered with \"Within a fortnight of delivery\" is perfect "
+         "and lexically distant.</p>"
+         "<p>The approach that works is <strong>question generation</strong>: "
+         "ask a model to write the questions this answer would be a good "
+         "response to, then compare those against the real question. If the "
+         "generated questions match, the answer is on point; if they are broader "
+         "or different, it is padded or off target. It measures what relevance "
+         "actually means rather than a proxy for it.</p>"
+         "<p>The alternative is claim-level judging, as in the visualisation "
+         "above: split the answer into claims and mark each as responsive or "
+         "not. Relevance is then the supported proportion, and you can see "
+         "exactly which sentence was padding.</p>"),
+        ("The tension with completeness, and how to resolve it",
+         "<p>Relevance and "
+         "<a href=\"completeness_in_llm_evaluation.html\">completeness</a> pull "
+         "in opposite directions, and optimising either alone produces a bad "
+         "system.</p>"
+         "<p>Maximise relevance alone and answers get terse to the point of "
+         "being unhelpful &mdash; every qualification stripped out because "
+         "qualifications are not strictly what was asked. Maximise completeness "
+         "alone and answers sprawl, because adding material can only help.</p>"
+         "<p>The resolution is to score both and watch them together, the same "
+         "way precision and recall are read as a pair. An answer that is 0.95 "
+         "relevant and 0.6 complete is leaving things out; one that is 0.6 "
+         "relevant and 1.0 complete is burying the answer in padding. Neither "
+         "single number would tell you which problem you have.</p>"
+         "<p>Note also that relevance is the dimension most affected by your "
+         "prompt rather than your retrieval. \"Answer in at most three "
+         "sentences, addressing only what was asked\" moves it substantially, "
+         "and costs nothing.</p>"),
+        ("Things to try",
+         "<ol><li>The 24/7 phone claim is marked correct but off topic. "
+         "Relevance drops while correctness and groundedness stay put &mdash; "
+         "this is the padding case, visible only here.</li>"
+         "<li>Click that claim to flip its grounding. Groundedness moves and "
+         "relevance does not: whether the context supports a claim has nothing "
+         "to do with whether it answers the question.</li>"
+         "<li>Compare relevance and completeness across the claim list. The "
+         "off-topic claim hurts one and does nothing for the other, which is "
+         "why they have to be read as a pair.</li></ol>"),
+        ("What to remember",
+         "<p>Answer relevance measures how much of the answer addresses the "
+         "question asked. Distinguish it from context relevance, which scores "
+         "retrieved chunks and is a retrieval metric. It is the only dimension "
+         "that penalises padding, hedging and confidently answering a nearby "
+         "question &mdash; all of which score perfectly on correctness and "
+         "groundedness. Do not measure it with question-answer embedding "
+         "similarity, which rewards restating the question; use generated "
+         "questions or per-claim judging. Read it alongside completeness, "
+         "because optimising either alone makes answers worse.</p>"
+         + _SHARED_JUDGE),
+    ],
+)
+
+_t(
+    slug="completeness_in_llm_evaluation",
+    group_label="LLM evaluation",
+    level="Intermediate",
+    title="Completeness in LLM evaluation",
+    asked="What is completeness, and why can a perfectly correct answer still "
+          "fail on it?",
+    desc="Completeness measures how much of what the question required the "
+         "answer actually covered - the dimension a fluent, correct, grounded "
+         "answer can still fail entirely.",
+    lead="Did the answer cover <em>everything</em> the question required? "
+         "<strong>Completeness measures the proportion of the required points "
+         "that the answer actually states.</strong> It is the dimension a "
+         "confident, correct, perfectly grounded answer can fail outright "
+         "&mdash; and the one users notice last, because a partial answer looks "
+         "exactly like a full one until you act on it.",
+    notice=[
+        "Completeness counts required points covered, not claims made.",
+        "Adding true, grounded, on-topic claims does not raise it.",
+        "It is the mirror image of relevance &mdash; read them together.",
+    ],
+    viz=WIDGETS["completeness_in_llm_evaluation"],
+    sections=[
+        ("Complete relative to what",
+         "<p>Completeness is undefined without a statement of what the answer "
+         "<em>needed</em> to contain, so the reference is not optional. In "
+         "practice that means a <strong>key-points list</strong> per evaluation "
+         "query: the facts a good answer must include, written by whoever "
+         "understands the domain.</p>"
+         "<p>Writing that list is the real work, and it is worth doing carefully "
+         "because it is reusable. The same list drives "
+         "<a href=\"correctness_in_llm_evaluation.html\">correctness</a> "
+         "(are the stated facts right?) and completeness (were they all "
+         "stated?), so one artefact serves two dimensions.</p>"
+         "<p>It also forces a decision your users have already made "
+         "implicitly: is the caveat about digital goods a required point or a "
+         "nice-to-have? Teams often discover during this exercise that they do "
+         "not agree on what a good answer is, which is more valuable than any "
+         "score.</p>"),
+        ("Why the other dimensions cannot see it",
+         "<p>Consider an answer that states only \"Refunds are issued within 14 "
+         "days.\" when the question was about the full refund policy. It is "
+         "correct. It is grounded. It is entirely relevant. It scores 1.0 on "
+         "three dimensions and leaves out the condition that makes it "
+         "actionable.</p>"
+         "<p>This asymmetry is the reason completeness is worth measuring "
+         "separately. The other three dimensions all penalise <em>saying the "
+         "wrong thing</em>. Only completeness penalises <em>not saying the right "
+         "thing</em>, and omission is the harder failure to notice, because "
+         "there is nothing on the screen to catch your eye.</p>"
+         "<p>It is also the failure with the worst consequences in practice. A "
+         "user who reads a wrong answer may check it. A user who reads a partial "
+         "answer has no signal that anything is missing and acts on it.</p>"),
+        ("Where incompleteness comes from",
+         "<p><strong>Retrieval, most often.</strong> If a required point was "
+         "never in the retrieved context, the model cannot state it without "
+         "hallucinating. Low completeness alongside low "
+         "<a href=\"recall_at_k.html\">recall@k</a> is a retrieval problem, and "
+         "no prompt change will fix it. This is the single most common "
+         "cause.</p>"
+         "<p><strong>Chunking.</strong> A policy split across two chunks where "
+         "only one was retrieved gives a confidently half-right answer &mdash; "
+         "which is exactly what "
+         "<a href=\"parent_document_retriever.html\">parent-document "
+         "retrieval</a> and generous chunk overlap exist to prevent.</p>"
+         "<p><strong>Length limits.</strong> A max-tokens cap or a \"be "
+         "concise\" instruction trades completeness for brevity, usually without "
+         "anyone deciding to.</p>"
+         "<p><strong>The model stopping early.</strong> Given ten chunks, models "
+         "reliably use the first few more than the rest. A required point in "
+         "chunk eight is retrieved, in context, and still absent from the answer "
+         "&mdash; which is why <a href=\"mean_reciprocal_rank.html\">MRR</a> is "
+         "worth tracking next to recall.</p>"),
+        ("Measuring it, and the trap in optimising it",
+         "<p>The measurement is mechanical once the key-points list exists: for "
+         "each required point, ask a judge whether the answer states it, and "
+         "take the proportion. Per point rather than per answer, so the output "
+         "tells you <em>which</em> point was dropped &mdash; that is the "
+         "actionable part.</p>"
+         "<p>The trap is that completeness is trivially gamed by verbosity. An "
+         "answer that dumps the entire retrieved context scores 1.0. If "
+         "completeness is the only dimension you optimise, you will get long, "
+         "hedged, exhaustive answers that score beautifully and that nobody "
+         "wants to read.</p>"
+         "<p>Which is why it is read against "
+         "<a href=\"relevance_in_llm_evaluation.html\">relevance</a>. The pair "
+         "behaves like precision and recall: completeness is the recall of "
+         "required information, relevance is its precision, and a system is only "
+         "good when both are high. Reporting either alone is the same mistake as "
+         "reporting recall without k.</p>"),
+        ("Things to try",
+         "<ol><li>Three of the five claims are required points and the "
+         "reference lists four. Completeness is 0.75 &mdash; one required point "
+         "is simply absent from the answer.</li>"
+         "<li>Click the off-topic phone claim on and off. Completeness does not "
+         "move at all: adding material that was not required cannot improve "
+         "it.</li>"
+         "<li>Compare with relevance on the same claim list. The claims that "
+         "hurt relevance are exactly the ones completeness ignores, which is why "
+         "the pair has to be read together.</li></ol>"),
+        ("What to remember",
+         "<p>Completeness is the proportion of required points an answer "
+         "actually states, and it needs a key-points reference to be defined at "
+         "all. It is the one dimension that penalises omission rather than "
+         "error, which makes it the failure users notice last and act on "
+         "first. Low completeness is usually a retrieval or chunking problem "
+         "rather than a generation one. Measure it per point so you know what "
+         "was dropped, and always read it against relevance &mdash; optimised "
+         "alone it rewards dumping the entire context into the answer.</p>"
+         + _SHARED_JUDGE),
     ],
 )

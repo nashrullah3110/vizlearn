@@ -431,12 +431,173 @@
     };
   };
 
+
+  // Ranking metrics, all four at once, over a result list the reader marks up.
+  MODELS.ranking = function (p, data) {
+    var on = p.__on || {};
+    var results = data.results.map(function (r, i) {
+      var key = 'r' + i;
+      var relevant = on[key] ? !r.relevant : r.relevant;
+      return { rank: i + 1, text: r.text, relevant: relevant, key: key };
+    });
+
+    var k = p.k;
+    var topK = results.slice(0, k);
+    var hitsAtK = topK.filter(function (r) { return r.relevant; }).length;
+    var totalRelevant = results.filter(function (r) { return r.relevant; }).length;
+
+    var precision = k ? hitsAtK / k : 0;
+    var recall = totalRelevant ? hitsAtK / totalRelevant : 0;
+    var hitRate = hitsAtK > 0 ? 1 : 0;
+    var firstHit = 0;
+    for (var i = 0; i < results.length; i++) {
+      if (results[i].relevant) { firstHit = i + 1; break; }
+    }
+    var rr = firstHit ? 1 / firstHit : 0;
+    var f1 = (precision + recall) ? 2 * precision * recall / (precision + recall) : 0;
+
+    var focus = data.focus;
+    var label = { precision: 'Precision@' + k, recall: 'Recall@' + k,
+                  hit: 'Hit Rate@' + k, mrr: 'Reciprocal Rank' }[focus];
+    var value = { precision: precision, recall: recall, hit: hitRate, mrr: rr }[focus];
+
+    var notes = {
+      precision: hitsAtK === k
+        ? 'Every result in the top ' + k + ' is relevant, so precision is 1.0 - and it '
+          + 'says nothing about the ' + (totalRelevant - hitsAtK) + ' relevant document(s) further down.'
+        : 'Precision counts how much of what you returned was useful. Lower k and it '
+          + 'usually rises, because the best results are at the top.',
+      recall: recall === 1
+        ? 'Every relevant document is inside the top ' + k + '. Recall is 1.0 and will '
+          + 'stay there however much further you look.'
+        : (totalRelevant - hitsAtK) + ' relevant document(s) sit below rank ' + k
+          + '. Recall only rises by looking deeper - which is why it is the metric '
+          + 'that matters for a RAG retriever.',
+      hit: hitRate
+        ? 'At least one relevant document made the top ' + k + ', so hit rate is 1. It '
+          + 'does not care whether there was one or five, or where they landed.'
+        : 'Nothing relevant in the top ' + k + '. Hit rate is 0 - the harshest and '
+          + 'bluntest of the four.',
+      mrr: firstHit
+        ? 'The first relevant result is at rank ' + firstHit + ', so RR is 1/' + firstHit
+          + ' = ' + round(rr, 3) + '. Only that one position matters; everything below it is ignored.'
+        : 'No relevant result anywhere, so the reciprocal rank is 0.'
+    };
+
+    return {
+      bars: results.map(function (r) {
+        var inK = r.rank <= k;
+        return { label: '#' + r.rank + '  ' + r.text,
+                 value: r.relevant ? 1 : 0, max: 1,
+                 tag: (inK ? 'in top ' + k : 'below k') +
+                      (r.relevant ? '  ·  relevant' : '  ·  not relevant') +
+                      (focus === 'mrr' && r.rank === firstHit ? '  ·  1/' + r.rank : ''),
+                 click: r.key, on: r.relevant,
+                 state: r.relevant ? (inK ? 'hit' : 'done') : (inK ? 'bad' : 'dim') };
+      }),
+      stats: [[label + ' \u2190 this page', round(value, 3)],
+              ['Precision@' + k, round(precision, 3)],
+              ['Recall@' + k, round(recall, 3)],
+              ['Hit Rate@' + k, hitRate],
+              ['Reciprocal Rank', round(rr, 3)],
+              ['F1@' + k, round(f1, 3)],
+              ['relevant in corpus', totalRelevant]],
+      badge: label + ' = ' + round(value, 3),
+      note: notes[focus] + '  Click any result to change whether it is relevant.'
+    };
+  };
+
+  // Answer-quality judging: claims against the retrieved context.
+  MODELS.judge = function (p, data) {
+    var on = p.__on || {};
+    var claims = data.claims.map(function (c, i) {
+      var key = 'c' + i;
+      var flipped = key in on ? on[key] : false;
+      return { text: c.text, key: key,
+               supported: flipped ? !c.supported : c.supported,
+               correct: c.correct, onTopic: c.onTopic, required: c.required };
+    });
+
+    var total = claims.length;
+    var supported = claims.filter(function (c) { return c.supported; }).length;
+    var correct = claims.filter(function (c) { return c.correct; }).length;
+    var onTopic = claims.filter(function (c) { return c.onTopic; }).length;
+    var required = data.requiredPoints;
+    var covered = claims.filter(function (c) { return c.required; }).length;
+
+    var scores = {
+      groundedness: total ? supported / total : 0,
+      correctness: total ? correct / total : 0,
+      relevance: total ? onTopic / total : 0,
+      completeness: required ? covered / required : 0
+    };
+    var focus = data.focus;
+    var value = scores[focus];
+    var label = focus.charAt(0).toUpperCase() + focus.slice(1);
+
+    var notes = {
+      groundedness: supported === total
+        ? 'Every claim traces to the retrieved context. Note that this says nothing '
+          + 'about whether those claims are TRUE - only that the answer did not invent them.'
+        : (total - supported) + ' claim(s) appear nowhere in the context. That is the '
+          + 'definition of a hallucination in a RAG system, and it is measurable '
+          + 'without a human.',
+      correctness: correct === total
+        ? 'Every claim matches the reference answer. Correctness needs a ground truth, '
+          + 'which is why it is the expensive one to measure.'
+        : (total - correct) + ' claim(s) disagree with the reference. A claim can be '
+          + 'perfectly grounded in a retrieved document and still be wrong, if the '
+          + 'document itself is out of date.',
+      relevance: onTopic === total
+        ? 'Every claim answers the question that was asked.'
+        : (total - onTopic) + ' claim(s) are true, grounded, and not what was asked. '
+          + 'Padding scores well on the other three dimensions and still fails the user.',
+      completeness: covered === required
+        ? 'Every point the reference answer requires is present.'
+        : (required - covered) + ' required point(s) missing. Completeness is the '
+          + 'dimension a confident, fluent, entirely correct answer can still fail.'
+    };
+
+    return {
+      bars: claims.map(function (c) {
+        var flags = [];
+        flags.push(c.supported ? 'grounded' : 'NOT in context');
+        if (!c.correct) flags.push('contradicts reference');
+        if (!c.onTopic) flags.push('off topic');
+        if (c.required) flags.push('required point');
+        return { label: c.text, value: c.supported ? 1 : 0, max: 1,
+                 tag: flags.join('  ·  '), click: c.key, on: c.supported,
+                 state: focus === 'groundedness'
+                   ? (c.supported ? 'hit' : 'bad')
+                   : focus === 'correctness' ? (c.correct ? 'hit' : 'bad')
+                   : focus === 'relevance' ? (c.onTopic ? 'hit' : 'bad')
+                   : (c.required ? 'hit' : 'dim') };
+      }),
+      stats: [[label + ' \u2190 this page', round(value, 2)],
+              ['Groundedness', round(scores.groundedness, 2)],
+              ['Correctness', round(scores.correctness, 2)],
+              ['Relevance', round(scores.relevance, 2)],
+              ['Completeness', round(scores.completeness, 2)],
+              ['claims in answer', total],
+              ['points required', required]],
+      badge: label + ' = ' + round(value, 2),
+      note: notes[focus] + '  Click a claim to flip whether the context supports it.'
+    };
+  };
+
   // ---------------------------------------------------------------- drawing
 
-  function drawBars(host, bars) {
+  function drawBars(host, bars, onToggle) {
     host.textContent = '';
     bars.forEach(function (b) {
-      var row = el('div', 'vz-rv-row' + (b.state ? ' is-' + b.state : ''));
+      var row = el(b.click ? 'button' : 'div',
+                   'vz-rv-row' + (b.state ? ' is-' + b.state : '') +
+                   (b.click ? ' is-clickable' : ''));
+      if (b.click) {
+        row.type = 'button';
+        row.setAttribute('aria-pressed', b.on ? 'true' : 'false');
+        row.addEventListener('click', function () { onToggle(b.click); });
+      }
       var head = el('div', 'vz-rv-rowhead');
       head.appendChild(el('span', 'vz-rv-label', b.label));
       head.appendChild(el('span', 'vz-rv-value', String(b.value)));
@@ -549,7 +710,13 @@
     var noteHost = block.querySelector('.vz-rv-note');
     var badgeHost = block.querySelector('.vz-rv-badge');
 
+    // Rows a model marks clickable toggle a key in this set, which the model
+    // reads back on the next render. It is how a reader marks which results
+    // are relevant, rather than being told.
+    var toggled = {};
+
     function render(values) {
+      values.__on = toggled;
       var out;
       try {
         out = model(values, spec.data || {});
@@ -557,7 +724,10 @@
         if (window.console) console.error('vz-rv: model failed', err);
         return;
       }
-      if (barHost) drawBars(barHost, out.bars || []);
+      if (barHost) drawBars(barHost, out.bars || [], function (key) {
+        toggled[key] = !toggled[key];
+        render(values);
+      });
       if (statHost) drawStats(statHost, out.stats || []);
       if (noteHost) noteHost.textContent = out.note || '';
       if (badgeHost) badgeHost.textContent = out.badge || '';

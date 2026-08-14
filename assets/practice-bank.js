@@ -3364,6 +3364,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/completeness_in_llm_evaluation.html",
+  "title": "Completeness in LLM evaluation",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Completeness is the proportion of required points an answer actually states, and it needs a key-points reference to be defined at all. It is the one dimension that penalises omission rather than error, which makes it the failure users notice last and act on first. Low completeness is usually a retrieval or chunking problem rather than a generation one."
+   },
+   {
+    "t": "What does this module say about “Complete relative to what”?",
+    "ans": "Completeness is undefined without a statement of what the answer needed to contain, so the reference is not optional. In practice that means a key-points list per evaluation query: the facts a good answer must include, written by whoever understands the domain."
+   },
+   {
+    "t": "What does this module say about “Why the other dimensions cannot see it”?",
+    "ans": "Consider an answer that states only \"Refunds are issued within 14 days.\" when the question was about the full refund policy. It is correct. It is grounded. It is entirely relevant. It scores 1.0 on three dimensions and leaves out the condition that makes it actionable."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/context_window_and_kv_cache.html",
   "title": "Context Windows and the KV Cache",
   "cat": "Gen AI",
@@ -3417,6 +3436,25 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “The three verdicts”?",
     "ans": "A grader — a small model, a cross-encoder, or a similarity threshold — labels the retrieved set:"
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/correctness_in_llm_evaluation.html",
+  "title": "Correctness in LLM evaluation",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Correctness compares the answer against a reference or verifiable fact, which makes it the only one of the four dimensions that requires ground truth someone has to write. Exact match and n-gram overlap fail on paraphrase; claim-level judging against a key-facts reference is what works."
+   },
+   {
+    "t": "What does this module say about “Correct against what, exactly”?",
+    "ans": "Correctness is only defined relative to a reference, and choosing that reference is most of the work:"
+   },
+   {
+    "t": "What does this module say about “Why exact match fails, and what replaces it”?",
+    "ans": "The obvious automation — string comparison against the reference — fails immediately on natural language. \"14 days\", \"fourteen days\" and \"two weeks\" are the same answer and share no characters. Exact match systematically punishes fluent phrasing."
    }
   ]
  },
@@ -3493,6 +3531,25 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Failure modes”?",
     "ans": "Pretraining supplies knowledge and fluency, supervised fine-tuning supplies behaviour by imitation, and preference optimisation supplies judgement between answers that are all plausible. RLHF and DPO reach the same optimum — a policy proportional to the reference times the exponentiated reward — with DPO skipping the reward model that RLHF has to train and then defend."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/groundedness_in_llm_evaluation.html",
+  "title": "Groundedness in LLM evaluation",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Groundedness is the proportion of an answer's claims that the retrieved context actually supports. It is the direct measure of hallucination, it needs no reference answer, and it is independent of truth — a claim can be grounded and wrong, or true and ungrounded. Measure it per claim rather than per answer so it tells you which span to look at."
+   },
+   {
+    "t": "What does this module say about “What it measures, claim by claim”?",
+    "ans": "The answer is decomposed into atomic claims — individual assertions that could each be checked independently — and each is tested against the retrieved context. Groundedness is the proportion that are supported."
+   },
+   {
+    "t": "What does this module say about “Why it is independent of correctness”?",
+    "ans": "This is the distinction people collapse, and the four combinations are all real:"
    }
   ]
  },
@@ -3864,6 +3921,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/relevance_in_llm_evaluation.html",
+  "title": "Relevance in LLM evaluation",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Answer relevance measures how much of the answer addresses the question asked. Distinguish it from context relevance, which scores retrieved chunks and is a retrieval metric. It is the only dimension that penalises padding, hedging and confidently answering a nearby question — all of which score perfectly on correctness and groundedness."
+   },
+   {
+    "t": "What does this module say about “Two different things are called relevance”?",
+    "ans": "The word is used for two distinct measurements and conflating them makes evaluation results incomparable."
+   },
+   {
+    "t": "What does this module say about “The failures it exists to catch”?",
+    "ans": "Padding. The answer contains the requested information plus three paragraphs of adjacent context nobody asked for. Every claim is true and grounded, and the user has to hunt for the answer. Models trained to be helpful pad heavily, and no other dimension penalises it."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/retrieval_evaluation_metrics.html",
   "title": "Retrieval Evaluation Metrics",
   "cat": "Gen AI",
@@ -4018,6 +4094,44 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/hit_rate_at_k.html",
+  "title": "What is Hit Rate@k?",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Hit Rate@k is the proportion of queries with at least one relevant result in the top k. It is binary per query, ignores position and quantity, and measures the ceiling on your pipeline — if the evidence never reaches the model, nothing downstream can fix it."
+   },
+   {
+    "t": "What does this module say about “The definition, and the averaging that hides in it”?",
+    "ans": "For a single query, Hit Rate@k is binary: 1 if any of the top k results is relevant, 0 if none is. There is no partial credit. A query whose top 3 contains five relevant documents and a query whose top 3 contains exactly one both score 1."
+   },
+   {
+    "t": "What does this module say about “Why it is the right first metric for RAG”?",
+    "ans": "A RAG generator does not need every relevant document. It needs enough grounding to answer, and for most factual questions one good chunk is enough. If the answer is in the context, the model can use it; if it is not, no amount of prompt engineering will recover it."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/mean_reciprocal_rank.html",
+  "title": "What is MRR (Mean Reciprocal Rank)?",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "MRR averages 1/rank of the first relevant result. It is the metric for systems where the consumer stops at the first good answer, and it is far more sensitive to the top of the ranking than recall or precision. It ignores every relevant result after the first, so it is the wrong choice for questions needing several sources."
+   },
+   {
+    "t": "What does this module say about “The definition, and the shape of the curve”?",
+    "ans": "Reciprocal rank for a query is 1/(rank of the first relevant result). MRR is the mean of that over an evaluation set. The name is worth reading literally: it is a mean of reciprocal ranks , and each word matters."
+   },
+   {
+    "t": "What does this module say about “When position is the whole question”?",
+    "ans": "MRR is the right metric when the consumer stops at the first good result. Question answering with a single correct answer, \"I'm feeling lucky\" search, entity lookup, a code assistant jumping to a definition — in all of these the second correct result is worth nothing."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/masked_language_modeling.html",
   "title": "What is Masked Language Modeling?",
   "cat": "Gen AI",
@@ -4033,6 +4147,44 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Masking Rate Is a Trade-off”?",
     "ans": "Mask too little and each sentence teaches the model almost nothing — training is slow because most positions carry no loss. Mask too much and you destroy the very context needed to make a prediction. Around 15% is the long-standing sweet spot, though later work has shown much higher rates can work with large enough models."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/precision_at_k.html",
+  "title": "What is Precision@k?",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Precision@k is the fraction of the returned k that was relevant, with k always as the denominator. It is the cheap metric to label, because it needs judgements only for what you returned. In a RAG pipeline it is not just about efficiency: irrelevant context costs tokens, pushes good evidence into the least-attended part of the prompt, and gives the model plausible material to be wrong with."
+   },
+   {
+    "t": "What does this module say about “The definition, and the denominator that never moves”?",
+    "ans": "Precision@k is the number of relevant documents in the top k divided by k. Not by the number of relevant documents in the corpus, and not by the number retrieved — by k, always."
+   },
+   {
+    "t": "What does this module say about “Why noise is not free in a RAG pipeline”?",
+    "ans": "The old intuition — \"the model can just ignore irrelevant chunks\" — is not quite true, and the ways it fails are worth naming."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/recall_at_k.html",
+  "title": "What is Recall@k?",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Recall@k is the fraction of all relevant documents that reached the top k. It is the metric that bounds a RAG pipeline, because a document that was never retrieved cannot be used, while an irrelevant one can be ignored. It rises monotonically with k, so it is meaningless without its k and must be read against a cost — usually your context budget."
+   },
+   {
+    "t": "What does this module say about “The definition, and the denominator people forget”?",
+    "ans": "Recall@k is the number of relevant documents in the top k divided by the total number of relevant documents that exist . The numerator is easy; the denominator is where the difficulty lives."
+   },
+   {
+    "t": "What does this module say about “Why it is the retrieval metric for RAG”?",
+    "ans": "The generator can ignore an irrelevant chunk. It cannot invent a relevant one that was never retrieved. That asymmetry is the whole argument: recall failures are unrecoverable, precision failures are merely expensive ."
    }
   ]
  },

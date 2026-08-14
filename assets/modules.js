@@ -964,6 +964,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Slide the chunk size down and watch fixed-size splitting cut sentences in half, while semantic chunking respects paragraph boundaries and never does."
  },
  {
+  "title": "Completeness in LLM evaluation",
+  "path": "gen_ai/completeness_in_llm_evaluation.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
   "title": "Context Windows and the KV Cache",
   "path": "gen_ai/context_window_and_kv_cache.html",
   "category": "Gen AI",
@@ -982,6 +990,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Corrective RAG (CRAG)",
   "path": "gen_ai/corrective_rag.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
+  "title": "Correctness in LLM evaluation",
+  "path": "gen_ai/correctness_in_llm_evaluation.html",
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
@@ -1018,6 +1034,14 @@ window.VIZLEARN_MODULES = [
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "Three stages, three jobs. Watch a model's answers move under supervised fine-tuning, then under preference optimisation, and watch reward hacking happen."
+ },
+ {
+  "title": "Groundedness in LLM evaluation",
+  "path": "gen_ai/groundedness_in_llm_evaluation.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
  },
  {
   "title": "Hallucination and Grounding",
@@ -1148,6 +1172,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Relevance in LLM evaluation",
+  "path": "gen_ai/relevance_in_llm_evaluation.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
   "title": "Retrieval Evaluation Metrics",
   "path": "gen_ai/retrieval_evaluation_metrics.html",
   "category": "Gen AI",
@@ -1204,12 +1236,44 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "What is Hit Rate@k?",
+  "path": "gen_ai/hit_rate_at_k.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
+  "title": "What is MRR (Mean Reciprocal Rank)?",
+  "path": "gen_ai/mean_reciprocal_rank.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
   "title": "What is Masked Language Modeling?",
   "path": "gen_ai/masked_language_modeling.html",
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "Interactive Masked Language Modeling lab - mask tokens in a sentence and see how a bidirectional model like BERT predicts them from left and right context."
+ },
+ {
+  "title": "What is Precision@k?",
+  "path": "gen_ai/precision_at_k.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
+ },
+ {
+  "title": "What is Recall@k?",
+  "path": "gen_ai/recall_at_k.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": ""
  },
  {
   "title": "3Sum",
