@@ -4,8 +4,8 @@
 lastmod comes from each file's last commit date, so re-crawls are driven by
 real edits rather than a blanket "today".
 
-The map covers four kinds of URL now: the hub, the eight topic landings, the
-166 modules, and the about/contact/privacy/terms set. Before the landings
+The map covers four kinds of URL: the hub, one landing per track, every
+module, and the about/contact/privacy/terms set. Before the landings
 existed a track was only reachable as `index.html#ml`, which is the same URL
 as the hub and so could not appear here at all.
 """

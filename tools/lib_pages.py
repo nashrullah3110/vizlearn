@@ -1,6 +1,6 @@
 """Metadata for the pages that are not modules.
 
-Until now every routable URL was either index.html or one of the 166 module
+Until now every routable URL was either index.html or one of the module
 pages, so `lib_catalog` was enough. This file adds the two other kinds:
 
   * **topic landing pages** - one per track, served at `/<dir>/`. Previously a

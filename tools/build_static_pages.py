@@ -15,13 +15,16 @@ import sys
 
 import lib_shell as shell
 from lib_catalog import ROOT
+from lib_catalog import counts
 from lib_pages import STATIC_TITLES, last_modified, pretty_date
 from static_pages import PAGES
 
 PREFIX = ""
 
 
-def build(rel, page):
+def build(rel, page, numbers):
+    """`numbers` fills the %(modules)d / %(tracks)d placeholders in the copy,
+    so a total quoted on the about page can never drift from the catalog."""
     title = "%s | VizLearn" % STATIC_TITLES[rel]
     parts = [shell.head_top(title, PREFIX), shell.header(PREFIX)]
 
@@ -29,7 +32,7 @@ def build(rel, page):
     for heading, content in page["sections"]:
         body.append(
             '<section class="vz-doc-section">'
-            '<h2>%s</h2>%s</section>' % (html.escape(heading), content)
+            '<h2>%s</h2>%s</section>' % (html.escape(heading), content % numbers)
         )
 
     toc = "".join(
@@ -59,7 +62,7 @@ def build(rel, page):
         "crumb": shell.breadcrumb_bar([("Home", "index.html"),
                                        (STATIC_TITLES[rel], None)]),
         "h1": html.escape(page["h1"]),
-        "lead": html.escape(page["lead"]),
+        "lead": html.escape(page["lead"] % numbers),
         "iso": last_modified(rel),
         "nice": pretty_date(last_modified(rel)),
         "toc": toc,
@@ -87,8 +90,10 @@ def slug(heading):
 
 def main():
     written = 0
+    numbers = counts()
     for rel, page in PAGES.items():
-        open(os.path.join(ROOT, rel), "w", encoding="utf-8").write(build(rel, page))
+        open(os.path.join(ROOT, rel), "w", encoding="utf-8").write(
+            build(rel, page, numbers))
         written += 1
     print("static pages : %d" % written)
     return 0

@@ -1894,12 +1894,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Pooling summarises each neighbourhood into one value, most often taking the maximum of a 2×2 window at stride 2, which quarters the feature map for free — it has no parameters. Its real value is enlarging the receptive field so small filters can eventually see large structures, with computational saving second and a modest, purely local translation tolerance third."
    },
    {
-    "t": "What does this module say about “The three reasons it is there”?",
-    "ans": "Computation. Quartering the spatial dimensions quarters the work of every subsequent layer. In a deep network that compounds enormously."
+    "t": "What does this module say about “What pooling does”?",
+    "ans": "A pooling layer slides a window over the feature map and replaces the values inside it with a single summary. With a 2×2 window and stride 2 — by far the most common setting — the windows do not overlap, and the output is half the height and half the width, so a quarter of the values ."
    },
    {
-    "t": "What does this module say about “Why some architectures drop it”?",
-    "ans": "Pooling is a fixed rule, and a strided convolution achieves the same downsampling while learning how to summarise. Many modern architectures use stride-2 convolutions instead, and all-convolutional networks remove pooling entirely."
+    "t": "What does this module say about “The three reasons it is there”?",
+    "ans": "Computation. Quartering the spatial dimensions quarters the work of every subsequent layer. In a deep network that compounds enormously."
    }
   ]
  },
@@ -2559,11 +2559,11 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Batching turns many small vector-matrix products into one large matrix-matrix product, which is what makes parallel hardware pay off, without changing the model at all. Batch size sets both the number of updates per epoch and the noise in each gradient, so it trades throughput against a regularising effect that favours flat minima."
    },
    {
-    "t": "What does this module say about “Things to try”?",
-    "ans": "Larger batches give a lower-variance estimate of the true gradient, so the path to the minimum is smoother. That sounds strictly good and is not."
+    "t": "What does this module say about “A batch is a matrix, not a loop”?",
+    "ans": "Feeding one sample through a layer is a vector-matrix product. Feeding 32 samples is a matrix -matrix product — stack the 32 input vectors into a 32×n in matrix and multiply once by the same n in ×n out weights."
    },
    {
-    "t": "What does this module say about “How batch size affects the result, not just the speed”?",
+    "t": "What does this module say about “Things to try”?",
     "ans": "Larger batches give a lower-variance estimate of the true gradient, so the path to the minimum is smoother. That sounds strictly good and is not."
    }
   ]
@@ -2578,12 +2578,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Sparse data is the norm for one-hot categories, text and recommenders, and it costs memory, wasted arithmetic, and — least obviously — badly uneven learning rates, because a weight only updates when its input is non-zero."
    },
    {
-    "t": "What does this module say about “Embeddings, the standard fix”?",
-    "ans": "For high-cardinality categorical data the usual answer is not to keep the one-hot vector at all. An embedding layer maps each category to a short dense vector — say 50 dimensions instead of 195 columns — learned during training."
+    "t": "What does this module say about “What sparsity means, and where it comes from”?",
+    "ans": "A feature vector is sparse when most of its entries are zero. This is not an edge case — it is the default in several of the most common data types:"
    },
    {
-    "t": "What does this module say about “Where this goes wrong”?",
-    "ans": "Sparse data is the norm for one-hot categories, text and recommenders, and it costs memory, wasted arithmetic, and — least obviously — badly uneven learning rates, because a weight only updates when its input is non-zero."
+    "t": "What does this module say about “Embeddings, the standard fix”?",
+    "ans": "For high-cardinality categorical data the usual answer is not to keep the one-hot vector at all. An embedding layer maps each category to a short dense vector — say 50 dimensions instead of 195 columns — learned during training."
    }
   ]
  },
@@ -2677,12 +2677,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Gradients scale with input magnitude, so unscaled features give some weights enormous gradients and others negligible ones, and no single learning rate serves both. Standardisation is the default for neural networks; min-max suits bounded inputs and breaks on outliers. Fit the scaler on the training split only, keep those statistics for validation, test and production, and leave one-hot columns alone."
    },
    {
-    "t": "What does this module say about “Work the numbers”?",
-    "ans": "Take age 30 and salary 60,000 with weights of 0.5 each. The salary term contributes 30,000 to the weighted sum and the age term contributes 15 — the age feature is invisible, and it would take a weight around 1000× larger to compete."
+    "t": "What does this module say about “Why scale breaks gradient descent”?",
+    "ans": "The gradient of the loss with respect to a weight is proportional to that weight’s input . So a feature measured in hundreds of thousands produces gradients roughly four orders of magnitude larger than a feature measured in tens."
    },
    {
-    "t": "What does this module say about “Where this goes wrong”?",
-    "ans": "Gradients scale with input magnitude, so unscaled features give some weights enormous gradients and others negligible ones, and no single learning rate serves both. Standardisation is the default for neural networks; min-max suits bounded inputs and breaks on outliers. Fit the scaler on the training split only, keep those statistics for validation, test and production, and leave one-hot columns alone."
+    "t": "What does this module say about “Work the numbers”?",
+    "ans": "Take age 30 and salary 60,000 with weights of 0.5 each. The salary term contributes 30,000 to the weighted sum and the age term contributes 15 — the age feature is invisible, and it would take a weight around 1000× larger to compete."
    }
   ]
  },
@@ -2814,12 +2814,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Hyperparameters sit outside gradient descent, so the only way to evaluate them is to train and measure — which makes the search strategy itself worth thinking about. Random search beats grid search at equal budget because it spends its samples on more distinct values of whichever hyperparameter actually matters, and anything spanning orders of magnitude should be sampled on a log scale."
    },
    {
-    "t": "What does this module say about “Grid search, random search, and why random usually wins”?",
-    "ans": "Grid search tries every combination on a predefined grid. With 5 learning rates and 5 layer widths that is 25 runs, and adding a third hyperparameter with 5 values makes it 125. The cost is exponential in the number of hyperparameters."
+    "t": "What does this module say about “Two kinds of number”?",
+    "ans": "A parameter is learned: weights and biases move during training because gradient descent moves them. A hyperparameter is fixed before training and never updated by the optimiser — learning rate, number of layers, neurons per layer, batch size, dropout rate, regularisation strength."
    },
    {
-    "t": "What does this module say about “Things to try”?",
-    "ans": "Learning rate should be sampled logarithmically, not uniformly. Sampling uniformly from 0.0001 to 0.1 puts 90% of the samples above 0.01, leaving the small-rate region — where the answer usually is — almost untested."
+    "t": "What does this module say about “Grid search, random search, and why random usually wins”?",
+    "ans": "Grid search tries every combination on a predefined grid. With 5 learning rates and 5 layer widths that is 25 runs, and adding a third hyperparameter with 5 values makes it 125. The cost is exponential in the number of hyperparameters."
    }
   ]
  },
@@ -2848,12 +2848,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Big steps to travel, small steps to arrive — and get the starting size right before tuning the decay."
    },
    {
-    "t": "What does this module say about “What usually goes wrong”?",
-    "ans": "Decaying too early. Shrink the step before the model has reached a good region and it will crawl the rest of the way, converging neatly to somewhere mediocre."
+    "t": "What does this module say about “Why one value cannot serve both phases”?",
+    "ans": "Early in training you are far from any good solution and want large steps. Late in training you are close, and large steps make you bounce around the minimum without ever landing in it. A fixed rate forces a compromise that is wrong at both ends."
    },
    {
-    "t": "What does this module say about “In one line”?",
-    "ans": "Big steps to travel, small steps to arrive — and get the starting size right before tuning the decay."
+    "t": "What does this module say about “What usually goes wrong”?",
+    "ans": "Decaying too early. Shrink the step before the model has reached a good region and it will crawl the rest of the way, converging neatly to somewhere mediocre."
    }
   ]
  },
@@ -2867,12 +2867,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Two parameters, the same optimiser as a deep network, and slow enough to watch every step."
    },
    {
-    "t": "What does this module say about “One step, worked out”?",
-    "ans": "Three points: (1, 2), (2, 4), (3, 6). The answer is obviously m = 2, c = 0, but start from m = 0, c = 0 and let the maths find it."
+    "t": "What does this module say about “The two gradients”?",
+    "ans": "You are fitting y = mx + c by minimising mean squared error. The partial derivatives are:"
    },
    {
-    "t": "What does this module say about “What usually goes wrong”?",
-    "ans": "Divergence from too high a learning rate is the classic failure, and its signature is unmistakable: the loss increases every step, often to infinity within a dozen iterations. If you see that, the fix is almost always η, not the model."
+    "t": "What does this module say about “One step, worked out”?",
+    "ans": "Three points: (1, 2), (2, 4), (3, 6). The answer is obviously m = 2, c = 0, but start from m = 0, c = 0 and let the maths find it."
    }
   ]
  },
@@ -2886,12 +2886,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Training draws randomness from initialisation, shuffling, dropout and augmentation, each from its own generator, so reproducibility means seeding all of them rather than one. Even then GPU reductions are non-deterministic at the level of floating-point rounding, and training amplifies those differences over thousands of steps."
    },
    {
-    "t": "What does this module say about “Seeding, and what a seed actually fixes”?",
-    "ans": "These are all pseudo -random: a deterministic sequence generated from a starting value called the seed. Fix the seed and the sequence is identical every run."
+    "t": "What does this module say about “Where the randomness comes from”?",
+    "ans": "Neural network training is randomised in at least four independent places, and every one of them changes the final weights:"
    },
    {
-    "t": "What does this module say about “Why the GPU can still be non-deterministic”?",
-    "ans": "Seeding every generator can still leave runs that differ, and the reason is floating-point arithmetic rather than randomness. GPU kernels parallelise reductions across thousands of threads, and the order in which partial sums combine varies between runs. Floating-point addition is not associative — (a + b) + c can differ from a + (b + c) in the last bits — so identical inputs can give slightly different outputs."
+    "t": "What does this module say about “Seeding, and what a seed actually fixes”?",
+    "ans": "These are all pseudo -random: a deterministic sequence generated from a starting value called the seed. Fix the seed and the sequence is identical every run."
    }
   ]
  },
@@ -3004,12 +3004,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Classifier body, linear head, distance-based loss — and scale your targets."
    },
    {
-    "t": "What does this module say about “A concrete architecture”?",
-    "ans": "Predicting house price from three features: 3 inputs → 16 hidden with ReLU → 1 linear output. That is (3×16 + 16) + (16×1 + 1) = 81 parameters."
+    "t": "What does this module say about “The two differences that matter”?",
+    "ans": "Everything else — hidden layers, ReLU, backpropagation, the optimiser — is unchanged from a classifier."
    },
    {
-    "t": "What does this module say about “Why the output layer has no activation”?",
-    "ans": "A classification network ends in softmax or sigmoid because the output must be a probability, bounded in [0, 1]. A regression network predicts an unbounded quantity — a price, a temperature, a duration — so squashing the output would put a ceiling on what it can ever predict."
+    "t": "What does this module say about “A concrete architecture”?",
+    "ans": "Predicting house price from three features: 3 inputs → 16 hidden with ReLU → 1 linear output. That is (3×16 + 16) + (16×1 + 1) = 81 parameters."
    }
   ]
  },
@@ -3023,12 +3023,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "No labels needed — make the input the target and let a narrow layer decide what was worth keeping."
    },
    {
-    "t": "What does this module say about “A worked shape”?",
-    "ans": "8 input features → 3-unit bottleneck → 8 reconstruction outputs. The encoder must express 8 numbers using 3, and the decoder must rebuild all 8 from those 3."
+    "t": "What does this module say about “The autoencoder trick”?",
+    "ans": "An autoencoder is trained to reproduce its own input. On its own that is trivial — copy the input to the output and the loss is zero. The trick is the bottleneck: a hidden layer narrower than the input, which the data must pass through."
    },
    {
-    "t": "What does this module say about “What usually goes wrong”?",
-    "ans": "A bottleneck as wide as the input. The network learns the identity function, the loss looks excellent, and you have learned nothing about the data. If reconstruction is perfect, suspect this first."
+    "t": "What does this module say about “A worked shape”?",
+    "ans": "8 input features → 3-unit bottleneck → 8 reconstruction outputs. The encoder must express 8 numbers using 3, and the decoder must rebuild all 8 from those 3."
    }
   ]
  },
@@ -3042,12 +3042,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The shape of the surface, not the cleverness of the algorithm, decides which optimiser looks good."
    },
    {
-    "t": "What does this module say about “Saddles matter more than local minima”?",
+    "t": "What does this module say about “What the terrain is made of”?",
     "ans": "The folk explanation of training failure is \"it got stuck in a local minimum\". In high dimensions that is mostly wrong. For a point to be a local minimum, the surface must curve upward in every direction at once — and with millions of parameters that is vanishingly unlikely. Saddle points, where it curves up in some directions and down in others, are enormously more common."
    },
    {
-    "t": "What does this module say about “What usually goes wrong”?",
-    "ans": "Over-reading the picture. This surface has two parameters. A real network has millions, and its loss landscape has properties that genuinely do not exist in 3D. Use this to build intuition about momentum and adaptive step sizes; do not use it to conclude anything about how many minima a real network has."
+    "t": "What does this module say about “Saddles matter more than local minima”?",
+    "ans": "The folk explanation of training failure is \"it got stuck in a local minimum\". In high dimensions that is mostly wrong. For a point to be a local minimum, the surface must curve upward in every direction at once — and with millions of parameters that is vanishingly unlikely. Saddle points, where it curves up in some directions and down in others, are enormously more common."
    }
   ]
  },
@@ -3061,12 +3061,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Same downhill direction, different memory — and memory is what stops you bouncing off the walls."
    },
    {
-    "t": "What does this module say about “Why plain SGD zig-zags”?",
+    "t": "What does this module say about “What each one adds”?",
     "ans": "Picture a long narrow valley where the gradient across the valley is 10 and along it is 0.1. With η = 0.01, SGD steps 0.1 across and 0.001 along — a hundred to one. It bounces off the steep walls while creeping toward the actual minimum."
    },
    {
-    "t": "What does this module say about “Momentum, precisely”?",
-    "ans": "Plain SGD steps in the direction of the current gradient and forgets everything before it. Momentum keeps a running average of past gradients and steps along that instead:"
+    "t": "What does this module say about “Why plain SGD zig-zags”?",
+    "ans": "Picture a long narrow valley where the gradient across the valley is 10 and along it is 0.1. With η = 0.01, SGD steps 0.1 across and 0.001 along — a hundred to one. It bounces off the steep walls while creeping toward the actual minimum."
    }
   ]
  },
@@ -3160,12 +3160,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Regularisation adds a weight-size penalty to the loss so the optimiser trades fit against simplicity, with λ setting the rate. L2 shrinks all weights proportionally and keeps every feature; L1 applies constant pressure and drives weights to exactly zero, producing a sparse, self-selecting model. Use it when the model overfits, scale the features first, and reach for AdamW if the optimiser is Adam."
    },
    {
-    "t": "What does this module say about “Weight decay is not quite L2”?",
-    "ans": "The two are used interchangeably and are only equivalent for plain SGD. Weight decay multiplies the weights by a factor slightly below 1 at each step; L2 adds a term to the loss, so its contribution passes through the optimiser’s gradient machinery."
+    "t": "What does this module say about “Penalising complexity”?",
+    "ans": "An overfitting model has found a way to fit noise, and doing that almost always requires large weights — sharp, wiggly functions need big coefficients. Regularisation exploits that by adding the size of the weights to the loss:"
    },
    {
-    "t": "What does this module say about “What usually goes wrong”?",
-    "ans": "Regularisation adds a weight-size penalty to the loss so the optimiser trades fit against simplicity, with λ setting the rate. L2 shrinks all weights proportionally and keeps every feature; L1 applies constant pressure and drives weights to exactly zero, producing a sparse, self-selecting model. Use it when the model overfits, scale the features first, and reach for AdamW if the optimiser is Adam."
+    "t": "What does this module say about “Weight decay is not quite L2”?",
+    "ans": "The two are used interchangeably and are only equivalent for plain SGD. Weight decay multiplies the weights by a factor slightly below 1 at each step; L2 adds a term to the loss, so its contribution passes through the optimiser’s gradient machinery."
    }
   ]
  },
@@ -3217,12 +3217,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Backpropagation multiplies per-layer derivatives together, so anything consistently below 1 shrinks the gradient exponentially with depth and anything above 1 amplifies it. Sigmoid’s maximum derivative of 0.25 made deep networks untrainable; ReLU’s derivative of 1 fixed it, and initialisation, normalisation and residual connections keep the product near 1 by design."
    },
    {
-    "t": "What does this module say about “Why sigmoid made it worse”?",
-    "ans": "The derivative of the sigmoid is σ(x)(1 − σ(x)) , which peaks at 0.25 when x = 0 and falls toward zero for inputs of large magnitude."
+    "t": "What does this module say about “Where both problems come from”?",
+    "ans": "Backpropagation computes the gradient at an early layer by multiplying together the local derivatives of every layer above it. For a network of depth L that is a product of L terms."
    },
    {
-    "t": "What does this module say about “What trips people up”?",
-    "ans": "Backpropagation multiplies per-layer derivatives together, so anything consistently below 1 shrinks the gradient exponentially with depth and anything above 1 amplifies it. Sigmoid’s maximum derivative of 0.25 made deep networks untrainable; ReLU’s derivative of 1 fixed it, and initialisation, normalisation and residual connections keep the product near 1 by design."
+    "t": "What does this module say about “Why sigmoid made it worse”?",
+    "ans": "The derivative of the sigmoid is σ(x)(1 − σ(x)) , which peaks at 0.25 when x = 0 and falls toward zero for inputs of large magnitude."
    }
   ]
  },
@@ -3236,12 +3236,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Initialisation must be random to break symmetry, and scaled to layer width so activation and gradient variance stay roughly constant with depth. He initialisation is the default for ReLU networks because ReLU halves the variance and He’s factor of 2 restores it; Xavier suits tanh and sigmoid. Get this wrong and a deep network either learns nothing or diverges — before the optimiser has had any say in the matter."
    },
    {
-    "t": "What does this module say about “The variance is what actually matters”?",
-    "ans": "Randomness alone is not enough; the scale of the random values decides whether signal survives depth. Each layer multiplies its input by a weight matrix, so the variance of the activations is multiplied layer by layer."
+    "t": "What does this module say about “Why not zero, and why not all-equal”?",
+    "ans": "Initialising every weight to zero seems harmless and completely breaks the network. If all weights in a layer are identical, every neuron in that layer computes the same output, receives the same gradient, and applies the same update — so they stay identical forever. A layer of 512 such neurons has the expressive power of one."
    },
    {
-    "t": "What does this module say about “Traps worth knowing”?",
-    "ans": "Initialisation must be random to break symmetry, and scaled to layer width so activation and gradient variance stay roughly constant with depth. He initialisation is the default for ReLU networks because ReLU halves the variance and He’s factor of 2 restores it; Xavier suits tanh and sigmoid. Get this wrong and a deep network either learns nothing or diverges — before the optimiser has had any say in the matter."
+    "t": "What does this module say about “The variance is what actually matters”?",
+    "ans": "Randomness alone is not enough; the scale of the random values decides whether signal survives depth. Each layer multiplies its input by a weight matrix, so the variance of the activations is multiplied layer by layer."
    }
   ]
  },
@@ -3255,12 +3255,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Weights decide direction and strength; the bias decides where the threshold sits."
    },
    {
-    "t": "What does this module say about “A concrete example”?",
-    "ans": "One input, weight w = 2.0 , bias b = 0 . At x = 0.5 you get z = 1.0 — the neuron fires."
+    "t": "What does this module say about “What each one does geometrically”?",
+    "ans": "A neuron computes z = w · x + b . Those two terms do different jobs, and it is worth separating them:"
    },
    {
-    "t": "What does this module say about “Why the bias cannot be dropped”?",
-    "ans": "Without a bias, the weighted sum is zero whenever every input is zero, so the decision boundary is forced through the origin. That is a severe restriction: a neuron that should fire only when its input exceeds 5 cannot express that threshold at all, because it has no way to shift its output independently of the inputs."
+    "t": "What does this module say about “A concrete example”?",
+    "ans": "One input, weight w = 2.0 , bias b = 0 . At x = 0.5 you get z = 1.0 — the neuron fires."
    }
   ]
  },
@@ -3274,12 +3274,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "HNSW stacks proximity graphs: sparse upper layers with long edges to cross the space, a dense bottom layer to refine. Search is greedy with a candidate list of width efSearch, which is the runtime recall/latency knob. M and efConstruction are fixed at build time. IVF is the simpler alternative — cluster then probe — cheaper to build and update, and it misses neighbours across cluster boundaries."
    },
    {
-    "t": "What does this module say about “The parameters worth naming”?",
-    "ans": "M — edges per node, fixed at build time. Higher means a better-connected graph, better recall, more memory. The graph itself is a real memory cost on top of the vectors, which is HNSW's main drawback."
+    "t": "What does this module say about “HNSW: skip lists, in vector space”?",
+    "ans": "Take a proximity graph — each vector linked to its nearest neighbours — and stack several, each a random sample of the one below. Search enters at the sparse top layer and greedily moves to whichever neighbour is closer to the query, until no neighbour improves. Then it drops a layer and repeats."
    },
    {
-    "t": "What does this module say about “How each one fails”?",
-    "ans": "HNSW's search is greedy, so it can settle in a local minimum and return a neighbourhood that is good but not the best. A wider efSearch makes that less likely without eliminating it. Deletion is also awkward — removing a node can disconnect the graph — so most implementations tombstone and rebuild periodically."
+    "t": "What does this module say about “The parameters worth naming”?",
+    "ans": "M — edges per node, fixed at build time. Higher means a better-connected graph, better recall, more memory. The graph itself is a real memory cost on top of the vectors, which is HNSW's main drawback."
    }
   ]
  },
@@ -3373,12 +3373,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Completeness is the proportion of required points an answer actually states, and it needs a key-points reference to be defined at all. It is the one dimension that penalises omission rather than error, which makes it the failure users notice last and act on first. Low completeness is usually a retrieval or chunking problem rather than a generation one."
    },
    {
-    "t": "What does this module say about “Why the other dimensions cannot see it”?",
-    "ans": "Consider an answer that states only \"Refunds are issued within 14 days.\" when the question was about the full refund policy. It is correct. It is grounded. It is entirely relevant. It scores 1.0 on three dimensions and leaves out the condition that makes it actionable."
+    "t": "What does this module say about “Complete relative to what”?",
+    "ans": "Completeness is undefined without a statement of what the answer needed to contain, so the reference is not optional. In practice that means a key-points list per evaluation query: the facts a good answer must include, written by whoever understands the domain."
    },
    {
-    "t": "What does this module say about “Where incompleteness comes from”?",
-    "ans": "Retrieval, most often. If a required point was never in the retrieved context, the model cannot state it without hallucinating. Low completeness alongside low recall@k is a retrieval problem, and no prompt change will fix it. This is the single most common cause."
+    "t": "What does this module say about “Why the other dimensions cannot see it”?",
+    "ans": "Consider an answer that states only \"Refunds are issued within 14 days.\" when the question was about the full refund policy. It is correct. It is grounded. It is entirely relevant. It scores 1.0 on three dimensions and leaves out the condition that makes it actionable."
    }
   ]
  },
@@ -3411,12 +3411,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Context-aware chunking changes what is stored rather than where the cut falls. A chunk full of pronouns and back-references is unusable by the generator and invisible to retrieval, so title, heading path and resolved references are added back. Keep the enrichment short relative to the chunk, or shared context dominates the embedding and chunks stop being distinguishable."
    },
    {
-    "t": "What does this module say about “What gets added”?",
-    "ans": "Cheap and free: document title and heading path, prepended. Deterministic, no model call, and usually the largest single improvement."
+    "t": "What does this module say about “The problem is coreference, not boundaries”?",
+    "ans": "Prose is written to be read in order, so it leans on everything before it: \"it\", \"this policy\", \"as described above\", \"the latter\". Cut one paragraph out and those references dangle."
    },
    {
-    "t": "What does this module say about “What it costs, and what to watch”?",
-    "ans": "Index time and money, both once. The subtler cost is dilution: prepending 200 tokens of context to a 300-token chunk means the embedding is largely about the context , so chunks from the same section start looking alike and the retriever loses its ability to distinguish them."
+    "t": "What does this module say about “What gets added”?",
+    "ans": "Cheap and free: document title and heading path, prepended. Deterministic, no model call, and usually the largest single improvement."
    }
   ]
  },
@@ -3430,12 +3430,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Corrective RAG grades retrieved documents before generating, and takes a different path when they are poor: rewrite the query, fall back to another source, or decline. Retrieval never fails loudly — it always returns its nearest k — so without a grader a query with no answer still produces a confident, sourced-looking one."
    },
    {
-    "t": "What does this module say about “The three verdicts”?",
-    "ans": "A grader — a small model, a cross-encoder, or a similarity threshold — labels the retrieved set:"
+    "t": "What does this module say about “The failure it fixes”?",
+    "ans": "A vector search returns the k nearest chunks whether or not any of them is relevant. There is no null result: ask about something absent from the corpus and you still get five chunks, at low similarity, and the generator dutifully writes an answer from them."
    },
    {
-    "t": "What does this module say about “What correction actually means”?",
-    "ans": "Query rewriting is the cheapest: the user's phrasing may simply not match the corpus vocabulary. See query rewriting and HyDE ."
+    "t": "What does this module say about “The three verdicts”?",
+    "ans": "A grader — a small model, a cross-encoder, or a similarity threshold — labels the retrieved set:"
    }
   ]
  },
@@ -3449,12 +3449,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Correctness compares the answer against a reference or verifiable fact, which makes it the only one of the four dimensions that requires ground truth someone has to write. Exact match and n-gram overlap fail on paraphrase; claim-level judging against a key-facts reference is what works."
    },
    {
-    "t": "What does this module say about “Why exact match fails, and what replaces it”?",
-    "ans": "The obvious automation — string comparison against the reference — fails immediately on natural language. \"14 days\", \"fourteen days\" and \"two weeks\" are the same answer and share no characters. Exact match systematically punishes fluent phrasing."
+    "t": "What does this module say about “Correct against what, exactly”?",
+    "ans": "Correctness is only defined relative to a reference, and choosing that reference is most of the work:"
    },
    {
-    "t": "What does this module say about “The failure this dimension exists to catch”?",
-    "ans": "The important case is the grounded but wrong answer. The model faithfully reports what a retrieved document says, and that document is out of date, contradicted by a newer one, or simply mistaken."
+    "t": "What does this module say about “Why exact match fails, and what replaces it”?",
+    "ans": "The obvious automation — string comparison against the reference — fails immediately on natural language. \"14 days\", \"fourteen days\" and \"two weeks\" are the same answer and share no characters. Exact match systematically punishes fluent phrasing."
    }
   ]
  },
@@ -3468,12 +3468,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Scatter-gather sends the query to every shard, takes a local top-k from each and merges. Shard randomly rather than by topic, or the relevant documents concentrate in one shard and its local k throws most of them away. Latency becomes the slowest shard's, not the average, so p99 gets worse with every shard added. Shards solve data that will not fit; replicas solve query volume."
    },
    {
-    "t": "What does this module say about “Shard randomly”?",
-    "ans": "The instinct is to shard by topic or tenant so a query only touches one shard. For a multi-tenant system where every query is scoped to one tenant, that is right — it is really many small indexes."
+    "t": "What does this module say about “Shards and replicas are different things”?",
+    "ans": "A shard holds a slice of the corpus. Sharding handles data that will not fit — memory or index build time — and every query must visit every shard."
    },
    {
-    "t": "What does this module say about “Tail latency, and the merge”?",
-    "ans": "Scatter-gather waits for the slowest shard, so p99 response time is roughly the p99 of any shard. Add shards and the chance one is slow rises — the classic result is that latency gets worse as you scale out, not better."
+    "t": "What does this module say about “Shard randomly”?",
+    "ans": "The instinct is to shard by topic or tenant so a query only touches one shard. For a multi-tenant system where every query is scoped to one tenant, that is right — it is really many small indexes."
    }
   ]
  },
@@ -3544,12 +3544,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Groundedness is the proportion of an answer's claims that the retrieved context actually supports. It is the direct measure of hallucination, it needs no reference answer, and it is independent of truth — a claim can be grounded and wrong, or true and ungrounded. Measure it per claim rather than per answer so it tells you which span to look at."
    },
    {
-    "t": "What does this module say about “Why it is independent of correctness”?",
-    "ans": "This is the distinction people collapse, and the four combinations are all real:"
+    "t": "What does this module say about “What it measures, claim by claim”?",
+    "ans": "The answer is decomposed into atomic claims — individual assertions that could each be checked independently — and each is tested against the retrieved context. Groundedness is the proportion that are supported."
    },
    {
-    "t": "What does this module say about “How it is measured in practice”?",
-    "ans": "LLM-as-judge, per claim. Split the answer into claims, then for each ask a strong model whether the context entails it, with the answer justified. This is the standard approach and it works well, because entailment against a supplied passage is a much easier task than open-ended judgement."
+    "t": "What does this module say about “Why it is independent of correctness”?",
+    "ans": "This is the distinction people collapse, and the four combinations are all real:"
    }
   ]
  },
@@ -3660,12 +3660,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Without an index, finding the nearest vector means comparing against every stored vector. An index prunes most of them and pays for it in recall, so the metric is recall@k measured against an exact search. Recall, latency and memory are the three knobs, and every index type exposes them under different names."
    },
    {
-    "t": "What does this module say about “What an index buys and what it costs”?",
-    "ans": "Every approximate index prunes: it organises vectors so that most can be skipped without being compared. That turns a linear scan into something closer to logarithmic, and introduces the possibility of missing a genuine neighbour because the structure routed the search elsewhere."
+    "t": "What does this module say about “Why exact search stops working”?",
+    "ans": "A flat index stores the vectors and compares the query with every one. It is exact, trivially correct, and the right answer for small collections — and the cost is O(n·d) per query, so a million 768-dimensional vectors is around 768 million multiply-adds for a single search."
    },
    {
-    "t": "What does this module say about “The families, briefly”?",
-    "ans": "IVF clusters the vectors and searches only the nearest few clusters. Cheap to build, and it misses neighbours that sit just across a cluster boundary."
+    "t": "What does this module say about “What an index buys and what it costs”?",
+    "ans": "Every approximate index prunes: it organises vectors so that most can be skipped without being compared. That turns a linear scan into something closer to logarithmic, and introduces the possibility of missing a genuine neighbour because the structure routed the search elsewhere."
    }
   ]
  },
@@ -3816,12 +3816,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Permission filtering has to happen inside the search, not around it. Post-filtering ranks first and drops afterwards, so it silently returns fewer results than requested and degrades worst for the most restricted users. Filtering after generation is not a control at all — the model has already read the text. Index a group id and resolve membership per request, because stale permissions fail open."
    },
    {
-    "t": "What does this module say about “Pre-filtering, and why it is harder than it looks”?",
-    "ans": "Pre-filtering restricts the candidate set before ranking, so the top k is k permitted results. That is the correct behaviour and it fights the index: an HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search — you traverse into a region where everything is filtered out and the walk stalls."
+    "t": "What does this module say about “Why post-filtering quietly fails”?",
+    "ans": "Retrieve the top 10 by similarity, then remove what the user may not see. If eight were restricted you return two, and nothing reports that the result set collapsed. The generator answers from thin evidence and sounds no less confident."
    },
    {
-    "t": "What does this module say about “Where the permissions live”?",
-    "ans": "Baking an access list into each chunk's metadata at index time is fast and goes stale the moment someone leaves a group — and stale permissions fail open, which is the wrong direction."
+    "t": "What does this module say about “Pre-filtering, and why it is harder than it looks”?",
+    "ans": "Pre-filtering restricts the candidate set before ranking, so the top k is k permitted results. That is the correct behaviour and it fights the index: an HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search — you traverse into a region where everything is filtered out and the walk stalls."
    }
   ]
  },
@@ -3873,12 +3873,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Three different caches share the name. The query cache stores a finished answer keyed on the question and saves the most per hit, at the risk of serving a stale one. The embedding cache stores a vector keyed on the text and is permanently valid until the model changes. Prompt caching lives in the provider and only helps when the shared text comes first in the prompt."
    },
    {
-    "t": "What does this module say about “Query cache: the highest saving, and the highest risk”?",
-    "ans": "Keyed on the question, storing the final answer. A hit skips retrieval, reranking and generation — often seconds and most of the cost. Real traffic is heavily repetitive, so hit rates can be high."
+    "t": "What does this module say about “Embedding cache: the easy one”?",
+    "ans": "Keyed on a hash of the text and the model name. Embedding is deterministic, so the same text always gives the same vector — which makes this cache both trivially correct and permanently valid, until you change models."
    },
    {
-    "t": "What does this module say about “Prompt caching: inside the model”?",
-    "ans": "Provider-side, and a different mechanism entirely: the model keeps the attention state (the KV cache ) for a prefix it has already processed. Send the same long system prompt and the prefill for that portion is skipped."
+    "t": "What does this module say about “Query cache: the highest saving, and the highest risk”?",
+    "ans": "Keyed on the question, storing the final answer. A hit skips retrieval, reranking and generation — often seconds and most of the cost. Real traffic is heavily repetitive, so hit rates can be high."
    }
   ]
  },
@@ -3911,12 +3911,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Recursive chunking splits on the largest natural boundary that fits, descending through a priority list of separators only when a piece is still oversized. The separator list is the whole configuration, and tailoring it to the document type is the cheapest large improvement available to a RAG pipeline."
    },
    {
-    "t": "What does this module say about “The separator list is the whole configuration”?",
-    "ans": "The default is roughly [\"\\n\\n\", \"\\n\", \". \", \" \", \"\"] — paragraph, line, sentence, word, character. It descends only when a piece still exceeds the limit, so the last entry fires only on text with no whitespace at all."
+    "t": "What does this module say about “Why not just split every N characters”?",
+    "ans": "Fixed-size splitting is one line and cuts wherever it lands — mid-sentence, mid-word, mid-number. The retrieved chunk then starts halfway through a thought, and the generator has to answer from a fragment."
    },
    {
-    "t": "What does this module say about “Overlap, and what it costs”?",
-    "ans": "Chunks usually overlap by 10–20% so a sentence spanning a boundary appears whole in at least one of them. The cost is real: overlap inflates the index, and duplicated text means near-identical chunks compete in the results, crowding out genuinely different ones."
+    "t": "What does this module say about “The separator list is the whole configuration”?",
+    "ans": "The default is roughly [\"\\n\\n\", \"\\n\", \". \", \" \", \"\"] — paragraph, line, sentence, word, character. It descends only when a piece still exceeds the limit, so the last entry fires only on text with no whitespace at all."
    }
   ]
  },
@@ -3930,12 +3930,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Answer relevance measures how much of the answer addresses the question asked. Distinguish it from context relevance, which scores retrieved chunks and is a retrieval metric. It is the only dimension that penalises padding, hedging and confidently answering a nearby question — all of which score perfectly on correctness and groundedness."
    },
    {
-    "t": "What does this module say about “The failures it exists to catch”?",
-    "ans": "Padding. The answer contains the requested information plus three paragraphs of adjacent context nobody asked for. Every claim is true and grounded, and the user has to hunt for the answer. Models trained to be helpful pad heavily, and no other dimension penalises it."
+    "t": "What does this module say about “Two different things are called relevance”?",
+    "ans": "The word is used for two distinct measurements and conflating them makes evaluation results incomparable."
    },
    {
-    "t": "What does this module say about “How to measure it without measuring similarity”?",
-    "ans": "The tempting approach — embed the question and the answer and take cosine similarity — is bad. It rewards vocabulary overlap, so restating the question scores highly and a correct answer that shares no words with the question scores poorly. \"When are refunds issued?\" answered with \"Within a fortnight of delivery\" is perfect and lexically distant."
+    "t": "What does this module say about “The failures it exists to catch”?",
+    "ans": "Padding. The answer contains the requested information plus three paragraphs of adjacent context nobody asked for. Every claim is true and grounded, and the user has to hunt for the answer. Models trained to be helpful pad heavily, and no other dimension penalises it."
    }
   ]
  },
@@ -4027,12 +4027,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Semantic chunking embeds each sentence and cuts where the similarity between neighbours drops, so boundaries land at topic changes rather than at character counts. It costs one embedding per sentence at index time, and it is usually not worth it on documents that already carry headings."
    },
    {
-    "t": "What does this module say about “What it costs”?",
-    "ans": "One embedding call per sentence at index time, against one per chunk for the alternatives. On a large corpus that is a real bill and a slow re-index, though it is paid once rather than per query."
+    "t": "What does this module say about “How the boundary is chosen”?",
+    "ans": "Split into sentences, embed each one, and compute the similarity between each consecutive pair. Where the text stays on topic the similarity is high; where the subject changes it dips. Cut at the dips."
    },
    {
-    "t": "What does this module say about “When to reach for it”?",
-    "ans": "Worth it for long unstructured prose — transcripts, interviews, reports without headings — where no formatting signal exists and a fixed-size split reliably cuts mid-argument."
+    "t": "What does this module say about “What it costs”?",
+    "ans": "One embedding call per sentence at index time, against one per chunk for the alternatives. On a large corpus that is a real bill and a slow re-index, though it is paid once rather than per query."
    }
   ]
  },
@@ -4046,12 +4046,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Structure-aware chunking splits along the document's own markup — headings, list items, table rows — because those boundaries were placed by the author and cost nothing to find. Carrying the heading path into each chunk is the half people miss: it makes a fragment self-describing and puts the section's vocabulary into the embedded text."
    },
    {
-    "t": "What does this module say about “Carrying the heading path”?",
-    "ans": "The half that gets missed. A chunk reading \"must be requested within 14 days\" is useless in isolation — 14 days of what? Prepending the heading path — Refund policy > Exceptions — makes the chunk self-describing."
+    "t": "What does this module say about “Boundaries you do not have to guess”?",
+    "ans": "A Markdown heading, an HTML <section> , a PDF outline entry, a slide break: each is a statement by the author that the subject changes here. Semantic chunking spends an embedding per sentence to infer what the markup already says."
    },
    {
-    "t": "What does this module say about “What it needs from you”?",
-    "ans": "A parser per format. Markdown is easy, HTML is manageable, PDF is genuinely hard — a PDF has no structure, only positioned glyphs, so headings must be inferred from font size and spacing. Most RAG quality problems on PDFs are really extraction problems."
+    "t": "What does this module say about “Carrying the heading path”?",
+    "ans": "The half that gets missed. A chunk reading \"must be requested within 14 days\" is useless in isolation — 14 days of what? Prepending the heading path — Refund policy > Exceptions — makes the chunk self-describing."
    }
   ]
  },
@@ -4065,12 +4065,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "TF-IDF weights a term by how often it appears here times how rare it is everywhere. A term in every document has an idf of zero and drops out by arithmetic rather than by a list. It knows nothing about meaning, which is why a synonym scores zero and why dense retrieval runs alongside it."
    },
    {
-    "t": "What does this module say about “Where it falls short”?",
-    "ans": "No length normalisation by default. A long document contains more of everything, so raw TF favours it. Dividing by length overcorrects and favours very short ones. BM25's b parameter exists to tune between the two."
+    "t": "What does this module say about “The two halves”?",
+    "ans": "Term frequency is how often a term occurs in a document, usually damped — a word appearing twenty times is not twenty times as relevant, so implementations take a logarithm or normalise by document length."
    },
    {
-    "t": "What does this module say about “Why it still matters in a RAG system”?",
-    "ans": "Exact terms still win on identifiers, error codes, product names and rare jargon — precisely the queries where an embedding model has seen too little to place the token meaningfully. A vector-only pipeline reliably fails on \"error TS2345\"."
+    "t": "What does this module say about “Where it falls short”?",
+    "ans": "No length normalisation by default. A long document contains more of everything, so raw TF favours it. Dividing by length overcorrects and favours very short ones. BM25's b parameter exists to tune between the two."
    }
   ]
  },
@@ -4084,12 +4084,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "softmax(QK T / √d) V . The dot products score every query against every key; the division keeps the softmax out of its saturated region, where gradients vanish; softmax turns scores into weights summing to one; and those weights are applied to the values."
    },
    {
-    "t": "What does this module say about “The mechanism in one line”?",
-    "ans": "softmax(QK T / √d) V . The dot products score every query against every key; the division keeps the softmax out of its saturated region, where gradients vanish; softmax turns scores into weights summing to one; and those weights are applied to the values."
+    "t": "What does this module say about “Why three and not one”?",
+    "ans": "If a token used the same vector to search with and to be found by, attention would collapse into plain similarity: tokens would attend to tokens like themselves. Separating query from key lets a token look for something different from itself — a verb seeking its subject, a pronoun seeking its referent."
    },
    {
-    "t": "What does this module say about “Why this is a serving question too”?",
-    "ans": "Generating token n needs the keys and values of all previous tokens — and those never change, because each depends only on tokens before it. So they are computed once and kept: the KV cache ."
+    "t": "What does this module say about “The mechanism in one line”?",
+    "ans": "softmax(QK T / √d) V . The dot products score every query against every key; the division keeps the softmax out of its saturated region, where gradients vanish; softmax turns scores into weights summing to one; and those weights are applied to the values."
    }
   ]
  },
@@ -4103,12 +4103,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Hit Rate@k is the proportion of queries with at least one relevant result in the top k. It is binary per query, ignores position and quantity, and measures the ceiling on your pipeline — if the evidence never reaches the model, nothing downstream can fix it."
    },
    {
-    "t": "What does this module say about “Why it is the right first metric for RAG”?",
-    "ans": "A RAG generator does not need every relevant document. It needs enough grounding to answer, and for most factual questions one good chunk is enough. If the answer is in the context, the model can use it; if it is not, no amount of prompt engineering will recover it."
+    "t": "What does this module say about “The definition, and the averaging that hides in it”?",
+    "ans": "For a single query, Hit Rate@k is binary: 1 if any of the top k results is relevant, 0 if none is. There is no partial credit. A query whose top 3 contains five relevant documents and a query whose top 3 contains exactly one both score 1."
    },
    {
-    "t": "What does this module say about “What it deliberately ignores”?",
-    "ans": "Position. A relevant document at rank 1 and at rank k score identically. That matters more than it sounds: models attend unevenly across a long context, and evidence buried at the bottom of ten chunks is measurably less likely to be used. Hit rate will not show you that; MRR will."
+    "t": "What does this module say about “Why it is the right first metric for RAG”?",
+    "ans": "A RAG generator does not need every relevant document. It needs enough grounding to answer, and for most factual questions one good chunk is enough. If the answer is in the context, the model can use it; if it is not, no amount of prompt engineering will recover it."
    }
   ]
  },
@@ -4122,12 +4122,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "MRR averages 1/rank of the first relevant result. It is the metric for systems where the consumer stops at the first good answer, and it is far more sensitive to the top of the ranking than recall or precision. It ignores every relevant result after the first, so it is the wrong choice for questions needing several sources."
    },
    {
-    "t": "What does this module say about “When position is the whole question”?",
-    "ans": "MRR is the right metric when the consumer stops at the first good result. Question answering with a single correct answer, \"I'm feeling lucky\" search, entity lookup, a code assistant jumping to a definition — in all of these the second correct result is worth nothing."
+    "t": "What does this module say about “The definition, and the shape of the curve”?",
+    "ans": "Reciprocal rank for a query is 1/(rank of the first relevant result). MRR is the mean of that over an evaluation set. The name is worth reading literally: it is a mean of reciprocal ranks , and each word matters."
    },
    {
-    "t": "What does this module say about “What it ignores, and when that is wrong”?",
-    "ans": "Every relevant result after the first. A query with one relevant document at rank 1 and a query with ten relevant documents at ranks 1 to 10 both score 1.0. If your questions need multiple sources — comparisons, summaries, anything aggregative — MRR is close to blind to what you care about, and Recall@k is the metric to use."
+    "t": "What does this module say about “When position is the whole question”?",
+    "ans": "MRR is the right metric when the consumer stops at the first good result. Question answering with a single correct answer, \"I'm feeling lucky\" search, entity lookup, a code assistant jumping to a definition — in all of these the second correct result is worth nothing."
    }
   ]
  },
@@ -4160,12 +4160,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Precision@k is the fraction of the returned k that was relevant, with k always as the denominator. It is the cheap metric to label, because it needs judgements only for what you returned. In a RAG pipeline it is not just about efficiency: irrelevant context costs tokens, pushes good evidence into the least-attended part of the prompt, and gives the model plausible material to be wrong with."
    },
    {
-    "t": "What does this module say about “Why noise is not free in a RAG pipeline”?",
-    "ans": "The old intuition — \"the model can just ignore irrelevant chunks\" — is not quite true, and the ways it fails are worth naming."
+    "t": "What does this module say about “The definition, and the denominator that never moves”?",
+    "ans": "Precision@k is the number of relevant documents in the top k divided by k. Not by the number of relevant documents in the corpus, and not by the number retrieved — by k, always."
    },
    {
-    "t": "What does this module say about “The trade with recall, and where each belongs”?",
-    "ans": "Precision and recall pull against each other as k moves. Raising k can only help recall and usually hurts precision, because the highest-scoring results were already at the top and what follows is progressively worse."
+    "t": "What does this module say about “Why noise is not free in a RAG pipeline”?",
+    "ans": "The old intuition — \"the model can just ignore irrelevant chunks\" — is not quite true, and the ways it fails are worth naming."
    }
   ]
  },
@@ -4179,12 +4179,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Recall@k is the fraction of all relevant documents that reached the top k. It is the metric that bounds a RAG pipeline, because a document that was never retrieved cannot be used, while an irrelevant one can be ignored. It rises monotonically with k, so it is meaningless without its k and must be read against a cost — usually your context budget."
    },
    {
-    "t": "What does this module say about “Why it is the retrieval metric for RAG”?",
-    "ans": "The generator can ignore an irrelevant chunk. It cannot invent a relevant one that was never retrieved. That asymmetry is the whole argument: recall failures are unrecoverable, precision failures are merely expensive ."
+    "t": "What does this module say about “The definition, and the denominator people forget”?",
+    "ans": "Recall@k is the number of relevant documents in the top k divided by the total number of relevant documents that exist . The numerator is easy; the denominator is where the difficulty lives."
    },
    {
-    "t": "What does this module say about “The monotonicity that makes it easy to game”?",
-    "ans": "Recall@k never decreases as k grows. Retrieve the entire corpus and recall is exactly 1.0. That makes it trivially gameable and means a recall number without its k is not a number at all."
+    "t": "What does this module say about “Why it is the retrieval metric for RAG”?",
+    "ans": "The generator can ignore an irrelevant chunk. It cannot invent a relevant one that was never retrieved. That asymmetry is the whole argument: recall failures are unrecoverable, precision failures are merely expensive ."
    }
   ]
  },
@@ -6683,12 +6683,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A sliding window converts a time series into supervised (input, target) pairs, with the window size encoding how much history you claim is relevant and the stride controlling how much consecutive examples overlap. The modelling choice is straightforward; the discipline is in the split — chronological, with a gap of at least one window between segments, and every scaler fitted on the training period alone."
    },
    {
-    "t": "What does this module say about “Window size and stride”?",
-    "ans": "Window size (W) is how much history the model sees per prediction, and it is a real modelling assumption: it asserts that nothing older than W steps matters. Too small and the model cannot see the pattern — a weekly cycle needs at least seven daily steps. Too large and each example carries mostly irrelevant history, the input dimension grows, and the number of examples shrinks."
+    "t": "What does this module say about “Turning a sequence into a supervised problem”?",
+    "ans": "A model needs examples with features and a label. A time series is a single ordered run of values, so you build examples by sliding a fixed-length window along it: the values inside the window are the input, and the value immediately after it is the target."
    },
    {
-    "t": "What does this module say about “Splitting without leaking”?",
-    "ans": "This is the part that matters most and is most often got wrong. Random train-test splitting is invalid for time series: it puts future windows in the training set and past windows in the test set, so the model is trained on the future to predict the past."
+    "t": "What does this module say about “Window size and stride”?",
+    "ans": "Window size (W) is how much history the model sees per prediction, and it is a real modelling assumption: it asserts that nothing older than W steps matters. Too small and the model cannot see the pattern — a weekly cycle needs at least seven daily steps. Too large and each example carries mostly irrelevant history, the input dimension grows, and the number of examples shrinks."
    }
   ]
  },
@@ -6757,15 +6757,15 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
+    "t": "What does this module say about “Why imbalance breaks training”?",
+    "ans": "Standard training minimises average loss over the dataset. When one class holds 99% of the rows, that average is dominated by it: predicting the majority everywhere already achieves very low loss, so there is little gradient pressure to learn the minority class at all."
+   },
+   {
     "t": "What does this module say about “The three families of fix”?",
     "ans": "Resample the data. Oversampling duplicates minority rows — simple, and risks overfitting to the few examples you have. SMOTE improves on it by synthesising new minority points along the lines between existing neighbours rather than copying. Undersampling discards majority rows, which balances the classes and throws away real information; it is reasonable when the majority class is genuinely enormous."
    },
    {
     "t": "What does this module say about “What usually goes wrong”?",
-    "ans": "Imbalance is a mismatch between the average loss you are minimising and the rare-class detection you actually want. Fix it by reweighting the loss (usually first), resampling the training data (inside the fold, never before the split), or simply moving the decision threshold. Then change the metric too — accuracy cannot show you whether any of it worked."
-   },
-   {
-    "t": "What does this module say about “The short version”?",
     "ans": "Imbalance is a mismatch between the average loss you are minimising and the rare-class detection you actually want. Fix it by reweighting the loss (usually first), resampling the training data (inside the fold, never before the split), or simply moving the decision threshold. Then change the metric too — accuracy cannot show you whether any of it worked."
    }
   ]
@@ -7553,12 +7553,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Embeddings are learned by training a deliberately simple model on a proxy task — predict a word from its context, or the context from the word — and keeping the embedding matrix while discarding everything else. Semantic structure emerges because words in similar contexts need similar vectors to make the prediction work."
    },
    {
-    "t": "What does this module say about “Negative sampling”?",
-    "ans": "The naive setup predicts a probability distribution over the whole vocabulary, which means a softmax over 50,000 words for every training example. That is prohibitively expensive."
+    "t": "What does this module say about “The distributional hypothesis”?",
+    "ans": "The whole field rests on one claim: a word is characterised by the company it keeps. Words appearing in similar contexts tend to mean similar things."
    },
    {
-    "t": "What does this module say about “Common mistakes”?",
-    "ans": "Embeddings are learned by training a deliberately simple model on a proxy task — predict a word from its context, or the context from the word — and keeping the embedding matrix while discarding everything else. Semantic structure emerges because words in similar contexts need similar vectors to make the prediction work."
+    "t": "What does this module say about “Negative sampling”?",
+    "ans": "The naive setup predicts a probability distribution over the whole vocabulary, which means a softmax over 50,000 words for every training example. That is prohibitively expensive."
    }
   ]
  },
@@ -7648,12 +7648,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "An n-gram model estimates the next word by counting how often each continuation followed the previous n−1 words, which makes it fast, interpretable, and trainable in a single pass. It is defeated by sparsity: the number of possible n-grams grows exponentially with n, so most sequences are never observed and smoothing is mandatory."
    },
    {
-    "t": "What does this module say about “Choosing n”?",
-    "ans": "This is a bias–variance trade in a very concrete form. Small n generalises but ignores context; large n captures context but has seen almost nothing."
+    "t": "What does this module say about “Counting, not learning”?",
+    "ans": "An n-gram model estimates the probability of a word from the n−1 words before it, using nothing but counts from a corpus:"
    },
    {
-    "t": "What does this module say about “The sparsity wall”?",
-    "ans": "The counts grow catastrophically. With a 50,000-word vocabulary there are 2.5 billion possible bigrams, 1.25 × 10 14 trigrams, and 3 × 10 23 5-grams. No corpus covers a meaningful fraction of them."
+    "t": "What does this module say about “Choosing n”?",
+    "ans": "This is a bias–variance trade in a very concrete form. Small n generalises but ignores context; large n captures context but has seen almost nothing."
    }
   ]
  },
@@ -7682,16 +7682,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
+    "t": "What does this module say about “Normalising over the wrong axis”?",
+    "ans": "Every normalisation layer does the same arithmetic — subtract a mean, divide by a standard deviation, then apply a learned scale and shift. What differs is which values are pooled to compute that mean and deviation."
+   },
+   {
     "t": "What does this module say about “Why batch norm fails on sequences”?",
     "ans": "Variable length. Sequences in a batch have different lengths, so timestep 50 might have 32 real values in one batch and 3 in another, with the rest padding. Statistics computed over that are unstable, and computed over padding they are simply wrong."
    },
    {
     "t": "What does this module say about “The variants worth knowing”?",
     "ans": "The placement matters too. Original transformers put layer norm after the residual addition (post-norm); modern ones put it before the sublayer (pre-norm), which makes deep stacks far easier to train and often removes the need for a learning-rate warmup."
-   },
-   {
-    "t": "What does this module say about “Where this goes wrong”?",
-    "ans": "All normalisation layers subtract a mean and divide by a deviation; they differ only in which values are pooled. Batch norm pools across the batch, which makes it unusable for sequences of varying length and inference on single examples. Layer norm pools across each sample’s own features, so it is independent of batch size and identical at training and inference — which is why every transformer uses it."
    }
   ]
  },
@@ -8030,12 +8030,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A recurrent cell applies one small network at every timestep, combining the current token with a hidden state that summarises everything before it, using the same weights throughout. That gives a fixed-size model the ability to read arbitrary-length sequences and to be sensitive to order."
    },
    {
-    "t": "What does this module say about “The recurrence, written out”?",
-    "ans": "At each timestep t the cell takes the current input x t and the previous hidden state h t−1 , and produces a new hidden state:"
+    "t": "What does this module say about “The problem with feeding a sentence to a normal network”?",
+    "ans": "A feedforward network has a fixed number of inputs. A sentence does not have a fixed number of words. You can pad everything to a maximum length, but then the model has no notion that word 3 comes before word 4 — each position gets its own independent weights, so “dog bites man” and “man bites dog” are unrelated inputs as far as it is concerned."
    },
    {
-    "t": "What does this module say about “Things to try”?",
-    "ans": "The hidden state is overwritten at every step. Information from token 1 survives to token 50 only by passing through 49 successive multiplications by W h and 49 tanh nonlinearities."
+    "t": "What does this module say about “The recurrence, written out”?",
+    "ans": "At each timestep t the cell takes the current input x t and the previous hidden state h t−1 , and produces a new hidden state:"
    }
   ]
  },
@@ -8087,12 +8087,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A word cloud encodes frequency as font size and nothing else — position, colour and rotation are layout, not data. It needs stopword removal to say anything at all, and TF-IDF rather than raw frequency to show what is distinctive rather than merely common. Treat it as a fast exploratory glance at a corpus, and reach for a bar chart whenever the question is how much bigger one term is than another."
    },
    {
-    "t": "What does this module say about “Why stopwords have to go”?",
-    "ans": "Run a word cloud on raw English text and you get the , of , and , to , a in enormous type. These are the most frequent words in almost any corpus and they tell you nothing about the subject."
+    "t": "What does this module say about “What the picture encodes”?",
+    "ans": "Font size maps to frequency: the most common word is largest, and everything else is scaled relative to it. Position, colour and rotation almost always carry no information — they are chosen by a layout algorithm packing shapes into a space without overlap."
    },
    {
-    "t": "What does this module say about “Where raw frequency misleads, and what to use instead”?",
-    "ans": "Frequency alone conflates “important in this document” with “common in general”. The standard correction is TF-IDF , which weights a word by how often it appears in this document and divides by how many documents contain it at all:"
+    "t": "What does this module say about “Why stopwords have to go”?",
+    "ans": "Run a word cloud on raw English text and you get the , of , and , to , a in enormous type. These are the most frequent words in almost any corpus and they tell you nothing about the subject."
    }
   ]
  },

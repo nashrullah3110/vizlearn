@@ -1,6 +1,6 @@
 """Read a module page's interactive controls out of its markup.
 
-The visualisations are 166 independent hand-written pages with no shared
+The visualisations are independent hand-written pages with no shared
 component layer, so there is no registry of "what can be changed on this
 page". There is, however, a very consistent shape to the markup: a <label>
 holding the human name, then the <input>/<select> it names.

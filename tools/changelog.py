@@ -12,6 +12,20 @@ Each entry is (date, title, [lines]).
 """
 
 CHANGES = [
+    ("2026-08-14", "An interview track, and runnable code inside the articles", [
+        "A tenth track at /interview/ answers one interview question per page. "
+        "Each has a step-through visualiser you drive yourself, the full "
+        "solution in an editor you can run and edit, and questions at the end.",
+        "Algorithm modules now carry a working Python program alongside the "
+        "animation, annotated line by line, so the thing you just watched and "
+        "the thing you can run are on the same page.",
+        "The retrieval and evaluation articles in Gen AI got interactive "
+        "panels of their own - chunkers, indexes, rankers and the metrics that "
+        "score them, each with parameters you can move and a readout that "
+        "explains what moved.",
+        "Reader-facing counts are derived from the catalog now rather than "
+        "typed in, so the site stops claiming a module total it outgrew.",
+    ]),
     ("2026-08-11", "JavaScript and HTML labs", [
         "A JavaScript compiler at /js-lab/ runs on your browser's own engine, "
         "in a worker thread, with the console mirrored back into the page.",

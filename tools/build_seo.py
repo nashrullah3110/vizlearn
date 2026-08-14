@@ -16,7 +16,7 @@ import json
 import os
 import re
 
-from lib_catalog import ROOT, SITE, modules, page_description
+from lib_catalog import ROOT, SITE, counts, modules, page_description
 from lib_pages import (is_tool_page, tool_page,
                        DIR_TO_TOPIC, STATIC_LD_TYPE, STATIC_PAGES, STATIC_TITLES,
                        TOPICS, first_published, is_static_page, is_topic_page,
@@ -41,12 +41,18 @@ ADSENSE_TAG = (
 LOOSE_ADSENSE = re.compile(
     r'[ \t]*<script[^>]*pagead2\.googlesyndication\.com[^>]*>\s*</script>\n?', re.S)
 
-# Pages that had no description of their own.
+# Pages whose description this build owns. index.html is here because its
+# description quotes a module count, which cannot be maintained by hand -
+# it read "166" for every module added after it was written. Entries listed
+# in GENERATED_DESC below are rewritten rather than merely defaulted.
 FALLBACK_DESC = {
+    # Derived, not transcribed: this string is the hub's search snippet and
+    # its social card, and it read "166" for every module added after it was
+    # written.
     "index.html": (
         "VizLearn makes AI, Machine Learning, Deep Learning, Algorithms and "
-        "Maths intuitive through 166 free interactive visualizations. No jargon, "
-        "no login, nothing to install."
+        "Maths intuitive through %d free interactive visualizations. No jargon, "
+        "no login, nothing to install." % counts()["modules"]
     ),
     "computer_vision/cnn.html": (
         "Explore a convolutional neural network layer by layer in 3D - see how "
@@ -57,6 +63,9 @@ FALLBACK_DESC = {
         "carrying hidden state from one time step to the next."
     ),
 }
+
+# Descriptions this build replaces even when the page already has one.
+GENERATED_DESC = {"index.html"}
 
 CDN_TAILWIND = re.compile(r'[ \t]*<script src="https://cdn\.tailwindcss\.com"></script>\n?')
 CDN_FA = re.compile(r'[ \t]*<link[^>]*font-awesome[^>]*>\n?')
@@ -409,6 +418,16 @@ def main():
                 anchor = src.index("</title>") + len("</title>\n")
                 src = src[:anchor] + "    " + tag + "\n" + src[anchor:]
             desc = override
+            rewritten_desc += 1
+        elif rel in GENERATED_DESC:
+            # Owned by the build: replace whatever the page currently says.
+            desc = FALLBACK_DESC[rel]
+            tag = '<meta name="description" content="%s">' % html.escape(desc)
+            if dm:
+                src = src[:dm.start()] + tag + src[dm.end():]
+            else:
+                anchor = src.index("</title>") + len("</title>\n")
+                src = src[:anchor] + "    " + tag + "\n" + src[anchor:]
             rewritten_desc += 1
         elif dm:
             # Same reason as the title above: read out of an escaped attribute,

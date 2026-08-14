@@ -4,7 +4,7 @@
 The grid is built client-side from courseData. Googlebot runs JavaScript, but
 Bing, LinkedIn, Slack, WhatsApp and most other crawlers do not - they saw an
 empty <main>. This writes the same markup statically between markers, so the
-166 module links are in the HTML source. The existing renderCourses() still
+every module link is in the HTML source. The existing renderCourses() still
 takes over on load and replaces it, so filtering and carousels are unaffected.
 
 Idempotent: re-running replaces the block.
@@ -31,7 +31,7 @@ def card(course):
 
     The card artwork is deliberately left out: it is decorative, it is the bulk
     of courseData's bytes, and renderCourses() paints it in a moment anyway.
-    Crawlers need the href and the title, and inlining 166 SVGs here nearly
+    Crawlers need the href and the title, and inlining every SVG here nearly
     doubled the transferred size of the homepage.
     """
     return (

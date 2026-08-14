@@ -11,6 +11,15 @@ ones above it. Reorder here, run `npm run build`, and prev/next, the related
 rail, the Learning Path and the hub all follow.
 """
 
+# The interview track is generated: tools/interview.py already defines the
+# questions in teaching order (concepts first, then problems by difficulty),
+# and build_interview.py writes courseData in that order. Transcribing the
+# slugs here would be a second source of truth that goes stale every time a
+# question is added, so derive them instead.
+from interview import QUESTIONS as _INTERVIEW_QUESTIONS
+
+_INTERVIEW = ["interview/%s.html" % q["slug"] for q in _INTERVIEW_QUESTIONS]
+
 SEQUENCE = {
     # Foundations the rest of the site quietly assumes.
     "maths": [
@@ -250,6 +259,7 @@ SEQUENCE = {
         "gen_ai/how_llms_process_text.html",
         "gen_ai/byte_pair_encoding_tokenizer.html",
         "gen_ai/how_llms_predict_next_word.html",
+        "gen_ai/queries_keys_and_values.html",
         "gen_ai/casual_language_modeling.html",
         "gen_ai/masked_language_modeling.html",
         "gen_ai/quantization_in_llms.html",
@@ -257,21 +267,43 @@ SEQUENCE = {
         "gen_ai/knowledge_distillation_in_llms.html",
         "gen_ai/embeddings_and_vector_search.html",
         "gen_ai/dot_product_vs_cosine_similarity.html",
+        "gen_ai/tf_idf.html",
         "gen_ai/bm25_and_sparse_retrieval.html",
+        "gen_ai/indexing_in_vector_databases.html",
+        "gen_ai/ann_indexing_hnsw_and_ivf.html",
         "gen_ai/chunking_strategies_for_rag.html",
+        "gen_ai/recursive_chunking.html",
+        "gen_ai/structure_aware_chunking.html",
+        "gen_ai/semantic_chunking.html",
+        "gen_ai/context_aware_chunking.html",
         "gen_ai/parent_document_retriever.html",
         "gen_ai/rag.html",
         "gen_ai/retrieval_evaluation_metrics.html",
+        "gen_ai/hit_rate_at_k.html",
+        "gen_ai/recall_at_k.html",
+        "gen_ai/precision_at_k.html",
+        "gen_ai/mean_reciprocal_rank.html",
         "gen_ai/hybrid_search_reciprocal_rank_fusion.html",
         "gen_ai/reranking_bi_encoders_vs_cross_encoders.html",
         "gen_ai/maximal_marginal_relevance.html",
         "gen_ai/query_rewriting_and_hyde.html",
         "gen_ai/multi_query_retriever.html",
         "gen_ai/self_query_retriever.html",
+        "gen_ai/corrective_rag.html",
         "gen_ai/context_window_and_kv_cache.html",
         "gen_ai/fine_tuning_vs_rlhf.html",
         "gen_ai/hallucination_and_grounding.html",
+        "gen_ai/groundedness_in_llm_evaluation.html",
+        "gen_ai/correctness_in_llm_evaluation.html",
+        "gen_ai/relevance_in_llm_evaluation.html",
+        "gen_ai/completeness_in_llm_evaluation.html",
+        "gen_ai/caching_in_rag_pipelines.html",
+        "gen_ai/permission_filtering_in_rag.html",
+        "gen_ai/distributed_retrieval_and_sharding.html",
     ],
+
+    # Generated - see _INTERVIEW above.
+    "interview": _INTERVIEW,
 
     # Run it first, then meet the pieces: the track teaches by execution.
     "python": [

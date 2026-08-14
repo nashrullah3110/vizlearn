@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inject per-module navigation furniture into all 166 module pages.
+"""Inject per-module navigation furniture into every module page.
 
 Adds, as real markup rather than client-rendered HTML so crawlers follow it:
 

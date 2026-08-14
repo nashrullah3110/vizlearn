@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Make the 166 hand-written module pages behave on phones and tablets.
+"""Make the hand-written module pages behave on phones and tablets.
 
 The outer three-column layout was already responsive (`grid-cols-1
 lg:grid-cols-12`), so pages did not visibly break. Three things inside them

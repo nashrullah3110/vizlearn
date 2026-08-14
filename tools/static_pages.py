@@ -23,9 +23,9 @@ PAGES = {
 # ---------------------------------------------------------------------------
 "about.html": {
     "h1": "About VizLearn",
-    "lead": "166 interactive explainers for AI, machine learning, algorithms "
+    "lead": "%(modules)d interactive explainers for AI, machine learning, algorithms "
             "and the maths underneath them. Free, and no account required.",
-    "description": "VizLearn is a free library of 166 interactive visual explainers for "
+    "description": "VizLearn is a free library of %(modules)d interactive visual explainers for "
                    "AI, machine learning, algorithms and maths. Learn who builds it and "
                    "how the modules are made.",
     "sections": [
@@ -49,7 +49,7 @@ PAGES = {
          "visualisation is running.</p>"),
 
         ("How the tracks fit together",
-         "<p>The 166 modules are grouped into eight tracks, and within a track they are "
+         "<p>The %(modules)d modules are grouped into %(tracks)d tracks, and within a track they are "
          "ordered so that each module only leans on ideas introduced before it. Every page "
          "links to the previous and next step, so a track can be read straight through.</p>"
          "<p>If you are starting from nothing, the <a href=\"index.html#learning-path\">"

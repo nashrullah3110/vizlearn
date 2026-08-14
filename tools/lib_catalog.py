@@ -72,6 +72,18 @@ def read_course_data(path=INDEX):
     return json.loads(src[start:end]), start, end
 
 
+def counts():
+    """The site's own numbers, derived rather than transcribed.
+
+    Reader-facing copy used to hardcode "166 modules across eight tracks",
+    which was true when it was written and silently wrong for every module
+    added since. Anything that quotes a total should call this.
+    """
+    mods = modules()
+    dirs = {m["dir"] for m in mods}
+    return {"modules": len(mods), "tracks": len(dirs)}
+
+
 DESC_RE = re.compile(r'<meta\s+name="description"\s+content="([^"]*)"', re.I)
 
 try:
