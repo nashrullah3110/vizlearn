@@ -3274,12 +3274,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "HNSW stacks proximity graphs: sparse upper layers with long edges to cross the space, a dense bottom layer to refine. Search is greedy with a candidate list of width efSearch, which is the runtime recall/latency knob. M and efConstruction are fixed at build time. IVF is the simpler alternative — cluster then probe — cheaper to build and update, and it misses neighbours across cluster boundaries."
    },
    {
-    "t": "What does this module say about “HNSW: skip lists, in vector space”?",
-    "ans": "Take a proximity graph — each vector linked to its nearest neighbours — and stack several, each a random sample of the one below. Search enters at the sparse top layer and greedily moves to whichever neighbour is closer to the query, until no neighbour improves. Then it drops a layer and repeats."
-   },
-   {
     "t": "What does this module say about “The parameters worth naming”?",
     "ans": "M — edges per node, fixed at build time. Higher means a better-connected graph, better recall, more memory. The graph itself is a real memory cost on top of the vectors, which is HNSW's main drawback."
+   },
+   {
+    "t": "What does this module say about “How each one fails”?",
+    "ans": "HNSW's search is greedy, so it can settle in a local minimum and return a neighbourhood that is good but not the best. A wider efSearch makes that less likely without eliminating it. Deletion is also awkward — removing a node can disconnect the graph — so most implementations tombstone and rebuild periodically."
    }
   ]
  },
@@ -3373,12 +3373,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Completeness is the proportion of required points an answer actually states, and it needs a key-points reference to be defined at all. It is the one dimension that penalises omission rather than error, which makes it the failure users notice last and act on first. Low completeness is usually a retrieval or chunking problem rather than a generation one."
    },
    {
-    "t": "What does this module say about “Complete relative to what”?",
-    "ans": "Completeness is undefined without a statement of what the answer needed to contain, so the reference is not optional. In practice that means a key-points list per evaluation query: the facts a good answer must include, written by whoever understands the domain."
-   },
-   {
     "t": "What does this module say about “Why the other dimensions cannot see it”?",
     "ans": "Consider an answer that states only \"Refunds are issued within 14 days.\" when the question was about the full refund policy. It is correct. It is grounded. It is entirely relevant. It scores 1.0 on three dimensions and leaves out the condition that makes it actionable."
+   },
+   {
+    "t": "What does this module say about “Where incompleteness comes from”?",
+    "ans": "Retrieval, most often. If a required point was never in the retrieved context, the model cannot state it without hallucinating. Low completeness alongside low recall@k is a retrieval problem, and no prompt change will fix it. This is the single most common cause."
    }
   ]
  },
@@ -3411,12 +3411,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Context-aware chunking changes what is stored rather than where the cut falls. A chunk full of pronouns and back-references is unusable by the generator and invisible to retrieval, so title, heading path and resolved references are added back. Keep the enrichment short relative to the chunk, or shared context dominates the embedding and chunks stop being distinguishable."
    },
    {
-    "t": "What does this module say about “The problem is coreference, not boundaries”?",
-    "ans": "Prose is written to be read in order, so it leans on everything before it: \"it\", \"this policy\", \"as described above\", \"the latter\". Cut one paragraph out and those references dangle."
-   },
-   {
     "t": "What does this module say about “What gets added”?",
     "ans": "Cheap and free: document title and heading path, prepended. Deterministic, no model call, and usually the largest single improvement."
+   },
+   {
+    "t": "What does this module say about “What it costs, and what to watch”?",
+    "ans": "Index time and money, both once. The subtler cost is dilution: prepending 200 tokens of context to a 300-token chunk means the embedding is largely about the context , so chunks from the same section start looking alike and the retriever loses its ability to distinguish them."
    }
   ]
  },
@@ -3430,12 +3430,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Corrective RAG grades retrieved documents before generating, and takes a different path when they are poor: rewrite the query, fall back to another source, or decline. Retrieval never fails loudly — it always returns its nearest k — so without a grader a query with no answer still produces a confident, sourced-looking one."
    },
    {
-    "t": "What does this module say about “The failure it fixes”?",
-    "ans": "A vector search returns the k nearest chunks whether or not any of them is relevant. There is no null result: ask about something absent from the corpus and you still get five chunks, at low similarity, and the generator dutifully writes an answer from them."
-   },
-   {
     "t": "What does this module say about “The three verdicts”?",
     "ans": "A grader — a small model, a cross-encoder, or a similarity threshold — labels the retrieved set:"
+   },
+   {
+    "t": "What does this module say about “What correction actually means”?",
+    "ans": "Query rewriting is the cheapest: the user's phrasing may simply not match the corpus vocabulary. See query rewriting and HyDE ."
    }
   ]
  },
@@ -3449,12 +3449,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Correctness compares the answer against a reference or verifiable fact, which makes it the only one of the four dimensions that requires ground truth someone has to write. Exact match and n-gram overlap fail on paraphrase; claim-level judging against a key-facts reference is what works."
    },
    {
-    "t": "What does this module say about “Correct against what, exactly”?",
-    "ans": "Correctness is only defined relative to a reference, and choosing that reference is most of the work:"
-   },
-   {
     "t": "What does this module say about “Why exact match fails, and what replaces it”?",
     "ans": "The obvious automation — string comparison against the reference — fails immediately on natural language. \"14 days\", \"fourteen days\" and \"two weeks\" are the same answer and share no characters. Exact match systematically punishes fluent phrasing."
+   },
+   {
+    "t": "What does this module say about “The failure this dimension exists to catch”?",
+    "ans": "The important case is the grounded but wrong answer. The model faithfully reports what a retrieved document says, and that document is out of date, contradicted by a newer one, or simply mistaken."
    }
   ]
  },
@@ -3468,12 +3468,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Scatter-gather sends the query to every shard, takes a local top-k from each and merges. Shard randomly rather than by topic, or the relevant documents concentrate in one shard and its local k throws most of them away. Latency becomes the slowest shard's, not the average, so p99 gets worse with every shard added. Shards solve data that will not fit; replicas solve query volume."
    },
    {
-    "t": "What does this module say about “Shards and replicas are different things”?",
-    "ans": "A shard holds a slice of the corpus. Sharding handles data that will not fit — memory or index build time — and every query must visit every shard."
-   },
-   {
     "t": "What does this module say about “Shard randomly”?",
     "ans": "The instinct is to shard by topic or tenant so a query only touches one shard. For a multi-tenant system where every query is scoped to one tenant, that is right — it is really many small indexes."
+   },
+   {
+    "t": "What does this module say about “Tail latency, and the merge”?",
+    "ans": "Scatter-gather waits for the slowest shard, so p99 response time is roughly the p99 of any shard. Add shards and the chance one is slow rises — the classic result is that latency gets worse as you scale out, not better."
    }
   ]
  },
@@ -3544,12 +3544,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Groundedness is the proportion of an answer's claims that the retrieved context actually supports. It is the direct measure of hallucination, it needs no reference answer, and it is independent of truth — a claim can be grounded and wrong, or true and ungrounded. Measure it per claim rather than per answer so it tells you which span to look at."
    },
    {
-    "t": "What does this module say about “What it measures, claim by claim”?",
-    "ans": "The answer is decomposed into atomic claims — individual assertions that could each be checked independently — and each is tested against the retrieved context. Groundedness is the proportion that are supported."
-   },
-   {
     "t": "What does this module say about “Why it is independent of correctness”?",
     "ans": "This is the distinction people collapse, and the four combinations are all real:"
+   },
+   {
+    "t": "What does this module say about “How it is measured in practice”?",
+    "ans": "LLM-as-judge, per claim. Split the answer into claims, then for each ask a strong model whether the context entails it, with the answer justified. This is the standard approach and it works well, because entailment against a supplied passage is a much easier task than open-ended judgement."
    }
   ]
  },
@@ -3660,12 +3660,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Without an index, finding the nearest vector means comparing against every stored vector. An index prunes most of them and pays for it in recall, so the metric is recall@k measured against an exact search. Recall, latency and memory are the three knobs, and every index type exposes them under different names."
    },
    {
-    "t": "What does this module say about “Why exact search stops working”?",
-    "ans": "A flat index stores the vectors and compares the query with every one. It is exact, trivially correct, and the right answer for small collections — and the cost is O(n·d) per query, so a million 768-dimensional vectors is around 768 million multiply-adds for a single search."
-   },
-   {
     "t": "What does this module say about “What an index buys and what it costs”?",
     "ans": "Every approximate index prunes: it organises vectors so that most can be skipped without being compared. That turns a linear scan into something closer to logarithmic, and introduces the possibility of missing a genuine neighbour because the structure routed the search elsewhere."
+   },
+   {
+    "t": "What does this module say about “The families, briefly”?",
+    "ans": "IVF clusters the vectors and searches only the nearest few clusters. Cheap to build, and it misses neighbours that sit just across a cluster boundary."
    }
   ]
  },
@@ -3816,12 +3816,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Permission filtering has to happen inside the search, not around it. Post-filtering ranks first and drops afterwards, so it silently returns fewer results than requested and degrades worst for the most restricted users. Filtering after generation is not a control at all — the model has already read the text. Index a group id and resolve membership per request, because stale permissions fail open."
    },
    {
-    "t": "What does this module say about “Why post-filtering quietly fails”?",
-    "ans": "Retrieve the top 10 by similarity, then remove what the user may not see. If eight were restricted you return two, and nothing reports that the result set collapsed. The generator answers from thin evidence and sounds no less confident."
-   },
-   {
     "t": "What does this module say about “Pre-filtering, and why it is harder than it looks”?",
     "ans": "Pre-filtering restricts the candidate set before ranking, so the top k is k permitted results. That is the correct behaviour and it fights the index: an HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search — you traverse into a region where everything is filtered out and the walk stalls."
+   },
+   {
+    "t": "What does this module say about “Where the permissions live”?",
+    "ans": "Baking an access list into each chunk's metadata at index time is fast and goes stale the moment someone leaves a group — and stale permissions fail open, which is the wrong direction."
    }
   ]
  },
@@ -3873,12 +3873,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Three different caches share the name. The query cache stores a finished answer keyed on the question and saves the most per hit, at the risk of serving a stale one. The embedding cache stores a vector keyed on the text and is permanently valid until the model changes. Prompt caching lives in the provider and only helps when the shared text comes first in the prompt."
    },
    {
-    "t": "What does this module say about “Embedding cache: the easy one”?",
-    "ans": "Keyed on a hash of the text and the model name. Embedding is deterministic, so the same text always gives the same vector — which makes this cache both trivially correct and permanently valid, until you change models."
-   },
-   {
     "t": "What does this module say about “Query cache: the highest saving, and the highest risk”?",
     "ans": "Keyed on the question, storing the final answer. A hit skips retrieval, reranking and generation — often seconds and most of the cost. Real traffic is heavily repetitive, so hit rates can be high."
+   },
+   {
+    "t": "What does this module say about “Prompt caching: inside the model”?",
+    "ans": "Provider-side, and a different mechanism entirely: the model keeps the attention state (the KV cache ) for a prefix it has already processed. Send the same long system prompt and the prefill for that portion is skipped."
    }
   ]
  },
@@ -3911,12 +3911,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Recursive chunking splits on the largest natural boundary that fits, descending through a priority list of separators only when a piece is still oversized. The separator list is the whole configuration, and tailoring it to the document type is the cheapest large improvement available to a RAG pipeline."
    },
    {
-    "t": "What does this module say about “Why not just split every N characters”?",
-    "ans": "Fixed-size splitting is one line and cuts wherever it lands — mid-sentence, mid-word, mid-number. The retrieved chunk then starts halfway through a thought, and the generator has to answer from a fragment."
-   },
-   {
     "t": "What does this module say about “The separator list is the whole configuration”?",
     "ans": "The default is roughly [\"\\n\\n\", \"\\n\", \". \", \" \", \"\"] — paragraph, line, sentence, word, character. It descends only when a piece still exceeds the limit, so the last entry fires only on text with no whitespace at all."
+   },
+   {
+    "t": "What does this module say about “Overlap, and what it costs”?",
+    "ans": "Chunks usually overlap by 10–20% so a sentence spanning a boundary appears whole in at least one of them. The cost is real: overlap inflates the index, and duplicated text means near-identical chunks compete in the results, crowding out genuinely different ones."
    }
   ]
  },
@@ -3930,12 +3930,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Answer relevance measures how much of the answer addresses the question asked. Distinguish it from context relevance, which scores retrieved chunks and is a retrieval metric. It is the only dimension that penalises padding, hedging and confidently answering a nearby question — all of which score perfectly on correctness and groundedness."
    },
    {
-    "t": "What does this module say about “Two different things are called relevance”?",
-    "ans": "The word is used for two distinct measurements and conflating them makes evaluation results incomparable."
-   },
-   {
     "t": "What does this module say about “The failures it exists to catch”?",
     "ans": "Padding. The answer contains the requested information plus three paragraphs of adjacent context nobody asked for. Every claim is true and grounded, and the user has to hunt for the answer. Models trained to be helpful pad heavily, and no other dimension penalises it."
+   },
+   {
+    "t": "What does this module say about “How to measure it without measuring similarity”?",
+    "ans": "The tempting approach — embed the question and the answer and take cosine similarity — is bad. It rewards vocabulary overlap, so restating the question scores highly and a correct answer that shares no words with the question scores poorly. \"When are refunds issued?\" answered with \"Within a fortnight of delivery\" is perfect and lexically distant."
    }
   ]
  },
@@ -4027,12 +4027,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Semantic chunking embeds each sentence and cuts where the similarity between neighbours drops, so boundaries land at topic changes rather than at character counts. It costs one embedding per sentence at index time, and it is usually not worth it on documents that already carry headings."
    },
    {
-    "t": "What does this module say about “How the boundary is chosen”?",
-    "ans": "Split into sentences, embed each one, and compute the similarity between each consecutive pair. Where the text stays on topic the similarity is high; where the subject changes it dips. Cut at the dips."
-   },
-   {
     "t": "What does this module say about “What it costs”?",
     "ans": "One embedding call per sentence at index time, against one per chunk for the alternatives. On a large corpus that is a real bill and a slow re-index, though it is paid once rather than per query."
+   },
+   {
+    "t": "What does this module say about “When to reach for it”?",
+    "ans": "Worth it for long unstructured prose — transcripts, interviews, reports without headings — where no formatting signal exists and a fixed-size split reliably cuts mid-argument."
    }
   ]
  },
@@ -4046,12 +4046,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Structure-aware chunking splits along the document's own markup — headings, list items, table rows — because those boundaries were placed by the author and cost nothing to find. Carrying the heading path into each chunk is the half people miss: it makes a fragment self-describing and puts the section's vocabulary into the embedded text."
    },
    {
-    "t": "What does this module say about “Boundaries you do not have to guess”?",
-    "ans": "A Markdown heading, an HTML <section> , a PDF outline entry, a slide break: each is a statement by the author that the subject changes here. Semantic chunking spends an embedding per sentence to infer what the markup already says."
-   },
-   {
     "t": "What does this module say about “Carrying the heading path”?",
     "ans": "The half that gets missed. A chunk reading \"must be requested within 14 days\" is useless in isolation — 14 days of what? Prepending the heading path — Refund policy > Exceptions — makes the chunk self-describing."
+   },
+   {
+    "t": "What does this module say about “What it needs from you”?",
+    "ans": "A parser per format. Markdown is easy, HTML is manageable, PDF is genuinely hard — a PDF has no structure, only positioned glyphs, so headings must be inferred from font size and spacing. Most RAG quality problems on PDFs are really extraction problems."
    }
   ]
  },
@@ -4065,12 +4065,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "TF-IDF weights a term by how often it appears here times how rare it is everywhere. A term in every document has an idf of zero and drops out by arithmetic rather than by a list. It knows nothing about meaning, which is why a synonym scores zero and why dense retrieval runs alongside it."
    },
    {
-    "t": "What does this module say about “The two halves”?",
-    "ans": "Term frequency is how often a term occurs in a document, usually damped — a word appearing twenty times is not twenty times as relevant, so implementations take a logarithm or normalise by document length."
-   },
-   {
     "t": "What does this module say about “Where it falls short”?",
     "ans": "No length normalisation by default. A long document contains more of everything, so raw TF favours it. Dividing by length overcorrects and favours very short ones. BM25's b parameter exists to tune between the two."
+   },
+   {
+    "t": "What does this module say about “Why it still matters in a RAG system”?",
+    "ans": "Exact terms still win on identifiers, error codes, product names and rare jargon — precisely the queries where an embedding model has seen too little to place the token meaningfully. A vector-only pipeline reliably fails on \"error TS2345\"."
    }
   ]
  },
@@ -4084,12 +4084,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "softmax(QK T / √d) V . The dot products score every query against every key; the division keeps the softmax out of its saturated region, where gradients vanish; softmax turns scores into weights summing to one; and those weights are applied to the values."
    },
    {
-    "t": "What does this module say about “Why three and not one”?",
-    "ans": "If a token used the same vector to search with and to be found by, attention would collapse into plain similarity: tokens would attend to tokens like themselves. Separating query from key lets a token look for something different from itself — a verb seeking its subject, a pronoun seeking its referent."
-   },
-   {
     "t": "What does this module say about “The mechanism in one line”?",
     "ans": "softmax(QK T / √d) V . The dot products score every query against every key; the division keeps the softmax out of its saturated region, where gradients vanish; softmax turns scores into weights summing to one; and those weights are applied to the values."
+   },
+   {
+    "t": "What does this module say about “Why this is a serving question too”?",
+    "ans": "Generating token n needs the keys and values of all previous tokens — and those never change, because each depends only on tokens before it. So they are computed once and kept: the KV cache ."
    }
   ]
  },
@@ -4103,12 +4103,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Hit Rate@k is the proportion of queries with at least one relevant result in the top k. It is binary per query, ignores position and quantity, and measures the ceiling on your pipeline — if the evidence never reaches the model, nothing downstream can fix it."
    },
    {
-    "t": "What does this module say about “The definition, and the averaging that hides in it”?",
-    "ans": "For a single query, Hit Rate@k is binary: 1 if any of the top k results is relevant, 0 if none is. There is no partial credit. A query whose top 3 contains five relevant documents and a query whose top 3 contains exactly one both score 1."
-   },
-   {
     "t": "What does this module say about “Why it is the right first metric for RAG”?",
     "ans": "A RAG generator does not need every relevant document. It needs enough grounding to answer, and for most factual questions one good chunk is enough. If the answer is in the context, the model can use it; if it is not, no amount of prompt engineering will recover it."
+   },
+   {
+    "t": "What does this module say about “What it deliberately ignores”?",
+    "ans": "Position. A relevant document at rank 1 and at rank k score identically. That matters more than it sounds: models attend unevenly across a long context, and evidence buried at the bottom of ten chunks is measurably less likely to be used. Hit rate will not show you that; MRR will."
    }
   ]
  },
@@ -4122,12 +4122,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "MRR averages 1/rank of the first relevant result. It is the metric for systems where the consumer stops at the first good answer, and it is far more sensitive to the top of the ranking than recall or precision. It ignores every relevant result after the first, so it is the wrong choice for questions needing several sources."
    },
    {
-    "t": "What does this module say about “The definition, and the shape of the curve”?",
-    "ans": "Reciprocal rank for a query is 1/(rank of the first relevant result). MRR is the mean of that over an evaluation set. The name is worth reading literally: it is a mean of reciprocal ranks , and each word matters."
-   },
-   {
     "t": "What does this module say about “When position is the whole question”?",
     "ans": "MRR is the right metric when the consumer stops at the first good result. Question answering with a single correct answer, \"I'm feeling lucky\" search, entity lookup, a code assistant jumping to a definition — in all of these the second correct result is worth nothing."
+   },
+   {
+    "t": "What does this module say about “What it ignores, and when that is wrong”?",
+    "ans": "Every relevant result after the first. A query with one relevant document at rank 1 and a query with ten relevant documents at ranks 1 to 10 both score 1.0. If your questions need multiple sources — comparisons, summaries, anything aggregative — MRR is close to blind to what you care about, and Recall@k is the metric to use."
    }
   ]
  },
@@ -4160,12 +4160,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Precision@k is the fraction of the returned k that was relevant, with k always as the denominator. It is the cheap metric to label, because it needs judgements only for what you returned. In a RAG pipeline it is not just about efficiency: irrelevant context costs tokens, pushes good evidence into the least-attended part of the prompt, and gives the model plausible material to be wrong with."
    },
    {
-    "t": "What does this module say about “The definition, and the denominator that never moves”?",
-    "ans": "Precision@k is the number of relevant documents in the top k divided by k. Not by the number of relevant documents in the corpus, and not by the number retrieved — by k, always."
-   },
-   {
     "t": "What does this module say about “Why noise is not free in a RAG pipeline”?",
     "ans": "The old intuition — \"the model can just ignore irrelevant chunks\" — is not quite true, and the ways it fails are worth naming."
+   },
+   {
+    "t": "What does this module say about “The trade with recall, and where each belongs”?",
+    "ans": "Precision and recall pull against each other as k moves. Raising k can only help recall and usually hurts precision, because the highest-scoring results were already at the top and what follows is progressively worse."
    }
   ]
  },
@@ -4179,12 +4179,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Recall@k is the fraction of all relevant documents that reached the top k. It is the metric that bounds a RAG pipeline, because a document that was never retrieved cannot be used, while an irrelevant one can be ignored. It rises monotonically with k, so it is meaningless without its k and must be read against a cost — usually your context budget."
    },
    {
-    "t": "What does this module say about “The definition, and the denominator people forget”?",
-    "ans": "Recall@k is the number of relevant documents in the top k divided by the total number of relevant documents that exist . The numerator is easy; the denominator is where the difficulty lives."
-   },
-   {
     "t": "What does this module say about “Why it is the retrieval metric for RAG”?",
     "ans": "The generator can ignore an irrelevant chunk. It cannot invent a relevant one that was never retrieved. That asymmetry is the whole argument: recall failures are unrecoverable, precision failures are merely expensive ."
+   },
+   {
+    "t": "What does this module say about “The monotonicity that makes it easy to game”?",
+    "ans": "Recall@k never decreases as k grows. Retrieve the entire corpus and recall is exactly 1.0. That makes it trivially gameable and means a recall number without its k is not a number at all."
    }
   ]
  },
