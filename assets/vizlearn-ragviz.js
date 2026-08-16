@@ -128,8 +128,9 @@
   // Attention: one query against every key, then softmax.
   MODELS.attention = function (p, data) {
     var tokens = data.tokens, focus = p.focus;
+    var row = data.affinity[focus] || data.affinity[tokens[0]];
     var scores = tokens.map(function (t) {
-      var s = data.affinity[focus][t] * p.sharpness;
+      var s = row[t] * p.sharpness;
       return { token: t, raw: s };
     });
     var top = Math.max.apply(null, scores.map(function (s) { return s.raw; }));
@@ -196,8 +197,11 @@
   // Split text on the largest separator that fits.
   MODELS.chunking = function (p, data) {
     var text = data.text;
-    var seps = { paragraph: ['\n\n', '\n', '. ', ' '], sentence: ['. ', ' '],
-                 character: [''] }[p.strategy];
+    var ladders = { paragraph: ['\n\n', '\n', '. ', ' '], sentence: ['. ', ' '],
+                    character: [''] };
+    // An unknown strategy used to throw inside split() and take the whole
+    // visualisation down with it; fall back to the widest ladder instead.
+    var seps = ladders[p.strategy] || ladders.paragraph;
 
     function split(t, limit, list) {
       if (t.length <= limit) return [t];
@@ -625,11 +629,21 @@
 
   // ----------------------------------------------------------------- wiring
 
+  // What a select hands the model. Some models index an array with it
+  // (tfidf and crag both do data.queries[p.query]), so the position is the
+  // useful value there. Others need a name - a token, a separator strategy -
+  // and got the raw index instead, which threw or silently took the wrong
+  // branch. An option can now declare the value its model should see.
+  function optionValue(c, i) {
+    var o = c.options[i];
+    return o && o.value !== undefined ? o.value : i;
+  }
+
   function buildControls(host, controls, onChange) {
     var values = {};
 
     controls.forEach(function (c) {
-      values[c.id] = c.value;
+      values[c.id] = c.kind === 'select' ? optionValue(c, c.value) : c.value;
       var wrap = el('div', 'vz-rv-control');
 
       if (c.kind === 'toggle') {
@@ -654,7 +668,9 @@
       var label = el('label', 'vz-rv-clabel', c.label);
       label.setAttribute('for', c.id + '-input');
       head.appendChild(label);
-      var readout = el('span', 'vz-rv-cvalue', String(c.value));
+      var readout = el('span', 'vz-rv-cvalue', c.kind === 'select'
+        ? String(c.options[c.value].label || c.options[c.value])
+        : String(c.value));
       readout.id = c.id + '-value';
       head.appendChild(readout);
       wrap.appendChild(head);
@@ -678,8 +694,8 @@
       }
       input.id = c.id + '-input';
       input.addEventListener('input', function () {
-        var v = c.kind === 'select' ? Number(input.value) : Number(input.value);
-        values[c.id] = v;
+        var v = Number(input.value);
+        values[c.id] = c.kind === 'select' ? optionValue(c, v) : v;
         readout.textContent = c.kind === 'select'
           ? (c.options[v].label || c.options[v]) : String(v);
         onChange(values);

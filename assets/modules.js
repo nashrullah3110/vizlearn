@@ -929,7 +929,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn ANN indexing: HNSW and IVF | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "BM25 and Sparse Lexical Retrieval",
@@ -969,7 +969,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Completeness in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Context Windows and the KV Cache",
@@ -985,7 +985,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Context-aware chunking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Corrective RAG (CRAG)",
@@ -993,7 +993,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Corrective RAG (CRAG) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Correctness in LLM evaluation",
@@ -1001,7 +1001,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Correctness in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Distributed retrieval and sharding",
@@ -1009,7 +1009,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Distributed retrieval and sharding | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Dot Product vs Cosine Similarity for Retrieval",
@@ -1041,7 +1041,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Groundedness in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Hallucination and Grounding",
@@ -1081,7 +1081,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Indexing in vector databases | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Knowledge Distillation in LLMs",
@@ -1129,7 +1129,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Permission filtering in RAG retrieval | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Quantization in LLMs",
@@ -1153,7 +1153,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Query, embedding and prompt caching | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Re-ranking: Bi-Encoders vs Cross-Encoders",
@@ -1169,7 +1169,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Recursive chunking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Relevance in LLM evaluation",
@@ -1177,7 +1177,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Relevance in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Retrieval Evaluation Metrics",
@@ -1209,7 +1209,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Semantic chunking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Structure-aware chunking",
@@ -1217,7 +1217,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Structure-aware chunking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "TF-IDF",
@@ -1225,7 +1225,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn TF-IDF | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "What are Queries, Keys and Values in an LLM?",
@@ -1233,7 +1233,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn What are Queries, Keys and Values in an LLM? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "What is Hit Rate@k?",
@@ -1241,7 +1241,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn What is Hit Rate@k? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "What is MRR (Mean Reciprocal Rank)?",
@@ -1249,7 +1249,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn What is MRR (Mean Reciprocal Rank)? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "What is Masked Language Modeling?",
@@ -1265,7 +1265,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn What is Precision@k? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "What is Recall@k?",
@@ -1273,7 +1273,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn What is Recall@k? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "3Sum",

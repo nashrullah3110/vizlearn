@@ -180,7 +180,8 @@ WIDGETS = {
 
 "queries_keys_and_values": {"model": "attention", "controls": [
     {"id": "focus", "label": "Attending from", "kind": "select", "value": 2,
-     "options": [{"label": "the"}, {"label": "cat"}, {"label": "sat"}, {"label": "mat"}]},
+     "options": [{"label": "the", "value": "the"}, {"label": "cat", "value": "cat"},
+                 {"label": "sat", "value": "sat"}, {"label": "mat", "value": "mat"}]},
     {"id": "sharpness", "label": "Score scale (1/sqrt(d))", "kind": "range",
      "min": 0.5, "max": 4, "step": 0.25, "value": 1},
 ], "data": {
@@ -204,8 +205,9 @@ WIDGETS = {
     {"id": "size", "label": "Chunk size (chars)", "kind": "range",
      "min": 40, "max": 260, "step": 10, "value": 120},
     {"id": "strategy", "label": "Separators", "kind": "select", "value": 0,
-     "options": [{"label": "recursive"}, {"label": "sentence only"},
-                 {"label": "fixed size"}]},
+     "options": [{"label": "recursive", "value": "paragraph"},
+                 {"label": "sentence only", "value": "sentence"},
+                 {"label": "fixed size", "value": "character"}]},
 ], "data": {"text": "Refunds are issued within 14 days of purchase. The item "
                     "must be unused and in its original packaging.\n\nShipping "
                     "costs are not refunded. Digital goods are non-refundable "
@@ -220,8 +222,9 @@ WIDGETS = {
     {"id": "size", "label": "Chunk size (chars)", "kind": "range",
      "min": 40, "max": 260, "step": 10, "value": 110},
     {"id": "strategy", "label": "Separators", "kind": "select", "value": 0,
-     "options": [{"label": "structure first"}, {"label": "sentence only"},
-                 {"label": "fixed size"}]},
+     "options": [{"label": "structure first", "value": "paragraph"},
+                 {"label": "sentence only", "value": "sentence"},
+                 {"label": "fixed size", "value": "character"}]},
 ], "data": {"text": "# Refund policy\n\nRefunds are issued within 14 days.\n\n"
                     "## Exceptions\n\nDigital goods are non-refundable once "
                     "downloaded."}},
@@ -272,7 +275,8 @@ WIDGETS = {
     {"id": "perShard", "label": "Per-shard k", "kind": "range",
      "min": 2, "max": 60, "step": 2, "value": 10},
     {"id": "strategy", "label": "Sharding strategy", "kind": "select", "value": 0,
-     "options": [{"label": "random"}, {"label": "semantic"}]},
+     "options": [{"label": "random", "value": "random"},
+                 {"label": "semantic", "value": "semantic"}]},
 ], "data": {}},
 
 }
