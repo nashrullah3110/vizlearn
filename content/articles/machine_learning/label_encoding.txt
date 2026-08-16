@@ -15,6 +15,68 @@ First, the encoder scans the entire input text (the "corpus") to find all unique
 
 Once the vocabulary is built, the encoder assigns a unique integer ID to each word, starting from 0. The first word in the sorted vocabulary gets ID 0, the second gets ID 1, and so on. The final output is a sequence of these integer IDs, representing the original text.
 
+## Why text has to become numbers at all
+
+Every model you are likely to train is arithmetic underneath. Linear regression multiplies inputs by weights. A neural network does matrix multiplications. Even a decision tree, which feels symbolic, is comparing numbers against thresholds.
+
+None of that works on the string "London". So before any of it can happen, categorical columns have to be turned into numbers, and label encoding is the most direct way of doing it: give each distinct value an integer.
+
+|City|Encoded|
+|---|---|
+|London|0|
+|Manchester|1|
+|Leeds|2|
+|London|0|
+|Leeds|2|
+
+Three rules make it predictable. The mapping is built from the values seen during fitting, usually sorted alphabetically. Every occurrence of the same value gets the same number. And the column stays one column wide, which is the property that makes it attractive for columns with hundreds of distinct values.
+
+## The problem it creates, stated precisely
+
+The encoder has just told your model that Leeds (2) is twice Manchester (1), and that Manchester sits exactly halfway between London and Leeds. None of that is true. Nothing about the cities implies an order, let alone even spacing.
+
+For models that do arithmetic on feature values, this invented ordering is a real distortion:
+
+- <strong>Linear and logistic regression</strong> fit one coefficient for the column, forcing the effect of the city to be a straight line across the invented number sequence.
+- <strong>KNN and k-means</strong> compute distances, so "London to Leeds" is now twice "London to Manchester".
+- <strong>Neural networks</strong> multiply the value by a weight and will happily learn spurious patterns from the ordering.
+
+For <strong>tree-based models</strong> the damage is much smaller, because a tree only asks "is this value &le; 1.5?", which is a question about set membership rather than magnitude. A tree can carve out any subset of categories given enough splits &mdash; it just needs more splits than it would with a better encoding.
+
+So the practical rule is not "never use label encoding". It is: <strong>label encoding for tree models and for genuinely ordered categories, one-hot or target encoding for everything else.</strong>
+
+## When the order is real
+
+Some categories do have an order, and encoding it as numbers is not a distortion but a gift to the model.
+
+- Sizes: small &lt; medium &lt; large &rarr; 0, 1, 2.
+- Education: GCSE &lt; A-level &lt; degree &lt; postgraduate &rarr; 0, 1, 2, 3.
+- Satisfaction: poor &lt; fair &lt; good &lt; excellent &rarr; 0, 1, 2, 3.
+
+This is called <strong>ordinal encoding</strong>, and the crucial difference from label encoding is that you specify the order rather than letting the alphabet decide. Left to itself, `LabelEncoder` would map excellent&rarr;0, fair&rarr;1, good&rarr;2, poor&rarr;3, which scrambles the meaning entirely.
+
+```python
+from sklearn.preprocessing import OrdinalEncoder
+
+order = [["poor", "fair", "good", "excellent"]]      # you state the order
+enc = OrdinalEncoder(categories=order)
+enc.fit_transform([["good"], ["poor"], ["excellent"]])   # [[2], [0], [3]]
+```
+
+One thing ordinal encoding still gets wrong: it assumes equal spacing. The step from "poor" to "fair" is treated as the same size as "good" to "excellent", which may not match reality. If that matters, encode with the actual values &mdash; 1, 3, 7, 12 &mdash; or use a model that does not care about spacing.
+
+## The unseen-category trap
+
+This is the bug that reaches production. You fit the encoder on training data containing London, Manchester and Leeds. Three weeks later a row arrives with "Bristol", and the encoder raises `ValueError: y contains previously unseen labels`. Your prediction service returns a 500.
+
+Three defences, in increasing order of robustness:
+
+1. Fit the encoder on the full set of known categories, not just the ones present in the training split. If you have a reference list of cities, use it.
+2. Use `OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)`, which maps anything unseen to a reserved code instead of raising.
+3. Collapse rare categories into an explicit "other" bucket during training, so the model has actually learned what to do with an unfamiliar value.
+
+The related trap is fitting the encoder separately on train and test. Fit once, on training data, then apply the same fitted object to everything else &mdash; refitting produces a different mapping, and your test set silently means something different from your training set.
+
 ## Things to try
 
 Use the interactive panel to understand the nuances of this technique.
@@ -31,3 +93,38 @@ The model might incorrectly assume that 'Dog' (1) is "greater" than 'Cat' (0), o
 
 - <strong>When is it okay?</strong> Label Encoding is suitable for categorical features that have a clear, inherent order (ordinal features), such as 'Low', 'Medium', 'High' or 'First Class', 'Second Class', 'Third Class'.
 - <strong>When should it be avoided?</strong> It should generally be avoided for features without a natural order (nominal features), like 'Country' or 'Color'. For these cases, <strong>One-Hot Encoding</strong> is a much better choice as it creates a new binary feature for each category, avoiding any implied ranking.
+
+## The alternatives, and when each wins
+
+|Encoding|Columns added|Invents an order?|Best for|
+|---|---|---|---|
+|Label / ordinal|0|Yes, unless you set it|Tree models; genuinely ordered categories|
+|One-hot|One per category|No|Linear models, neural networks, few categories|
+|Target (mean) encoding|0|No|High-cardinality columns with a strong signal|
+|Frequency encoding|0|Only by frequency|When how common a value is carries meaning|
+|Hashing|A fixed number|No|Enormous cardinality where collisions are acceptable|
+|Learned embeddings|A chosen width|No|Neural networks with many categories|
+
+<strong>Target encoding</strong> deserves a warning. Replacing each category with the average target value for that category is powerful and leaks badly if done carelessly: a category appearing once takes the target of its own row, and the model reads the answer straight off the feature. Always compute it out-of-fold, and smooth rare categories towards the global average.
+
+A quick heuristic for the everyday case: under about 10 categories, one-hot. Above 50 and using trees, label encoding or the library's native categorical support. Above 50 and using a linear model or a network, target encoding or learned embeddings.
+
+## Questions people ask
+
+<strong>Should I label-encode the target variable?</strong> Yes, that is the one place it is unambiguously right. Classification targets need to be integers, there is no arithmetic performed on them, and scikit-learn's `LabelEncoder` is designed for exactly this.
+
+<strong>Does the order of the integers matter for trees?</strong> Slightly. A tree can express any grouping eventually, but an ordering that happens to put similar categories next to each other needs fewer splits. This is part of why target-statistic orderings help boosted trees.
+
+<strong>Is label encoding the same as ordinal encoding?</strong> Effectively the same operation with a different intent, and in scikit-learn `LabelEncoder` works on a single target column while `OrdinalEncoder` works on feature matrices and lets you specify the order. Use the second one for features.
+
+<strong>What about missing values?</strong> Decide deliberately. Treating "missing" as its own category is often correct &mdash; the fact that a field was left blank is frequently informative. Silently imputing it to the most common value throws that away.
+
+<strong>Will one-hot encoding always be safer?</strong> Safer for linear models, but with 10,000 distinct values it produces 10,000 mostly-zero columns, which is slow, memory-hungry and gives each individual column almost no data to learn from. Safety has a cost.
+
+## Recap in one screen
+
+- Models need numbers, so categorical text has to be encoded.
+- Label encoding assigns one integer per category and keeps the column width at one.
+- Those integers imply an order and a spacing that usually do not exist &mdash; harmless for trees, damaging for linear models, KNN and networks.
+- Use it deliberately for ordered categories, and state the order yourself.
+- Fit the encoder once, on training data, and plan for categories you have never seen.

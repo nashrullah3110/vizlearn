@@ -14,6 +14,51 @@ Imagine you have a feature like "Color" with categories: "Red", "Green", and "Bl
 
 This creates a sparse binary vector where only one bit is "hot" (set to 1), clearly and unambiguously representing the original category without implying any ordinal relationship between the categories.
 
+## One column becomes several
+
+One-hot encoding replaces a categorical column with one new column per category, each holding 1 if the row has that category and 0 otherwise. Exactly one column is "hot" in each row, which is where the name comes from.
+
+|City|is_London|is_Manchester|is_Leeds|
+|---|---|---|---|
+|London|1|0|0|
+|Leeds|0|0|1|
+|Manchester|0|1|0|
+|Leeds|0|0|1|
+
+What this buys you is the absence of a lie. Label encoding says London=0, Manchester=1, Leeds=2, and a linear model reads that as an order and a spacing. One-hot says nothing except "this row is London" &mdash; every category sits the same distance from every other, which is the honest representation of an unordered set.
+
+The model can now learn a separate coefficient for each city. In a linear model, `is_London` might get +45 and `is_Leeds` &minus;12, meaning London adds &pound;45k to a price and Leeds subtracts &pound;12k. Those are readable numbers, which is a real secondary benefit.
+
+## The dummy variable trap
+
+Here is a subtlety that catches people in regression and confuses everyone else.
+
+If a row must be exactly one of London, Manchester or Leeds, then the three columns always sum to 1. That means any one of them can be worked out from the other two &mdash; they are perfectly collinear, and if the model also has an intercept, there are infinitely many equally good coefficient sets. The matrix becomes non-invertible and the coefficients become unstable or arbitrary.
+
+The fix is to drop one category, which becomes the <strong>reference level</strong>. With London dropped, `is_Manchester = 0` and `is_Leeds = 0` means London, and each remaining coefficient reads as "compared to London".
+
+```python
+from sklearn.preprocessing import OneHotEncoder
+
+enc = OneHotEncoder(drop="first",              # avoid the dummy trap
+                    handle_unknown="ignore",   # unseen category -> all zeros
+                    sparse_output=True)        # do not materialise the zeros
+```
+
+Whether you need `drop="first"` depends on the model. Linear and logistic regression with an intercept: yes. Regularised models, trees, forests, boosting and neural networks: no, and dropping a level can actually hurt, because regularisation penalises the remaining categories asymmetrically relative to the hidden reference.
+
+## The cost: width, sparsity and memory
+
+One-hot encoding is safe and it is expensive, and the expense is a function of cardinality.
+
+A column with 5 categories adds 5 columns. A postcode column with 2,000 distinct values adds 2,000 columns, of which 1,999 are zero in every row. Three consequences follow:
+
+- <strong>Memory.</strong> Stored densely, 1 million rows &times; 2,000 columns of floats is 16 GB. Stored sparsely &mdash; only the positions of the ones &mdash; it is a few megabytes. Always keep high-cardinality one-hot output sparse.
+- <strong>Statistics.</strong> A category appearing in 20 of 1,000,000 rows gives its column almost nothing to learn from, so the coefficient is mostly noise.
+- <strong>Trees suffer specifically.</strong> A binary column can only ever produce the split "is it this category or not", so a tree needs many splits to isolate a group of categories that a single native categorical split would handle at once. This is why LightGBM and CatBoost's native category handling usually beats one-hot on tree models.
+
+Two practical mitigations. Group rare categories into an explicit "other" bucket &mdash; anything under about 1% of rows is usually a candidate. And above roughly 50 categories, look at target encoding or learned embeddings instead.
+
 ## Experiment in the Live Panel
 
 The interactive visualization on this page lets you see this process in action. Follow these steps to build a strong mental model:
@@ -59,3 +104,61 @@ function oneHotEncode(corpus):
 ## Beyond One-Hot Encoding
 
 While One-Hot Encoding is a great starting point, for more complex tasks, especially in Natural Language Processing (NLP), more advanced techniques like <strong>Word Embeddings (e.g., Word2Vec, GloVe, FastText)</strong> are used. These methods represent words as dense, low-dimensional vectors that capture semantic relationships (e.g., the vectors for "king" and "queen" are closer to each other). One-Hot Encoding, in contrast, treats every word as equally different from all others.
+
+## Choosing between the encodings
+
+|Situation|Reach for|
+|---|---|
+|Under ~10 categories, linear model or network|One-hot|
+|Ordered categories (small/medium/large)|Ordinal, with the order stated|
+|Many categories, tree ensemble|Native categorical support, or label encoding|
+|Many categories, strong relationship to the target|Out-of-fold target encoding|
+|Huge cardinality, collisions acceptable|Feature hashing|
+|Deep learning with many categories|A learned embedding layer|
+
+The embedding option is worth a moment. Instead of 2,000 sparse columns, learn a dense vector of, say, 16 numbers per category, trained along with the rest of the network. Similar categories end up with similar vectors, which one-hot can never express since every category is equidistant from every other. This is exactly how categorical features are handled in recommendation systems, and it is why an embedding of 10,000 products is routine while one-hot encoding them is not.
+
+## Getting it right in a pipeline
+
+The single most common one-hot bug in production is a column-count mismatch: training data had 40 cities, today's batch has 38, and the model receives a matrix of the wrong width.
+
+The fix is to fit the encoder once and reuse the fitted object &mdash; never to call `pd.get_dummies` separately on training and serving data, which is what causes this.
+
+```python
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+pre = ColumnTransformer([
+    ("cat", OneHotEncoder(handle_unknown="ignore"), ["city", "product"]),
+    ("num", StandardScaler(), ["price", "age"]),
+])
+
+model = Pipeline([("pre", pre), ("clf", LogisticRegression())])
+model.fit(X_train, y_train)      # the encoder's vocabulary is now fixed
+model.predict(X_new)             # unseen categories become all-zero rows
+```
+
+`handle_unknown="ignore"` is what stops an unfamiliar city from crashing the service: the row simply gets zeros across all the city columns, which the model reads as "none of the known cities". Not ideal, but far better than an exception at request time.
+
+## Questions people ask
+
+<strong>Should I one-hot encode the target?</strong> For multi-class classification with a neural network and categorical cross-entropy, yes. With scikit-learn classifiers and sparse categorical loss, no &mdash; integer labels are what they expect.
+
+<strong>Does one-hot encoding need scaling afterwards?</strong> The columns are already 0/1, so scaling changes little. It matters only if you are also scaling other features and want the regularisation penalty to fall evenly across them.
+
+<strong>Is `pd.get_dummies` fine?</strong> For exploration, yes. For anything that will see new data later, no &mdash; it derives the columns from whatever data you hand it, so training and serving can disagree silently.
+
+<strong>How many categories are too many?</strong> There is no hard line, but past 50 the sparsity starts to hurt and past a few hundred it usually dominates. Measure it: compare one-hot against target encoding by cross-validation rather than guessing.
+
+<strong>What about missing values?</strong> Encode them as their own category. A blank field is often informative, and folding it into the most common category destroys that information.
+
+<strong>Does one-hot encoding cause overfitting?</strong> Indirectly. Adding hundreds of columns to a model with limited rows gives it more ways to fit noise. Regularisation and rare-category grouping are the usual answers.
+
+## Recap in one screen
+
+- One column per category, exactly one 1 per row, no invented ordering.
+- Drop one level for linear models with an intercept; keep all levels for regularised models and trees.
+- Cardinality is the cost: width, sparsity and thin statistics per column.
+- Keep the matrix sparse, group rare values, and consider target encoding or embeddings above ~50 categories.
+- Fit the encoder once, inside a pipeline, and set `handle_unknown="ignore"` before it reaches production.

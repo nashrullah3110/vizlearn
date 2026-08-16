@@ -19,11 +19,65 @@ Three consequences fall straight out of it:
 
 ## Which clause does a condition belong in?
 
-<p>Ask what the condition is about.</p><strong>About one row?</strong> It goes in WHERE. <span class="mono-font">amount &gt; 200</span>, <span class="mono-font">region = 'North'</span>, <span class="mono-font">sold_at &gt;= '2026-01-01'</span> &mdash; each of these can be answered by looking at a single row, so put it in WHERE and let the database discard those rows as early and as cheaply as possible.<strong>About a whole group?</strong> It goes in HAVING. <span class="mono-font kw">HAVING</span> <span class="mono-font fn">COUNT</span>(*) &gt; 3, <span class="mono-font kw">HAVING</span> <span class="mono-font fn">SUM</span>(amount) &gt; 1000 &mdash; these cannot be answered from one row at all.<p>A condition on the grouping column itself is legal in either place and belongs in WHERE, because filtering before you group is strictly less work than grouping and then throwing groups away.</p>
+A short decision rule that covers nearly everything:
+
+|Condition|Goes in|
+|---|---|
+|On a raw column value (`status = 'paid'`)|`WHERE`|
+|On a column you are grouping by|`WHERE` &mdash; cheaper, same result|
+|On an aggregate (`COUNT(*) > 5`)|`HAVING`|
+|On a `SELECT` alias for an aggregate|`HAVING`, and in most engines you must repeat the expression|
+|On a window function|Neither &mdash; wrap in a CTE and use `WHERE` outside|
+
+That last row catches people regularly. Window functions are computed after `HAVING`, so filtering on `ROW_NUMBER()` requires another query level.
+
+Note also that `HAVING` without `GROUP BY` is legal: the whole result set is treated as one group. `SELECT SUM(amount) FROM sales HAVING SUM(amount) > 100000` returns either one row or none, which is occasionally a neat way to write a threshold check.
 
 ## Two things people are surprised by
 
 <strong>HAVING works without GROUP BY.</strong> With no GROUP BY the whole table is one implicit group, so <span class="mono-font kw">SELECT</span> <span class="mono-font fn">SUM</span>(amount) <span class="mono-font kw">FROM</span> sales <span class="mono-font kw">HAVING</span> <span class="mono-font fn">SUM</span>(amount) &gt; 5000 returns either one row or none.<strong>An aggregate in HAVING need not appear in SELECT.</strong> You can filter on <span class="mono-font fn">COUNT</span>(*) while selecting only the region. The aggregate is computed either way; SELECT just decides what is shown.
+
+## Two filters, two moments
+
+`WHERE` and `HAVING` both remove rows. The difference is when they run, and everything else follows from that.
+
+<p class="mono-font">FROM &rarr; WHERE &rarr; GROUP BY &rarr; HAVING &rarr; SELECT &rarr; ORDER BY &rarr; LIMIT</p>
+
+`WHERE` runs before the grouping, so it sees individual rows and knows nothing about totals. `HAVING` runs after, so it sees one row per group and can test aggregates.
+
+```sql
+SELECT   region, SUM(amount) AS total
+FROM     sales
+WHERE    sale_date >= '2026-01-01'    -- individual rows: recent sales only
+GROUP BY region
+HAVING   SUM(amount) > 10000          -- whole groups: big regions only
+ORDER BY total DESC;
+```
+
+Swap those two conditions and both fail. `WHERE SUM(amount) > 10000` is an error, because no sum exists yet when `WHERE` runs. `HAVING sale_date >= '2026-01-01'` is either an error or, worse, silently meaningless &mdash; the group has many dates and no single one to test.
+
+## A worked example where the order changes the answer
+
+Six sales, three regions:
+
+|Region|Date|Amount|
+|---|---|---|
+|North|2025-11-02|8,000|
+|North|2026-02-14|4,000|
+|South|2026-01-20|7,000|
+|South|2026-03-01|5,000|
+|East|2025-12-10|9,000|
+|East|2026-04-02|2,000|
+
+Now run two queries that look similar and are not.
+
+<strong>Filter first (`WHERE`), then group:</strong> only 2026 sales survive, so the totals are North 4,000, South 12,000, East 2,000. With `HAVING SUM(amount) > 10000`, only South is returned.
+
+<strong>Group first, then filter groups (`HAVING` alone):</strong> totals are North 12,000, South 12,000, East 11,000 &mdash; all three exceed 10,000 and all three are returned.
+
+Same data, same threshold, entirely different report. When someone says "these numbers don't match the other dashboard", this is frequently why.
+
+The performance implication points the same way: `WHERE` throws rows away before the expensive grouping happens, so any condition that <em>can</em> go in `WHERE` should.
 
 ## Experiments to try
 
@@ -37,3 +91,68 @@ Three consequences fall straight out of it:
 ## In one line
 
 WHERE filters rows before grouping and HAVING filters groups after, which is why WHERE cannot mention an aggregate and why HAVING is the only place a condition on SUM or COUNT can live. The consequence people miss is that WHERE does not merely remove rows from the output &mdash; it changes what every aggregate downstream is computed from, so moving one condition between the two clauses changes the numbers, not just the row count. Put per-row conditions in WHERE, group conditions in HAVING, and when a condition is legal in both, put it in WHERE: filtering early is always the cheaper plan.
+
+## Patterns worth knowing
+
+<strong>Find duplicates.</strong> The canonical use of `HAVING`, and worth memorising:
+
+```sql
+SELECT   email, COUNT(*) AS copies
+FROM     users
+GROUP BY email
+HAVING   COUNT(*) > 1
+ORDER BY copies DESC;
+```
+
+<strong>Find customers meeting a volume threshold:</strong>
+
+```sql
+SELECT   customer_id, COUNT(*) AS orders, SUM(total) AS spend
+FROM     orders
+WHERE    order_date >= '2026-01-01'
+GROUP BY customer_id
+HAVING   COUNT(*) >= 3 AND SUM(total) > 500;
+```
+
+Several conditions combine with `AND`/`OR` exactly as in `WHERE`.
+
+<strong>Compare a group against the overall average</strong>, using a scalar subquery inside `HAVING`:
+
+```sql
+SELECT   department, AVG(salary) AS dept_avg
+FROM     employees
+GROUP BY department
+HAVING   AVG(salary) > (SELECT AVG(salary) FROM employees);
+```
+
+<strong>Exclude groups containing a value</strong>, which is a neat trick using a conditional count:
+
+```sql
+SELECT   order_id
+FROM     order_lines
+GROUP BY order_id
+HAVING   COUNT(*) FILTER (WHERE status = 'cancelled') = 0;    -- PostgreSQL
+-- portable form: HAVING SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) = 0
+```
+
+## Questions people ask
+
+<strong>Can `HAVING` reference a `SELECT` alias?</strong> In MySQL and PostgreSQL, often yes; in standard SQL, no, because `SELECT` is evaluated after `HAVING`. Repeating the expression is the portable choice.
+
+<strong>Is `HAVING` slower than `WHERE`?</strong> The clause itself is cheap; what costs is that `HAVING` operates after grouping, so more rows had to be grouped. Move conditions to `WHERE` whenever they can go there.
+
+<strong>Can I use `HAVING` without an aggregate?</strong> Syntactically yes, on a grouped column, and it will work &mdash; but it is the same filter done later and more expensively, so put it in `WHERE`.
+
+<strong>Why does my `HAVING COUNT(*) > 1` return nothing?</strong> Usually because the grouping is finer than intended &mdash; an extra column in `GROUP BY` makes every group unique. Check the grouping columns first.
+
+<strong>Can I filter on a group's minimum or maximum date?</strong> Yes, that is exactly what `HAVING` is for: `HAVING MAX(order_date) < '2026-01-01'` finds customers who have not ordered this year.
+
+<strong>Does `HAVING` work with `DISTINCT`?</strong> `HAVING COUNT(DISTINCT product_id) > 3` is valid and common &mdash; "orders containing more than three different products".
+
+## Recap in one screen
+
+- `WHERE` filters rows before grouping; `HAVING` filters groups after it.
+- A condition on an aggregate can only live in `HAVING`; a condition on a raw column should live in `WHERE`.
+- Which one you use changes the answer, not just the speed &mdash; filtering before grouping changes what is summed.
+- `HAVING COUNT(*) > 1` is the standard duplicate finder.
+- Window functions are computed later still, so filtering on them needs another query level.

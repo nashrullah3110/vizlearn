@@ -83,6 +83,22 @@ def index_of(sections, needle):
     return None
 
 
+# The experiments section is titled a dozen different ways across the site
+# ("Try it yourself", "Exploration guide", "Things to try"), and new material
+# almost always wants to go in front of it. `@experiments` finds it without
+# the caller having to look the exact wording up first.
+EXPERIMENTS = re.compile(
+    r"(try (it|this|these)|experiment|exploration|explore|guided tour|"
+    r"things to try|guided|in the live panel|interactive lab|how to use)", re.I)
+
+
+def experiments_index(sections):
+    for i, (heading, _b) in enumerate(sections):
+        if EXPERIMENTS.search(heading):
+            return i
+    return None
+
+
 def apply(rel, where, anchor, new):
     path = os.path.join(prose.content_dir(ROOT), rel + ".txt")
     if not os.path.exists(path):
@@ -103,6 +119,10 @@ def apply(rel, where, anchor, new):
 
     if where == "@start":
         at = 0
+    elif where == "@experiments":
+        at = experiments_index(sections)
+        if at is None:
+            at = max(len(sections) - 1, 0)   # in front of the closing takeaway
     elif where in ("@before", "@after"):
         at = index_of(sections, anchor)
         if at is None:

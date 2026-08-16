@@ -26,9 +26,21 @@ An index is sorted by the value of the column. Anything that destroys that order
 
 ## Composite indexes and the leftmost rule
 
-An index on <span class="mono-font">(a, b)</span> is sorted by a first and by b only within equal values of a. So it serves <span class="mono-font">WHERE a = ?</span> and <span class="mono-font">WHERE a = ? AND b = ?</span>, but not <span class="mono-font">WHERE b = ?</span> alone &mdash; the b values are scattered. Column order in a composite index is a design decision, not a formality.
+An index on `(last_name, first_name)` is sorted by surname, and within each surname by first name &mdash; exactly like a phone book.
 
-If an index happens to contain every column a query needs, the engine can answer from the index alone without touching the table at all. That is a <strong>covering index</strong>, and it is often the difference between fast and very fast.
+That means it helps with:
+
+- `WHERE last_name = 'Smith'` &mdash; seek straight there.
+- `WHERE last_name = 'Smith' AND first_name = 'John'` &mdash; ideal, both columns used.
+- `ORDER BY last_name, first_name` &mdash; already in that order, no sort needed.
+
+And it does <em>not</em> help with `WHERE first_name = 'John'` alone. A phone book cannot find every John without reading all of it, and neither can the index. This is the <strong>leftmost prefix rule</strong>, and it is the single most useful thing to know about composite indexes.
+
+Practical consequences:
+
+- Column order matters enormously. Put the column used in equality conditions first, and the one used for ranges or sorting after it.
+- One composite index on `(a, b, c)` also serves queries on `(a)` and `(a, b)`, so three separate single-column indexes are often the wrong choice.
+- A <strong>covering index</strong> &mdash; one that includes every column the query needs &mdash; lets the engine answer entirely from the index without touching the table at all. `INCLUDE` in PostgreSQL and SQL Server adds columns for this purpose without making them part of the sort order.
 
 ## What it costs
 
@@ -37,6 +49,26 @@ Every index is a copy of some of your data that has to be kept correct. An <span
 They also take space, and they can be ignored: when a condition matches a large fraction of the table, the planner will often choose a scan anyway, because reading the table in order beats jumping to scattered rows one at a time. An index on a column with only a handful of distinct values &mdash; a boolean, a status flag &mdash; is usually not worth having for that reason.
 
 Index the columns you filter, join and sort on. Then check with <span class="mono-font kw">EXPLAIN</span>, which tells you what the planner actually chose rather than what you hoped it would.
+
+## The index at the back of a book
+
+Without an index, finding every mention of "photosynthesis" in a 900-page textbook means reading all 900 pages. With one, you look up the word in a short alphabetical list and jump to pages 214 and 655.
+
+A database index is the same bargain, with the same costs. It takes extra space. It has to be kept up to date whenever the content changes. And it only helps for the things it was built on &mdash; an index of topics does nothing if you want to find every page with a diagram.
+
+Concretely: on a table of 10 million orders, `WHERE customer_id = 8412` without an index reads all 10 million rows. With a B-tree index on `customer_id`, the engine makes about three or four jumps down the tree and lands on the matching entries. The difference is not a percentage &mdash; it is seconds against milliseconds.
+
+## What an index cannot do for you
+
+Indexes have a specific shape, and queries that do not fit it get no benefit:
+
+- <strong>Low selectivity.</strong> An index on a `status` column with two values, where 90% of rows are 'active', is useless for finding active rows. The planner will correctly ignore it, because reading most of the table via an index is slower than scanning it directly.
+- <strong>Functions on the column.</strong> `WHERE LOWER(email) = 'a@b.com'` cannot use an index on `email`. Index the expression instead.
+- <strong>Leading wildcards.</strong> `LIKE '%son'` has no prefix to seek to. Trailing wildcards are fine.
+- <strong>Type mismatches.</strong> Comparing an integer column to a quoted string can force a conversion that disables the index.
+- <strong>`OR` across different columns</strong> often prevents a single index from being used, though some engines can combine two index scans.
+
+The rule underneath all of these: an index is an <em>ordered</em> structure, and it only helps when the query can be expressed as "seek to a position in that order, then read forward".
 
 ## Try it yourself
 
@@ -51,3 +83,53 @@ Index the columns you filter, join and sort on. Then check with <span class="mon
 ## In one line
 
 An index turns a linear scan into a logarithmic descent of a B-tree, which is why an indexed lookup barely notices a table growing a thousand-fold while a scan grows with it exactly. It works only while the query preserves the index's sort order, so a leading wildcard, a function or arithmetic on the column, or an implicit cast will quietly cost you the index and leave the query text looking innocent. A composite index reads left to right, and one that contains every column a query needs can answer it without touching the table. The price is paid on every write and in disk space, so index the columns you filter, join and sort on, and confirm with EXPLAIN rather than assumption.
+
+## What indexes cost
+
+Nothing about an index is free, and the costs land on writes:
+
+- <strong>Storage.</strong> Typically 10&ndash;20% of the table size per index, sometimes far more for wide composite indexes.
+- <strong>Insert, update and delete speed.</strong> Every index must be updated whenever the indexed data changes. A table with eight indexes does nine writes for every logical write.
+- <strong>Planning time and instability.</strong> More indexes means more options for the planner to consider, and more chances for it to choose a bad one on a mis-estimated query.
+- <strong>Maintenance.</strong> Indexes fragment as data changes and occasionally need rebuilding.
+
+This is why the answer to "should I add an index?" is never automatically yes. On a write-heavy table &mdash; an event log, a queue &mdash; a careful minimum is right. On a read-heavy reporting table, generous indexing usually pays.
+
+Finding the indexes you do not need is easy and rarely done: every major database exposes usage statistics (`pg_stat_user_indexes` in PostgreSQL, `sys.dm_db_index_usage_stats` in SQL Server). An index with zero scans since the last restart is pure cost. Duplicate indexes &mdash; one on `(a)` and another on `(a, b)` &mdash; are a common find too, and the narrower one is usually redundant.
+
+## The types beyond B-tree
+
+|Type|Good at|Available in|
+|---|---|---|
+|B-tree|Equality, ranges, sorting &mdash; the default|Everywhere|
+|Hash|Equality only, slightly faster|PostgreSQL, MySQL (memory tables)|
+|GIN / inverted|Arrays, JSON keys, full-text search|PostgreSQL, Elasticsearch-style engines|
+|GiST / R-tree|Geometric and geographic queries|PostgreSQL, MySQL spatial|
+|Bitmap|Low-cardinality columns in analytics|Oracle, column stores|
+|Partial / filtered|A subset of rows, e.g. `WHERE active`|PostgreSQL, SQL Server|
+
+Partial indexes are underused and often the neatest fix for the low-selectivity problem: index only the 2% of rows where `status = 'pending'`, and the index stays tiny while serving exactly the query that needed it.
+
+A note on primary keys: they are indexed automatically. Foreign keys usually are not &mdash; and an unindexed foreign key makes both joins and cascading deletes slow. That is one of the most common missing indexes in real schemas.
+
+## Questions people ask
+
+<strong>How many indexes is too many?</strong> There is no fixed number, but past five or six on a write-heavy table the cost usually shows. Measure write throughput before and after.
+
+<strong>Should every foreign key have an index?</strong> Nearly always yes, unless the child table is tiny or never joined.
+
+<strong>Why is my index not being used?</strong> Common causes: the condition wraps the column in a function, the column type does not match, the table is small enough that scanning is cheaper, or the statistics are stale. `EXPLAIN` tells you; `ANALYZE` fixes the last one.
+
+<strong>Do indexes help `ORDER BY`?</strong> Yes &mdash; an index already in the requested order lets the engine skip the sort entirely, which on large result sets is a bigger win than the filtering.
+
+<strong>Does an index help `COUNT(*)`?</strong> Sometimes, if a small index can be scanned instead of the whole table. Exact counts on huge tables are expensive regardless; approximate counts from statistics are often good enough.
+
+<strong>Should I index a boolean column?</strong> Rarely on its own. As part of a composite index, or as a partial index on the rare value, yes.
+
+## Recap in one screen
+
+- An index is an ordered copy of some columns that lets the engine seek instead of scan.
+- It helps equality, ranges, sorting and joins &mdash; not functions on the column, leading wildcards, or low-selectivity filters.
+- Composite indexes work left to right; column order is a design decision, not a detail.
+- Every index slows writes and costs storage, so audit for unused and duplicate ones.
+- Index your foreign keys, consider partial indexes for skewed data, and let `EXPLAIN` settle arguments.

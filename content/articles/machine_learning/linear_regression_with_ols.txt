@@ -21,6 +21,67 @@ The "best" line is the one with the lowest possible MSE. Your goal is to find th
 
 While you can manually drag the line to try and find the best fit, there's a direct mathematical method to find the perfect 'm' and 'c'. This method is called <strong>Ordinary Least Squares (OLS)</strong>. It's a formula that takes all the data points and instantly calculates the slope and intercept that guarantee the minimum possible Mean Squared Error. When you click the "Snap to Best Fit" button, you are seeing the OLS solution.
 
+## What the line is actually claiming
+
+A fitted line is a claim in a sentence: "for every extra unit of x, y goes up by m &mdash; and when x is zero, y is c."
+
+Fit house price against floor area and you might get price = 2.8 &times; area + 45. Read it back: every extra square metre is worth &pound;2,800, and the model's starting point for a hypothetical zero-area house is &pound;45,000. The first half is a genuinely useful business fact. The second half is a mathematical convenience &mdash; there are no zero-area houses, and the intercept is just where the line happens to cross the axis when extended beyond the data.
+
+That distinction matters constantly. A slope is usually interpretable; an intercept usually is not, unless zero is a real, observed value of x.
+
+With several features the equation grows terms but not ideas:
+
+<p class="mono-font">price = 2.8&times;area + 12.5&times;bedrooms &minus; 0.9&times;age + 30</p>
+
+Each coefficient now means "the effect of this feature <em>holding the others constant</em>". Adding a bedroom is worth &pound;12,500 for a house of the same floor area &mdash; which is a different and more careful statement than "houses with more bedrooms cost more".
+
+## Why squares, and not just distances
+
+"Best fit" needs a definition before it can be computed. The obvious one &mdash; add up how far each point is from the line &mdash; turns out to be the wrong choice for three reasons.
+
+Errors above and below the line cancel out if you add them raw, so a wildly wrong line through the middle scores zero. Absolute values fix that but have a corner at zero, which makes the calculus awkward and the solution not unique. Squares fix both: always positive, smooth everywhere, and differentiable.
+
+Squaring also does something with real consequences: <strong>it punishes big misses disproportionately</strong>. Two points off by 5 contribute 50; one point off by 10 contributes 100. The fitted line will contort itself to reduce a single large error, which is why one outlier can visibly tilt a regression line and why you should always look at a scatter plot before trusting the coefficients.
+
+There is a deeper justification too. If the errors around the true line are normally distributed, then the least-squares line is exactly the maximum-likelihood estimate &mdash; the line that makes the observed data most probable. That is why this particular definition of "best" has stuck for two centuries.
+
+## OLS has a formula, and gradient descent does not need it
+
+Ordinary least squares is unusual among fitting procedures: the answer can be written down directly rather than searched for.
+
+For a single feature, the slope and intercept come out as:
+
+<p class="mono-font">m = &Sigma;(x &minus; x&#772;)(y &minus; y&#772;) / &Sigma;(x &minus; x&#772;)&sup2; &nbsp;&nbsp; c = y&#772; &minus; m&thinsp;x&#772;</p>
+
+Two facts fall out of the second equation. The line always passes through the point (x&#772;, y&#772;) &mdash; the mean of both variables. And once you know the slope, the intercept costs nothing to compute.
+
+In matrix form for any number of features it becomes the normal equation, <span class="mono-font">&beta; = (X&#7488;X)&#8315;&sup1;X&#7488;y</span> &mdash; one calculation, no iteration, no learning rate, and the answer is exact.
+
+So why does anyone use gradient descent? Because inverting X&#7488;X costs roughly the cube of the number of features, and it fails outright when features are perfectly correlated, which makes the matrix non-invertible. Below a few thousand features, use the closed form. Above that, or when the data does not fit in memory, iterate.
+
+```python
+from sklearn.linear_model import LinearRegression
+
+model = LinearRegression().fit(X, y)
+print(model.coef_, model.intercept_)     # the slopes and the c
+print(model.score(X, y))                 # R-squared on the training data
+```
+
+## The assumptions, and how to tell they are broken
+
+Least squares always returns a line. Whether that line means anything rests on four assumptions, each with a visible symptom when it fails.
+
+|Assumption|What it means|How it fails visibly|
+|---|---|---|
+|Linearity|The real relationship is a straight line|Residuals form a curve, not a cloud|
+|Independence|Errors are unrelated to each other|Residuals follow a pattern over time|
+|Equal variance|Spread of errors is constant across x|Residual plot fans out like a funnel|
+|Normal errors|Errors are roughly bell-shaped|Heavy tails on a Q-Q plot|
+
+The single most valuable diagnostic is the residual plot: predicted values on the x-axis, errors on the y-axis. A shapeless band around zero means the assumptions are holding well enough. A curve means you need a transformed or additional feature. A funnel means the error grows with the prediction, and modelling log(y) instead of y usually straightens it out.
+
+Two more problems worth naming. <strong>Multicollinearity</strong> &mdash; features that are nearly duplicates &mdash; leaves the overall predictions fine but makes individual coefficients wild and unstable, flipping sign when you add a row. And extrapolation: a line fitted on houses of 50&ndash;200 square metres will confidently quote a price for a 900-square-metre house, and that number is fiction.
+
 ## Experiments to try
 
 Use the interactive visualization to build your intuition.
@@ -29,3 +90,25 @@ Use the interactive visualization to build your intuition.
 - <strong>See the Optimal Solution:</strong> Once you think you have a good fit, click the "Snap to Best Fit" button. The line will jump to the OLS solution, and you can see the "Optimal Loss" in the panel. How close were you?
 - <strong>The Impact of Outliers:</strong> Generate a new dataset. Now, click and drag one of the blue data points far away from the others. This point is now an "outlier". Click "Snap to Best Fit" again. Notice how the best-fit line is pulled towards the outlier. This demonstrates that OLS is sensitive to outliers because the squaring process in MSE gives large errors (like the one from the outlier) a very heavy weight.
 - <strong>Visualize the Loss:</strong> Check the "Show Optimal Line" box. Now your manual line (hypothesis) and the best-fit line are both visible. The "Live Loss" panel on the left shows you how far your current MSE is from the best possible MSE. This gives you a clear target: make your line match the amber-colored optimal line to achieve zero "Distance to Optimal".
+
+## Questions people ask
+
+<strong>Do I need to scale the features?</strong> Not for the closed-form solution, which is unaffected by units. You do need it for gradient descent to converge sensibly, and for comparing coefficient sizes against each other.
+
+<strong>Can linear regression fit curves?</strong> Yes, if you give it curved features. Add x&sup2; as a column and it fits a parabola &mdash; the model is linear in its <em>parameters</em>, not necessarily in the inputs. That is the whole idea behind polynomial regression.
+
+<strong>What does a negative R&sup2; on the test set mean?</strong> That the model does worse than predicting the average. Usually overfitting, a data leak, or a distribution shift between train and test.
+
+<strong>Is a p-value on a coefficient enough to claim an effect is real?</strong> No. It says the coefficient is unlikely to be zero given the model's assumptions. It says nothing about causation, and it is unreliable when the assumptions above are violated.
+
+<strong>What if two features are almost identical?</strong> Drop one, combine them, or move to ridge regression, which handles correlated features gracefully by shrinking their coefficients together.
+
+<strong>Is least squares robust to outliers?</strong> The opposite. Squaring makes it unusually sensitive. Huber regression or RANSAC are the standard robust alternatives when outliers are genuine and unavoidable.
+
+## Recap in one screen
+
+- The model is a straight line: a slope per feature, plus one intercept.
+- "Best" means the smallest sum of squared vertical distances &mdash; smooth, always positive, and heavily influenced by outliers.
+- OLS has an exact closed-form solution; gradient descent is for when that becomes too expensive.
+- The line always passes through the mean of x and the mean of y.
+- Read the residual plot before you read the coefficients, and never extrapolate past the data you fitted.

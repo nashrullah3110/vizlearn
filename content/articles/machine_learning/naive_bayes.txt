@@ -9,6 +9,50 @@ The <strong>Naive Bayes Classifier</strong> is a simple yet powerful algorithm f
 
 The "naive" part of the name comes from a key assumption the algorithm makes: <strong>it assumes that all features are independent of each other</strong>. In our example, it assumes that the 'Outlook' has no effect on the 'Temperature' or 'Wind'. While this is often not true in the real world (a sunny outlook usually implies hotter temperatures), this simplification makes the calculations much easier and faster. Despite this "naive" assumption, the classifier works surprisingly well in many real-world scenarios.
 
+## Bayes' theorem without the fear
+
+Everything here rests on one line, and the line is less intimidating written as a sentence.
+
+<p class="mono-font">P(class | evidence) &prop; P(evidence | class) &times; P(class)</p>
+
+"How likely is this class, given what I have seen?" equals "how typical is this evidence for that class" times "how common is that class in the first place".
+
+The second term is the one people forget, and it is the one that stops the classic mistake. A test for a disease that affects 1 in 10,000 people, with a 1% false-positive rate, produces about 100 false positives for every true one &mdash; not because the test is bad but because the prior is tiny. Naive Bayes never forgets the prior, which is one reason it behaves sensibly on rare classes.
+
+To classify, you compute that product for every class and pick the biggest. The denominator that would turn the product into a proper probability is the same for all classes, so it can be ignored while you are only ranking them.
+
+## What "naive" is doing
+
+The hard part of the true calculation is P(evidence | class) when the evidence is several features at once. To know P("free" and "money" and "click" | spam) properly, you would need to know how those words co-occur, and with a vocabulary of 20,000 words that is more combinations than there are atoms available to count them with.
+
+The naive assumption cuts through this: <strong>assume every feature is independent of every other, given the class</strong>. Then the joint probability is just the product:
+
+<p class="mono-font">P(free, money, click | spam) = P(free|spam) &times; P(money|spam) &times; P(click|spam)</p>
+
+Each of those is a single count divided by another count. The whole model becomes a table of frequencies, computable in one pass over the data.
+
+The assumption is, of course, false. "New" and "York" are wildly dependent. And yet the classifier works, because for <em>ranking</em> classes you do not need the probabilities to be right &mdash; you only need the right class to come out on top. The estimated probabilities are typically far too extreme (0.9999 and similar), while the decisions they lead to are sound. Trust the argmax, distrust the number, and calibrate if you need the number.
+
+## A spam calculation you can follow
+
+Training data: 100 emails, 30 spam and 70 not. Among the spam, "free" appears in 24; among the rest, in 7.
+
+Priors: P(spam) = 0.30, P(not spam) = 0.70.
+Likelihoods: P(free | spam) = 24/30 = 0.80, P(free | not spam) = 7/70 = 0.10.
+
+A new email contains "free":
+
+- Spam score: 0.80 &times; 0.30 = <strong>0.24</strong>
+- Not-spam score: 0.10 &times; 0.70 = <strong>0.07</strong>
+
+Spam wins. Normalising, 0.24 / (0.24 + 0.07) = 77% probability of spam.
+
+Now suppose the email also contains "meeting", a word that appeared in zero spam emails during training. P(meeting | spam) = 0, and the entire spam score is multiplied by zero &mdash; one unseen word has vetoed the whole calculation.
+
+The fix is <strong>Laplace smoothing</strong>: add 1 to every count (and the vocabulary size to every denominator), so no probability is ever exactly zero. With a vocabulary of 1,000 words, P(meeting | spam) becomes 1/(30 + 1000) = 0.00097 instead of 0. Small, but survivable. Every practical implementation does this by default; scikit-learn calls the parameter `alpha`.
+
+The other implementation detail: multiplying thousands of small probabilities underflows to zero in floating point, so real implementations add logarithms instead of multiplying probabilities. Same ranking, no underflow.
+
 ## The Calculation Process: A Walkthrough
 
 The interactive panel walks you through the exact steps the algorithm takes to make a prediction. Let's use the default input: <strong>Outlook=Sunny, Temp=Cool, Wind=Strong</strong>.
@@ -17,3 +61,56 @@ The interactive panel walks you through the exact steps the algorithm takes to m
 2. <strong>Step 2: Calculate Likelihoods for Each Feature</strong> <p>Next, for each class ('Yes' and 'No'), the algorithm calculates the probability of our specific input features occurring. This is the "likelihood".</p> <ul class="list-disc list-outside space-y-1 pl-5 mt-2"> <li><strong>Likelihood for 'Yes':</strong> <ul class="list-circle list-outside space-y-1 pl-5 mt-1"> <li><code>P(Outlook=Sunny | Play=Yes)</code>: Among the 9 'Yes' days, 2 were 'Sunny'. (Prob = 2/9)</li> <li><code>P(Temp=Cool | Play=Yes)</code>: Among the 9 'Yes' days, 3 were 'Cool'. (Prob = 3/9)</li> <li><code>P(Wind=Strong | Play=Yes)</code>: Among the 9 'Yes' days, 3 were 'Strong'. (Prob = 3/9)</li> </ul> </li> <li><strong>Likelihood for 'No':</strong> <ul class="list-circle list-outside space-y-1 pl-5 mt-1"> <li><code>P(Outlook=Sunny | Play=No)</code>: Among the 5 'No' days, 3 were 'Sunny'. (Prob = 3/5)</li> <li><code>P(Temp=Cool | Play=No)</code>: Among the 5 'No' days, 1 was 'Cool'. (Prob = 1/5)</li> <li><code>P(Wind=Strong | Play=No)</code>: Among the 5 'No' days, 3 were 'Strong'. (Prob = 3/5)</li> </ul> </li> </ul> <p class="text-xs mt-2 opacity-80"><em>Note: The visualization uses Laplace Smoothing (adding 1 to the numerator and the number of unique feature values to the denominator) to avoid zero-probability issues, so the exact fractions will look slightly different in the "Calculation Story".</em></p>
 3. <strong>Step 3: Combine and Calculate Scores</strong> <p>Now, we combine everything. For each outcome, we multiply its prior probability by all of its likelihoods.</p> <ul class="list-disc list-outside space-y-1 pl-5 mt-2"> <li><code>Score(Yes) = P(Yes) * P(Sunny|Yes) * P(Cool|Yes) * P(Strong|Yes)</code></li> <li><code>Score(No) = P(No) * P(Sunny|No) * P(Cool|No) * P(Strong|No)</code></li> </ul>
 4. <strong>Step 4: Normalize and Predict</strong> <p>The scores are not final probabilities. To get a clean 0-100% result, we normalize them by dividing each score by the sum of both scores. The class with the higher final probability is our prediction.</p>
+
+## Which flavour to use
+
+|Variant|Feature type|Typical use|
+|---|---|---|
+|Multinomial|Counts|Word counts or TF-IDF for text classification|
+|Bernoulli|Binary|Word present / absent; short texts|
+|Gaussian|Continuous|Numeric features, assumed normal within each class|
+|Complement|Counts|Text with imbalanced classes; often beats multinomial|
+
+Gaussian Naive Bayes is the one to be careful with: it assumes each feature follows a bell curve within each class. On a heavily skewed feature such as income, that assumption is badly wrong, and a log transform beforehand usually helps more than switching models.
+
+## Where it still earns its place
+
+Naive Bayes is old, and it is still deployed, for reasons that have not been undermined by anything newer:
+
+- <strong>Speed.</strong> Training is one pass of counting. On millions of documents it finishes while other models are still loading.
+- <strong>Small data.</strong> With a few hundred labelled examples it often outperforms models with more parameters to fit, because it has so few of its own.
+- <strong>Streaming.</strong> Counts update incrementally, so the model can learn continuously with no retraining step.
+- <strong>Baselines.</strong> If your transformer cannot beat Naive Bayes on your text classification task, something is wrong with the pipeline, not with the transformer.
+- <strong>High dimensions.</strong> A vocabulary of 100,000 features is not a problem; each contributes one number per class.
+
+It is a poor choice when feature interactions carry the signal &mdash; the naive assumption discards them by construction &mdash; and when you need well-calibrated probabilities rather than a ranking.
+
+## Questions people ask
+
+<strong>Why does it work if the independence assumption is false?</strong> Because classification only needs the correct class to score highest. Correlated features distort the magnitude of the scores in the same direction for all classes, which often leaves the ordering intact.
+
+<strong>What does `alpha` do?</strong> It is the smoothing constant. `alpha=1` is Laplace smoothing; smaller values trust the observed counts more; `alpha=0` reintroduces the zero-probability veto. Tune it &mdash; on small vocabularies it matters more than people expect.
+
+<strong>Can it handle continuous and categorical features together?</strong> Not in one standard estimator. Either bin the continuous features into categories, or train separate models and combine their log-probabilities.
+
+<strong>Why are the predicted probabilities so extreme?</strong> Multiplying many correlated likelihoods double-counts evidence, pushing outputs towards 0 or 1. Apply isotonic or sigmoid calibration if you need trustworthy probabilities.
+
+<strong>Is it affected by imbalanced classes?</strong> The prior handles imbalance sensibly, but for text specifically, Complement Naive Bayes was designed to correct a bias multinomial NB shows on skewed class distributions.
+
+## Recap in one screen
+
+- Score each class by "how common is this class" times "how typical is this evidence for it", and pick the winner.
+- The naive assumption &mdash; features independent given the class &mdash; turns an impossible count into a product of easy ones.
+- Smoothing is mandatory, or a single unseen feature zeroes out a class.
+- Fast, tiny, excellent on text and small datasets, and a benchmark every heavier model should have to beat.
+- Trust its decisions more than its probabilities.
+
+## A last word on why it survives
+
+Naive Bayes is roughly as old as the field, is based on an assumption everyone agrees is false, and is still in production in spam filters, document routers and medical triage tools. That combination is worth understanding, because it teaches something general about modelling.
+
+The lesson is that a model does not have to be right to be useful &mdash; it has to be wrong in a way that does not affect the decision being made. The independence assumption distorts the magnitude of the probabilities, and the decision only depends on their order. So the error goes almost entirely into a quantity nobody uses.
+
+Compare that with a model whose errors land directly on the decision boundary, and the difference in practical value is enormous even if their stated assumptions look equally shaky.
+
+The second reason it survives is that its cost profile is unusual. Training is one pass of counting, memory is a table of frequencies, and prediction is a handful of additions in log space. On a device with no GPU, in a stream with no batch window, or in a system that must update continuously, that profile beats a more accurate model that cannot be deployed.

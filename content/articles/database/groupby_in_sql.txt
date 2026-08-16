@@ -14,6 +14,80 @@ Imagine you have a table of sales data. You don't want to see every single sale;
 
 The final result is a new, smaller table showing each group and its calculated aggregate value.
 
+## What "collapse and calculate" means in rows
+
+`GROUP BY` takes many rows and returns one row per distinct value of the grouping columns. Everything else in the `SELECT` must therefore be either one of those grouping columns, or an aggregate that summarises the rows in the group.
+
+Start with six sales rows:
+
+|Region|Salesperson|Amount|
+|---|---|---|
+|North|Alice|100|
+|North|Bob|150|
+|South|Carol|200|
+|South|Dan|120|
+|South|Alice|80|
+|North|Carol|90|
+
+```sql
+SELECT region, COUNT(*) AS sales, SUM(amount) AS total, AVG(amount) AS average
+FROM   sales
+GROUP  BY region;
+```
+
+|region|sales|total|average|
+|---|---|---|---|
+|North|3|340|113.33|
+|South|3|400|133.33|
+
+Six rows became two. The database sorted or hashed the rows by region, then ran each aggregate over each bucket.
+
+Grouping by two columns makes one row per <em>combination</em> that exists in the data:
+
+```sql
+SELECT region, salesperson, SUM(amount)
+FROM   sales
+GROUP  BY region, salesperson;
+```
+
+That returns six rows here, because every pair happens to be unique. This is worth knowing: adding a column to `GROUP BY` can only increase the number of groups, never decrease it, and grouping by something unique (like a primary key) does nothing at all.
+
+## The rule that causes the error message
+
+The most common `GROUP BY` error is selecting a column that is neither grouped nor aggregated:
+
+```sql
+SELECT region, salesperson, SUM(amount)   -- salesperson is not grouped
+FROM   sales
+GROUP  BY region;
+```
+
+The database's objection is reasonable: the North group contains three different salespeople, so which one should it print? There is no defensible answer, so standard SQL refuses.
+
+The fixes, in order of preference:
+
+1. <strong>Add the column to `GROUP BY`</strong>, if you genuinely want finer groups.
+2. <strong>Aggregate it</strong> &mdash; `MAX(salesperson)`, or `STRING_AGG(salesperson, ', ')` to list them all.
+3. <strong>Use a window function</strong> if you want the detail rows kept alongside the group total.
+
+MySQL historically allowed this query and returned an arbitrary value, which is why old MySQL code often breaks when moved to PostgreSQL or when `ONLY_FULL_GROUP_BY` is enabled. The permissive behaviour was never a feature; it was a source of silently wrong reports.
+
+## COUNT, NULLs, and the counts that disagree
+
+Three counts that look interchangeable and are not:
+
+- <strong>`COUNT(*)`</strong> &mdash; the number of rows in the group, full stop.
+- <strong>`COUNT(column)`</strong> &mdash; the number of rows where that column is not NULL.
+- <strong>`COUNT(DISTINCT column)`</strong> &mdash; the number of different non-NULL values.
+
+For a group of 10 rows where 3 have a NULL email and the 7 remaining emails include one duplicate: `COUNT(*)` = 10, `COUNT(email)` = 7, `COUNT(DISTINCT email)` = 6.
+
+The same NULL-skipping rule applies to every aggregate. `AVG(amount)` divides by the number of non-NULL amounts, not by the number of rows &mdash; so a column with missing values gives an average of what is present, which may or may not be what you meant. If NULL should count as zero, say so explicitly with `AVG(COALESCE(amount, 0))`.
+
+`SUM` of an empty group returns NULL, not 0. Wrap it in `COALESCE(SUM(amount), 0)` whenever the result feeds a calculation or a display.
+
+Grouping itself treats NULLs differently again: all NULLs in a grouping column are gathered into a single group, even though `NULL = NULL` is not true anywhere else in SQL. It is a deliberate exception, and it is why a stray NULL group appears in reports.
+
 ## Guided tour
 
 Use the interactive tool above to see this process in action. The animation directly mirrors how a database engine thinks.
@@ -48,3 +122,61 @@ This makes sense: if you've collapsed all 'Sales' department rows into one, whic
 - It is almost always used with an aggregate function like <code>SUM()</code>, <code>COUNT()</code>, <code>AVG()</code>, <code>MAX()</code>, or <code>MIN()</code>.
 - The columns in your <code>SELECT</code> statement must be either aggregated or listed in the <code>GROUP BY</code> clause.
 - Think of it as creating "buckets" for your data and then running a calculation on the contents of each bucket.
+
+## WHERE, GROUP BY, HAVING: the order settles the argument
+
+The clauses run in a fixed order, and knowing it removes almost all confusion about which filter goes where:
+
+<p class="mono-font">FROM &rarr; WHERE &rarr; GROUP BY &rarr; HAVING &rarr; SELECT &rarr; ORDER BY &rarr; LIMIT</p>
+
+- <strong>`WHERE`</strong> runs <em>before</em> grouping, so it filters individual rows and cannot see aggregates.
+- <strong>`HAVING`</strong> runs <em>after</em> grouping, so it filters whole groups and can use aggregates.
+
+```sql
+SELECT   region, SUM(amount) AS total
+FROM     sales
+WHERE    sale_date >= '2026-01-01'   -- drop old rows first
+GROUP BY region
+HAVING   SUM(amount) > 300           -- then drop small regions
+ORDER BY total DESC;
+```
+
+Two practical consequences. Put a condition in `WHERE` whenever it can go there &mdash; filtering before grouping means fewer rows to group, which is faster. And a condition on an aggregate can only go in `HAVING`, because the aggregate does not exist yet when `WHERE` runs.
+
+The same ordering explains why `SELECT` aliases are usually unavailable in `WHERE` and `HAVING` (they are created later) but are available in `ORDER BY` (which runs later still). PostgreSQL and MySQL relax this for `ORDER BY` and `GROUP BY`; the standard does not.
+
+## Rollups, and grouping at several levels at once
+
+Reports frequently need subtotals and a grand total alongside the detail. Writing three queries and stitching them together with `UNION ALL` works, and there is a purpose-built alternative:
+
+```sql
+SELECT   region, salesperson, SUM(amount)
+FROM     sales
+GROUP BY ROLLUP (region, salesperson);
+```
+
+That returns one row per salesperson within region, one subtotal row per region (with salesperson NULL), and one grand total row (both NULL). `CUBE` produces every combination of the grouping columns, and `GROUPING SETS` lets you list exactly the combinations you want.
+
+Use `GROUPING(column)` to distinguish a genuine NULL in the data from a NULL that marks a subtotal row &mdash; it returns 1 for the latter.
+
+## Questions people ask
+
+<strong>Can I `GROUP BY` a column not in `SELECT`?</strong> Yes. Grouping and selecting are independent; you might group by customer and select only the count.
+
+<strong>Is `GROUP BY` slow?</strong> It requires sorting or hashing, so it costs more than a plain scan. An index on the grouping columns can let the engine skip the sort entirely, which is the main optimisation available.
+
+<strong>What is the difference from `DISTINCT`?</strong> `SELECT DISTINCT region` and `SELECT region GROUP BY region` return the same rows and usually the same plan. `GROUP BY` is the one that lets you add aggregates.
+
+<strong>Why does my average look wrong?</strong> Most often because NULLs are excluded from the denominator, or because a join duplicated rows before the grouping happened.
+
+<strong>Can I use a window function instead?</strong> Often, and it is the right choice when you want group totals shown next to the individual rows rather than collapsing them.
+
+<strong>How do I group by a computed value?</strong> Repeat the expression in `GROUP BY` &mdash; `GROUP BY DATE_TRUNC('month', sale_date)` &mdash; or wrap the query in a CTE and group by the alias.
+
+## Recap in one screen
+
+- `GROUP BY` collapses rows into one row per distinct combination of the grouping columns.
+- Every selected column must be grouped or aggregated, and the error message is telling the truth.
+- Aggregates skip NULLs; `COUNT(*)` counts rows, `COUNT(col)` counts non-NULL values.
+- `WHERE` filters rows before grouping, `HAVING` filters groups after it.
+- `ROLLUP` and `CUBE` add subtotals without a pile of `UNION ALL`s.

@@ -15,6 +15,59 @@ Seven observations become four training examples. In general a series of length 
 
 <strong>Window size (W)</strong> is how much history the model sees per prediction, and it is a real modelling assumption: it asserts that nothing older than W steps matters. Too small and the model cannot see the pattern &mdash; a weekly cycle needs at least seven daily steps. Too large and each example carries mostly irrelevant history, the input dimension grows, and the number of examples shrinks.<strong>Stride (S)</strong> is how far the window jumps between examples. A stride of 1 gives the maximum number of examples, heavily overlapping and therefore highly correlated. A larger stride gives fewer, more independent examples. Stride 1 is the usual choice for training; larger strides are used to cut redundancy on very long series.
 
+## Turning a timeline into a table
+
+Machine learning models expect a table: one row per example, one column per feature, and rows that do not depend on each other. A time series is none of those things &mdash; it is one long sequence where every value depends on the ones before it.
+
+The sliding window is the conversion. Pick a window length, slide it along the series, and each position becomes one row of an ordinary supervised learning problem.
+
+With daily sales [10, 12, 15, 13, 18, 20, 22] and a window of 3:
+
+|Row|Features (past 3 days)|Target (next day)|
+|---|---|---|
+|1|10, 12, 15|13|
+|2|12, 15, 13|18|
+|3|15, 13, 18|20|
+|4|13, 18, 20|22|
+
+Seven numbers have become four training examples with three features each. From here, any tabular model will do &mdash; linear regression, random forest, gradient boosting &mdash; and none of them need to know anything about time.
+
+Two immediate consequences. You lose the first `window` observations, because there is no complete history for them. And consecutive rows overlap heavily, so they are not independent &mdash; which is exactly why the usual random train/test split is invalid here.
+
+## Choosing the window and the horizon
+
+Two numbers define the setup, and they answer different questions.
+
+<strong>Window size (lookback)</strong> &mdash; how much history each prediction sees. Too short and the model cannot see the pattern: a window of 3 on daily data cannot represent a weekly cycle. Too long and you have many features, fewer rows, and a lot of ancient history diluting recent signal.
+
+Start from the domain. Daily data with weekly seasonality wants at least 7, often 14. Hourly data with a daily cycle wants at least 24. Then tune around that starting point, and let the data confirm it &mdash; an autocorrelation plot shows directly how far back the useful dependence reaches.
+
+<strong>Horizon</strong> &mdash; how far ahead you predict. One step is easiest and most accurate. For multiple steps there are three strategies:
+
+- <strong>Recursive.</strong> Predict one step, feed it back in as an input, predict the next. Simple, and errors compound quickly.
+- <strong>Direct.</strong> Train a separate model for each horizon &mdash; one for t+1, one for t+2, and so on. More models, no error compounding.
+- <strong>Multi-output.</strong> One model predicting the whole horizon vector at once. Efficient, and it can learn the relationships between the steps.
+
+<strong>Stride</strong> is the third, quieter setting: how far the window moves each time. A stride of 1 extracts every possible window and maximises the number of training rows. Larger strides reduce overlap and training time, at the cost of fewer examples.
+
+## Splitting time series without cheating
+
+Shuffling a windowed dataset is the single most common mistake in this topic, and it produces beautiful, worthless results.
+
+The reason is direct: window 1 contains days 1&ndash;3 and window 2 contains days 2&ndash;4. Put one in training and the other in test, and the test row shares two-thirds of its inputs with a training row. Worse, a shuffled split lets the model train on next month while being tested on this month, which is a capability it will never have in production.
+
+The correct approach is a chronological split &mdash; train on the earliest portion, validate on the middle, test on the most recent &mdash; and for cross-validation, an expanding or rolling window:
+
+|Fold|Train on|Test on|
+|---|---|---|
+|1|Months 1&ndash;6|Month 7|
+|2|Months 1&ndash;7|Month 8|
+|3|Months 1&ndash;8|Month 9|
+
+Scikit-learn's `TimeSeriesSplit` implements exactly this. Add a small <strong>gap</strong> between the end of training and the start of testing when your windows overlap the boundary, so no test window shares observations with a training window.
+
+The same discipline applies to scaling: fit the scaler on the training period only. Fitting it on the whole series leaks the future's mean and standard deviation into the past.
+
 ## Interactive Exploration Guide
 
 1. <strong>Watch the window slide.</strong> Set <strong>Window Size (W)</strong> to 3 and <strong>Stride (S)</strong> to 1, then scroll along the series. Each position produces one training example, and consecutive examples share almost all their values.
@@ -43,3 +96,59 @@ The same applies to scaling. Fit the scaler on the training period only; computi
 ## Key takeaway
 
 A sliding window converts a time series into supervised (input, target) pairs, with the window size encoding how much history you claim is relevant and the stride controlling how much consecutive examples overlap. The modelling choice is straightforward; the discipline is in the split &mdash; chronological, with a gap of at least one window between segments, and every scaler fitted on the training period alone.
+
+## Features worth adding to the window
+
+The raw lagged values are the starting point, not the finished feature set. Three additions usually earn their place:
+
+<strong>Rolling statistics.</strong> The mean, standard deviation, minimum and maximum over the window summarise its level and volatility in a few stable numbers. A rolling mean over 7 days is often a stronger feature than seven individual lags.
+
+<strong>Calendar features.</strong> Day of week, month, hour, and a holiday flag. Most human-generated series have strong calendar structure that lags alone represent inefficiently. Encode cyclical values as sine and cosine pairs so that hour 23 and hour 0 are adjacent rather than 23 units apart.
+
+<strong>Differences and ratios.</strong> The change from the previous value, or the ratio to the value a week ago, makes trends explicit. For series with a trend this often matters more than anything else, because tree models cannot extrapolate: a forest trained on values between 100 and 200 will never predict 250, but it can predict "a 5% increase" from a differenced target.
+
+```python
+import pandas as pd
+
+df = pd.DataFrame({"sales": series})
+for lag in range(1, 8):
+    df[f"lag_{lag}"] = df["sales"].shift(lag)
+
+df["roll_mean_7"] = df["sales"].shift(1).rolling(7).mean()
+df["roll_std_7"]  = df["sales"].shift(1).rolling(7).std()
+df["dow"]         = df.index.dayofweek
+df["target"]      = df["sales"].shift(-1)      # next day
+df = df.dropna()
+```
+
+The `.shift(1)` before `.rolling()` is the important detail. Without it, the rolling mean at time t includes the value at time t &mdash; the very thing you are trying to predict. That is a leak, it is easy to write by accident, and it produces suspiciously excellent results.
+
+## Where this approach fits
+
+Windowing plus a gradient-boosted model is a strong, unglamorous baseline for most forecasting problems, and it frequently beats deep sequence models on business data with limited history.
+
+It is the right tool for demand and sales forecasting, sensor and IoT prediction, predictive maintenance (windows of vibration or temperature readings), anomaly detection over rolling statistics, and energy load forecasting.
+
+It is the wrong tool when the sequence is very long and the dependencies are distant &mdash; a fixed window simply cannot see beyond its own length, which is where recurrent networks and transformers earn their keep. It also handles irregular sampling poorly: windows assume evenly spaced observations, so resample first if your timestamps are ragged.
+
+## Questions people ask
+
+<strong>How do I choose the window size?</strong> Start from the known seasonality, check an autocorrelation plot, then tune it as a hyperparameter with time-series cross-validation.
+
+<strong>Can I use a random forest for forecasting?</strong> Yes, on windowed features, with one caveat: tree models cannot predict outside the range of their training targets. For a trending series, model the difference rather than the level.
+
+<strong>What about missing timestamps?</strong> Resample to a regular frequency first and decide explicitly how to fill gaps &mdash; forward fill, interpolate, or flag them as missing. Silently skipping them corrupts every window that spans the gap.
+
+<strong>Should the target be scaled?</strong> Usually not necessary for tree models. For neural networks, yes &mdash; and remember to invert the scaling before reporting errors, or your RMSE will be in the wrong units.
+
+<strong>How many rows do I need?</strong> Enough to cover several full seasonal cycles. Two years of daily data to learn annual seasonality; a few weeks is not enough to learn anything about December.
+
+<strong>Do I need a separate model per series?</strong> Not necessarily. Training one model across many related series, with an identifier feature, often outperforms hundreds of individual models &mdash; the shared model borrows strength from series with more history.
+
+## Recap in one screen
+
+- A sliding window turns a sequence into a normal feature/target table.
+- Window size is how far back the model sees; horizon is how far ahead it predicts; stride is how far the window moves.
+- Never shuffle: split chronologically, use `TimeSeriesSplit`, and leave a gap when windows overlap.
+- Add rolling statistics, calendar features and differences &mdash; and shift before rolling, or you leak the target.
+- Fixed windows cannot see beyond their own length; that is where sequence models take over.

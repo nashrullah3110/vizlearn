@@ -2152,16 +2152,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "An index turns a linear scan into a logarithmic descent of a B-tree, which is why an indexed lookup barely notices a table growing a thousand-fold while a scan grows with it exactly. It works only while the query preserves the index's sort order, so a leading wildcard, a function or arithmetic on the column, or an implicit cast will quietly cost you the index and leave the query text looking innocent."
+    "t": "What is meant by “Storage” here?",
+    "ans": "Typically 10–20% of the table size per index, sometimes far more for wide composite indexes."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Without an index, finding the rows that match a condition means reading every row and testing it — a full table scan, and its cost grows in a straight line with the size of the table. That is perfectly fine on ten thousand rows and ruinous on ten million."
+    "t": "What is meant by “Insert, update and delete speed” here?",
+    "ans": "Every index must be updated whenever the indexed data changes. A table with eight indexes does nine writes for every logical write."
    },
    {
-    "t": "What does this module say about “Why a B-tree”?",
-    "ans": "Almost every relational index is a B-tree: a balanced tree whose nodes are disk pages holding many keys each. Every leaf sits at the same depth, so every lookup costs the same. Because a page holds hundreds of keys, the tree is astonishingly shallow — with a fanout of a few hundred, three or four levels is enough for hundreds of millions of rows."
+    "t": "What is meant by “Planning time and instability” here?",
+    "ans": "More indexes means more options for the planner to consider, and more chances for it to choose a bad one on a mis-estimated query."
+   },
+   {
+    "t": "What is meant by “Maintenance” here?",
+    "ans": "Indexes fragment as data changes and occasionally need rebuilding."
    }
   ]
  },
@@ -2199,7 +2203,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “The three tools”?",
-    "ans": "NULL means unknown, so comparisons involving it are UNKNOWN rather than TRUE or FALSE, and aggregates skip it by default. COALESCE substitutes a default, NULLIF creates a NULL on purpose, and IS NULL is the only comparison that actually works — everything else is a trap that looks like it should work and quietly does not."
+    "ans": "The single idea that unlocks this topic: NULL does not mean zero, and it does not mean an empty string. It means no value was recorded ."
    }
   ]
  },
@@ -2213,12 +2217,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A denormalized table stores the same fact in more than one place, which means updating it can leave two copies disagreeing. Normalization is a sequence of rules, each one removing a specific kind of redundancy by moving data into its own table."
    },
    {
-    "t": "What does this module say about “Guided tour”?",
-    "ans": "Over-normalizing has a cost too: every extra table is another join at query time. Reporting and analytics workloads often deliberately denormalize back down for read speed, accepting the redundancy because the data is written once and read constantly. Normalize for correctness where writes happen; consider denormalizing where reads dominate."
+    "t": "What does this module say about “The three rules”?",
+    "ans": "Put everything in one wide table and three specific problems appear. They have names, and recognising them is most of the skill."
    },
    {
-    "t": "What does this module say about “Where this goes wrong”?",
-    "ans": "Over-normalizing has a cost too: every extra table is another join at query time. Reporting and analytics workloads often deliberately denormalize back down for read speed, accepting the redundancy because the data is written once and read constantly. Normalize for correctness where writes happen; consider denormalizing where reads dominate."
+    "t": "What does this module say about “The problem normalisation solves”?",
+    "ans": "Put everything in one wide table and three specific problems appear. They have names, and recognising them is most of the skill."
    }
   ]
  },
@@ -2286,7 +2290,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "The GROUP BY clause in SQL is used with aggregate functions (COUNT, SUM, AVG, etc.) to group rows that have the same values in specified columns into summary rows. It's one of the most powerful tools for data analysis."
+    "ans": "The clauses run in a fixed order, and knowing it removes almost all confusion about which filter goes where:"
    },
    {
     "t": "What does this module say about “The idea in brief”?",
@@ -2352,8 +2356,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The magic of window functions is the OVER() clause. This clause defines the \"window\" or set of rows the function should consider for its calculation. It has two key components:"
    },
    {
-    "t": "What does this module say about “Things to try”?",
-    "ans": "The visualizer helps you see how the PARTITION BY and ORDER BY clauses define the calculation for each row."
+    "t": "What does this module say about “Aggregate without collapsing”?",
+    "ans": "GROUP BY answers \"what is the total per region?\" and destroys the individual rows in the process. A window function answers \"what is the total for this row's region, shown next to this row?\" and keeps everything."
    }
   ]
  },
@@ -2363,16 +2367,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A subquery is just a query whose result another query consumes, and its shape is decided by what it returns: one value (scalar), one column (IN), or a table (derived, which must be aliased). An uncorrelated subquery runs once, before the outer query."
+    "t": "What is meant by “A scalar subquery returning more than one row” here?",
+    "ans": "The engine raises an error at runtime, and only when the data grows enough to produce a second row — so this bug ships. Guard with LIMIT 1 and an explicit ORDER BY , or use MIN / MAX ."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "You cannot write WHERE salary > AVG (salary) — an aggregate over the whole table is not something a row-by-row filter can evaluate. What you can do is compute the average in its own query and use the result: that inner query is a subquery."
+    "t": "What is meant by “NOT IN with NULLs” here?",
+    "ans": "Covered above, and worth repeating because it fails silently rather than loudly."
    },
    {
-    "t": "What does this module say about “The four shapes”?",
-    "ans": "Compare the two comparisons in the lab. The scalar version asks \"is this person paid more than the company average?\" — one number, computed once, tested against all eight rows. The correlated version asks \"is this person paid more than their own department's average?\" — a different number per row, so the inner query runs eight times."
+    "t": "What is meant by “Forgetting the alias on a derived table” here?",
+    "ans": "Most engines require one; the error message is clear but the cause is not obvious the first time."
+   },
+   {
+    "t": "What is meant by “Correlated subqueries in SELECT” here?",
+    "ans": "SELECT name, (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) FROM customers c runs one count per customer. A LEFT JOIN with GROUP BY , or a window function, does it in one pass."
    }
   ]
  },
@@ -2382,16 +2390,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A transaction makes a group of writes behave as one unit: Atomicity guarantees all-or-nothing, Consistency guarantees the result is valid, Isolation controls what concurrent sessions can see of work in progress, and Durability guarantees a commit survives a crash."
+    "t": "What is meant by “Always touch rows in a consistent order” here?",
+    "ans": "— sort account IDs before updating them, and the cycle above cannot form."
    },
    {
-    "t": "What does this module say about “What this is”?",
-    "ans": "A transfer between two accounts is two separate UPDATE statements. If the database crashes between them, one account has lost money and the other never received it — unless the two are wrapped in a transaction, which guarantees they happen together or not at all."
+    "t": "What is meant by “Keep transactions short” here?",
+    "ans": "Never hold a transaction open across a network call, a user's think time, or an external API. The most common cause of lock contention is a transaction that started before it needed to."
    },
    {
-    "t": "What does this module say about “Isolation levels, briefly”?",
-    "ans": "A transaction makes a group of writes behave as one unit: Atomicity guarantees all-or-nothing, Consistency guarantees the result is valid, Isolation controls what concurrent sessions can see of work in progress, and Durability guarantees a commit survives a crash."
+    "t": "What is meant by “Retry on deadlock” here?",
+    "ans": "Deadlock errors are expected under load, not exceptional. Application code that touches contended rows should catch the error and retry with a short random delay."
    }
   ]
  },
@@ -2458,16 +2466,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "WHERE asks one yes/no question of every row — except the answer can also be \"unknown\", and unknown rows are silently dropped. Most WHERE-clause bugs in production are really NULL bugs."
+    "t": "What is meant by “BETWEEN a AND b” here?",
+    "ans": "is inclusive at both ends. For dates this is a common source of off-by-one bugs, because BETWEEN '2026-01-01' AND '2026-01-31' excludes anything timestamped later on the 31st. Prefer >= start AND ."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "The WHERE clause is a condition tested against each row independently . If it evaluates to TRUE, the row is kept; anything else and it is dropped. That row-at-a-time model is the key mental picture — the database is not filtering \"the table\", it is asking one question of every row."
+    "t": "What is meant by “IN (...)” here?",
+    "ans": "is shorthand for a chain of ORs, and works with a subquery as well as a literal list."
    },
    {
-    "t": "What does this module say about “The Operators You Actually Need”?",
-    "ans": "NULL does not mean zero or empty string — it means unknown . Comparing anything to an unknown gives an unknown result, so manager = 'Ada Lovelace' is neither TRUE nor FALSE for a row where manager is NULL. It is UNKNOWN , and WHERE only keeps TRUE."
+    "t": "What is meant by “LIKE” here?",
+    "ans": "uses % for any run of characters and _ for exactly one. Escape literal percent signs with an ESCAPE clause."
+   },
+   {
+    "t": "What is meant by “IS DISTINCT FROM” here?",
+    "ans": "compares two values treating NULLs as comparable — NULL IS DISTINCT FROM 5 is TRUE. It is the operator you want when comparing nullable columns, and it is supported by PostgreSQL and several others."
    }
   ]
  },
@@ -6264,7 +6276,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Mean Squared Error (MSE)”?",
-    "ans": "Use the controls and the interactive plot to build a strong intuition for these metrics."
+    "ans": "Definitions blur together until you put numbers through them. Here are five predicted and actual house prices, in thousands of pounds:"
    }
   ]
  },
@@ -6274,16 +6286,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Gradient boosting fits each new small tree to the residuals left by everything built so far, then adds a fraction of it to the running prediction — which is gradient descent performed in function space, with the learning rate as the step size."
+    "t": "What is meant by “XGBoost” here?",
+    "ans": "— the one that made boosting famous by winning competitions. Adds explicit L1 and L2 regularisation on leaf weights and a well-engineered handling of missing values, where each split learns a default direction for absent values."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A random forest builds many strong trees independently and averages away their variance. Boosting does close to the opposite: it builds many deliberately weak trees in sequence, each one aimed squarely at the mistakes the previous ones left behind."
+    "t": "What is meant by “LightGBM” here?",
+    "ans": "— the fastest on large data. It grows trees leaf-wise (always splitting the leaf that reduces loss most) rather than level by level, and bins continuous features into histograms. Usually the best choice above a few hundred thousand rows, but leaf-wise growth overfits small datasets unless you cap num_leaves ."
    },
    {
-    "t": "What does this module say about “The loop”?",
-    "ans": "The residual panel above is step 2 made visible. Watch it after each tree: the bars shrink, and where they are still tall is exactly where the next tree will spend its capacity."
+    "t": "What is meant by “CatBoost” here?",
+    "ans": "— the one to reach for with many categorical columns. It encodes them with target statistics computed in a way that avoids leaking the target, and its defaults are unusually good, so it often wins with no tuning at all."
    }
   ]
  },
@@ -6535,8 +6547,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The \"naive\" part of the name comes from a key assumption the algorithm makes: it assumes that all features are independent of each other . In our example, it assumes that the 'Outlook' has no effect on the 'Temperature' or 'Wind'. While this is often not true in the real world (a sunny outlook usually implies hotter temperatures), this simplification makes the calculations much easier and faster."
    },
    {
-    "t": "What does this module say about “The Calculation Process: A Walkthrough”?",
-    "ans": "The interactive panel walks you through the exact steps the algorithm takes to make a prediction. Let's use the default input: Outlook=Sunny, Temp=Cool, Wind=Strong ."
+    "t": "What does this module say about “Bayes' theorem without the fear”?",
+    "ans": "Everything here rests on one line, and the line is less intimidating written as a sentence."
    }
   ]
  },
@@ -6631,11 +6643,11 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “What AUC actually measures”?",
-    "ans": "The area under the curve has an interpretation worth memorising, because it is far more intuitive than \"area\":"
+    "ans": "The area under that curve compresses the whole picture into one number between 0 and 1."
    },
    {
-    "t": "What does this module say about “The imbalance trap, spelled out”?",
-    "ans": "Suppose 1% of a million people have a disease, and your test catches 90% of them at a 10% false positive rate. That is a respectable ROC point. In absolute numbers: 9,000 true positives, and 99,000 false positives. Over 90% of the people you flag are healthy."
+    "t": "What does this module say about “One model, every threshold”?",
+    "ans": "A classifier that outputs probabilities is not one classifier — it is a family of them, one for every threshold you might pick. Threshold at 0.9 and you get a cautious model; threshold at 0.1 and you get an eager one. Accuracy, precision and recall all describe a single member of that family."
    }
   ]
  },
@@ -6691,8 +6703,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A model needs examples with features and a label. A time series is a single ordered run of values, so you build examples by sliding a fixed-length window along it: the values inside the window are the input, and the value immediately after it is the target."
    },
    {
-    "t": "What does this module say about “Splitting without leaking”?",
-    "ans": "This is the part that matters most and is most often got wrong. Random train-test splitting is invalid for time series: it puts future windows in the training set and past windows in the test set, so the model is trained on the future to predict the past."
+    "t": "What does this module say about “Window size and stride”?",
+    "ans": "Machine learning models expect a table: one row per example, one column per feature, and rows that do not depend on each other. A time series is none of those things — it is one long sequence where every value depends on the ones before it."
    }
   ]
  },
@@ -6765,12 +6777,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Standard training minimises average loss over the dataset. When one class holds 99% of the rows, that average is dominated by it: predicting the majority everywhere already achieves very low loss, so there is little gradient pressure to learn the minority class at all."
    },
    {
-    "t": "What does this module say about “What usually goes wrong”?",
-    "ans": "Imbalance is a mismatch between the average loss you are minimising and the rare-class detection you actually want. Fix it by reweighting the loss (usually first), resampling the training data (inside the fold, never before the split), or simply moving the decision threshold. Then change the metric too — accuracy cannot show you whether any of it worked."
+    "t": "What does this module say about “The three families of fix”?",
+    "ans": "The instinct on seeing an imbalanced dataset is to resample it immediately. That is usually the third-best move. Two cheaper things come first, and often one of them is enough."
    },
    {
-    "t": "What does this module say about “The short version”?",
-    "ans": "Imbalance is a mismatch between the average loss you are minimising and the rare-class detection you actually want. Fix it by reweighting the loss (usually first), resampling the training data (inside the fold, never before the split), or simply moving the decision threshold. Then change the metric too — accuracy cannot show you whether any of it worked."
+    "t": "What does this module say about “Start by changing nothing about the data”?",
+    "ans": "The instinct on seeing an imbalanced dataset is to resample it immediately. That is usually the third-best move. Two cheaper things come first, and often one of them is enough."
    }
   ]
  },

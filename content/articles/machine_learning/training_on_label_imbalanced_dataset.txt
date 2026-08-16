@@ -11,6 +11,67 @@ The model is not malfunctioning. It is optimising exactly what you asked it to, 
 
 <strong>Resample the data.</strong> <em>Oversampling</em> duplicates minority rows &mdash; simple, and risks overfitting to the few examples you have. <strong>SMOTE</strong> improves on it by synthesising new minority points along the lines between existing neighbours rather than copying. <em>Undersampling</em> discards majority rows, which balances the classes and throws away real information; it is reasonable when the majority class is genuinely enormous.<strong>Reweight the loss.</strong> Give minority errors a larger weight, typically inversely proportional to class frequency, so one minority mistake costs as much as ninety-nine majority ones. This changes nothing about the data and is usually the first thing to try &mdash; <span class="mono-font">class_weight="balanced"</span> in scikit-learn, or <span class="mono-font">pos_weight</span> in a PyTorch loss. <strong>Focal loss</strong> goes further by down-weighting examples the model already classifies confidently, concentrating training on the hard cases.<strong>Move the threshold.</strong> Often the model’s probabilities are fine and only the 0.5 cutoff is wrong. Lowering it trades precision for recall without retraining anything, and choosing it from a precision-recall curve is frequently the cheapest real improvement available.
 
+## Start by changing nothing about the data
+
+The instinct on seeing an imbalanced dataset is to resample it immediately. That is usually the third-best move. Two cheaper things come first, and often one of them is enough.
+
+<strong>Change what you measure.</strong> If you are still reading accuracy, no training change will help, because you cannot see the problem. Switch to precision, recall, F1 and PR-AUC, and look at the confusion matrix directly. Sometimes the model was already fine and only the report was broken.
+
+<strong>Change the threshold.</strong> A model that outputs probabilities has already learned a ranking. If it ranks fraud above legitimate transactions well, the only thing wrong is that 0.5 is too high a bar for a class that makes up 0.5% of the data. Sweep the threshold, pick the point that meets your recall target, and you may be finished &mdash; at no training cost at all.
+
+Only after those two should you change the training procedure. And when you do, weighting is the gentler intervention: it changes how much each row counts, without inventing or deleting rows.
+
+## Weighting versus resampling
+
+<strong>Class weights</strong> multiply each class's contribution to the loss by a factor, typically the inverse of its frequency. With 99,500 negatives and 500 positives, each positive counts 199 times as much, and the totals balance. No data is created or destroyed.
+
+```python
+# scikit-learn: one argument
+model = RandomForestClassifier(class_weight="balanced")
+model = LogisticRegression(class_weight="balanced")
+
+# boosting libraries: the ratio directly
+xgb = XGBClassifier(scale_pos_weight=len(y[y==0]) / len(y[y==1]))
+```
+
+<strong>Undersampling</strong> throws away majority rows until the ratio improves. Fast, and it makes training much cheaper on very large datasets, but you are discarding real information. Reasonable when you have millions of majority rows and can afford to lose some.
+
+<strong>Oversampling</strong> duplicates minority rows. Keeps all the data, but exact duplicates encourage memorisation &mdash; the model can fit those specific rows rather than the pattern.
+
+<strong>SMOTE</strong> creates new synthetic minority points along the lines between existing minority neighbours, instead of duplicating. It works best with continuous, well-scaled features and a moderate imbalance. It struggles with categorical features (the interpolated value is not a real category), with high dimensions (the interpolation is between points that were not really neighbours), and with noisy minority points (it amplifies them).
+
+|Approach|Data changed|Cost|Main risk|
+|---|---|---|---|
+|Threshold shift|None|None|None &mdash; try it first|
+|Class weights|None|None|Can over-correct; still tune|
+|Undersampling|Majority removed|Cheap, faster training|Information thrown away|
+|Oversampling|Minority duplicated|Slower training|Memorising duplicates|
+|SMOTE|Synthetic rows added|Slower training|Unrealistic synthetic points|
+
+## The ordering rule that keeps results honest
+
+Resampling belongs <em>inside</em> the cross-validation fold, applied only to the training portion, and never to validation or test data.
+
+Get this wrong and the failure is spectacular but invisible: SMOTE applied before splitting creates synthetic points from rows that later land in the test set. The model then sees close relatives of test rows during training, scores 0.97, and collapses in production.
+
+The safe pattern is an imbalanced-learn pipeline, which applies the sampler only during `fit`:
+
+```python
+from imblearn.pipeline import Pipeline
+from imblearn.over_sampling import SMOTE
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+
+pipe = Pipeline([
+    ("smote", SMOTE(random_state=0)),        # training folds only
+    ("clf", RandomForestClassifier(n_jobs=-1)),
+])
+
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+scores = cross_val_score(pipe, X, y, cv=cv, scoring="average_precision")
+```
+
+`StratifiedKFold` matters here too: without it a fold can end up with almost no positives, and its score becomes meaningless noise that drags the average around.
+
 ## Experiments to try
 
 1. <strong>Start balanced.</strong> Set <strong>Class 0 Ratio</strong> to 50 and press <strong>Retrain Both Models</strong>. Both classes are learned and the boundary sits sensibly between them.
@@ -29,3 +90,35 @@ The model is not malfunctioning. It is optimising exactly what you asked it to, 
 ## The short version
 
 Imbalance is a mismatch between the average loss you are minimising and the rare-class detection you actually want. Fix it by reweighting the loss (usually first), resampling the training data (inside the fold, never before the split), or simply moving the decision threshold. Then change the metric too &mdash; accuracy cannot show you whether any of it worked.
+
+## When the class is very rare indeed
+
+Below roughly one positive in a thousand, classification starts to be the wrong framing altogether, and two alternatives become worth considering.
+
+<strong>Anomaly detection</strong> learns what normal looks like from the majority class alone and flags departures from it. Isolation Forest, One-Class SVM and autoencoder reconstruction error are the usual tools. This works when the positives are heterogeneous &mdash; many different kinds of unusual &mdash; rather than one coherent pattern.
+
+<strong>A two-stage pipeline.</strong> A cheap, high-recall model first reduces millions of candidates to thousands, and a more expensive, high-precision model then ranks those. This is how large-scale fraud and moderation systems are actually built, and it sidesteps the problem of asking one model to be both sensitive and precise.
+
+Whichever route you take, the evaluation discipline is the same: a test set with the real prevalence, PR-AUC rather than ROC-AUC, and metrics reported at the operating point you will actually deploy.
+
+## Questions people ask
+
+<strong>Does `class_weight="balanced"` always help?</strong> No. It sometimes over-corrects, producing a model that flags far too much. Treat the weight as a hyperparameter and tune it rather than assuming the balanced setting is optimal.
+
+<strong>Should I resample before or after splitting?</strong> After, always, and only the training part.
+
+<strong>Is SMOTE better than plain oversampling?</strong> Often, on continuous numeric features. On categorical or very high-dimensional data it frequently is not, and plain oversampling with strong regularisation can do better. Test both.
+
+<strong>What about generating synthetic data with a model?</strong> GANs and similar can produce minority-class examples, and this is used in some domains. It is far more effort than SMOTE and carries the same fundamental risk: the model learns the generator's idea of the class, not the world's.
+
+<strong>Do neural networks need special handling?</strong> Yes, and focal loss is the standard answer &mdash; it down-weights easy, well-classified examples so training focuses on the hard ones. It was designed for object detection, where background boxes outnumber objects by a thousand to one.
+
+<strong>How do I know if it worked?</strong> Compare confusion matrices before and after at the same threshold, on the real distribution. If recall rose and precision did not collapse, it worked. If both moved and you only looked at F1, you have not learned much.
+
+## Recap in one screen
+
+- Fix the metric, then the threshold, before you touch the data.
+- Class weights change influence without changing rows; resampling changes rows and carries more risk.
+- SMOTE synthesises rather than duplicates, and suits continuous features with moderate imbalance.
+- Resample only inside training folds, stratify your splits, evaluate on the real distribution.
+- Below about 1 in 1,000, consider anomaly detection or a two-stage pipeline instead.

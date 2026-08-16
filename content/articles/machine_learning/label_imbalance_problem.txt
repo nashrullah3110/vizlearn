@@ -17,6 +17,48 @@ This is a deliberately dumb model. Its only rule is: <strong>always predict Clas
 
 This is a standard Logistic Regression model. It tries to learn a decision boundary to separate the two classes based on the data. Watch how its behavior and metrics change as the dataset becomes more imbalanced.
 
+## How badly the numbers can mislead
+
+Take a fraud dataset: 100,000 transactions, 500 of them fraudulent. That is 0.5% positive.
+
+Now write the laziest possible model &mdash; `return "not fraud"` &mdash; and evaluate it:
+
+- Accuracy: 99.5%
+- Fraud caught: 0 out of 500
+- Money saved: nothing
+
+This is the accuracy paradox in its purest form. The number is excellent and the model is worthless, because accuracy is dominated by the class you did not care about. Worse, a real model trained with a standard loss will drift towards this behaviour on its own: predicting the majority class is genuinely the fastest way to reduce average error, so that is where the optimiser goes.
+
+The confusion matrix tells the true story instantly:
+
+|&nbsp;|Predicted fraud|Predicted legitimate|
+|---|---|---|
+|<strong>Actually fraud</strong>|0|500|
+|<strong>Actually legitimate</strong>|0|99,500|
+
+An empty column is the signature of a model that has learned to abstain. If you never look past accuracy, you will never see it.
+
+## Why models collapse onto the majority class
+
+Two mechanisms do the damage, and they are worth separating because they suggest different fixes.
+
+<strong>The loss function is an average.</strong> Cross-entropy sums equally over rows, so 99,500 easy negatives contribute far more total loss than 500 hard positives. Reducing the loss on the many is simply the better deal for the optimiser.
+
+<strong>There is not enough of the minority to learn from.</strong> Even a perfectly balanced loss cannot conjure a pattern out of 500 examples spread across a complicated feature space. This is a data problem, not a weighting problem, and no amount of reweighting fixes it.
+
+Distinguishing the two is diagnostic. If the model does well on the training minority and poorly on the test minority, you have too few examples. If it does badly on both, the loss is drowning the signal and reweighting should help.
+
+## Fixes, in the order worth trying
+
+1. <strong>Change the metric first.</strong> Before touching the data, stop reading accuracy. Use precision, recall, F1, and PR-AUC. Half the time this alone changes which model you would have shipped.
+2. <strong>Move the threshold.</strong> A model that outputs probabilities is not committed to 0.5. Sweep the threshold and pick the point that meets your recall requirement. This costs nothing and is often the entire fix.
+3. <strong>Weight the classes.</strong> `class_weight="balanced"` multiplies each class's loss contribution by the inverse of its frequency, so 500 fraud cases count as much as 99,500 legitimate ones. Supported by most scikit-learn estimators and by the boosting libraries via `scale_pos_weight`.
+4. <strong>Resample.</strong> Undersample the majority (fast, discards data) or oversample the minority (keeps data, risks memorising duplicates). SMOTE creates synthetic minority points by interpolating between real ones, which works well on smooth numeric features and poorly on categorical or high-dimensional data.
+5. <strong>Collect more of the rare class.</strong> Unglamorous and by far the most effective when it is possible.
+6. <strong>Reframe as anomaly detection.</strong> Below roughly 0.1% positives, treating the problem as "learn what normal looks like and flag departures" often beats classification outright.
+
+Two warnings that cost people weeks. <strong>Resample only the training set</strong> &mdash; a balanced test set measures a world that does not exist. And apply SMOTE <em>inside</em> the cross-validation fold, never before splitting, or synthetic points derived from test rows leak straight into training.
+
 ## Guided tour
 
 Use the interactive panel to build a strong intuition for this problem.
@@ -33,3 +75,55 @@ The paradox teaches us a critical lesson: <strong>accuracy is not the right metr
 - <strong>Precision:</strong> Of all the cases the model <em>predicted</em> as positive, how many were <em>actually</em> positive? High precision means the model is trustworthy when it raises an alarm.
 
 When dealing with imbalanced data, always evaluate your model using a <strong>Confusion Matrix</strong>, and pay close attention to Precision, Recall, and the F1-Score, especially for the rare class you are trying to find.
+
+## Costs make the decision, not ratios
+
+The right operating point is a business question with a numerical answer. Put pounds on each cell of the confusion matrix and it stops being a judgement call.
+
+Suppose a missed fraud costs &pound;200 on average, and a false alarm costs &pound;5 in review time and customer annoyance. Then:
+
+- Catching 400 of 500 frauds and raising 3,000 false alarms costs 100&times;200 + 3,000&times;5 = &pound;35,000.
+- Catching 300 and raising 500 false alarms costs 200&times;200 + 500&times;5 = &pound;42,500.
+
+The first model is better despite raising six times as many false alarms, because the asymmetry in costs is 40 to 1. Compute this curve across thresholds and the optimum is a number rather than an argument.
+
+This framing also settles the perennial "which metric?" debate. When you can put costs on the errors, expected cost <em>is</em> the metric, and precision, recall and F1 are just proxies for it.
+
+## Questions people ask
+
+<strong>How imbalanced is too imbalanced?</strong> There is no threshold, but rough bands help: up to 1:10 usually needs nothing but sensible metrics; 1:100 needs weighting or resampling; beyond 1:1000, consider anomaly detection.
+
+<strong>Does SMOTE actually work?</strong> Sometimes. It helps most with moderate imbalance and continuous features, and it can hurt with high-dimensional or categorical data, where interpolating between two points produces something that is not a plausible record.
+
+<strong>Should I balance the validation set?</strong> Never. Evaluate on the real distribution or your estimates are fiction.
+
+<strong>Is class weighting the same as oversampling?</strong> Mathematically close &mdash; both increase the minority's influence on the loss &mdash; but weighting does not duplicate rows, so it is cheaper and does not encourage memorising specific examples.
+
+<strong>My PR-AUC is 0.3. Is that bad?</strong> Compare it with the base rate. On a dataset with 0.5% positives, random guessing gives a PR-AUC of 0.005, so 0.3 is sixty times better than chance. PR-AUC must always be read against the prevalence.
+
+<strong>Can I just collect more data?</strong> If the extra data contains more of the rare class, yes &mdash; it is the best fix available. More majority-class rows make the imbalance worse.
+
+## Recap in one screen
+
+- With rare positives, accuracy measures the majority class and nothing else.
+- Models drift towards predicting the majority because that genuinely minimises average loss.
+- Fix the metric first, then the threshold, then the class weights, then the sampling.
+- Resample and synthesise only inside the training fold; keep evaluation on the real distribution.
+- When you can price the two mistakes, expected cost beats every other metric.
+
+## A worked threshold sweep
+
+Numbers make the threshold argument concrete. Take a fraud model scored on 100,000 transactions containing 500 frauds, and read what happens as the threshold falls:
+
+|Threshold|Alerts raised|Frauds caught|Precision|Recall|
+|---|---|---|---|---|
+|0.90|120|95|0.79|0.19|
+|0.50|610|280|0.46|0.56|
+|0.20|2,400|420|0.18|0.84|
+|0.05|11,000|480|0.04|0.96|
+
+Nothing about the model changed across those four rows. Only the bar moved.
+
+Which row is best depends entirely on what happens after the alert. If a human reviews every alert and can handle 500 a day, row two is the only feasible option. If the alert triggers an automatic extra verification step that costs pennies and annoys the customer slightly, row three catches 140 more frauds for a cost most businesses would accept. If a missed fraud costs &pound;200 and a review costs &pound;5, row three's expected cost is 80&times;200 + 2,400&times;5 = &pound;28,000 against row two's 220&times;200 + 610&times;5 = &pound;47,050 &mdash; and the eager model wins clearly.
+
+Produce this table before you produce a model comparison. It is usually more decision-relevant than any single metric, and it costs one line of code from a probability column.

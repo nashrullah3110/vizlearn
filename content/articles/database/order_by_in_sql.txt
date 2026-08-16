@@ -17,9 +17,21 @@ You can sort by things that are not columns: an expression such as <span class="
 
 ## Ties, and why a second key is not optional
 
-Sort the sample table by <span class="mono-font">salary</span> and four pairs of rows tie. Those eight rows appear in <em>some</em> order, but nothing in your query asked for it, so nothing guarantees it will be the same order tomorrow. That is what the "order is decided" readout is telling you: a sort is only deterministic once the keys you supplied separate every pair of rows.
+Sorting by a column with duplicate values leaves the tied rows in an undefined order relative to each other. Combined with `LIMIT`, this produces one of the most confusing bugs in SQL:
 
-Adding a tie-breaker that is unique &mdash; a primary key is the usual choice &mdash; makes the result reproducible. This matters most with pagination: <span class="mono-font kw">ORDER BY</span> <span class="mono-font">salary</span> <span class="mono-font kw">LIMIT</span> <span class="mono-font lit">10 OFFSET 10</span> can return a row you already saw on page one, and skip another entirely, purely because the tied rows shuffled between the two queries.
+```sql
+SELECT * FROM orders ORDER BY order_date DESC LIMIT 10;
+```
+
+If twenty orders share the most recent date, which ten you get is arbitrary &mdash; and can change between runs. Page 2 of the results may repeat a row from page 1, or skip one entirely, because the two queries broke the ties differently.
+
+The fix is a <strong>tiebreaker</strong>: add a unique column as the final sort key.
+
+```sql
+SELECT * FROM orders ORDER BY order_date DESC, id DESC LIMIT 10;
+```
+
+Now the order is total &mdash; no two rows compare equal &mdash; and pagination is stable. Make this a habit for any sorted, paginated query.
 
 ## Where NULLs go
 
@@ -33,6 +45,59 @@ ORDER BY is almost last in the logical order of a query: <span class="mono-font 
 
 Sorting is O(n log n) and needs memory; when the set does not fit, the engine spills to disk and the query gets dramatically slower. An index whose column order matches the ORDER BY can remove the sort entirely, because the index is already in that order &mdash; which is also why <span class="mono-font">(a ASC, b DESC)</span> may not be servable by an index on <span class="mono-font">(a, b)</span>.
 
+## Sorting is not free, and not automatic
+
+Without `ORDER BY`, a database makes no promise at all about row order. It may return rows in insertion order, in index order, in whatever order the storage engine found them, or in a different order every time depending on parallelism and caching.
+
+This surprises people because small test tables usually come back in a stable-looking order. Then the table grows, the plan changes, and a report that "always" listed the newest first quietly starts listing something else. The rule is simple: if the order matters, say so.
+
+```sql
+SELECT name, salary, hired_on
+FROM   employees
+ORDER  BY salary DESC, name ASC;
+```
+
+`ASC` is the default and can be omitted; `DESC` must be written per column, so `ORDER BY a, b DESC` sorts `a` ascending and only `b` descending.
+
+## Where NULLs land, and how to control it
+
+`ORDER BY` has to put missing values somewhere, and engines disagree on where.
+
+|Engine|Ascending|Descending|
+|---|---|---|
+|PostgreSQL, Oracle|NULLs last|NULLs first|
+|MySQL, SQLite|NULLs first|NULLs last|
+|SQL Server|NULLs first|NULLs last|
+
+PostgreSQL and Oracle let you say it explicitly with `NULLS FIRST` / `NULLS LAST`. Elsewhere, a portable trick works everywhere:
+
+```sql
+ORDER BY (col IS NULL), col;     -- false (0) sorts before true (1): NULLs last
+```
+
+The same technique generalises to custom orderings. To sort statuses in a business order rather than alphabetically, sort by a `CASE`:
+
+```sql
+ORDER BY CASE status
+           WHEN 'urgent'  THEN 1
+           WHEN 'open'    THEN 2
+           WHEN 'closed'  THEN 3
+           ELSE 4
+         END, created_at DESC;
+```
+
+## What sorting costs, and how an index removes it
+
+A sort is one of the more expensive things a query can do. Cost grows faster than linearly with the number of rows, and if the data does not fit in the sort memory the engine spills to disk, at which point the query gets dramatically slower.
+
+Two ways to avoid paying:
+
+<strong>Sort fewer rows.</strong> Filter first. `ORDER BY` runs after `WHERE`, so a selective filter shrinks the input to the sort.
+
+<strong>Let an index provide the order.</strong> An index on `(salary DESC)` is already sorted, so the engine can read it in order and skip the sort entirely. In `EXPLAIN` output you will see the sort node disappear. For a composite index to help, the `ORDER BY` must match its columns from the left, in the same direction or exactly reversed.
+
+This combination &mdash; an index on `(status, created_at DESC)` serving `WHERE status = 'open' ORDER BY created_at DESC LIMIT 20` &mdash; is what makes a busy list view fast. The engine seeks to the first matching entry and reads twenty rows, touching almost nothing.
+
 ## Try it yourself
 
 1. <strong>Sort by salary.</strong> Rows slide into place and eight of them light up amber &mdash; those are the ties. "Order is decided" reads NO, because your query has not said what should happen inside a tie.
@@ -45,3 +110,46 @@ Sorting is O(n log n) and needs memory; when the set does not fit, the engine sp
 ## In one line
 
 A result set has no order unless ORDER BY gives it one, and the order is only deterministic once your keys separate every pair of rows &mdash; which is why a unique tie-breaker belongs on anything paginated. Keys apply left to right, each one consulted only for the ties the previous keys left behind. NULL placement is engine-specific, so write NULLS FIRST or NULLS LAST rather than trusting a default. And because the sort runs near the end of the query, it can see SELECT aliases, it feeds LIMIT, and it costs real time and memory unless an index already holds the rows in the order you asked for.
+
+## Pagination that stays correct
+
+The familiar approach is `LIMIT` and `OFFSET`:
+
+```sql
+SELECT * FROM orders ORDER BY id DESC LIMIT 20 OFFSET 40;   -- page 3
+```
+
+It has two problems at scale. The database must produce and discard every skipped row, so `OFFSET 100000` reads a hundred thousand rows to return twenty. And if rows are inserted or deleted between requests, the window shifts &mdash; a user paging forward can see the same row twice or miss one.
+
+<strong>Keyset pagination</strong> (also called seek pagination) fixes both by remembering where the last page ended:
+
+```sql
+SELECT * FROM orders
+WHERE  (order_date, id) < ('2026-08-01', 5312)   -- the last row of page 2
+ORDER  BY order_date DESC, id DESC
+LIMIT  20;
+```
+
+Every page costs the same, because the index seeks straight to the position. The trade-off is that you can only move forward and backward, not jump to page 47 &mdash; which for infinite-scroll interfaces is not a trade-off at all.
+
+## Questions people ask
+
+<strong>Can I sort by a column not in `SELECT`?</strong> Yes in most cases &mdash; `ORDER BY` runs after `SELECT` but can still reference the underlying table's columns. The exception is with `SELECT DISTINCT` or `UNION`, where the sort applies to the result set and the column must be present.
+
+<strong>Can I use a `SELECT` alias in `ORDER BY`?</strong> Yes. `ORDER BY` is evaluated after `SELECT`, so aliases are available &mdash; unlike in `WHERE`.
+
+<strong>Is `ORDER BY 1` valid?</strong> Yes, sorting by the first selected column, and it is fine in ad-hoc queries. In saved code it is fragile: reorder the `SELECT` list and the sort silently changes.
+
+<strong>How do I sort text case-insensitively?</strong> Depends on the collation. `ORDER BY LOWER(name)` works everywhere but prevents index use; a case-insensitive collation on the column is the better fix.
+
+<strong>Does `ORDER BY` in a subquery or view carry through?</strong> Not reliably. The outer query is free to reorder, and several engines ignore an inner `ORDER BY` entirely unless it is paired with `LIMIT`. Put the ordering on the outermost query.
+
+<strong>Why is my sort slow only sometimes?</strong> Almost always because it fits in memory for small inputs and spills to disk past a threshold. Raising the sort memory setting or adding a matching index are the two fixes.
+
+## Recap in one screen
+
+- Without `ORDER BY` there is no guaranteed order, whatever small tests suggest.
+- Always add a unique tiebreaker when sorting a column with duplicates, especially with `LIMIT`.
+- NULL placement differs by engine &mdash; state it explicitly, or use `ORDER BY (col IS NULL), col`.
+- Sorting is expensive; filter first, and let a matching index remove the sort altogether.
+- For deep pages, keyset pagination beats `OFFSET` on both speed and correctness.

@@ -11,6 +11,57 @@ A denormalized table stores the same fact in more than one place, which means up
 - <strong>2NF — no partial dependency.</strong> With a composite key, every other column must depend on the <em>whole</em> key, not just part of it. Customer name depends only on order_id, not on (order_id, product) — so it moves out.
 - <strong>3NF — no transitive dependency.</strong> A column cannot depend on another non-key column. Customer city depends on customer, not directly on the order — so it moves to its own table.
 
+## The problem normalisation solves
+
+Put everything in one wide table and three specific problems appear. They have names, and recognising them is most of the skill.
+
+Start with a table that stores an order, its customer and its product all in one row:
+
+|OrderID|Customer|CustomerCity|Product|Price|
+|---|---|---|---|---|
+|1|Alice|London|Keyboard|45|
+|2|Alice|London|Mouse|20|
+|3|Bob|Leeds|Keyboard|45|
+
+- <strong>Update anomaly.</strong> Alice moves to Bristol. Her city is stored in two rows, and if you update only one, the database now holds two contradictory answers to the same question.
+- <strong>Insert anomaly.</strong> You cannot record a new customer until they place an order, because the row has no order to hang on.
+- <strong>Delete anomaly.</strong> Delete order 3 and you lose the only record that Bob exists, and the only record of the keyboard's price if it was the last one.
+
+Splitting the data into Customers, Products and Orders makes each fact live in exactly one place. Update Alice's city once and everything that references her sees the change, because there is nothing else to update.
+
+## The three normal forms, with a test each
+
+<strong>First normal form (1NF): one value per cell.</strong> No comma-separated lists, no repeating column groups like `phone1`, `phone2`, `phone3`.
+
+Test: does any cell contain more than one thing? A `tags` column holding "urgent,billing,uk" fails. The fix is a separate row per tag.
+
+<strong>Second normal form (2NF): no partial dependencies.</strong> Applies when the primary key is made of several columns. Every non-key column must depend on the <em>whole</em> key, not just part of it.
+
+Test: with a key of (OrderID, ProductID), does `ProductName` depend on both? No &mdash; it depends on ProductID alone. It belongs in a Products table.
+
+<strong>Third normal form (3NF): no transitive dependencies.</strong> Non-key columns must not depend on other non-key columns.
+
+Test: does `CustomerCity` depend on the order, or on the customer? On the customer &mdash; so it belongs in Customers, keyed by CustomerID.
+
+The informal summary that people memorise, and which is genuinely accurate: <em>every non-key column depends on the key, the whole key, and nothing but the key</em>.
+
+Higher forms exist &mdash; BCNF, 4NF, 5NF &mdash; and address rarer situations with overlapping candidate keys and multi-valued dependencies. In practice, 3NF is where most well-designed transactional schemas sit.
+
+## When to denormalise deliberately
+
+Normalisation optimises for correctness of writes. Reads pay for it in joins, and past a certain scale that cost becomes the dominant one.
+
+Denormalising means storing something redundantly on purpose, accepting the duplication in exchange for speed. It is a legitimate engineering decision when:
+
+- A report joins eight tables and runs constantly.
+- The redundant data does not change &mdash; the price <em>at the time of the order</em> genuinely belongs on the order, because it must not change when the product's price does.
+- You are building an analytics warehouse, where star schemas are deliberately denormalised for query speed.
+- A counter (`comment_count`) is read thousands of times per write.
+
+The cost is that you now own the consistency problem the database was solving for you. Every denormalised copy needs a plan: a trigger, an application-level update, or a scheduled rebuild. Denormalising without that plan is not a trade-off, it is a bug waiting for its first inconsistency.
+
+The order to work in: normalise first, measure, then denormalise the specific hot paths with evidence. Starting denormalised because it might be faster is how schemas become unmaintainable.
+
 ## Guided tour
 
 1. <strong>Start at raw.</strong> One table, one row per order, a multi-valued products column — not even 1NF.
@@ -26,3 +77,89 @@ Over-normalizing has a cost too: every extra table is another join at query time
 ## Summing up
 
 1NF removes multi-valued columns, 2NF removes columns that depend on only part of a composite key, and 3NF removes columns that depend on another non-key column rather than the key itself. Each step moves a fact into the one table where it is defined once, which is what makes update anomalies structurally impossible rather than merely unlikely.
+
+## A worked split
+
+Take the wide table from earlier and normalise it properly.
+
+<strong>Customers</strong> &mdash; one row per customer:
+
+```sql
+CREATE TABLE customers (
+  id    INT PRIMARY KEY,
+  name  VARCHAR(100) NOT NULL,
+  city  VARCHAR(100)
+);
+```
+
+<strong>Products</strong> &mdash; one row per product, with the current price:
+
+```sql
+CREATE TABLE products (
+  id    INT PRIMARY KEY,
+  name  VARCHAR(100) NOT NULL,
+  price DECIMAL(10,2) NOT NULL
+);
+```
+
+<strong>Orders</strong> &mdash; one row per order, referencing the customer:
+
+```sql
+CREATE TABLE orders (
+  id          INT PRIMARY KEY,
+  customer_id INT NOT NULL REFERENCES customers(id),
+  ordered_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);
+```
+
+<strong>Order lines</strong> &mdash; one row per product on an order, with the price <em>as charged</em>:
+
+```sql
+CREATE TABLE order_lines (
+  order_id     INT NOT NULL REFERENCES orders(id),
+  product_id   INT NOT NULL REFERENCES products(id),
+  quantity     INT NOT NULL CHECK (quantity > 0),
+  unit_price   DECIMAL(10,2) NOT NULL,   -- deliberately duplicated
+  PRIMARY KEY (order_id, product_id)
+);
+```
+
+That `unit_price` looks like a normalisation violation and is not. The price on the order is a historical fact that must never change; the price in `products` is the current one. They are two different facts that happen to be equal today, which is exactly the distinction normalisation asks you to make.
+
+## Questions people ask
+
+<strong>Do I need to go beyond 3NF?</strong> Rarely. BCNF matters when a table has overlapping candidate keys; most schemas never hit that case.
+
+<strong>Is normalisation bad for performance?</strong> It costs joins on reads and saves work on writes, while keeping tables smaller and more cacheable. For transactional systems it is usually a net win; for analytics, denormalised star schemas generally win.
+
+<strong>What about NoSQL?</strong> Document databases embrace denormalisation as the default &mdash; embed related data in one document and read it in one operation. The trade is the same one, made in the other direction, and the consistency work moves to your application.
+
+<strong>How do I know if my schema is normalised?</strong> Take each non-key column and ask what it actually depends on. If the answer is anything other than "the whole primary key", it belongs elsewhere.
+
+<strong>Should every table have a surrogate key?</strong> A single-column integer or UUID key is easier to reference and to change than a natural key, and most schemas use one. Keep a unique constraint on the natural key as well, so the real rule is still enforced.
+
+<strong>Can I normalise an existing production table?</strong> Yes, incrementally: create the new tables, backfill, write to both for a period, migrate readers, then drop the old columns. Doing it in one step on a live system is how outages happen.
+
+## Recap in one screen
+
+- Normalisation removes redundancy so that each fact is stored once.
+- Redundancy causes update, insert and delete anomalies &mdash; the concrete reasons the rules exist.
+- 1NF: one value per cell. 2NF: depend on the whole key. 3NF: depend on nothing but the key.
+- Denormalise deliberately, for measured read paths, with a plan for keeping copies consistent.
+- Historical values, such as the price charged on an order, are not redundancy &mdash; they are different facts.
+
+## Keys, and why they carry the design
+
+Normalisation is a statement about dependencies, and keys are how those dependencies get enforced.
+
+<strong>Primary key</strong> &mdash; the column, or set of columns, that identifies a row uniquely. It is `NOT NULL` by definition and is the anchor everything else references.
+
+<strong>Foreign key</strong> &mdash; a column that references another table's primary key. It is what stops an order pointing at a customer who does not exist, and what `ON DELETE CASCADE` or `ON DELETE RESTRICT` hangs off.
+
+<strong>Candidate key</strong> &mdash; any column set that <em>could</em> serve as the primary key. An email address and a national insurance number might both be candidates; you pick one as primary and enforce the others with `UNIQUE`.
+
+<strong>Composite key</strong> &mdash; a key made of several columns, common in the junction tables that model many-to-many relationships.
+
+The junction table is the pattern to remember, because it is how normalisation handles relationships that a single foreign key cannot express. Students and courses are many-to-many, so neither table can hold a reference to the other; a third table with `(student_id, course_id)` as its primary key does the job, and any facts about the enrolment itself &mdash; the grade, the enrolment date &mdash; belong there too.
+
+A last practical note: declare your foreign keys. Enforcing referential integrity in application code instead means the database will eventually contain rows the application says are impossible, usually inserted by a migration script at two in the morning.

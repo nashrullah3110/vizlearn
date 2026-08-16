@@ -27,6 +27,46 @@ The derivative of <span class="mono-font">|w|</span> is a constant &plusmn;1, no
 
 That is why Lasso performs feature selection and Ridge does not. Watch the coefficient bars above: under Ridge they all shrink together and stay non-zero; under Lasso they vanish one by one.
 
+## Why a penalty helps at all
+
+Plain least squares has one instruction: make the training errors as small as possible. With many features, or with features that are nearly duplicates of each other, it will do exactly that by assigning some enormous coefficients that happen to cancel each other out &mdash; +4,300 on one column, &minus;4,290 on a near-copy.
+
+Those coefficients fit the training data beautifully and mean nothing. Move one input slightly and the prediction swings wildly, because two huge numbers are no longer cancelling.
+
+Regularisation adds a second instruction: <em>and keep the coefficients small</em>. The model now minimises
+
+<p class="mono-font">error on the training data &nbsp;+&nbsp; &lambda; &times; (size of the coefficients)</p>
+
+&lambda; (called `alpha` in scikit-learn) sets the exchange rate between the two. At &lambda; = 0 you are back to ordinary least squares. As &lambda; grows, the model becomes progressively less willing to buy a small error reduction with a large coefficient, and at very large &lambda; every coefficient is pushed to nearly zero and the model predicts the mean.
+
+Deliberately accepting some bias to remove a lot of variance is the whole trade, and on data with many correlated features it is nearly always worth making.
+
+## The one difference that changes everything
+
+The two methods differ only in how "size of the coefficients" is measured.
+
+- <strong>Ridge (L2)</strong> penalises the sum of <em>squared</em> coefficients.
+- <strong>Lasso (L1)</strong> penalises the sum of <em>absolute</em> coefficients.
+
+That small change produces a large behavioural difference. Squaring means the penalty on a coefficient of 0.1 is 0.01 &mdash; almost nothing &mdash; so ridge has very little incentive to push a small coefficient all the way to zero. It shrinks everything smoothly and keeps every feature.
+
+With absolute values, the penalty on 0.1 is 0.1, and the pressure to remove it entirely is exactly as strong as the pressure on any other unit of coefficient. So lasso pushes weak coefficients to exactly zero, and the features attached to them drop out of the model completely.
+
+That makes lasso a feature selector as well as a regulariser. Fit it with a moderate alpha on 200 columns and you may be left with 30 non-zero coefficients and a model you can actually read.
+
+|&nbsp;|Ridge (L2)|Lasso (L1)|
+|---|---|---|
+|Penalty|Sum of squares|Sum of absolute values|
+|Coefficients|Shrunk, never exactly zero|Some become exactly zero|
+|Feature selection|No|Yes|
+|Correlated features|Shares weight between them|Picks one, drops the rest|
+|Solution|Closed form exists|Iterative|
+|Use when|All features plausibly matter|You suspect many are useless|
+
+The correlated-features row is the one that decides most real cases. Ridge splits the weight across a group of correlated columns, which is stable and sensible. Lasso arbitrarily keeps one and zeroes the others, and which one it keeps can change with a small change in the data &mdash; unstable, though the predictions stay similar.
+
+<strong>Elastic Net</strong> uses both penalties with a mixing ratio, and it is the standard answer when you want lasso's sparsity without its instability on correlated groups.
+
 ## Guided tour
 
 1. <strong>See the problem first.</strong> Set the <strong>Penalty Type</strong> to None (plain OLS) and set the <strong>Polynomial Degree</strong> slider to 12. The curve whips between the training points, train MSE is almost zero, and test MSE is enormous. That gap is overfitting, made visible.
@@ -54,3 +94,58 @@ In practice &lambda; is not chosen by eye. It is selected by <a href="cross_vali
 ## Where that leaves you
 
 Both methods add a penalty on coefficient size to the loss, trading a little training accuracy for a lot of stability, with lambda controlling how hard that trade is pushed. Ridge squares the weights, so its pressure fades as a coefficient nears zero and everything merely shrinks; Lasso uses absolute values, so its pressure stays constant and weak coefficients are driven to exactly zero, which makes it a feature selector as well as a regulariser. Scale your features first, never penalise the intercept, and pick lambda by cross-validation rather than by eye.
+
+## Choosing alpha, and the scaling requirement
+
+Alpha is not a setting you reason your way to &mdash; it is chosen by cross-validation, and scikit-learn provides estimators that do exactly that.
+
+```python
+from sklearn.linear_model import RidgeCV, LassoCV
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+import numpy as np
+
+alphas = np.logspace(-3, 3, 25)      # 0.001 to 1000, log-spaced
+
+ridge = make_pipeline(StandardScaler(), RidgeCV(alphas=alphas, cv=5))
+lasso = make_pipeline(StandardScaler(), LassoCV(alphas=alphas, cv=5))
+
+ridge.fit(X_train, y_train)
+print(ridge[-1].alpha_)               # the value cross-validation chose
+```
+
+Search alpha on a logarithmic scale &mdash; the interesting range spans orders of magnitude, and a linear grid wastes almost all its points.
+
+<strong>Scaling is mandatory.</strong> The penalty is applied to raw coefficient values, so a feature measured in thousands naturally has a tiny coefficient and is barely penalised, while a feature measured in units has a large one and is penalised heavily. Standardise first and the penalty falls evenly. Skipping this is the most common way to get nonsense out of a regularised model.
+
+Note also that the intercept is not penalised, and should not be &mdash; shrinking it towards zero would mean insisting the target is centred at zero.
+
+## Reading the coefficient path
+
+The most informative plot in this topic is the coefficient path: alpha on a log x-axis, coefficient values on the y-axis, one line per feature.
+
+For ridge, the lines converge smoothly towards zero as alpha grows, but never touch it. For lasso, lines hit zero one after another and stay there &mdash; and the order in which they drop out is a ranking of how much each feature was contributing. The last few survivors are the features carrying the signal.
+
+Two things to look for. A coefficient that changes sign as alpha varies is a warning about collinearity, not a finding. And a large gap between the alpha with the lowest cross-validation error and the "one standard error" alpha &mdash; the largest alpha within one standard error of the best &mdash; is a chance to buy a much simpler model for almost no accuracy. That heuristic is standard practice in statistics and underused elsewhere.
+
+## Questions people ask
+
+<strong>Which should I use by default?</strong> Ridge, if you have no strong reason to prefer otherwise. It is stable, has a closed-form solution, and does not throw away information. Move to lasso when you specifically want a smaller feature set, and to elastic net when you want both.
+
+<strong>Does regularisation work with logistic regression?</strong> Yes, identically, and scikit-learn applies L2 by default with `C = 1/alpha`. Everything here transfers.
+
+<strong>Can lasso select more features than there are rows?</strong> No &mdash; lasso can select at most n features from a dataset with n rows. Elastic net does not have this limitation, which is another reason it is preferred in wide, short datasets such as genomics.
+
+<strong>Should I trust lasso's feature selection?</strong> As a ranking, broadly. As a definitive statement about which features matter, no &mdash; refit with different random splits and see how stable the selected set is. Stability selection formalises this.
+
+<strong>Is regularisation the same as feature selection?</strong> Lasso happens to do both. Ridge does not select anything; it keeps every feature and reduces their influence.
+
+<strong>What if alpha comes out at essentially zero?</strong> Then your data does not need regularisation &mdash; plenty of rows, few features, low collinearity. That is a legitimate outcome and worth noticing.
+
+## Recap in one screen
+
+- Both methods add a penalty on coefficient size to the usual squared-error objective.
+- Ridge squares the coefficients: smooth shrinkage, nothing reaches zero, correlated features share the weight.
+- Lasso uses absolute values: weak coefficients hit exactly zero, so the model selects features.
+- Elastic net mixes the two and is the safe default on correlated, wide data.
+- Standardise your features, search alpha on a log scale by cross-validation, and read the coefficient path.

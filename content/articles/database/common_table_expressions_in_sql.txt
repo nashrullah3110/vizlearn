@@ -19,6 +19,71 @@ Each CTE can also reference the ones declared before it, which is what turns a t
 
 Historically PostgreSQL treated CTEs as an <em>optimisation fence</em> &mdash; always materialised, never merged into the outer query, which sometimes made them slower than the equivalent subquery. Since version 12 it inlines them by default, with <span class="mono-font">MATERIALIZED</span> and <span class="mono-font">NOT MATERIALIZED</span> available to force the choice. Most other engines have always inlined them. Treat CTEs as free for readability, but check the plan if a query is unexpectedly slow.
 
+## Naming the steps of a query
+
+A CTE gives a name to an intermediate result, so a complicated query can be written as a sequence of readable steps instead of one deeply nested expression.
+
+```sql
+WITH monthly AS (
+  SELECT DATE_TRUNC('month', order_date) AS month, SUM(total) AS revenue
+  FROM   orders
+  GROUP  BY 1
+),
+with_growth AS (
+  SELECT month,
+         revenue,
+         LAG(revenue) OVER (ORDER BY month) AS prev
+  FROM   monthly
+)
+SELECT month, revenue, ROUND(100.0 * (revenue - prev) / prev, 1) AS growth_pct
+FROM   with_growth
+WHERE  prev IS NOT NULL;
+```
+
+Three steps, each named, each readable on its own, and the final query is four lines. The nested-subquery version of the same logic is a single expression three levels deep that nobody enjoys editing six months later.
+
+Two mechanical points: separate multiple CTEs with commas (only the first gets `WITH`), and later CTEs may reference earlier ones but not the other way round.
+
+## Recursion: the thing only CTEs can do
+
+`WITH RECURSIVE` lets a query refer to itself, which is how hierarchies and sequences are handled in SQL.
+
+Every recursive CTE has exactly two halves joined by `UNION ALL`:
+
+```sql
+WITH RECURSIVE org AS (
+  -- anchor: where to start
+  SELECT id, name, manager_id, 1 AS level
+  FROM   employees
+  WHERE  manager_id IS NULL
+
+  UNION ALL
+
+  -- recursive step: one level further, each time
+  SELECT e.id, e.name, e.manager_id, o.level + 1
+  FROM   employees e
+  JOIN   org o ON e.manager_id = o.id
+)
+SELECT * FROM org ORDER BY level;
+```
+
+The anchor runs once and produces the starting rows. The recursive part then runs repeatedly, each time against the rows produced by the previous round, until a round produces nothing. Then all the results are unioned together.
+
+This is how you walk an organisation chart, expand a bill of materials, trace a comment thread, find every descendant category, or generate a series of dates with no numbers table.
+
+The failure mode to guard against is a cycle. If employee A reports to B and B reports to A, the recursion never ends. Two defences: track the path visited so far and exclude rows already in it, or add a `WHERE level < 100` guard. PostgreSQL also offers a `CYCLE` clause that does the tracking for you.
+
+## Where CTEs help and where they do not
+
+They help most when a query has repeated logic, several stages, or needs to be understood by someone else. They are the difference between a query a colleague can review and one they have to reverse-engineer.
+
+They do not, by themselves, make anything faster. On modern engines a CTE is inlined into the main query exactly as a derived table would be, so the plan is usually identical. Two exceptions worth knowing:
+
+- <strong>PostgreSQL before version 12</strong> materialised every CTE, which acted as an optimisation fence &mdash; sometimes helpful, often harmful. Since 12 they are inlined unless you write `MATERIALIZED`.
+- <strong>Deliberate materialisation</strong> is occasionally what you want: if a CTE is expensive and referenced three times, forcing it to be computed once can genuinely help.
+
+If a CTE result is used by many queries rather than one, you are looking at a view or a materialised view instead. A CTE lives and dies with its statement.
+
 ## Guided experiments
 
 1. <strong>Start with the chained CTEs.</strong> Each named step shows its own output, so you can see the data narrowing at every stage.
@@ -29,3 +94,53 @@ Historically PostgreSQL treated CTEs as an <em>optimisation fence</em> &mdash; a
 ## Where that leaves you
 
 Use CTEs to turn one unreadable query into several named steps that a colleague can follow. Use <span class="mono-font">WITH RECURSIVE</span> when the data is a hierarchy and you do not know how deep it goes &mdash; that is a problem plain SQL simply cannot express.
+
+## Practical patterns
+
+<strong>Generating a date series</strong>, so that days with no data still appear in a report:
+
+```sql
+WITH RECURSIVE dates AS (
+  SELECT DATE '2026-01-01' AS d
+  UNION ALL
+  SELECT d + 1 FROM dates WHERE d < DATE '2026-01-31'
+)
+SELECT dates.d, COALESCE(SUM(o.total), 0) AS revenue
+FROM   dates LEFT JOIN orders o ON o.order_date = dates.d
+GROUP  BY dates.d ORDER BY dates.d;
+```
+
+<strong>Splitting a data-cleaning pipeline into readable stages</strong>: one CTE to deduplicate, one to normalise values, one to join reference data, and a final `SELECT` that reads like a summary of the whole thing.
+
+<strong>Reusing an expensive filter</strong> that would otherwise be written twice in a `UNION` or a self-join.
+
+<strong>Writable CTEs</strong>, in PostgreSQL, where a CTE can contain `INSERT`, `UPDATE` or `DELETE` with `RETURNING` &mdash; the standard way to move rows between tables in a single statement:
+
+```sql
+WITH moved AS (
+  DELETE FROM active_orders WHERE completed_at IS NOT NULL RETURNING *
+)
+INSERT INTO archived_orders SELECT * FROM moved;
+```
+
+## Questions people ask
+
+<strong>Are CTEs slower than subqueries?</strong> Not on current engines, where they are inlined. On PostgreSQL 11 and earlier, they could be either faster or slower because they were always materialised.
+
+<strong>Can I use a CTE in an `INSERT` or `UPDATE`?</strong> Yes &mdash; `WITH ... UPDATE ...` and `WITH ... INSERT ...` are both valid, and useful for computing the rows to change in a readable way.
+
+<strong>How many CTEs can I chain?</strong> No practical limit. Readability is the constraint; past six or seven stages, consider a view or a materialised table.
+
+<strong>Can a CTE reference a later CTE?</strong> No &mdash; references only go backwards. Recursive CTEs reference themselves, which is the one exception.
+
+<strong>Do all databases support them?</strong> Yes in current versions: PostgreSQL, MySQL 8+, SQL Server, Oracle, SQLite 3.8.3+. Recursion is supported by all of those too, with minor syntax differences (Oracle and SQL Server omit the `RECURSIVE` keyword).
+
+<strong>When should I use a temporary table instead?</strong> When the intermediate result is large, used by several separate statements, or worth indexing. A CTE cannot be indexed and does not outlive its statement.
+
+## Recap in one screen
+
+- `WITH name AS (...)` names an intermediate result and makes multi-step queries readable.
+- Chain several with commas; each may reference the ones before it.
+- `WITH RECURSIVE` walks hierarchies and generates sequences &mdash; an anchor, `UNION ALL`, and a step that references the CTE itself.
+- Guard recursion against cycles with a depth limit or a visited-path check.
+- CTEs are about clarity, not speed; on modern engines they are inlined like subqueries.

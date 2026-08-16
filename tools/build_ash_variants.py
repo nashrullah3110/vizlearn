@@ -19,11 +19,11 @@ import os
 import sys
 
 from lib_catalog import DIR_META, counts, modules
-from phosphor_variants import FIXES_CSS, VARIANTS, css as palette_css
+from ash_variants import ASH_FIXES, PHOSPHOR_FIXES, VARIANTS, css as palette_css
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INDEX = os.path.join(ROOT, "index.html")
-MARK = "<!-- VIZLEARN:PHOSPHOR-VARIANT -->"
+MARK = "<!-- VIZLEARN:ASH-VARIANT -->"
 
 ANCHOR_SECTIONS = '<main id="course-container"'
 ANCHOR_CTA = '<footer class="vz-footer"'
@@ -379,7 +379,7 @@ STRAY_GREEN = """
 
 def switcher(cur):
     links = "".join(
-        '<a href="theme-phos-%s.html" style="text-decoration:none;padding:.25rem .6rem;'
+        '<a href="theme-ash-%s.html" style="text-decoration:none;padding:.25rem .6rem;'
         'border-radius:4px;%s">%s</a>'
         % (v["slug"],
            "background:var(--accent-primary);color:var(--text-inverse);font-weight:700"
@@ -393,16 +393,36 @@ def switcher(cur):
             'border:1px solid var(--border-subtle);font-family:var(--vz-mono);'
             'font-size:.72rem;color:var(--text-muted);box-shadow:0 8px 24px rgba(0,0,0,.18);'
             'max-width:calc(100vw - 2rem);flex-wrap:wrap;justify-content:center">'
-            '<span style="opacity:.6;padding-left:.35rem">phosphor</span>%s</div>' % (MARK, links))
+            '<span style="opacity:.6;padding-left:.35rem">ash</span>%s</div>' % (MARK, links))
+
+
+INTRO_BAND = '<section class="vz-intro-band"'
+
+
+def strip_intro_band(src):
+    """Remove the three-card intro block and the "New here?" note.
+
+    They are one <section>: the heading only exists to introduce the cards,
+    so it goes with them. Nothing else in the opening is removed.
+    """
+    at = src.find(INTRO_BAND)
+    if at == -1:
+        raise SystemExit("intro band not found in index.html - refusing to guess")
+    end = src.find("</section>", at)
+    if end == -1:
+        raise SystemExit("intro band has no closing tag")
+    return src[:at] + src[end + len("</section>"):]
 
 
 def build(src, v, sections, closing):
+    src = strip_intro_band(src)
     head = src.find("</head>")
     if head == -1:
         raise SystemExit("index.html has no </head>")
     style = ('%s\n<meta name="robots" content="noindex, nofollow">\n'
-             '<style id="vz-phos-variant">\n    /* %s - %s */\n%s\n%s\n%s\n%s\n</style>\n'
-             % (MARK, v["name"], v["blurb"], palette_css(v), STRAY_GREEN, BASE_CSS, FIXES_CSS))
+             '<style id="vz-ash-variant">\n    /* %s - %s */\n%s\n%s\n%s\n%s\n%s\n%s\n</style>\n'
+             % (MARK, v["name"], v["blurb"], palette_css(v), STRAY_GREEN,
+                BASE_CSS, PHOSPHOR_FIXES, ASH_FIXES, v["layout"]))
     out = src[:head] + style + src[head:]
 
     for anchor, chunk in ((ANCHOR_SECTIONS, sections), (ANCHOR_CTA, closing)):
@@ -420,11 +440,11 @@ def main():
     if "--clean" in sys.argv:
         gone = 0
         for v in VARIANTS:
-            p = os.path.join(ROOT, "theme-phos-%s.html" % v["slug"])
+            p = os.path.join(ROOT, "theme-ash-%s.html" % v["slug"])
             if os.path.exists(p):
                 os.remove(p)
                 gone += 1
-        print("phosphor variants removed : %d" % gone)
+        print("ash variants removed : %d" % gone)
         return 0
 
     src = open(INDEX, encoding="utf-8").read()
@@ -438,12 +458,12 @@ def main():
     closing = cta(n["modules"])
 
     for v in VARIANTS:
-        rel = "theme-phos-%s.html" % v["slug"]
+        rel = "theme-ash-%s.html" % v["slug"]
         open(os.path.join(ROOT, rel), "w", encoding="utf-8").write(
             build(src, v, sections, closing))
         print("  %-8s -> %s" % (v["name"], rel))
 
-    print("phosphor variants written : %d" % len(VARIANTS))
+    print("ash variants written : %d" % len(VARIANTS))
     print("index.html                : untouched")
     return 0
 

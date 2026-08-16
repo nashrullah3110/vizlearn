@@ -15,6 +15,51 @@ This occurs when the fundamental relationship between the input variables and th
 
 This occurs when the distribution of the input data changes, even if the underlying concept remains the same. The model starts seeing data it has never encountered before. In the visualization, the <span style="color: var(--true-color);">green dashed line</span> will remain static, but the <span style="color: var(--data-color);">blue data points</span> will drift horizontally into a new region. The model, which was only trained on data from the initial region, has no idea how to make accurate predictions for these new inputs. A third type, <strong>Sudden Shock</strong>, is an extreme form of drift where a major event instantly changes the data or concept, like the effect of a global pandemic on shopping behavior.
 
+## The world moves and the model does not
+
+A trained model is a photograph. It records the relationships that held in the data it saw, on the day it saw it, and then it stops updating &mdash; forever, unless you retrain it.
+
+Everything else keeps moving. A demand forecast built before a competitor opened nearby. A fraud model built before fraudsters read about it. A recommendation model built before a new product category existed. None of these models break loudly; they degrade, quietly, while continuing to return confident predictions.
+
+This is why "the model is finished" is never true of a deployed system. A model in production is a component with a maintenance schedule, and drift monitoring is that schedule.
+
+## The three kinds, and how they differ
+
+The word "drift" covers three genuinely different problems, and the fixes differ.
+
+<strong>Data drift (covariate shift)</strong> &mdash; the inputs change, the relationship does not. Your customer base shifts younger; the way age relates to purchase behaviour stays the same. The model is now making predictions in a region it saw less of during training, so accuracy typically drops even though nothing about the underlying rule changed.
+
+<strong>Concept drift</strong> &mdash; the relationship itself changes. The inputs might look identical, but what they imply is different. "Working from home" meant something different about a customer in 2019 than in 2021. This is the serious one: no amount of reweighting the old data fixes it, because the old data is now wrong.
+
+<strong>Label drift (prior shift)</strong> &mdash; the mix of outcomes changes. Fraud rises from 0.5% to 2% of transactions. The model's calibration is now off even if its ranking is still good, and a fixed threshold is now in the wrong place.
+
+|Type|What changed|Typical fix|
+|---|---|---|
+|Data drift|P(X)|Retrain on recent data; reweight|
+|Concept drift|P(y given X)|Retrain, and shorten the training window|
+|Label drift|P(y)|Recalibrate, adjust the threshold|
+
+Concept drift also comes in speeds. <em>Sudden</em>: a regulation changes overnight. <em>Gradual</em>: preferences shift over a year. <em>Recurring</em>: seasonality, which is not really drift at all if your features include the season.
+
+## Detecting it before your users do
+
+The awkward reality is that ground-truth labels usually arrive late &mdash; you learn whether a loan defaulted a year after you approved it. So monitoring splits into two layers.
+
+<strong>Input monitoring</strong> works immediately, because it needs no labels:
+
+- <strong>Population Stability Index (PSI)</strong> &mdash; bucket a feature, compare the training and recent distributions. Under 0.1 is stable, 0.1&ndash;0.25 is worth watching, above 0.25 is a material shift. The industry standard in credit risk.
+- <strong>Kolmogorov&ndash;Smirnov test</strong> for continuous features, chi-squared for categorical ones.
+- <strong>A domain classifier.</strong> Train a model to distinguish training rows from recent rows. If it can, they differ &mdash; and its feature importances tell you exactly which columns moved.
+- <strong>Prediction distribution.</strong> If a model that used to predict "approve" 70% of the time now says 45%, something changed, whether or not you can yet say what.
+
+<strong>Outcome monitoring</strong> is the real test, and it lags:
+
+- Track accuracy, precision, recall or error over rolling windows, not as a single all-time number.
+- Segment it. An overall accuracy that holds steady can hide a specific region or product line falling apart.
+- Watch calibration, not just ranking &mdash; drift often shows up as confident predictions that are no longer well-calibrated.
+
+Set thresholds and alerts on these before launch, not after the first incident. And log every prediction with its inputs and a timestamp, or you will have nothing to compare against later.
+
 ## Experiments to try
 
 Use the interactive panel to see how drift destroys a model's performance and how retraining can fix it.
@@ -31,3 +76,50 @@ Drift is not a sign of a bad model; it is an inevitability for any model deploye
 - <strong>Monitoring:</strong> Continuously track the model's performance and the statistical properties of live data.
 - <strong>Detection:</strong> Set up alerts to trigger when performance drops below a certain threshold or when data drift is detected.
 - <strong>Retraining:</strong> Have an automated or semi-automated pipeline to retrain the model on new, relevant data to adapt to the changes.
+
+## Responding: retrain, reweight, or redesign
+
+Detection is only useful if there is a response attached, and there are three, in increasing order of effort.
+
+<strong>Scheduled retraining.</strong> The simplest policy: refit on a rolling window every week or month. Cheap to automate, and it handles gradual drift well. The main decision is the window length &mdash; too long and it dilutes recent reality, too short and the model becomes noisy and unstable.
+
+<strong>Triggered retraining.</strong> Retrain when a monitor crosses a threshold rather than on a calendar. More efficient, and it responds to sudden drift far faster. It requires the monitoring to be trustworthy, since a false alarm costs a full retraining cycle.
+
+<strong>Redesign.</strong> Sometimes the features themselves have stopped being meaningful &mdash; a channel was discontinued, a product was renamed, a data source changed its schema. No retraining fixes that; the pipeline needs work.
+
+Two practices make all three safer. Keep a <strong>champion&ndash;challenger</strong> setup, where the newly trained model runs alongside the live one on real traffic before replacing it &mdash; a retrained model is not automatically a better model. And keep a small, stable <strong>golden test set</strong> that never changes, so you can distinguish "the model got worse" from "the new test data got harder".
+
+## What monitoring looks like in practice
+
+A workable minimum for any deployed model:
+
+1. <strong>Log everything.</strong> Inputs, prediction, model version, timestamp, and the label whenever it eventually arrives.
+2. <strong>Compute drift statistics on a schedule.</strong> PSI per feature, daily or weekly, against the training distribution.
+3. <strong>Track prediction distributions</strong> as a leading indicator, since they need no labels.
+4. <strong>Track outcome metrics</strong> on rolling windows as labels arrive, broken down by segment.
+5. <strong>Alert with a runbook.</strong> "PSI above 0.25 on any top-10 feature" should route to a person with instructions, not to a dashboard nobody opens.
+6. <strong>Keep model versions and their training data reproducible</strong>, so a rollback is possible when a retrain makes things worse.
+
+Open-source tools such as Evidently, NannyML and river cover most of this, and every major cloud ML platform has a monitoring product. The tooling matters much less than having decided, before launch, what "too much drift" means for this model.
+
+## Questions people ask
+
+<strong>How often should I retrain?</strong> As often as the underlying process changes. Fraud and pricing models often need weekly or daily attention; a model predicting physical properties may run for years. Measure the decay rate rather than guessing: retrain on old data, evaluate on progressively newer windows, and see how fast performance falls.
+
+<strong>Can a model drift if the data does not?</strong> The model itself does not change, but the world's relationship to it can &mdash; and a stable input distribution with falling accuracy is the signature of concept drift.
+
+<strong>Is drift the same as an outlier?</strong> No. An outlier is one unusual row; drift is a sustained change in the distribution. Both matter, and both need separate detection.
+
+<strong>Should I always retrain on the newest data only?</strong> Not always. Recency helps with concept drift and hurts when it discards rare but still-valid patterns. Weighted training &mdash; recent rows count more, old rows still count &mdash; is often a better compromise.
+
+<strong>What if I never get labels?</strong> Then input drift monitoring and prediction monitoring are all you have, plus any proxy outcome you can obtain: click-throughs, manual review outcomes, complaint rates.
+
+<strong>Does drift affect deep learning models more?</strong> Not inherently, but they are often deployed on inputs that shift more &mdash; user-generated text, camera images, sensor streams &mdash; and they are more expensive to retrain, so the monitoring matters more.
+
+## Recap in one screen
+
+- Models are snapshots; the world keeps moving, so performance decays by default.
+- Data drift changes the inputs, concept drift changes the rule, label drift changes the base rate.
+- Monitor inputs and prediction distributions immediately, outcomes as labels arrive.
+- PSI, KS tests and a train-versus-recent domain classifier are the standard detectors.
+- Attach a response &mdash; scheduled or triggered retraining &mdash; and validate the retrained model before it replaces the live one.

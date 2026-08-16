@@ -11,6 +11,93 @@ At its heart, a JOIN operation is like a matching game. The database engine take
 
 The different types of JOINs (<code>INNER</code>, <code>LEFT</code>, <code>RIGHT</code>, <code>FULL</code>) simply change the rules for what happens when a row in one table doesn't have a matching partner in the other.
 
+## The four joins on one small example
+
+Two tables, deliberately tiny, so every row can be accounted for.
+
+<strong>Employees</strong>: Alice (DeptID 101), Bob (101), Carol (102), David (103).
+<strong>Departments</strong>: 101 Engineering, 102 Marketing, 104 Sales.
+
+Note the two orphans: David's department 103 does not exist, and Sales has nobody in it.
+
+```sql
+SELECT e.name, d.name AS dept
+FROM   employees e
+JOIN   departments d ON e.dept_id = d.id;
+```
+
+|Join type|Rows returned|Who is missing|
+|---|---|---|
+|`INNER JOIN`|Alice, Bob, Carol|David and Sales &mdash; no partner|
+|`LEFT JOIN`|Alice, Bob, Carol, David (dept NULL)|Sales|
+|`RIGHT JOIN`|Alice, Bob, Carol, Sales (name NULL)|David|
+|`FULL OUTER JOIN`|All five rows, NULLs where unmatched|Nobody|
+
+Everything else about joins is elaboration on this table. `INNER` keeps only pairs. `LEFT` keeps every row of the first table regardless. `RIGHT` keeps every row of the second. `FULL OUTER` keeps everything and fills gaps with NULL.
+
+The word "outer" simply means "keep the unmatched rows too" &mdash; `LEFT JOIN` and `LEFT OUTER JOIN` are the same thing, and the `OUTER` is optional noise.
+
+## Finding what is missing: the anti-join
+
+The most useful pattern in this topic is not a join type at all. It is a `LEFT JOIN` followed by a filter for the rows that failed to match:
+
+```sql
+-- Employees whose department does not exist
+SELECT e.name
+FROM   employees e
+LEFT   JOIN departments d ON e.dept_id = d.id
+WHERE  d.id IS NULL;
+```
+
+The `LEFT JOIN` keeps David with NULLs in the department columns; `WHERE d.id IS NULL` keeps only rows where the match failed. This is how you find customers with no orders, products never sold, users who never logged in, and orphaned foreign keys.
+
+The condition must test a column that is `NOT NULL` in the right-hand table &mdash; usually its primary key. Testing a nullable column cannot distinguish "no match" from "matched a row whose value was NULL".
+
+`NOT EXISTS` expresses the same idea and is often clearer, and on most modern engines the planner produces the same execution plan for both.
+
+## ON versus WHERE, and why it only matters for outer joins
+
+This distinction quietly breaks more queries than any other join topic.
+
+```sql
+-- (A) filter inside the join
+SELECT e.name, d.name
+FROM   employees e
+LEFT   JOIN departments d ON e.dept_id = d.id AND d.name = 'Engineering';
+
+-- (B) filter after the join
+SELECT e.name, d.name
+FROM   employees e
+LEFT   JOIN departments d ON e.dept_id = d.id
+WHERE  d.name = 'Engineering';
+```
+
+Query A returns <em>every</em> employee, with department details filled in only for those in Engineering and NULLs for everyone else. Query B returns only the Engineering employees, because `WHERE` runs after the join and discards every row whose department name is NULL &mdash; which includes all the rows the `LEFT JOIN` was preserving.
+
+Query B has silently become an inner join. If you ever write a `LEFT JOIN` and then filter on a column from the right-hand table in `WHERE`, you have almost certainly made this mistake.
+
+For `INNER JOIN` the distinction does not matter: filtering during or after produces the same rows, and the planner is free to reorder them anyway.
+
+## Duplicates, and why row counts explode
+
+A join does not preserve row counts, and the arithmetic surprises people.
+
+If one customer has 3 orders, joining customers to orders returns that customer's name 3 times. That is correct behaviour &mdash; the result has one row per matched pair, not one row per customer.
+
+Where it becomes a real bug is with two joins:
+
+```sql
+SELECT c.name, SUM(o.total)
+FROM   customers c
+JOIN   orders   o ON o.customer_id = c.id
+JOIN   payments p ON p.customer_id = c.id     -- a second one-to-many
+GROUP  BY c.name;
+```
+
+A customer with 3 orders and 2 payments produces 3 &times; 2 = 6 rows, and the `SUM(o.total)` now counts every order twice. The total is inflated and nothing in the output looks wrong.
+
+Two defences. Aggregate each side separately before joining &mdash; in a CTE or a subquery &mdash; so each returns one row per customer. Or add `COUNT(*)` to any aggregate query while developing, and check it against the row counts you expect.
+
 ## Experiments to try
 
 The Venn diagram is your best friend here. It shows exactly which data will be included. Use it to predict the outcome before running the visualizer.
@@ -48,3 +135,57 @@ return result_set
 - <strong><code>LEFT JOIN</code></strong>: All rows from the left table, plus matches from the right. Use this when you want to keep all records from the primary table, even if they don't have a corresponding entry in the other (e.g., "Show me ALL employees and their department name, if they have one").
 - <strong><code>RIGHT JOIN</code></strong>: All rows from the right table. Less common, but useful for finding records in the right table that don't have a match in the left (e.g., "Show me all departments, and which employees are in them").
 - <strong><code>FULL OUTER JOIN</code></strong>: All rows from both tables. Use when you need a complete picture of all data from both tables, regardless of whether it matches.
+
+## How the database actually executes a join
+
+You write `JOIN`; the planner chooses one of three algorithms, and knowing which explains most performance questions.
+
+<strong>Nested loop join.</strong> For each row of the outer table, look up matching rows in the inner one. Fast when the outer side is small <em>and</em> the inner side has an index on the join column. Without that index it degrades to scanning the inner table once per outer row, which is the classic slow join.
+
+<strong>Hash join.</strong> Build a hash table of the smaller side in memory, then scan the larger side and probe it. Excellent for large, unindexed equality joins &mdash; and it needs enough memory to hold the build side, or it spills to disk and slows down sharply.
+
+<strong>Merge join.</strong> Sort both sides by the join key and walk them in step. Efficient when both inputs are already sorted, typically because they arrive from index scans.
+
+The single most valuable habit here is running `EXPLAIN` (or `EXPLAIN ANALYZE`) on a slow join. It tells you which algorithm was chosen, whether an index was used, and where the estimated row counts diverge from reality &mdash; and a bad estimate is usually the root cause when the planner picks the wrong strategy.
+
+The practical checklist for a slow join: index both sides of the join condition, make sure the two columns have the same data type (a mismatch can silently disable index use), and filter as early as possible so fewer rows reach the join.
+
+## Self joins and other useful shapes
+
+A table can be joined to itself, which is how hierarchies are queried:
+
+```sql
+SELECT e.name AS employee, m.name AS manager
+FROM   employees e
+LEFT   JOIN employees m ON e.manager_id = m.id;
+```
+
+The aliases `e` and `m` make one physical table act as two logical ones. The `LEFT JOIN` keeps the chief executive, who has no manager.
+
+Two other shapes worth recognising:
+
+- <strong>`CROSS JOIN`</strong> pairs every row with every row &mdash; 100 rows against 100 rows gives 10,000. Deliberately useful for generating calendars or all combinations of two dimensions, and accidentally produced by forgetting a join condition.
+- <strong>Joining on a range</strong> rather than equality &mdash; `ON t.event_time BETWEEN p.start AND p.end` &mdash; is legal and common in time-based work, but it cannot use hash joins, so watch the plan.
+
+## Questions people ask
+
+<strong>Is `LEFT JOIN` slower than `INNER JOIN`?</strong> Usually slightly, because the engine must preserve unmatched rows and has fewer options for reordering. The difference is rarely the reason a query is slow &mdash; missing indexes are.
+
+<strong>Should I use `RIGHT JOIN`?</strong> You can, but almost nobody does. Swapping the table order and using `LEFT JOIN` reads more naturally, and consistency helps whoever maintains the query next.
+
+<strong>How many tables can I join?</strong> Dozens, technically. Past about eight the planner's job gets much harder and query plans become unstable. If you regularly join ten tables, consider a view, a materialised summary, or a schema change.
+
+<strong>Why did my join produce more rows than either table?</strong> Because at least one side matched multiple rows. Check for duplicate keys on the join column &mdash; `SELECT key, COUNT(*) ... HAVING COUNT(*) > 1` finds them immediately.
+
+<strong>Does the order of tables in a join matter?</strong> Not for the result of an inner join, and the planner reorders them freely. It does matter for outer joins, where "left" and "right" are defined by the written order.
+
+<strong>What is `USING`?</strong> Shorthand for joining on identically named columns: `JOIN departments USING (dept_id)`. It also merges the two columns into one in the output, which is occasionally what you want.
+
+## Recap in one screen
+
+- A join matches rows from two tables on a condition and returns the combined pairs.
+- `INNER` keeps matches only; `LEFT`/`RIGHT` keep all rows from one side; `FULL OUTER` keeps everything.
+- `LEFT JOIN` plus `WHERE right.key IS NULL` is how you find rows with no match.
+- Filtering a right-hand column in `WHERE` turns an outer join back into an inner one &mdash; put it in `ON` instead.
+- Joining two one-to-many relationships at once multiplies rows and inflates aggregates.
+- Index both join columns, keep their types identical, and read `EXPLAIN` when it is slow.

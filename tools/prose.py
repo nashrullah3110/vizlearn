@@ -75,7 +75,10 @@ def _table(lines):
         m = ROW.match(line)
         if not m:
             continue
-        cells = [c.strip() for c in m.group(1).split("|")]
+        # \| is a literal pipe inside a cell - SQL's || concatenation
+        # operator would otherwise split one cell into three.
+        cells = [c.strip().replace("\\|", "|")
+                 for c in re.split(r"(?<!\\)\|", m.group(1))]
         if all(set(c) <= set("-: ") and c for c in cells):
             continue  # the |---|---| separator
         rows.append(cells)

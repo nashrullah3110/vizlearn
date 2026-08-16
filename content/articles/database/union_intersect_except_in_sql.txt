@@ -26,6 +26,70 @@ Some databases spell EXCEPT as MINUS (Oracle), and the semantics are the same.
 
 Note that matching is <em>positional</em>, not by name. If the first query selects (id, name) and the second selects (name, id), and both are text-compatible, the query runs and silently returns nonsense.
 
+## Stacking results, not joining them
+
+Joins put tables side by side, matching rows on a condition. Set operators put results one on top of the other, matching them by column position.
+
+```sql
+SELECT name, email FROM customers
+UNION
+SELECT name, email FROM suppliers;
+```
+
+Three operators cover the whole topic:
+
+- <strong>`UNION`</strong> &mdash; everything from both, duplicates removed.
+- <strong>`INTERSECT`</strong> &mdash; only rows appearing in both.
+- <strong>`EXCEPT`</strong> (called `MINUS` in Oracle) &mdash; rows in the first result that are not in the second.
+
+Each has an `ALL` variant that keeps duplicates: `UNION ALL`, `INTERSECT ALL`, `EXCEPT ALL`.
+
+The rules every set operator enforces:
+
+1. Both queries must return the <strong>same number of columns</strong>.
+2. Corresponding columns must have <strong>compatible types</strong>.
+3. Column names come from the <strong>first</strong> query; names in the second are ignored.
+4. `ORDER BY` applies to the combined result and goes at the very end, once.
+
+Matching is by <em>position</em>, not by name. `SELECT name, email` unioned with `SELECT email, name` compiles happily and produces nonsense &mdash; a real bug that type compatibility often fails to catch, since both columns are text.
+
+## UNION versus UNION ALL, and why the default is the slow one
+
+`UNION` removes duplicates, and removing duplicates means sorting or hashing the entire combined result. `UNION ALL` simply concatenates.
+
+On a million rows, the difference is large &mdash; often several times the runtime, plus the memory for the sort. And most of the time the deduplication is unnecessary, because the two queries return inherently distinct rows: this year's orders and last year's orders cannot overlap.
+
+The habit worth forming: <strong>write `UNION ALL` by default, and use `UNION` only when you specifically need duplicates removed and cannot rule them out.</strong> That is the reverse of what most people do, and it is the right way round.
+
+```sql
+-- combining partitioned tables: overlap is impossible
+SELECT * FROM orders_2025
+UNION ALL
+SELECT * FROM orders_2026;
+```
+
+## What INTERSECT and EXCEPT are actually for
+
+Both express set membership questions that would otherwise need subqueries.
+
+```sql
+-- customers who are also suppliers
+SELECT email FROM customers
+INTERSECT
+SELECT email FROM suppliers;
+
+-- customers who have never ordered
+SELECT id FROM customers
+EXCEPT
+SELECT customer_id FROM orders;
+```
+
+The `EXCEPT` form is the readable alternative to `NOT IN` &mdash; and unlike `NOT IN`, it handles NULLs correctly, treating them as comparable to each other. That alone is a reason to prefer it.
+
+Two behavioural details worth knowing. Set operators treat two NULLs as duplicates of each other, which is the opposite of `=` semantics and consistent with `GROUP BY`. And `EXCEPT` removes <em>all</em> copies of a matching row, not one per occurrence, unless you use `EXCEPT ALL`.
+
+Precedence: `INTERSECT` binds more tightly than `UNION` and `EXCEPT`, so mixed expressions need parentheses to mean what you intend.
+
 ## Exploration guide
 
 1. <strong>Compare UNION with UNION ALL.</strong> Switch <strong>Operator</strong> between them and count the rows. The difference is exactly the duplicates &mdash; and UNION paid to find them.
@@ -50,3 +114,59 @@ UNION ALL simply concatenates and is frequently several times faster on large re
 ## What to remember
 
 UNION, INTERSECT and EXCEPT combine result sets vertically, requiring the same column count and compatible types matched by position rather than name. All three deduplicate by default, which costs a full sort or hash &mdash; so prefer UNION ALL unless you specifically need duplicates removed. EXCEPT is the only one where operand order changes the answer, and none of them is a substitute for a JOIN.
+
+## Practical uses
+
+- <strong>Combining partitioned or archived tables</strong> into one result, which is the classic `UNION ALL` case.
+- <strong>Comparing two datasets during a migration.</strong> Run `A EXCEPT B` and `B EXCEPT A`; if both return nothing, the datasets are identical. This is the fastest reconciliation check there is.
+- <strong>Adding a total row</strong> to a report by unioning the detail with an aggregate.
+- <strong>Merging results from different sources</strong> that happen to share a shape &mdash; internal customers and external ones, current staff and alumni.
+- <strong>Expressing "in this list but not that one"</strong> without a correlated subquery.
+
+A worked reconciliation:
+
+```sql
+-- rows in the old table missing from the new one
+SELECT id, amount FROM legacy_payments
+EXCEPT
+SELECT id, amount FROM payments
+
+UNION ALL
+
+-- rows in the new table that were not in the old one
+SELECT id, amount FROM payments
+EXCEPT
+SELECT id, amount FROM legacy_payments;
+```
+
+An empty result means the migration is clean. Anything returned is a discrepancy with its side identifiable by which half produced it.
+
+## Performance notes
+
+- Every deduplicating variant costs a sort or hash. Prefer `ALL` unless you need otherwise.
+- Each branch is executed independently, so index each of them well &mdash; a set operator does not make a slow branch faster.
+- `ORDER BY` at the end sorts the combined result, and cannot use an index from either branch.
+- With `LIMIT` after a `UNION`, the engine generally has to produce both branches fully before it can apply the limit. Pushing the limit into each branch first (each with its own `ORDER BY`) is often much faster.
+- For very large `UNION ALL` sets over the same shape of data, consider whether the tables should be genuine partitions of one table instead &mdash; the planner then handles the combination itself.
+
+## Questions people ask
+
+<strong>Do the column names have to match?</strong> No &mdash; only the count and the types. The first query's names are used for the result.
+
+<strong>Can I `ORDER BY` inside one branch?</strong> Not usefully; the combined result is what gets ordered. The exception is when a branch has its own `LIMIT`, where the inner ordering is meaningful &mdash; wrap that branch in a subquery.
+
+<strong>Is `UNION` the same as a `FULL OUTER JOIN`?</strong> No. `UNION` stacks rows vertically; a join widens rows horizontally by matching them.
+
+<strong>Does `INTERSECT` work with different column counts?</strong> No &mdash; the same rule applies to all set operators.
+
+<strong>Which engines support `INTERSECT` and `EXCEPT`?</strong> PostgreSQL, SQL Server, SQLite and Oracle (as `MINUS`). MySQL added them in 8.0.31; before that, `INNER JOIN` and `LEFT JOIN ... IS NULL` were the workarounds.
+
+<strong>How do NULLs behave?</strong> Two NULLs count as duplicates for deduplication and as matching rows for `INTERSECT` and `EXCEPT` &mdash; deliberately unlike `=`.
+
+## Recap in one screen
+
+- Set operators stack results vertically; joins combine them horizontally.
+- `UNION` deduplicates, `UNION ALL` does not &mdash; and `ALL` should be your default.
+- `INTERSECT` keeps rows in both; `EXCEPT` keeps rows in the first only, and handles NULLs better than `NOT IN`.
+- Columns match by position, not name; the first query names the result.
+- `A EXCEPT B` plus `B EXCEPT A` is the quickest way to prove two datasets are identical.

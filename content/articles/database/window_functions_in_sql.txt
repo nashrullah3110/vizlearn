@@ -14,6 +14,95 @@ The magic of window functions is the <code>OVER()</code> clause. This clause def
 
 For each row, the function calculates its result based on the other rows in its "window" (its partition).
 
+## Aggregate without collapsing
+
+`GROUP BY` answers "what is the total per region?" and destroys the individual rows in the process. A window function answers "what is the total for this row's region, shown next to this row?" and keeps everything.
+
+That is the entire distinction, and it is why window functions feel like a superpower the first time they solve a problem that previously needed a self-join.
+
+```sql
+SELECT name,
+       region,
+       amount,
+       SUM(amount)  OVER (PARTITION BY region) AS region_total,
+       amount * 100.0 / SUM(amount) OVER (PARTITION BY region) AS pct_of_region
+FROM   sales;
+```
+
+Every original row survives, and each one now carries its region's total and its own share of it. Doing this with `GROUP BY` requires computing the totals separately and joining them back &mdash; two passes and a join, replaced by one clause.
+
+The `OVER (...)` is what makes a function a window function. Without it, `SUM(amount)` is an ordinary aggregate; with it, the same `SUM` is computed over a window of rows defined relative to the current row.
+
+## Reading the OVER clause
+
+`OVER` has three optional parts, and each does one job.
+
+<strong>`PARTITION BY`</strong> divides the rows into groups, and the window function restarts for each. It is `GROUP BY` for windows &mdash; without it, the whole result set is one window.
+
+<strong>`ORDER BY`</strong> sorts the rows within each partition. It matters for two reasons: ranking functions need an order to rank by, and adding `ORDER BY` to an aggregate silently changes its frame to "everything up to and including this row", which is how running totals happen.
+
+<strong>The frame clause</strong> &mdash; `ROWS BETWEEN ... AND ...` &mdash; sets exactly which rows around the current one are included. Defaults cover most cases, so this is the part you can ignore until you need a moving average.
+
+```sql
+SELECT sale_date,
+       amount,
+       SUM(amount) OVER (ORDER BY sale_date)                                     AS running_total,
+       AVG(amount) OVER (ORDER BY sale_date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS avg_7day
+FROM   sales;
+```
+
+The first is a running total, because `ORDER BY` without a frame means "from the start of the partition to the current row". The second is a seven-day moving average, because the frame is stated explicitly.
+
+One subtlety worth knowing: the default frame with `ORDER BY` is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`, and `RANGE` groups tied values together. If two sales share a date, both get the same running total &mdash; the total including both. Use `ROWS` instead when you want strict row-by-row behaviour.
+
+## The three ranking functions, and their differences
+
+Given scores 90, 85, 85, 70:
+
+|Score|`ROW_NUMBER()`|`RANK()`|`DENSE_RANK()`|
+|---|---|---|---|
+|90|1|1|1|
+|85|2|2|2|
+|85|3|2|2|
+|70|4|4|3|
+
+- <strong>`ROW_NUMBER()`</strong> always gives distinct numbers, breaking ties arbitrarily. Use it when you need exactly one row per group &mdash; deduplication, "the latest record per customer".
+- <strong>`RANK()`</strong> gives ties the same rank and then skips &mdash; two second places, no third. This is how sports rankings work.
+- <strong>`DENSE_RANK()`</strong> gives ties the same rank and does not skip. Use it when you want "the top 3 distinct salaries" rather than the top 3 rows.
+
+The deduplication pattern is worth memorising, because it comes up constantly:
+
+```sql
+WITH ranked AS (
+  SELECT *,
+         ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC) AS rn
+  FROM   orders
+)
+SELECT * FROM ranked WHERE rn = 1;      -- the most recent order per customer
+```
+
+Note the CTE. Window functions are computed after `WHERE`, so you cannot filter on `rn` in the same query level &mdash; it does not exist yet. Wrapping in a CTE or subquery is not a style choice; it is required.
+
+## LAG, LEAD, and comparing a row to its neighbours
+
+`LAG` reaches backwards and `LEAD` reaches forwards within the partition, which makes period-over-period comparisons a single expression:
+
+```sql
+SELECT month,
+       revenue,
+       LAG(revenue) OVER (ORDER BY month)                    AS prev_month,
+       revenue - LAG(revenue) OVER (ORDER BY month)          AS change,
+       ROUND(100.0 * (revenue - LAG(revenue) OVER (ORDER BY month))
+             / LAG(revenue) OVER (ORDER BY month), 1)        AS pct_change
+FROM   monthly_revenue;
+```
+
+The first row's `LAG` is NULL, because there is nothing before it &mdash; supply a default with `LAG(revenue, 1, 0)` if a zero is more convenient than a NULL.
+
+Related functions in the same family: `FIRST_VALUE` and `LAST_VALUE` return the first or last row in the frame, `NTH_VALUE` returns a specific position, and `NTILE(4)` splits each partition into four roughly equal buckets, which is how quartiles are computed.
+
+`LAST_VALUE` has a famous gotcha: with the default frame it means "last row up to the current row", which is the current row itself. To get the genuine last value of the partition you must state the frame: `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`.
+
 ## Things to try
 
 The visualizer helps you see how the <code>PARTITION BY</code> and <code>ORDER BY</code> clauses define the calculation for each row.
@@ -48,3 +137,57 @@ FROM MonthlySales;
 - <code>PARTITION BY</code> is like a temporary <code>GROUP BY</code> that defines the window.
 - <code>ORDER BY</code> is essential for ranking and sequential functions (<code>LAG</code>, <code>LEAD</code>).
 - Use them for ranking, running totals, moving averages, and comparing a row to its peers.
+
+## Where they are used in real reporting
+
+- <strong>Running totals and cumulative sums</strong> &mdash; account balances, year-to-date revenue, inventory levels over time.
+- <strong>Moving averages</strong> &mdash; smoothing noisy daily figures into a readable trend.
+- <strong>Top-N per group</strong> &mdash; the three best-selling products in each category, in one query rather than one query per category.
+- <strong>Deduplication</strong> &mdash; keeping the newest row per key when a source system sends repeats.
+- <strong>Gap and island detection</strong> &mdash; finding consecutive runs, such as how many days in a row a user was active, using the difference between a date and a `ROW_NUMBER()` over that date.
+- <strong>Percentages of a total</strong> &mdash; each row's share of its group, without a self-join.
+- <strong>Sessionisation</strong> &mdash; grouping events into sessions by comparing each event's timestamp with the previous one via `LAG`.
+
+Almost all of these have a pre-window-function equivalent involving correlated subqueries or self-joins, and almost all of those are both slower and considerably harder to read.
+
+## Performance and ordering
+
+Window functions run late in the pipeline &mdash; after `WHERE`, `GROUP BY` and `HAVING`, and before `ORDER BY` and `LIMIT`. Three consequences follow:
+
+1. You cannot filter on a window function's result in the same query level. Wrap it.
+2. Filtering rows in `WHERE` happens <em>before</em> the window is computed, so it changes the totals. That is usually what you want, but it means a running total over a filtered set is a running total of the filtered rows only.
+3. The window sees rows after grouping, so you can combine `GROUP BY` and window functions &mdash; `SUM(SUM(amount)) OVER (...)` is legal and computes a window over the grouped results.
+
+For performance, each distinct `OVER` specification generally requires its own sort. Reusing the same partition and ordering across several functions lets the engine sort once and compute them all together, so keep the specifications identical where possible &mdash; or name them once with a `WINDOW` clause:
+
+```sql
+SELECT name,
+       RANK()       OVER w,
+       SUM(amount)  OVER w
+FROM   sales
+WINDOW w AS (PARTITION BY region ORDER BY amount DESC);
+```
+
+An index on the partition and ordering columns can remove the sort entirely, which is the main lever available on large tables.
+
+## Questions people ask
+
+<strong>Do all databases support window functions?</strong> Yes, in current versions &mdash; PostgreSQL for many years, MySQL since 8.0, SQLite since 3.25, SQL Server and Oracle long before that. Only genuinely old versions lack them.
+
+<strong>Can I use `DISTINCT` inside a window function?</strong> Not portably. PostgreSQL and most engines reject `COUNT(DISTINCT x) OVER (...)`. The usual workaround is a `DENSE_RANK()` trick or a pre-aggregating CTE.
+
+<strong>What is the difference from a correlated subquery?</strong> They can express many of the same things, but the window function is computed in a single pass over sorted data, while the subquery is potentially re-executed per row. The window version is usually much faster and always shorter.
+
+<strong>Can I nest window functions?</strong> Not directly. Compute the inner one in a CTE and apply the outer one to its result.
+
+<strong>Why is my running total repeating the same value for several rows?</strong> Because the default frame uses `RANGE`, which lumps tied ordering values together. Switch to `ROWS`.
+
+<strong>Do they work with `GROUP BY`?</strong> Yes, and the window operates on the grouped rows. This is how "each region's share of the national total" is written in one query.
+
+## Recap in one screen
+
+- A window function computes across a set of rows without collapsing them.
+- `OVER (PARTITION BY ... ORDER BY ... frame)` defines which rows each calculation sees.
+- Adding `ORDER BY` to an aggregate turns it into a running total; state `ROWS` explicitly for moving windows.
+- `ROW_NUMBER`, `RANK` and `DENSE_RANK` differ only in how they treat ties.
+- They run after `WHERE`, so filtering on their output needs a CTE or subquery.

@@ -32,6 +32,97 @@ Most subqueries can be written as a <a href="joins_in_sql.html" style="color: va
 
 Once a derived table is more than a couple of lines, or you need it twice, lift it into a CTE. Same execution, a name, and no nesting to read inside-out.
 
+## A query inside a query, and where it can sit
+
+A subquery is a `SELECT` wrapped in parentheses and used as part of a larger statement. What it can be used <em>as</em> depends on what it returns.
+
+<strong>A single value (scalar).</strong> Anywhere a value is allowed:
+
+```sql
+SELECT name, salary
+FROM   employees
+WHERE  salary > (SELECT AVG(salary) FROM employees);
+```
+
+<strong>A list of values.</strong> With `IN`, `ANY` or `ALL`:
+
+```sql
+SELECT name FROM employees
+WHERE  dept_id IN (SELECT id FROM departments WHERE budget > 100000);
+```
+
+<strong>A table.</strong> In `FROM`, where it is called a derived table and must be given an alias:
+
+```sql
+SELECT dept, avg_salary
+FROM  (SELECT dept_id AS dept, AVG(salary) AS avg_salary
+       FROM   employees GROUP BY dept_id) AS dept_avgs
+WHERE  avg_salary > 60000;
+```
+
+<strong>An existence test.</strong> With `EXISTS`, where the returned columns are irrelevant:
+
+```sql
+SELECT name FROM customers c
+WHERE  EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id);
+```
+
+That last shape is the one to become comfortable with, because it introduces the distinction that matters most.
+
+## Correlated or not: the distinction that decides performance
+
+A <strong>non-correlated</strong> subquery can run on its own. `SELECT AVG(salary) FROM employees` needs nothing from the outer query, so the engine computes it once and reuses the answer.
+
+A <strong>correlated</strong> subquery references a column from the outer query, so conceptually it must run again for every outer row:
+
+```sql
+SELECT name, salary
+FROM   employees e
+WHERE  salary > (SELECT AVG(salary)
+                 FROM   employees
+                 WHERE  dept_id = e.dept_id);   -- e.dept_id ties them together
+```
+
+This reads beautifully &mdash; "everyone earning above their own department's average" &mdash; and the naive execution is one inner query per employee. With 100,000 employees that is 100,000 aggregate queries.
+
+Modern planners often rewrite correlated subqueries into joins automatically, so the disaster is not guaranteed. But "often" is not "always", and the safe habit is: if a correlated subquery appears in a slow query, rewriting it as a join or a window function is the first thing to try.
+
+The window function version of the query above avoids the issue entirely:
+
+```sql
+SELECT name, salary
+FROM  (SELECT name, salary,
+              AVG(salary) OVER (PARTITION BY dept_id) AS dept_avg
+       FROM   employees) t
+WHERE  salary > dept_avg;
+```
+
+## EXISTS, IN and JOIN for the same question
+
+Three ways to ask "which customers have placed an order":
+
+```sql
+-- 1. IN
+SELECT name FROM customers
+WHERE  id IN (SELECT customer_id FROM orders);
+
+-- 2. EXISTS
+SELECT name FROM customers c
+WHERE  EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id);
+
+-- 3. JOIN
+SELECT DISTINCT c.name
+FROM   customers c JOIN orders o ON o.customer_id = c.id;
+```
+
+All three usually produce the same plan on a modern engine. The differences that remain are worth knowing:
+
+- <strong>`EXISTS` stops at the first match</strong>, which is exactly the semantics of the question. It also handles NULLs correctly.
+- <strong>`IN` with a subquery that can return NULL</strong> behaves as expected; the danger is `NOT IN`, which returns nothing at all if a single NULL appears in the list. Prefer `NOT EXISTS` for the negative case, always.
+- <strong>The join</strong> needs `DISTINCT` to avoid duplicating customers with several orders, and `DISTINCT` costs a sort. If you also want columns from `orders`, the join is the only option of the three.
+
+Rule of thumb: `EXISTS`/`NOT EXISTS` when you only want to test for presence, a join when you need data from both tables, and `IN` for short literal lists.
+
 ## Guided experiments
 
 1. <strong>Start with the scalar case.</strong> The inner query produces one number, the company average of 84250, and all eight rows are tested against it. Inner query runs: 1.
@@ -44,3 +135,64 @@ Once a derived table is more than a couple of lines, or you need it twice, lift 
 ## Worth remembering
 
 A subquery is just a query whose result another query consumes, and its shape is decided by what it returns: one value (scalar), one column (IN), or a table (derived, which must be aliased). An uncorrelated subquery runs once, before the outer query. A correlated one names a column from the outer row, so conceptually it runs once per row &mdash; which is both why it can answer per-group questions no single precomputed value could, and why it is the first thing to look at when a query is unexpectedly slow. Reach for EXISTS when you only need to know whether a match exists, and lift anything long or reused out into a CTE.
+
+## Subquery, derived table, or CTE?
+
+A CTE (`WITH name AS (...)`) does the same job as a derived table with a different syntax, and the choice is mostly about readability &mdash; with two real differences.
+
+|&nbsp;|Subquery / derived table|CTE|
+|---|---|---|
+|Readability with several steps|Deteriorates fast when nested|Reads top to bottom|
+|Reusing the same result twice|Must be written twice|Written once, referenced twice|
+|Recursion|Not possible|`WITH RECURSIVE`|
+|Optimisation|Always inlined|Inlined in modern engines; older PostgreSQL materialised it|
+
+The reuse point is the practical one. If the same derived table appears twice in a query, a CTE states it once and makes the intent obvious.
+
+The optimisation note matters if you work on older systems: PostgreSQL before version 12 treated every CTE as an optimisation fence, materialising it whether or not that was efficient. Since 12 it inlines them by default, with `MATERIALIZED` and `NOT MATERIALIZED` available to override.
+
+For anything with more than two steps, a chain of CTEs is almost always the more maintainable choice:
+
+```sql
+WITH recent_orders AS (
+  SELECT * FROM orders WHERE order_date >= '2026-01-01'
+),
+customer_totals AS (
+  SELECT customer_id, SUM(total) AS spend
+  FROM   recent_orders GROUP BY customer_id
+)
+SELECT c.name, t.spend
+FROM   customer_totals t
+JOIN   customers c ON c.id = t.customer_id
+WHERE  t.spend > 1000;
+```
+
+## Common mistakes with subqueries
+
+- <strong>A scalar subquery returning more than one row.</strong> The engine raises an error at runtime, and only when the data grows enough to produce a second row &mdash; so this bug ships. Guard with `LIMIT 1` and an explicit `ORDER BY`, or use `MIN`/`MAX`.
+- <strong>`NOT IN` with NULLs.</strong> Covered above, and worth repeating because it fails silently rather than loudly.
+- <strong>Forgetting the alias on a derived table.</strong> Most engines require one; the error message is clear but the cause is not obvious the first time.
+- <strong>Correlated subqueries in `SELECT`.</strong> `SELECT name, (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) FROM customers c` runs one count per customer. A `LEFT JOIN` with `GROUP BY`, or a window function, does it in one pass.
+- <strong>Referring to an outer alias inside a non-correlated subquery.</strong> Scope runs outwards, not inwards: the outer query cannot see the subquery's columns.
+
+## Questions people ask
+
+<strong>Are subqueries slower than joins?</strong> Not inherently. Non-correlated subqueries run once. Correlated ones may run per row unless the planner rewrites them, which is where the reputation comes from.
+
+<strong>Can I use a subquery in `UPDATE` or `DELETE`?</strong> Yes, and it is one of the most useful places for them &mdash; `DELETE FROM orders WHERE customer_id IN (SELECT id FROM customers WHERE inactive)`.
+
+<strong>How deep can I nest them?</strong> Deeper than you should. Past two levels, rewrite as CTEs &mdash; the query becomes readable and the plan rarely changes.
+
+<strong>Does `EXISTS` care what the subquery selects?</strong> No. `SELECT 1`, `SELECT *` and `SELECT NULL` are equivalent; the engine only checks whether a row is produced.
+
+<strong>Can a subquery reference the table it is inside?</strong> Yes, and it is a normal pattern &mdash; "employees earning more than their department's average" does exactly that.
+
+<strong>What is a lateral join?</strong> A subquery in `FROM` that <em>is</em> allowed to reference earlier tables in the same `FROM` clause (`LATERAL` in PostgreSQL, `CROSS APPLY` in SQL Server). It is the clean way to write "the three most recent orders for each customer".
+
+## Recap in one screen
+
+- A subquery can act as a value, a list, a table or an existence test, depending on what it returns.
+- Non-correlated subqueries run once; correlated ones reference the outer row and may run per row.
+- Use `EXISTS`/`NOT EXISTS` for presence tests, joins when you need columns from both sides.
+- `NOT IN` plus a NULL returns nothing at all &mdash; the most dangerous silent failure in SQL.
+- Beyond two levels of nesting, switch to CTEs for readability.
