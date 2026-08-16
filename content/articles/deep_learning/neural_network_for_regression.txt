@@ -1,0 +1,57 @@
+title: Neural Network for Regression: A Practical Guide
+intro: A regression network is a classifier with two changes: nothing squashes the output, and the loss measures distance instead of disagreement.
+
+## The two differences that matter
+
+- <strong>Linear output layer.</strong> No sigmoid, no softmax. The final neuron emits whatever value it computes, so the network can predict 3.7, &minus;120 or 275,000.
+- <strong>Distance-based loss.</strong> Mean squared error, or mean absolute error when outliers should not dominate.
+
+Everything else &mdash; hidden layers, ReLU, backpropagation, the optimiser &mdash; is unchanged from a classifier.
+
+## A concrete architecture
+
+Predicting house price from three features: 3 inputs &rarr; 16 hidden with ReLU &rarr; 1 linear output. That is <span class="mono-font">(3&times;16 + 16) + (16&times;1 + 1) = 81</span> parameters.
+
+The output neuron is where regression and classification part ways. Leave a sigmoid on it and the largest value the network can ever predict is 1.0 &mdash; every house is priced somewhere between nothing and one. It is a surprisingly easy mistake to make when adapting a classifier.
+
+Use several output neurons when you have several continuous targets: predicting an (x, y, z) position is three linear outputs and one shared body.
+
+## Why the output layer has no activation
+
+A classification network ends in softmax or sigmoid because the output must be a probability, bounded in [0, 1]. A regression network predicts an unbounded quantity &mdash; a price, a temperature, a duration &mdash; so squashing the output would put a ceiling on what it can ever predict.
+
+The final layer is therefore left linear: a plain weighted sum with no activation applied. Putting a sigmoid there caps every prediction at 1, and putting a ReLU there makes negative predictions impossible &mdash; occasionally what you want for a strictly positive target, and a silent bug otherwise.
+
+## Choosing the loss
+
+The loss encodes what kind of error you care about, and the two standard choices behave very differently:
+
+- <strong>MSE</strong> (mean squared error) squares the error, so an error of 10 counts a hundred times an error of 1. It is smooth and differentiable everywhere, and highly sensitive to outliers.
+- <strong>MAE</strong> (mean absolute error) scales linearly with the error, so outliers do not dominate. Its gradient is constant in magnitude, which converges less cleanly near the minimum.
+- <strong>Huber loss</strong> is quadratic for small errors and linear for large ones, giving MSE’s smooth convergence with MAE’s outlier tolerance. It is the sensible default on noisy data.
+
+These are not interchangeable: minimising MSE fits the conditional <em>mean</em> of the target, minimising MAE fits the <em>median</em>. On a skewed target those are different numbers, and the choice of loss is really a choice about which one you want.
+
+## Scaling the target, not just the inputs
+
+Feature scaling gets the attention, but for regression the target matters just as much. A target in the hundreds of thousands produces enormous initial losses and correspondingly enormous gradients, which either diverges immediately or forces a learning rate so small that nothing else trains.
+
+Standardise the target for training, then invert the transform on the predictions before reporting or using them. Forgetting that inversion produces predictions in standardised units &mdash; numbers around zero where the answer should be 250,000 &mdash; which is one of the more embarrassing bugs to ship, because the model itself is entirely correct.
+
+## Try this above
+
+1. Set <strong>Output Neurons</strong> to 1. That is the standard single-target regression head.
+2. Change it to 3 &mdash; multi-target regression, where one network predicts several related numbers from shared hidden features.
+3. Vary <strong>Hidden Layers</strong> and note the output layer's shape never changes. The head is decided by the task, not the depth.
+
+## What usually goes wrong
+
+<strong>A squashing activation left on the output.</strong> Caps the prediction range and flattens the gradient for any target outside it, so the model cannot learn its way out.
+
+<strong>Unscaled targets.</strong> Squared error on values near 300,000 produces gradients around 10<sup>11</sup>. The first update destroys the weights and the loss becomes NaN. Standardise the target and invert the scaling afterwards.
+
+<strong>Reporting accuracy.</strong> There is no such thing for continuous output. Report MAE or RMSE in the target's own units, so "off by £18,000 on average" is something a reader can actually judge.
+
+## In one line
+
+Classifier body, linear head, distance-based loss &mdash; and scale your targets.

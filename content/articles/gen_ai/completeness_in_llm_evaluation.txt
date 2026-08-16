@@ -1,0 +1,50 @@
+title: Completeness in LLM evaluation: A Practical Guide
+intro: What is completeness, and why can a perfectly correct answer still fail on it?
+
+## Complete relative to what
+
+Completeness is undefined without a statement of what the answer <em>needed</em> to contain, so the reference is not optional. In practice that means a <strong>key-points list</strong> per evaluation query: the facts a good answer must include, written by whoever understands the domain.
+
+Writing that list is the real work, and it is worth doing carefully because it is reusable. The same list drives <a href="correctness_in_llm_evaluation.html">correctness</a> (are the stated facts right?) and completeness (were they all stated?), so one artefact serves two dimensions.
+
+It also forces a decision your users have already made implicitly: is the caveat about digital goods a required point or a nice-to-have? Teams often discover during this exercise that they do not agree on what a good answer is, which is more valuable than any score.
+
+## Why the other dimensions cannot see it
+
+Consider an answer that states only "Refunds are issued within 14 days." when the question was about the full refund policy. It is correct. It is grounded. It is entirely relevant. It scores 1.0 on three dimensions and leaves out the condition that makes it actionable.
+
+This asymmetry is the reason completeness is worth measuring separately. The other three dimensions all penalise <em>saying the wrong thing</em>. Only completeness penalises <em>not saying the right thing</em>, and omission is the harder failure to notice, because there is nothing on the screen to catch your eye.
+
+It is also the failure with the worst consequences in practice. A user who reads a wrong answer may check it. A user who reads a partial answer has no signal that anything is missing and acts on it.
+
+## Where incompleteness comes from
+
+<strong>Retrieval, most often.</strong> If a required point was never in the retrieved context, the model cannot state it without hallucinating. Low completeness alongside low <a href="recall_at_k.html">recall@k</a> is a retrieval problem, and no prompt change will fix it. This is the single most common cause.
+
+<strong>Chunking.</strong> A policy split across two chunks where only one was retrieved gives a confidently half-right answer &mdash; which is exactly what <a href="parent_document_retriever.html">parent-document retrieval</a> and generous chunk overlap exist to prevent.
+
+<strong>Length limits.</strong> A max-tokens cap or a "be concise" instruction trades completeness for brevity, usually without anyone deciding to.
+
+<strong>The model stopping early.</strong> Given ten chunks, models reliably use the first few more than the rest. A required point in chunk eight is retrieved, in context, and still absent from the answer &mdash; which is why <a href="mean_reciprocal_rank.html">MRR</a> is worth tracking next to recall.
+
+## Measuring it, and the trap in optimising it
+
+The measurement is mechanical once the key-points list exists: for each required point, ask a judge whether the answer states it, and take the proportion. Per point rather than per answer, so the output tells you <em>which</em> point was dropped &mdash; that is the actionable part.
+
+The trap is that completeness is trivially gamed by verbosity. An answer that dumps the entire retrieved context scores 1.0. If completeness is the only dimension you optimise, you will get long, hedged, exhaustive answers that score beautifully and that nobody wants to read.
+
+Which is why it is read against <a href="relevance_in_llm_evaluation.html">relevance</a>. The pair behaves like precision and recall: completeness is the recall of required information, relevance is its precision, and a system is only good when both are high. Reporting either alone is the same mistake as reporting recall without k.
+
+## Things to try
+
+1. Three of the five claims are required points and the reference lists four. Completeness is 0.75 &mdash; one required point is simply absent from the answer.
+2. Click the off-topic phone claim on and off. Completeness does not move at all: adding material that was not required cannot improve it.
+3. Compare with relevance on the same claim list. The claims that hurt relevance are exactly the ones completeness ignores, which is why the pair has to be read together.
+
+## What to remember
+
+Completeness is the proportion of required points an answer actually states, and it needs a key-points reference to be defined at all. It is the one dimension that penalises omission rather than error, which makes it the failure users notice last and act on first. Low completeness is usually a retrieval or chunking problem rather than a generation one. Measure it per point so you know what was dropped, and always read it against relevance &mdash; optimised alone it rewards dumping the entire context into the answer.
+
+These four are usually measured with an <strong>LLM as judge</strong>: a strong model is shown the question, the retrieved context, the answer and sometimes a reference, and asked to score one dimension at a time. Judging one dimension per call is not a stylistic choice &mdash; a single prompt asking for all four produces correlated, mushy scores, because the model settles on a general impression and applies it everywhere.
+
+Two habits make judge scores trustworthy. Ask for a decision and a justification, so a human can audit disagreements. And calibrate against a small human-labelled set before believing any of it &mdash; a judge that agrees with your annotators 70% of the time is not measuring what you think it is measuring.

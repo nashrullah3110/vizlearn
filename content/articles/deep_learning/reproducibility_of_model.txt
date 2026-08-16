@@ -1,0 +1,45 @@
+title: Model Reproducibility: A Practical Guide
+intro: Train the same model twice on the same data and you get two different results. Controlling the randomness is what turns a demo into an experiment you can trust.
+
+## Where the randomness comes from
+
+Neural network training is randomised in at least four independent places, and every one of them changes the final weights:
+
+- <strong>Weight initialisation.</strong> Every weight starts as a random draw. Different draws land the optimiser in different basins of the loss surface.
+- <strong>Data shuffling.</strong> Mini-batches are formed from a shuffled dataset, so a different order means different gradients at every step.
+- <strong>Dropout.</strong> Which units are zeroed is resampled on every forward pass during training.
+- <strong>Augmentation.</strong> Random crops, flips and noise mean the model literally never sees the same input twice.
+
+None of these is a defect &mdash; each is deliberately there to improve generalisation. But they mean “the model” is a sample from a distribution of models, not a fixed object.
+
+## Seeding, and what a seed actually fixes
+
+These are all <em>pseudo</em>-random: a deterministic sequence generated from a starting value called the seed. Fix the seed and the sequence is identical every run.
+
+random.seed(42)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Python&rsquo;s own generator<br>np.random.seed(42)&nbsp;&nbsp;&nbsp;&nbsp;# NumPy<br>torch.manual_seed(42)&nbsp;# PyTorch, CPU and GPU
+
+The catch is that these are separate generators. Seeding NumPy does nothing for PyTorch’s dropout, and seeding PyTorch does nothing for a shuffle done with Python’s <span class="mono-font">random</span>. Every library that draws a random number needs its own seed, and missing one is the usual reason a “seeded” run is still not reproducible.
+
+## Interactive Exploration Guide
+
+1. <strong>Fix the seed and repeat.</strong> Enter a seed value and press <strong>Apply Seed &amp; Init</strong>, note the initial weights, then press it again with the same seed. Identical values &mdash; the initialisation is fully determined by that number.
+2. <strong>Change one digit.</strong> Change the seed and re-initialise. Every weight is different. The seed is not a setting with a meaningful scale; it just selects an arbitrary point in the sequence.
+3. <strong>Watch the sequence advance.</strong> Press <strong>Next Sample</strong> several times. Each draw differs, but the whole run of draws replays identically after re-applying the same seed &mdash; that is what pseudo-random means.
+4. <strong>Stream without reseeding.</strong> Press <strong>Auto Stream</strong> and let it run, then re-apply the seed. The stream restarts from the beginning of the same sequence, not from where it stopped.
+
+## Why the GPU can still be non-deterministic
+
+Seeding every generator can still leave runs that differ, and the reason is floating-point arithmetic rather than randomness. GPU kernels parallelise reductions across thousands of threads, and the order in which partial sums combine varies between runs. Floating-point addition is not associative &mdash; <span class="mono-font">(a + b) + c</span> can differ from <span class="mono-font">a + (b + c)</span> in the last bits &mdash; so identical inputs can give slightly different outputs.
+
+Those differences are around 10<sup>&minus;7</sup>, but training amplifies them: a tiny gradient difference changes the next weights, which changes the next gradient, and after thousands of steps the runs have visibly diverged. Frameworks offer deterministic modes (<span class="mono-font">torch.use_deterministic_algorithms(True)</span>) that force reproducible kernels, typically at a real cost in speed.
+
+## What usually goes wrong
+
+- <strong>Seeding one library and assuming it covers the rest.</strong> Python, NumPy and the framework each need seeding, plus <span class="mono-font">PYTHONHASHSEED</span> if set ordering matters.
+- <strong>Treating the seed as a hyperparameter.</strong> Searching for a good seed is fitting to noise. If results depend heavily on it, the finding is fragile, not tuned.
+- <strong>Reporting a single run.</strong> A one-run comparison between two methods is uninterpretable when seed variance alone can move accuracy a point or more. Report mean and spread over several seeds.
+- <strong>Expecting reproducibility across machines.</strong> A fixed seed reproduces a run on the same hardware, library versions and thread count. Change the GPU or the cuDNN version and results move again.
+
+## Key takeaway
+
+Training draws randomness from initialisation, shuffling, dropout and augmentation, each from its own generator, so reproducibility means seeding all of them rather than one. Even then GPU reductions are non-deterministic at the level of floating-point rounding, and training amplifies those differences over thousands of steps. Seed to make a run repeatable for debugging &mdash; and report results over several seeds, because a single run tells you as much about the seed as about the method.

@@ -1,0 +1,35 @@
+title: Training on Imbalanced Dataset: A Practical Guide
+intro: When 99% of your rows share one label, a model that always predicts that label scores 99%. Fixing imbalance means changing the data, the loss, or the threshold - and being honest about which metric you are reading.
+
+## Why imbalance breaks training
+
+Standard training minimises average loss over the dataset. When one class holds 99% of the rows, that average is dominated by it: predicting the majority everywhere already achieves very low loss, so there is little gradient pressure to learn the minority class at all.
+
+The model is not malfunctioning. It is optimising exactly what you asked it to, and what you asked for was the wrong thing &mdash; you wanted the rare class detected, and you told it to minimise overall error, which are different objectives whenever the classes are unequal.
+
+## The three families of fix
+
+<strong>Resample the data.</strong> <em>Oversampling</em> duplicates minority rows &mdash; simple, and risks overfitting to the few examples you have. <strong>SMOTE</strong> improves on it by synthesising new minority points along the lines between existing neighbours rather than copying. <em>Undersampling</em> discards majority rows, which balances the classes and throws away real information; it is reasonable when the majority class is genuinely enormous.
+
+<strong>Reweight the loss.</strong> Give minority errors a larger weight, typically inversely proportional to class frequency, so one minority mistake costs as much as ninety-nine majority ones. This changes nothing about the data and is usually the first thing to try &mdash; <span class="mono-font">class_weight="balanced"</span> in scikit-learn, or <span class="mono-font">pos_weight</span> in a PyTorch loss. <strong>Focal loss</strong> goes further by down-weighting examples the model already classifies confidently, concentrating training on the hard cases.
+
+<strong>Move the threshold.</strong> Often the model’s probabilities are fine and only the 0.5 cutoff is wrong. Lowering it trades precision for recall without retraining anything, and choosing it from a precision-recall curve is frequently the cheapest real improvement available.
+
+## Experiments to try
+
+1. <strong>Start balanced.</strong> Set <strong>Class 0 Ratio</strong> to 50 and press <strong>Retrain Both Models</strong>. Both classes are learned and the boundary sits sensibly between them.
+2. <strong>Make it severe.</strong> Raise <strong>Class 0 Ratio</strong> to 95 and retrain. The boundary shifts toward the minority class and swallows it &mdash; accuracy stays high while the minority class is barely detected.
+3. <strong>Apply a fix.</strong> With the ratio still at 95, choose a strategy from <strong>Fix Strategy</strong> and retrain. The boundary moves back and minority recall recovers, at some cost in precision.
+4. <strong>Push to the extreme.</strong> Set <strong>Class 0 Ratio</strong> to 99 and compare with and without a fix. At this level the unmitigated model is close to a constant predictor.
+
+## What usually goes wrong
+
+- <strong>Resampling before splitting.</strong> The most damaging mistake here. Oversample first and duplicated (or SMOTE-interpolated) rows appear in both train and test, so the test set contains near-copies of training rows and the score is meaningless. Resample <em>inside</em> the training fold only.
+- <strong>Still reporting accuracy.</strong> If you fixed the training and kept the metric, you cannot see whether it worked. Use precision, recall, F1, or PR-AUC.
+- <strong>Using ROC-AUC on severe imbalance.</strong> It is computed over the whole threshold range and stays optimistic because true negatives are plentiful. Precision-recall AUC is the more honest curve when positives are rare.
+- <strong>SMOTE on high-dimensional or categorical data.</strong> Interpolating between neighbours assumes a meaningful metric space; on one-hot features it synthesises rows that could not exist.
+- <strong>Treating imbalance as always a problem.</strong> If the class ratio in training matches the real world and the metric reflects the actual costs, no correction may be needed.
+
+## The short version
+
+Imbalance is a mismatch between the average loss you are minimising and the rare-class detection you actually want. Fix it by reweighting the loss (usually first), resampling the training data (inside the fold, never before the split), or simply moving the decision threshold. Then change the metric too &mdash; accuracy cannot show you whether any of it worked.

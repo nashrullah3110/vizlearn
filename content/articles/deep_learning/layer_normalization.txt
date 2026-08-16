@@ -1,0 +1,25 @@
+title: Layer Normalization: A Practical Guide
+intro: Normalize the axis that does not depend on who else is in the batch.
+
+## Start here
+
+<a href="batch_normalization.html" style="color: var(--accent-primary)">BatchNorm</a> normalizes each feature — each column — using the mean and standard deviation computed across every sample currently in the batch. That is powerful, and it has one structural weakness: its statistics depend on which other examples happen to be in the batch with you, which becomes a real problem at batch size 1 and in architectures like transformers where "the batch" is not a stable, meaningful group.
+
+LayerNorm normalizes each sample against <em>itself</em> — the mean and standard deviation are computed across that one row's own features, so no other sample's presence or absence changes the answer.
+
+## The formula, row instead of column
+
+LayerNorm: y<sub>i</sub> = (x<sub>i</sub> &minus; &mu;<sub>row</sub>) / &sigma;<sub>row</sub>
+
+&mu;<sub>row</sub> and &sigma;<sub>row</sub> are the mean and standard deviation of that one sample's own feature vector. Compare to BatchNorm's &mu;<sub>col</sub>, &sigma;<sub>col</sub> — computed down a column, across samples. Same shape of formula, different axis.
+
+## Guided experiments
+
+1. <strong>Start at None.</strong> Four samples with deliberately different overall magnitudes — Sample B in particular is roughly 500x the scale of Sample C. Per-column stats are dominated by whichever sample happens to be largest.
+2. <strong>Switch to LayerNorm.</strong> Every row now has mean 0 and standard deviation 1, regardless of its original scale — the per-row stats confirm it, and the wildly different starting magnitudes stop mattering to whatever layer reads this next.
+3. <strong>Switch to BatchNorm instead.</strong> Now the per-column stats read 0/1, but the rows keep their very different scales — this is the complementary normalization, useful when the batch is a meaningful, stable group.
+4. <strong>Shrink the batch to one sample.</strong> Tick Batch Size = 1. Under BatchNorm, a single sample has no variation to normalize against — its standard deviation is 0, and the column stats break down. Under LayerNorm nothing changes at all, because it never depended on the other samples in the first place.
+
+## Summing up
+
+BatchNorm and LayerNorm are the same normalization idea applied to different axes: BatchNorm down a column, across the batch; LayerNorm across a row, within one sample. That single difference in axis is why LayerNorm works identically at any batch size, including one, while BatchNorm's statistics depend on the batch it happens to see — which is why transformers and RNNs, which often run with small or variable batches, use LayerNorm almost universally.

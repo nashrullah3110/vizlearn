@@ -1,0 +1,45 @@
+title: Batch Processing in Networks: A Practical Guide
+intro: Networks process many samples at once, not one at a time. Batching is what makes GPUs worth using - and the batch size quietly changes both how fast you train and how well the result generalises.
+
+## A batch is a matrix, not a loop
+
+Feeding one sample through a layer is a vector-matrix product. Feeding 32 samples is a <em>matrix</em>-matrix product &mdash; stack the 32 input vectors into a 32&times;n<sub>in</sub> matrix and multiply once by the same n<sub>in</sub>&times;n<sub>out</sub> weights.
+
+Crucially the weights are unchanged. Batching does not alter the model; it changes how many samples pass through it per operation. Because the hardware executes one large matrix multiply far more efficiently than 32 small ones, a batch of 32 costs nothing like 32 times a single sample.
+
+## Epoch, batch, iteration
+
+These three get muddled constantly:
+
+- <strong>Batch size</strong> &mdash; samples processed before one weight update.
+- <strong>Iteration (step)</strong> &mdash; one forward pass, one backward pass, one update.
+- <strong>Epoch</strong> &mdash; one complete pass over the training set.
+
+With 10,000 samples and a batch size of 100, one epoch is 100 iterations, so 10 epochs means 1,000 weight updates. Halving the batch size to 50 doubles the updates per epoch to 200 &mdash; which is why batch size and learning rate cannot be tuned independently.
+
+## Things to try
+
+1. <strong>Watch a single sample flow.</strong> Set <strong>Batch Size</strong> to 1 and press <strong>Simulate Flow</strong>. One activation pattern moves through the network and one update follows &mdash; maximally noisy and maximally frequent.
+2. <strong>Batch it up.</strong> Set <strong>Batch Size</strong> to 32 and simulate again. Many samples traverse together and produce a single averaged update. The averaging is where the noise reduction comes from.
+3. <strong>Count the updates.</strong> Fix <strong>Epochs</strong> and compare <strong>Batch Size</strong> 1 against 100. The same epoch count gives a hundred times fewer weight updates at the larger batch &mdash; the usual reason a large-batch run appears to underfit.
+4. <strong>Widen the network.</strong> Raise <strong>Input</strong> and <strong>Output</strong> and simulate at a large batch. More arithmetic per sample makes the batched matrix multiply proportionally more worthwhile.
+
+## How batch size affects the result, not just the speed
+
+Larger batches give a lower-variance estimate of the true gradient, so the path to the minimum is smoother. That sounds strictly good and is not.
+
+The noise in small-batch gradients acts as a regulariser. It shakes the optimiser out of sharp, narrow minima and toward flat, wide ones &mdash; and flat minima generalise better, because a small shift in the weights or the data distribution barely changes the loss. Large-batch training tends to settle into sharp minima and frequently generalises slightly worse, an effect known as the <strong>generalisation gap</strong>.
+
+The standard mitigation is the <strong>linear scaling rule</strong>: when you multiply the batch size by k, multiply the learning rate by k as well, since each update is now averaged over k times as much data. Combined with a short warmup this makes large-batch training match small-batch accuracy in most settings.
+
+## Where this goes wrong
+
+- <strong>Raising the batch size and leaving the learning rate alone.</strong> Fewer, no-larger updates per epoch means visibly slower convergence. Scale the rate with the batch.
+- <strong>Choosing the batch size purely by what fits in memory.</strong> The largest batch that fits is not automatically the best one; it is a regularisation choice as well as a throughput one.
+- <strong>Batch normalisation with tiny batches.</strong> Batch norm estimates mean and variance from the batch. At a batch size of 2 or 4 those estimates are noise; use group or layer normalisation instead.
+- <strong>A final partial batch.</strong> When the dataset does not divide evenly the last batch is smaller, which skews batch-norm statistics and any per-batch averaging. Drop it during training if it is much smaller.
+- <strong>Comparing runs by epoch instead of by update.</strong> Two runs at different batch sizes have done very different amounts of optimisation after the same number of epochs.
+
+## Key takeaway
+
+Batching turns many small vector-matrix products into one large matrix-matrix product, which is what makes parallel hardware pay off, without changing the model at all. Batch size sets both the number of updates per epoch and the noise in each gradient, so it trades throughput against a regularising effect that favours flat minima. Change it and change the learning rate with it &mdash; roughly linearly &mdash; or the comparison is not fair.

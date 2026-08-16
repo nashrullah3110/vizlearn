@@ -1,0 +1,23 @@
+title: Gradient Clipping: A Practical Guide
+intro: A safety valve for the one bad gradient in a thousand.
+
+## Context first
+
+Most gradients during training are reasonably sized. Occasionally — a badly scaled batch, a long <a href="../natural_language_processing/how_rnn_process_text.html" style="color: var(--accent-primary)">recurrent</a> chain, a numerically unstable loss — one gradient is enormous. Applied directly, <span class="mono-font">w &minus; lr &middot; g</span> can throw a weight far outside the region the optimiser was making sane progress in, and the next few steps are spent recovering rather than learning.
+
+## What clipping does
+
+if ||g|| &gt; threshold: g &larr; g &middot; (threshold / ||g||)
+
+The gradient's <em>direction</em> is unchanged — it still points the way steepest descent says to go — only its length is capped. This is norm clipping, the common form; value clipping (capping each component independently) is cruder and used less often.
+
+## Guided experiments
+
+1. <strong>Step twice normally.</strong> The weight descends the parabola exactly as gradient descent should.
+2. <strong>Step through the spike, unclipped.</strong> Uncheck Clip Gradients first. Step 3's gradient is 50x normal, and the update sends w far past the minimum — sometimes far enough that the next raw gradient is even larger, a genuine divergence.
+3. <strong>Reset, turn clipping back on, step through again.</strong> The spike is capped at the clip norm before it is applied, and the weight takes a bounded step instead of an unbounded one.
+4. <strong>Lower the clip norm.</strong> Smaller thresholds cap harder — including, if set low enough, ordinary gradients that were never a problem. It is a trade between safety and full-speed learning.
+
+## Worth remembering
+
+Gradient clipping rescales an oversized gradient down to a maximum norm before the optimiser applies it, preserving direction while bounding step size. It is cheap insurance against the rare exploding gradient that would otherwise throw training off course, and it is standard practice in <a href="../natural_language_processing/how_rnn_process_text.html" style="color: var(--accent-primary)">RNNs</a> and very deep networks, where long chains of multiplication make the occasional huge gradient close to inevitable.

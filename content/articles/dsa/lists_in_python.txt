@@ -1,0 +1,61 @@
+title: Python List Lab: A Practical Guide
+intro: A Python list is a dynamic array, not a linked list. That single fact explains why appending is fast, inserting at the front is slow, and slicing always costs a copy.
+
+## A dynamic array, not a linked list
+
+Despite the name, a Python list is a contiguous array of pointers. Elements sit next to each other in memory, so indexing is a single address calculation: <span class="mono-font">lst[i]</span> is O(1) regardless of the list’s length or the value of i.
+
+Everything else follows from that layout. Inserting in the middle means shifting every later element up one slot. Deleting means shifting them down. Only the end of the list can be modified without moving anything &mdash; which is why <span class="mono-font">append</span> and <span class="mono-font">pop()</span> are the fast operations and their front-of-list counterparts are not.
+
+## Indexing and slicing
+
+Indices count from 0, and negative indices count from the end: <span class="mono-font">lst[-1]</span> is the last element, <span class="mono-font">lst[-2]</span> the second-last.
+
+A slice takes <span class="mono-font">[start:stop:step]</span>, where start is inclusive, stop is exclusive, and any part may be omitted. With <span class="mono-font">lst = [10, 20, 30, 40, 50]</span>:
+
+lst[1:4]&nbsp;&nbsp;&rarr; [20, 30, 40]&nbsp;&nbsp;&nbsp;# stop is excluded
+
+lst[:3]&nbsp;&nbsp;&nbsp;&rarr; [10, 20, 30]
+
+lst[::2]&nbsp;&nbsp;&rarr; [10, 30, 50]&nbsp;&nbsp;&nbsp;# every second element
+
+lst[::-1]&nbsp;&rarr; [50, 40, 30, 20, 10]&nbsp;# reversed
+
+The exclusive stop is deliberate: it makes <span class="mono-font">lst[:k] + lst[k:]</span> reconstruct the original for any k, and it makes the length of a slice simply <span class="mono-font">stop &minus; start</span>. Every slice returns a <strong>new list</strong>, so slicing an n-element list costs O(n) time and O(n) memory &mdash; slicing in a loop is a common accidental quadratic.
+
+## What each operation costs
+
+lst[i]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(1)&nbsp;&nbsp; direct address
+
+lst.append(x)&nbsp;&nbsp;&nbsp;# O(1) amortised
+
+lst.pop()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(1)&nbsp;&nbsp; from the end
+
+lst.insert(0, x)&nbsp;# O(n)&nbsp;&nbsp; shifts everything
+
+lst.pop(0)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(n)&nbsp;&nbsp; shifts everything
+
+x in lst&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(n)&nbsp;&nbsp; linear scan
+
+lst[a:b]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(b&minus;a) copies
+
+<strong>Amortised</strong> O(1) for append means individual appends are occasionally expensive. When the underlying array fills, Python allocates a larger one and copies everything across &mdash; O(n) for that one call. Because the array grows by a proportion rather than a fixed amount, those resizes become rarer as the list grows, and the average over many appends is constant.
+
+## Exploration guide
+
+1. <strong>Watch the exclusive stop.</strong> Set <strong>Start</strong> to 1 and <strong>Stop</strong> to 4, then press <strong>Run Expression</strong>. Three elements come back, not four &mdash; index 4 is the boundary, not a member.
+2. <strong>Reverse with a negative step.</strong> Set <strong>Step</strong> to &minus;1 and leave start and stop empty. The whole list comes back reversed, and it is a copy: the original is untouched.
+3. <strong>Index from the end.</strong> Set <strong>Index (i)</strong> to &minus;1 and run. You get the last element without needing to know the length &mdash; the idiom that replaces <span class="mono-font">lst[len(lst)&minus;1]</span>.
+4. <strong>Compare a front insert with an append.</strong> Use <strong>Select Method</strong> to insert at index 0, then to append. Both look instant here, but only one avoids shifting every element &mdash; the difference shows up at a hundred thousand elements, not five.
+
+## What trips people up
+
+- <strong>Using pop(0) as a queue.</strong> Every removal shifts the whole list, so a queue built this way is O(n&sup2;). Use <span class="mono-font">collections.deque</span>, which is O(1) at both ends.
+- <strong>The mutable default argument.</strong> <span class="mono-font">def f(items=[])</span> creates the list <em>once</em>, at definition time, and every call shares it. Use <span class="mono-font">None</span> as the default and build the list inside.
+- <strong>Assuming assignment copies.</strong> <span class="mono-font">b = a</span> binds another name to the same list; mutating b changes a. Use <span class="mono-font">a[:]</span> or <span class="mono-font">list(a)</span> for a shallow copy.
+- <strong>Removing items while iterating.</strong> Deleting during a <span class="mono-font">for</span> loop shifts the remaining elements and the loop skips items. Iterate over a copy, or build a new list with a comprehension.
+- <strong>Multiplying to build a grid.</strong> <span class="mono-font">[[0]*3]*3</span> makes three references to the <em>same</em> row. Use a comprehension: <span class="mono-font">[[0]*3 for _ in range(3)]</span>.
+
+## What to remember
+
+A Python list is a contiguous dynamic array, so indexing is O(1), appending is amortised O(1), and anything touching the front is O(n) because every later element must shift. Slices are always copies, negative indices count from the end, and the stop bound is exclusive. Most list performance bugs are one of two things: treating the front like the back, or slicing inside a loop.

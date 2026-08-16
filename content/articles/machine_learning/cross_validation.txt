@@ -1,0 +1,43 @@
+title: K-Fold Cross Validation: A Practical Guide
+intro: One train-test split gives you one number, and that number depends on which rows happened to land in the test set. K-fold cross-validation uses every row for testing exactly once and reports the spread as well as the average.
+
+## What a single split cannot tell you
+
+Hold out 20% of the data, train on the rest, and you get an accuracy figure. Change the random seed and you get a different one &mdash; sometimes several points different on a small dataset.
+
+Neither number is wrong; both are estimates from a sample of test rows, and a sample of 200 rows carries real sampling error. With one split you have no way to tell whether a two-point difference between two models is a genuine improvement or the luck of the partition.
+
+## How k-fold works
+
+Split the data into k equally sized folds. Then run k separate experiments: hold out fold 1 and train on folds 2&hellip;k, hold out fold 2 and train on the rest, and so on. Each fold serves as the test set exactly once, and each row is predicted exactly once by a model that never saw it.
+
+You end up with k scores. Report the <strong>mean</strong> as the performance estimate and the <strong>standard deviation</strong> as a measure of how stable it is. The standard deviation is the part a single split cannot give you, and it is often the more informative number: a model scoring 0.82 &plusmn; 0.01 is a very different proposition from one scoring 0.82 &plusmn; 0.09.
+
+k = 5 or k = 10 are the standard choices. Larger k means more training data per fold (less pessimistic bias) but k model fits and more correlated training sets. The extreme, k = n, is leave-one-out: nearly unbiased, high variance, and usually far too expensive.
+
+## Guided experiments
+
+1. <strong>Watch each fold take its turn.</strong> Set <strong>Folds (k)</strong> to 5 and press <strong>Run Next Fold</strong> repeatedly. A different block becomes the test set each time, and the remaining blocks train.
+2. <strong>Compare the fold scores.</strong> Press <strong>Auto-Run All</strong> and look at the individual results, not just the average. The spread between the best and worst fold is exactly the uncertainty a single split would have hidden.
+3. <strong>Increase k.</strong> Set <strong>Folds (k)</strong> to 10 and run again. Each model trains on 90% of the data instead of 80%, and there are twice as many fits to pay for.
+4. <strong>Shuffle first.</strong> Press <strong>Shuffle</strong> and re-run. If the data arrived sorted by class, unshuffled folds can be wildly unrepresentative &mdash; which is why stratification exists.
+
+## Stratified, grouped, and time series
+
+Plain k-fold splits at random, which is wrong in three common situations:
+
+- <strong>Imbalanced classes</strong> &mdash; a random fold might contain almost none of the minority class. <strong>Stratified k-fold</strong> preserves the class proportions in every fold, and should be the default for classification.
+- <strong>Grouped data</strong> &mdash; multiple rows per patient, user or session. If rows from the same group land in both train and test, the model has effectively seen the answer. <strong>GroupKFold</strong> keeps each group entirely on one side.
+- <strong>Time series</strong> &mdash; random folds train on the future to predict the past, which is leakage in its purest form. Use a forward-chaining split where each fold trains only on data preceding its test window.
+
+## Where this goes wrong
+
+- <strong>Preprocessing before splitting.</strong> Fitting a scaler, imputer or feature selector on the whole dataset leaks test information into training and inflates every fold. Put the preprocessing inside a Pipeline so it is refitted within each fold.
+- <strong>Random folds on time series.</strong> Produces excellent scores and a model that fails in production.
+- <strong>Reporting only the mean.</strong> The standard deviation is what tells you whether a difference between two models is meaningful.
+- <strong>Tuning hyperparameters on the same CV used to report the score.</strong> Selecting on those folds means the reported number is optimistic; nested cross-validation is the correct fix.
+- <strong>Forgetting to shuffle sorted data.</strong> Folds become unrepresentative before stratification can help.
+
+## What to remember
+
+K-fold cross-validation trains k models, each holding out a different fold, so every row is tested once and you get a mean <em>and</em> a spread rather than one seed-dependent number. Use stratified folds for classification, grouped folds when rows share a subject, and forward-chaining for time series. Whatever the variant, fit every preprocessing step inside the fold &mdash; doing it beforehand leaks the test set and quietly invalidates the whole exercise.

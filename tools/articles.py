@@ -488,3 +488,13 @@ def _deepen(path, extra):
 
 for _path, _extra in EXTRA_SECTIONS_DL.items():
     _deepen(_path, _extra)
+
+
+# The long-form articles live in content/articles/ as text rather than as
+# Python literals - see tools/prose.py. Every page above has a content file
+# too (seeded from what the page already said), so the files win: this dict
+# is the older, shorter copy of the same material.
+import prose as _prose
+from lib_catalog import ROOT as _ROOT
+
+ARTICLES.update(_prose.load(_ROOT))

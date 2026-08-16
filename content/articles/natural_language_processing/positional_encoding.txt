@@ -1,0 +1,60 @@
+title: Positional Encoding: A Practical Guide
+intro: Why a transformer has to be told what order the words came in, and the odd-looking function that tells it.
+
+## Quick Context
+
+<a href="self_attention.html" style="color: var(--accent-primary)">Self-attention</a> computes every position from every other position by dot products and weighted sums. Nowhere in that computation does an index appear. Permute the input and the outputs permute with it, unchanged &mdash; the mechanism is <em>permutation-equivariant</em>.
+
+For a bag of words that would be a feature. For language it is fatal: "dog bites man" and "man bites dog" contain exactly the same words, and a model that cannot tell them apart cannot do anything useful. An <a href="rnn.html" style="color: var(--accent-primary)">RNN</a> got order for free by reading left to right. Throwing out recurrence threw that away too, and it has to be put back by hand.
+
+## The obvious ideas, and why they fail
+
+- <strong>Append the integer position.</strong> Position 512 then contributes a value five hundred times larger than position 1, swamping the embedding, and the model has never seen position 3000 during training.
+- <strong>Append position / length.</strong> Now it is bounded, but the same value means different things in different sentences &mdash; 0.5 is word 5 of 10 and word 50 of 100. Nothing consistent can be learned from it.
+
+Both are available in the Scheme control above. What is wanted is something bounded, unique per position, consistent across sentence lengths, and &mdash; ideally &mdash; carrying information about <em>relative</em> distance, since "the adjective three words back" is a far more useful notion than "the word at index 17".
+
+## The sinusoidal answer
+
+The original transformer used a fixed function of position, with a different frequency in every pair of dimensions:
+
+PE(pos, 2i) = sin( pos / 10000<sup>2i/d</sup> )
+
+PE(pos, 2i+1) = cos( pos / 10000<sup>2i/d</sup> )
+
+The wavelengths form a geometric series from about 2 up to about 10000·2&pi;. Early dimensions flip every couple of positions; late dimensions barely move across the whole sequence. Together they behave like the digits of a binary counter &mdash; the fast bits distinguish neighbours, the slow bits distinguish regions &mdash; which is why the matrix above has that striped, fanning appearance.
+
+Every value stays inside &minus;1 to 1 no matter how long the sequence, and the pattern for position 500 is defined whether or not the model ever trained on a sequence that long.
+
+## Experiments to try
+
+1. <strong>Break word order.</strong> Set the <strong>Scheme</strong> to None and tick <strong>Swap Two Words</strong>. Input Difference reads 0.000 and the two sentences are literally identical to the model. Switch the <strong>Scheme</strong> back to Sinusoidal and the difference becomes non-zero &mdash; the encoding is what makes them different inputs.
+2. <strong>See the frequency fan.</strong> Look at the matrix with the <strong>Model Dimension</strong> slider at 64. The leftmost columns stripe rapidly down the page while the rightmost are almost flat. That spread of wavelengths is the whole design.
+3. <strong>Check it encodes distance.</strong> Set the <strong>Inspect Position</strong> slider to 12 and look at the lower panel. Similarity peaks at position 12 and falls away smoothly on both sides, so nearby positions have similar encodings. Move the position and the peak travels with it, keeping its shape &mdash; the pattern depends on the gap, not on where you are.
+4. <strong>Try the naive schemes.</strong> Set the <strong>Scheme</strong> to Raw integer position, then drag the <strong>Inspect Position</strong> slider up and watch Largest Value climb with it, without bound. Compare against Sinusoidal, where it never leaves 1. Then try Position / length and lengthen the sequence: every encoding shifts, because the same position now means a different fraction.
+5. <strong>Push past training length.</strong> Set the <strong>Sequence Length</strong> slider to its maximum with Sinusoidal selected. The values stay inside &minus;1 to 1 and every row is still distinct. Nothing had to be learned for those positions to exist.
+
+## Added, not concatenated
+
+The encoding is <em>added</em> to the word embedding, not stapled onto the end of it. That surprises people &mdash; surely adding corrupts the meaning?
+
+In practice it does not, and the usual explanation is that in a space of several hundred dimensions there is room for the model to keep the two kinds of information in largely separate subspaces, and the projections that follow can pull them apart again. Concatenating would be cleaner conceptually but would spend dimensions that are more useful elsewhere.
+
+## What is used now
+
+- <strong>Learned absolute</strong> &mdash; a plain embedding table indexed by position, used by BERT and GPT-2. Simple and works well, but has a hard maximum length and learns nothing about positions beyond it.
+- <strong>Relative</strong> &mdash; bias the attention scores by the distance between the two positions rather than encoding absolutes at all. Closer to what attention actually wants to know.
+- <strong>RoPE</strong> (rotary) &mdash; rotate the query and key vectors by an angle proportional to position, so the dot product between them depends on their difference by construction. Now the default in most open-weight models.
+
+Sinusoidal encoding is no longer the state of the art, but it is the clearest illustration of what the problem is, and RoPE is easier to understand once you have seen it.
+
+## Where this goes wrong
+
+- <strong>Leaving it out.</strong> The model still trains and the loss still falls, so the bug is silent &mdash; it just performs like a bag-of-words model and nobody knows why.
+- <strong>Exceeding the trained length.</strong> With learned encodings, positions past the table simply do not exist. Most context-extension work is about making positional information survive past where it was trained.
+- <strong>Adding it at every layer.</strong> The original adds it once, at the input. Re-adding it at each layer is a common misreading of the diagram.
+- <strong>Assuming the model reads it as a number.</strong> It is a pattern, not a counter. What the model learns is which patterns co-occur, not that dimension 7 means "position 12".
+
+## Where that leaves you
+
+Self-attention has no notion of order, so position has to be supplied explicitly, and the naive options fail: raw indices grow without bound and normalised ones mean different things in different-length sentences. Sinusoidal encoding solves it with a bank of sine and cosine waves at geometrically spaced frequencies, giving every position a bounded, unique fingerprint that is defined for any length and whose similarity to other positions depends on the distance between them. It is added to the embedding rather than concatenated, and modern models mostly use learned or rotary variants &mdash; but all of them exist to answer the same question this one does.

@@ -1,0 +1,47 @@
+title: HAVING: A Filter That Runs After the Grouping
+intro: Same word, "filter". Different stage, different input, different answer.
+
+## Quick Context
+
+A grouped query runs in stages. Rows are read, <span class="mono-font kw">WHERE</span> discards the ones that fail a per-row test, what is left is collected into groups, each group is boiled down to its aggregates, and only then does <span class="mono-font kw">HAVING</span> get a look &mdash; at the groups, not the rows.
+
+That ordering is the entire module. WHERE cannot see <span class="mono-font fn">SUM()</span> because no sum exists yet when WHERE runs. HAVING can, because by the time it runs the individual rows are gone.
+
+## The order that explains everything
+
+FROM &rarr; WHERE &rarr; GROUP BY &rarr; HAVING &rarr; SELECT &rarr; ORDER BY &rarr; LIMIT
+
+Three consequences fall straight out of it:
+
+- <strong>WHERE changes what the aggregates are.</strong> Filtering rows out before grouping removes their contribution from every SUM, AVG and COUNT downstream. Watch the totals in stage 2 move as you raise the WHERE threshold &mdash; the group is still there, but it is now the total of fewer rows.
+- <strong>HAVING cannot bring anything back.</strong> It only ever removes whole groups from a set that has already been computed.
+- <strong>Neither can see a SELECT alias in standard SQL</strong>, because SELECT runs after both. MySQL and SQLite allow an alias in HAVING as an extension; PostgreSQL and SQL Server do not.
+
+## Which clause does a condition belong in?
+
+Ask what the condition is about.
+
+<strong>About one row?</strong> It goes in WHERE. <span class="mono-font">amount &gt; 200</span>, <span class="mono-font">region = 'North'</span>, <span class="mono-font">sold_at &gt;= '2026-01-01'</span> &mdash; each of these can be answered by looking at a single row, so put it in WHERE and let the database discard those rows as early and as cheaply as possible.
+
+<strong>About a whole group?</strong> It goes in HAVING. <span class="mono-font kw">HAVING</span> <span class="mono-font fn">COUNT</span>(*) &gt; 3, <span class="mono-font kw">HAVING</span> <span class="mono-font fn">SUM</span>(amount) &gt; 1000 &mdash; these cannot be answered from one row at all.
+
+A condition on the grouping column itself is legal in either place and belongs in WHERE, because filtering before you group is strictly less work than grouping and then throwing groups away.
+
+## Two things people are surprised by
+
+<strong>HAVING works without GROUP BY.</strong> With no GROUP BY the whole table is one implicit group, so <span class="mono-font kw">SELECT</span> <span class="mono-font fn">SUM</span>(amount) <span class="mono-font kw">FROM</span> sales <span class="mono-font kw">HAVING</span> <span class="mono-font fn">SUM</span>(amount) &gt; 5000 returns either one row or none.
+
+<strong>An aggregate in HAVING need not appear in SELECT.</strong> You can filter on <span class="mono-font fn">COUNT</span>(*) while selecting only the region. The aggregate is computed either way; SELECT just decides what is shown.
+
+## Experiments to try
+
+1. <strong>Start with HAVING alone.</strong> WHERE is at 0, so all 14 rows are grouped into 4 regions and <span class="mono-font kw">HAVING</span> <span class="mono-font fn">SUM</span>(amount) &ge; 800 removes one of them. Note which, and note its total.
+2. <strong>Now add a row filter.</strong> Push <strong>WHERE amount &ge;</strong> to 200. Seven of the fourteen rows vanish from stage 1, every total in stage 2 drops, and every group that passed HAVING a moment ago now fails it &mdash; without HAVING itself changing at all.
+3. <strong>Read the strike-throughs.</strong> Each group still lists the amounts WHERE removed, struck out. Those are the values missing from the totals above them.
+4. <strong>Filter on a count instead.</strong> Set <strong>HAVING Aggregate</strong> to COUNT(*); the threshold slider retunes to a count-sized range and lands on 3. With WHERE at 0 every region qualifies, because the smallest has three sales. Push WHERE to 200 and none do.
+5. <strong>Group by something finer.</strong> Put WHERE back to 0, set the aggregate to SUM(amount) with a threshold of 800, then set <strong>GROUP BY</strong> to rep. Nine small groups instead of four large ones, and not one reaches 800 &mdash; the biggest is 730. A HAVING threshold is only meaningful for the grouping it was chosen for.
+6. <strong>Make HAVING empty-handed.</strong> Push the threshold past every group's total. Zero rows returned &mdash; which is a perfectly ordinary result, not an error.
+
+## In one line
+
+WHERE filters rows before grouping and HAVING filters groups after, which is why WHERE cannot mention an aggregate and why HAVING is the only place a condition on SUM or COUNT can live. The consequence people miss is that WHERE does not merely remove rows from the output &mdash; it changes what every aggregate downstream is computed from, so moving one condition between the two clauses changes the numbers, not just the row count. Put per-row conditions in WHERE, group conditions in HAVING, and when a condition is legal in both, put it in WHERE: filtering early is always the cheaper plan.

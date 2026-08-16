@@ -1,0 +1,57 @@
+title: Retrieval Evaluation Metrics: A Practical Guide
+intro: Retrieval returns a ranked list, so the metric has to care about order. Precision@k, recall@k, MRR and NDCG each answer a different question about that list.
+
+## Why classification metrics are not enough
+
+A retriever does not return a yes or no; it returns an ordered list of candidates. Two systems can retrieve exactly the same documents and be very different in quality if one puts the relevant ones first and the other buries them at position 10.
+
+So retrieval metrics are evaluated <strong>at a cutoff k</strong> &mdash; the number of results a user or a downstream model will actually see &mdash; and the better ones are sensitive to position within that cutoff.
+
+## Precision@k and Recall@k
+
+precision@k = (relevant in top k) / k
+
+recall@k&nbsp;&nbsp;&nbsp; = (relevant in top k) / (total relevant)
+
+Precision@k asks how much of what you returned was useful. Recall@k asks how much of what exists you managed to find.
+
+With 3 relevant documents in the collection and a top-5 list containing 2 of them: precision@5 = 2/5 = 0.4, recall@5 = 2/3 = 0.67.
+
+Both ignore order entirely &mdash; a relevant document at position 1 and at position 5 count identically. For a RAG pipeline feeding a fixed number of chunks to a model that may be the right simplification; for a search results page it is not.
+
+## MRR and NDCG
+
+<strong>MRR</strong> (mean reciprocal rank) uses only the position of the <em>first</em> relevant result, averaged over queries:
+
+MRR = mean(1 / rank of first relevant)
+
+First position scores 1.0, second 0.5, third 0.33. It is the right metric when the user needs one good answer and will stop reading once they have it &mdash; question answering, navigational search &mdash; and it deliberately ignores everything after the first hit.
+
+<strong>NDCG</strong> (normalised discounted cumulative gain) is the most complete of the four. It handles <em>graded</em> relevance rather than a binary label, applies a logarithmic discount so later positions contribute less, and normalises by the score of the ideal ranking so the result lands in [0, 1] and is comparable across queries.
+
+Use NDCG when relevance comes in degrees and the whole ordering matters; use MRR when only the first hit does.
+
+## Interactive Exploration Guide
+
+1. <strong>Move the cutoff.</strong> Slide <strong>k</strong> from 1 to 10 and watch precision@k and recall@k move in opposite directions. A larger k almost always raises recall and lowers precision.
+2. <strong>Change the ranking.</strong> Switch <strong>Ranking</strong> so the relevant documents sit lower. Precision@k and recall@k at a large k barely move, while MRR and NDCG drop sharply &mdash; that difference is exactly what order-aware metrics measure.
+3. <strong>Put one relevant result first.</strong> Choose a ranking with a relevant document at position 1. MRR jumps to 1.0 regardless of what follows, which shows how much it ignores.
+4. <strong>Set k = 1.</strong> Precision@1 and recall@1 become extremely blunt. At small k the choice of metric matters far more than at large k.
+
+## Choosing one for a RAG pipeline
+
+For retrieval feeding a language model, <strong>recall@k</strong> is usually the metric that matters most. The model can ignore an irrelevant chunk among the k it receives, but it cannot use a relevant chunk that was never retrieved &mdash; a missed document is unrecoverable, whereas a spurious one is merely noise.
+
+Set k to the number of chunks you actually pass to the model and measure recall at that value. Then use precision or NDCG as a secondary check, since packing the context with irrelevant material does cost tokens and can distract the model.
+
+## What trips people up
+
+- <strong>Reporting a metric without its k.</strong> “Precision 0.4” is meaningless; precision@5 is a number.
+- <strong>Using accuracy.</strong> It has no meaning over a ranked list of a large corpus, where almost everything is irrelevant.
+- <strong>Ignoring order when order matters.</strong> Precision@k cannot distinguish a system that ranks well from one that merely retrieves the same set in a worse order.
+- <strong>Assuming complete relevance labels.</strong> Most evaluation sets label only judged documents, so an unjudged-but-relevant result counts against you and recall is systematically understated.
+- <strong>Averaging over too few queries.</strong> These metrics are noisy per query; differences need many queries to be meaningful.
+
+## Key takeaway
+
+Retrieval returns a ranking, so metrics are computed at a cutoff k and differ mainly in whether they care about position. Precision@k and recall@k ignore order within the cutoff; MRR looks only at the first relevant result; NDCG discounts by position and handles graded relevance. For RAG, recall@k at your actual context size is the number to optimise, because the model can survive a bad chunk but not a missing one.

@@ -1,0 +1,53 @@
+title: Functions and Return Values: A Practical Guide
+intro: A function packages a piece of work behind a name. return sends a value back to the caller - and a function without one still returns something, which is the source of a great many confusing bugs.
+
+## Defining and calling
+
+def area(width, height):<br>&nbsp;&nbsp;&nbsp;&nbsp;return width * height
+
+<span class="mono-font">width</span> and <span class="mono-font">height</span> are <strong>parameters</strong> &mdash; names the function uses internally. The values supplied at the call site are <strong>arguments</strong>. Calling <span class="mono-font">area(3, 4)</span> binds 3 to width and 4 to height, runs the body, and evaluates to 12.
+
+Arguments can be passed by position or by name, and keyword arguments are worth using whenever the meaning is not obvious: <span class="mono-font">area(width=3, height=4)</span> cannot be got the wrong way round.
+
+## return, and the None you did not ask for
+
+<span class="mono-font">return</span> does two things at once: it sends a value back and it <em>exits the function immediately</em>. Any code after it in the same path never runs, which is what makes early returns a clean way to handle edge cases.
+
+A function with no return statement still returns <span class="mono-font">None</span>. So does one that reaches the end without hitting a return. That is why this is such a common bug:
+
+def double(x):<br>&nbsp;&nbsp;&nbsp;&nbsp;x * 2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# computed, then thrown away<br><br>result = double(5)&nbsp;&nbsp;&rarr; None
+
+The multiplication happens; nothing is sent back. There is no error, and the None surfaces later as a TypeError somewhere unrelated.
+
+Distinguish <span class="mono-font">return</span> from <span class="mono-font">print</span>: printing shows a value to a human, returning gives it to the calling code. A function that prints its answer instead of returning it cannot be used in a calculation.
+
+## Scope and default arguments
+
+Names created inside a function are <strong>local</strong> to it and disappear when it ends. The function can read names from the enclosing scope but assigning to one creates a new local rather than modifying the outer variable, unless declared <span class="mono-font">global</span> &mdash; which is nearly always the wrong solution.
+
+Default values let a parameter be optional: <span class="mono-font">def greet(name, greeting="Hello")</span>. Defaults must come after all non-default parameters.
+
+The famous trap is a <strong>mutable default</strong>. The default is evaluated <em>once</em>, when the function is defined, not on each call:
+
+def add(item, target=[]):&nbsp;&nbsp;# wrong<br>&nbsp;&nbsp;&nbsp;&nbsp;target.append(item)<br>&nbsp;&nbsp;&nbsp;&nbsp;return target
+
+Every call that omits <span class="mono-font">target</span> shares the same list, so results accumulate across calls. Use <span class="mono-font">None</span> as the default and create the list inside the body.
+
+## Exploration guide
+
+1. <strong>Forget the return.</strong> Write a function that computes a value without returning it, then print the call. You get None, and no error to explain why.
+2. <strong>Return early.</strong> Put a return before other statements and confirm the later ones never run.
+3. <strong>Compare print and return.</strong> Write one function that prints and one that returns, then try to use each result in an arithmetic expression. Only the returning one works.
+4. <strong>Trigger the mutable default.</strong> Define the buggy version above and call it three times. The list grows across calls, because there is only ever one of it.
+
+## Traps worth knowing
+
+- <strong>Printing instead of returning.</strong> The value is displayed and then lost.
+- <strong>Falling off the end.</strong> A branch with no return silently yields None.
+- <strong>Mutable default arguments.</strong> Shared state between calls; use None.
+- <strong>Reaching for <span class="mono-font">global</span>.</strong> Almost always better solved by returning a value and assigning it at the call site.
+- <strong>Calling without parentheses.</strong> <span class="mono-font">f</span> is the function object; <span class="mono-font">f()</span> calls it.
+
+## The short version
+
+A function takes parameters, runs a body, and returns a value; without an explicit return it returns None, which is why a missing return shows up as a confusing error far from its cause. Return exits immediately, local names vanish when the call ends, and default arguments are evaluated once at definition time &mdash; so a mutable default is shared by every call that relies on it.

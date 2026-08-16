@@ -1,0 +1,20 @@
+title: How does a Python dict work?
+intro: How is a dictionary implemented, and why is lookup O(1)?
+
+## Computing an address instead of searching
+
+Two steps: hash the key to a number, then fold that number into a slot index. The lookup goes straight to that slot and compares keys there. Neither step depends on how many entries the dictionary holds, which is the entire O(1) claim.
+
+The comparison at the end is not optional. Two different keys can share a slot, so the answer is only correct because the key itself is checked &mdash; see <a href="../dsa/hash_tables.html">hash tables</a> for the machinery in full.
+
+## Collisions and the load factor
+
+When two keys want the same slot, CPython probes for another one using a sequence derived from the hash. That costs extra comparisons, and the fuller the table the longer the probe sequences get.
+
+So the table grows before that becomes a problem &mdash; past roughly two-thirds occupancy it allocates a bigger one and reinserts everything. A resize is O(n) and every key's slot changes, because the index is <code>hash % size</code> and <code>size</code> just moved. Amortised over the insertions that caused it, insertion is still O(1).
+
+## When O(1) is not true
+
+If every key hashes to the same slot, every operation degrades to a linear scan. That is not hypothetical: it was a real denial-of-service attack, where an attacker sent form fields chosen to collide. Python's answer is <strong>hash randomisation</strong> &mdash; string hashes are salted per process, so an attacker cannot precompute a colliding set.
+
+That is also why dictionary iteration order must never be assumed to be hash order, and why <code>hash('x')</code> differs between runs.

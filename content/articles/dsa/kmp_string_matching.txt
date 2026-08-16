@@ -1,0 +1,46 @@
+title: KMP String Matching
+intro: Never re-read a character you have already seen.
+
+## What this is
+
+<strong>Knuth&ndash;Morris&ndash;Pratt</strong> finds a pattern inside a text in <strong>O(n + m)</strong>, where naive search can take O(n&middot;m). The insight: a partial match already tells you something, so there is no need to start over.
+
+## What Naive Search Wastes
+
+Naive search compares the pattern at position 0. On a mismatch it shifts by one and <strong>restarts from the beginning of the pattern</strong>, re-reading text characters it has already examined.
+
+Switch to naive mode and watch the backtrack counter climb. With a text like "aaaaaaab" and pattern "aaab" it re-reads almost everything, every time &mdash; that is the O(n&middot;m) worst case.
+
+## The LPS Table
+
+KMP precomputes an array over the <em>pattern only</em>. <span class="mono-font">LPS[i]</span> is the length of the longest proper prefix of <span class="mono-font">pattern[0..i]</span> that is also a suffix of it.
+
+For <span class="mono-font">ababd</span> the table is <span class="mono-font">[0,0,1,2,0]</span>. At index 3 ("abab") the value 2 means "ab" is both a prefix and a suffix.
+
+So if a mismatch happens after matching "abab", those last two characters are already a valid prefix &mdash; the pattern can slide forward and resume at index 2, without moving the text pointer at all.
+
+## The Text Pointer Never Goes Backwards
+
+This is the guarantee that produces the linear bound. In KMP, <span class="mono-font">i</span> (the text index) only ever increases &mdash; watch the backtrack counter stay at <strong>zero</strong>. Only the pattern index moves back, and it can only decrease as many times as it increased.
+
+Total work is therefore at most 2n for the search plus O(m) to build the table &mdash; hence O(n + m).
+
+It also means KMP can run on a <em>stream</em>: you never need to store or rewind the text, which matters for network and file processing.
+
+## In Context
+
+KMP is the classic, but not always the fastest in practice. <strong>Boyer&ndash;Moore</strong> scans the pattern right-to-left and can skip whole blocks, making it typically faster for long patterns &mdash; it is what most <span class="mono-font">grep</span> implementations use. <strong>Rabin&ndash;Karp</strong> uses rolling hashes and is well suited to searching for many patterns at once.
+
+KMP's distinguishing strength is its worst-case guarantee and its ability to work on streaming input without buffering.
+
+## Things to try
+
+1. <strong>Look at the LPS table first.</strong> Non-zero entries mark places where a prefix reappears as a suffix &mdash; the only places a shortcut is possible.
+2. <strong>Step through KMP</strong> and watch the pattern jump forward by several positions on a mismatch, instead of one.
+3. <strong>Keep an eye on the text pointer.</strong> It never decreases, which is the entire source of the linear guarantee.
+4. <strong>Switch to naive mode</strong> on the same input and watch the backtrack counter climb while KMP's stays at zero.
+5. <strong>Try text 'aaaaaaaab' with pattern 'aaab'.</strong> This is naive search's worst case, and the comparison gap becomes dramatic.
+
+## What to remember
+
+KMP precomputes an LPS table describing the pattern's self-overlap, then uses it to shift intelligently after a mismatch. Because the text pointer never moves backwards, matching is O(n+m) with a worst-case guarantee — and it works on streams that can never be rewound.

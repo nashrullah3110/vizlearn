@@ -1,0 +1,47 @@
+title: Hash Tables and Hashing
+intro: Constant-time lookup by turning a key into an address &mdash; and what happens when two keys want the same one.
+
+## Quick Context
+
+A <strong>hash table</strong> stores key&ndash;value pairs in an array. A <strong>hash function</strong> converts each key into an array index, so finding a key requires no searching at all &mdash; you compute where it must be and go straight there.
+
+## What Makes a Good Hash Function
+
+- <strong>Deterministic</strong> &mdash; the same key must always give the same index, or you could never find anything again.
+- <strong>Uniform</strong> &mdash; keys should spread evenly across buckets. A function that sends everything to bucket 0 turns your O(1) table into an O(n) list.
+- <strong>Fast</strong> &mdash; it runs on every single operation, so it must be cheaper than the search it replaces.
+
+The lab uses a simple polynomial rolling hash, shown live above the buckets. Real implementations use stronger functions, but the mechanism is identical.
+
+## Collisions Are Inevitable
+
+There are infinitely many possible keys and only a finite number of buckets, so two keys <em>will</em> eventually hash to the same index. This is not a flaw to be engineered away &mdash; it is a certainty to be handled. Press <strong>Force collision</strong> to see one.
+
+## Two Ways to Resolve Them
+
+- <strong>Separate chaining</strong> &mdash; each bucket holds a small list. Colliding keys simply join the list. Simple, degrades gracefully, but costs extra memory for the pointers and loses cache locality.
+- <strong>Open addressing</strong> &mdash; on a collision, probe forward to the next free slot. Everything stays in one contiguous array, which is cache-friendly and faster in practice &mdash; but deletion becomes awkward (you need tombstones) and performance collapses as the table fills.
+
+Switch between the two with the same keys and watch where the colliding entries end up.
+
+## Load Factor and Resizing
+
+As the load factor climbs, collisions become common and performance decays toward O(n). Implementations therefore <strong>resize</strong> &mdash; typically doubling the bucket count and rehashing every key &mdash; once the load factor passes a threshold (0.75 in Java's HashMap, around 0.66 in Python's dict).
+
+Rehashing is an expensive O(n) operation, but it happens rarely enough that the <em>amortised</em> cost of insertion stays O(1). Add keys here and watch the load-factor warning appear.
+
+## Why This Matters to You
+
+Python's <span class="mono-font">dict</span>, JavaScript's <span class="mono-font">Map</span> and object, Java's <span class="mono-font">HashMap</span>, Go's <span class="mono-font">map</span> &mdash; all hash tables. When someone says "just use a dictionary for O(1) lookup", this is the machinery they are invoking. It is also why dictionary keys must be <em>hashable</em> and immutable: mutating a key after insertion changes its hash, and the entry becomes permanently unreachable.
+
+## Experiments to try
+
+1. <strong>Insert a few keys</strong> and watch each one compute its own index &mdash; no searching involved at any point.
+2. <strong>Press Force collision.</strong> Two keys land in the same bucket; the strategy selector decides what happens next.
+3. <strong>Switch to open addressing</strong> with a collision present. The second key moves to the next free slot rather than sharing.
+4. <strong>Reduce the bucket count to 4</strong> and keep inserting. The load factor rises, collisions multiply, and lookups start needing several probes.
+5. <strong>Look up a key after several collisions.</strong> The probe count is exactly how far O(1) has drifted toward O(n).
+
+## What to remember
+
+Hashing replaces searching with computing an address. Collisions are unavoidable and must be resolved by chaining or probing; the load factor governs how often they happen. Keep it low and lookups stay effectively constant &mdash; let it climb and a hash table quietly becomes a linked list.

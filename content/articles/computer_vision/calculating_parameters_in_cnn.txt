@@ -1,0 +1,50 @@
+title: Calculating Parameters in CNN: A Practical Guide
+intro: A convolutional layer's parameter count depends on the filter size, the input channels and the number of filters - and not at all on the size of the image. That independence is the whole reason CNNs are practical.
+
+## The formula
+
+For a convolutional layer with kernel size k&times;k, C<sub>in</sub> input channels and F filters:
+
+parameters = (k &times; k &times; C<sub>in</sub> &times; F) + F
+
+Each filter is a small 3-D volume of size k&times;k&times;C<sub>in</sub>, and there are F of them. The trailing <span class="mono-font">+ F</span> is one bias per filter.
+
+The part worth pausing on is what is <em>absent</em>: the height and width of the input never appear. A layer applied to a 32&times;32 image and the same layer applied to a 4096&times;4096 image have exactly the same number of parameters.
+
+## Filters are three-dimensional
+
+A “3&times;3 filter” on an RGB input is not 9 weights, it is 3&times;3&times;3 = 27. A filter always spans <em>every</em> input channel, because it looks for a pattern across all of them at once &mdash; an edge detector on colour images must consider red, green and blue together.
+
+Work one through. First conv layer, 3&times;3 kernel, RGB input, 64 filters:
+
+(3 &times; 3 &times; 3 &times; 64) + 64 = 1728 + 64 = <strong>1792</strong>
+
+Second layer, 3&times;3 kernel, taking those 64 channels, producing 128:
+
+(3 &times; 3 &times; 64 &times; 128) + 128 = 73728 + 128 = <strong>73,856</strong>
+
+Forty times more, from the same kernel size &mdash; because C<sub>in</sub> and F both grew. The product of those two dominates, which is why deep layers with many channels hold most of a CNN’s weights.
+
+## Weight sharing, and the comparison that makes the point
+
+A fully connected layer on a 224&times;224&times;3 image with 64 outputs would need 224 &times; 224 &times; 3 &times; 64 &asymp; <strong>9.6 million</strong> parameters. The convolutional layer above does a comparable job with <strong>1,792</strong>.
+
+The saving comes from <strong>weight sharing</strong>: the same filter slides across every position rather than each position having its own weights. That encodes a real assumption &mdash; a vertical edge is a vertical edge wherever it appears &mdash; and it buys two things at once. Far fewer parameters, and translation equivariance, since a feature is detected the same way regardless of where it sits.
+
+## Interactive Exploration Guide
+
+1. <strong>Grow the kernel.</strong> Raise <strong>3x3</strong> from 3 to 7 and watch the count. It grows with the <em>square</em> of the kernel size, so 7&times;7 costs more than five times a 3&times;3 &mdash; which is why modern networks stack small kernels instead.
+2. <strong>Grow the channels.</strong> Raise <strong>Input Channels</strong> and then <strong>Number of Filters</strong>. Each scales the count linearly, and together they scale it multiplicatively.
+3. <strong>Toggle the bias.</strong> Switch the bias checkbox and note the change is exactly F &mdash; a rounding error next to the weights, which is why layers followed by batch normalisation usually drop it entirely.
+4. <strong>Confirm the image size is irrelevant.</strong> Nothing in the calculation refers to input height or width. That is the property that makes a CNN usable on large images at all.
+
+## What trips people up
+
+- <strong>Forgetting the depth dimension.</strong> Counting a 3&times;3 filter as 9 weights instead of 9 &times; C<sub>in</sub> is the most common error, and it understates the layer by a large factor.
+- <strong>Confusing parameters with activations.</strong> Parameters are fixed and independent of image size; activation memory scales with height &times; width &times; channels &times; batch. Out-of-memory errors during training are almost always activations, not weights.
+- <strong>Using large kernels.</strong> Two stacked 3&times;3 layers cover the same receptive field as one 5&times;5 with fewer parameters and an extra non-linearity. VGG made this the standard.
+- <strong>Keeping the bias before batch norm.</strong> The normalisation subtracts the mean and cancels it exactly, so those parameters do nothing.
+
+## In one line
+
+A convolutional layer holds (k &times; k &times; C<sub>in</sub> &times; F) + F parameters, with filters spanning every input channel and the image dimensions appearing nowhere. Weight sharing is what buys the enormous reduction against a fully connected layer, along with translation equivariance. Cost grows with the square of the kernel and the product of input and output channels &mdash; which is why small kernels and staged channel growth are the standard design.

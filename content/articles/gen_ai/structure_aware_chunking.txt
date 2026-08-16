@@ -1,0 +1,60 @@
+title: Structure-aware chunking: A Practical Guide
+intro: What is structure-aware chunking, and why does it beat a character splitter on real documents?
+
+## Boundaries you do not have to guess
+
+A Markdown heading, an HTML <code>&lt;section&gt;</code>, a PDF outline entry, a slide break: each is a statement by the author that the subject changes here. Semantic chunking spends an embedding per sentence to infer what the markup already says.
+
+Some structures must not be split at all. A table split down the middle loses its header row and becomes unreadable; a code block cut in half is not code. These are kept whole even when they exceed the size limit, or summarised separately.
+
+## Carrying the heading path
+
+The half that gets missed. A chunk reading "must be requested within 14 days" is useless in isolation &mdash; 14 days of what? Prepending the heading path &mdash; <code>Refund policy &gt; Exceptions</code> &mdash; makes the chunk self-describing.
+
+It improves retrieval as well as generation, because the heading words are now in the embedded text and match queries that use the section's vocabulary. Store the path as metadata too, so it can be filtered and displayed as a citation.
+
+## What it needs from you
+
+A parser per format. Markdown is easy, HTML is manageable, PDF is genuinely hard &mdash; a PDF has no structure, only positioned glyphs, so headings must be inferred from font size and spacing. Most RAG quality problems on PDFs are really extraction problems.
+
+Sections also vary wildly in length, so structure-aware chunking is usually combined with a recursive splitter: split on structure first, then recursively split any section still over the limit, keeping the heading path on every resulting piece.
+
+## Extraction is the hard part, not splitting
+
+The splitting is easy once the structure is known. Knowing it is the problem, and it varies enormously by format.
+
+<strong>Markdown and HTML</strong> carry structure explicitly; a parser gives you the tree.
+
+<strong>PDF</strong> has no structure at all &mdash; only positioned glyphs. Headings must be inferred from font size, weight and spacing, multi-column layouts interleave text if read naively, and tables lose their rows. Most RAG quality complaints about PDFs are extraction failures rather than retrieval failures, and swapping the embedding model will not touch them.
+
+<strong>Office documents and slides</strong> sit in between: real structure exists in the file format, and most extraction libraries flatten it away before you see it.
+
+Budget for extraction seriously. It is unglamorous and it decides the ceiling on everything downstream.
+
+## Tables, code and the things that must not be split
+
+Some structures are atomic. A table cut between its header row and its data leaves rows of unlabelled numbers; a code block cut in half is not code; a numbered list split mid-way loses the numbering that made it readable.
+
+The usual handling is to keep these whole even when they exceed the size limit, and to accept the occasional oversized chunk. For a genuinely large table, the better answer is often to store a generated summary for retrieval and the full table for generation &mdash; the summary is what matches the query, the table is what answers it.
+
+The same reasoning applies to images and diagrams: retrieve on a caption or description, return the artefact. Once you separate what is embedded from what is returned, you are already at the <a href="parent_document_retriever.html">parent-document</a> pattern.
+
+## What the heading path does to retrieval
+
+Prepending <code>Refund policy &gt; Exceptions</code> to a chunk is often described as a readability improvement, and its larger effect is on retrieval.
+
+The section's vocabulary is now inside the embedded text. A query using the words of the section &mdash; "refund exceptions" &mdash; matches a chunk whose body never uses either word, because the body says "digital goods are non-refundable once downloaded". Without the path, that chunk is close to unfindable by its own section's name.
+
+Store the path as metadata as well as prepending it. As metadata it supports filtering ("only search the exceptions"), it gives you a citation to display, and it lets you reconstruct the document's hierarchy for a parent-document lookup.
+
+One caution: on a deep hierarchy the path can grow long enough to dominate a short chunk's embedding, which is the dilution problem described under <a href="context_aware_chunking.html">context-aware chunking</a>. Two or three levels is usually the useful limit.
+
+## Things to try
+
+1. Compare <em>structure first</em> with <em>fixed size</em> at the same chunk size. The character splitter cuts through the heading; the structure-aware one does not.
+2. Lower the <strong>chunk size</strong> until a section still exceeds it. Structure gives boundaries, not size control, so a recursive splitter has to finish the job.
+3. Note the heading path on each chunk. A fragment retrieved alone still says which section it belongs to.
+
+## What to remember
+
+Structure-aware chunking splits along the document's own markup &mdash; headings, list items, table rows &mdash; because those boundaries were placed by the author and cost nothing to find. Carrying the heading path into each chunk is the half people miss: it makes a fragment self-describing and puts the section's vocabulary into the embedded text.

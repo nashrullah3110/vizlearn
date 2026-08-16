@@ -1,0 +1,49 @@
+title: Regularization Techniques: A Practical Guide
+intro: Add a penalty on the size of the weights and the model prefers simpler explanations. L1 drives weights to exactly zero and selects features; L2 shrinks them all smoothly and is the usual default.
+
+## Penalising complexity
+
+An overfitting model has found a way to fit noise, and doing that almost always requires large weights &mdash; sharp, wiggly functions need big coefficients. Regularisation exploits that by adding the size of the weights to the loss:
+
+total loss = data loss + &lambda; &times; penalty(w)
+
+Now the optimiser has two objectives in tension: fit the data, and keep the weights small. &lambda; sets the exchange rate. At &lambda; = 0 there is no penalty and you are back to plain training; at very large &lambda; the weights are crushed toward zero and the model underfits.
+
+## L1 and L2, and why one is sparse
+
+<strong>L2 (ridge, weight decay)</strong> penalises the sum of squared weights:
+
+penalty = &Sigma; w<sub>i</sub>&sup2; &nbsp;&nbsp;&rarr;&nbsp;&nbsp; gradient = 2w<sub>i</sub>
+
+<strong>L1 (lasso)</strong> penalises the sum of absolute values:
+
+penalty = &Sigma; |w<sub>i</sub>| &nbsp;&nbsp;&rarr;&nbsp;&nbsp; gradient = sign(w<sub>i</sub>)
+
+The gradients explain the difference completely. L2’s pull is <em>proportional to the weight</em>, so as a weight approaches zero the force pulling it there fades &mdash; weights shrink toward zero and never quite arrive. L1’s pull is <em>constant</em> regardless of size, so a weight near zero is pushed just as hard as a large one and is driven exactly to zero, where it stays.
+
+That is why L1 produces sparse models and performs feature selection, while L2 keeps every feature with a smaller coefficient. <strong>Elastic net</strong> uses both, getting L1’s selection with L2’s stability when features are correlated.
+
+## Guided experiments
+
+1. <strong>Train with no penalty.</strong> Set <strong>Penalty Strength (&lambda;)</strong> to its minimum and press <strong>Train Network</strong>. Weights grow freely and the model fits the targets as closely as it can, noise included.
+2. <strong>Apply L2.</strong> Enable the L2 toggle, set <strong>Penalty Strength (&lambda;)</strong> to about 0.1, press <strong>Reset &amp; Randomize Targets</strong> and train. Every weight shrinks, and none reaches zero &mdash; that smooth shrinkage is the whole behaviour of L2.
+3. <strong>Switch to L1.</strong> Enable the L1 toggle instead at the same &lambda;. Now some weights collapse to exactly zero while others stay large. The model has selected a subset of connections and switched the rest off.
+4. <strong>Turn it up too far.</strong> Set <strong>Penalty Strength (&lambda;)</strong> to 0.8 and train. Nearly everything is crushed toward zero and the model can no longer fit even the real structure &mdash; regularisation causing underfitting, which is the failure mode at the far end.
+
+## Weight decay is not quite L2
+
+The two are used interchangeably and are only equivalent for plain SGD. Weight decay multiplies the weights by a factor slightly below 1 at each step; L2 adds a term to the loss, so its contribution passes through the optimiser’s gradient machinery.
+
+With Adam that difference is real. Adam divides each gradient by a running estimate of its magnitude, which also rescales the L2 term &mdash; so parameters with large gradients end up effectively less regularised. <strong>AdamW</strong> fixes this by applying the decay directly to the weights, outside the adaptive step, and it is the reason AdamW is now the default optimiser for transformers.
+
+## What usually goes wrong
+
+- <strong>Regularising a model that is underfitting.</strong> If training loss is already high, adding a penalty makes both curves worse. Confirm the model can overfit before trying to stop it.
+- <strong>Penalising the biases.</strong> Biases shift the output rather than scale the input, so shrinking them limits what the model can represent without reducing overfitting. Regularise weights only.
+- <strong>Using L2 with Adam and expecting weight decay.</strong> Use AdamW when you want true decay.
+- <strong>Failing to scale features first.</strong> The penalty treats all weights equally, so a feature on a large scale needs a small weight and is under-penalised relative to the rest. Standardise before regularising.
+- <strong>Tuning &lambda; linearly.</strong> It spans orders of magnitude; search it on a log scale, typically 10<sup>&minus;5</sup> to 10<sup>&minus;1</sup>.
+
+## In one line
+
+Regularisation adds a weight-size penalty to the loss so the optimiser trades fit against simplicity, with &lambda; setting the rate. L2 shrinks all weights proportionally and keeps every feature; L1 applies constant pressure and drives weights to exactly zero, producing a sparse, self-selecting model. Use it when the model overfits, scale the features first, and reach for AdamW if the optimiser is Adam.

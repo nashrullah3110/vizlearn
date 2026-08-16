@@ -1,0 +1,75 @@
+title: Batch Normalization in Deep Networks: Complete Guide
+intro: Read this after trying the interactive once, then run it again with the suggested experiments.
+
+## Quick Context
+
+Batch Normalization (BatchNorm) was introduced by Ioffe &amp; Szegedy in 2015 and is now a standard building block in virtually every deep network. It normalizes the inputs to each layer so that training is faster and more stable. This page lets you <em>see</em> what happens with and without it.
+
+## 1) The Problem BatchNorm Solves
+
+When you feed raw features with different scales (e.g., Age 18–80 vs. Salary 20k–200k) into a network, the first-layer weights that receive the large feature grow disproportionately. During backpropagation those large weights amplify gradients in early layers (<span style="color:var(--accent-danger)">exploding</span>), while deeper layers receive progressively smaller updates (<span style="color:var(--accent-blue)">vanishing</span>). The result: unstable training or very slow convergence.
+
+Normalizing inputs at the front door helps the first layer, but <strong>internal covariate shift</strong> — the distribution of each hidden layer's inputs keeps changing as weights update — still destabilizes deeper layers. BatchNorm fixes this by re-normalizing activations <em>inside</em> the network at every layer.
+
+## 2) How Batch Normalization Works
+
+For a mini-batch of activations <strong>z</strong> at a given layer:
+
+<span style="color:var(--text-muted)"># batch mean</span>
+
+<br>
+
+<span style="color:var(--text-muted)"># batch variance</span>
+
+<br>
+
+<span style="color:var(--text-muted)"># normalize</span>
+
+<br>
+
+<span style="color:var(--text-muted)"># scale &amp; shift (learnable)</span>
+- <strong>ε</strong> is a tiny constant (e.g., 1e-5) to avoid division by zero.
+- <strong>γ</strong> and <strong>β</strong> are learnable parameters that let the network recover any scale/shift it needs — BatchNorm doesn't permanently force zero-mean unit-variance; it just gives the optimizer a much friendlier starting point.
+- At inference time, the running mean and variance computed during training are used instead of batch statistics.
+
+## 3) Why This Is Worth Learning
+
+- <strong>Faster convergence</strong> — you can often use much higher learning rates.
+- <strong>Regularization effect</strong> — the noise from batch statistics acts as mild regularization, sometimes reducing the need for Dropout.
+- <strong>Enables deeper networks</strong> — gradients stay in a healthy range across 50, 100, or even 1000+ layers.
+- <strong>Interview staple</strong> — expect questions on BatchNorm in almost every ML/DL interview.
+
+## 4) Guided Experiments with This Interactive
+
+1. <strong>Baseline</strong> — Set Age ≈ 35, Salary ≈ 80k. Leave both toggles OFF. Click <em>Train Network</em>. Watch W1 (first layer) turn <span style="color:var(--accent-danger)">red</span> and W3 (deep layer) turn <span style="color:var(--accent-blue)">blue</span>. The status should say "Unstable".
+2. <strong>Input normalization only</strong> — Turn ON "Normalize Raw Inputs", leave Batch Norm OFF. Train again. W1 calms down, but deep layers may still drift.
+3. <strong>Batch Normalization</strong> — Turn ON "Enable Batch Norm" (keep input normalization ON too). Train again. All bars should stay <span style="color:var(--accent-primary)">green</span> and status should read "Stable".
+4. <strong>Extreme inputs</strong> — Set Salary to 200k with only Batch Norm ON (no input normalization). Observe how BatchNorm alone handles large feature scales internally.
+5. <strong>Reset &amp; reproduce</strong> — Click Reset and repeat experiment 3 to confirm the result is consistent.
+
+## 5) Where BatchNorm Is Placed
+
+There are two common conventions:
+
+- <strong>Before activation</strong>: Linear → BatchNorm → ReLU (the original paper's approach).
+- <strong>After activation</strong>: Linear → ReLU → BatchNorm (some practitioners prefer this).
+
+In practice both work well; consistency within your architecture matters more than the placement choice.
+
+## 6) Common Mistakes
+
+- <strong>Forgetting model.eval()</strong> — at inference, if you don't switch to eval mode, PyTorch/TensorFlow will use live batch stats instead of running averages, producing inconsistent predictions.
+- <strong>Batch size too small</strong> — with batch size 1 or 2, the batch mean/variance estimate is too noisy. Use Group Normalization or Layer Normalization instead.
+- <strong>Using BatchNorm with Dropout carelessly</strong> — both introduce stochasticity; their interaction can hurt. Test whether you need both.
+- <strong>Applying BatchNorm to the output layer</strong> — normalizing the final prediction layer often harms performance.
+
+## 7) BatchNorm vs. Other Normalizations
+
+<table class="w-full text-sm border-collapse" style="color: var(--text-main)"> <thead><tr style="border-bottom: 1px solid var(--border-subtle)"> <th class="text-left p-2">Technique</th><th class="text-left p-2">Normalizes Over</th><th class="text-left p-2">Best For</th> </tr></thead> <tbody> <tr style="border-bottom: 1px solid var(--border-subtle)"><td class="p-2">Batch Norm</td><td class="p-2">Batch dimension</td><td class="p-2">CNNs with large batches</td></tr> <tr style="border-bottom: 1px solid var(--border-subtle)"><td class="p-2">Layer Norm</td><td class="p-2">Feature dimension</td><td class="p-2">Transformers, RNNs</td></tr> <tr style="border-bottom: 1px solid var(--border-subtle)"><td class="p-2">Group Norm</td><td class="p-2">Channel groups</td><td class="p-2">Small-batch CNNs</td></tr> <tr><td class="p-2">Instance Norm</td><td class="p-2">Single sample, single channel</td><td class="p-2">Style transfer</td></tr> </tbody> </table>
+
+## 8) Key Takeaways
+
+- BatchNorm normalizes hidden-layer activations using batch statistics during training and running statistics during inference.
+- It fights internal covariate shift, enabling higher learning rates and deeper architectures.
+- The learnable parameters γ and β let the network undo the normalization if needed.
+- Always switch to eval mode at inference and be mindful of batch size.

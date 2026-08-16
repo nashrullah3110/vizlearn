@@ -1,0 +1,47 @@
+title: Normalization Techniques for Sequential Data: A Practical Guide
+intro: Batch normalisation works beautifully on images and badly on sequences. Layer normalisation is what replaced it, and the reason is entirely about which axis the statistics are computed over.
+
+## Normalising over the wrong axis
+
+Every normalisation layer does the same arithmetic &mdash; subtract a mean, divide by a standard deviation, then apply a learned scale and shift. What differs is <em>which</em> values are pooled to compute that mean and deviation.
+
+<strong>Batch normalisation</strong> computes statistics per feature, across the batch: for feature 3, average over all samples in the batch. <strong>Layer normalisation</strong> computes statistics per sample, across the features: for sample 3, average over all of its features.
+
+On images batch norm is excellent. On sequences it breaks, for three separate reasons.
+
+## Why batch norm fails on sequences
+
+<strong>Variable length.</strong> Sequences in a batch have different lengths, so timestep 50 might have 32 real values in one batch and 3 in another, with the rest padding. Statistics computed over that are unstable, and computed over padding they are simply wrong.
+
+<strong>Per-timestep statistics.</strong> A recurrent network applies the same cell at every step, but batch norm would need separate running statistics for each timestep &mdash; and at inference on a sequence longer than anything seen in training, there are no statistics for those positions at all.
+
+<strong>Batch dependence.</strong> A sample’s normalised representation depends on the other samples it happens to be batched with. For generation, where inference often runs one sequence at a time, the batch statistics are meaningless.
+
+Layer norm sidesteps all three. It uses only the sample’s own features, so it is independent of batch size, identical at training and inference, and unaffected by how many other sequences are present or how long they are.
+
+## Interactive Exploration Guide
+
+1. <strong>Look at the unnormalised distribution.</strong> With the outlier toggle off, note the spread of the raw values &mdash; features on different scales pull the layer’s activations around.
+2. <strong>Introduce an outlier.</strong> Enable the outlier toggle. Watch how a single extreme value shifts the computed mean and inflates the standard deviation, dragging every other value with it.
+3. <strong>Compare the axes.</strong> Note which values get pooled. Normalising across the batch means one sample’s statistics depend on its neighbours; normalising across features means each sample is self-contained.
+4. <strong>Toggle back and forth.</strong> The sensitivity to a single outlier is the practical argument for robust preprocessing before the layer ever sees the data.
+
+## The variants worth knowing
+
+- <strong>Batch norm</strong> &mdash; per feature, across the batch. Convolutional networks with reasonable batch sizes.
+- <strong>Layer norm</strong> &mdash; per sample, across features. Transformers and recurrent networks, essentially universally.
+- <strong>Group norm</strong> &mdash; per sample, across groups of channels. Vision with small batches, where batch norm’s estimates go noisy.
+- <strong>RMSNorm</strong> &mdash; layer norm without the mean subtraction, dividing by the root mean square only. Slightly cheaper, works as well, and is what most recent large language models use.
+
+The placement matters too. Original transformers put layer norm after the residual addition (post-norm); modern ones put it before the sublayer (pre-norm), which makes deep stacks far easier to train and often removes the need for a learning-rate warmup.
+
+## Where this goes wrong
+
+- <strong>Batch norm with a batch size of 1 or 2.</strong> The variance estimate is meaningless. Use layer or group norm.
+- <strong>Forgetting eval mode.</strong> Batch norm uses batch statistics in training and running averages at inference. Leaving the model in training mode makes predictions depend on whatever else is in the batch.
+- <strong>Normalising over padded positions.</strong> Pollutes the statistics with zeros that carry no information.
+- <strong>Adding a bias before a normalisation layer.</strong> The mean subtraction cancels it exactly, so those parameters do nothing. Disable the bias on a layer feeding into a norm.
+
+## The short version
+
+All normalisation layers subtract a mean and divide by a deviation; they differ only in which values are pooled. Batch norm pools across the batch, which makes it unusable for sequences of varying length and inference on single examples. Layer norm pools across each sample’s own features, so it is independent of batch size and identical at training and inference &mdash; which is why every transformer uses it.

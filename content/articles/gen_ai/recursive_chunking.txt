@@ -1,0 +1,60 @@
+title: Recursive chunking: A Practical Guide
+intro: What is recursive character chunking, and why is it the default?
+
+## Why not just split every N characters
+
+Fixed-size splitting is one line and cuts wherever it lands &mdash; mid-sentence, mid-word, mid-number. The retrieved chunk then starts halfway through a thought, and the generator has to answer from a fragment.
+
+Recursive splitting keeps the size limit and spends it on the best boundary available. Chunks vary in length, which is fine: a chunk is a unit of meaning, not a unit of storage.
+
+## The separator list is the whole configuration
+
+The default is roughly <code>["\n\n", "\n", ". ", " ", ""]</code> &mdash; paragraph, line, sentence, word, character. It descends only when a piece still exceeds the limit, so the last entry fires only on text with no whitespace at all.
+
+Change the list to match the document type. Code wants <code>["\nclass ", "\ndef ", "\n\n"]</code>; Markdown wants heading markers first. That is the cheapest large improvement available to a RAG pipeline, and it is usually left at the default.
+
+## Overlap, and what it costs
+
+Chunks usually overlap by 10&ndash;20% so a sentence spanning a boundary appears whole in at least one of them. The cost is real: overlap inflates the index, and duplicated text means near-identical chunks compete in the results, crowding out genuinely different ones.
+
+Recursive chunking is the right default and it is still structure-blind &mdash; it does not know a heading from a sentence. That is what the structure-aware and semantic variants address.
+
+## Choosing the size, and why there is no default
+
+Chunk size is a trade between two failures. Too small and a chunk lacks the context to be understood alone &mdash; a sentence about "the second condition" without the first. Too large and the chunk covers several topics, so its embedding is an average of all of them and matches none precisely, while also burning context budget on material the query did not need.
+
+The useful framing is that a chunk should be <strong>one retrievable idea</strong>. For dense prose that is often a paragraph, 200&ndash;500 tokens. For reference material with short entries it is much smaller. For code it is a function, whatever that costs in tokens.
+
+Do not pick from a blog post. Build a small evaluation set of real questions, measure <a href="recall_at_k.html">recall@k</a> at three or four sizes, and take the winner. The difference between 200 and 800 tokens on a real corpus is routinely larger than the difference between two embedding models.
+
+## Overlap, and the deduplication it forces
+
+Overlap exists because a boundary can fall mid-argument however carefully it is chosen. Repeating the last 10&ndash;20% of each chunk at the start of the next means a straddling sentence appears whole somewhere.
+
+It costs more than index size. Overlapping chunks are near-duplicates, so a query matching the overlapped region retrieves both, and your top 5 is really a top 3 with two copies. That crowds out genuinely different evidence, and it is the reason <a href="maximal_marginal_relevance.html">maximal marginal relevance</a> and other diversity-aware selection strategies exist.
+
+If overlap is doing a lot of work for you, that is usually a signal the separators are wrong rather than that more overlap is needed. Fixing the boundaries is cheaper than paying for redundancy on every query.
+
+## Tuning the separator list per format
+
+The default list &mdash; paragraph, line, sentence, word, character &mdash; assumes prose. Changing it for the document type is the single cheapest improvement available, and it is almost always left alone.
+
+<strong>Code:</strong> lead with <code>\nclass </code>, <code>\ndef </code>, <code>\n\n</code>, so a function stays whole and a chunk is a unit someone could actually read.
+
+<strong>Markdown:</strong> lead with heading markers, which turns the recursive splitter into a cheap approximation of <a href="structure_aware_chunking.html">structure-aware chunking</a>.
+
+<strong>Transcripts:</strong> split on speaker turns before sentences, so a chunk holds one person's contribution rather than half of two.
+
+<strong>CSV and logs:</strong> split on lines and never below, because a half-row is meaningless.
+
+Every one of these is a few characters of configuration against an embedding-model migration, and they routinely produce more improvement.
+
+## Things to try
+
+1. Drop the <strong>chunk size</strong> to 60. More pieces fall through to sentence and then word level, and chunks start ending mid-sentence.
+2. Switch <strong>separators</strong> to <em>fixed size</em>. Every boundary lands wherever the character count ran out &mdash; watch the mid-sentence count climb.
+3. Raise the size to 260 with recursive separators. One chunk holds the whole passage, which retrieves as a single coarse unit.
+
+## What to remember
+
+Recursive chunking splits on the largest natural boundary that fits, descending through a priority list of separators only when a piece is still oversized. The separator list is the whole configuration, and tailoring it to the document type is the cheapest large improvement available to a RAG pipeline.

@@ -1,0 +1,47 @@
+title: Sliding Window for Time Series: A Practical Guide
+intro: Supervised learning needs (input, target) pairs and a time series is just one long sequence. A sliding window manufactures the pairs - and the way you split them afterwards is where most time-series projects go wrong.
+
+## Turning a sequence into a supervised problem
+
+A model needs examples with features and a label. A time series is a single ordered run of values, so you build examples by sliding a fixed-length window along it: the values inside the window are the input, and the value immediately after it is the target.
+
+With the series <span class="mono-font">[10, 12, 15, 13, 18, 20, 19]</span> and a window of 3:
+
+[10, 12, 15] &rarr; 13<br>[12, 15, 13] &rarr; 18<br>[15, 13, 18] &rarr; 20<br>[13, 18, 20] &rarr; 19
+
+Seven observations become four training examples. In general a series of length n with window W and stride S yields <span class="mono-font">&lfloor;(n &minus; W) / S&rfloor; + 1</span> examples &mdash; so the window costs you W observations’ worth of data before you get anything at all.
+
+## Window size and stride
+
+<strong>Window size (W)</strong> is how much history the model sees per prediction, and it is a real modelling assumption: it asserts that nothing older than W steps matters. Too small and the model cannot see the pattern &mdash; a weekly cycle needs at least seven daily steps. Too large and each example carries mostly irrelevant history, the input dimension grows, and the number of examples shrinks.
+
+<strong>Stride (S)</strong> is how far the window jumps between examples. A stride of 1 gives the maximum number of examples, heavily overlapping and therefore highly correlated. A larger stride gives fewer, more independent examples. Stride 1 is the usual choice for training; larger strides are used to cut redundancy on very long series.
+
+## Interactive Exploration Guide
+
+1. <strong>Watch the window slide.</strong> Set <strong>Window Size (W)</strong> to 3 and <strong>Stride (S)</strong> to 1, then scroll along the series. Each position produces one training example, and consecutive examples share almost all their values.
+2. <strong>Widen the window.</strong> Raise <strong>Window Size (W)</strong> to 10. Each example carries more history, and there are fewer of them &mdash; the trade is visible directly in the count.
+3. <strong>Increase the stride.</strong> Set <strong>Stride (S)</strong> to 5. The windows stop overlapping heavily and the example count drops sharply, but each one is far more independent of the last.
+4. <strong>Change the data.</strong> Press <strong>Random Series</strong> and try a window shorter than the visible cycle, then longer. A window that cannot span one period of the pattern cannot represent it.
+
+## Splitting without leaking
+
+This is the part that matters most and is most often got wrong. Random train-test splitting is <em>invalid</em> for time series: it puts future windows in the training set and past windows in the test set, so the model is trained on the future to predict the past.
+
+Scores from that setup look excellent and mean nothing. Split <strong>chronologically</strong> &mdash; train on the earliest portion, validate on the middle, test on the most recent &mdash; so the evaluation mirrors how the model will actually be used.
+
+Overlapping windows add a second leak at the boundary: the last training window and the first test window share observations. Leave a gap of at least W steps between the splits.
+
+The same applies to scaling. Fit the scaler on the training period only; computing a mean over the whole series leaks future information into every training example.
+
+## Traps worth knowing
+
+- <strong>Random shuffling before the split.</strong> Guarantees leakage and a score that will not survive deployment.
+- <strong>No gap between train and test.</strong> Overlapping windows straddle the boundary and share data.
+- <strong>Scaling on the full series.</strong> The training data learns statistics that include the test period.
+- <strong>Ignoring non-stationarity.</strong> If the mean or variance drifts over time, a model fitted on early data may not transfer. Difference the series or model the trend explicitly.
+- <strong>Predicting one step and reporting it as multi-step.</strong> Errors compound when a model’s own predictions are fed back as inputs; evaluate the horizon you actually need.
+
+## Key takeaway
+
+A sliding window converts a time series into supervised (input, target) pairs, with the window size encoding how much history you claim is relevant and the stride controlling how much consecutive examples overlap. The modelling choice is straightforward; the discipline is in the split &mdash; chronological, with a gap of at least one window between segments, and every scaler fitted on the training period alone.

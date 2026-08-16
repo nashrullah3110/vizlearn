@@ -1,0 +1,20 @@
+title: Implement a hash map from scratch
+intro: Implement a hash map with put, get and remove, without using a dict.
+
+## Chaining versus open addressing
+
+<strong>Separate chaining</strong> puts colliding entries in a list per bucket. Simple, deletion is trivial, and it tolerates a high load factor. This is what to implement under time pressure.
+
+<strong>Open addressing</strong> stores everything in the array itself and probes for the next free slot on a collision. Better cache behaviour and less pointer chasing &mdash; it is what CPython actually uses &mdash; but deletion is genuinely hard.
+
+## Why deletion is hard in open addressing
+
+Removing an entry leaves a hole, and a probe sequence that ran <em>through</em> that slot to reach a later entry now stops at the hole and reports the later entry missing.
+
+The fix is a <strong>tombstone</strong>: mark the slot deleted rather than empty, so probes continue past it but inserts may reuse it. Tombstones accumulate and eventually force a rehash even without growth. Being able to say that is usually what the question is really checking.
+
+## The load factor and the resize
+
+Lookup is O(1) only while buckets stay short. Once entries divided by buckets passes roughly 0.75, chains lengthen and every operation drifts towards O(n).
+
+So the table doubles and <em>every key is rehashed</em>, because the index is <code>hash(key) % size</code> and the size just changed. That single resize is O(n), and amortised over the insertions that caused it each insert is still O(1) &mdash; but any individual insert can be the expensive one.

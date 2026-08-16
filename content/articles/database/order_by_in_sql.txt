@@ -1,0 +1,47 @@
+title: ORDER BY: The Only Thing That Guarantees an Order
+intro: Without it a result set has no order at all &mdash; whatever you saw last time was luck.
+
+## Quick Context
+
+A table is a set of rows, and a set has no order. Without an <span class="mono-font kw">ORDER BY</span> the database is free to return rows in whatever order came out of its plan &mdash; insertion order, index order, or whatever the parallel workers finished in. It often looks stable for months and then changes the day the table grows an index or the optimiser picks a different plan.
+
+This is the single most common source of "it worked yesterday" bugs in reporting code. If the order matters, say so.
+
+## The shape of the clause
+
+ORDER BY expr [ASC | DESC] [NULLS FIRST | NULLS LAST], expr2 ...
+
+Keys are applied left to right. The second key is consulted <em>only</em> for rows the first key could not separate, the third only for rows the first two could not, and so on. <span class="mono-font kw">ASC</span> is the default and almost never written out.
+
+You can sort by things that are not columns: an expression such as <span class="mono-font">salary * 12</span>, an alias defined in the SELECT list, or a positional number such as <span class="mono-font kw">ORDER BY</span> <span class="mono-font lit">2</span> meaning the second selected column. The positional form is compact and a menace &mdash; it silently changes meaning when someone edits the SELECT list.
+
+## Ties, and why a second key is not optional
+
+Sort the sample table by <span class="mono-font">salary</span> and four pairs of rows tie. Those eight rows appear in <em>some</em> order, but nothing in your query asked for it, so nothing guarantees it will be the same order tomorrow. That is what the "order is decided" readout is telling you: a sort is only deterministic once the keys you supplied separate every pair of rows.
+
+Adding a tie-breaker that is unique &mdash; a primary key is the usual choice &mdash; makes the result reproducible. This matters most with pagination: <span class="mono-font kw">ORDER BY</span> <span class="mono-font">salary</span> <span class="mono-font kw">LIMIT</span> <span class="mono-font lit">10 OFFSET 10</span> can return a row you already saw on page one, and skip another entirely, purely because the tied rows shuffled between the two queries.
+
+## Where NULLs go
+
+NULL is not a value, so "is it bigger or smaller?" has no natural answer, and engines disagree. PostgreSQL and Oracle treat NULL as the largest value: NULLS LAST for <span class="mono-font kw">ASC</span>, NULLS FIRST for <span class="mono-font kw">DESC</span>. MySQL and SQLite treat it as the smallest, so they do the opposite. SQL Server has no <span class="mono-font kw">NULLS</span> clause at all and sorts NULLs first.
+
+If it matters, be explicit. Where the syntax is unavailable, sort by a flag first: <span class="mono-font kw">ORDER BY</span> (<span class="mono-font">bonus</span> <span class="mono-font kw">IS NULL</span>), <span class="mono-font">bonus</span> <span class="mono-font kw">DESC</span>.
+
+## When it runs, and what it costs
+
+ORDER BY is almost last in the logical order of a query: <span class="mono-font kw">FROM</span> &rarr; <span class="mono-font kw">WHERE</span> &rarr; <span class="mono-font kw">GROUP BY</span> &rarr; <span class="mono-font kw">HAVING</span> &rarr; <span class="mono-font kw">SELECT</span> &rarr; <span class="mono-font kw">ORDER BY</span> &rarr; <span class="mono-font kw">LIMIT</span>. That is why an alias from the SELECT list is usable here but not in WHERE, and why LIMIT takes the top of the sorted result rather than an arbitrary handful of rows.
+
+Sorting is O(n log n) and needs memory; when the set does not fit, the engine spills to disk and the query gets dramatically slower. An index whose column order matches the ORDER BY can remove the sort entirely, because the index is already in that order &mdash; which is also why <span class="mono-font">(a ASC, b DESC)</span> may not be servable by an index on <span class="mono-font">(a, b)</span>.
+
+## Try it yourself
+
+1. <strong>Sort by salary.</strong> Rows slide into place and eight of them light up amber &mdash; those are the ties. "Order is decided" reads NO, because your query has not said what should happen inside a tie.
+2. <strong>Flip the direction.</strong> Set <strong>Direction</strong> to DESC and the whole list reverses. Note the tied pairs: their internal order does not simply mirror, because reversing the comparison does not reverse the rows the comparison never separated.
+3. <strong>Break the ties.</strong> Set <strong>Then By</strong> to name. The amber highlighting clears, "Order is decided" flips to YES, and the result is now reproducible.
+4. <strong>Sort by something unique.</strong> Set <strong>Order By</strong> to name. One key is enough here, because no two employees share a name.
+5. <strong>Meet the NULLs.</strong> Set <strong>Order By</strong> to bonus. Three rows have no bonus; with NULLS LAST they sink to the bottom.
+6. <strong>Move them.</strong> Switch <strong>NULLS Placement</strong> to NULLS FIRST and those three jump to the top without any other row changing place. This is the setting MySQL and PostgreSQL disagree about by default.
+
+## In one line
+
+A result set has no order unless ORDER BY gives it one, and the order is only deterministic once your keys separate every pair of rows &mdash; which is why a unique tie-breaker belongs on anything paginated. Keys apply left to right, each one consulted only for the ties the previous keys left behind. NULL placement is engine-specific, so write NULLS FIRST or NULLS LAST rather than trusting a default. And because the sort runs near the end of the query, it can see SELECT aliases, it feeds LIMIT, and it costs real time and memory unless an index already holds the rows in the order you asked for.

@@ -1,0 +1,20 @@
+title: Why does [[0]*3]*3 break?
+intro: What does [[0] * 3] * 3 create, and why does writing to one row change all of them?
+
+## What multiplication actually does
+
+<code>[x] * 3</code> builds a list holding the same reference three times. For immutable contents that is invisible &mdash; <code>[0] * 3</code> is fine, because you can never mutate a <code>0</code>. For a mutable inner object it is a trap, because all three names lead to one object.
+
+The tell is that the bug only appears on <em>write</em>. Building and printing the grid looks perfect; the first assignment to a cell is when it falls apart.
+
+## The same idea, three ways
+
+This is one instance of a general rule: assignment and shallow copies duplicate references, never the objects behind them.
+
+<code>b = a</code> &mdash; another name for the same list. <code>b = a[:]</code> or <code>list(a)</code> or <code>copy.copy(a)</code> &mdash; a new outer list holding the same inner references, so nested contents are still shared. <code>copy.deepcopy(a)</code> &mdash; new objects all the way down, at the cost of walking the whole structure.
+
+## How to spot it in review
+
+Any <code>* n</code> where the repeated element is a list, a dict, a set or a custom object is suspicious. The same rule explains the mutable default argument bug: <code>def f(acc=[])</code> creates the list once, when the function is <em>defined</em>, and every call that omits the argument shares it.
+
+The fix in both cases is the same &mdash; build the mutable thing at the moment it is needed rather than once, up front.

@@ -1,0 +1,46 @@
+title: Data Sparsity: A Practical Guide
+intro: When most feature values are zero, dense storage and dense arithmetic both stop making sense. Sparsity is normal in real data, and handling it well is mostly about not materialising the zeros.
+
+## What sparsity means, and where it comes from
+
+A feature vector is <strong>sparse</strong> when most of its entries are zero. This is not an edge case &mdash; it is the default in several of the most common data types:
+
+- <strong>One-hot encoded categories.</strong> A country field with 195 values becomes 195 columns of which exactly one is 1. That is 99.5% zeros by construction.
+- <strong>Bag-of-words text.</strong> A vocabulary of 50,000 words against a 200-word document gives at most 0.4% non-zero.
+- <strong>Recommender matrices.</strong> A user has rated a few dozen of a million items; these are routinely above 99.9% zero.
+- <strong>Interaction and count features</strong> where most combinations simply never occur.
+
+## Why it hurts training
+
+Sparsity causes three separate problems, and they are worth keeping apart:
+
+<strong>Memory.</strong> Storing a 100,000&times;50,000 matrix densely at 4 bytes per float is 20 GB, nearly all of it zeros. Sparse formats such as CSR store only the non-zeros plus their indices, typically cutting this by two or three orders of magnitude.
+
+<strong>Wasted computation.</strong> A dense matrix multiply performs a multiply-add for every element, and multiplying by zero contributes nothing. Most of the arithmetic produces no information.
+
+<strong>Uneven gradients.</strong> This is the subtle one. A weight connected to a feature that is non-zero in 0.1% of samples receives a gradient in only 0.1% of steps. Rare features therefore learn roughly a thousand times more slowly than common ones under a single global learning rate &mdash; which is precisely the problem <strong>Adagrad</strong> and <strong>Adam</strong> solve, by giving each parameter its own effective rate based on how often it has received a gradient. That is why adaptive optimisers are the standard choice on sparse data.
+
+## Guided experiments
+
+1. <strong>Start dense.</strong> Set <strong>Input Sparsity Level</strong> to 0 and press <strong>Stream Data</strong>. Every input carries signal and every weight receives a gradient on every sample.
+2. <strong>Introduce realistic sparsity.</strong> Set <strong>Input Sparsity Level</strong> to 70 and stream again. Most inputs are now zero, and the connections behind them go quiet &mdash; a weight whose input is zero gets no gradient at all that step.
+3. <strong>Push it to the recommender regime.</strong> Set <strong>Input Sparsity Level</strong> to 95 and press <strong>Next Sample</strong> repeatedly. Watch how rarely any particular input activates. Those weights update on a handful of samples in a hundred, which is exactly why they lag.
+4. <strong>Compare which weights move.</strong> At high sparsity, note that the weights attached to frequently non-zero inputs converge quickly while the rest barely move. A global learning rate cannot serve both.
+
+## Embeddings, the standard fix
+
+For high-cardinality categorical data the usual answer is not to keep the one-hot vector at all. An <strong>embedding layer</strong> maps each category to a short dense vector &mdash; say 50 dimensions instead of 195 columns &mdash; learned during training.
+
+Mathematically this is identical to multiplying the one-hot vector by a weight matrix, but the implementation is a row lookup instead of a matrix multiply, so it skips the zeros entirely. It also solves a modelling problem: one-hot categories are all equidistant, whereas learned embeddings place similar categories near each other, so information is shared between related values rather than each being learned in isolation.
+
+## Where this goes wrong
+
+- <strong>Densifying a sparse matrix.</strong> Calling <span class="mono-font">.toarray()</span> on a large sparse matrix is the classic out-of-memory error. Keep it sparse through the whole pipeline.
+- <strong>Plain SGD on sparse features.</strong> Rare features learn far too slowly. Use Adam or Adagrad, which adapt per-parameter learning rates to update frequency.
+- <strong>One-hot encoding a high-cardinality column.</strong> Thousands of near-empty columns; use an embedding, target encoding or hashing instead.
+- <strong>Mean-imputing a structural zero.</strong> In sparse data zero usually means “absent”, not “missing”. Replacing it with a column mean invents signal that was never there.
+- <strong>Centring sparse data.</strong> Subtracting the mean makes every zero non-zero and destroys the sparsity outright. Scale without centring.
+
+## What to remember
+
+Sparse data is the norm for one-hot categories, text and recommenders, and it costs memory, wasted arithmetic, and &mdash; least obviously &mdash; badly uneven learning rates, because a weight only updates when its input is non-zero. Keep sparse matrices in sparse formats, replace one-hot encodings of high-cardinality fields with learned embeddings, and use an adaptive optimiser so rare features are not left thousands of steps behind common ones.

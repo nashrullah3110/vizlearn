@@ -1,0 +1,35 @@
+title: Quantization: Trading Precision for Memory
+intro: A 70B-parameter model in full 32-bit precision needs about <strong>280 GB</strong> just to hold its weights &mdash; far beyond any single GPU. <strong>Quantization</strong> stores those same weights in fewer bits, and it is the single technique most responsible for large models running on ordinary hardware.
+
+## The Core Idea: A Coarser Ruler
+
+A 32-bit float can express billions of distinct values. An 8-bit integer can express 256, and a 4-bit integer just 16. Quantization finds the range your weights actually occupy and divides it into that many evenly spaced levels:
+
+scale = (max &minus; min) / (2<sup>bits</sup> &minus; 1) &nbsp;&nbsp;&nbsp; q = round(w / scale)
+
+Every weight is then snapped to its nearest level. The difference between where a weight <em>was</em> and where it <em>landed</em> is the quantization error &mdash; unavoidable, and the entire subject in one sentence.
+
+## Symmetric vs Asymmetric
+
+- <strong>Symmetric</strong> centres the grid on zero, using a range of &plusmn;max(|w|). Simpler and faster, since zero maps exactly to zero &mdash; but if your weights are lopsided, half the levels are wasted on values that never occur.
+- <strong>Asymmetric</strong> fits the grid to the actual min and max, adding a <em>zero-point</em> offset. It uses every level, at the cost of slightly more arithmetic at inference.
+
+Toggle between them with the outlier enabled and watch the step size and RMS error change.
+
+## Outliers Are the Real Enemy
+
+Quantization error does not grow smoothly with bit-width &mdash; it is dominated by <strong>range</strong>. A single weight far from the others stretches the min-max span, and since the step size is that span divided by a fixed number of levels, <em>every other weight</em> gets a coarser grid.
+
+Tick "Inject an outlier" and watch the step size jump while the ordinary weights suddenly land further from home. This is not a toy effect: emergent outlier features in large transformers are precisely why naive INT8 broke down, and why methods like LLM.int8(), GPTQ and AWQ exist &mdash; they isolate or protect the outliers instead of letting them ruin the scale for everyone.
+
+## Try it yourself
+
+1. <strong>Step from FP32 down to INT4.</strong> Levels fall from billions to 16, the horizontal grid lines thin out, and the green dots drift visibly away from the grey ones.
+2. <strong>Watch RMS error against memory saved.</strong> FP16 is nearly free &mdash; huge savings, negligible error. That is why it is the default almost everywhere.
+3. <strong>Now enable the outlier at INT4.</strong> Step size roughly doubles and every ordinary weight is punished for one extreme value.
+4. <strong>Switch to asymmetric with the outlier on.</strong> Error usually improves, because the grid stops wasting levels on an empty side of the range.
+5. <strong>Pick 70B and compare FP16 to INT4.</strong> 140 GB versus roughly 35 GB &mdash; the difference between a multi-GPU server and a single high-end card. That is the whole reason anyone tolerates the error.
+
+## Summing up
+
+Quantization buys memory and speed with precision. The surprise is how cheap the trade is: 8-bit is usually indistinguishable from full precision, and modern 4-bit methods come remarkably close. The size numbers here count weights only &mdash; real deployments also need memory for activations and the KV cache, which grows with context length.

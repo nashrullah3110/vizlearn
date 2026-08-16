@@ -1,0 +1,30 @@
+title: GRU: The LSTM on a Diet
+intro: Two gates, one state, three-quarters of the parameters &mdash; and most of the power.
+
+## Simplify Without Breaking
+
+The <strong>Gated Recurrent Unit</strong> (Cho et al., 2014) asked a sharp question: does an LSTM really need three gates <em>and</em> two separate memory tracks? The GRU's answer: merge the cell state and hidden state into one vector, merge forget+input into a single <strong style="color: #c084fc">update gate z</strong>, and add a <strong style="color: #22d3ee">reset gate r</strong> for proposing new content. Same gating idea, leaner machine.
+
+## How the Two Gates Cooperate
+
+z&#8348; = &sigma;(W&#8386;x&#8348; + U&#8386;h&#8348;&#8331;&#8321;) &nbsp;&middot;&nbsp; r&#8348; = &sigma;(W&#7523;x&#8348; + U&#7523;h&#8348;&#8331;&#8321;)<br> h&#771;&#8348; = tanh(W&middot;x&#8348; + U&middot;(r&#8348;&#8857;h&#8348;&#8331;&#8321;))<br> h&#8348; = z&#8348;&#8857;h&#8348;&#8331;&#8321; + (1 &minus; z&#8348;)&#8857;h&#771;&#8348;
+
+- <strong style="color: #22d3ee">Reset gate r</strong> &mdash; when proposing the new candidate h&#771;, decides how much of the old memory to consult. r&rarr;0 means &ldquo;start fresh, the past is irrelevant here.&rdquo;
+- <strong style="color: #c084fc">Update gate z</strong> &mdash; the final blend: each dimension of the new state is a weighted average between the <em>old value</em> (weight z) and the <em>new candidate</em> (weight 1&minus;z). One dial does the job of the LSTM's forget and input gates.
+- <strong>The interpolation is the gradient highway.</strong> When z sits near 1, h&#8348; &asymp; h&#8348;&#8331;&#8321; &mdash; the state (and its gradient) passes through the step almost untouched, exactly like the LSTM's conveyor.
+
+## LSTM vs GRU at a Glance
+
+<table class="w-full text-left text-xs md:text-sm border rounded-lg" style="border-color: var(--border-subtle)"> <thead><tr class="text-[10px] uppercase font-bold tracking-widest opacity-60 border-b" style="border-color: var(--border-subtle)"><th class="p-3"></th><th class="p-3">LSTM</th><th class="p-3">GRU</th></tr></thead> <tbody class="mono-font"> <tr class="border-b" style="border-color: var(--border-subtle)"><td class="p-3 opacity-60">Gates</td><td class="p-3">3 (forget, input, output)</td><td class="p-3">2 (update, reset)</td></tr> <tr class="border-b" style="border-color: var(--border-subtle)"><td class="p-3 opacity-60">Memory tracks</td><td class="p-3">2 (cell state + hidden)</td><td class="p-3">1 (hidden only)</td></tr> <tr class="border-b" style="border-color: var(--border-subtle)"><td class="p-3 opacity-60">Weight matrices</td><td class="p-3">4 sets</td><td class="p-3">3 sets (~25% fewer params)</td></tr> <tr><td class="p-3 opacity-60">When to prefer</td><td class="p-3">very long dependencies, large data</td><td class="p-3">smaller data, faster training</td></tr> </tbody> </table>
+In practice the two trade blows: no consistent winner across tasks. GRUs train faster and overfit less on small datasets; LSTMs sometimes edge ahead when sequences are very long.
+
+## Exploration guide
+
+1. <strong>Auto-run with learned gates</strong> and watch z&#772; hover in the middle &mdash; the cell constantly negotiates between keeping and rewriting.
+2. <strong>Force z &rarr; 1.</strong> The hidden state freezes at zero no matter what you feed in: with the update gate fully closed to new content, the GRU is a perfect (if useless) memory.
+3. <strong>Force z &rarr; 0.</strong> Now the state is rewritten from scratch at every token &mdash; the network becomes almost memoryless. The learned mode is powerful precisely because it sits <em>between</em> these extremes, per dimension, per step.
+4. <strong>Drag the hidden-size slider</strong> and watch the LSTM/GRU parameter gap widen &mdash; at H = 512 the GRU saves over a million weights in a single layer.
+
+## Summing up
+
+The GRU keeps the essential insight of gating &mdash; <em>memory updates as learned, per-dimension decisions</em> &mdash; while cutting a gate, a state track, and a quarter of the parameters. Both LSTM and GRU still read strictly left-to-right, though. What if the meaning of a word depends on what comes <em>after</em> it? That is the next module: bidirectional processing.

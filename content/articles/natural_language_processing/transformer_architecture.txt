@@ -1,0 +1,59 @@
+title: The Transformer Architecture: A Practical Guide
+intro: How the pieces are assembled into a block, and which of them are load-bearing.
+
+## Quick Context
+
+The previous modules built the parts: <a href="query_key_value.html" style="color: var(--accent-primary)">query, key and value</a>, <a href="self_attention.html" style="color: var(--accent-primary)">self-attention</a>, <a href="multi_head_attention.html" style="color: var(--accent-primary)">multiple heads</a>, <a href="positional_encoding.html" style="color: var(--accent-primary)">positional encoding</a>. This module assembles them.
+
+The surprise, when you finally see the block written out, is how little there is. Two sublayers, each wrapped in the same two-line pattern, repeated N times.
+
+## The block
+
+Every transformer block is these four lines:
+
+x = LayerNorm( x + MultiHeadAttention(x) )
+
+x = LayerNorm( x + FeedForward(x) )
+
+That is the entire thing. Two sublayers, and each is wrapped identically: run the sublayer, <strong>add the input back</strong>, then normalise. The pattern is called Add &amp; Norm, and it is applied so uniformly that the block is easier to remember as "sublayer, add, norm" repeated twice than as a diagram.
+
+## What each piece is for
+
+- <strong>Attention</strong> moves information <em>between</em> positions. It is the only part of the block that lets one token see another.
+- <strong>The feed-forward network</strong> processes each position <em>independently</em> &mdash; the same small two-layer MLP applied to every token separately. It is where the model does per-token computation on whatever attention just gathered.
+- <strong>The residual connection</strong> gives the gradient a path that skips the sublayer entirely.
+- <strong>Layer normalisation</strong> keeps the activations at a stable scale as depth grows.
+
+The division of labour between the first two is worth holding on to: attention mixes across tokens, the FFN thinks about each token. A transformer alternates between the two, over and over.
+
+## Try it yourself
+
+1. <strong>Take the residuals away.</strong> Untick <strong>Residual Connections</strong> and set the <strong>Number of Layers</strong> slider to 24. Watch the gradient curve decay toward zero and Trainable flip to no. Each sublayer shrinks what passes through it, and twenty-four of those in a row leave nothing to learn from.
+2. <strong>Put them back.</strong> Tick <strong>Residual Connections</strong> with the depth still at 24. The gradient holds at 1 all the way back to layer 1. This is the single change that makes deep stacks trainable at all.
+3. <strong>Take normalisation away instead.</strong> Untick <strong>Layer Normalisation</strong> with residuals on and depth at 24. Now the opposite failure: with nothing rescaling between layers the gradient compounds instead of decaying, and a deep stack becomes unstable rather than dead.
+4. <strong>Find where the parameters are.</strong> With <strong>Feed-Forward Width</strong> at 4, read FFN Share. Roughly two thirds of every block sits in the feed-forward network, not in attention &mdash; which surprises most people, since attention is the part that gets all the attention.
+5. <strong>Change the width.</strong> Set the <strong>Feed-Forward Width</strong> slider to 1 and watch FFN Share collapse, then to 8 and watch it dominate. The 4× default is a convention, not a law.
+6. <strong>Scale it up.</strong> Set the <strong>Model Dimension</strong> slider to its maximum and watch the total. Parameters grow with the <em>square</em> of the dimension but only linearly with depth, which is why widening is so much more expensive than deepening.
+
+## Why residuals matter so much
+
+Without a residual connection, the gradient reaching layer 1 has to pass back through every layer above it, being multiplied at each step. Multiply twenty-four numbers smaller than one and you get approximately zero &mdash; the <a href="vanishing_gradient_problem_in_rnn.html" style="color: var(--accent-primary)">vanishing gradient problem</a>, arriving from a different direction.
+
+The residual gives the gradient a route that skips the sublayer, so it reaches the early layers essentially intact. That is why the same trick appears in ResNets, and why almost every deep architecture built since 2015 has some version of it. It is not an optimisation detail; without it, "deep" is not available.
+
+## Pre-norm and post-norm
+
+The original paper put normalisation <em>after</em> the addition &mdash; <span class="mono-font">LayerNorm(x + Sublayer(x))</span>, which is what the diagram above shows. Almost every model since does the opposite, <span class="mono-font">x + Sublayer(LayerNorm(x))</span>, called pre-norm.
+
+The reason is practical: with post-norm the residual path itself gets normalised at every layer, which weakens it, and deep post-norm models need a careful learning-rate warmup to train at all. Pre-norm leaves the residual path clean from input to output and trains far more forgivingly. If you read the 2017 paper and then read a modern implementation, this is the difference you will notice first.
+
+## Where this goes wrong
+
+- <strong>Thinking the FFN is the small part.</strong> It is about two thirds of the block. Most of a transformer's parameters do per-token computation, not attention.
+- <strong>Forgetting the FFN is position-wise.</strong> It has no view of other tokens at all. Every bit of cross-token information arrived through attention.
+- <strong>Mixing up pre-norm and post-norm.</strong> Implementing the paper's post-norm without warmup and wondering why a deep model will not converge is a rite of passage.
+- <strong>Expecting depth to be free.</strong> Layers add parameters linearly but add sequential compute too; width adds parameters quadratically but parallelises well. The trade is why model shapes look the way they do.
+
+## In one line
+
+A transformer block is two sublayers, each wrapped in the same add-and-normalise pattern: attention moves information between positions, and a position-wise feed-forward network processes each token on its own. The residual connection is what makes depth possible, giving the gradient a path that skips each sublayer &mdash; remove it and a deep stack stops training entirely &mdash; while layer normalisation holds the activation scale steady as layers accumulate. About two thirds of the parameters live in the feed-forward network rather than in attention, and parameters grow with the square of the model dimension but only linearly with depth.

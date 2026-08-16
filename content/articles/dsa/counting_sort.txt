@@ -1,0 +1,58 @@
+title: Counting Sort: A Practical Guide
+intro: Sort without comparing anything. Tally how many times each value occurs, then rebuild the array from the tallies - linear time, provided the range of values is small.
+
+## Beating the comparison lower bound
+
+Every comparison-based sort needs &Omega;(n log n) comparisons in the worst case; that is a proven lower bound, not an engineering limit. Counting sort is faster because it never compares two elements. Instead it uses each value <em>as an index</em>, which is a fundamentally different source of information.
+
+The requirement is that values are integers in a known, bounded range. If a value can index an array, counting sort applies.
+
+## The three passes
+
+Sort <span class="mono-font">[3, 1, 4, 1, 5, 3, 1]</span> with values in 0&ndash;5.
+
+<strong>1. Count.</strong> Walk the input, incrementing <span class="mono-font">count[value]</span>:
+
+index: 0 1 2 3 4 5<br>count: 0 3 0 2 1 1
+
+<strong>2. Prefix sum.</strong> Replace each entry with the running total, so each slot holds the number of elements less than or equal to that value:
+
+count: 0 3 3 5 6 7
+
+<strong>3. Place.</strong> Walk the input <em>backwards</em>, and for each element use <span class="mono-font">count[value] &minus; 1</span> as its output index, then decrement. The result is <span class="mono-font">[1, 1, 1, 3, 3, 4, 5]</span>.
+
+Three linear passes and no comparison anywhere.
+
+## The complexity, and the k that matters
+
+Counting sort runs in <strong>O(n + k)</strong> time and O(n + k) space, where n is the number of elements and k is the size of the value range.
+
+When k is O(n) this is linear and beats every comparison sort. When k is large it collapses: sorting 1,000 integers spread over the full 32-bit range means allocating a counting array of 4 billion entries to sort 1,000 values. The algorithm is not slow there so much as unusable.
+
+So the honest rule is that counting sort is linear <em>in n and k together</em>, and it is only a good idea when k is comparable to n or smaller.
+
+## Exploration guide
+
+1. <strong>Watch the tally build.</strong> Set <strong>Array Size</strong> to 20 and <strong>Max Value Limit (K)</strong> to 5, then press <strong>Next Step</strong> through the counting pass. No two input elements are ever compared &mdash; each one simply increments a bucket.
+2. <strong>Make k small and see it win.</strong> Keep <strong>Array Size</strong> at 25 and set <strong>Max Value Limit (K)</strong> to 3. The counting array is tiny, buckets fill fast, and the whole sort finishes in three quick sweeps.
+3. <strong>Make k large and watch the waste.</strong> Set <strong>Max Value Limit (K)</strong> to 15 with <strong>Array Size</strong> at 5. Now there are more buckets than elements and most sit empty &mdash; you are paying O(k) to sort n = 5. This is the failure mode, in miniature.
+4. <strong>See stability in action.</strong> Press <strong>Randomize Array</strong> until duplicates appear, then <strong>Auto-Run</strong>. Equal values are emitted in their original relative order, because the placement pass walks the input backwards.
+
+## Why the last pass runs backwards
+
+This is the detail that looks arbitrary and is not. Walking the input in reverse during the placement pass is what makes counting sort <strong>stable</strong> &mdash; equal elements keep their original relative order.
+
+The prefix-sum array says where the <em>last</em> copy of each value belongs. Consuming the input from the back means the last equal element is placed at the highest available slot, the second-to-last just below it, and so on, preserving input order. Walking forwards places them in reverse.
+
+Stability is not a nicety here: it is the entire reason <strong>radix sort</strong> works. Radix sort runs counting sort once per digit, from least significant to most, and relies on each pass preserving the order established by the previous one. Make counting sort unstable and radix sort produces garbage.
+
+## Common mistakes
+
+- <strong>Assuming values start at zero.</strong> With a range like 1000&ndash;1005, allocating 1006 buckets wastes almost all of them. Offset by the minimum: index with <span class="mono-font">value &minus; min</span> and allocate <span class="mono-font">max &minus; min + 1</span>.
+- <strong>Walking forwards in the placement pass.</strong> Silently destroys stability, and therefore silently breaks any radix sort built on top.
+- <strong>Using it on floats or strings.</strong> The value must be usable as an array index. Floats and arbitrary strings need a different approach &mdash; bucket sort or radix sort on their byte representation.
+- <strong>Ignoring k in the complexity.</strong> Calling counting sort “O(n)” without qualification is the most common mistake in exams and interviews. It is O(n + k), and k is what decides whether it is usable.
+
+## Key takeaway
+
+Counting sort tallies occurrences, converts the tallies to positions with a prefix sum, and writes elements straight to their final slots &mdash; no comparisons, so the &Omega;(n log n) bound does not apply. It runs in O(n + k) and is only worth using when the value range k is comparable to n. Its stability, which comes from that backwards final pass, is what makes radix sort possible.

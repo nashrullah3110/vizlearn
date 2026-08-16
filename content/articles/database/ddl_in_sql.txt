@@ -1,0 +1,42 @@
+title: DDL: Defining the Shape of Your Data
+intro: Before a single row can be stored, something has to declare what a row looks like. That is DDL's job.
+
+## Context first
+
+<strong>Data Definition Language</strong> is the subset of SQL that creates and changes <em>structure</em> &mdash; tables, columns, types, constraints, indexes. It is distinct from DML, which changes the <em>contents</em>. A useful shorthand: DDL is the blueprint, DML is the furniture.
+
+## The Four Commands
+
+- <span class="mono-font kw">CREATE</span> &mdash; brings a new object into existence. Fails if it already exists (unless you write <span class="mono-font">IF NOT EXISTS</span>).
+- <span class="mono-font kw">ALTER</span> &mdash; changes an existing object: add a column, drop a column, change a type, add a constraint. Existing rows are adjusted to fit.
+- <span class="mono-font kw">TRUNCATE</span> &mdash; removes <em>all</em> rows but keeps the table. Faster than <span class="mono-font">DELETE</span> because it does not log each row individually.
+- <span class="mono-font kw">DROP</span> &mdash; deletes the object entirely: structure, data, indexes, everything.
+
+## DDL Usually Cannot Be Rolled Back
+
+In most engines (MySQL and Oracle in particular) DDL statements perform an <strong>implicit commit</strong>: the moment you run one, any open transaction is committed and the change is permanent. A <span class="mono-font">ROLLBACK</span> afterwards will not save you. PostgreSQL is the notable exception &mdash; it supports transactional DDL.
+
+This is why <span class="mono-font">DROP TABLE</span> on the wrong connection is one of the most feared mistakes in this profession. Press the DROP button here and note that the row counter goes to zero with no undo offered.
+
+## Constraints: Rules the Database Enforces
+
+Constraints declared in DDL are checked on every write, forever, no matter which application is connecting:
+
+- <span class="mono-font">PRIMARY KEY</span> &mdash; unique and not null; identifies the row.
+- <span class="mono-font">NOT NULL</span> &mdash; the column must always have a value.
+- <span class="mono-font">UNIQUE</span> &mdash; no two rows may share this value.
+- <span class="mono-font">FOREIGN KEY</span> &mdash; the value must exist in the referenced table.
+- <span class="mono-font">CHECK</span> &mdash; an arbitrary condition, such as <span class="mono-font">salary &gt; 0</span>.
+
+Putting a rule here rather than in application code means it cannot be bypassed by a script, a migration or a careless intern with a database client.
+
+## Things to try
+
+1. <strong>Build a table</strong> and mark one column as PRIMARY KEY. Watch the generated <span class="mono-font">CREATE TABLE</span> update as you type.
+2. <strong>Press CREATE, then ALTER &middot; ADD COLUMN.</strong> The new column appears on every existing row, filled with NULL &mdash; because the rows already existed and had no value to offer.
+3. <strong>Press TRUNCATE.</strong> Rows go to zero; the columns stay. The blueprint survives.
+4. <strong>Press DROP.</strong> Both structure and data vanish, and the log records the difference between the two operations.
+
+## In one line
+
+DDL defines the contract your data must obey. Time spent choosing sensible types and constraints up front is repaid every day afterwards &mdash; and because these statements are usually irreversible, they deserve more care than any query you will write.

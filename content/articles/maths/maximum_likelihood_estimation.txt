@@ -1,0 +1,63 @@
+title: Maximum Likelihood: A Practical Guide
+intro: The principle that produces almost every loss function you have already been using.
+
+## Quick Context
+
+You have some data and a family of distributions that might have produced it. Which member of the family should you pick?
+
+Maximum likelihood gives one answer, and it is almost embarrassingly reasonable: <strong>pick the distribution that makes the data you actually observed as unsurprising as possible</strong>. Nothing more sophisticated than that.
+
+It is worth learning properly because it is not one technique among many. Mean squared error, log loss and cross-entropy are all maximum likelihood in disguise, each for a different assumption about the noise.
+
+## Likelihood is not probability
+
+The two words get used interchangeably in conversation and they are not the same thing.
+
+- <strong>Probability</strong> fixes the distribution and asks about the data. "Given this coin is fair, how likely is 7 heads in 10?"
+- <strong>Likelihood</strong> fixes the data and asks about the distribution. "Given I observed 7 heads in 10, how well does 'fair' explain it?"
+
+The data never changes in this module &mdash; the points stay exactly where they are. What moves is the candidate curve, and the likelihood is a statement about the curve, not about the points.
+
+## The calculation
+
+For each observed point, read off the density of the candidate distribution at that point. Multiply them all together:
+
+L(&mu;, &sigma;) = p(x&#8321;) &times; p(x&#8322;) &times; &hellip; &times; p(x&#8345;)
+
+The stems in the top panel are the individual densities. A candidate positioned over the bulk of the data has tall stems everywhere; one shifted away has some tall and many nearly zero, and one near-zero factor drags the whole product down.
+
+In practice nobody computes that product, because multiplying a few hundred numbers below 1 underflows to exactly zero in floating point. Taking the logarithm turns the product into a sum:
+
+log L = log p(x&#8321;) + log p(x&#8322;) + &hellip; + log p(x&#8345;)
+
+The logarithm is monotonic, so whatever maximises the sum also maximises the product. Nothing is lost, and the arithmetic becomes stable.
+
+## Exploration guide
+
+1. <strong>Search by hand.</strong> Drag the <strong>Guessed Mean</strong> slider slowly across its range and watch the log-likelihood readout rise to a peak and fall away. There is exactly one best answer and you can feel where it is.
+2. <strong>Check the punchline.</strong> Click <strong>Jump to the MLE</strong> and compare Your Guess against Sample Mean. They are the same number. The maximum-likelihood estimate of a normal mean <em>is</em> the sample mean &mdash; the formula you already knew, derived rather than assumed.
+3. <strong>Watch it climb.</strong> Click <strong>Climb to the Maximum</strong> and watch the curve slide into place while log-likelihood rises. This is gradient ascent on the likelihood, which is exactly what fitting a model does.
+4. <strong>Get the spread wrong.</strong> Set the <strong>Guessed Spread</strong> slider to 6. The curve flattens, every stem shortens, and log-likelihood falls &mdash; a distribution too vague to commit to anything explains the data badly. Now set it to 0.3: the curve is so narrow that points even slightly off-centre get almost no density, and it falls again. The best spread is in between.
+5. <strong>Break the arithmetic.</strong> Set the <strong>Sample Size</strong> slider to its maximum and watch Raw Likelihood. It collapses toward zero and Underflowed flips to yes, while the log-likelihood carries on working perfectly. This is not a rounding detail &mdash; it is the entire reason every implementation works in log space.
+6. <strong>See small samples mislead.</strong> Set the <strong>Sample Size</strong> slider to 2 and press <strong>New Data</strong> a few times. The MLE jumps around wildly. Maximum likelihood is not magic; with little data it happily returns a confident, wrong answer.
+
+## Why your loss function looks the way it does
+
+This is the part worth carrying away. Take maximum likelihood and change only the assumed noise:
+
+- <strong>Assume normal noise</strong> around the prediction, and maximising log-likelihood turns out to be identical to minimising the <strong>sum of squared errors</strong>. Squaring in <a href="../machine_learning/linear_regression_with_ols.html" style="color: var(--accent-primary)">least squares</a> is not an arbitrary choice of penalty &mdash; it falls out of the exponent in the normal density.
+- <strong>Assume a Bernoulli outcome</strong>, and the same principle gives <strong>log loss</strong>, which is what <a href="../machine_learning/logistic_regression.html" style="color: var(--accent-primary)">logistic regression</a> minimises.
+- <strong>Assume a categorical outcome</strong>, and you get <a href="../deep_learning/softmax_and_cross_entropy.html" style="color: var(--accent-primary)">cross-entropy</a>, the loss of essentially every classifier.
+
+So "minimising the loss" and "maximising the likelihood" are usually the same sentence. Negative log-likelihood is the loss; the minus sign is there only because optimisers are written to go downhill.
+
+## Where it goes wrong
+
+- <strong>It overfits happily.</strong> Maximum likelihood picks whatever explains the observed data best, with no preference for simplicity. Regularisation is what you add to stop it, and it corresponds to putting a prior on the parameters.
+- <strong>The MLE of variance is biased.</strong> It divides by n, while the unbiased estimator divides by n&minus;1. Maximum likelihood is not guaranteed to be unbiased, only to maximise likelihood.
+- <strong>The model family matters more than the fit.</strong> Fitting a normal to data that is not remotely normal gives you the best possible normal, and it is still the wrong answer. The method chooses within a family, never between families.
+- <strong>Likelihoods are not probabilities of the parameters.</strong> "The likelihood of &mu; = 3 is high" does not mean &mu; = 3 is probable. Turning one into the other requires a prior, which is what Bayesian inference does with <a href="bayes_theorem.html" style="color: var(--accent-primary)">Bayes' theorem</a>.
+
+## Worth remembering
+
+Maximum likelihood picks the distribution that makes the observed data least surprising, by holding the data fixed and varying the parameters &mdash; the reverse of a probability question. The likelihood is the product of each point's density, and because that product underflows to zero on any real sample, it is always computed as a sum of logarithms instead, which is safe because the logarithm is monotonic. For a normal distribution the answer comes out as exactly the sample mean and sample spread, and changing only the assumed noise turns the same principle into squared error, log loss or cross-entropy &mdash; which is why minimising a loss and maximising a likelihood are usually the same thing.

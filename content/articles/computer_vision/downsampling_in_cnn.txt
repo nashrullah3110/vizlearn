@@ -1,0 +1,45 @@
+title: Pooling Layer: A Practical Guide
+intro: Pooling shrinks a feature map by summarising each small neighbourhood into one value. It cuts computation, widens what later layers can see, and buys a small amount of tolerance to things moving.
+
+## What pooling does
+
+A pooling layer slides a window over the feature map and replaces the values inside it with a single summary. With a 2&times;2 window and stride 2 &mdash; by far the most common setting &mdash; the windows do not overlap, and the output is half the height and half the width, so <strong>a quarter of the values</strong>.
+
+<strong>Max pooling</strong> keeps the largest value in the window. Since a feature map records how strongly a filter responded at each position, the maximum says “this feature was detected somewhere in this neighbourhood”, which is usually the useful part.
+
+<strong>Average pooling</strong> takes the mean, preserving overall intensity rather than peak response. It is smoother and less common in hidden layers, but <em>global</em> average pooling &mdash; averaging each channel down to a single number &mdash; is now standard at the end of a network, replacing the large fully connected layer that used to sit there.
+
+Pooling has <strong>no parameters</strong>. It is a fixed operation, so it adds nothing to the model size and nothing to train.
+
+## The three reasons it is there
+
+<strong>Computation.</strong> Quartering the spatial dimensions quarters the work of every subsequent layer. In a deep network that compounds enormously.
+
+<strong>Receptive field.</strong> This is the one people miss. After pooling, each position in the smaller map summarises a larger region of the original image, so a 3&times;3 filter applied afterwards covers twice the input area it would have before. Stacking convolution and pooling is what lets a network built from small filters eventually see the whole image &mdash; without it, a network of 3&times;3 filters would need to be impractically deep.
+
+<strong>Translation invariance.</strong> If a feature shifts by one pixel within a pooling window, the maximum is unchanged. This is a genuine but modest benefit &mdash; it tolerates small shifts, not large ones, and it is often overstated.
+
+## Interactive Exploration Guide
+
+1. <strong>Halve the map.</strong> Draw a pattern, set <strong>Window Size</strong> to 2&times;2 and <strong>Stride</strong> to 2, then press <strong>Animate Pooling</strong>. The output is half the width and height, and the windows tile without overlapping.
+2. <strong>Compare max with average.</strong> Switch <strong>Operation Type</strong> between them on the same drawing. Max keeps sharp peaks and discards everything else; average blurs, preserving overall intensity.
+3. <strong>Test the invariance claim.</strong> Draw a small mark, pool it, then <strong>Clear</strong> and redraw it shifted by one cell within the same window. The max-pooled output is identical. Shift it into the next window and the output changes &mdash; the invariance is strictly local.
+4. <strong>Overlap the windows.</strong> Set <strong>Stride</strong> to 1 with a 2&times;2 window. The output barely shrinks, because overlapping windows downsample far less.
+
+## Why some architectures drop it
+
+Pooling is a fixed rule, and a strided convolution achieves the same downsampling while <em>learning</em> how to summarise. Many modern architectures use stride-2 convolutions instead, and all-convolutional networks remove pooling entirely.
+
+It is also destructive in a way that matters for some tasks. Max pooling discards the position of the maximum within the window, which is fine for classification and harmful for segmentation, where the output must be pixel-accurate. U-Net’s skip connections exist largely to restore the spatial detail pooling threw away.
+
+## What usually goes wrong
+
+- <strong>Pooling too aggressively.</strong> Several 2&times;2 pools in quick succession reduce a 224&times;224 image to a handful of pixels, destroying the spatial information later layers need.
+- <strong>Expecting real translation invariance.</strong> It handles a shift of a pixel or two. Larger shifts need data augmentation.
+- <strong>Using max pooling for segmentation without skip connections.</strong> The precise locations are gone and cannot be recovered from the pooled map alone.
+- <strong>Forgetting it has no parameters.</strong> A pooling layer cannot learn or adapt; if you want a learned reduction, use a strided convolution.
+- <strong>Odd input sizes.</strong> A 2&times;2 pool on a 7&times;7 map leaves a remainder, and different frameworks handle the edge differently. Check whether yours floors or pads.
+
+## What to remember
+
+Pooling summarises each neighbourhood into one value, most often taking the maximum of a 2&times;2 window at stride 2, which quarters the feature map for free &mdash; it has no parameters. Its real value is enlarging the receptive field so small filters can eventually see large structures, with computational saving second and a modest, purely local translation tolerance third. Strided convolutions do the same job with learned weights, which is why newer architectures often skip it.

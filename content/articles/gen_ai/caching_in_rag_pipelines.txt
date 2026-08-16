@@ -1,0 +1,46 @@
+title: Query, embedding and prompt caching: A Practical Guide
+intro: What are the different caches in a RAG system, and what does each one actually save?
+
+## Embedding cache: the easy one
+
+Keyed on a hash of the text and the model name. Embedding is deterministic, so the same text always gives the same vector &mdash; which makes this cache both trivially correct and permanently valid, until you change models.
+
+Include the model identifier in the key. Vectors from different models are not comparable, and a cache that silently mixes them produces retrieval results that look plausible and are meaningless. The biggest win is at indexing time: re-indexing a corpus after a chunking tweak re-embeds only the chunks that actually changed.
+
+## Query cache: the highest saving, and the highest risk
+
+Keyed on the question, storing the final answer. A hit skips retrieval, reranking and generation &mdash; often seconds and most of the cost. Real traffic is heavily repetitive, so hit rates can be high.
+
+Two problems. <strong>Staleness:</strong> the answer was correct for the corpus as it was, so any document update can invalidate it, and there is no cheap way to know which entries. Most systems use a short TTL and flush on re-index. <strong>Exact matching:</strong> "what is the refund policy" and "how do refunds work" are one question and two keys. Semantic caching &mdash; keying on the embedding and accepting a near match &mdash; raises the hit rate and introduces the risk of returning the answer to a subtly different question.
+
+## Prompt caching: inside the model
+
+Provider-side, and a different mechanism entirely: the model keeps the attention state (the <a href="context_window_and_kv_cache.html">KV cache</a>) for a prefix it has already processed. Send the same long system prompt and the prefill for that portion is skipped.
+
+It is prefix-based, so it only helps if the shared part comes <em>first</em>. Put the system prompt and any fixed instructions at the front and the retrieved chunks and the question after them; putting the variable part first defeats it entirely. Typical savings are large on time-to-first-token and on input cost, and nothing about correctness changes &mdash; the model computes the same thing.
+
+## Semantic caching, and the risk it introduces
+
+An exact-match query cache misses on any rewording, and real users reword constantly. Semantic caching keys on the question's embedding instead and returns a stored answer when a previous question is close enough.
+
+It raises the hit rate substantially and introduces a failure the exact cache cannot have: returning the answer to a <em>similar but different</em> question. "What is the refund policy for digital goods?" and "What is the refund policy?" are close in embedding space and have different answers. The threshold is the whole design, and it should be set from measured false-hit rate on real traffic, not chosen.
+
+Two safeguards are worth the effort: exclude anything user-specific or permission-scoped from the cache entirely, and log hits so a wrong answer can be traced back to the question that seeded it.
+
+## Invalidation, which is where these systems actually break
+
+The embedding cache never goes stale &mdash; embedding is deterministic, so the same text and model always give the same vector. Include the model name in the key and it is correct forever.
+
+The query cache is the opposite. It stores a conclusion drawn from a corpus at a moment in time, and nothing in it knows when a document changed. The practical options are all imperfect: a short TTL, which trades hit rate for staleness; a flush on re-index, which is coarse but honest; or tracking which chunks contributed to each cached answer and invalidating precisely, which is correct and rarely worth the bookkeeping.
+
+Prompt caching sidesteps the question because it caches computation rather than conclusions. The model recomputes the same thing it would have anyway, so there is nothing to go stale &mdash; which is why it is the safest of the three and the one to reach for first.
+
+## Things to try
+
+1. Push <strong>exact repeats</strong> to 70%. The query cache dominates &mdash; and it is the cache that goes stale the moment a document changes.
+2. Set exact repeats to 0 and reworded to 60%. The exact caches stop helping entirely; only the prompt cache, which keys on the shared prefix, still does.
+3. Turn <strong>prompt caching</strong> off. Reworded queries lose their only remaining saving, which is why prompt order matters.
+
+## What to remember
+
+Three different caches share the name. The query cache stores a finished answer keyed on the question and saves the most per hit, at the risk of serving a stale one. The embedding cache stores a vector keyed on the text and is permanently valid until the model changes. Prompt caching lives in the provider and only helps when the shared text comes first in the prompt.

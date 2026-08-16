@@ -1,0 +1,43 @@
+title: How are Embeddings Generated?: A Practical Guide
+intro: Nobody hand-labels an embedding space. It falls out of a simple prediction task: guess a word from its neighbours, and the vectors that make you good at guessing turn out to encode meaning.
+
+## The distributional hypothesis
+
+The whole field rests on one claim: a word is characterised by the company it keeps. Words appearing in similar contexts tend to mean similar things.
+
+It is easy to check. <em>Cat</em> and <em>dog</em> both appear near <em>pet</em>, <em>feed</em>, <em>vet</em> and <em>fur</em>. <em>Bulldozer</em> does not. So if you build vectors that predict a word’s context well, words with similar contexts must end up with similar vectors &mdash; the semantic structure is a by-product of the prediction task, never an objective in itself.
+
+## Skip-gram and CBOW
+
+Word2Vec offers two ways to set up the prediction:
+
+- <strong>Skip-gram</strong> &mdash; given the centre word, predict the surrounding words. From “the cat sat on the mat”, given <em>sat</em>, predict <em>the</em>, <em>cat</em>, <em>on</em>, <em>the</em>. Slower, and better on rare words because each occurrence generates several training examples.
+- <strong>CBOW</strong> &mdash; given the surrounding words, predict the centre. Faster, and better on frequent words.
+
+The architecture is deliberately trivial: an input embedding layer, no hidden layer, and an output projection. The embedding matrix is the only thing anybody wants; the output layer is discarded after training. The vectors are a side effect of a task nobody cares about the answers to.
+
+## Negative sampling
+
+The naive setup predicts a probability distribution over the whole vocabulary, which means a softmax over 50,000 words for every training example. That is prohibitively expensive.
+
+<strong>Negative sampling</strong> replaces it with a much cheaper question. Instead of “which of 50,000 words is the context?”, ask “is this pair a real (word, context) pair or a fabricated one?” &mdash; a binary classification. For each true pair, draw perhaps 5 to 20 random words as negatives and train the model to score the real pair high and the fakes low.
+
+Cost drops from 50,000 output computations to about 20, and quality is comparable. This is what made training on billions of words practical.
+
+## Guided experiments
+
+1. <strong>Start from noise.</strong> Press <strong>Re-randomize</strong> and look at the layout. Vectors are random, so the arrangement is meaningless &mdash; no structure exists before training.
+2. <strong>Train one epoch.</strong> Press <strong>Train 1 Epoch</strong> and watch points shift slightly. Each step nudges words that co-occur closer together and pushes unrelated ones apart.
+3. <strong>Let clusters form.</strong> Press <strong>Train 20 Epochs</strong>. Related words gather into groups. Nothing told the model these words were related &mdash; it only ever tried to predict context.
+4. <strong>Re-randomize and train again.</strong> The clusters re-form, but in different positions and orientations. The absolute coordinates are arbitrary; only the relative geometry carries meaning, which is why you cannot compare vectors from two separately trained models.
+
+## Common mistakes
+
+- <strong>Comparing vectors across models.</strong> Two training runs produce different, incompatible spaces. Vectors are only meaningful relative to others from the same run.
+- <strong>Too little data.</strong> These methods need tens of millions of tokens. On a small corpus the vectors are noise, and a pretrained set is almost always better.
+- <strong>Leaving frequent words unsubsampled.</strong> <em>The</em> and <em>of</em> co-occur with everything and carry almost no information. Word2Vec subsamples them aggressively, which improves both speed and quality.
+- <strong>Assuming a bigger window is better.</strong> Small windows (2&ndash;5) capture syntactic similarity; large windows (10+) capture topical relatedness. They are different notions of “similar” and the right one depends on the task.
+
+## What to remember
+
+Embeddings are learned by training a deliberately simple model on a proxy task &mdash; predict a word from its context, or the context from the word &mdash; and keeping the embedding matrix while discarding everything else. Semantic structure emerges because words in similar contexts need similar vectors to make the prediction work. Negative sampling replaces the vocabulary-wide softmax with a cheap binary decision, which is what made the whole approach scale.

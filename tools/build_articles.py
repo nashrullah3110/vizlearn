@@ -87,6 +87,9 @@ def card_inner(src):
 
 
 def render(title, entry):
+    # A page that came with its own card title keeps it; "<module>: A
+    # Practical Guide" is only the fallback for the ones that never had one.
+    title = entry.get("title") or title
     parts = [
         BEGIN,
         '            <div class="card-header">',

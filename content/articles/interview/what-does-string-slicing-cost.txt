@@ -1,0 +1,22 @@
+title: What does slicing a string cost?
+intro: What does s[2:6] cost, and is it a view or a copy?
+
+## Copy, not view
+
+Some languages hand you a slice that points into the original buffer, so taking one is O(1). Python does not: <code>s[2:6]</code> allocates a new string object and memcpys four characters into it. The cost is proportional to the slice, not to the original.
+
+You can prove it from the interpreter: the id differs, and mutating is impossible anyway, so there is no aliasing to observe. What you can measure is the time, which is what the editor below does.
+
+## Where it actually hurts
+
+One slice costs nothing worth thinking about. The problem is the shape where a slice is taken per iteration &mdash; checking every substring, or peeling a character off the front:
+
+<code>while s: first, s = s[0], s[1:]</code>
+
+Each iteration copies the entire remainder, so an O(n) walk becomes O(n&sup2;). The same bug appears in recursive solutions that pass <code>s[1:]</code> down: correct, elegant, and quadratic.
+
+## What to do instead
+
+Carry indices. Every algorithm on this track that scans text &mdash; two pointers, sliding window, KMP &mdash; keeps <code>i</code> and <code>j</code> into the original string and never slices inside the loop. Slice once at the end, when you need the answer as a string.
+
+If you genuinely need a zero-copy view over a large buffer, that exists, but only for bytes: <code>memoryview(b)</code> slices in O(1) and shares the underlying memory.

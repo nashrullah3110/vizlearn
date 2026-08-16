@@ -1,0 +1,20 @@
+title: What is the difference between str and bytes?
+intro: What is the difference between str and bytes, and when do you need encode and decode?
+
+## Two different things that both print nicely
+
+<code>"hi"</code> and <code>b"hi"</code> look almost identical and are not comparable: <code>"hi" == b"hi"</code> is <code>False</code>, and in Python 3 that is deliberate. A str has no encoding &mdash; asking for the bytes of a str is meaningless until you say <em>which</em> bytes, which is why <code>encode</code> takes an argument.
+
+Indexing differs too. <code>s[0]</code> on a str gives a one-character str; <code>b[0]</code> on bytes gives an <code>int</code>. That catches people constantly.
+
+## The sandwich rule
+
+Decode at the boundary in, encode at the boundary out, and keep the middle in <code>str</code>. Every layer of a well-behaved program works in text; only the outermost layer knows about UTF-8.
+
+Violating it produces the two classic errors. <code>UnicodeDecodeError</code> means you were handed bytes that are not valid in the encoding you claimed &mdash; usually the encoding is wrong, not the data. <code>UnicodeEncodeError</code> means you tried to write a character the target encoding cannot represent, which is what happens when something defaults to ASCII or latin-1.
+
+## Where it actually shows up
+
+Reading a file with <code>open(path)</code> gives str and applies your platform's default encoding, which differs between machines and is the source of "works on my laptop" bugs. Pass <code>encoding="utf-8"</code> explicitly, always. <code>open(path, "rb")</code> gives bytes and does not guess.
+
+Sockets, subprocess output, hashlib and most binary formats are bytes. <code>hashlib.sha256(s)</code> is a <code>TypeError</code> until you encode &mdash; a hash is defined over bytes, so the encoding is part of the answer.

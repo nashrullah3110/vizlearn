@@ -1,0 +1,44 @@
+title: Vector Search: A Practical Guide
+intro: Nearest neighbours, and the approximation everyone actually runs.
+
+## Quick Context
+
+An <a href="../natural_language_processing/what_are_embeddings.html" style="color: var(--accent-primary)">embedding model</a> maps a piece of text to a point, arranged so that texts about the same thing land near each other. Nothing about the words themselves survives the trip &mdash; "peel a mango" and "how to prepare tropical fruit" share no vocabulary and end up as neighbours anyway.
+
+That is the whole trick behind semantic search, recommendation, deduplication and the retrieval half of <a href="rag.html" style="color: var(--accent-primary)">RAG</a>. Once meaning is a position, similarity is distance, and search becomes a nearest-neighbour problem.
+
+## Cosine, and why it is the default
+
+Retrieval almost always ranks by <a href="../machine_learning/cosine_similarity.html" style="color: var(--accent-primary)">cosine similarity</a>: the angle between the query vector and the document vector, ignoring how long either one is. Length in an embedding tends to carry things like document length or token count rather than meaning, so ignoring it is the point.
+
+On vectors normalised to unit length, ranking by cosine and ranking by Euclidean distance give identical orders, which is why many systems normalise once at index time and then use whichever their hardware does faster. Switch the metric here and watch how little changes &mdash; and, on the points that are not near the unit circle, exactly where it does.
+
+## Exact search does not scale
+
+An exact search compares the query against every vector in the index. That is 18 comparisons here and 18 million in a real corpus, per query, and it is why nobody runs exact search at scale.
+
+The standard fix is to partition the space. Cluster the vectors once, keep a centroid per cell, and at query time compare against the centroids first and then search only the nearest few cells. This is an inverted file index (IVF); HNSW does the same job with a navigable graph instead of cells. Both are <strong>approximate</strong>: they trade a small chance of missing a true neighbour for an enormous reduction in work.
+
+That chance is what recall@k measures &mdash; the share of the true top k that the approximate search actually returned. It is a dial, not a defect: probing more cells raises recall and costs comparisons.
+
+## Guided tour
+
+1. <strong>Look at the space.</strong> Four topics, four visible clumps. Nothing arranged them by keyword; they are grouped because their meanings are.
+2. <strong>Search exactly.</strong> The default compares all 18 documents and returns the true nearest three. Recall is 100% by definition &mdash; this <em>is</em> the answer everything else is measured against.
+3. <strong>Partition it.</strong> Switch <strong>Search Mode</strong> to partitioned with one cell probed. Comparisons drop to the cell's contents plus the four centroids, and recall usually stays at 100% &mdash; the neighbours were in the obvious cell.
+4. <strong>Now find the failure.</strong> Raise <strong>k</strong> to 5 or 6 with one cell probed. The cell runs out of documents, so the search returns whatever it has and recall drops below 100%: real neighbours were sitting in a cell nobody looked at.
+5. <strong>Buy the recall back.</strong> Raise <strong>Cells Probed</strong>. Recall climbs back to 100% and the comparison count climbs with it. That trade is the entire tuning surface of a vector database.
+6. <strong>Probe everything.</strong> At 4 cells the search does 22 comparisons for an index of 18 documents &mdash; worse than the exact scan, because you pay for the centroids too. Partitioning only pays when you skip most of the index.
+7. <strong>Change the metric.</strong> On the mango query, cosine calls "a summer fruit salad" and "peeling a ripe mango" a tie at 1.000, because they sit at almost the same angle from the origin. Euclidean puts "peeling a ripe mango" clearly first, because it is genuinely nearer. Same points, same query, different question being asked.
+
+## Where this goes wrong
+
+- <strong>Mixing embedding models.</strong> Vectors from two different models are not comparable, even at the same dimension. Re-embed everything when you change model, or the index quietly returns nonsense.
+- <strong>Expecting exact matches.</strong> Embeddings are poor at part numbers, error codes and rare proper nouns, which is why serious systems run hybrid retrieval &mdash; keyword search alongside vectors.
+- <strong>Ignoring recall.</strong> An approximate index that has drifted to 70% recall looks perfectly healthy from the outside; every query returns results. Measure against exact search on a sample.
+- <strong>Chunk size chosen by accident.</strong> A vector represents its whole chunk, so a chunk covering three topics has an embedding that means none of them.
+- <strong>No filtering plan.</strong> "Nearest neighbours, but only from this tenant, in the last 30 days" is a much harder query than pure similarity, and the index has to be built for it.
+
+## The short of it
+
+An embedding puts meaning somewhere in space, so similarity becomes geometry and retrieval becomes nearest-neighbour search, ranked by cosine because vector length carries length rather than meaning. Exact search costs one comparison per document and does not survive scale, so production indexes partition the space and probe only the nearest few cells &mdash; buying a large drop in work for a small, measurable chance of missing a true neighbour. That chance is recall@k, and it moves with how many cells you probe, which makes vector search a tuning problem rather than a solved one.

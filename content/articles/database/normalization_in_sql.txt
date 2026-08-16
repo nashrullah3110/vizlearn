@@ -1,0 +1,28 @@
+title: Normalization: A Practical Guide
+intro: Splitting a table so each fact is stored exactly once.
+
+## Start here
+
+A denormalized table stores the same fact in more than one place, which means updating it can leave two copies disagreeing. Normalization is a sequence of rules, each one removing a specific kind of redundancy by moving data into its own table.
+
+## The three rules
+
+- <strong>1NF — atomic values.</strong> No column holds a list. "Pen, Notebook" in one cell becomes two rows.
+- <strong>2NF — no partial dependency.</strong> With a composite key, every other column must depend on the <em>whole</em> key, not just part of it. Customer name depends only on order_id, not on (order_id, product) — so it moves out.
+- <strong>3NF — no transitive dependency.</strong> A column cannot depend on another non-key column. Customer city depends on customer, not directly on the order — so it moves to its own table.
+
+## Guided tour
+
+1. <strong>Start at raw.</strong> One table, one row per order, a multi-valued products column — not even 1NF.
+2. <strong>Normalize to 1NF.</strong> Products become atomic — one row per (order, product) — but now customer, city and price all repeat across the exploded rows.
+3. <strong>Normalize to 2NF.</strong> Orders and Products split out — price no longer repeats per line item. Redundant cells fall from 8 to 2.
+4. <strong>Normalize to 3NF.</strong> Customers splits out from Orders — city no longer repeats per order for the same customer. Redundant cells hit 0.
+5. <strong>Read what is left.</strong> order_id and customer still repeat across tables — that is a normal foreign key, not redundancy. Redundancy is a *fact* stored twice; a key linking two facts is the whole point of splitting them apart.
+
+## Where this goes wrong
+
+Over-normalizing has a cost too: every extra table is another join at query time. Reporting and analytics workloads often deliberately denormalize back down for read speed, accepting the redundancy because the data is written once and read constantly. Normalize for correctness where writes happen; consider denormalizing where reads dominate.
+
+## Summing up
+
+1NF removes multi-valued columns, 2NF removes columns that depend on only part of a composite key, and 3NF removes columns that depend on another non-key column rather than the key itself. Each step moves a fact into the one table where it is defined once, which is what makes update anomalies structurally impossible rather than merely unlikely.

@@ -1,0 +1,54 @@
+title: What is MRR (Mean Reciprocal Rank)?: A Practical Guide
+intro: What does MRR measure, and when is the position of the first correct result the thing that matters?
+
+## The definition, and the shape of the curve
+
+Reciprocal rank for a query is 1/(rank of the first relevant result). MRR is the mean of that over an evaluation set. The name is worth reading literally: it is a <em>mean</em> of <em>reciprocal</em> <em>ranks</em>, and each word matters.
+
+The reciprocal makes the curve steep at the top and flat at the bottom. Moving a result from rank 2 to rank 1 gains 0.5. Moving one from rank 10 to rank 9 gains about 0.011 &mdash; forty-five times less. That shape encodes an assumption: users and models care enormously about the top of the list and barely at all about the bottom.
+
+Because it is a mean of per-query scores, a single query can move it noticeably on a small evaluation set. Report the number of queries alongside it, and be suspicious of MRR differences on fewer than a hundred.
+
+## When position is the whole question
+
+MRR is the right metric when the consumer stops at the first good result. Question answering with a single correct answer, "I'm feeling lucky" search, entity lookup, a code assistant jumping to a definition &mdash; in all of these the second correct result is worth nothing.
+
+It also matters inside RAG more than it first appears. Attention over a long context is uneven, and evidence placed first is more likely to be used than evidence placed eighth. Two retrievers with identical recall@5 can produce measurably different answers if one puts the key chunk at the top and the other buries it. Recall cannot see that difference; MRR can.
+
+The practical use: track recall@k to know whether the evidence arrives, and MRR to know whether it arrives somewhere the model will actually look. A reranker that leaves recall unchanged while lifting MRR is doing real work.
+
+## What it ignores, and when that is wrong
+
+<strong>Every relevant result after the first.</strong> A query with one relevant document at rank 1 and a query with ten relevant documents at ranks 1 to 10 both score 1.0. If your questions need multiple sources &mdash; comparisons, summaries, anything aggregative &mdash; MRR is close to blind to what you care about, and <a href="recall_at_k.html">Recall@k</a> is the metric to use.
+
+<strong>Degrees of relevance.</strong> A marginally useful document at rank 1 outscores a perfect one at rank 2. MAP averages precision over every relevant position and nDCG additionally uses graded judgements; both are strictly more informative and both cost more to label.
+
+<strong>The zero.</strong> Queries with no relevant result contribute 0, which is correct and worth watching: a system with excellent MRR on the queries it answers and a large silent tail of zeros has a coverage problem that the average partially conceals. Report the proportion of zero-score queries next to it.
+
+## Reading MRR against the alternatives
+
+The family is easiest to keep straight by what each one uses:
+
+<strong>Hit Rate@k</strong> &mdash; is there anything relevant in the top k? Binary, ignores position entirely.
+
+<strong>MRR</strong> &mdash; where is the <em>first</em> relevant result? Uses position, ignores everything after it.
+
+<strong>MAP</strong> &mdash; where is <em>every</em> relevant result? Uses all positions, still binary relevance.
+
+<strong>nDCG</strong> &mdash; where is every relevant result, and how relevant is each? Uses positions and grades, and is the most informative and most expensive.
+
+They are a ladder of increasing information and increasing labelling cost. Climb it only as far as your judgements can honestly support: nDCG computed from binary labels guessed by a weak model is not better than a hit rate from careful human ones.
+
+## Things to try
+
+1. Click result #1 on and off. MRR swings between 1.0 and 0.33 on a single change, while recall moves a fraction &mdash; MRR is by far the most position-sensitive of the four.
+2. Mark only the last result relevant. RR is 0.1, and no amount of additional relevant documents further down would improve it.
+3. Mark results 1 and 2 both relevant, then mark only result 1. MRR is identical either way &mdash; everything after the first hit is invisible to it.
+
+## What to remember
+
+MRR averages 1/rank of the first relevant result. It is the metric for systems where the consumer stops at the first good answer, and it is far more sensitive to the top of the ranking than recall or precision. It ignores every relevant result after the first, so it is the wrong choice for questions needing several sources. Inside RAG it is a useful companion to recall: recall says the evidence arrived, MRR says whether it arrived where the model will actually attend to it.
+
+All four of these read the same object: an ordered list of retrieved results, with each one labelled relevant or not by a human or a strong model. They differ only in what they choose to notice about it &mdash; which is why quoting one without saying which is close to meaningless, and why the visualisation above shows all four at once.
+
+The labels are the expensive part. A relevance judgement per query-document pair is human work, and an evaluation set of fifty queries with judged results is worth more than any amount of metric sophistication on top of unjudged data. Build the set first.

@@ -1,0 +1,46 @@
+title: Knowledge Distillation: Teaching a Small Model to Think Big
+intro: A large model is accurate but expensive. A small model is cheap but weaker. <strong>Knowledge distillation</strong> narrows that gap by training the small <em>student</em> to imitate the large <em>teacher</em> &mdash; and remarkably, the student often beats an identical model trained on the original labels.
+
+## Dark Knowledge: The Central Idea
+
+A training label says "this is a dog" and nothing else. But a trained teacher, shown that same photo, might output <span class="mono-font">dog 0.90, wolf 0.07, cat 0.02, car 0.001</span>.
+
+Those small numbers are not noise &mdash; they encode <strong>similarity structure</strong> the label cannot express: a dog resembles a wolf far more than a car. Geoffrey Hinton named this <em>dark knowledge</em>. It is the teacher's entire learned view of how the classes relate, and it is free supervision on every single example.
+
+## Why Temperature Is Essential
+
+There is a catch: a confident teacher's non-target probabilities are so tiny that they contribute almost nothing to the gradient. At <span class="mono-font">T = 1</span> the distribution is nearly one-hot, so the student learns roughly what the plain label already told it.
+
+Raising the temperature in the softmax flattens the distribution and <em>amplifies the ratios between the small values</em>:
+
+p&#7522; = exp(z&#7522; / T) / &Sigma;&#11002; exp(z&#11002; / T)
+
+Drag T from 1 to 6 and watch the runner-up bars rise out of nothing. That is the dark knowledge becoming visible &mdash; and becoming trainable. Both teacher and student are softened by the same T, and the distillation loss is scaled by <span class="mono-font">T&sup2;</span> to keep gradient magnitudes comparable to the hard-label term.
+
+## The Combined Loss
+
+In practice the student learns from both sources at once:
+
+L = (1 &minus; &alpha;) &middot; CE(student, true label) &nbsp; + &nbsp; &alpha; &middot; T&sup2; &middot; KL(teacher&#8202;&Vert;&#8202;student)
+
+- The <strong>cross-entropy</strong> term keeps the student anchored to ground truth, so it cannot inherit the teacher's mistakes wholesale.
+- The <strong>KL divergence</strong> term pulls the student's whole distribution toward the teacher's, transferring the similarity structure.
+- <strong>&alpha;</strong> balances them. Typical values lean toward the teacher, since the soft targets carry strictly more information per example.
+
+## Why It Matters for LLMs
+
+Distillation is how most small production models are made. DistilBERT keeps roughly 97% of BERT's performance at 40% of the size and 60% faster inference. The same recipe produced the compact members of most modern model families.
+
+For generative models the idea extends naturally: the teacher's full next-token distribution at every position is a far richer target than the single token that happened to appear in the text. A related variant, <em>sequence-level</em> distillation, simply trains the student on text the teacher generated.
+
+## Guided tour
+
+1. <strong>Look at T = 1.</strong> The teacher is nearly one-hot and looks almost identical to the hard label &mdash; barely any extra signal.
+2. <strong>Raise T to 5.</strong> The runner-ups emerge. Note <em>which</em> ones rise: semantically related classes, never random ones. That ordering is the knowledge being transferred.
+3. <strong>Press "Train student" repeatedly</strong> and watch KL divergence fall as the student's bars converge on the teacher's shape &mdash; including the small ones.
+4. <strong>Set &alpha; = 0 and retrain from reset.</strong> The student matches only the one-hot label; its non-target probabilities collapse and the similarity structure is lost.
+5. <strong>Try the sentiment example.</strong> "not bad at all" is genuinely ambiguous, so the teacher stays uncertain even at T = 1 &mdash; and that calibrated uncertainty is itself worth teaching.
+
+## In one line
+
+A hard label answers one question. A teacher's full distribution answers every question at once &mdash; how likely each alternative is, and therefore how the classes relate. Temperature is the tool that makes that hidden structure large enough to learn from. The student in this lab performs real gradient descent on the combined loss, so the convergence you watch is genuine optimisation, just at a much smaller scale.

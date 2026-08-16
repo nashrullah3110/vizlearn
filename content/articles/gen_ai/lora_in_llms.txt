@@ -1,0 +1,46 @@
+title: LoRA: Fine-Tuning Without Touching the Model
+intro: Fine-tuning a 7B model the traditional way means updating all 7 billion weights &mdash; and storing optimizer state for each, which typically needs <strong>four to six times</strong> the model's own size in GPU memory. <strong>LoRA</strong> (Low-Rank Adaptation) sidesteps this almost entirely, and it has become the default way to adapt large models.
+
+## The Insight: Updates Are Low-Rank
+
+Fine-tuning changes a weight matrix from <span class="mono-font">W</span> to <span class="mono-font">W + &Delta;W</span>. The observation behind LoRA is that although <span class="mono-font">W</span> is enormously expressive, the <em>change</em> needed to specialise a model for one task has very low intrinsic rank &mdash; it does not need the full space.
+
+So instead of learning a full <span class="mono-font">d &times; k</span> matrix, LoRA factorises the update into two thin matrices:
+
+&Delta;W = B &middot; A &nbsp;&nbsp; where B is d&times;r and A is r&times;k, with r &lll; min(d, k)
+
+The original weights are <strong>frozen</strong>. Only A and B are trained.
+
+## Why the Savings Are So Extreme
+
+A full update on a 4096&times;4096 layer is <strong>16.7 million</strong> parameters. The LoRA version at rank 8 is <span class="mono-font">8 &times; (4096 + 4096) = 65,536</span> &mdash; about <strong>0.4%</strong>. The saving comes from replacing a product of dimensions with a sum of them.
+
+The memory win is even larger than the parameter count suggests, because optimizers like Adam store two extra values per <em>trainable</em> parameter. Freezing 99.6% of the weights removes that overhead almost completely &mdash; which is what lets a 7B model be fine-tuned on a single consumer GPU.
+
+## Choosing the Rank
+
+Rank is the one hyperparameter that matters, and it is a capacity dial:
+
+- <strong>r = 1&ndash;4</strong> &mdash; extremely cheap; enough for style or tone adjustments.
+- <strong>r = 8&ndash;16</strong> &mdash; the common default. Handles most instruction-tuning and domain adaptation.
+- <strong>r = 64&ndash;128</strong> &mdash; for teaching genuinely new capabilities, approaching full fine-tuning behaviour at a fraction of the cost.
+
+Higher is not automatically better: past the task's intrinsic rank you are adding parameters that mostly learn noise. Note also that A is initialised randomly while B is initialised to <strong>zero</strong>, so <span class="mono-font">BA = 0</span> at the start and training begins from exactly the pretrained model.
+
+## The Practical Superpower: Swappable Adapters
+
+Because the base model is untouched, a LoRA adapter is a small standalone file &mdash; often just a few megabytes. One copy of a 70B model in memory can serve many specialisations by swapping adapters, and they can be merged into the weights before deployment (<span class="mono-font">W' = W + BA</span>) so inference costs nothing extra.
+
+Combine LoRA with a 4-bit quantized base and you get <strong>QLoRA</strong>, the recipe that made fine-tuning very large models possible on a single GPU.
+
+## Things to try
+
+1. <strong>Start at r = 8</strong> on a 4096&times;4096 layer and read the trainable fraction &mdash; well under 1%.
+2. <strong>Drag the rank to 128.</strong> Parameters climb steeply but remain a small slice of the full matrix. Even a large rank is cheap.
+3. <strong>Widen d and k while holding rank fixed.</strong> Full fine-tuning grows <em>quadratically</em>; LoRA grows only linearly. The bigger the model, the better LoRA looks.
+4. <strong>Watch the &Delta;W preview at r = 1</strong>, then raise the rank. At rank 1 every row is a scaled copy of a single pattern; higher ranks can express genuinely independent structure.
+5. <strong>Switch to 70B</strong> and compare the adapter file size to the full model. That gap is why model hubs host thousands of adapters instead of thousands of full checkpoints.
+
+## Worth remembering
+
+LoRA does not make the model smaller &mdash; it makes the <em>update</em> smaller. By constraining the change to a low-rank subspace, it converts fine-tuning from an infrastructure project into something that runs on one GPU and ships as a few-megabyte file, with no inference penalty once merged.

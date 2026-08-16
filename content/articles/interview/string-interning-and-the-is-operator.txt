@@ -1,0 +1,20 @@
+title: Why does `is` sometimes work on strings?
+intro: Why does &#x27;a&#x27; is &#x27;a&#x27; return True, and why should you never rely on it?
+
+## What interning is
+
+CPython keeps a table of strings and reuses the entry rather than allocating a second identical object. Identifiers, and literals in compiled code that look like identifiers, go in it automatically. The payoff is real: comparing interned strings can short-circuit on a pointer comparison, and attribute lookup does this constantly.
+
+Immutability is what makes it legal. Sharing one object between unrelated pieces of code would be a disaster if either could modify it.
+
+## Why it is a trap
+
+The rules are not part of the language. They vary by CPython version, by whether the string was a literal in a compiled block, by whether it contains a space, and by whether the constant folder saw it. The REPL compiles line by line and a script compiles as a unit, so the same code can behave differently in the two.
+
+Code that uses <code>is</code> on strings therefore works in testing, works in the REPL, and fails on the one input that was built by concatenation. That failure looks like a logic error, not a comparison error, which is why it takes so long to find.
+
+## The rule, and the exception
+
+Use <code>==</code> for strings, always. Use <code>is</code> only for singletons &mdash; <code>None</code>, <code>True</code>, <code>False</code> &mdash; where identity <em>is</em> the intended test.
+
+There is one legitimate use of interning: <code>sys.intern(s)</code>, called deliberately on a large set of repeated strings such as parsed field names, cuts memory and speeds up dictionary lookups. That is opting in, which is different from relying on a coincidence.

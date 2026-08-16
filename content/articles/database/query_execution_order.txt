@@ -1,0 +1,60 @@
+title: Query Execution Order in SQL: A Practical Guide
+intro: SQL is written SELECT first and executed SELECT almost last. Nearly every confusing SQL error - unknown alias, aggregate in WHERE - is explained by that gap.
+
+## Written order versus execution order
+
+A query is written in this order:
+
+SELECT &rarr; FROM &rarr; WHERE &rarr; GROUP BY &rarr; HAVING &rarr; ORDER BY &rarr; LIMIT
+
+It is executed in this one:
+
+FROM &rarr; JOIN &rarr; WHERE &rarr; GROUP BY &rarr; HAVING &rarr; SELECT &rarr; DISTINCT &rarr; ORDER BY &rarr; LIMIT
+
+The database first works out which rows it is dealing with (FROM and JOIN), filters them (WHERE), groups what survives (GROUP BY), filters the groups (HAVING), and only then computes the output columns (SELECT). Sorting and limiting happen last, on the finished result.
+
+## The two errors this explains
+
+<strong>An alias defined in SELECT cannot be used in WHERE.</strong>
+
+SELECT price * qty AS total<br>FROM orders<br>WHERE total &gt; 100&nbsp;&nbsp;&nbsp;&nbsp;&minus;&minus; error
+
+WHERE runs before SELECT, so at that moment <span class="mono-font">total</span> does not exist yet. Repeat the expression instead: <span class="mono-font">WHERE price * qty &gt; 100</span>.
+
+ORDER BY, however, runs <em>after</em> SELECT &mdash; so <span class="mono-font">ORDER BY total</span> works perfectly well. That is why the same alias is legal in one clause and not the other, which looks arbitrary until you know the order.
+
+<strong>An aggregate cannot appear in WHERE.</strong>
+
+WHERE COUNT(*) &gt; 5&nbsp;&nbsp;&nbsp;&minus;&minus; error<br>HAVING COUNT(*) &gt; 5&nbsp;&nbsp;&minus;&minus; correct
+
+WHERE runs before GROUP BY, when no groups exist and there is nothing to count. HAVING runs after, which is precisely what it is for.
+
+## WHERE and HAVING are not interchangeable
+
+Both filter, at different stages, and the distinction matters for correctness as well as speed:
+
+- <strong>WHERE</strong> filters individual <em>rows</em>, before grouping. Excluded rows never reach the aggregate.
+- <strong>HAVING</strong> filters <em>groups</em>, after aggregation. All rows contribute to the aggregate; whole groups are then discarded.
+
+<span class="mono-font">WHERE status = 'paid'</span> computes totals from paid orders only. <span class="mono-font">HAVING SUM(amount) &gt; 1000</span> computes totals from every order and keeps the customers whose total exceeds 1000. Moving a condition between them changes the answer.
+
+When a condition <em>could</em> go in either &mdash; a plain column filter &mdash; put it in WHERE. Filtering earlier means fewer rows to group, which is almost always faster.
+
+## Exploration guide
+
+1. <strong>Step through a query.</strong> Press <strong>Step</strong> repeatedly and watch which clause runs at each stage. FROM produces the rows, WHERE removes some, GROUP BY collapses the rest, and SELECT is near the end.
+2. <strong>Break it deliberately.</strong> Enable the option that uses a SELECT alias in WHERE. It fails, because at that point the alias has not been created.
+3. <strong>Then use the same alias in ORDER BY.</strong> Enable that option instead. It works &mdash; same alias, different clause, and the execution order is the only reason.
+4. <strong>Reset and compare.</strong> Press <strong>Reset</strong> and run a working query, watching how many rows survive each stage. Filtering early leaves far less work for everything downstream.
+
+## What usually goes wrong
+
+- <strong>Using a SELECT alias in WHERE or GROUP BY.</strong> Repeat the expression, or wrap the query in a subquery or CTE where the alias already exists.
+- <strong>Putting an aggregate in WHERE.</strong> Use HAVING.
+- <strong>Using HAVING for row filters.</strong> Correct results, more work &mdash; the rows are grouped before being discarded.
+- <strong>Expecting LIMIT to speed up an aggregate.</strong> LIMIT runs last, so the database has already grouped and sorted everything before it truncates.
+- <strong>Filtering an outer join in WHERE.</strong> A condition on the right-hand table in WHERE discards the NULL rows and silently turns the LEFT JOIN into an INNER JOIN. Put it in the ON clause instead.
+
+## Key takeaway
+
+SQL executes FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY, LIMIT &mdash; not the order it is written in. That single fact explains why SELECT aliases work in ORDER BY but not WHERE, why aggregates belong in HAVING rather than WHERE, and why filtering early is faster. When a query does something surprising, walking it through the execution order usually answers it in one step.

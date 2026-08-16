@@ -1,0 +1,21 @@
+title: IoU and Non-Max Suppression: A Practical Guide
+intro: Turning a pile of overlapping boxes into one box per object.
+
+## The problem it solves
+
+A detector's region proposal stage doesn't stop at one box per object — it scores hundreds of candidate boxes and keeps every one above a confidence floor, which for a single real object usually means a cluster of overlapping, near-duplicate boxes. <strong>Intersection over Union (IoU)</strong> is the standard way to measure how much two boxes overlap: the area they share, divided by the total area either one covers. <code>IoU = 1</code> means identical boxes; <code>IoU = 0</code> means no overlap at all.
+
+## Non-Max Suppression
+
+NMS turns that overlap score into a cleanup rule. Sort every proposal by confidence, descending. Take the top one, keep it, and discard every remaining box whose IoU with it exceeds a threshold — those are treated as duplicate detections of the same object. Move to the next surviving box by confidence and repeat, until nothing is left to process. The threshold is the only knob: too low and boxes on genuinely different but nearby objects get merged into one; too high and duplicate boxes on the same object all survive.
+
+## Try it yourself
+
+1. <strong>Read the stage at the default threshold.</strong> Box A (confidence 0.95) is kept. Box D, a separate object with no real overlap with A, is also kept. Boxes B and C overlap A too heavily and are suppressed as duplicates.
+2. <strong>Lower the threshold toward 0.1.</strong> Nothing changes here — B and C already fail a much looser bar, so tightening it further has no effect on this particular layout.
+3. <strong>Raise the threshold past roughly 0.59.</strong> Box B's overlap with A no longer exceeds the (now looser) suppression bar, so B is kept as a second detection of what is really the same object.
+4. <strong>Raise it past roughly 0.81.</strong> Now C survives too — at this threshold NMS considers all four boxes different enough to keep, even though A, B and C clearly describe one dog.
+
+## The short of it
+
+IoU is a pure geometry calculation — it knows nothing about confidence or class. NMS is the policy layer that uses it: keep the most confident box, discard anything that overlaps it past a threshold, repeat. Set the threshold too low and it merges distinct nearby objects into one detection; set it too high and duplicate boxes on the same object all survive. Every object detector that outputs boxes runs some form of this after its raw proposals come out.

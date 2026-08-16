@@ -1,0 +1,55 @@
+title: Random Forest and Bagging: A Practical Guide
+intro: Why averaging many deliberately imperfect models beats tuning one.
+
+## Quick Context
+
+A <a href="decision_tree.html" style="color: var(--accent-primary)">decision tree</a> grown to full depth will classify every training point correctly. It does this by carving the space into ever smaller rectangles until each one is pure &mdash; including rectangles that exist only to accommodate a single mislabelled point. The result has near-perfect training accuracy and a boundary that looks like a staircase drawn during an earthquake.
+
+The tree is not wrong on average; it is unstable. Change a handful of training points and you get a noticeably different tree. That is high variance, and variance is the one error you can cancel by averaging.
+
+## Bagging: the general idea
+
+Bagging is short for <strong>bootstrap aggregating</strong>, and it is exactly those two steps:
+
+1. <strong>Bootstrap.</strong> Draw a random sample of the training data, with replacement, the same size as the original. Roughly 63% of the rows appear at least once; the rest are left out.
+2. <strong>Aggregate.</strong> Train one model per sample, then combine them &mdash; majority vote for classification, mean for regression.
+
+Each tree sees a slightly different world, so each makes slightly different mistakes. Where they agree, the signal was real. Where they disagree, one of them was chasing noise, and the vote overrules it.
+
+## What makes a forest more than bagging
+
+Bagged trees have a weakness: if one feature is strongly predictive, nearly every tree splits on it first, and the trees end up highly correlated. Averaging correlated models buys much less than averaging independent ones.
+
+Random Forest adds a second source of randomness. At <em>every split</em>, the tree may only consider a random subset of the features &mdash; typically the square root of the total for classification. A tree that is denied the dominant feature is forced to find a different, still-useful split, and the forest becomes genuinely diverse rather than forty copies of the same idea.
+
+That is the entire difference between bagged trees and a random forest: one extra random choice, made at every node.
+
+## Experiments to try
+
+1. <strong>Start with the problem.</strong> Set the <strong>Number of Trees</strong> slider to 1. The boundary is a jagged staircase with isolated islands carved around individual mislabelled points. Train accuracy is near perfect and test accuracy is not &mdash; and pressing <strong>Regrow Forest</strong> four or five times swings test accuracy by several points. Watch Accuracy Spread: that swing is the variance bagging exists to remove.
+2. <strong>Add trees and watch it settle.</strong> Set the <strong>Number of Trees</strong> slider to 40. The islands dissolve, test accuracy climbs, and Accuracy Spread collapses to a point or two &mdash; without any single tree having improved.
+3. <strong>Confirm nothing was tuned away.</strong> Compare Forest Test Accuracy against Avg Single Tree. The individual trees are no better than before; the gain comes entirely from voting.
+4. <strong>Take away one source of diversity.</strong> Untick <strong>Feature Subsampling</strong> and watch Gain from Voting shrink and Trees Disagreeing fall. Every tree may now consider both features at every split, so they reach for the same ones and their mistakes start to coincide. The gain does not vanish entirely, because bootstrapping still hands each tree a different sample &mdash; that is the difference between bagged trees and a random forest, measured.
+5. <strong>Cripple the trees instead.</strong> Set the <strong>Max Depth</strong> slider to 1. Each tree is now a single split &mdash; a stump &mdash; and no amount of voting fixes it. Bagging reduces variance, not bias.
+6. <strong>Turn up the noise.</strong> Set the <strong>Label Noise</strong> slider to 0.3, then compare one tree against forty. The gap between them widens: the more noise there is to memorise, the more averaging is worth.
+
+## Why it does not overfit with more trees
+
+This surprises people: adding trees to a random forest does not cause overfitting. More trees means a more precise estimate of the same average, and the curve flattens rather than turning back up. Past a few hundred trees you are spending compute for no gain, but you are not doing damage.
+
+What <em>does</em> overfit is depth, along with allowing tiny leaves. Those control how much each individual tree can memorise, and they are the knobs worth tuning.
+
+## Out-of-bag error, free of charge
+
+Each tree leaves out about 37% of the rows during bootstrapping. Those rows are unseen by that tree, so you can evaluate the tree on them &mdash; and averaging that over the forest gives an honest estimate of generalisation error with no separate validation split at all. It is one of the few genuinely free lunches in machine learning, and it is why random forests are so convenient on small datasets.
+
+## Where this goes wrong
+
+- <strong>Trusting the default feature importances.</strong> Impurity-based importance is biased toward high-cardinality and continuous features, which can look important simply because they offer more places to split. Prefer permutation importance.
+- <strong>Expecting extrapolation.</strong> A forest predicts by averaging training labels in a region. Outside the range of the training data it returns the nearest thing it saw and flatlines &mdash; it cannot continue a trend the way a linear model can.
+- <strong>Assuming it beats boosting.</strong> On structured tabular data, <a href="gradient_boosting.html" style="color: var(--accent-primary)">gradient boosting</a> usually edges it out. Forests win on robustness: they need almost no tuning and are very hard to break.
+- <strong>Ignoring class imbalance.</strong> Majority voting inherits whatever imbalance is in the data. Use class weights or balanced bootstrapping &mdash; see <a href="training_on_label_imbalanced_dataset.html" style="color: var(--accent-primary)">training on imbalanced data</a>.
+
+## Worth remembering
+
+A random forest trains many deep, deliberately different trees and lets them vote, which cancels the variance that makes any single deep tree unreliable. The diversity comes from two places &mdash; a bootstrap sample of the rows and a random subset of the features at every split &mdash; and without that diversity extra trees buy nothing. Adding trees never overfits, so depth and leaf size are the parameters that actually need care. It is the sensible default when you want a strong model with almost no tuning, and the out-of-bag rows give you an honest error estimate for free.

@@ -1,0 +1,58 @@
+title: Context-aware chunking: A Practical Guide
+intro: What is context-aware chunking, and what problem does it solve that the other strategies do not?
+
+## The problem is coreference, not boundaries
+
+Prose is written to be read in order, so it leans on everything before it: "it", "this policy", "as described above", "the latter". Cut one paragraph out and those references dangle.
+
+Two consequences. The generator cannot answer from the chunk because it does not know what "it" is. And retrieval never surfaces the chunk in the first place, because the embedding is of text that does not contain the words a user would search for.
+
+## What gets added
+
+<strong>Cheap and free:</strong> document title and heading path, prepended. Deterministic, no model call, and usually the largest single improvement.
+
+<strong>Neighbour context:</strong> the previous and next chunk, or a window around the chunk, stored for generation but not embedded &mdash; the <a href="parent_document_retriever.html">parent document retriever</a> is exactly this idea, retrieving small and returning large.
+
+<strong>Generated context:</strong> an LLM writes a sentence situating the chunk in the document, prepended before embedding. Anthropic's "contextual retrieval" is this, and it works well. It costs one model call per chunk at index time, which prompt caching over the shared document makes affordable.
+
+## What it costs, and what to watch
+
+Index time and money, both once. The subtler cost is dilution: prepending 200 tokens of context to a 300-token chunk means the embedding is largely <em>about the context</em>, so chunks from the same section start looking alike and the retriever loses its ability to distinguish them.
+
+Keep the enrichment short relative to the chunk, and measure on a retrieval evaluation set rather than assuming. This is the strategy with the best evidence behind it and it is not free of trade-offs.
+
+## Contextual retrieval, and what it costs
+
+The strongest published form of this is to have an LLM write a short sentence situating each chunk inside its document &mdash; what it is about, what it follows &mdash; and prepend that before embedding. Reported reductions in retrieval failure are large, and the technique is simple enough to implement in an afternoon.
+
+The cost is one model call per chunk at index time, which sounds prohibitive on a large corpus and mostly is not: the document is the same for every chunk in it, so <a href="caching_in_rag_pipelines.html">prompt caching</a> over that shared prefix makes the marginal call cheap. It is the clearest practical example of two of these techniques composing.
+
+It is still an index-time cost paid on every re-index, so it belongs in your pipeline design rather than being bolted on: changing the chunker means regenerating every context sentence.
+
+## Embedded text and returned text can differ
+
+The enrichment does not have to be what the model reads. You can embed the enriched text &mdash; so the chunk is findable &mdash; while storing and returning the original, so the generator is not fed repetitive boilerplate.
+
+Separating the two is the general form of a pattern that appears everywhere in retrieval: embed something optimised for matching, return something optimised for reading. Parent-document retrieval embeds a small chunk and returns its parent. Summary indexing embeds a summary and returns the document. Contextual retrieval embeds chunk-plus-context and can return either.
+
+Once you see the pattern, the design question stops being "how should I chunk?" and becomes two questions with different answers: what should be <em>matched</em> against, and what should be <em>read</em>?
+
+## Measuring whether the enrichment helped
+
+Enrichment is easy to add and easy to overdo, and the only way to tell which you have done is to measure both halves.
+
+<strong>Did findability improve?</strong> <a href="recall_at_k.html">Recall@k</a> on a fixed query set, before and after. This is the number the technique is supposed to move, and it usually does.
+
+<strong>Did distinguishability degrade?</strong> The failure mode is chunks from one section becoming interchangeable. A cheap proxy is the mean pairwise similarity between chunks that share a parent: if it climbs sharply after enrichment, the shared context is dominating and the retriever is losing its ability to pick between them.
+
+Watching only the first will lead you to enrich more and more, because recall keeps improving right up until the point where the top-k fills with near-identical chunks from the same section &mdash; at which point recall still looks fine and answers get worse.
+
+## Things to try
+
+1. Start with everything off. The raw chunk is about refunds, never says so, and cannot be retrieved.
+2. Turn on <strong>resolve pronouns</strong>. Similarity jumps, because the searchable nouns are now in the text.
+3. Turn on <strong>over-enrich</strong>. The chunk stays findable and stops being distinguishable from its sibling &mdash; the cost of adding too much shared context.
+
+## What to remember
+
+Context-aware chunking changes what is stored rather than where the cut falls. A chunk full of pronouns and back-references is unusable by the generator and invisible to retrieval, so title, heading path and resolved references are added back. Keep the enrichment short relative to the chunk, or shared context dominates the embedding and chunks stop being distinguishable.

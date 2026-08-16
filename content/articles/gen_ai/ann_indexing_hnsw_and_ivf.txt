@@ -1,0 +1,52 @@
+title: ANN indexing: HNSW and IVF: A Practical Guide
+intro: How does approximate nearest neighbour search actually work? Explain HNSW.
+
+## HNSW: skip lists, in vector space
+
+Take a proximity graph &mdash; each vector linked to its nearest neighbours &mdash; and stack several, each a random sample of the one below. Search enters at the sparse top layer and greedily moves to whichever neighbour is closer to the query, until no neighbour improves. Then it drops a layer and repeats.
+
+The top layers have long edges, so a few hops cross most of the space; the bottom layer has short edges, so the final steps are precise. It is the skip-list idea applied to geometry, and it is the reason HNSW dominates: excellent recall at low latency.
+
+## The parameters worth naming
+
+<strong>M</strong> &mdash; edges per node, fixed at build time. Higher means a better-connected graph, better recall, more memory. The graph itself is a real memory cost on top of the vectors, which is HNSW's main drawback.
+
+<strong>efConstruction</strong> &mdash; how hard the builder works to find good neighbours. Build-time only: slower indexing, better graph forever.
+
+<strong>efSearch</strong> &mdash; the size of the candidate list during a query. The runtime knob: raise it for recall, lower it for latency, per query if you like. This is the one to mention, because it is the one you actually tune in production.
+
+## How each one fails
+
+HNSW's search is greedy, so it can settle in a local minimum and return a neighbourhood that is good but not the best. A wider <code>efSearch</code> makes that less likely without eliminating it. Deletion is also awkward &mdash; removing a node can disconnect the graph &mdash; so most implementations tombstone and rebuild periodically.
+
+IVF's failure is cleaner: a true neighbour sitting just across a cluster boundary is missed unless that cluster is probed. More probes fixes it and costs latency. IVF is cheaper to build and to update, which is why it survives alongside HNSW &mdash; and combined with product quantization it is what runs when memory, not latency, is the binding constraint.
+
+## Product quantization, and when memory is the constraint
+
+HNSW keeps every vector in memory plus the graph, so a million 768-dimensional float32 vectors is about 3&nbsp;GB before the graph. Past some scale that, not latency, is what stops you.
+
+Product quantization splits each vector into subvectors, clusters each subspace, and stores the cluster ids instead of the values &mdash; typically a 10&ndash;30&times; reduction. Distances are then computed against the codes using a precomputed lookup table, which is also faster.
+
+The cost is precision: distances become approximate on top of the search already being approximate, so recall drops. The standard mitigation is <strong>rerank with the real vectors</strong> &mdash; retrieve a generous candidate set from the compressed index, then rescore the top few hundred against the originals held on disk. IVF-PQ with reranking is what most billion-scale deployments actually run.
+
+## Choosing between them, and what to measure
+
+<strong>HNSW</strong> when the index fits in memory and query latency matters most. Best recall-for-latency, worst memory, awkward deletes.
+
+<strong>IVF</strong> when builds and updates need to be cheap, or as the base for quantization. Simpler to reason about; recall depends on probing enough clusters.
+
+<strong>IVF-PQ</strong> when memory is binding. Accept lower raw recall and recover it with a rerank pass.
+
+<strong>Flat</strong> when the corpus is small or a miss is a correctness bug. Under a hundred thousand vectors, a brute-force scan is often a few milliseconds and needs no tuning at all &mdash; which is worth checking before adopting anything else.
+
+Measure on your own data. Recall/latency curves depend on the intrinsic dimensionality and clustering of your embeddings, and published benchmarks on academic datasets transfer poorly.
+
+## Things to try
+
+1. Sweep <strong>efSearch</strong> from 8 to 512. Recall and latency both climb &mdash; this is the knob you tune in production, and it can differ per query.
+2. Drop <strong>M</strong> to 4. Recall is capped no matter how large efSearch gets: build-time damage cannot be repaired at query time.
+3. Raise M to 48 and watch the index memory. The graph is stored alongside the vectors, which is HNSW's main cost.
+
+## What to remember
+
+HNSW stacks proximity graphs: sparse upper layers with long edges to cross the space, a dense bottom layer to refine. Search is greedy with a candidate list of width efSearch, which is the runtime recall/latency knob. M and efConstruction are fixed at build time. IVF is the simpler alternative &mdash; cluster then probe &mdash; cheaper to build and update, and it misses neighbours across cluster boundaries.

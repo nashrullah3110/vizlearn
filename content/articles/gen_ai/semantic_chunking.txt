@@ -1,0 +1,60 @@
+title: Semantic chunking: A Practical Guide
+intro: What is semantic chunking, and when is it worth the extra cost?
+
+## How the boundary is chosen
+
+Split into sentences, embed each one, and compute the similarity between each consecutive pair. Where the text stays on topic the similarity is high; where the subject changes it dips. Cut at the dips.
+
+The threshold should be relative. A fixed number like 0.7 means something different in every corpus, so implementations use a percentile of the similarities observed in <em>this</em> document &mdash; the 5th percentile of gaps, say &mdash; which adapts automatically to how varied the writing is.
+
+## What it costs
+
+One embedding call per sentence at index time, against one per chunk for the alternatives. On a large corpus that is a real bill and a slow re-index, though it is paid once rather than per query.
+
+It is also brittle on short sentences. "Yes." and "See above." have unstable embeddings, so a document full of them produces noisy similarity and boundaries in odd places. Buffering each sentence with its neighbours before embedding is the usual mitigation.
+
+## When to reach for it
+
+Worth it for long unstructured prose &mdash; transcripts, interviews, reports without headings &mdash; where no formatting signal exists and a fixed-size split reliably cuts mid-argument.
+
+Not worth it when the document already carries structure. If there are headings, they are an explicit, author-provided, free topic boundary, and structure-aware chunking will beat semantic chunking at a fraction of the cost. Measure before adopting: on a retrieval evaluation set the gain over a well-tuned recursive splitter is often small.
+
+## Making the similarity signal usable
+
+Raw sentence-to-sentence similarity is noisy. Short sentences &mdash; "Yes.", "See above.", a heading fragment &mdash; have unstable embeddings, so the gap sequence contains dips that are artefacts rather than topic changes.
+
+Two standard mitigations. <strong>Buffering:</strong> embed each sentence together with its neighbours, so a short sentence inherits context and its vector stops swinging. <strong>Smoothing:</strong> take a rolling mean over the gap sequence before looking for troughs, so a single anomalous sentence cannot open a boundary on its own.
+
+Both trade sensitivity for stability, and both are worth having. Without them the technique looks impressive on a clean essay and falls apart on a support transcript, which is exactly the sort of unstructured text it was supposed to be good at.
+
+## Is it worth it? Measure before adopting
+
+Semantic chunking is the most cited of the strategies and the hardest to justify on evidence. It costs an embedding call per sentence at index time, produces chunks of unpredictable size that complicate context budgeting, and on published comparisons its advantage over a well-tuned recursive splitter is often small or absent.
+
+Where it does earn its cost: long unstructured prose with no formatting signal &mdash; interview transcripts, meeting notes, scanned reports &mdash; and corpora where topics shift within a paragraph, so paragraph boundaries mislead.
+
+The honest order of operations is to tune the separators and the size first, measure, and only then try semantic chunking against that baseline. It is a real technique that is frequently adopted before the cheap options have been exhausted.
+
+## How it relates to the other three strategies
+
+The four strategies answer genuinely different questions, which is why they compose rather than compete.
+
+<strong>Recursive</strong> asks where the safest boundary is given a size budget. It is the default and the baseline.
+
+<strong>Structure-aware</strong> asks what boundaries the author already marked. Free when the format carries them, and strictly better than guessing when it does.
+
+<strong>Semantic</strong> asks where the meaning changes. It is the only one that can find a boundary the author did not mark, which is why it is for unstructured prose specifically.
+
+<strong>Context-aware</strong> asks what the chunk lost by being cut, and is orthogonal to all three &mdash; you can enrich chunks produced by any splitter.
+
+A sensible production pipeline is usually structure first, recursive to enforce the size limit, and context enrichment on the result. Semantic chunking enters when the documents have no structure to exploit.
+
+## Things to try
+
+1. Raise the <strong>split percentile</strong> to 70. It splits almost everywhere, producing chunks too small to carry an idea.
+2. Drop it to 10. Only the single largest topic change survives as a boundary.
+3. Note that the threshold is derived from this document's own gaps &mdash; a fixed number would behave differently on every corpus.
+
+## What to remember
+
+Semantic chunking embeds each sentence and cuts where the similarity between neighbours drops, so boundaries land at topic changes rather than at character counts. It costs one embedding per sentence at index time, and it is usually not worth it on documents that already carry headings.

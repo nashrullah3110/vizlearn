@@ -1,0 +1,20 @@
+title: Why must dictionary keys be hashable?
+intro: Why can a tuple be a dictionary key but a list cannot?
+
+## The invariant being protected
+
+Equal objects must have equal hashes, and an object's hash must not change while it is in use as a key. Both follow from how the table works: the hash is the address, so a moving hash is a moving address.
+
+Python enforces this by making mutable built-ins unhashable. <code>list</code>, <code>dict</code> and <code>set</code> all set <code>__hash__ = None</code>, which is why the error is <code>unhashable type</code> rather than something about dictionaries.
+
+## It goes all the way down
+
+A tuple is hashable only if everything in it is. <code>(1, 2)</code> is a fine key; <code>(1, [2])</code> is not, because the tuple's hash is derived from its contents and one of them can change.
+
+<code>frozenset</code> is the immutable set, and it is hashable for the same reason. <code>set</code> is not, which is why you cannot have a set of sets without it.
+
+## Custom objects
+
+By default a custom object hashes by identity, so two equal-looking instances are different keys. Define <code>__eq__</code> and Python sets <code>__hash__</code> to <code>None</code> &mdash; because you have redefined equality and the default hash no longer agrees with it.
+
+To make it usable as a key, define <code>__hash__</code> too, over the same fields <code>__eq__</code> uses, and do not mutate those fields afterwards. <code>@dataclass(frozen=True)</code> does all of this correctly for you.

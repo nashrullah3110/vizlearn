@@ -1,0 +1,46 @@
+title: Fibonacci Search: A Practical Guide
+intro: Binary search without division. It splits the array at Fibonacci boundaries using only addition and subtraction, which mattered enormously on hardware that could not divide.
+
+## Why anyone would avoid the midpoint
+
+Binary search computes <span class="mono-font">mid = (lo + hi) / 2</span>. That division &mdash; or at least a bit shift &mdash; was genuinely expensive on early hardware, and on some architectures it still is. Fibonacci search finds a comparable split point using nothing but addition and subtraction of precomputed Fibonacci numbers.
+
+The trick rests on a property of the sequence. Since <span class="mono-font">F(k) = F(k&minus;1) + F(k&minus;2)</span>, any Fibonacci number splits naturally into two smaller Fibonacci numbers. Use that split as the probe point and both resulting subarrays are themselves Fibonacci-sized, so the same trick applies recursively without ever computing a new boundary from scratch.
+
+## The mechanism, step by step
+
+First find the smallest Fibonacci number that is at least the array length. For an array of 10 elements the sequence runs 1, 1, 2, 3, 5, 8, 13 &mdash; so <span class="mono-font">F(7) = 13</span>, with <span class="mono-font">F(6) = 8</span> and <span class="mono-font">F(5) = 5</span>.
+
+Probe at <span class="mono-font">offset + F(k&minus;2)</span>, clamped to the array bounds. Compare:
+
+- Target is <strong>larger</strong> &rarr; discard the left part; shift the Fibonacci numbers down two and move the offset up to the probe.
+- Target is <strong>smaller</strong> &rarr; discard the right part; shift the Fibonacci numbers down one.
+- Equal &rarr; found.
+
+Every update is an index addition or a step down the precomputed sequence. No division, no multiplication.
+
+## The complexity, and the honest comparison
+
+Because consecutive Fibonacci numbers approach the golden ratio &phi; &asymp; 1.618, each step shrinks the search space by a factor of about 1.618 rather than binary search’s 2. So Fibonacci search is O(log n) too, but with a slightly larger constant:
+
+log<sub>1.618</sub>(n) &asymp; 1.44 &times; log<sub>2</sub>(n)
+
+Roughly 44% more comparisons. In exchange, the probe positions are computed with additions only, and &mdash; the reason it survives in practice &mdash; the two subarrays it examines are unequal in size, with the smaller one probed first. On data read from tape or disk in blocks, that uneven split touches fewer distant locations than binary search’s repeated jumps to the exact middle.
+
+## Experiments to try
+
+1. <strong>Watch the uneven split.</strong> Set <strong>Array Size</strong> to 30 and press <strong>Next Step</strong> through a search. Notice the probe does not land in the middle &mdash; it sits about 38% of the way in, which is 1/&phi;&sup2;. Binary search would split at exactly 50% every time.
+2. <strong>Count against binary search.</strong> Run a full search at <strong>Array Size</strong> 30 with <strong>Auto-Run</strong> and count the probes. Compare with the binary search module at the same size: Fibonacci search usually needs one or two more.
+3. <strong>Find the boundary Fibonacci number.</strong> Set <strong>Array Size</strong> to 13, then 14. At 13 the array is exactly a Fibonacci number and the splits land cleanly; at 14 the algorithm pads up to 21 and the first probe sits further from the centre.
+4. <strong>Search past the end.</strong> Set <strong>Search Target</strong> to a value larger than everything in the array. Watch the clamping keep probes inside the array even though the Fibonacci offsets would run past it &mdash; that clamp is the part implementations most often get wrong.
+
+## Where this goes wrong
+
+- <strong>Probing out of bounds.</strong> <span class="mono-font">offset + F(k&minus;2)</span> can exceed the last index whenever n is not exactly a Fibonacci number. It must be clamped with <span class="mono-font">min(offset + F(k&minus;2), n&minus;1)</span>, and omitting that is the classic implementation bug.
+- <strong>Expecting it to beat binary search.</strong> On modern hardware with a cache and a fast divider, binary search wins on almost every workload. Fibonacci search is the right choice for block-access storage or division-free processors, not as a general upgrade.
+- <strong>Recomputing the sequence each call.</strong> The Fibonacci numbers must be precomputed or maintained by subtraction. Regenerating them per search reintroduces the arithmetic you were avoiding.
+- <strong>Forgetting the sorted precondition.</strong> It is exactly as strict as binary search’s. Unsorted input gives silent wrong answers, not an error.
+
+## The short version
+
+Fibonacci search is binary search rebuilt out of additions. It costs about 44% more comparisons because it divides by &phi; rather than by 2, and it earns that back only on hardware where division is expensive or where uneven, locality-friendly splits beat repeated jumps to the middle. Learn it for what it demonstrates: the halving in binary search is not sacred, and any constant-factor shrink per step still gives you a logarithm.

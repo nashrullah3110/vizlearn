@@ -1,0 +1,52 @@
+title: What is Precision@k?: A Practical Guide
+intro: What does Precision@k measure, and why does it matter more in RAG than people expect?
+
+## The definition, and the denominator that never moves
+
+Precision@k is the number of relevant documents in the top k divided by k. Not by the number of relevant documents in the corpus, and not by the number retrieved &mdash; by k, always.
+
+That fixed denominator is what makes precision cheap to measure. You only need judgements for the k results you actually returned, not for the whole corpus. An evaluation set for precision can be built by judging a few hundred query-document pairs; one for recall needs exhaustive or pooled labelling. If you can only afford one, precision is the affordable one.
+
+The consequence of the fixed denominator: if fewer than k documents are relevant in total, precision@k <em>cannot</em> reach 1.0. With two relevant documents and k=5, the ceiling is 0.4. A low precision score is sometimes a property of the query, not a failure of the retriever.
+
+## Why noise is not free in a RAG pipeline
+
+The old intuition &mdash; "the model can just ignore irrelevant chunks" &mdash; is not quite true, and the ways it fails are worth naming.
+
+<strong>Cost and latency.</strong> Every retrieved chunk is input tokens on every request. Halving the number of chunks halves that bill and shortens time to first token.
+
+<strong>Distraction.</strong> Irrelevant context measurably reduces answer quality. A plausible-but-wrong passage is worse than no passage &mdash; the model has been handed a reason to be confidently incorrect, and it is grounded in a real retrieved document, which makes the error harder to spot.
+
+<strong>Position effects.</strong> Attention over a long context is uneven, with the middle attended least. Padding the prompt with irrelevant chunks pushes good evidence into that dead zone.
+
+So precision is not merely an efficiency metric here. Past a point, improving precision improves the answers.
+
+## The trade with recall, and where each belongs
+
+Precision and recall pull against each other as k moves. Raising k can only help recall and usually hurts precision, because the highest-scoring results were already at the top and what follows is progressively worse.
+
+The standard combination is F1, the harmonic mean, which punishes an imbalance &mdash; a system with precision 1.0 and recall 0.1 scores 0.18, not 0.55. The harmonic mean is used precisely because it refuses to let one strong number hide a weak one.
+
+In a modern RAG stack the two are usually optimised at different stages. The retriever runs at high k for recall; the <a href="reranking_bi_encoders_vs_cross_encoders.html">reranker</a> cuts that to a handful for precision. Measuring recall@50 and precision@5 in the same evaluation tells you which of the two stages is failing, and they are fixed by completely different work.
+
+## What precision cannot see
+
+<strong>Order within k.</strong> Relevant documents at ranks 1 and 2 score the same as relevant documents at ranks 4 and 5. For a generator, that difference is real; precision is blind to it and <a href="mean_reciprocal_rank.html">MRR</a> or nDCG is not.
+
+<strong>What was missed.</strong> A retriever that returns three perfect documents and misses seven more scores precision 1.0. The metric is silent about the corpus it did not touch, which is exactly why it is never reported alone.
+
+<strong>Degrees of usefulness.</strong> Binary relevance forces a yes/no on documents that are genuinely partial. If your judgements are graded, nDCG uses that information and precision discards it.
+
+## Things to try
+
+1. Drag <strong>k</strong> up from 1. Precision generally falls while recall rises &mdash; that opposition is the whole reason both numbers are quoted together.
+2. Set k to 10 with four relevant documents. Precision cannot exceed 0.4 however good the ranking is; the ceiling is set by the query, not the retriever.
+3. Mark the two lowest results relevant and watch precision@5 stay put. Improving what sits below k does nothing for it &mdash; which is why k must match what you actually send to the model.
+
+## What to remember
+
+Precision@k is the fraction of the returned k that was relevant, with k always as the denominator. It is the cheap metric to label, because it needs judgements only for what you returned. In a RAG pipeline it is not just about efficiency: irrelevant context costs tokens, pushes good evidence into the least-attended part of the prompt, and gives the model plausible material to be wrong with. Optimise recall at the retriever and precision at the reranker, and report both with their k.
+
+All four of these read the same object: an ordered list of retrieved results, with each one labelled relevant or not by a human or a strong model. They differ only in what they choose to notice about it &mdash; which is why quoting one without saying which is close to meaningless, and why the visualisation above shows all four at once.
+
+The labels are the expensive part. A relevance judgement per query-document pair is human work, and an evaluation set of fifty queries with judged results is worth more than any amount of metric sophistication on top of unjudged data. Build the set first.

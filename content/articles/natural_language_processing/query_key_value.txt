@@ -1,0 +1,69 @@
+title: Query, Key and Value: A Practical Guide
+intro: The three projections every transformer is written in, and why there are three rather than two.
+
+## Quick Context
+
+The <a href="attention_mechanism.html" style="color: var(--accent-primary)">previous module</a> described attention as score, normalise, blend. That description works, but it leaves one thing vague: what exactly is being compared against what?
+
+The query&ndash;key&ndash;value framing answers that, and it is worth learning properly because every transformer paper, diagram and implementation is written in it.
+
+## A soft dictionary lookup
+
+Think of a Python dictionary. You supply a key, it matches one stored key exactly, and you get back its value. Attention is the same operation with the hard edges removed:
+
+- the <strong>query</strong> is what you are looking up;
+- every entry has a <strong>key</strong>, which decides how well it matches;
+- every entry has a <strong>value</strong>, which is what you get back.
+
+The difference is that instead of one key matching and the rest failing, <em>every</em> key matches to some degree, and you get back a weighted blend of all the values. A dictionary lookup is attention with one weight set to 1 and the rest to 0.
+
+## Where they come from
+
+All three are linear projections of the same input embedding:
+
+Q = X W<sub>Q</sub> &nbsp;&nbsp; K = X W<sub>K</sub> &nbsp;&nbsp; V = X W<sub>V</sub>
+
+The three weight matrices are learned. This is the part people find surprising: the same word produces three different vectors, because it plays three different roles. As a query it asks a question; as a key it advertises what it can answer; as a value it supplies content.
+
+And the whole mechanism is one formula:
+
+Attention(Q, K, V) = softmax( QK<sup>T</sup> / &radic;d<sub>k</sub> ) V
+
+## Why keys and values are separate
+
+It is reasonable to ask why we need both &mdash; why not match against the values directly and save a matrix?
+
+Because how easily something is <em>found</em> is a different question from what it <em>contains</em>. A word might be highly relevant to a query while the information it should pass on is quite unrelated to why it matched. Splitting the two lets the model learn addressing and content independently, and in practice that separation is what allows different heads to specialise.
+
+## Things to try
+
+1. <strong>Follow one lookup end to end.</strong> Set the <strong>Stage</strong> slider to 1 and step it up to 4. You see the raw dot products appear, get divided by the square root of the head dimension, become weights through softmax, and finally blend the value vectors into one output.
+2. <strong>Change who is asking.</strong> Set the <strong>Query Word</strong> to drank. The scores rearrange completely &mdash; the same six keys, a different question, a different answer.
+3. <strong>Break the scaling.</strong> Set the <strong>Head Dimension</strong> slider to 64 and untick <strong>Scale by 1/&radic;d_k</strong>. The raw scores grow large, softmax saturates, and the weights collapse onto a single key with entropy near zero. In a real model that means a vanishing gradient and a layer that stops learning.
+4. <strong>Then fix it.</strong> Tick <strong>Scale by 1/&radic;d_k</strong> again with the dimension still at 64. The scores come back into a sane range and the distribution is usable again. That single division is the entire reason the mechanism is called <em>scaled</em> dot-product attention.
+5. <strong>Check the low-dimension case.</strong> Set the <strong>Head Dimension</strong> slider to 1. Now the scaling barely matters, because there was never anything to blow up. The correction only earns its keep as dimension grows.
+
+## Why divide by √d k
+
+If the components of the query and key are roughly independent with unit variance, their dot product is a sum of d<sub>k</sub> such products, so its variance grows with d<sub>k</sub> and its typical magnitude grows with &radic;d<sub>k</sub>. At d<sub>k</sub> = 64 the scores are around eight times larger than at d<sub>k</sub> = 1.
+
+Softmax is exponential, so those larger gaps translate into near-one and near-zero weights. That is bad in itself &mdash; the layer stops blending &mdash; and worse for training, because softmax's gradient is almost zero once it saturates. Dividing by &radic;d<sub>k</sub> cancels the growth exactly and keeps the scores in the range where softmax is still responsive.
+
+## The three kinds of attention
+
+The same formula covers every attention in a transformer; only where Q, K and V come from changes:
+
+<table> <tr><th>Kind</th><th>Query from</th><th>Key and value from</th></tr> <tr><td>Encoder self-attention</td><td>the input</td><td>the input</td></tr> <tr><td>Decoder self-attention</td><td>the output so far</td><td>the output so far (masked)</td></tr> <tr><td>Cross-attention</td><td>the decoder</td><td>the encoder</td></tr> </table>
+
+Cross-attention is the classic encoder&ndash;decoder attention of the previous module. When query, key and value all come from the same sequence you get <a href="self_attention.html" style="color: var(--accent-primary)">self-attention</a>, which is the next module.
+
+## Traps worth knowing
+
+- <strong>Assuming Q, K and V are the same vector.</strong> They are three different projections of it, with three different learned matrices, and conflating them makes the rest of the architecture impossible to follow.
+- <strong>Dropping the scaling.</strong> It looks like a detail and is not. Without it, wide heads saturate and training stalls.
+- <strong>Thinking the weights are a similarity between words.</strong> They are a similarity between a <em>query projection</em> of one word and a <em>key projection</em> of another. Those projections are learned, so two synonyms need not attend to each other at all.
+- <strong>Forgetting the last multiply.</strong> Softmax gives weights, not output. The output is those weights applied to V, and V is a different projection again.
+
+## Summing up
+
+Attention is a soft dictionary lookup: the query says what a position is looking for, each key says how well that position matches, and each value says what it contributes once matched, with all three being separate learned projections of the same input. Every key matches to some degree, so the output is a weighted blend rather than a single retrieved entry, and the whole mechanism is softmax(QKᵀ/&radic;d_k)V. Keys and values are kept apart because findability and content are different things, and the &radic;d_k division exists because dot products grow with dimension and would otherwise saturate the softmax into a hard, ungradient-able argmax.

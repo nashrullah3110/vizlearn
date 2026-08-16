@@ -1,0 +1,44 @@
+title: What are Queries, Keys and Values in an LLM?: A Practical Guide
+intro: What do Q, K and V actually mean in attention, and why are they three separate things?
+
+## Why three and not one
+
+If a token used the same vector to search with and to be found by, attention would collapse into plain similarity: tokens would attend to tokens like themselves. Separating query from key lets a token look for something <em>different</em> from itself &mdash; a verb seeking its subject, a pronoun seeking its referent.
+
+Separating value from key matters just as much. What makes a token worth attending to is not necessarily what it should contribute once attended to. The key is the address; the value is the payload.
+
+## The mechanism in one line
+
+<code>softmax(QK<sup>T</sup> / &radic;d) V</code>. The dot products score every query against every key; the division keeps the softmax out of its saturated region, where gradients vanish; softmax turns scores into weights summing to one; and those weights are applied to the values.
+
+In self-attention all three come from the same sequence. In cross-attention the queries come from one sequence and the keys and values from another &mdash; which is how a decoder reads an encoder, and the same shape as retrieval: a query against a set of keys.
+
+## Why this is a serving question too
+
+Generating token <em>n</em> needs the keys and values of all previous tokens &mdash; and those never change, because each depends only on tokens before it. So they are computed once and kept: the <a href="context_window_and_kv_cache.html">KV cache</a>.
+
+Without it every new token would recompute K and V for the whole prefix, making generation quadratic. With it, each step is linear in the context length. The cost is memory: the cache grows with sequence length &times; layers &times; heads, and it is usually what limits how many requests a GPU can serve at once.
+
+## Where the shapes come from
+
+For a sequence of n tokens with model dimension d, the three projections are matrices of shape d&times;d<sub>k</sub>, so Q, K and V each come out n&times;d<sub>k</sub>. QK<sup>T</sup> is then n&times;n &mdash; every token scored against every token &mdash; and multiplying that by V returns to n&times;d<sub>k</sub>.
+
+That n&times;n matrix is why attention is quadratic in sequence length, and why context windows were hard to extend. It is also why flash attention and its relatives matter: they compute the same result without ever materialising the full matrix in memory.
+
+In multi-head attention the projections are split into h heads of dimension d/h, each computing its own attention, with the outputs concatenated. Same arithmetic, run in parallel over subspaces, so different heads can specialise &mdash; some track syntax, some track position, some appear to do very little.
+
+## Masking, and what it has to do with the cache
+
+A decoder must not attend to tokens it has not generated yet, so the scores above the diagonal are set to negative infinity before the softmax, which drives their weights to zero. That is causal masking, and it is what makes the KV cache correct rather than merely convenient: since token <em>i</em> can only ever attend to tokens up to <em>i</em>, its keys and values can never be affected by anything generated later.
+
+The cache's cost is memory, and it is the usual limit on how many requests a GPU can serve at once: roughly 2 &times; layers &times; heads &times; head dimension &times; sequence length &times; batch, per precision byte. Grouped-query and multi-query attention exist mostly to shrink it, by sharing K and V across heads while keeping separate queries &mdash; a large memory saving for a small quality cost.
+
+## Things to try
+
+1. Attend from <em>sat</em>. It puts most of its weight on <em>cat</em>, its subject &mdash; which a token searching with its own embedding could never do.
+2. Raise the <strong>score scale</strong> to 4. The softmax collapses to nearly one-hot; that saturation is what dividing by &radic;d exists to prevent.
+3. Switch the focus token and watch the whole distribution move. Each token's query is asking a different question of the same keys.
+
+## What to remember
+
+Q, K and V are three learned projections of one embedding. The query is what a token looks for, the key is what it advertises, the value is what it contributes. Scores come from Q&middot;K and the output is a weighted sum of V. Because K and V for a token never change once computed, they can be cached &mdash; which is what makes generation linear rather than quadratic.

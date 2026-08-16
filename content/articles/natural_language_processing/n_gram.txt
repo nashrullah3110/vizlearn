@@ -1,0 +1,47 @@
+title: N-gram Explainer: A Practical Guide
+intro: Predict the next word from the previous n-1 words, by counting how often that sequence appeared. Simple, fast, interpretable - and defeated by the fact that most valid sentences have never been written down.
+
+## Counting, not learning
+
+An n-gram model estimates the probability of a word from the n&minus;1 words before it, using nothing but counts from a corpus:
+
+P(w<sub>t</sub> | w<sub>t&minus;1</sub>, &hellip;) &asymp; count(w<sub>t&minus;n+1</sub> &hellip; w<sub>t</sub>) / count(w<sub>t&minus;n+1</sub> &hellip; w<sub>t&minus;1</sub>)
+
+If “the cat sat” appears 100 times and “the cat sat on” appears 60, then P(on | the cat, sat) = 0.6. There is no training in the gradient-descent sense &mdash; the model is a table of counts, built in one pass.
+
+The underlying simplification is the <strong>Markov assumption</strong>: that only the last n&minus;1 words matter. It is plainly false for language and works surprisingly well anyway.
+
+## Choosing n
+
+- <strong>n = 1 (unigram)</strong> &mdash; no context at all, just word frequency. Generates word salad.
+- <strong>n = 2 (bigram)</strong> &mdash; one word of context. Locally plausible, globally incoherent.
+- <strong>n = 3 (trigram)</strong> &mdash; the traditional sweet spot, and the workhorse of speech recognition for decades.
+- <strong>n = 5+</strong> &mdash; better context in principle, and almost every 5-gram you meet at test time was never seen in training.
+
+This is a bias&ndash;variance trade in a very concrete form. Small n generalises but ignores context; large n captures context but has seen almost nothing.
+
+## The sparsity wall
+
+The counts grow catastrophically. With a 50,000-word vocabulary there are 2.5 billion possible bigrams, 1.25 &times; 10<sup>14</sup> trigrams, and 3 &times; 10<sup>23</sup> 5-grams. No corpus covers a meaningful fraction of them.
+
+So most n-grams have a count of zero, and a zero count means a probability of zero &mdash; the model declares a perfectly ordinary sentence impossible because it happens not to have seen one four-word span before. Worse, one zero anywhere makes the probability of the whole sentence zero.
+
+The fixes are all forms of <strong>smoothing</strong>. Add-one (Laplace) smoothing adds a pseudocount to everything, which is simple and crude. <strong>Backoff</strong> falls back to a shorter n-gram when the longer one is unseen. <strong>Kneser-Ney</strong>, the best of the classical methods, discounts observed counts and redistributes the mass according to how many distinct contexts a word appears in &mdash; capturing that <em>Francisco</em> is common but only ever after <em>San</em>.
+
+## Interactive Exploration Guide
+
+1. <strong>Start at n = 1.</strong> Set the n slider to 1 and read the output. With no context the model produces frequency-ordered nonsense.
+2. <strong>Step up to 2 and 3.</strong> Raise n and watch local fluency appear. Pairs and triples look like real language, even though the sentence as a whole still drifts.
+3. <strong>Push to 6.</strong> Set n to 6. Now most contexts have been seen once or not at all, so the model either repeats the training text verbatim or has nothing to offer &mdash; overfitting and sparsity in the same picture.
+4. <strong>Scroll through the corpus.</strong> Use the view slider and watch which sequences have high counts. Almost all the probability mass sits on a small number of common patterns; the tail is enormous and nearly empty.
+
+## Traps worth knowing
+
+- <strong>No smoothing.</strong> Any unseen n-gram makes the whole sentence probability zero. Smoothing is not optional.
+- <strong>Multiplying raw probabilities.</strong> Multiplying hundreds of small numbers underflows to zero in floating point. Sum log-probabilities instead.
+- <strong>Raising n to fix quality.</strong> It usually makes things worse by increasing sparsity. Better smoothing beats a larger n.
+- <strong>Forgetting sentence boundaries.</strong> Without explicit start and end tokens the model cannot represent which words begin or end a sentence.
+
+## In one line
+
+An n-gram model estimates the next word by counting how often each continuation followed the previous n&minus;1 words, which makes it fast, interpretable, and trainable in a single pass. It is defeated by sparsity: the number of possible n-grams grows exponentially with n, so most sequences are never observed and smoothing is mandatory. Neural language models replaced it precisely because embeddings let them generalise across similar contexts rather than requiring each one to have been seen.

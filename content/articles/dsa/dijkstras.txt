@@ -1,0 +1,58 @@
+title: Dijkstra's Algorithm: A Practical Guide
+intro: Grow a set of nodes whose shortest distance is already final, always expanding the cheapest one next. It is the standard weighted shortest-path algorithm, and it breaks the moment an edge weight goes negative.
+
+## Why BFS is not enough
+
+On an unweighted graph, BFS finds shortest paths because every edge costs the same and the queue naturally orders nodes by hop count. Add weights and that collapses: a route of three cheap edges can beat one expensive edge, so the fewest hops is no longer the lowest cost.
+
+Dijkstra’s algorithm fixes this by replacing the queue with a <strong>priority queue</strong> ordered by distance from the source. Instead of expanding the node discovered earliest, it expands the node whose known distance is smallest.
+
+## The algorithm, and the invariant that makes it correct
+
+Give the source distance 0 and everything else infinity. Then repeat: take the unvisited node with the smallest tentative distance, mark it visited, and for each neighbour check whether going through this node is cheaper than the neighbour’s current best:
+
+if dist[u] + weight(u, v) &lt; dist[v]: dist[v] = dist[u] + weight(u, v)
+
+That check is called <strong>relaxation</strong>. The key claim is that when a node is selected as the minimum, its distance is already final and will never improve.
+
+Why? Any other route to it would have to leave the visited set through some unvisited node w. But w was not chosen, so <span class="mono-font">dist[w] &ge; dist[u]</span>, and the rest of that route only adds more weight. So no cheaper route exists. <strong>This argument depends entirely on weights being non-negative</strong> &mdash; “the rest only adds more” is false if a later edge can subtract.
+
+## Work one through by hand
+
+Edges: <span class="mono-font">A&rarr;B (4), A&rarr;C (2), C&rarr;B (1), B&rarr;D (5), C&rarr;D (8)</span>, from A.
+
+start:&nbsp; A=0, B=&infin;, C=&infin;, D=&infin;
+
+pick A &rarr; relax: B=4, C=2
+
+pick C (2, smallest) &rarr; relax: B = min(4, 2+1) = 3, D = 2+8 = 10
+
+pick B (3) &rarr; relax: D = min(10, 3+5) = 8
+
+pick D (8) &rarr; done
+
+The shortest route to B is A&rarr;C&rarr;B at cost 3, not the direct edge at cost 4. Two hops beat one, which is exactly the case BFS gets wrong.
+
+## Exploration guide
+
+1. <strong>Watch it expand by cost, not by distance on screen.</strong> Press <strong>Start Solver</strong> then <strong>Step</strong> repeatedly. The next node chosen is always the cheapest known, which is often not the nearest-looking one.
+2. <strong>Catch a relaxation.</strong> Keep stepping and watch a node’s distance <em>drop</em> when a better route is found. Every improvement is one relaxation, and once a node is finalised its number never changes again.
+3. <strong>Slow the expansion.</strong> Set <strong>Search Speed</strong> to 1 and press <strong>Auto</strong>. The visited set grows outward in rings of equal cost &mdash; that shape is Dijkstra exploring uniformly in every direction, which is precisely what A* improves on.
+4. <strong>Change the graph.</strong> Pick a different <strong>Network Topology</strong>, press <strong>Reset Grid</strong>, and run again. On a denser graph many more relaxations happen per node, because each node has more neighbours to improve.
+
+## Complexity, and why the priority queue matters
+
+With a binary heap the cost is <strong>O((V + E) log V)</strong>: each of V nodes is extracted once at O(log V), and each of E edges may trigger a decrease-key at O(log V).
+
+With a naive array scan for the minimum it is O(V&sup2;), which is actually <em>faster</em> on dense graphs where E approaches V&sup2;. With a Fibonacci heap the theoretical bound improves to O(E + V log V), though the constants are bad enough that binary heaps usually win in practice.
+
+## Traps worth knowing
+
+- <strong>Using it with negative edge weights.</strong> The correctness argument fails and the algorithm returns wrong answers silently &mdash; a node finalised early may have a cheaper route through an edge considered later. Use Bellman-Ford, which handles negatives in O(VE) and detects negative cycles.
+- <strong>Re-processing stale heap entries.</strong> Most implementations push duplicates instead of doing decrease-key. You must skip a popped node if it is already visited, or you will relax from an out-of-date distance.
+- <strong>Forgetting the predecessor array.</strong> Dijkstra computes distances; reconstructing the actual route needs the parent pointer recorded on every successful relaxation.
+- <strong>Running it to completion when one target is wanted.</strong> You can stop as soon as the target is popped &mdash; its distance is final at that moment. Continuing wastes the rest of the graph.
+
+## In one line
+
+Dijkstra’s algorithm repeatedly finalises the cheapest unvisited node and relaxes its edges, giving single-source shortest paths in O((V + E) log V) with a binary heap. Its correctness rests on non-negative weights, so negative edges call for Bellman-Ford instead. Because it expands uniformly in all directions, it does more work than necessary when you only want one destination &mdash; which is the gap A* fills.

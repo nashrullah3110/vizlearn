@@ -1,0 +1,34 @@
+title: Understanding Transfer Learning
+intro: Why reinvent the wheel? Learn how to reuse powerful models trained by giant tech companies for your own custom tasks.
+
+## What is Transfer Learning?
+
+Training a Deep Convolutional Neural Network from scratch requires millions of images (like the ImageNet dataset), massive amounts of computing power (GPUs), and weeks of training time. Furthermore, early layers in a CNN generally learn the exact same things regardless of the dataset: generic edges, colors, and basic textures.
+
+<strong>Transfer Learning</strong> is the practice of taking a pre-trained model (whose weights have already been optimized on a massive dataset) and repurposing it for a new, related task. You are transferring the "knowledge" of visual features to a new domain.
+
+## How it Works: Modifying the Architecture
+
+A standard pre-trained model (like ResNet-50 or VGG-16) is split into two conceptual parts:
+
+- <strong>The Convolutional Base:</strong> Extracts features. We keep this part and its pre-trained weights.
+- <strong>The Classification Head (Dense Layers):</strong> Outputs predictions for the original 1000 classes. We <strong>remove</strong> this part, because we want to predict our own classes (e.g., 2 classes for Medical X-Rays).
+
+After removing the original head, we attach a new, randomly initialized Dense layer matching our target class count. Now, we have to decide how to train this new hybrid model.
+
+## The Three Strategies
+
+1. <strong>Train from Scratch:</strong> <p class="font-light opacity-80 mt-1">We ignore pre-trained weights and initialize the entire network randomly. The network has no prior knowledge. The accuracy climbs very slowly, and on a small dataset, heavy models like VGG-16 will likely overfit and fail to reach high performance.</p>
+2. <strong>Feature Extraction (Freeze the Base):</strong> <p class="font-light opacity-80 mt-1">We load the pre-trained weights into the Conv Base and <strong>freeze</strong> them (set them to untrainable). During training, only the weights of our newly added Dense Head are updated. The frozen base acts as a powerful feature extractor. Training is extremely fast, and accuracy jumps up quickly because the network already knows how to "see".</p>
+3. <strong>Fine-Tuning (Selective Unfreezing):</strong> <p class="font-light opacity-80 mt-1">First, we perform Feature Extraction. Then, we <strong>unfreeze</strong> specific layers of the Convolutional Base (usually the top layers) and train them alongside the Dense Head using a very small learning rate. <em>(In the app, select Fine-Tune and click layers to unlock them)</em>. We keep early layers frozen (generic edges), but let later layers adapt their specific shape-detectors to our custom images. This pushes the accuracy to its absolute maximum limit.</p>
+
+## Catastrophic Forgetting
+
+In Fine-Tuning mode, try unfreezing <strong>all</strong> the Convolutional layers. You will notice the accuracy curve might drop or cap lower than expected. If you unfreeze the entire network and train it on a small dataset, the massive gradients from the randomly initialized Dense Head propagate backward and wreck the delicate, pre-trained weights of the entire base. This is called Catastrophic Forgetting.
+
+## The short of it
+
+- Transfer Learning reuses Convolutional layers from models trained on huge datasets.
+- <strong>Freezing</strong> a layer means its weights are locked and not updated during backpropagation.
+- Optimal Fine-Tuning usually involves unfreezing only the top 1 or 2 Convolutional blocks.
+- Different architectures (VGG vs ResNet) have vastly different parameter counts and training speeds.

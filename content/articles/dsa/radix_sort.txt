@@ -1,0 +1,45 @@
+title: Radix Sort
+intro: Sorting without ever asking which of two values is bigger.
+
+## The idea in brief
+
+<strong>Radix sort</strong> processes numbers one digit at a time, distributing them into buckets by that digit and collecting them back. Repeat for every digit position &mdash; least significant first &mdash; and the array emerges sorted, with <strong>zero comparisons</strong>.
+
+## Why Stability Is Non-Negotiable
+
+This is the crux. When sorting by the tens digit, two numbers with the same tens digit must retain the order they got from the units pass &mdash; otherwise that earlier work is destroyed.
+
+A <strong>stable</strong> bucketing preserves relative order of equal keys, so each pass refines the previous one instead of undoing it. Watch numbers entering a bucket: they always append to the end, never jump the queue. Swap in an unstable bucketing and radix sort simply stops working.
+
+## Least Significant Digit First
+
+It feels backwards to start with the last digit, but it is what makes stability sufficient. After the units pass, the array is sorted by units. After the tens pass, it is sorted by tens with units breaking ties &mdash; because stability preserved them. After the hundreds pass, fully sorted.
+
+Step through and check the array after each pass: it is correctly sorted by all digits processed <em>so far</em>.
+
+## Beating the O(n log n) Barrier
+
+Any sort that works by <em>comparing</em> elements needs at least O(n log n) comparisons &mdash; that is a proven lower bound, not an engineering limitation. Merge sort and heap sort sit exactly on it.
+
+Radix sort escapes because it never compares. Its cost is <strong>O(d &middot; n)</strong> for d digits, which is linear in n when d is fixed. There is no contradiction: the lower bound only constrains comparison sorts.
+
+## The Catch
+
+- It needs <strong>O(n + k)</strong> extra space for buckets &mdash; it does not sort in place.
+- It only works on keys decomposable into digits: integers, fixed-length strings, dates. Arbitrary objects with a custom comparator are out.
+- The <span class="mono-font">d</span> factor matters. For 64-bit integers d can be large enough that O(n log n) wins in practice.
+- Cache behaviour is poor &mdash; scattering into buckets jumps around memory.
+
+Its sweet spot is large volumes of fixed-width keys, which is why it appears in database index construction and older card-sorting machinery &mdash; literally where the algorithm came from.
+
+## Guided experiments
+
+1. <strong>Step through pass 1 (units).</strong> Values scatter into buckets by their last digit and are collected back in bucket order.
+2. <strong>Check the array after pass 1.</strong> It is sorted by units only &mdash; the tens are still scrambled.
+3. <strong>Watch pass 2.</strong> Numbers sharing a tens digit stay in their pass-1 order. That is stability doing the real work.
+4. <strong>Note the comparison counter: zero.</strong> No two values are ever compared, which is exactly how the O(n log n) bound is sidestepped.
+5. <strong>Count the passes.</strong> Three-digit numbers need three passes, regardless of how many values there are.
+
+## The short of it
+
+Radix sort distributes by digit rather than comparing, achieving O(d·n) — linear when digit count is fixed. It depends entirely on stable bucketing, since each pass must preserve the ordering established by the last. Only usable on digit-decomposable keys, and it costs extra memory.

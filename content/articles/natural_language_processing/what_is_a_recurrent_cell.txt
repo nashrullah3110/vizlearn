@@ -1,0 +1,44 @@
+title: What is a Recurrent Cell?: A Practical Guide
+intro: A recurrent cell is a small network that runs once per token and passes a summary of everything it has seen to its future self. That loop is what lets a fixed-size model read a sequence of any length.
+
+## The problem with feeding a sentence to a normal network
+
+A feedforward network has a fixed number of inputs. A sentence does not have a fixed number of words. You can pad everything to a maximum length, but then the model has no notion that word 3 comes before word 4 &mdash; each position gets its own independent weights, so “dog bites man” and “man bites dog” are unrelated inputs as far as it is concerned.
+
+A recurrent cell solves both problems with one idea: process <em>one</em> token at a time, and carry a running summary forward.
+
+## The recurrence, written out
+
+At each timestep t the cell takes the current input <span class="mono-font">x<sub>t</sub></span> and the previous hidden state <span class="mono-font">h<sub>t&minus;1</sub></span>, and produces a new hidden state:
+
+h<sub>t</sub> = tanh(W<sub>x</sub>x<sub>t</sub> + W<sub>h</sub>h<sub>t&minus;1</sub> + b)
+
+Three things are worth noticing. The hidden state is the <strong>memory</strong> &mdash; a fixed-size vector holding everything the cell has decided is worth keeping from the sequence so far. The weights <span class="mono-font">W<sub>x</sub></span>, <span class="mono-font">W<sub>h</sub></span> and <span class="mono-font">b</span> are the <strong>same at every timestep</strong>; the cell is one small network applied repeatedly, not a chain of different networks. And because the weights do not depend on position, the same cell handles a sequence of 5 tokens or 500.
+
+That weight sharing is what makes the parameter count independent of sequence length &mdash; and it is exactly the same trick a convolution uses across space.
+
+## Things to try
+
+1. <strong>Feed one token at a time.</strong> Press <strong>Feed Next Token</strong> and watch the hidden state change. Each press mixes new input into the existing memory rather than replacing it.
+2. <strong>Watch old information fade.</strong> Keep pressing and follow the contribution of the first token. It does not vanish at once; it is progressively diluted as later tokens are folded in. That gradual decay is exactly why plain recurrent cells struggle with long-range dependencies.
+3. <strong>Reset and compare.</strong> Press <strong>Reset Memory</strong> and feed the same tokens in a different order. The final state differs &mdash; unlike a bag-of-words model, order genuinely changes the representation.
+4. <strong>Run it continuously.</strong> Press <strong>Auto Run</strong> and note that no new parameters appear as the sequence lengthens. One cell, applied repeatedly.
+
+## Why the simple cell is not enough
+
+The hidden state is overwritten at every step. Information from token 1 survives to token 50 only by passing through 49 successive multiplications by <span class="mono-font">W<sub>h</sub></span> and 49 tanh nonlinearities.
+
+That is the vanishing gradient problem in its original setting. The gradient reaching timestep 1 is a product of 49 terms, and since tanh’s derivative is at most 1 and typically well below it, the product decays geometrically. In practice a simple recurrent cell reliably remembers about 10 timesteps and loses anything much further back.
+
+The fix is to give the cell an explicit, <em>additive</em> memory channel with learned gates controlling what enters and leaves it &mdash; which is precisely what LSTM and GRU do.
+
+## Common mistakes
+
+- <strong>Expecting long-range memory.</strong> A vanilla recurrent cell does not have it. If dependencies span more than a handful of tokens, use an LSTM, a GRU, or attention.
+- <strong>Exploding gradients.</strong> If <span class="mono-font">W<sub>h</sub></span> has eigenvalues above 1 the repeated multiplication amplifies instead of decaying, and the loss becomes NaN. Gradient clipping is standard practice for recurrent models for exactly this reason.
+- <strong>Confusing the hidden state with the output.</strong> They coincide in the simplest cell, but in an LSTM the cell state and hidden state are different objects, and mixing them up is a common implementation bug.
+- <strong>Forgetting to reset state between sequences.</strong> Carrying the hidden state from one unrelated example into the next leaks information and quietly corrupts training.
+
+## In one line
+
+A recurrent cell applies one small network at every timestep, combining the current token with a hidden state that summarises everything before it, using the same weights throughout. That gives a fixed-size model the ability to read arbitrary-length sequences and to be sensitive to order. Its weakness is that memory is overwritten multiplicatively at each step, so information decays after roughly ten timesteps &mdash; the limitation that gated cells were invented to remove.

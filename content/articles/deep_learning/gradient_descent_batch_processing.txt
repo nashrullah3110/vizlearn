@@ -1,0 +1,55 @@
+title: Gradient Descent Batch Processing: A Practical Guide
+intro: Batch size decides how many examples the model looks at before it changes its mind. It is the quietest hyperparameter with the widest effect on how training feels.
+
+## Three regimes
+
+- <strong>Batch size 1 (stochastic).</strong> One sample per update. Very noisy gradient, very many updates, and the noise itself sometimes helps escape bad regions.
+- <strong>Full batch.</strong> The whole dataset per update. The gradient is exact, but you get one update per epoch and it is slow.
+- <strong>Mini-batch (32&ndash;256).</strong> What essentially everyone uses. Enough samples for a usable gradient estimate, enough updates to make progress, and it fits on a GPU.
+
+## How the numbers work out
+
+With 1,024 training samples:
+
+- Batch size 32 &rarr; <strong>32 updates</strong> per epoch
+- Batch size 256 &rarr; <strong>4 updates</strong> per epoch
+
+Gradient noise falls roughly with the square root of batch size. Going from 32 to 128 &mdash; a 4&times; increase &mdash; halves the noise, not quarters it. That diminishing return is why batch sizes stop growing well before memory runs out.
+
+## Why mini-batch won
+
+Batch gradient descent computes an exact gradient and needs a full pass over the data for a single update. On a million samples that is a million forward passes to move the weights once &mdash; accurate and unusable.
+
+Stochastic gradient descent updates after every sample, so it makes a million updates per epoch, but each gradient is a single-sample estimate and the path jitters badly. It also wastes the hardware: one sample cannot occupy a GPU.
+
+Mini-batches of 32 to 256 sit at the point where both problems disappear. The gradient estimate is close enough to the true one for stable progress, updates are frequent, and the batch is large enough to fill the device. This is not a compromise nobody is happy with &mdash; it is better than either extreme on both axes that matter.
+
+## Batch size and learning rate move together
+
+These two cannot be tuned independently. The gradient of a batch is an <em>average</em>, so a larger batch gives a lower-variance estimate &mdash; and a more reliable estimate can support a larger step.
+
+The <strong>linear scaling rule</strong> is the standard heuristic: multiply the batch size by k and multiply the learning rate by k. Going from batch 32 at learning rate 0.01 to batch 256 suggests roughly 0.08. Very large batches usually need a warmup period as well, ramping the rate up over the first few epochs, because the scaled rate is unstable while the weights are still random.
+
+The corollary is that comparing two runs at different batch sizes with the same learning rate compares nothing useful.
+
+## Shuffling is not optional
+
+Mini-batches must be drawn from a shuffled dataset, reshuffled every epoch. If the data arrives sorted by class &mdash; all the cats then all the dogs &mdash; then each batch contains one class, every gradient points toward predicting that class, and the model oscillates instead of converging.
+
+Reshuffling each epoch also means the model never sees the same batch composition twice, which adds a small amount of useful noise. The exception is time series, where shuffling destroys the temporal ordering the model is supposed to learn from; there the batches must be contiguous windows.
+
+## Try this above
+
+1. Drag <strong>Batch Size</strong> to its minimum. The descent path visibly jitters &mdash; each step is reacting to one or two samples.
+2. Raise it toward the maximum. The path straightens out, but notice it also takes fewer, larger steps to cover the same ground.
+3. Now hold batch size high and lower <strong>Learning Rate</strong>. Progress stalls &mdash; a big smooth gradient with a tiny step size wastes the smoothness.
+
+## What usually goes wrong
+
+<strong>Raising batch size without touching the learning rate.</strong> You get fewer updates per epoch, each no larger than before, so training slows down and people conclude the larger batch "trains worse". The usual remedy is the linear scaling rule: double the batch, double the learning rate, within reason.
+
+<strong>Comparing runs by epoch count.</strong> An epoch at batch size 512 contains a fraction of the updates an epoch at batch size 32 does. Compare by number of updates, or by wall-clock time, not by epochs.
+
+## In one line
+
+Batch size trades gradient noise against how many times per epoch you get to move.

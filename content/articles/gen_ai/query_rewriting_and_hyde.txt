@@ -1,0 +1,25 @@
+title: Query Rewriting and HyDE: A Practical Guide
+intro: Sometimes the query is the part that needs fixing, not the index.
+
+## Before the details
+
+A user's question and the passage that answers it are usually written in different registers: short and colloquial versus long-form and technical. Every similarity metric in this batch — <a href="dot_product_vs_cosine_similarity.html" style="color: var(--accent-primary)">cosine</a>, <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> — depends on shared vocabulary between what is embedded and what is stored. If the question and the answer do not share words, no similarity metric can bridge that gap on its own; the fix has to happen before retrieval, to the query itself.
+
+## Two ways to close the gap
+
+<strong>Query expansion</strong> adds related terms to the original query — synonyms, likely technical vocabulary — widening what it can match against. <strong>HyDE (Hypothetical Document Embeddings)</strong> goes further: ask a language model to draft a plausible answer to the question, without ever checking whether that answer is true, and embed <em>that hypothetical answer</em> instead of the question. A fabricated but stylistically realistic answer sits much closer in embedding space to a real answer than a terse question ever does — the retrieval step never sees or uses the hypothetical text's truth, only its vocabulary and register.
+
+## Experiments to try
+
+1. <strong>Read the raw query's ranking.</strong> A passage about data drift in production beats the overfitting passage — it happens to share more surface words ("model", "worse", "new", "data") with the terse question, even though the overfitting passage is the intended answer.
+2. <strong>Switch to the expanded query.</strong> A handful of added technical terms — "overfitting", "generalization" — appear in the target passage but not the drift one, and that is enough to move the target back to the top.
+3. <strong>Switch to HyDE.</strong> The hypothetical answer is written in the same register as the target passage — full sentences, technical vocabulary, no question words — and it pulls ahead by the widest margin of the three, precisely because it does not resemble the drift passage's phrasing at all.
+4. <strong>Compare all three similarity numbers.</strong> Same underlying question, same target document, three very different embedded-text choices — and three different outcomes for whether the right document is even reachable.
+
+## What can go wrong
+
+HyDE embeds a fabrication. If the hypothetical answer is confidently wrong about the topic rather than just stylistically answer-shaped, it can retrieve confidently wrong documents just as easily as right ones — it improves vocabulary match, not correctness. It also costs an extra model call before retrieval even starts, which query expansion usually does not.
+
+## The short of it
+
+Retrieval quality is not only a property of the index and the similarity metric — it depends on how close the embedded query text sits to the embedded document text in vocabulary and register. Query expansion narrows that gap cheaply by adding terms; HyDE narrows it further by replacing the question with a fabricated answer written in the target register, at the cost of an extra generation step and the risk of chasing a plausible-sounding but wrong hypothesis.

@@ -1,0 +1,24 @@
+title: NULL and COALESCE: A Practical Guide
+intro: The value that means "I don't know" and behaves exactly like it.
+
+## Context first
+
+NULL is not zero, not an empty string, and not false. It means the value is unknown, and every comparison that touches it inherits that uncertainty: <span class="mono-font">NULL = NULL</span> is not TRUE, it is UNKNOWN. This is <a href="where_clause_in_sql.html" style="color: var(--accent-primary)">three-valued logic</a>, and COALESCE, NULLIF and IS NULL are the tools for working with it on purpose instead of by accident.
+
+## The three tools
+
+- <strong>COALESCE(a, b, ...)</strong> returns the first non-NULL argument. <span class="mono-font">COALESCE(bonus, 0)</span> turns a missing bonus into a real zero for arithmetic.
+- <strong>NULLIF(a, b)</strong> is the reverse: returns NULL if a equals b, otherwise a. Useful for turning a sentinel value like 0 or "" back into a proper NULL before averaging.
+- <strong>IS NULL / IS NOT NULL</strong> are the only correct way to test for NULL. <span class="mono-font">= NULL</span> and <span class="mono-font">!= NULL</span> both silently evaluate to UNKNOWN and match nothing.
+
+## Try it yourself
+
+1. <strong>Look at the raw column.</strong> Three employees have no bonus recorded — NULL, not zero.
+2. <strong>Try bonus = 0.</strong> Every NULL row evaluates to UNKNOWN, not TRUE, so none of them match a filter on this condition — even though "no bonus" feels like it should mean zero.
+3. <strong>Try COALESCE(bonus, 0).</strong> The NULLs become real zeros, usable in arithmetic.
+4. <strong>Compare AVG(bonus) with and without COALESCE.</strong> AVG ignores NULLs entirely — it divides by the count of non-NULL rows, not by all rows — so wrapping in COALESCE changes the answer because it changes what counts as a value.
+5. <strong>Compare COUNT(bonus) with COUNT(*).</strong> COUNT(column) skips NULLs; COUNT(*) counts every row regardless. Same table, different answer.
+
+## Worth remembering
+
+NULL means unknown, so comparisons involving it are UNKNOWN rather than TRUE or FALSE, and aggregates skip it by default. COALESCE substitutes a default, NULLIF creates a NULL on purpose, and IS NULL is the only comparison that actually works — everything else is a trap that looks like it should work and quietly does not.

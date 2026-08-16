@@ -1,0 +1,57 @@
+title: Feature Scaling & Weight Bias: A Practical Guide
+intro: Age runs from 18 to 80; salary runs from 20,000 to 200,000. Feed both into a network unscaled and the salary weight receives gradients thousands of times larger - so no single learning rate can train both.
+
+## Why scale breaks gradient descent
+
+The gradient of the loss with respect to a weight is proportional to that weight’s <em>input</em>. So a feature measured in hundreds of thousands produces gradients roughly four orders of magnitude larger than a feature measured in tens.
+
+That leaves no workable learning rate. Set it small enough to keep the salary weight stable and the age weight barely moves; set it large enough for age and salary diverges. The loss surface is a long narrow valley, and gradient descent bounces across it instead of running down it.
+
+Scaling makes the valley round. With comparable input ranges the gradients are comparable, one learning rate suits every weight, and convergence takes a fraction of the steps.
+
+## Standardisation and normalisation
+
+<strong>Standardisation (z-score)</strong> centres on zero with unit variance:
+
+x&prime; = (x &minus; &mu;) / &sigma;
+
+Output is unbounded but typically within &minus;3 to +3. It preserves the shape of the distribution and handles outliers without letting them compress everything else. This is the sensible default for neural networks.
+
+<strong>Min-max normalisation</strong> maps to a fixed range, usually [0, 1]:
+
+x&prime; = (x &minus; min) / (max &minus; min)
+
+Useful when a bounded input is required, and fragile: a single extreme outlier sets the maximum and squashes every ordinary value into a narrow band near zero.
+
+<strong>Robust scaling</strong> uses the median and interquartile range instead of mean and standard deviation, which is the right choice when outliers are present and genuine.
+
+## Work the numbers
+
+Take age 30 and salary 60,000 with weights of 0.5 each. The salary term contributes 30,000 to the weighted sum and the age term contributes 15 &mdash; the age feature is invisible, and it would take a weight around 1000&times; larger to compete.
+
+Standardise first. If age has mean 45 and standard deviation 15, and salary has mean 80,000 with standard deviation 40,000:
+
+age&prime;&nbsp;&nbsp;&nbsp; = (30 &minus; 45) / 15 = &minus;1.0
+
+salary&prime; = (60000 &minus; 80000) / 40000 = &minus;0.5
+
+Both are now around 1 in magnitude, both contribute comparably, and both weights receive gradients of a similar size.
+
+## Guided experiments
+
+1. <strong>Train unscaled.</strong> Set <strong>Data Normalization Method</strong> to none, put <strong>Salary Input</strong> near 200000 and <strong>Age Input</strong> near 30, and press <strong>Start Training</strong>. Training is unstable or crawls, because one input dominates every gradient.
+2. <strong>Standardise and repeat.</strong> Switch <strong>Data Normalization Method</strong> to standardisation, press <strong>Reset Weights</strong> and train again with the same inputs. Convergence is faster and far smoother.
+3. <strong>Compare the scalers.</strong> Run min-max against standardisation on the same values. Min-max compresses everything into [0, 1]; standardisation centres on zero and keeps the spread &mdash; which is why it pairs better with activations symmetric about zero.
+4. <strong>Change the learning rate under each.</strong> With scaling off, raise <strong>Learning Rate</strong> and watch it diverge. With scaling on, the same rate is stable. Scaling widens the range of learning rates that work at all.
+
+## Where this goes wrong
+
+- <strong>Fitting the scaler on the full dataset.</strong> Computing the mean and standard deviation before splitting leaks test information into training. Fit on train, then <span class="mono-font">transform</span> validation and test with those same statistics.
+- <strong>Refitting the scaler at inference.</strong> Production data must use the training statistics. Fitting a new scaler on a single incoming batch produces silently wrong inputs.
+- <strong>Scaling one-hot columns.</strong> They are already on a comparable scale, and standardising them destroys sparsity by making every zero non-zero.
+- <strong>Min-max with outliers.</strong> One extreme value compresses everything else into a sliver of the range. Use standardisation or robust scaling.
+- <strong>Scaling the target without inverting it.</strong> If you scale y for training, predictions come back in scaled units and must be transformed back before they mean anything.
+
+## In one line
+
+Gradients scale with input magnitude, so unscaled features give some weights enormous gradients and others negligible ones, and no single learning rate serves both. Standardisation is the default for neural networks; min-max suits bounded inputs and breaks on outliers. Fit the scaler on the training split only, keep those statistics for validation, test and production, and leave one-hot columns alone.

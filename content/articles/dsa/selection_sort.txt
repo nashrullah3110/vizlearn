@@ -1,0 +1,56 @@
+title: Selection Sort: A Practical Guide
+intro: Find the smallest remaining element, swap it into place, repeat. Always quadratic - but it performs the fewest writes of any comparison sort, which is the one thing it is genuinely best at.
+
+## The mechanism
+
+Scan the entire unsorted region to find its minimum. Swap that minimum with the first unsorted position. That position is now finished and never moves again. Shrink the unsorted region by one and repeat.
+
+Where insertion sort takes the <em>next</em> element and finds its place, selection sort takes the <em>next place</em> and finds its element. That inversion is the whole difference, and it explains every performance property below.
+
+## Work one through by hand
+
+Sort <span class="mono-font">[29, 10, 14, 37, 13]</span>.
+
+Pass 1: min of all five is 10 &rarr; swap with 29 &rarr; [<u>10</u>, 29, 14, 37, 13]
+
+Pass 2: min of last four is 13 &rarr; swap with 29 &rarr; [<u>10, 13</u>, 14, 37, 29]
+
+Pass 3: min of last three is 14 &rarr; already in place &rarr; [<u>10, 13, 14</u>, 37, 29]
+
+Pass 4: min of last two is 29 &rarr; swap with 37 &rarr; [<u>10, 13, 14, 29</u>, 37]
+
+Four passes, 4 + 3 + 2 + 1 = 10 comparisons, and <strong>3 swaps</strong>. The comparison count is fixed by the array size; only the swap count depends on the data.
+
+## Why it is quadratic no matter what
+
+Pass 1 scans n elements, pass 2 scans n&minus;1, and so on:
+
+(n&minus;1) + (n&minus;2) + &hellip; + 1 = n(n&minus;1)/2 &nbsp;&rarr;&nbsp; O(n&sup2;)
+
+Critically this holds for <em>every</em> input. Finding a minimum requires examining every candidate, and the algorithm has no way to notice that the array is already sorted &mdash; it still scans the whole remaining region to confirm the minimum. Best case, average case and worst case are all &Theta;(n&sup2;), which makes selection sort strictly worse than insertion sort on nearly-sorted data.
+
+The compensation is the write count. Selection sort performs at most <strong>n&minus;1 swaps</strong> &mdash; O(n) writes, one per position. Insertion sort and bubble sort both perform O(n&sup2;) writes.
+
+## Things to try
+
+1. <strong>Watch the scan, then the single swap.</strong> Set <strong>Array Size</strong> to 15 and press <strong>Next Step</strong>. Each pass sweeps the whole unsorted region looking for a minimum, then makes exactly one swap. The scanning is where all the time goes.
+2. <strong>Confirm the sorted region never changes.</strong> Once a cell joins the sorted block on the left it is never touched again. Contrast with bubble sort, where elements keep moving until the very end.
+3. <strong>Give it sorted input and watch it not care.</strong> Press <strong>Randomize Array</strong> until the array looks close to ascending, then <strong>Auto-Run</strong>. The comparison count is identical to a shuffled array &mdash; only the swaps drop. No other sort on this track is this indifferent to its input.
+4. <strong>Count the swaps.</strong> Run a full sort at <strong>Array Size</strong> 30 and note the swap count stays at or below 29, while the comparison count climbs past 400. That ratio is the entire argument for using it.
+
+## The one situation where it wins
+
+When writes are dramatically more expensive than reads, minimising them matters more than minimising comparisons. That is the case for EEPROM and flash memory, where each cell tolerates a limited number of erase cycles, and for any sort where moving an element means copying a large record rather than an integer.
+
+Selection sort guarantees at most n&minus;1 writes. Cycle sort pushes this to the theoretical minimum and is the specialist choice, but selection sort gets most of the benefit with far simpler code.
+
+## What trips people up
+
+- <strong>Swapping on every comparison.</strong> The minimum’s <em>index</em> should be tracked through the scan and swapped once at the end. Swapping each time a smaller element appears turns the O(n) write advantage &mdash; the only reason to use it &mdash; back into O(n&sup2;).
+- <strong>Assuming it is stable.</strong> It is not. Sorting <span class="mono-font">[2a, 2b, 1]</span> swaps the 1 with the first 2, putting 2b before 2a. Stability requires the shifting variant, which forfeits the low write count.
+- <strong>Expecting sorted input to be fast.</strong> Unlike insertion sort, there is no early exit and no adaptivity. Sorted input costs exactly as many comparisons as random input.
+- <strong>Skipping the self-swap check.</strong> When the minimum is already in position the swap is a no-op; guarding it costs one comparison and saves a write, which matters given that low writes are the point.
+
+## The short version
+
+Selection sort makes n&minus;1 passes, each finding the minimum of what remains, giving &Theta;(n&sup2;) comparisons on every input and no benefit from partially sorted data. What it does offer is at most n&minus;1 swaps &mdash; the fewest writes of any simple comparison sort. On ordinary in-memory data insertion sort beats it on every axis; on write-limited storage that swap count is the reason to choose it anyway.

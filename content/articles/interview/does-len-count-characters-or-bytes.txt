@@ -1,0 +1,24 @@
+title: Does len() count characters or bytes?
+intro: Is len(s) the number of characters or the number of bytes?
+
+## Three different counts
+
+There are three things you could mean by "length", and they coincide only for ASCII:
+
+<strong>Code points</strong> &mdash; what <code>len(s)</code> returns. A Python 3 <code>str</code> is a sequence of code points, and indexing gives you one.
+
+<strong>Bytes</strong> &mdash; <code>len(s.encode('utf-8'))</code>. Depends entirely on the encoding, which is why the encoding has to be named. This is the number that matters for a database column or a network frame.
+
+<strong>Grapheme clusters</strong> &mdash; what a human counts. Python has no built-in for this; it needs a library.
+
+## Where it goes wrong
+
+Two strings that render identically can have different lengths and compare unequal, because <code>&eacute;</code> can be one code point or two (<code>e</code> plus a combining accent). Users produce both, depending on their keyboard and operating system.
+
+The fix is normalisation: <code>unicodedata.normalize('NFC', s)</code> before comparing or storing. Any system that accepts names, usernames or search terms needs this, and most learn it from a bug report.
+
+Emoji are the other reliable surprise. A family emoji or a skin-tone modifier is several code points joined by zero-width joiners, so <code>len</code> says 5 or 7 for something a user counts as one, and slicing it in half produces garbage.
+
+## The practical rule
+
+Use <code>len(s)</code> for indexing and slicing your own text. Use <code>len(s.encode('utf-8'))</code> whenever a limit is a storage or transport limit. Normalise on input. And if you are truncating text for display &mdash; a preview, a tweet counter &mdash; know that code points are an approximation you may have to replace.

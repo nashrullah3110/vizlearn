@@ -1,0 +1,20 @@
+title: What is a Python list underneath?
+intro: What is a Python list actually implemented as, and why does that make append O(1) but insert(0, x) O(n)?
+
+## An array of pointers, not of objects
+
+The block holds <em>references</em>, all the same size, which is why one list can hold an int, a string and another list at once. It is also why <code>sys.getsizeof</code> on a list of a million integers is far smaller than the integers themselves &mdash; the list only stores the pointers.
+
+Because the references are contiguous and equally sized, element <em>i</em> lives at a computable address. That is the whole reason indexing is O(1) and a <a href="../dsa/linked_lists.html">linked list</a> is not.
+
+## Why append is amortised O(1)
+
+CPython allocates more room than the list currently needs. Most appends write into a spare slot: one store, no allocation. When the block fills, a larger one is allocated and everything is copied &mdash; O(n), but only on that one append.
+
+Because the growth is geometric, the copies are rare enough that the cost spread over n appends is constant each. That is what "amortised" means, and it is worth saying the word: any individual append can be the expensive one, which matters if you care about latency rather than throughput.
+
+## Why the front is expensive
+
+<code>insert(0, x)</code> and <code>pop(0)</code> both have to move every other element one slot, so both are O(n). Doing either in a loop is O(n&sup2;), and that is the single most common accidental quadratic in Python &mdash; usually written as a queue.
+
+<code>collections.deque</code> is the fix: a doubly linked list of blocks, O(1) at both ends. It gives up O(1) random access in exchange, which is almost always the right trade when you only touch the ends.

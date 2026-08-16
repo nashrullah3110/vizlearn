@@ -1,0 +1,48 @@
+title: K-Means Clustering: A Practical Guide
+intro: Guess k centres, assign every point to its nearest one, move each centre to the mean of its points, repeat. It converges quickly, and it converges to whatever the initial guess led it toward.
+
+## Two steps, repeated
+
+K-means alternates between two operations until nothing changes:
+
+1. <strong>Assign.</strong> Each point joins the cluster whose centroid is nearest, by Euclidean distance.
+2. <strong>Update.</strong> Each centroid moves to the mean position of the points assigned to it.
+
+Each step can only reduce the total within-cluster sum of squares &mdash; reassigning a point to a nearer centroid reduces its contribution, and moving a centroid to the mean minimises the sum of squared distances by definition. Since the objective decreases monotonically and there are finitely many assignments, the algorithm always terminates.
+
+What it does <em>not</em> guarantee is arriving at the best solution. It converges to a local minimum, and which one depends entirely on where the centroids started.
+
+## Initialisation decides the answer
+
+Place two initial centroids inside the same true cluster and k-means will happily split that cluster in half while merging two others. The result is stable, self-consistent and wrong.
+
+<strong>k-means++</strong> is the standard fix and the default in most libraries. It chooses the first centroid at random, then chooses each subsequent one with probability proportional to its squared distance from the nearest existing centroid &mdash; so new centroids tend to land far from the ones already placed. This costs one extra pass and dramatically improves both the quality and the consistency of the result.
+
+The complementary defence is to run the whole algorithm several times from different seeds and keep the best (<span class="mono-font">n_init</span> in scikit-learn).
+
+## Choosing k
+
+K-means cannot tell you how many clusters there are; k is an input. Two standard ways to choose it:
+
+The <strong>elbow method</strong> plots within-cluster sum of squares against k. It always decreases &mdash; more centroids always fit better, and at k = n it reaches zero &mdash; so you look for the bend where the improvement flattens. It is subjective, and frequently there is no clear elbow.
+
+The <strong>silhouette score</strong> measures, for each point, how much closer it is to its own cluster than to the next nearest, on a scale from &minus;1 to 1. Averaged over all points it gives a single number per k, and picking the maximum is less arbitrary than eyeballing a bend.
+
+## Guided experiments
+
+1. <strong>Watch the two steps alternate.</strong> Press <strong>Step Algorithm</strong> repeatedly. Assignments change, then centroids move, then assignments change again &mdash; and the movements shrink each round.
+2. <strong>Get a different answer from the same data.</strong> Press <strong>Reset Positions</strong> and run again several times. Different starts sometimes give visibly different clusterings, which is the local-minimum problem directly.
+3. <strong>Ask for the wrong k.</strong> Set <strong>Clusters (K)</strong> to 8 on data with three obvious groups. K-means splits real clusters to reach the number requested &mdash; it never declines to use a centroid.
+4. <strong>Try a shape it cannot handle.</strong> Choose a non-spherical arrangement from <strong>Initial Layout</strong> and run. Because assignment is by distance to a centre, the clusters come out as convex blobs regardless of the true structure.
+
+## Common mistakes
+
+- <strong>Not scaling the features.</strong> K-means uses Euclidean distance, so a feature measured in thousands dominates one measured in decimals and effectively becomes the only feature. Standardise first &mdash; this is the most common mistake.
+- <strong>Expecting non-spherical clusters.</strong> The algorithm assumes roughly round, similarly sized groups. For elongated, nested or density-based shapes use DBSCAN or Gaussian mixtures.
+- <strong>Running it once.</strong> A single run from a single initialisation is a coin flip. Use k-means++ and multiple restarts.
+- <strong>Reading the elbow as objective.</strong> The curve always decreases; the bend is a judgement call. Cross-check with silhouette.
+- <strong>Ignoring outliers.</strong> Centroids are means, so a single extreme point drags its centroid noticeably. Consider k-medoids when outliers are present.
+
+## The short version
+
+K-means alternates assigning points to the nearest centroid and moving each centroid to its points’ mean, which always converges but only to a local optimum determined by the initialisation &mdash; so use k-means++ and several restarts. It requires you to choose k, assumes roughly spherical clusters of similar size, and relies on Euclidean distance, which makes feature scaling mandatory rather than advisable.

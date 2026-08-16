@@ -1,0 +1,25 @@
+title: Hybrid Search: A Practical Guide
+intro: Neither method alone, combined by their agreement.
+
+## The idea in brief
+
+<a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">Dense retrieval</a> and <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously. Hybrid search runs both and combines the results, so a failure in one is not automatically a failure of the whole system.
+
+## Why fuse ranks, not raw scores
+
+A cosine similarity lives between -1 and 1. A BM25 score is an unbounded sum that depends on corpus size and term rarity. Averaging the two numbers directly is meaningless — a BM25 score of 8 is not "worth" anything in particular next to a cosine of 0.6. <strong>Reciprocal Rank Fusion</strong> sidesteps this by throwing the scores away and using only each document's <em>position</em> in each list.
+
+RRF(d) = &Sigma;<sub>list</sub> 1 / (k + rank<sub>list</sub>(d))
+
+A document ranked highly by both methods accumulates a large score from both terms. A document ranked #1 by one method but unranked or low by the other only gets a large contribution from the one list — which lets a document that both methods agree is decent beat a document only one method loves.
+
+## Try it yourself
+
+1. <strong>Compare the two lists.</strong> They do not agree on the #1 result — dense and sparse are weighting the same five documents by genuinely different criteria.
+2. <strong>Read the fused ranking.</strong> The winner is not necessarily #1 in either individual list — it is the document both methods placed respectably, which is exactly what "fused by rank" is built to surface.
+3. <strong>Push k up toward 60.</strong> The gaps between fused scores shrink and consensus dominates even more strongly — this is the standard default, chosen to be forgiving of exactly how far down a list something sits.
+4. <strong>Pull k down to 1.</strong> Rank 1 in either list is now worth dramatically more than rank 2 — a document has to actually top one of the lists to compete.
+
+## Summing up
+
+Hybrid search runs dense and sparse retrieval independently and fuses their rankings rather than their scores, because the two methods' raw numbers are not on comparable scales. Reciprocal Rank Fusion rewards documents both methods rank well, which makes the combined system more robust than either retrieval method alone — a document only one method loves can be outranked by one both methods merely like.

@@ -1,0 +1,70 @@
+title: Logistic Regression: A Practical Guide
+intro: The default classifier, and the shortest path from a straight line to a neural network.
+
+## Quick Context
+
+Linear regression predicts a number. If you need a yes or no, you cannot use it directly: it happily predicts &minus;4 or 17, and neither is a probability. Logistic regression fixes this with one extra step. It computes the same weighted sum, then passes the result through a function that squashes any real number into the range 0 to 1.
+
+That is the entire model. It is called <em>regression</em> because the inside is a linear regression, and it is used for <em>classification</em> because the outside is a probability.
+
+## The two steps
+
+First the linear score, exactly as in <a href="linear_regression_with_ols.html" style="color: var(--accent-primary)">ordinary least squares</a>:
+
+z = w<sub>1</sub>x<sub>1</sub> + w<sub>2</sub>x<sub>2</sub> + b
+
+Then the sigmoid, which turns that score into a probability:
+
+p = 1 / (1 + e<sup>&minus;z</sup>)
+
+Sigmoid has three properties that matter. It is 0.5 exactly when z is 0. It approaches 1 as z grows and 0 as z falls, without ever reaching either. And it is smooth everywhere, so it has a gradient everywhere &mdash; which is what lets the model be trained by gradient descent at all.
+
+## Work one through by hand
+
+Take weights <span class="mono-font">w = [1.0, 1.0]</span> and bias <span class="mono-font">b = &minus;10</span>, the values this page starts on. Feed it the point <span class="mono-font">(4, 4)</span>:
+
+z = (1.0 &times; 4) + (1.0 &times; 4) &minus; 10 = &minus;2
+
+p = 1 / (1 + e<sup>2</sup>) = 0.12
+
+So the model gives that point a 12% chance of being class B &mdash; a fairly confident vote for class A. Now move to <span class="mono-font">(6, 6)</span>: z becomes +2 and p becomes 0.88, the mirror image. The point <span class="mono-font">(5, 5)</span> sits exactly on the boundary, where z is 0 and p is 0.50.
+
+## Where the boundary comes from
+
+The model predicts class B whenever p is above the threshold. With the usual threshold of 0.5, that happens exactly when z is above 0. So the decision boundary is the set of points where <span class="mono-font">w<sub>1</sub>x<sub>1</sub> + w<sub>2</sub>x<sub>2</sub> + b = 0</span> &mdash; a straight line, and in higher dimensions a flat plane.
+
+This is worth being precise about, because it is the model's main limitation. The probabilities curve; the boundary does not. Logistic regression can express "confidence falls off gradually as you move away from the line", but it cannot express a boundary that bends.
+
+## Things to try
+
+1. <strong>Let it find the answer.</strong> Click <strong>Fit with Gradient Descent</strong> and watch the boundary swing into position while log loss falls. The weights that arrive are the ones that make the observed labels most likely.
+2. <strong>Break it deliberately.</strong> Set the <strong>Weight w1</strong> slider to -3. The boundary flips its orientation and accuracy collapses, because the model now reads the first feature backwards.
+3. <strong>Separate the classes.</strong> Set the <strong>Class Overlap</strong> slider to 0.3 and fit again. With clean separation the shading turns sharply from blue to orange &mdash; the model is confident everywhere except a thin band.
+4. <strong>Then make it hard.</strong> Set the <strong>Class Overlap</strong> slider to 3. Fit again and the shading becomes a soft gradient: the model is honestly uncertain across most of the plot, and log loss stays high no matter what the weights do.
+5. <strong>Move the threshold, not the model.</strong> Set the <strong>Threshold</strong> slider to 0.9. The weights and the probabilities do not change at all &mdash; only the line at which a probability becomes a prediction. Watch false positives fall and false negatives rise.
+6. <strong>Read a single point.</strong> Drag the white probe across the boundary and watch the probability pass through 0.50. That number is what the model actually outputs; the class label is just a comparison against the threshold.
+
+## Why not squared error?
+
+Logistic regression is trained with log loss (also called binary cross-entropy), not the squared error used for linear regression:
+
+loss = &minus;[ y &middot; log(p) + (1 &minus; y) &middot; log(1 &minus; p) ]
+
+There are two reasons. The first is practical: squared error applied to a sigmoid produces a non-convex surface with local minima that gradient descent can get stuck in, while log loss is convex and has a single global optimum. The second is about incentives. Log loss goes to infinity as a confident prediction turns out to be wrong, so a model that says 0.99 and is wrong is punished enormously. Squared error caps that penalty at 1, which lets a badly calibrated classifier off far too lightly.
+
+## The link to neural networks
+
+A single logistic regression is a single neuron. The weighted sum is the <a href="../maths/vectors_and_dot_product.html" style="color: var(--accent-primary)">dot product</a>, the sigmoid is the activation, and the training signal is the same gradient descent step. Stack these units into layers and you have a neural network; that is why the <a href="../deep_learning/perceptron.html" style="color: var(--accent-primary)">perceptron</a> module looks so familiar after this one.
+
+The reverse is also true and worth remembering: if your network has one layer and a sigmoid output, you have not built anything more powerful than logistic regression, no matter how it is implemented.
+
+## Traps worth knowing
+
+- <strong>Reading coefficients as probabilities.</strong> A weight of 2.0 does not mean "2% more likely". Weights act on the log-odds scale; exponentiate one to get an odds ratio, which is the only interpretation that holds.
+- <strong>Unscaled features.</strong> The weights are fitted jointly, so a feature measured in thousands and one measured in decimals produce wildly different coefficient magnitudes and a badly conditioned optimisation. Scale first.
+- <strong>Perfect separation.</strong> If a straight line separates the classes exactly, the likelihood is maximised by pushing the weights to infinity. Training does not converge and the coefficients blow up. Regularisation &mdash; see <a href="ridge_and_lasso_regression.html" style="color: var(--accent-primary)">Ridge and Lasso</a> &mdash; is the standard fix.
+- <strong>Leaving the threshold at 0.5.</strong> That default is only right when the classes are balanced and the two kinds of error cost the same. On an imbalanced problem it is usually the wrong place to stand; pick the threshold from the <a href="roc_curve_and_auc.html" style="color: var(--accent-primary)">ROC curve</a> instead.
+
+## In one line
+
+Logistic regression computes a linear score and squashes it through a sigmoid to get a probability, which makes the decision boundary a straight line and the output something you can actually reason about. It is trained with log loss because that surface is convex and punishes confident mistakes properly. It remains the sensible first classifier to try on any problem: it is fast, it rarely overfits, its coefficients can be inspected, and it gives you a calibrated probability rather than a bare label &mdash; and if it is beaten by something more complex, you at least know by how much.

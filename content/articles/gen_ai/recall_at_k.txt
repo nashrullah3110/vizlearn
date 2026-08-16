@@ -1,0 +1,48 @@
+title: What is Recall@k?: A Practical Guide
+intro: What does Recall@k measure, and why is it usually the metric that matters most for a RAG retriever?
+
+## The definition, and the denominator people forget
+
+Recall@k is the number of relevant documents in the top k divided by the <strong>total number of relevant documents that exist</strong>. The numerator is easy; the denominator is where the difficulty lives.
+
+Knowing it requires knowing every relevant document in the corpus for every evaluation query. On a corpus of a hundred documents you can label exhaustively. On a million you cannot, so the denominator is estimated &mdash; usually by pooling: run several different retrievers, judge the union of everything any of them returned, and treat that pool as the ground truth. It is the standard approach and it is biased, because a document no retriever surfaced is silently counted as irrelevant.
+
+Be honest about this when you report recall. "Recall@5 is 0.83 against a pooled judgement set" is a defensible claim; "recall@5 is 0.83" without qualification implies exhaustive labelling you almost certainly do not have.
+
+## Why it is the retrieval metric for RAG
+
+The generator can ignore an irrelevant chunk. It cannot invent a relevant one that was never retrieved. That asymmetry is the whole argument: <strong>recall failures are unrecoverable, precision failures are merely expensive</strong>.
+
+So the usual configuration is to retrieve generously &mdash; a large k, favouring recall &mdash; and then let a reranker or the model's own attention handle precision. Retrieve 50, rerank to 5, pass 5. Recall@50 is the number that bounds what the reranker can possibly achieve, and precision@5 is what the generator actually sees.
+
+This is also why hybrid search exists. Dense and sparse retrievers fail on different queries, so taking the union of both raises recall well above either alone &mdash; see <a href="hybrid_search_reciprocal_rank_fusion.html">hybrid search</a>. Fusing two retrievers is a recall strategy first and a ranking strategy second.
+
+## The monotonicity that makes it easy to game
+
+Recall@k never decreases as k grows. Retrieve the entire corpus and recall is exactly 1.0. That makes it trivially gameable and means a recall number without its k is not a number at all.
+
+It also means recall must always be read alongside a cost. In classical IR that partner is precision, and the two are combined into F1. In RAG the more meaningful partner is your context budget: recall at the k you can actually afford to put in the prompt. Recall@100 is irrelevant if you pass three chunks.
+
+The useful diagnostic is the gap between recall at a large k and recall at your real k. A large gap means the documents are being found but ranked badly, which is exactly what a cross-encoder reranker fixes. A small gap means better ranking will not help and the problem is upstream &mdash; embeddings, chunking, or coverage.
+
+## Where recall is the wrong metric
+
+<strong>When one document suffices.</strong> If a query has a single correct answer, recall@k collapses into <a href="hit_rate_at_k.html">Hit Rate@k</a> and the extra machinery buys nothing.
+
+<strong>When context is tight.</strong> Optimising recall pushes k up, and a long context of mostly-irrelevant chunks measurably degrades generation quality and inflates cost. Past a point, more recall makes answers worse.
+
+<strong>When relevance is graded rather than binary.</strong> Recall treats a perfect document and a marginally useful one identically. If your judgements have degrees, nDCG uses them and recall throws them away.
+
+## Things to try
+
+1. Drag <strong>k</strong> from 1 to 10 and watch recall climb and never fall. That monotonicity is why a recall figure without its k means nothing.
+2. Mark one more result relevant. Recall <em>drops</em> even though nothing about the ranking changed &mdash; the denominator grew. This is what makes an incomplete judgement set flatter your system.
+3. Set k to 3 and compare recall with precision. They move in opposite directions as k changes, which is the trade the whole field is organised around.
+
+## What to remember
+
+Recall@k is the fraction of all relevant documents that reached the top k. It is the metric that bounds a RAG pipeline, because a document that was never retrieved cannot be used, while an irrelevant one can be ignored. It rises monotonically with k, so it is meaningless without its k and must be read against a cost &mdash; usually your context budget. Its denominator requires knowing every relevant document, which on a real corpus means pooled judgements and an honest caveat.
+
+All four of these read the same object: an ordered list of retrieved results, with each one labelled relevant or not by a human or a strong model. They differ only in what they choose to notice about it &mdash; which is why quoting one without saying which is close to meaningless, and why the visualisation above shows all four at once.
+
+The labels are the expensive part. A relevance judgement per query-document pair is human work, and an evaluation set of fifty queries with judged results is worth more than any amount of metric sophistication on top of unjudged data. Build the set first.

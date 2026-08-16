@@ -1,0 +1,52 @@
+title: Distributed retrieval and sharding: A Practical Guide
+intro: How do you scale retrieval past one machine? What are the trade-offs between sharding strategies?
+
+## Shards and replicas are different things
+
+A <strong>shard</strong> holds a slice of the corpus. Sharding handles data that will not fit &mdash; memory or index build time &mdash; and every query must visit every shard.
+
+A <strong>replica</strong> holds a complete copy of a shard. Replication handles query volume and failure, and a query goes to one replica of each shard.
+
+They solve different problems and are often confused. If the index fits on one machine and you are simply serving too many queries, you need replicas and no sharding at all &mdash; which is much simpler, because there is nothing to merge.
+
+## Shard randomly
+
+The instinct is to shard by topic or tenant so a query only touches one shard. For a multi-tenant system where every query is scoped to one tenant, that is right &mdash; it is really many small indexes.
+
+For a general corpus it is a mistake. If all the finance documents live on shard 2, a finance query's true top 50 are all there, and taking only the local top 5 discards forty-five of them. Random sharding spreads relevant documents evenly so a modest per-shard k captures nearly all of them.
+
+The fix if you must shard semantically is to over-fetch from every shard, which costs the bandwidth and latency the routing was meant to save.
+
+## Tail latency, and the merge
+
+Scatter-gather waits for the slowest shard, so p99 response time is roughly the p99 of <em>any</em> shard. Add shards and the chance one is slow rises &mdash; the classic result is that latency gets worse as you scale out, not better.
+
+Mitigations: hedged requests (ask two replicas, take the first answer), a deadline after which a late shard is dropped and the degraded result served, and keeping shard counts modest.
+
+The merge itself needs care. Scores must be comparable across shards &mdash; fine for cosine similarity, not fine for BM25, whose IDF depends on corpus statistics that differ per shard unless they are shared globally. That is a real bug in hand-rolled distributed lexical search.
+
+## The merge, and the scores that do not survive it
+
+Merging local top-k lists assumes the scores are comparable across shards, and that assumption quietly fails for lexical retrieval.
+
+BM25's idf term depends on corpus statistics &mdash; document frequency and average document length &mdash; which differ per shard. A term that is rare on shard 1 and common on shard 3 gets different weights, so a merged ranking is comparing numbers computed on different scales. The fix is global statistics: compute df and avgdl across the whole corpus and distribute them, which is an extra coordination step people discover only after the rankings look wrong.
+
+Dense retrieval escapes this. Cosine similarity between a query and a document vector involves no corpus statistics at all, so shard-local scores are directly comparable. It is one of the underrated operational advantages of vector search.
+
+## Replication, failure and the degraded answer
+
+Sharding splits data; replication copies it. They solve different problems, and conflating them is the most common design error here: if the index fits on one machine and you are simply serving too many queries, you want replicas and no sharding at all, and there is then nothing to merge.
+
+Once shards exist, so does partial failure. Scatter-gather waits for everyone, so a single slow or dead shard degrades every query. The practical answers are a <strong>deadline</strong> &mdash; serve what returned in time and mark the result degraded &mdash; and <strong>hedged requests</strong>, asking two replicas and taking whichever answers first, which trades a few percent extra load for a much better tail.
+
+Decide explicitly whether a degraded answer is acceptable. For search it usually is. For a RAG answer that will be presented as authoritative, silently dropping a shard means silently dropping evidence, and the user has no way to know.
+
+## Things to try
+
+1. Switch to <em>semantic</em> sharding. Recall collapses: every relevant document is on one shard, whose local top-k discards the rest.
+2. With semantic sharding, raise <strong>per-shard k</strong> until recall recovers. You have paid back the bandwidth the topic routing was meant to save.
+3. Raise <strong>shards</strong> to 40 with random sharding. Recall is fine and p99 latency climbs, because scatter-gather waits for whichever shard was slow.
+
+## What to remember
+
+Scatter-gather sends the query to every shard, takes a local top-k from each and merges. Shard randomly rather than by topic, or the relevant documents concentrate in one shard and its local k throws most of them away. Latency becomes the slowest shard's, not the average, so p99 gets worse with every shard added. Shards solve data that will not fit; replicas solve query volume.

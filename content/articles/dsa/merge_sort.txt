@@ -1,0 +1,60 @@
+title: Merge Sort: A Practical Guide
+intro: Split the array in half, sort each half, then merge the two sorted halves. Guaranteed O(n log n) on every input, stable, and the reason it costs O(n) extra memory.
+
+## Divide, conquer, combine
+
+Merge sort is the textbook divide-and-conquer algorithm and it has exactly three steps. <strong>Divide:</strong> split the array at the midpoint. <strong>Conquer:</strong> sort each half by calling merge sort on it. <strong>Combine:</strong> merge the two sorted halves into one sorted array.
+
+The recursion bottoms out at arrays of length one, which are sorted by definition. All the real work happens in the merge, on the way back up.
+
+## The merge is the whole algorithm
+
+Merging two sorted arrays is linear. Keep a finger on the front of each; repeatedly take the smaller of the two and advance that finger. Merge <span class="mono-font">[2, 5, 9]</span> with <span class="mono-font">[1, 6, 8]</span>:
+
+compare 2 vs 1 &rarr; take 1 &nbsp;&nbsp; [1]
+
+compare 2 vs 6 &rarr; take 2 &nbsp;&nbsp; [1, 2]
+
+compare 5 vs 6 &rarr; take 5 &nbsp;&nbsp; [1, 2, 5]
+
+compare 9 vs 6 &rarr; take 6 &nbsp;&nbsp; [1, 2, 5, 6]
+
+compare 9 vs 8 &rarr; take 8 &nbsp;&nbsp; [1, 2, 5, 8]
+
+left only &rarr; append 9 &nbsp;&nbsp; [1, 2, 5, 6, 8, 9]
+
+Six elements, five comparisons. Each comparison places exactly one element, so merging two runs of total length n costs at most n&minus;1 comparisons and exactly n writes.
+
+## Where n log n comes from
+
+Halving the array repeatedly gives log&#8322;n levels of recursion &mdash; 32 elements become 16, 8, 4, 2, 1, which is 5 levels. At every level, the merges together touch all n elements exactly once. So:
+
+total work = n per level &times; log<sub>2</sub>(n) levels = O(n log n)
+
+The recurrence is <span class="mono-font">T(n) = 2T(n/2) + O(n)</span>, which is the standard case of the master theorem giving &Theta;(n log n). Crucially this holds for <em>every</em> input &mdash; the split is positional, not value-dependent, so there is no bad pivot and no worst case. Sorted, reversed and random input all cost the same.
+
+## Experiments to try
+
+1. <strong>Watch the recursion bottom out.</strong> Set <strong>Array Size</strong> to 16 and press <strong>Next Step</strong> repeatedly. The array splits until every block holds one element, and only then does anything get compared. All the sorting happens on the way back up.
+2. <strong>Count the levels.</strong> At <strong>Array Size</strong> 16 there are 4 levels of merging; at 32 there are 5. Doubling the array adds one level, and each level costs a full pass &mdash; that is n log n, split into its two factors.
+3. <strong>Give it sorted input.</strong> Press <strong>Randomize Array</strong> until the array is close to ascending and press <strong>Auto-Run</strong>. The step count barely moves. Unlike quick sort, merge sort has no input that hurts it.
+4. <strong>Spot the extra array.</strong> Watch a merge closely: elements are written to a separate buffer and then copied back. That buffer is the O(n) auxiliary memory, and it is not an implementation detail you can optimise away.
+
+## The memory cost, and why it is unavoidable
+
+Merging in place is the hard part. To write the smaller element into position 0 you must first move whatever already occupies position 0, and doing that without a buffer requires shifting &mdash; which turns the linear merge quadratic.
+
+So standard merge sort allocates an auxiliary array of size n, giving <strong>O(n) space</strong>. In-place merge sort algorithms exist, but they trade the clean linear merge for substantially worse constants and considerably more complexity. In practice, if memory is the constraint you use quick sort or heap sort instead.
+
+The exception is linked lists, where merging needs only pointer reassignment and no buffer. Merge sort on a linked list is O(1) extra space, which is why it is the standard list-sorting algorithm.
+
+## Where this goes wrong
+
+- <strong>Allocating a new buffer per recursive call.</strong> This turns O(n) space into O(n log n) and hammers the allocator. Allocate one buffer up front and pass it down.
+- <strong>Breaking stability with &lt; instead of &le;.</strong> When the two fronts are equal the merge must take from the <em>left</em> run. Using a strict comparison that prefers the right run reverses equal elements and silently destroys stability.
+- <strong>Forgetting the leftover tail.</strong> When one run empties, the remainder of the other must be copied across. Dropping that step truncates the output.
+- <strong>Recursing all the way to size 1.</strong> The call overhead dominates on tiny subarrays. Real implementations switch to insertion sort below roughly 16 elements, which typically buys 10&ndash;20%.
+
+## Key takeaway
+
+Merge sort splits positionally, sorts recursively, and does its real work in a linear merge, giving a guaranteed &Theta;(n log n) on every input with no pathological case. It is stable, it parallelises cleanly, and it is the natural sort for linked lists and for data too large to fit in memory. The price is O(n) auxiliary space for arrays &mdash; which is precisely the trade quick sort makes in the opposite direction.

@@ -1,0 +1,40 @@
+title: Candidate Memory: Proposing the New Content
+intro: Three of the LSTM's four internal layers are sigmoid gates that control flow. This one is different: it is the only layer that manufactures the information itself.
+
+## A Proposal, Not a Decision
+
+The candidate layer &mdash; written $\tilde{C}_t$ and read "C-tilde" &mdash; takes the same merged vector as every other layer and produces a fresh piece of content:
+
+$$\tilde{C}_t = \tanh(W_C \cdot [H_{t-1}, X_t] + b_C)$$
+
+It has no authority. It cannot write to memory on its own; the Input Gate decides how much of it survives. Think of it as an <strong>employee drafting a proposal</strong> and the input gate as the manager approving some, all, or none of it.
+
+## Why $\tanh$ and Not a Sigmoid?
+
+This is the question that separates people who have memorised the diagram from people who understand it. The answer is <strong>sign</strong>.
+
+- A sigmoid outputs $[0, 1]$. Every update it proposed would <em>increase</em> the memory value. The cell state could only ever drift upward.
+- $\tanh$ outputs $[-1, 1]$. The candidate can push a memory slot <strong>up or down</strong>, which is what real information requires &mdash; "this sentence is negative" needs to be representable, not just "more of something".
+
+Being zero-centred also helps optimisation: the updates do not carry a systematic positive bias that the rest of the network has to cancel out.
+
+## Bounded Output Keeps Memory Stable
+
+Because the cell state is repeatedly <em>added</em> to, an unbounded proposal would let $C_t$ grow without limit over a long sequence and blow up the activations. Clamping every proposal to $[-1, 1]$ means each step can move a memory slot by at most 1. Combined with the Forget Gate's decay, the cell state stays in a numerically comfortable range no matter how long the sequence runs.
+
+## The Cost of Bounding: Saturation
+
+The same squashing that keeps things stable creates a trap. The derivative of $\tanh$ is $1 - \tanh^2(z)$: it peaks at <strong>1.0</strong> when $z = 0$ and collapses toward <strong>0</strong> as $|z|$ grows. Once a unit is driven to $z = \pm 4$, its output is stuck near $\pm 1$ and almost no gradient flows back &mdash; the unit has effectively stopped learning.
+
+This is why weight initialisation and normalisation matter so much. They keep pre-activations near the middle of the curve, where the layer is still responsive.
+
+## Guided tour
+
+1. <strong>Run the simulation.</strong> Watch the highlighted red route: the candidate is computed alongside the gates, then immediately meets the Input Gate at a $\times$ before it is ever allowed near the conveyor belt.
+2. <strong>Slide $z$ to 0.</strong> The proposal is zero, but the gradient bar is at its maximum. Nothing is being written, yet this is the state in which the layer learns fastest.
+3. <strong>Push $z$ past $\pm 3$.</strong> The output bar pins to full while the gradient bar empties &mdash; watch both at once. That is saturation, visible in a single glance.
+4. <strong>Go negative.</strong> The output bar turns red, showing a proposal that <em>subtracts</em> from memory. No sigmoid gate in this cell can do that; only the candidate carries a sign.
+
+## In one line
+
+The candidate layer is the LSTM's content generator: bounded, signed, and completely powerless on its own. Content and control are deliberately separated &mdash; $\tanh$ proposes, sigmoid disposes. The last piece of the cell decides what the outside world gets to see: the <strong>Output Gate</strong>.

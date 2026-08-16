@@ -1,0 +1,37 @@
+title: Masked Language Modeling: Learning by Filling Blanks
+intro: <strong>Masked Language Modeling (MLM)</strong> is the pretraining objective behind BERT and its descendants. The recipe is deceptively simple: take ordinary text, hide a fraction of the tokens, and train the model to reconstruct exactly what was hidden. No human labels required &mdash; the text supplies its own answer key.
+
+## Why It Must Be Bidirectional
+
+A causal model reads left to right and predicts what comes next, so it can never look ahead. MLM has no such restriction: the blank sits in the <em>middle</em>, and the model is free to use every token on both sides at once.
+
+Mask <span class="mono-font">soft</span> in "the cat sat on the ___ mat" and the left context narrows it to a modifier while the right context (<span class="mono-font">mat</span>) rules out most adjectives. Neither side alone is enough. That is why MLM produces such strong <em>understanding</em> representations &mdash; and why it cannot be used to generate text.
+
+## The Curious 80 / 10 / 10 Split
+
+BERT masks about <strong>15%</strong> of tokens, but does not always insert a literal <span class="mono-font">[MASK]</span>. Of the chosen positions:
+
+- <strong style="color:#f59e0b">80%</strong> become <span class="mono-font">[MASK]</span> &mdash; the standard fill-in-the-blank case.
+- <strong style="color:#a855f7">10%</strong> are replaced by a <em>random</em> word &mdash; forcing the model to notice when a token does not fit, rather than trusting whatever it sees.
+- <strong style="color:#38bdf8">10%</strong> are left <em>unchanged</em> &mdash; but still predicted, so the model keeps a useful representation of every token, not just masked ones.
+
+The reason is a train/test mismatch: <span class="mono-font">[MASK]</span> never appears during fine-tuning or inference. If every masked slot were a literal mask token, the model would learn features that only activate on a symbol it will never see again.
+
+## Masking Rate Is a Trade-off
+
+Mask too little and each sentence teaches the model almost nothing &mdash; training is slow because most positions carry no loss. Mask too much and you destroy the very context needed to make a prediction. Around 15% is the long-standing sweet spot, though later work has shown much higher rates can work with large enough models. Drag the rate slider and watch the sentence degrade: at 50% the remaining context often cannot pin the answer down.
+
+## Exploration guide
+
+1. <strong>Mask a single strongly-constrained token</strong> such as <span class="mono-font">mat</span>. The top candidate should dominate &mdash; the surrounding words leave little freedom.
+2. <strong>Now mask an adjective</strong> like <span class="mono-font">soft</span>. Confidence spreads across several plausible words: the context permits a whole family of answers.
+3. <strong>Load the "bank / river" preset</strong> and mask <span class="mono-font">bank</span>. The words after it are what disambiguate the sense &mdash; exactly the information a left-to-right model would not yet have.
+4. <strong>Mask two adjacent tokens.</strong> Accuracy drops sharply, because MLM predicts each blank <em>independently</em> and cannot coordinate between them &mdash; a genuine known limitation of the objective.
+
+## About the model in this lab
+
+Predictions come from a small context-scoring model built live in your browser from the demo corpus shown in the vocabulary count &mdash; it ranks candidate words by how often they co-occur with the surviving context. It is a genuine calculation, not a canned list, but it is far simpler than a transformer: treat the <em>shape</em> of the results as the lesson, not the exact percentages.
+
+## In one line
+
+MLM turns any raw text into supervised training data by deleting parts of it. Because the blank is surrounded rather than trailing, the model learns deep bidirectional understanding &mdash; ideal for classification, retrieval and question answering, and unsuitable for generation. That generative job belongs to causal models, which predict strictly forward.

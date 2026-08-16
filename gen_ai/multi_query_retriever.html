@@ -232,25 +232,28 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">One question can be asked many ways, and vector search only finds what is phrased like the query it was given. A multi-query retriever generates several rewordings, searches with each, and merges the results.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-generating-several-queries-and-merging">Generating several queries and merging</h3>
+                    <h3>The vocabulary mismatch problem</h3>
+                    <p>Embedding-based retrieval finds documents whose vectors are near the query’s vector. That works well when the question and the document use similar language, and fails when they do not.</p><p>Ask “how do I speed up my model?” of a corpus that discusses “reducing inference latency”, “quantisation” and “batch throughput” and the embedding may simply not land near any of them. The information is present and the phrasing is wrong, and a single query gets a single shot at matching it.</p><p>The failure is silent. The retriever returns its nearest neighbours regardless, so you get plausible-looking, unhelpful chunks with no signal that anything was missed.</p>
+                </div>
+                <div>
+                    <h3>Generating several queries and merging</h3>
                     <p>A multi-query retriever asks a language model to produce N alternative phrasings of the question &mdash; typically 3 to 5 &mdash; each approaching it from a different angle. The original question above might become:</p><ul><li>“What techniques reduce model inference latency?”</li><li>“How can I improve throughput at serving time?”</li><li>“What makes a neural network run faster in production?”</li></ul><p>Each is embedded and searched independently, giving N result sets which are then combined and deduplicated. Because the rewordings cover different vocabulary, their nearest neighbours differ, and the union covers substantially more of the relevant material than any one query would.</p><p>Merging is usually done with <strong>reciprocal rank fusion</strong> rather than raw scores. RRF assigns each document a score of <span class="mono-font">&Sigma; 1/(60 + rank)</span> across the lists it appears in, which rewards documents that several rewordings agree on and avoids the problem that similarity scores from different queries are not directly comparable.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-guided-experiments">Guided experiments</h3>
+                    <h3>Guided experiments</h3>
                     <ol><li><strong>Compare a single query with the set.</strong> Look at what one phrasing retrieves against the union of all of them. The union is broader, and usually includes at least one document no single query found.</li><li><strong>Find the documents only one variant retrieves.</strong> These are exactly the recall the technique is buying &mdash; material the original phrasing would have missed entirely.</li><li><strong>Look for agreement.</strong> Documents retrieved by several variants are the strongest candidates, and that consensus is what rank fusion promotes to the top.</li><li><strong>Watch the precision cost.</strong> The merged list is longer and contains more marginal results. Multi-query improves recall and dilutes precision, which is why a reranker usually follows it.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-it-costs-and-what-to-use-instead">What it costs, and what to use instead</h3>
+                    <h3>What it costs, and what to use instead</h3>
                     <p>Multi-query is not free. Generating the variants is an extra LLM call on the critical path, adding latency and cost to every request, and it runs N searches instead of one. For an interactive application that overhead is real.</p><p>Related approaches make different trades. <strong>HyDE</strong> generates a hypothetical <em>answer</em> and embeds that, on the argument that an answer is textually closer to the passage containing it than a question is. <strong>Query decomposition</strong> splits a multi-part question into separate sub-questions, which multi-query does not do &mdash; it rephrases rather than divides. And <strong>hybrid search</strong>, combining dense retrieval with BM25 keyword matching, addresses much of the same vocabulary problem for a fraction of the cost, because exact term matching catches precisely the rare words embeddings handle worst.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-common-mistakes">Common mistakes</h3>
+                    <h3>Common mistakes</h3>
                     <ul><li><strong>Generating variants that all say the same thing.</strong> If the rewordings are near-identical, they retrieve the same documents and you have paid for nothing. The prompt must push for genuinely different angles and vocabulary.</li><li><strong>Merging by raw similarity score.</strong> Scores from different query embeddings are not comparable. Use rank-based fusion.</li><li><strong>Skipping deduplication.</strong> The same chunk retrieved by four variants will otherwise occupy four slots of context.</li><li><strong>Not reranking afterwards.</strong> The merged list is broader and noisier; a cross-encoder reranker recovers the precision.</li><li><strong>Using it where the problem is chunking.</strong> If the relevant text is split badly across chunks, no amount of query rewriting will retrieve it intact.</li></ul>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-to-remember">What to remember</h3>
+                    <h3>What to remember</h3>
                     <p>A multi-query retriever compensates for the fact that a single embedding gets one attempt at matching the corpus vocabulary: it generates several rewordings, retrieves with each, and fuses the ranked lists. It buys recall at the cost of an extra LLM call, N searches, and some precision &mdash; so it pairs naturally with a reranker. Where the mismatch is about rare or exact terms, hybrid search with BM25 gets much of the same benefit far more cheaply.</p>
                 </div>
             </div>

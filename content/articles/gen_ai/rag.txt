@@ -1,0 +1,46 @@
+title: RAG: A Practical Guide
+intro: Give the model the page before you ask it the question.
+
+## Quick Context
+
+A language model knows what was in its training data, frozen at some cutoff date. It does not know your company's handbook, last week's incident report, or a product invented for a teaching page. Asked anyway, it will answer &mdash; fluently, and wrongly.
+
+Retrieval-augmented generation is the fix that does not involve training anything. Find the passages that look relevant, paste them into the prompt, and ask the question with the evidence attached. The model stops recalling and starts reading.
+
+## The pipeline
+
+1. <strong>Chunk.</strong> Split the documents into passages small enough to be specific and large enough to stand alone.
+2. <strong>Embed.</strong> Turn each chunk into a vector with an <a href="../natural_language_processing/what_are_embeddings.html" style="color: var(--accent-primary)">embedding model</a>, and store it.
+3. <strong>Retrieve.</strong> Embed the question the same way and find the nearest chunks, usually by <a href="../machine_learning/cosine_similarity.html" style="color: var(--accent-primary)">cosine similarity</a>.
+4. <strong>Augment.</strong> Paste the top k chunks into the prompt above the question.
+5. <strong>Generate.</strong> The model answers from what is in front of it, and can cite it.
+
+Only steps 3 to 5 happen per question. Steps 1 and 2 happen once, when the documents change &mdash; which is why RAG updates in the time it takes to re-index rather than the time it takes to retrain.
+
+The scores on this page are real cosine similarities over word-frequency vectors rather than a neural embedding, so the retrieval you are watching genuinely runs. A production system embeds meaning rather than words, which is exactly why it can match "descale" to "limescale" where this cannot.
+
+## Guided tour
+
+1. <strong>Turn retrieval off.</strong> Set <strong>Chunks Retrieved</strong> to 0. The prompt is the bare question, and the answer is what a model does when it has nothing: something plausible and unsupported, flagged in red.
+2. <strong>Turn it back on.</strong> At k = 1 the top-scoring chunk is pasted in and the answer arrives with a citation. Same model, same question, different prompt.
+3. <strong>Meet the distractor.</strong> Ask about the warranty and read the scores: chunk 1 wins on 0.213, but chunk 7 &mdash; the warranty for the <em>previous</em> model &mdash; is right behind it on 0.183, because it talks about warranties too. At k = 1 the ranking has to be right; at k = 2 breadth covers you instead. Retrieval fails quietly, and this is the shape it fails in.
+4. <strong>Watch the prompt grow.</strong> Push k to 6 and the prompt words climb steeply. Everything you retrieve is paid for on every request, in latency and in cost, and the useful chunk gets harder for the model to find among the noise.
+5. <strong>Ask something the documents do not cover.</strong> Choose the voltage question. Retrieval still returns its best matches &mdash; it always returns something &mdash; but none of them answer it, so the honest response is "not in the documents". A system that cannot say that is a system that will invent.
+
+## Why not just fine-tune?
+
+Fine-tuning changes how a model behaves; retrieval changes what it knows right now. Facts that change weekly, documents with access rules, anything that needs a citation &mdash; all of those want retrieval. Tone, format, a domain's vocabulary, a stubborn output schema &mdash; those want fine-tuning. They are not competitors, and production systems often use both.
+
+Retrieval also has a property fine-tuning cannot offer: you can show the user where the answer came from, and delete a document and have it genuinely gone.
+
+## Common mistakes
+
+- <strong>Chunking badly.</strong> Too small and a passage loses the context that made it meaningful; too large and the embedding averages several topics into mush. Overlapping windows of a few hundred tokens are the usual compromise.
+- <strong>Assuming retrieval succeeded.</strong> Similarity search always returns its best k, however bad they are. Without a relevance floor, an unanswerable question quietly becomes a confident wrong answer.
+- <strong>Stuffing the context.</strong> More chunks is not more accuracy. Models attend unevenly across a long context, and a fact buried in the middle of twenty passages can be missed entirely.
+- <strong>Pure vector search.</strong> Embeddings are poor at exact identifiers &mdash; part numbers, error codes, names. Hybrid retrieval, combining keyword search with vectors, is standard for a reason.
+- <strong>A stale index.</strong> The documents changed and nobody re-embedded them. Now the system cites yesterday's policy with complete confidence.
+
+## What to remember
+
+RAG answers questions a model was never trained on by finding relevant passages and putting them in the prompt, so generation becomes reading rather than recall. The retrieval step is ordinary similarity search and it always returns something, which makes the quality of your chunking, your ranking and your "I could not find it" path the whole ballgame. Raising k buys robustness against a bad ranking and costs latency, money and attention, so it is a trade rather than a setting. Use retrieval for facts that change or need citing, fine-tuning for behaviour that needs to change, and never assume the top result was actually relevant.

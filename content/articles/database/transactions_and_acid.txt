@@ -1,0 +1,27 @@
+title: Transactions and ACID: A Practical Guide
+intro: Four guarantees, wrapped around every BEGIN...COMMIT.
+
+## What this is
+
+A transfer between two accounts is two separate <a href="dml_in_sql.html" style="color: var(--accent-primary)">UPDATE</a> statements. If the database crashes between them, one account has lost money and the other never received it — unless the two are wrapped in a transaction, which guarantees they happen together or not at all.
+
+## The four letters
+
+- <strong>Atomicity</strong> — the whole transaction commits or none of it does. A failure midway rolls everything back, including steps that already ran cleanly.
+- <strong>Consistency</strong> — a transaction moves the database from one valid state to another; it cannot leave money existing that came from nowhere.
+- <strong>Isolation</strong> — concurrent transactions do not see each other's half-finished work, to a degree controlled by the isolation level.
+- <strong>Durability</strong> — once COMMIT returns, the change survives a crash the instant after.
+
+## Isolation levels, briefly
+
+<strong>READ UNCOMMITTED</strong> lets one session see another's uncommitted changes — a "dirty read". <strong>READ COMMITTED</strong>, the default in most engines, blocks that: a session only ever sees data that has actually been committed. Stricter levels (REPEATABLE READ, SERIALIZABLE) exist to stop other classes of anomaly, at a cost in concurrency.
+
+## Guided tour
+
+1. <strong>Step through a clean transfer.</strong> BEGIN, debit Alice, credit Bob, COMMIT. Session B's balances only change at the very last step.
+2. <strong>Switch to READ UNCOMMITTED and step again.</strong> Now B sees Alice's balance drop the instant A's UPDATE runs — before COMMIT. That is a dirty read, and it is why READ UNCOMMITTED is rarely the default.
+3. <strong>Tick "Fail after the second UPDATE" and step through again.</strong> Both writes ran — Alice was debited, Bob was credited — but the transaction rolls back instead of committing, and Session A's own view snaps back to the original balances. Atomicity in one demonstration: a completed write is not a committed write.
+
+## In one line
+
+A transaction makes a group of writes behave as one unit: Atomicity guarantees all-or-nothing, Consistency guarantees the result is valid, Isolation controls what concurrent sessions can see of work in progress, and Durability guarantees a commit survives a crash. Isolation is a dial, not a switch — READ UNCOMMITTED trades correctness for speed by permitting dirty reads, which is why READ COMMITTED is the default almost everywhere.

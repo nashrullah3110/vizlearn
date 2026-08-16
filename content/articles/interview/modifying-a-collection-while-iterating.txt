@@ -1,0 +1,22 @@
+title: What happens if you modify a collection while looping over it?
+intro: Why can&#x27;t you delete from a dict or a list while iterating it, and what should you do instead?
+
+## Two different failures
+
+A dictionary keeps a version counter and compares it on each step, so a size change during iteration is caught immediately and loudly. That is a feature: the alternative is undefined behaviour, because a resize can move every entry to a different slot.
+
+A list has no such check. Deleting element i shifts everything after it one place left, while the loop's internal index advances &mdash; so the element that moved into position i is never visited. You get a wrong answer and no error at all, which is the harder bug to find.
+
+## The fixes, in order of preference
+
+<strong>Build a new collection.</strong> <code>[x for x in items if keep(x)]</code> or <code>{k: v for k, v in d.items() if keep(k)}</code>. Nothing is mutated, the intent is explicit, and it is usually faster than repeated deletion.
+
+<strong>Iterate over a snapshot.</strong> <code>for k in list(d):</code> or <code>for x in items[:]:</code>. Necessary when you genuinely must mutate in place &mdash; because other references to the object are watching.
+
+<strong>Filter in place backwards.</strong> Walking from the end means deletions only shift elements you have already passed. Correct, and worth knowing for when memory matters.
+
+## What counts as a change
+
+For a dict, only a <em>size</em> change trips the check. Assigning to an existing key is fine, which surprises people who expect any mutation to raise. Adding a key raises just as deletion does.
+
+Sets behave like dicts. <code>collections.deque</code> also raises. And modifying the object a variable points to &mdash; appending to a list stored as a dict value &mdash; is not a change to the dict, so it is perfectly legal.

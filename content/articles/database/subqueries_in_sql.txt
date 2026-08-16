@@ -1,0 +1,48 @@
+title: Subqueries: A Query That Answers a Question for Another Query
+intro: Four shapes, one idea &mdash; and one of them costs a great deal more than the others.
+
+## Quick Context
+
+You cannot write <span class="mono-font kw">WHERE</span> salary &gt; <span class="mono-font fn">AVG</span>(salary) &mdash; an aggregate over the whole table is not something a row-by-row filter can evaluate. What you can do is compute the average in its own query and use the result: that inner query is a subquery.
+
+Everything else follows from what the subquery returns: one value, one column, or a whole table. And from one further question &mdash; whether it depends on the outer row or not.
+
+## The four shapes
+
+- <strong>Scalar</strong> &mdash; returns exactly one row and one column, so it can stand anywhere a single value can: in SELECT, in WHERE, in an expression. If it ever returns two rows, the query fails at runtime, which is why a scalar subquery usually contains an aggregate.
+- <strong>IN list</strong> &mdash; returns one column of any length, used as the right-hand side of <span class="mono-font kw">IN</span>. The classic membership test. Beware <span class="mono-font kw">NOT IN</span> against a column containing NULL: the comparison goes UNKNOWN and the whole query returns nothing, silently.
+- <strong>Derived table</strong> &mdash; a whole result set used in the <span class="mono-font kw">FROM</span> clause as if it were a table. It needs an alias. This is how you filter on an aggregate you just computed, and it is the same tool a <a href="common_table_expressions_in_sql.html" style="color: var(--accent-primary)">CTE</a> gives you with a readable name attached.
+- <strong>Correlated</strong> &mdash; references a column from the outer query, so it cannot be computed once up front. Conceptually it runs again for every candidate row, with that row's value substituted in.
+
+## Why correlated is the one to understand
+
+Compare the two comparisons in the lab. The scalar version asks "is this person paid more than the company average?" &mdash; one number, computed once, tested against all eight rows. The correlated version asks "is this person paid more than <em>their own department's</em> average?" &mdash; a different number per row, so the inner query runs eight times.
+
+The answers differ, and the difference is the point: one employee sits below the company average and above their department's. No single precomputed number could have produced that answer.
+
+Note the "conceptually" above. The optimiser is free to rewrite a correlated subquery into a join or a grouped aggregate, and usually does. But it is not obliged to, and when it cannot, you get one inner execution per outer row &mdash; the classic accidentally-quadratic query.
+
+## EXISTS, and when to prefer it
+
+<span class="mono-font kw">EXISTS</span> takes a correlated subquery and asks only whether it produced any row at all, so the engine can stop at the first match instead of building the full result. For "does this customer have any order?" it is both clearer and cheaper than <span class="mono-font kw">IN</span>.
+
+It also sidesteps the NULL trap: <span class="mono-font kw">NOT EXISTS</span> behaves the way people expect <span class="mono-font kw">NOT IN</span> to behave.
+
+## Subquery, join or CTE?
+
+Most subqueries can be written as a <a href="joins_in_sql.html" style="color: var(--accent-primary)">join</a>, and joins are often faster because the planner has more freedom with them. Prefer a subquery when it says what you mean more plainly &mdash; a membership test reads better as IN or EXISTS than as a join you then have to de-duplicate.
+
+Once a derived table is more than a couple of lines, or you need it twice, lift it into a CTE. Same execution, a name, and no nesting to read inside-out.
+
+## Guided experiments
+
+1. <strong>Start with the scalar case.</strong> The inner query produces one number, the company average of 84250, and all eight rows are tested against it. Inner query runs: 1.
+2. <strong>Switch to the IN list.</strong> Now the inner query returns a column &mdash; the departments with a budget over 500,000 &mdash; and the outer query keeps any employee whose department is in it. Still one execution.
+3. <strong>Switch to the derived table.</strong> The inner query returns a three-row table of per-department averages &mdash; 82333.33, 86666.67 and 83500 &mdash; and the outer query filters <em>that</em>, keeping the two above 83000. This is the shape to reach for when you want to filter on something you had to compute first.
+4. <strong>Switch to correlated and press Play.</strong> The inner query re-runs for each row with that row's department substituted in, and you can watch the substituted text change. Inner query runs climbs to 8.
+5. <strong>Find the row that disagrees.</strong> Grace clears her department's average but not the company's, so she is returned by the correlated query and rejected by the scalar one. Same table, same operator, different question.
+6. <strong>Step through it by hand.</strong> Press Reset then Step. Each press is one execution of the inner query, which is exactly the cost model you are being warned about when someone says "correlated subquery" in a code review.
+
+## Worth remembering
+
+A subquery is just a query whose result another query consumes, and its shape is decided by what it returns: one value (scalar), one column (IN), or a table (derived, which must be aliased). An uncorrelated subquery runs once, before the outer query. A correlated one names a column from the outer row, so conceptually it runs once per row &mdash; which is both why it can answer per-group questions no single precomputed value could, and why it is the first thing to look at when a query is unexpectedly slow. Reach for EXISTS when you only need to know whether a match exists, and lift anything long or reused out into a CTE.

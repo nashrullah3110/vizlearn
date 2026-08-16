@@ -1,0 +1,21 @@
+title: Parent Document Retrieval: A Practical Guide
+intro: Index the needle, return the haystack it came from.
+
+## The problem it solves
+
+<a href="chunking_strategies_for_rag.html" style="color: var(--accent-primary)">Chunking</a> forces a trade-off. A small chunk concentrates the query's terms, so its similarity score is high and the match is precise &mdash; but on its own it may be a fragment that answers nothing. A large chunk carries the surrounding context that makes an answer possible, but dilutes the matching terms among hundreds of unrelated words, so it scores worse and may not be retrieved at all.
+
+## Searching one thing, returning another
+
+A parent document retriever refuses the trade. It splits each document into small <strong>child chunks</strong> and indexes only those, so retrieval is as precise as small chunks allow. But when a child chunk wins, what gets passed to the model is the <strong>parent</strong> it came from. The score decides <em>which</em> document is relevant; the parent decides <em>how much text</em> the model sees. Two chunks from the same parent collapse to one passage, so the context window is not spent sending the same document twice.
+
+## Guided experiments
+
+1. <strong>Read the child list at chunk size 8.</strong> The winning chunk is a short fragment. Read it alone and ask whether it actually answers the question &mdash; it names a duration but not what the duration applies to.
+2. <strong>Turn off "Return the parent".</strong> The model now receives only those fragments. The word count drops sharply, and so does the chance of a usable answer.
+3. <strong>Turn it back on and watch the passage count.</strong> Two separate child chunks hit the same document, but only one parent passage is returned &mdash; the deduplication is doing real work.
+4. <strong>Drag the chunk size up to 24.</strong> Each child is now most of its parent. The top score actually goes <em>up</em> &mdash; a longer window catches more of the query's words &mdash; but the selection gets worse: the second slot now goes to a different product's document, and the model is sent 53 words instead of 29 for the same question.
+
+## Summing up
+
+Precision of retrieval and sufficiency of context are different requirements, and chunk size cannot satisfy both at once. Indexing small children while returning their parents lets the score come from the tightest possible match and the context come from the whole document. The cost is a larger prompt, which is why deduplicating parents matters: without it, three good chunks from one document would send that document three times.

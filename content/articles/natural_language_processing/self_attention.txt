@@ -1,0 +1,57 @@
+title: Self-Attention: A Practical Guide
+intro: The step that made recurrence optional, and the two things it cost.
+
+## Quick Context
+
+In <a href="attention_mechanism.html" style="color: var(--accent-primary)">encoder&ndash;decoder attention</a> the queries come from one sequence and the keys and values from another. Self-attention is the same machinery with a single change: <strong>all three come from the same sequence</strong>. The sentence attends to itself.
+
+That sounds like a small variation. It is the change that produced the transformer.
+
+## What a word is actually doing
+
+Every position emits a <a href="query_key_value.html" style="color: var(--accent-primary)">query, a key and a value</a>. Each query is scored against every key &mdash; including its own &mdash; giving an n × n grid of scores. Softmax each row, and you have the matrix above: row <em>i</em> is how word <em>i</em> distributes its attention across the whole sentence.
+
+The output for that word is the weighted blend of all the values. So after one self-attention layer, every word's representation has been rewritten as a mixture of the words it found relevant. The word "it" stops being a generic pronoun vector and becomes something closer to whatever it refers to.
+
+## The example worth staring at
+
+"The animal didn't cross the street because it was too tired." What does "it" refer to?
+
+Change one word &mdash; "because it was too <em>wide</em>" &mdash; and the answer flips from the animal to the street. Nothing about the grammar changed. The only way to resolve it is to notice which noun makes sense with the adjective, which means "it" has to be able to look at both nouns <em>and</em> at the adjective, all at once.
+
+An RNN reading left to right has to carry that decision in its hidden state across six words. Self-attention just looks &mdash; but not, it turns out, in one go.
+
+<strong>One layer cannot do it.</strong> In layer 1 each word's query is a fixed function of that word alone, so the query "it" sends out is identical in both sentences. It scores the same against "animal" and against "street" whichever adjective the sentence ends on, and the panel confirms this: at layer 1 the answer is "animal" both times, to three decimal places.
+
+Layer 2 is where it resolves. By then "it" has absorbed a little of everything it attended to in layer 1, including the adjective, so the query it sends the second time is no longer generic &mdash; and that is enough to separate the two nouns. Switch to layer 2 and the reference follows the adjective: "tired" keeps it on the animal, "wide" moves it to the street.
+
+This is the real reason transformers are deep. A single attention layer mixes information; it takes another to <em>use</em> what was mixed.
+
+## Guided tour
+
+1. <strong>Watch one layer fail.</strong> Set the <strong>Layer</strong> slider to 1 and the <strong>Focus Row</strong> to it. Note what it attends to, then switch the <strong>Example</strong> to the "wide" sentence. The number does not move at all &mdash; a single layer's query for "it" cannot depend on a word elsewhere in the sentence.
+2. <strong>Then watch depth fix it.</strong> Set the <strong>Layer</strong> slider to 2 and switch between the two examples again. Now the reference follows the adjective: "tired" holds it on the animal, "wide" moves it to the street. Layer 2's query was built from what layer 1 collected.
+3. <strong>Confirm every row is a distribution.</strong> Change the <strong>Focus Row</strong> to any word and check Row Sum. It is always 1 &mdash; softmax runs across each row independently.
+4. <strong>Blur the whole thing.</strong> Set the <strong>Sharpness</strong> slider to 0.2. The matrix goes flat grey: every word attends equally to everything, which is the same as attending to nothing. Set it to 5 and the matrix turns into a near-binary lookup.
+5. <strong>Cut off the future.</strong> Tick <strong>Causal Mask</strong>. The upper triangle goes black &mdash; each position can now only see itself and what came before. This single change is the whole architectural difference between BERT and GPT.
+6. <strong>Prove it is order-blind.</strong> Tick <strong>Shuffle Word Order</strong>. The words move, but each word keeps exactly the same attention pattern toward the same partners, because the mechanism never consulted position at all. This is precisely why <a href="positional_encoding.html" style="color: var(--accent-primary)">positional encoding</a> has to exist.
+7. <strong>Read the price.</strong> Watch Scores Computed. Ten words need 100 scores; double the sentence and it quadruples. Path Length stays at 1 no matter what &mdash; that is the trade self-attention makes.
+
+## Why this killed recurrence
+
+<table> <tr><th></th><th>RNN / LSTM</th><th>Self-attention</th></tr> <tr><td>Steps between two words</td><td>their distance</td><td>1, always</td></tr> <tr><td>Training</td><td>sequential</td><td>fully parallel</td></tr> <tr><td>Work per layer</td><td>grows with n</td><td>grows with n&sup2;</td></tr> <tr><td>Knows word order</td><td>inherently</td><td>only if told</td></tr> </table>
+
+The first two rows are why transformers took over. A <a href="rnn.html" style="color: var(--accent-primary)">recurrent network</a> cannot start step 50 until step 49 is done, so training time scales with sentence length and gradients have to survive fifty multiplications. Self-attention computes every position simultaneously, which is what let models grow to the size they are now.
+
+The last two rows are the bill. The quadratic cost is why context windows were small for years, and the order-blindness is a genuine hole that has to be patched.
+
+## Traps worth knowing
+
+- <strong>Forgetting positional information.</strong> Without it, "dog bites man" and "man bites dog" are the same input. Self-attention is permutation-equivariant by construction.
+- <strong>Assuming the matrix is symmetric.</strong> It is not. Word A attending to B says nothing about B attending to A, because queries and keys are different projections.
+- <strong>Reading heads as syntax.</strong> A trained model's heads often attend to punctuation or dump weight on the first token when they have nothing useful to do. Clean linguistic patterns are the exception, not the rule.
+- <strong>Underestimating n&sup2;.</strong> Doubling the context quadruples both time and memory for attention. Almost every "efficient transformer" paper is an attack on that one term.
+
+## Where that leaves you
+
+Self-attention is attention with queries, keys and values all drawn from the same sequence, so every word is rewritten as a blend of the words it finds relevant &mdash; which is how a pronoun can resolve to a noun six words away in a single step. Because every position is computed independently, training parallelises completely and the path between any two words is length 1 regardless of distance, and those two properties are what displaced recurrence. One layer only mixes information, though &mdash; resolving a pronoun against a distant adjective takes a second layer to use what the first collected, which is why the architecture is stacked. The costs are real and specific: the number of scores grows with the square of the sequence length, and the mechanism is entirely blind to word order until positional information is added.

@@ -1,0 +1,43 @@
+title: Regular Expressions in SQL: Pattern Matching That Actually Fits
+intro: LIKE handles "starts with". Regex handles "a valid email address".
+
+## The idea in brief
+
+A <strong>regular expression</strong> describes a <em>shape</em> that text may take, rather than the text itself. SQL's <span class="mono-font">LIKE</span> offers exactly two wildcards; regex offers character classes, quantifiers, anchors, alternation and grouping &mdash; enough to validate, extract and clean data directly in the database.
+
+## Every Engine Spells It Differently
+
+- <strong>PostgreSQL</strong> &mdash; <span class="mono-font">~</span> (match), <span class="mono-font">~*</span> (case-insensitive), <span class="mono-font">!~</span> (not match). Also <span class="mono-font">SIMILAR TO</span> and functions like <span class="mono-font">REGEXP_REPLACE</span>.
+- <strong>MySQL / MariaDB</strong> &mdash; <span class="mono-font">REGEXP</span> or <span class="mono-font">RLIKE</span>.
+- <strong>Oracle</strong> &mdash; <span class="mono-font">REGEXP_LIKE()</span>, plus <span class="mono-font">REGEXP_SUBSTR</span> and <span class="mono-font">REGEXP_COUNT</span>.
+- <strong>SQL Server</strong> &mdash; historically none; you use <span class="mono-font">LIKE</span> with its limited bracket syntax, or CLR functions. SQL Server 2025 finally adds <span class="mono-font">REGEXP_LIKE</span>.
+- <strong>SQLite</strong> &mdash; <span class="mono-font">REGEXP</span> exists as an operator but the host application must supply the implementation.
+
+The dialect differences are mostly in the operator name; the pattern syntax itself is broadly POSIX or PCRE and transfers well.
+
+## LIKE vs REGEXP
+
+Try the email-validation pattern in this lab and read the LIKE equivalent underneath it. LIKE can express "contains an @" and little more; it cannot say "one or more of these characters", "exactly four digits", or "either gmail or yahoo". Those are quantifiers, character classes and alternation &mdash; the things LIKE simply does not have.
+
+One more difference that catches people: <span class="mono-font">LIKE 'abc'</span> must match the <em>whole</em> string, whereas most SQL regex operators match if the pattern is found <em>anywhere</em> in it. That is why anchors <span class="mono-font">^</span> and <span class="mono-font">$</span> matter so much &mdash; toggle them in this lab and watch the match count change.
+
+## The Performance Warning
+
+A regex in a WHERE clause is applied row by row and <strong>cannot use a normal B-tree index</strong>. On a large table that is a full scan every time. Practical guidance:
+
+- Narrow the rows with an indexable condition first, then apply the regex to what survives.
+- Prefer <span class="mono-font">LIKE 'abc%'</span> when it suffices &mdash; a trailing wildcard <em>can</em> use an index.
+- For repeated searches, consider a functional index, a generated column, or full-text search instead.
+- Validate on write (a <span class="mono-font">CHECK</span> constraint) rather than filtering on read, when you can.
+
+## Exploration guide
+
+1. <strong>Start with <span class="mono-font">^A</span>.</strong> The anchor forces the match to the start; matched text is highlighted inside each value.
+2. <strong>Remove the <span class="mono-font">^</span>.</strong> Suddenly any row containing an "A" anywhere matches. Anchors are the difference between "starts with" and "contains".
+3. <strong>Run the email pattern.</strong> Malformed addresses in the data fail it &mdash; this is validation LIKE cannot perform.
+4. <strong>Try the code pattern <span class="mono-font">^[A-Z]{2}[0-9]{4}$</span></strong> with case-insensitivity on and off, and watch which rows drop out.
+5. <strong>Type a deliberately broken pattern</strong> such as <span class="mono-font">[a-</span>. The error is reported rather than silently matching nothing.
+
+## What to remember
+
+Reach for regex when the <em>shape</em> of the text matters and LIKE cannot describe it &mdash; validation, extraction, messy-data cleanup. Reach for LIKE when a prefix will do, because it can use an index and regex usually cannot. This lab runs your pattern through a real regex engine, so what matches here is what will match in your database.

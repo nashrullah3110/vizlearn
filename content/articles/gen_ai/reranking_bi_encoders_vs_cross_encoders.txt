@@ -1,0 +1,21 @@
+title: Re-ranking: A Practical Guide
+intro: Spend the expensive model only on the candidates that survived the cheap one.
+
+## The idea in brief
+
+A <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">bi-encoder</a> embeds the query and every document <em>separately</em>, ahead of time — that is what makes the embeddings precomputable and search fast, but it also means the model never looks at a query and a document together. A <strong>cross-encoder</strong> takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable.
+
+## The two-stage pattern
+
+Cross-encoders are far more accurate but cost too much to run over an entire corpus — a million documents means a million forward passes per query. The standard fix is two stages: a cheap bi-encoder (or BM25, or both) retrieves a shortlist of maybe 20-100 candidates, and only that shortlist is re-scored by the expensive cross-encoder, which then decides the final order. You pay the cross-encoder's cost dozens of times per query instead of millions of times.
+
+## Try it yourself
+
+1. <strong>Read Stage 1.</strong> Pure cosine similarity over word overlap. One candidate about python <em>the snake</em> ranks deceptively high — it shares the words "python" and "memory" with the query, and a bi-encoder scoring query and document independently has no way to notice they mean something different in context.
+2. <strong>Turn on the reranker.</strong> The final order changes: the snake document drops sharply, and a genuinely on-topic document that Stage 1 under-ranked moves up. This is what "reading query and document together" catches that comparing two independent vectors cannot.
+3. <strong>Turn it back off.</strong> The order reverts to pure Stage 1 — the reranker did not change what was retrieved, only the order the survivors are returned in.
+4. <strong>Read the cost panel.</strong> The bi-encoder cost is already paid, before the query ever arrived. The cross-encoder cost is exactly the number of candidates it re-scores — six forward passes, not a million.
+
+## Worth remembering
+
+A bi-encoder scores query and document independently, which is what makes it fast enough to search a whole corpus but blind to interactions between them — a lexical coincidence can outrank a genuine match. A cross-encoder reads both together and catches that, at a cost that only scales with the shortlist, not the corpus. Two-stage retrieval — cheap and broad, then expensive and narrow — is how production search gets both speed and accuracy instead of choosing one.

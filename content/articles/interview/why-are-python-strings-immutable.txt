@@ -1,0 +1,26 @@
+title: Why are Python strings immutable?
+intro: Why are Python strings immutable, and what does that buy you?
+
+## What immutability actually means
+
+There is no operation in Python that changes a string in place. <code>s.upper()</code>, <code>s.replace()</code>, <code>s.strip()</code> and <code>s + t</code> all <em>return</em> a new string and leave the original exactly as it was. Assigning to an index &mdash; <code>s[0] = 'A'</code> &mdash; is not slow, it is a <code>TypeError</code>.
+
+This is enforced, not advisory. There is no private method and no escape hatch, which is what lets the interpreter make assumptions it could not otherwise make.
+
+## The three things it buys
+
+<strong>Hashability.</strong> A dictionary stores a key in a slot chosen from its hash. If the key could change after insertion, its hash would no longer match its slot and the entry would become unreachable. Immutable types can be keys; mutable ones cannot, which is why <code>{[1,2]: 'x'}</code> raises and <code>{(1,2): 'x'}</code> does not.
+
+<strong>Free sharing.</strong> Passing a string to a function, storing it in two places, closing over it &mdash; none of these need a defensive copy, because no one can modify it behind your back. In a language with mutable strings, library code often copies on the way in just in case.
+
+<strong>Interning.</strong> CPython reuses one object for short string literals that look like identifiers, so equality can often be settled by an identity check. That is an optimisation immutability makes legal.
+
+## What it costs, and the one place it bites
+
+Every edit allocates. Usually that is irrelevant &mdash; one <code>replace</code> on one line costs nothing you can measure. It matters in exactly one shape: building a string a piece at a time in a loop.
+
+Each <code>+=</code> copies everything accumulated so far, so n appends copy 1 + 2 + 3 + ... + n characters, which is O(n&sup2;). The fix is <code>"".join(parts)</code>: one pass to total the lengths, one allocation, one copy. The editor below measures both.
+
+## The follow-up you should expect
+
+"If strings are immutable, why does <code>s += 'x'</code> sometimes look fast?" CPython has a special case that resizes a string in place when the target is a plain local variable and nothing else refers to it. It is real, it is invisible, and it stops firing the moment you store into an attribute or a list. Do not build on it.

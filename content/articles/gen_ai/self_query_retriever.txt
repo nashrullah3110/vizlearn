@@ -1,0 +1,22 @@
+title: Self-Query Retrieval: A Practical Guide
+intro: Half the sentence is a subject. Half of it is a WHERE clause.
+
+## The idea in brief
+
+Similarity search compares meaning, and that is all it does. Ask it for "papers about attention published after 2020" and the words <em>published after 2020</em> are treated as more subject matter to match, not as a rule to enforce. A 2017 paper that is squarely about attention will score well and be returned, because nothing in a cosine score knows what a year is.
+
+## Two questions in one sentence
+
+A self-query retriever hands the sentence to an LLM along with a description of the metadata each document carries, and asks it to return two things: the <strong>semantic query</strong> &mdash; the part that should be embedded and compared &mdash; and a <strong>structured filter</strong> over the metadata, in the form of real comparisons like <code>year &gt; 2020</code>. The filter runs first as an ordinary database-style predicate; similarity then ranks only the documents that survived it. The constraint becomes a guarantee rather than a hint.
+
+## Exploration guide
+
+1. <strong>Read the parse for the first query.</strong> Note what was removed from the semantic half: only <em>attention</em> is left to match on, because the date has become a filter instead.
+2. <strong>Turn the filter off.</strong> This is plain similarity search over everything. A 2017 paper takes the top spot &mdash; it is genuinely the best match for "attention", and it breaks the constraint the reader stated.
+3. <strong>Turn it back on.</strong> The 2017 paper is struck out with the reason it failed, and the top result is now both about attention and inside the requested date range.
+4. <strong>Try "short surveys on retrieval".</strong> Two constraints this time, on different fields and different types &mdash; a number and a category &mdash; combined with AND.
+5. <strong>Try "anything about attention".</strong> No constraint in the sentence, so the filter is empty and the retriever degrades gracefully into ordinary similarity search.
+
+## The short of it
+
+Embeddings compare meaning and cannot enforce a rule, so any constraint left inside the query text is at best a weak hint. Self-querying separates the sentence into the part worth embedding and the part worth executing as a filter, which turns "after 2020" from a phrase competing for cosine similarity into a predicate that simply removes the documents that fail it. The trade is an extra LLM call before retrieval, and a hard dependency on documents actually carrying the metadata the filter names.

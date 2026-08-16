@@ -1,0 +1,25 @@
+title: ResNet and Identity Shortcuts: A Practical Guide
+intro: The forward-pass half of the same story <a href="../deep_learning/residual_connections.html" style="color: var(--accent-primary)">the backward-pass gradient module</a> tells.
+
+## The idea in brief
+
+ResNet's headline idea is the identity shortcut: instead of a block computing <code>x_{i+1} = f(x_i)</code>, it computes <code>x_{i+1} = x_i + f(x_i)</code>, adding the block's own input back onto its output. The usual explanation is about gradients flowing backward through very deep networks. This module shows the forward-pass version of the same mechanism — what happens to the signal itself, going forward, as it passes through many stacked blocks.
+
+## The degradation problem
+
+Before ResNet, simply stacking more convolutional layers past a certain depth made plain networks <em>harder</em> to train, not just slower — a well-documented empirical finding known as the degradation problem. One real contributor: if each block's weights shrink the signal even slightly, a long enough plain stack keeps shrinking it, layer after layer, until by the far end there is barely any signal left carrying information forward. A shortcut connection breaks that: because <code>relu(f(x))</code> can never be negative, adding it to <code>x</code> can never make the running signal smaller than <code>x</code> was — the identity path is a floor the plain stack simply doesn't have.
+
+## Guided tour
+
+1. <strong>Read the norms at depth 10.</strong> The plain stack's signal has shrunk to a small fraction of where it started; the version with the shortcut is larger than where it started, not smaller.
+2. <strong>Push depth to 20.</strong> The plain stack keeps shrinking — by block 20 there is very little of the original signal left. The shortcut version keeps growing instead.
+3. <strong>Bring depth back down to 1 or 2.</strong> At shallow depth the two barely differ — this problem is specifically about what happens over many stacked layers, not about any single block.
+4. <strong>Read the per-block table.</strong> Every row is a real matrix-vector multiply and ReLU, not a smoothed illustration — you can check the arithmetic at any single block.
+
+## What this simplification doesn't show
+
+Here the shortcut version's norm keeps <em>growing</em> with depth rather than settling — this fixed, unnormalized toy has no mechanism to stop it, which is exactly why real ResNets pair every shortcut with batch or layer normalization to keep the growing signal in a well-behaved range. The point this module demonstrates is narrower and still real: an identity shortcut with a ReLU'd residual branch mathematically cannot let the running signal fall below where it started, in a way a plain stack of contractive layers can and does.
+
+## In one line
+
+A plain stack of layers with a contractive weight matrix shrinks its forward signal geometrically with depth — the same kind of multiplicative decay that causes vanishing gradients on the way back. An identity shortcut adds a nonnegative quantity back onto the running signal at every block, which makes shrinkage below the starting point mathematically impossible. It is the same one-line change, x + f(x) instead of f(x), showing up on both passes through the network.

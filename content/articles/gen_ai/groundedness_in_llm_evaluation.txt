@@ -1,0 +1,54 @@
+title: Groundedness in LLM evaluation: A Practical Guide
+intro: What is groundedness, and how is it different from correctness?
+
+## What it measures, claim by claim
+
+The answer is decomposed into atomic claims &mdash; individual assertions that could each be checked independently &mdash; and each is tested against the retrieved context. Groundedness is the proportion that are supported.
+
+The decomposition matters. Scoring a whole paragraph as "grounded or not" throws away the most useful information a groundedness evaluation produces: <em>which</em> sentence was invented. A per-claim score points you at the exact span to investigate, and lets you distinguish an answer that is 90% supported with one fabricated detail from one that is wholly invented.
+
+"Supported" should mean entailed by the context, not merely consistent with it. A claim the context neither states nor contradicts is ungrounded, even if it is plausible and even if it is true. That strictness is the whole value of the metric.
+
+## Why it is independent of correctness
+
+This is the distinction people collapse, and the four combinations are all real:
+
+<strong>Grounded and correct.</strong> The context said it and it is true. What you want.
+
+<strong>Grounded and wrong.</strong> The context said it and the context is out of date or simply incorrect. The model behaved perfectly; your corpus is the problem. Groundedness scores 1.0 and the user is misinformed.
+
+<strong>Ungrounded and correct.</strong> The model knew the answer from pretraining and the context never mentioned it. Harmless-looking, and it is the failure mode that erodes trust in a RAG system: you have no idea which answers came from your documents and which came from the model's memory, so the citations mean nothing.
+
+<strong>Ungrounded and wrong.</strong> A hallucination, in the ordinary sense.
+
+Groundedness catches rows three and four without needing to know the truth of anything. That is why it is cheap: it requires the context and the answer, and no reference and no domain expert.
+
+## How it is measured in practice
+
+<strong>LLM-as-judge, per claim.</strong> Split the answer into claims, then for each ask a strong model whether the context entails it, with the answer justified. This is the standard approach and it works well, because entailment against a supplied passage is a much easier task than open-ended judgement.
+
+<strong>Natural-language inference models.</strong> A dedicated NLI classifier scores entailment between context and claim. Cheaper and faster than a large judge, weaker on long or technical passages.
+
+<strong>Citation checking.</strong> Require the model to cite a chunk id per sentence, then verify the cited chunk actually supports it. This has the useful property of being auditable by a human in seconds, and it changes the generator's behaviour for the better even before you measure anything.
+
+## What a low score is actually telling you
+
+A groundedness problem is often a retrieval problem wearing a generation costume. If the context did not contain the answer, a model asked to answer anyway will fill the gap from memory &mdash; so low groundedness correlates with low <a href="recall_at_k.html">recall@k</a>, and the fix is upstream.
+
+The other common cause is a prompt that does not permit abstention. A model told to "answer the question using the context" will answer; one told "if the context does not contain the answer, say so" will often decline correctly. That single sentence moves groundedness more than most model changes, and it is why <a href="corrective_rag.html">corrective RAG</a> treats declining as a first-class outcome.
+
+Watch for the degenerate optimum, too. An answer that quotes the context verbatim and says nothing else scores 1.0 on groundedness and may be useless. Groundedness has to be read next to <a href="completeness_in_llm_evaluation.html">completeness</a> and <a href="relevance_in_llm_evaluation.html">relevance</a>, or you will optimise your way into a system that recites.
+
+## Things to try
+
+1. Click the digital-goods claim, which the context does not support. Groundedness falls while correctness is unaffected &mdash; the two dimensions move independently.
+2. Flip every claim to supported. Groundedness reaches 1.0 while relevance and completeness stay where they were: a perfectly grounded answer can still be padded and incomplete.
+3. Note that the 24/7 phone claim is marked correct but off topic. True, plausible, and not what was asked &mdash; groundedness alone would not catch it.
+
+## What to remember
+
+Groundedness is the proportion of an answer's claims that the retrieved context actually supports. It is the direct measure of hallucination, it needs no reference answer, and it is independent of truth &mdash; a claim can be grounded and wrong, or true and ungrounded. Measure it per claim rather than per answer so it tells you which span to look at. A low score usually means a retrieval failure or a prompt that does not allow the model to decline. Never optimise it alone, because verbatim quotation scores perfectly.
+
+These four are usually measured with an <strong>LLM as judge</strong>: a strong model is shown the question, the retrieved context, the answer and sometimes a reference, and asked to score one dimension at a time. Judging one dimension per call is not a stylistic choice &mdash; a single prompt asking for all four produces correlated, mushy scores, because the model settles on a general impression and applies it everywhere.
+
+Two habits make judge scores trustworthy. Ask for a decision and a justification, so a human can audit disagreements. And calibrate against a small human-labelled set before believing any of it &mdash; a judge that agrees with your annotators 70% of the time is not measuring what you think it is measuring.

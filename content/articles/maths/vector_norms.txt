@@ -1,0 +1,70 @@
+title: Vector Norms: A Practical Guide
+intro: Three ways to measure length, and why the choice decides whether a model deletes features.
+
+## Quick Context
+
+"How big is this vector?" sounds like it has one answer. It has several, and machine learning uses at least three of them routinely &mdash; often in the same model.
+
+A norm is any function that takes a vector and returns a non-negative size, is zero only for the zero vector, scales properly when you multiply the vector by a constant, and obeys the triangle inequality. Several functions qualify, and they disagree.
+
+## The three you will meet
+
+L1 = |x&#8321;| + |x&#8322;| + &hellip;
+
+Add up the absolute values. Called the Manhattan or taxicab norm, because it is the distance you walk on a street grid &mdash; you cannot cut the corner.
+
+L2 = &radic;(x&#8321;&sup2; + x&#8322;&sup2; + &hellip;)
+
+Ordinary straight-line distance, from Pythagoras. This is the default: when someone writes ‖x‖ with no subscript, they mean this.
+
+L&infin; = max(|x&#8321;|, |x&#8322;|, &hellip;)
+
+Just the largest component. Everything else is ignored entirely.
+
+All three are the special cases p = 1, 2 and &infin; of one family, <span class="mono-font">Lp = (&Sigma;|x&#7522;|&#7510;)<sup>1/p</sup></span>, which is what the general p slider sweeps through.
+
+## The shapes are the point
+
+Draw every vector whose norm equals exactly 1 and you get that norm's <strong>unit ball</strong>. This is where the three stop being interchangeable:
+
+- <strong>L2</strong> gives a circle. Perfectly round &mdash; no direction is special.
+- <strong>L1</strong> gives a diamond, with sharp corners sitting exactly on the axes.
+- <strong>L&infin;</strong> gives a square, with flat sides.
+
+Those corners on the L1 diamond are not decoration. They are the entire reason Lasso produces exact zeros and Ridge does not.
+
+## Guided tour
+
+1. <strong>Confirm the ordering.</strong> Set <strong>Component X</strong> to 3 and <strong>Component Y</strong> to 4. L2 reads exactly 5 &mdash; the 3-4-5 triangle &mdash; while L1 reads 7 and L&infin; reads 4. The rule L&infin; &le; L2 &le; L1 holds for every vector you can drag to.
+2. <strong>Find where they agree.</strong> Set <strong>Component Y</strong> to 0. Now all three read the same number, because a vector lying on an axis has nothing for them to disagree about.
+3. <strong>Find where they disagree most.</strong> Set both components equal. L1 is now the largest it can be relative to L2 &mdash; the diagonal is exactly where the diamond is furthest inside the circle.
+4. <strong>Sweep the family.</strong> Drag the <strong>General p</strong> slider from 1 to 8 and watch the Lp ball morph from diamond to circle to square. There is nothing special about 1 and 2 except that they are useful and easy to differentiate.
+5. <strong>See sparsity happen.</strong> Tick <strong>Sparsity Demo</strong>. A line of equally good solutions appears, and each ball grows until it first touches that line. The L1 diamond almost always makes contact at a corner &mdash; where one coordinate is exactly zero &mdash; while the L2 circle touches at a smooth point with both coordinates non-zero.
+6. <strong>Try to break it.</strong> With the demo on, drag the sliders to change the line's angle. The L1 solution stays pinned to an axis across most angles; only when the line is nearly parallel to a diamond edge does it slide off the corner.
+
+## Why the corners cause zeros
+
+Regularised regression solves a constrained problem: find the best fit whose coefficient vector has norm below some budget. Geometrically, you inflate the norm's unit ball until it first touches the set of best-fitting solutions.
+
+A circle is smooth, so it will touch that set at whatever point happens to be nearest &mdash; a generic point, with every coordinate non-zero. That is <strong>Ridge</strong>: everything shrinks, nothing disappears.
+
+A diamond is mostly corner. Its corners stick out further along the axes than its edges do anywhere else, so contact is disproportionately likely to happen at a corner &mdash; and a corner is exactly a point where a coordinate equals zero. That is <strong>Lasso</strong>: coefficients are deleted, not merely shrunk.
+
+The same fact shows up in the calculus. The derivative of x&sup2; is 2x, which fades to nothing as x approaches zero; the derivative of |x| is &plusmn;1 all the way down. Smooth pressure that weakens versus constant pressure that does not &mdash; geometry and calculus telling the same story.
+
+## Where each shows up
+
+- <strong>L2</strong> &mdash; Euclidean distance in <a href="../machine_learning/knn.html" style="color: var(--accent-primary)">KNN</a> and k-means, weight decay, gradient clipping, and the length in almost every geometric argument.
+- <strong>L1</strong> &mdash; <a href="../machine_learning/ridge_and_lasso_regression.html" style="color: var(--accent-primary)">Lasso</a> and feature selection, and mean absolute error, which is more robust to outliers than squared error for the same reason.
+- <strong>L&infin;</strong> &mdash; worst-case bounds and adversarial robustness, where "no single pixel changed by more than &epsilon;" is exactly an L&infin; constraint.
+
+## Where this goes wrong
+
+- <strong>Assuming ‖x‖ means L2.</strong> It usually does, but not always. In a paper about sparsity it may well not.
+- <strong>Forgetting to scale features first.</strong> A norm adds up components, so a feature measured in thousands dominates the total. Regularising unscaled features penalises them by their units rather than their importance.
+- <strong>Calling L0 a norm.</strong> Counting non-zero entries is not a norm &mdash; it fails the scaling rule, since doubling a vector does not double the count. It is also what Lasso approximates, because optimising it directly is intractable.
+- <strong>Expecting L1 zeros to be stable.</strong> With correlated features the corner that gets touched can flip between similar datasets. The sparsity is real; which particular coefficient survives is not always meaningful.
+
+## What to remember
+
+A norm answers "how big is this vector", and L1, L2 and L&infin; give three different answers &mdash; the sum of absolute values, the straight-line length, and the largest component &mdash; always ordered L&infin; &le; L2 &le; L1, agreeing only on the axes. What separates them in practice is the shape of their unit ball: L2's circle is smooth and touches a solution set at a generic point, while L1's diamond is mostly corner and its corners sit on the axes, where a coordinate is exactly zero. That single geometric fact is why Lasso deletes features and Ridge only shrinks them.

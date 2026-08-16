@@ -1,0 +1,38 @@
+title: Common Table Expressions: Naming Your Steps
+intro: A CTE does not make queries more powerful. It makes them readable &mdash; and it unlocks recursion.
+
+## Quick Context
+
+A <strong>Common Table Expression</strong> is a named temporary result set defined with <span class="mono-font kw">WITH</span>, available only to the statement that follows it. Think of it as a variable for a query: compute something once, give it a name, then use that name.
+
+## Why Not Just Nest Subqueries?
+
+You can &mdash; the nested example in this lab returns exactly the same rows. But compare how they read. A nested query is evaluated <strong>inside out</strong>, so you must find the innermost parenthesis and work outward, holding each layer in your head. A chain of CTEs reads <strong>top to bottom</strong>, like a recipe.
+
+Each CTE can also reference the ones declared before it, which is what turns a tangle into a pipeline. And a CTE referenced twice is written once, rather than copy-pasted into two places that can drift apart.
+
+## Recursive CTEs: The Real Superpower
+
+This is the thing subqueries genuinely cannot do. A recursive CTE has two halves joined by <span class="mono-font kw">UNION ALL</span>:
+
+- The <strong>anchor</strong> &mdash; a plain query producing the starting rows. It runs once.
+- The <strong>recursive member</strong> &mdash; a query that references the CTE itself. It runs repeatedly, each time seeing only the rows produced by the previous round, until a round returns nothing.
+
+Press <strong>Step</strong> in the recursive example and watch one level of the org chart appear per iteration. This is how you query hierarchies of unknown depth: reporting lines, folder trees, bill-of-materials, graph traversal, or simply generating a series of numbers or dates.
+
+<strong>Always ensure the recursion terminates.</strong> If the recursive member never stops producing new rows you have an infinite loop; most engines cap it, but a cycle in your data (A reports to B, B reports to A) will hit that cap rather than finish.
+
+## A Note on Performance
+
+Historically PostgreSQL treated CTEs as an <em>optimisation fence</em> &mdash; always materialised, never merged into the outer query, which sometimes made them slower than the equivalent subquery. Since version 12 it inlines them by default, with <span class="mono-font">MATERIALIZED</span> and <span class="mono-font">NOT MATERIALIZED</span> available to force the choice. Most other engines have always inlined them. Treat CTEs as free for readability, but check the plan if a query is unexpectedly slow.
+
+## Guided experiments
+
+1. <strong>Start with the chained CTEs.</strong> Each named step shows its own output, so you can see the data narrowing at every stage.
+2. <strong>Switch to the nested subquery version.</strong> Identical result, one dense block, nesting depth 3 &mdash; and no way to inspect the middle.
+3. <strong>Open the recursive example and press Step.</strong> Iteration 1 finds the CEO, iteration 2 their direct reports, and so on down the tree.
+4. <strong>Keep stepping until it stops.</strong> The final iteration returns zero new rows &mdash; that empty result is the termination condition, not a row limit.
+
+## Where that leaves you
+
+Use CTEs to turn one unreadable query into several named steps that a colleague can follow. Use <span class="mono-font">WITH RECURSIVE</span> when the data is a hierarchy and you do not know how deep it goes &mdash; that is a problem plain SQL simply cannot express.

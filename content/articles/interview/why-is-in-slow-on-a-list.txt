@@ -1,0 +1,22 @@
+title: Why is `in` slow on a list but fast on a set?
+intro: What is the complexity of `x in my_list`, and how do you make it faster?
+
+## The two mechanisms
+
+A list has no idea where anything is, so <code>in</code> walks it comparing element by element. Best case one comparison, worst case n, and a value that is absent always costs n.
+
+A set stores values in slots chosen from their hashes. <code>in</code> hashes the value, goes to that slot and compares. The length of the set does not enter into it &mdash; see <a href="../dsa/hash_tables.html">hash tables</a> for the machinery.
+
+## The shape that turns quadratic
+
+The damage is rarely a single lookup. It is a lookup inside a loop:
+
+<code>for x in candidates: if x in seen_list: ...</code>
+
+That is O(n&middot;m). Building a set from <code>seen_list</code> once, before the loop, makes it O(n + m). This is the most common accidental quadratic in Python after <code>pop(0)</code>, and it is invisible in testing because small inputs are fast either way.
+
+## When a list is still right
+
+Building the set costs O(n) and some memory, so for a single membership test on a small list it is not worth it. The rule of thumb: if you will test more than a couple of times, or the collection is large, convert.
+
+Sets also require hashable elements and lose ordering and duplicates. If you need order, a dict works as an ordered set since 3.7 &mdash; and <code>dict.fromkeys(seq)</code> deduplicates while preserving order in one line.

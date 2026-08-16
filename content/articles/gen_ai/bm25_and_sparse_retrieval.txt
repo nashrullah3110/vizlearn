@@ -1,0 +1,28 @@
+title: BM25: A Practical Guide
+intro: Keyword search, done properly.
+
+## What this is
+
+Before <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">dense vector search</a>, and still running alongside it in most real systems, is sparse lexical search: score a document by which query terms it contains, weighted by how informative each term is. BM25 is the version of this idea that actually works well, and it needs no training, no GPU, and no embedding model.
+
+## The formula
+
+score(D,Q) = &Sigma;<sub>t&isin;Q</sub> IDF(t) &middot; f(t,D)(k1+1) / (f(t,D) + k1(1 &minus; b + b&middot;|D|/avgdl))
+
+Three ideas, one formula. <strong>IDF(t)</strong> — a term that appears in fewer documents is more informative, so it is weighted higher. <strong>f(t,D)</strong> — more occurrences of a query term help, but with diminishing returns, controlled by <strong>k1</strong>. <strong>|D|/avgdl</strong> — a document's raw term count is normalised against its own length, controlled by <strong>b</strong>, so a long document does not win purely by containing more words.
+
+## Things to try
+
+1. <strong>Read the default ranking.</strong> D2 leads — it repeats "list" four times and mentions every query term at least twice, and that repetition still wins even after the default length normalization is applied.
+2. <strong>Drag b to 0.</strong> Length normalization is off entirely. D2's lead grows further still, since its extra length now costs it nothing at all.
+3. <strong>Push b to 1.</strong> Full length normalization. D2's lead shrinks — but does not disappear. A four-times repeated rare term is still worth more than one clean mention, even once length is fully accounted for.
+4. <strong>Now drag k1 to 0.</strong> This is the setting that actually flips it: D1 overtakes D2. With k1 at 0, repeating a term buys nothing at all — only whether a term is present matters — so D2's four mentions of "list" count exactly the same as D1's one, and D1 wins on being the tighter, fully on-topic match.
+5. <strong>The lesson in that flip:</strong> b alone tempers term-stuffing; k1 is what actually caps it. The two parameters are doing different jobs, and neither one alone fully neutralises a document that just repeats the query terms.
+
+## Why it still matters next to embeddings
+
+BM25 gets exact terms right where embeddings can blur them — product codes, error messages, names, acronyms. It is also completely interpretable: every score decomposes into per-term contributions, which is why the breakdown panel above can show exactly where a score came from. This is the sparse half of the <a href="hybrid_search_reciprocal_rank_fusion.html" style="color: var(--accent-primary)">hybrid search</a> that most production RAG systems actually run.
+
+## What to remember
+
+BM25 scores a document by summing, over each query term it contains, that term's rarity across the corpus times a saturating function of how often it appears, normalised by document length. b controls how much long documents are penalised for being long; k1 controls how much repeated terms are rewarded before diminishing returns kick in. No embeddings, no training — and still the metric most search engines reach for first.

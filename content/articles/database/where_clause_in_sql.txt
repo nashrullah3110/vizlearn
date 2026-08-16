@@ -1,0 +1,37 @@
+title: The WHERE Clause: Keeping Only What You Asked For
+intro: A filter applied to every row, one at a time. Simple &mdash; until NULL gets involved.
+
+## Quick Context
+
+The <span class="mono-font kw">WHERE</span> clause is a condition tested against <strong>each row independently</strong>. If it evaluates to TRUE, the row is kept; anything else and it is dropped. That row-at-a-time model is the key mental picture &mdash; the database is not filtering "the table", it is asking one question of every row.
+
+## The Operators You Actually Need
+
+- <strong>Comparison</strong> &mdash; <span class="mono-font">= &lt;&gt; &lt; &gt; &lt;= &gt;=</span>. Note SQL uses <span class="mono-font">=</span> for equality, not <span class="mono-font">==</span>.
+- <strong>Logical</strong> &mdash; <span class="mono-font">AND</span>, <span class="mono-font">OR</span>, <span class="mono-font">NOT</span>. <span class="mono-font">AND</span> binds tighter than <span class="mono-font">OR</span>, so use parentheses when mixing them.
+- <span class="mono-font">IN (a, b, c)</span> &mdash; shorthand for a chain of ORs.
+- <span class="mono-font">BETWEEN x AND y</span> &mdash; inclusive of <em>both</em> endpoints, which surprises people regularly.
+- <span class="mono-font">LIKE</span> &mdash; pattern matching where <span class="mono-font">%</span> is any run of characters and <span class="mono-font">_</span> is exactly one.
+- <span class="mono-font">IS NULL</span> / <span class="mono-font">IS NOT NULL</span> &mdash; the only correct way to test for missing values.
+
+## The NULL Trap: SQL Has Three Truth Values
+
+NULL does not mean zero or empty string &mdash; it means <em>unknown</em>. Comparing anything to an unknown gives an unknown result, so <span class="mono-font">manager = 'Ada Lovelace'</span> is neither TRUE nor FALSE for a row where manager is NULL. It is <strong>UNKNOWN</strong>, and WHERE only keeps TRUE.
+
+Run the two manager examples in this lab and watch the UNKNOWN counter. The consequence catches everyone eventually: <span class="mono-font">WHERE manager = 'X'</span> and <span class="mono-font">WHERE manager &lt;&gt; 'X'</span> together do <em>not</em> return every row. The NULL rows fall through both. To include them you must say <span class="mono-font">OR manager IS NULL</span> explicitly.
+
+## WHERE and Performance
+
+WHERE is also where indexes earn their keep. A condition like <span class="mono-font">salary &gt; 65000</span> can use an index on <span class="mono-font">salary</span> to skip most of the table. But wrapping the column in a function &mdash; <span class="mono-font">WHERE UPPER(name) = 'ADA'</span> &mdash; usually defeats the index, because the stored values are no longer what is being compared. Similarly, <span class="mono-font">LIKE 'A%'</span> can use an index while <span class="mono-font">LIKE '%a'</span> cannot, since the leading wildcard gives the engine no prefix to seek on.
+
+## Try it yourself
+
+1. <strong>Run the default predicate.</strong> The evaluation column shows TRUE or FALSE for every row &mdash; the filter is genuinely parsed and applied, so you can type your own.
+2. <strong>Try <span class="mono-font">manager IS NULL</span>, then <span class="mono-font">manager = 'Ada Lovelace'</span>.</strong> Watch the UNKNOWN counter appear in the second case.
+3. <strong>Test <span class="mono-font">salary BETWEEN 60000 AND 75000</span></strong> and confirm that a row sitting exactly on an endpoint is included.
+4. <strong>Break the syntax on purpose</strong> &mdash; delete a closing quote. The parser reports the error rather than silently returning nothing, exactly as a database would.
+5. <strong>Compare <span class="mono-font">NOT (dept = 'Engineering') OR salary &lt; 65000</span> with the parentheses removed.</strong> Operator precedence changes the answer.
+
+## In one line
+
+WHERE asks one yes/no question of every row &mdash; except the answer can also be "unknown", and unknown rows are silently dropped. Most WHERE-clause bugs in production are really NULL bugs.

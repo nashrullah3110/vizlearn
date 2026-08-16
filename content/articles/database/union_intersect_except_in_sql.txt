@@ -1,0 +1,52 @@
+title: UNION, INTERSECT and EXCEPT in SQL: A Practical Guide
+intro: Set operators combine whole result sets vertically, stacking rows rather than widening them. That is the difference from a JOIN, and it is the point people miss most often.
+
+## Stacking, not joining
+
+A JOIN combines tables <strong>horizontally</strong>: matching rows are linked and the result has the columns of both. A set operator combines result sets <strong>vertically</strong>: rows from the second query are stacked under rows from the first, and the column count does not change.
+
+So the question a set operator answers is “which rows appear in these two result sets?”, not “what belongs together?”. If you want columns from two tables, you need a JOIN; if you want the rows from two similar queries treated as one collection, you need these.
+
+## The three operators
+
+Take two result sets, A = {1, 2, 3} and B = {2, 3, 4}:
+
+A UNION B&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr; 1, 2, 3, 4&nbsp;&nbsp;&nbsp;in either, duplicates removed<br>A UNION ALL B&nbsp;&rarr; 1,2,3,2,3,4&nbsp;&nbsp;everything, duplicates kept<br>A INTERSECT B &rarr; 2, 3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in both<br>A EXCEPT B&nbsp;&nbsp;&nbsp;&nbsp;&rarr; 1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in A but not B
+
+Two things are worth noting. <strong>EXCEPT is not symmetric</strong> &mdash; <span class="mono-font">B EXCEPT A</span> gives 4, a different answer. And UNION, INTERSECT and EXCEPT all remove duplicates by default, which is a genuine cost: the database must sort or hash the entire result to find them.
+
+Some databases spell EXCEPT as MINUS (Oracle), and the semantics are the same.
+
+## The rules every set operator enforces
+
+- <strong>Same number of columns</strong> in both queries.
+- <strong>Compatible types</strong>, position by position &mdash; the first column of one must be comparable with the first column of the other.
+- <strong>Column names come from the first query.</strong> The second query’s aliases are ignored entirely.
+- <strong>ORDER BY applies to the whole result</strong> and may appear only once, at the very end. It cannot be attached to an individual branch.
+
+Note that matching is <em>positional</em>, not by name. If the first query selects (id, name) and the second selects (name, id), and both are text-compatible, the query runs and silently returns nonsense.
+
+## Exploration guide
+
+1. <strong>Compare UNION with UNION ALL.</strong> Switch <strong>Operator</strong> between them and count the rows. The difference is exactly the duplicates &mdash; and UNION paid to find them.
+2. <strong>Look at INTERSECT.</strong> Only rows present in both sides survive. This is the set equivalent of an inner join on every column at once.
+3. <strong>Reverse EXCEPT.</strong> Note which rows survive, then imagine swapping the two queries. The answer changes completely &mdash; order matters here and nowhere else among the three.
+4. <strong>Watch the duplicate handling.</strong> With duplicates present in the source, see which operators collapse them and which do not.
+
+## UNION ALL is usually the one you want
+
+UNION performs a deduplication pass over the combined result, which means a sort or a hash of every row. When you know the two sets cannot overlap &mdash; last month’s orders and this month’s orders, or partitioned tables split by region &mdash; that work finds nothing and you have paid for it anyway.
+
+UNION ALL simply concatenates and is frequently several times faster on large result sets. Use UNION only when duplicates are genuinely possible <em>and</em> you want them removed; reach for UNION ALL by default and add the deduplication deliberately.
+
+## What trips people up
+
+- <strong>Using UNION out of habit.</strong> The unnecessary deduplication is one of the more common avoidable costs in reporting queries.
+- <strong>Mismatched column order.</strong> Positional matching means compatible-but-wrong orderings run happily and return garbage.
+- <strong>Expecting EXCEPT to be symmetric.</strong> Swapping the operands gives a different result.
+- <strong>Putting ORDER BY on a branch.</strong> It belongs once, at the end, and applies to the whole combined set.
+- <strong>Reaching for a set operator when a JOIN is needed.</strong> If you want columns from both tables, no set operator will do it &mdash; they only ever stack rows.
+
+## What to remember
+
+UNION, INTERSECT and EXCEPT combine result sets vertically, requiring the same column count and compatible types matched by position rather than name. All three deduplicate by default, which costs a full sort or hash &mdash; so prefer UNION ALL unless you specifically need duplicates removed. EXCEPT is the only one where operand order changes the answer, and none of them is a substitute for a JOIN.

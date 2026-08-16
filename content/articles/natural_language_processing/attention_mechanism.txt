@@ -1,0 +1,57 @@
+title: The Attention Mechanism: A Practical Guide
+intro: The idea that removed the bottleneck, and then removed recurrence altogether.
+
+## Quick Context
+
+The encoder&ndash;decoder models that came before attention worked like this: an <a href="rnn.html" style="color: var(--accent-primary)">RNN</a> read the whole input sentence and squeezed it into a single fixed-length vector, and a second RNN generated the output from that vector alone.
+
+The flaw is visible as soon as you say it out loud. Every sentence, whether five words or fifty, has to fit in the same number of floats. The encoder's final state is dominated by whatever it read last, and the beginning of a long sentence is simply gone by the time decoding starts. Translation quality fell off a cliff past about twenty words.
+
+## The fix
+
+Attention throws away the assumption that the decoder needs one summary. Instead, keep <em>every</em> encoder state, and at each output step let the decoder build a fresh context vector by weighting them:
+
+1. <strong>Score.</strong> Compare the decoder's current state against every encoder state. One number per input word &mdash; how relevant is this word, right now?
+2. <strong>Normalise.</strong> Push the scores through <a href="../deep_learning/softmax_and_cross_entropy.html" style="color: var(--accent-primary)">softmax</a> so they are positive and sum to 1. These are the attention weights.
+3. <strong>Blend.</strong> Take the weighted average of the encoder states. That is the context vector for this step, and it is different for every output word.
+
+Nothing is discarded and nothing is compressed. The decoder reaches back into the full input every single time it produces a word.
+
+## Why the weights are interpretable
+
+Because they sum to 1 and are all positive, the weights read as a distribution of interest: "to produce this word, I looked 70% at <em>cat</em> and 20% at <em>the</em>". Plotting them for every output word against every input word gives the alignment matrix in the second panel, and on a translation task it recovers word alignment without ever having been told what alignment is.
+
+That interpretability is genuinely useful, but treat it carefully &mdash; attention weights show where information was drawn from, which is not quite the same as showing why the model decided what it decided.
+
+## Things to try
+
+1. <strong>Walk the output.</strong> Set the <strong>Output Step</strong> slider to 1, then step it up one at a time. The bright connection moves across the source sentence as each output word is produced &mdash; the decoder is looking somewhere different every time.
+2. <strong>See the bottleneck it replaced.</strong> Tick <strong>Bottleneck Mode</strong>. Now every output step gets the same flat average of the input, exactly as a fixed context vector would give it. The weights stop moving, focus collapses, and the model has nothing left to distinguish one step from another.
+3. <strong>Sharpen the focus.</strong> Set the <strong>Sharpness</strong> slider to 4. The weights concentrate almost entirely on one source word and the entropy readout falls toward zero &mdash; this is a hard alignment.
+4. <strong>Blur it.</strong> Set the <strong>Sharpness</strong> slider to 0.2. The weights spread almost evenly and entropy rises toward its maximum. The context vector becomes a bland average, which is the bottleneck failure again, arrived at from a different direction.
+5. <strong>Watch the whole matrix.</strong> Look at the second panel while you change sharpness. The bright diagonal-ish band is the alignment the model has learned; blurring smears it into a uniform grey.
+
+## Scoring functions
+
+Step 1 needs a way to compare two vectors. Two became standard:
+
+- <strong>Additive</strong> (Bahdanau, 2014): push both vectors through a small feed-forward layer. Flexible, works when the two have different sizes, but adds parameters and is slower.
+- <strong>Dot-product</strong> (Luong, 2015): just take the <a href="../maths/vectors_and_dot_product.html" style="color: var(--accent-primary)">dot product</a>. No parameters at all, and it is a matrix multiplication, which is exactly what accelerators are built for.
+
+Dot-product won, and that decision is the reason transformers are fast. Its one wrinkle &mdash; that dot products grow with vector size and push softmax into saturation &mdash; is fixed by dividing by the square root of the dimension, the "scaled" in scaled dot-product attention.
+
+## What came next
+
+Attention was invented as a patch for RNNs, and for three years that is what it was. Then came the observation that gave the paper <em>Attention Is All You Need</em> its title: if the decoder can reach any input position directly, the recurrence is no longer doing anything essential. Remove it, apply attention to the sequence against itself, and you get <a href="self_attention.html" style="color: var(--accent-primary)">self-attention</a> &mdash; which trains in parallel across all positions instead of stepping through them one at a time.
+
+The next module generalises the three steps above into the <a href="query_key_value.html" style="color: var(--accent-primary)">query, key and value</a> framing that every transformer is written in.
+
+## Where this goes wrong
+
+- <strong>Treating attention weights as explanation.</strong> They show where information came from, not why the output was chosen. Different weightings can produce the same prediction.
+- <strong>Forgetting the cost.</strong> Every output position scores against every input position, so the work grows with the product of the two lengths. On long sequences this quadratic term, not the model size, is what runs out of memory.
+- <strong>Expecting clean alignments everywhere.</strong> Attention is often diffuse, and heads in a real model frequently attend to punctuation or to the first token for reasons that have nothing to do with meaning.
+
+## Summing up
+
+Attention replaces the single fixed context vector with a fresh weighted average of every encoder state, recomputed at each output step: score the decoder state against each input position, softmax the scores into weights that sum to 1, and blend. Because nothing is compressed, long sentences stop degrading, and because the weights are a proper distribution they can be read as an alignment. Dot-product scoring made it fast enough to be worth doing everywhere, and once the decoder could reach any position directly, recurrence turned out to be optional.
