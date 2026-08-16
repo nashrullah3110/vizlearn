@@ -202,7 +202,7 @@ def page(entry):
         CSS.strip("\n"))
 
     main = """
-    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+    <main class="flex-1 p-4 md:p-8 max-w-[1600px] mx-auto w-full">
         <div class="mb-8 animate-fade-in">
             %(crumb)s
             <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">%(title)s</h1>

@@ -96,7 +96,7 @@ def build(key, mods):
     parts = [shell.head_top(title, PREFIX), shell.header(PREFIX)]
 
     parts.append("""
-    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+    <main class="flex-1 p-4 md:p-8 max-w-[1600px] mx-auto w-full">
 
         <div class="mb-8 animate-fade-in">
             %(crumb)s
