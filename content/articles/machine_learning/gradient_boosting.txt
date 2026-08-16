@@ -23,6 +23,66 @@ For squared-error loss, the negative gradient of the loss with respect to the pr
 
 That framing is what makes the method general. Swap in a different loss and the "residual" becomes that loss's negative gradient instead, which is how the same algorithm handles classification, ranking and count data without changing shape.
 
+## The exam-revision analogy
+
+Boosting is what a sensible student does with a mock exam.
+
+You sit the paper and get 60%. You do not then revise everything again from page one &mdash; you look at what you got wrong and study that. Sit another paper, look at the new mistakes, study those. Each round of revision is small and targeted at whatever is still failing.
+
+Gradient boosting does exactly this with models. The first tree makes a crude prediction. The second tree is not trained on the original target at all &mdash; it is trained on the <em>errors</em> the first tree made. The third is trained on the errors that remain after the first two. Add them all up and you have a prediction that has been corrected hundreds of times.
+
+The trees stay deliberately weak &mdash; often just three to six levels deep. A weak learner cannot overreact to one round's mistakes, and with a small learning rate each correction is only partly applied. Hundreds of small, cautious corrections turn out to beat a handful of confident ones, on almost every tabular dataset anyone has tried.
+
+## Three rounds with numbers
+
+Predict house prices from a single starting guess. Suppose the average price is 300 (thousand), so the model starts by predicting 300 for everybody.
+
+|Row|Actual|Prediction after round 0|Residual to learn|
+|---|---|---|---|
+|A|250|300|&minus;50|
+|B|420|300|+120|
+|C|310|300|+10|
+
+Tree 1 is fitted to the residual column, not the price column. Suppose it learns "small houses &minus;40, large houses +90". With a learning rate of 0.1, only a tenth of that correction is applied:
+
+|Row|Prediction after round 1|New residual|
+|---|---|---|
+|A|300 + 0.1&times;(&minus;40) = 296|&minus;46|
+|B|300 + 0.1&times;(+90) = 309|+111|
+|C|300 + 0.1&times;(&minus;40) = 296|+14|
+
+Barely moved &mdash; and that is the design. Tree 2 now fits the new residual column, tree 3 fits what is left after that, and so on for several hundred rounds. Each tree sees a target that is what the ensemble still gets wrong, so the errors shrink gradually and no single tree gets to dominate.
+
+Two consequences follow directly. Boosting cannot be parallelised across trees, because tree n needs the residuals from tree n&minus;1. And more trees always fit the training data better, which is why the stopping rule matters more here than in any other common model.
+
+## The four settings that matter
+
+|Setting|What it does|Sensible range|
+|---|---|---|
+|`learning_rate`|How much of each tree's correction to apply|0.01&ndash;0.1|
+|`n_estimators`|How many trees|300&ndash;3000, with early stopping|
+|`max_depth`|How complex each tree may be|3&ndash;8|
+|`subsample`|Fraction of rows each tree sees|0.7&ndash;1.0|
+
+The first two are one knob wearing two labels: halve the learning rate and you need roughly twice the trees for the same fit. The practical recipe is to fix a small learning rate, set a generous number of trees, and let <strong>early stopping</strong> on a validation set decide when to quit.
+
+```python
+from sklearn.ensemble import HistGradientBoostingClassifier
+
+model = HistGradientBoostingClassifier(
+    learning_rate=0.05,
+    max_iter=2000,             # an upper bound, not a target
+    max_depth=6,
+    early_stopping=True,       # stop when validation stops improving
+    n_iter_no_change=50,       # patience
+    validation_fraction=0.1,
+)
+model.fit(X_train, y_train)
+print(model.n_iter_)           # how many rounds it actually used
+```
+
+`subsample` below 1.0 turns this into <em>stochastic</em> gradient boosting: each tree sees a random fraction of the rows, which adds a useful dose of randomness and often improves generalisation as well as speed.
+
 ## Exploration guide
 
 1. <strong>Watch it build.</strong> Press <strong>Reset to Zero Trees</strong>, then click <strong>Add One Tree</strong> a few times. Each stump adds a single step to the prediction and flattens one part of the residual plot. After three or four trees the shape of the underlying curve is already visible.
@@ -52,3 +112,41 @@ Halving the learning rate roughly doubles the number of trees you need to reach 
 ## What to remember
 
 Gradient boosting fits each new small tree to the residuals left by everything built so far, then adds a fraction of it to the running prediction &mdash; which is gradient descent performed in function space, with the learning rate as the step size. Because it attacks bias by sequential correction rather than variance by averaging, its trees must be weak and its round count must be limited, and unlike a random forest it will overfit if you keep going. Fix a small learning rate, add trees while held-out error improves, and stop the moment it does not.
+
+## XGBoost, LightGBM and CatBoost
+
+The idea is one thing; the implementations are another, and in practice you will use one of three.
+
+- <strong>XGBoost</strong> &mdash; the one that made boosting famous by winning competitions. Adds explicit L1 and L2 regularisation on leaf weights and a well-engineered handling of missing values, where each split learns a default direction for absent values.
+- <strong>LightGBM</strong> &mdash; the fastest on large data. It grows trees leaf-wise (always splitting the leaf that reduces loss most) rather than level by level, and bins continuous features into histograms. Usually the best choice above a few hundred thousand rows, but leaf-wise growth overfits small datasets unless you cap `num_leaves`.
+- <strong>CatBoost</strong> &mdash; the one to reach for with many categorical columns. It encodes them with target statistics computed in a way that avoids leaking the target, and its defaults are unusually good, so it often wins with no tuning at all.
+
+Scikit-learn's own `HistGradientBoostingClassifier` is a LightGBM-style implementation with no extra dependency, and is a perfectly good default for a first pass.
+
+## When to use it, and when not to
+
+Gradient boosting is the strongest general-purpose model for tabular data &mdash; rows and columns, mixed types, tens to millions of rows. If your data lives in a spreadsheet or a database table, this is the family to try first and probably to ship.
+
+It is the wrong tool for images, audio and raw text, where neural networks capture structure that trees cannot. It is a poor fit when you need a model a regulator can read, since "the sum of 800 trees" is not an explanation without extra tooling like SHAP. It struggles to extrapolate beyond the range of the training data, as all tree models do. And it is more sensitive to noisy labels than a random forest is, precisely because it keeps focusing effort on the examples it gets wrong &mdash; and a mislabelled row is an example it will always get wrong.
+
+## Questions people ask
+
+<strong>How is this different from a random forest?</strong> A forest builds hundreds of deep trees independently on random samples and averages them, which reduces variance. Boosting builds shallow trees sequentially, each fixing the last one's errors, which reduces bias. Forests are harder to break; boosting reaches higher.
+
+<strong>Does it need feature scaling?</strong> No. Trees split on thresholds, so units are irrelevant.
+
+<strong>How do I stop it overfitting?</strong> Early stopping first, then a lower learning rate, shallower trees, `subsample` below 1, and the L1/L2 penalties the library offers. Watch the validation curve: the point where validation loss turns up while training loss keeps falling is the moment to stop.
+
+<strong>Why is my model worse after adding more trees?</strong> Because past the optimum, additional trees are fitting noise. This is normal and is exactly what early stopping is for.
+
+<strong>Can it do multi-class classification?</strong> Yes &mdash; typically by fitting one set of trees per class and taking a softmax over their outputs, which is why training time scales with the number of classes.
+
+<strong>Is it good with missing values?</strong> Unusually good. XGBoost and LightGBM learn which way to send missing values at each split, so imputing beforehand is often unnecessary and occasionally harmful.
+
+## Recap in one screen
+
+- Each tree is trained on what the ensemble still gets wrong, and only a fraction of its correction is applied.
+- Learning rate and number of trees are one knob: small rate, many trees, early stopping.
+- Keep trees shallow. The strength comes from the sequence, not from any single tree.
+- Best-in-class for tabular data; not for images, text or hard interpretability requirements.
+- More trees is not better past the validation minimum &mdash; it is memorisation.

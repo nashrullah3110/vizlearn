@@ -15,6 +15,68 @@ You end up with k scores. Report the <strong>mean</strong> as the performance es
 
 k = 5 or k = 10 are the standard choices. Larger k means more training data per fold (less pessimistic bias) but k model fits and more correlated training sets. The extreme, k = n, is leave-one-out: nearly unbiased, high variance, and usually far too expensive.
 
+## Why one number is not an answer
+
+Suppose you split 1,000 rows into 800 for training and 200 for testing, and the model scores 87%. Report that and you have said something slightly dishonest, because you have not said how much of the 87% was luck.
+
+Shuffle the data differently and try again: 84%. Again: 89%. Again: 86%. The model did not change. What changed is which awkward rows happened to land in the test set.
+
+The spread across those runs is the thing a single split hides. A model that scores 87% &plusmn; 1% and a model that scores 87% &plusmn; 6% are not equally trustworthy, and only the second one is going to embarrass you in production. Cross-validation exists to put the &plusmn; on the number.
+
+It also fixes a quieter waste. With one split, 20% of your data only ever gets tested on and 80% only ever gets trained on. When data is expensive &mdash; medical records, labelled defects, anything a human had to annotate &mdash; throwing away a fifth of it is a real cost. K-fold uses every row for both jobs, just never at the same time.
+
+## A worked example with 100 rows
+
+Take 100 rows and k = 5. Cross-validation shuffles them, cuts them into five blocks of 20, and runs five separate experiments:
+
+|Run|Trained on|Tested on|Score|
+|---|---|---|---|
+|1|Blocks 2,3,4,5|Block 1|0.86|
+|2|Blocks 1,3,4,5|Block 2|0.91|
+|3|Blocks 1,2,4,5|Block 3|0.79|
+|4|Blocks 1,2,3,5|Block 4|0.88|
+|5|Blocks 1,2,3,4|Block 5|0.84|
+
+The headline is the mean: (0.86 + 0.91 + 0.79 + 0.88 + 0.84) / 5 = <strong>0.856</strong>. The standard deviation is about <strong>0.04</strong>, so the honest summary is "roughly 0.86, give or take 0.04".
+
+Block 3 is worth a look on its own. A fold that scores well below the others is not noise to be averaged away &mdash; it usually means those twenty rows contain something the others do not. A different time period, a different hospital, a different product line. Open them.
+
+Note what five folds cost: five models trained instead of one. That is the whole downside, and it is why k = 5 or k = 10 are the standard choices. Ten folds give a slightly better estimate for double the compute, and beyond that the returns are tiny.
+
+## Choosing k, and the leave-one-out extreme
+
+- <strong>k = 5</strong> &mdash; the everyday default. Each model trains on 80% of the data, and you pay five times the training cost.
+- <strong>k = 10</strong> &mdash; the classic recommendation. Each model sees 90% of the data, so the estimate is a little less pessimistic, and the variance across folds is usually smaller.
+- <strong>k = n (leave-one-out)</strong> &mdash; every single row takes a turn as the test set. Almost unbiased, but you train n models, and the folds are so similar to each other that the estimate can be surprisingly unstable. Reserve it for very small datasets.
+
+There is a real tension here. Small k means each model trains on less data, so every fold's score is pessimistic compared to the model you will finally ship on 100% of the data. Large k reduces that pessimism but makes the training sets nearly identical, which means the fold scores stop being independent estimates. Five and ten are compromises that have survived decades of practice.
+
+For very small datasets, <strong>repeated k-fold</strong> is often the better move: run 5-fold cross-validation five times with different shuffles and average the twenty-five scores. You get a much steadier estimate without the pathologies of leave-one-out.
+
+## Nested cross-validation, and why the ordinary kind can lie
+
+Here is the trap that catches most people once. You use cross-validation to pick hyperparameters &mdash; try thirty settings, keep whichever scored best &mdash; and then report that best score as the model's performance.
+
+That number is optimistic, and sometimes badly so. You searched thirty options against those exact folds and kept the luckiest. The score now includes the luck.
+
+The fix is <strong>nested</strong> cross-validation. An outer loop splits off a test fold and never touches it for tuning. Inside each outer training set, an inner cross-validation picks the hyperparameters. The outer fold then scores that tuned model on data no part of the tuning ever saw.
+
+```python
+from sklearn.model_selection import GridSearchCV, cross_val_score, KFold
+
+inner = KFold(n_splits=5, shuffle=True, random_state=0)
+outer = KFold(n_splits=5, shuffle=True, random_state=1)
+
+search = GridSearchCV(model, param_grid, cv=inner)      # picks the settings
+scores = cross_val_score(search, X, y, cv=outer)        # scores them honestly
+
+print(scores.mean(), scores.std())
+```
+
+It costs k&times;k model fits, so it is not free. Use it when you are reporting a number someone will make a decision on. For day-to-day iteration, plain k-fold plus one genuinely untouched hold-out set is the pragmatic compromise.
+
+The same discipline applies to preprocessing. Fit your scaler, your imputer and your feature selector <em>inside</em> each fold, by putting them in a `Pipeline`. Scaling the whole dataset before splitting leaks the test folds' means and standard deviations into training, and quietly inflates every score you produce.
+
 ## Guided experiments
 
 1. <strong>Watch each fold take its turn.</strong> Set <strong>Folds (k)</strong> to 5 and press <strong>Run Next Fold</strong> repeatedly. A different block becomes the test set each time, and the remaining blocks train.
@@ -41,3 +103,26 @@ Plain k-fold splits at random, which is wrong in three common situations:
 ## What to remember
 
 K-fold cross-validation trains k models, each holding out a different fold, so every row is tested once and you get a mean <em>and</em> a spread rather than one seed-dependent number. Use stratified folds for classification, grouped folds when rows share a subject, and forward-chaining for time series. Whatever the variant, fit every preprocessing step inside the fold &mdash; doing it beforehand leaks the test set and quietly invalidates the whole exercise.
+
+## Questions people ask
+
+<strong>Do I still need a separate test set?</strong> Yes, if you can afford one. Cross-validation is for choosing between options; a final untouched hold-out is for the number you tell other people. Every decision you make while looking at the cross-validation scores erodes their independence a little.
+
+<strong>Which model do I actually deploy?</strong> Not any of the k fold models. Once cross-validation has told you which method and which settings to use, retrain on all the data and ship that. The fold scores were an estimate of how that final model will behave.
+
+<strong>Should I shuffle?</strong> Usually yes &mdash; data that arrived sorted by class or by date makes unshuffled folds wildly unrepresentative. The exception is time series, where shuffling destroys the point entirely.
+
+<strong>What if the folds disagree a lot?</strong> Treat it as a finding. Wide spread means your dataset is small, heterogeneous, or contains groups the split is cutting through. Look at the worst fold's rows before you look at a different algorithm.
+
+<strong>Is cross-validation useful for deep learning?</strong> Rarely, and only for small datasets. Training a large network five times is often unaffordable, and with hundreds of thousands of examples a single well-constructed validation set is stable enough.
+
+<strong>Can I cross-validate on imbalanced data?</strong> Yes, with `StratifiedKFold`, which keeps each fold's class proportions the same as the whole. Without it, a rare class can be absent from a fold entirely and the score for that fold becomes meaningless.
+
+## Recap in one screen
+
+- One split gives one number; cross-validation gives a mean and a spread, and the spread is the part you were missing.
+- k-fold trains k models, testing each row exactly once. k = 5 or 10 is the normal choice.
+- Stratify for classification, group for repeated subjects, and never shuffle time series.
+- Fit every preprocessing step inside the fold, using a pipeline, or you leak.
+- Tuning on the same folds you report inflates the result &mdash; nest the loops when the number matters.
+- Retrain on everything before you deploy.

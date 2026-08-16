@@ -587,40 +587,37 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Without a non-linearity between layers, stacking them is pointless: any chain of linear maps collapses into a single linear map. Activations are what make depth mean something.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Why depth needs a bend</h3>
-                    <p>Two linear layers in a row compute <span class="mono-font">W<sub>2</sub>(W<sub>1</sub>x) = (W<sub>2</sub>W<sub>1</sub>)x</span>, which is just another single matrix. A hundred stacked linear layers still only draw a straight boundary. Inserting a non-linear function between them is what lets a network represent curves, corners and disjoint regions.</p>
-                </div>
-                <div>
-                    <h3>The four you will actually meet</h3>
+                    <h3 id="vz-s-the-four-you-will-actually-meet">The four you will actually meet</h3>
                     <ul><li><strong>Sigmoid</strong> &mdash; <span class="mono-font">1 / (1 + e<sup>&minus;x</sup>)</span>, output in (0, 1). Reads as a probability, which is why it survives at the output of binary classifiers.</li><li><strong>Tanh</strong> &mdash; output in (&minus;1, 1) and centred on zero, which tends to train better than sigmoid in hidden layers.</li><li><strong>ReLU</strong> &mdash; <span class="mono-font">max(0, x)</span>. Gradient is exactly 1 for positive input and exactly 0 otherwise. Cheap, and the default for hidden layers.</li><li><strong>Leaky ReLU</strong> &mdash; <span class="mono-font">max(0.01x, x)</span>. Keeps a small gradient alive on the negative side.</li></ul>
                 </div>
                 <div>
-                    <h3>Numbers at three inputs</h3>
+                    <h3 id="vz-s-numbers-at-three-inputs">Numbers at three inputs</h3>
                     <p>Set the same x through each function and the differences become obvious:</p><ul><li><span class="mono-font">x = 2</span> &rarr; sigmoid <strong>0.881</strong>, tanh <strong>0.964</strong>, ReLU <strong>2.0</strong></li><li><span class="mono-font">x = &minus;2</span> &rarr; sigmoid <strong>0.119</strong>, tanh <strong>&minus;0.964</strong>, ReLU <strong>0</strong></li><li><span class="mono-font">x = 10</span> &rarr; sigmoid <strong>0.99995</strong>, and its slope there is about <strong>0.000045</strong></li></ul><p>That last figure is the problem in a nutshell. A neuron sitting at x = 10 with a sigmoid has effectively stopped learning: the gradient flowing back through it is almost zero.</p>
                 </div>
                 <div>
-                    <h3>The dying ReLU problem</h3>
+                    <h3 id="vz-s-the-dying-relu-problem">The dying ReLU problem</h3>
                     <p>ReLU outputs zero for any negative input, and its derivative there is also zero. If a neuron’s weights are pushed far enough negative that it outputs zero for <em>every</em> training example, it receives no gradient &mdash; and with no gradient it can never recover. The neuron is permanently dead.</p><p>This is not rare. A large learning rate can kill a substantial fraction of a layer in a single update, and dead neurons are invisible in the loss curve; the network simply has less capacity than you think it does.</p><strong>Leaky ReLU</strong> fixes it by giving negative inputs a small slope, typically 0.01, so the gradient is never exactly zero and a neuron can always climb back. <strong>ELU</strong> and <strong>GELU</strong> do the same with a smooth curve, and GELU is the standard choice in transformers.
                 </div>
                 <div>
-                    <h3>Which one to use where</h3>
+                    <h3 id="vz-s-which-one-to-use-where">Which one to use where</h3>
                     <ul><li><strong>Hidden layers, general default</strong> &mdash; ReLU. Cheap, no vanishing gradient in the positive region, and works.</li><li><strong>Hidden layers, if neurons are dying</strong> &mdash; Leaky ReLU or ELU.</li><li><strong>Transformers</strong> &mdash; GELU, essentially universally.</li><li><strong>Recurrent networks</strong> &mdash; tanh inside the cell, because bounded outputs keep the recurrent state from growing without limit.</li><li><strong>Anywhere deep, with sigmoid</strong> &mdash; avoid. Its maximum derivative of 0.25 shrinks the gradient by at least a factor of four per layer.</li></ul>
                 </div>
                 <div>
-                    <h3>Output activations are a separate decision</h3>
+                    <h3 id="vz-s-output-activations-are-a-separate-decision">Output activations are a separate decision</h3>
                     <p>Hidden-layer activations exist to introduce non-linearity. Output activations exist to put the prediction in the right range, and the choice is dictated by the task rather than by preference:</p><ul><li><strong>Regression</strong> &mdash; no activation. The output must be unbounded.</li><li><strong>Binary classification</strong> &mdash; sigmoid, giving one probability in [0, 1].</li><li><strong>Multi-class, one label</strong> &mdash; softmax, giving probabilities across classes that sum to 1.</li><li><strong>Multi-label</strong> &mdash; sigmoid on each output independently, since several labels can be true at once and the outputs should <em>not</em> sum to 1.</li></ul><p>One practical warning: frameworks usually fold the output activation into the loss for numerical stability, so <span class="mono-font">CrossEntropyLoss</span> in PyTorch expects raw logits and applies softmax itself. Adding your own softmax before it applies the function twice and quietly degrades training.</p>
                 </div>
                 <div>
-                    <h3>Try this above</h3>
+                    <h3 id="vz-s-try-this-above">Try this above</h3>
                     <ol><li>Drag <strong>Input Value (x)</strong> to around 6 and look at sigmoid and tanh. Both are pinned near their ceiling and the curve is nearly flat &mdash; that flatness is saturation.<button class="vz-run" type="button" data-vz-run="0" aria-label="Run this experiment in the visualisation: Input Value (x)"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li>Bring x back toward 0. Both functions are at their steepest here, which is where they learn fastest.</li><li>Set x to &minus;3 and note ReLU outputs exactly 0, not a small number.</li></ol>
                 </div>
                 <div>
-                    <h3>What usually goes wrong</h3>
+                    <h3 id="vz-s-what-usually-goes-wrong">What usually goes wrong</h3>
                     <strong>Sigmoid in deep hidden layers.</strong> Its derivative peaks at 0.25, so gradients shrink by at least 4&times; per layer. Five layers of sigmoid multiplies the gradient by roughly 0.25<sup>5</sup> &asymp; 0.001 in the best case &mdash; the early layers barely move. This is the vanishing gradient problem, and it is why ReLU became standard.<strong>Dying ReLU.</strong> A neuron pushed firmly negative outputs 0 and has zero gradient, so nothing ever pulls it back. It is dead for the rest of training. Leaky ReLU exists precisely to leave a small escape route.
                 </div>
                 <div>
-                    <h3>In one line</h3>
+                    <h3 id="vz-s-in-one-line">In one line</h3>
                     <p>ReLU in the hidden layers by default; sigmoid or softmax only at the output, where the bounded range is the point.</p>
                 </div>
             </div>

@@ -343,28 +343,25 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Give the model the page before you ask it the question.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Quick Context</h3>
-                    <p>A language model knows what was in its training data, frozen at some cutoff date. It does not know your company's handbook, last week's incident report, or a product invented for a teaching page. Asked anyway, it will answer &mdash; fluently, and wrongly.</p><p>Retrieval-augmented generation is the fix that does not involve training anything. Find the passages that look relevant, paste them into the prompt, and ask the question with the evidence attached. The model stops recalling and starts reading.</p>
-                </div>
-                <div>
-                    <h3>The pipeline</h3>
+                    <h3 id="vz-s-the-pipeline">The pipeline</h3>
                     <ol><li><strong>Chunk.</strong> Split the documents into passages small enough to be specific and large enough to stand alone.</li><li><strong>Embed.</strong> Turn each chunk into a vector with an <a href="../natural_language_processing/what_are_embeddings.html" style="color: var(--accent-primary)">embedding model</a>, and store it.</li><li><strong>Retrieve.</strong> Embed the question the same way and find the nearest chunks, usually by <a href="../machine_learning/cosine_similarity.html" style="color: var(--accent-primary)">cosine similarity</a>.</li><li><strong>Augment.</strong> Paste the top k chunks into the prompt above the question.</li><li><strong>Generate.</strong> The model answers from what is in front of it, and can cite it.</li></ol><p>Only steps 3 to 5 happen per question. Steps 1 and 2 happen once, when the documents change &mdash; which is why RAG updates in the time it takes to re-index rather than the time it takes to retrain.</p><p>The scores on this page are real cosine similarities over word-frequency vectors rather than a neural embedding, so the retrieval you are watching genuinely runs. A production system embeds meaning rather than words, which is exactly why it can match "descale" to "limescale" where this cannot.</p>
                 </div>
                 <div>
-                    <h3>Guided tour</h3>
+                    <h3 id="vz-s-guided-tour">Guided tour</h3>
                     <ol><li><strong>Turn retrieval off.</strong> Set <strong>Chunks Retrieved</strong> to 0. The prompt is the bare question, and the answer is what a model does when it has nothing: something plausible and unsupported, flagged in red.</li><li><strong>Turn it back on.</strong> At k = 1 the top-scoring chunk is pasted in and the answer arrives with a citation. Same model, same question, different prompt.</li><li><strong>Meet the distractor.</strong> Ask about the warranty and read the scores: chunk 1 wins on 0.213, but chunk 7 &mdash; the warranty for the <em>previous</em> model &mdash; is right behind it on 0.183, because it talks about warranties too. At k = 1 the ranking has to be right; at k = 2 breadth covers you instead. Retrieval fails quietly, and this is the shape it fails in.</li><li><strong>Watch the prompt grow.</strong> Push k to 6 and the prompt words climb steeply. Everything you retrieve is paid for on every request, in latency and in cost, and the useful chunk gets harder for the model to find among the noise.</li><li><strong>Ask something the documents do not cover.</strong> Choose the voltage question. Retrieval still returns its best matches &mdash; it always returns something &mdash; but none of them answer it, so the honest response is "not in the documents". A system that cannot say that is a system that will invent.</li></ol>
                 </div>
                 <div>
-                    <h3>Why not just fine-tune?</h3>
+                    <h3 id="vz-s-why-not-just-fine-tune">Why not just fine-tune?</h3>
                     <p>Fine-tuning changes how a model behaves; retrieval changes what it knows right now. Facts that change weekly, documents with access rules, anything that needs a citation &mdash; all of those want retrieval. Tone, format, a domain's vocabulary, a stubborn output schema &mdash; those want fine-tuning. They are not competitors, and production systems often use both.</p><p>Retrieval also has a property fine-tuning cannot offer: you can show the user where the answer came from, and delete a document and have it genuinely gone.</p>
                 </div>
                 <div>
-                    <h3>Common mistakes</h3>
+                    <h3 id="vz-s-common-mistakes">Common mistakes</h3>
                     <ul><li><strong>Chunking badly.</strong> Too small and a passage loses the context that made it meaningful; too large and the embedding averages several topics into mush. Overlapping windows of a few hundred tokens are the usual compromise.</li><li><strong>Assuming retrieval succeeded.</strong> Similarity search always returns its best k, however bad they are. Without a relevance floor, an unanswerable question quietly becomes a confident wrong answer.</li><li><strong>Stuffing the context.</strong> More chunks is not more accuracy. Models attend unevenly across a long context, and a fact buried in the middle of twenty passages can be missed entirely.</li><li><strong>Pure vector search.</strong> Embeddings are poor at exact identifiers &mdash; part numbers, error codes, names. Hybrid retrieval, combining keyword search with vectors, is standard for a reason.</li><li><strong>A stale index.</strong> The documents changed and nobody re-embedded them. Now the system cites yesterday's policy with complete confidence.</li></ul>
                 </div>
                 <div>
-                    <h3>What to remember</h3>
+                    <h3 id="vz-s-what-to-remember">What to remember</h3>
                     <p>RAG answers questions a model was never trained on by finding relevant passages and putting them in the prompt, so generation becomes reading rather than recall. The retrieval step is ordinary similarity search and it always returns something, which makes the quality of your chunking, your ranking and your "I could not find it" path the whole ballgame. Raising k buys robustness against a bad ranking and costs latency, money and attention, so it is a trade rather than a setting. Use retrieval for facts that change or need citing, fine-tuning for behaviour that needs to change, and never assume the top result was actually relevant.</p>
                 </div>
             </div>

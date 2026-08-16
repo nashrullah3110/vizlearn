@@ -332,24 +332,21 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Why a chatbot forgets, why long prompts cost so much, and where the memory goes.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Quick Context</h3>
-                    <p>A language model holds no state between requests. Everything it appears to remember &mdash; your name, the file you pasted, what it said three turns ago &mdash; is re-sent on every call, inside the context window. The window is a hard limit on how much can be sent, and everything competes for it: the system prompt, retrieved documents, the conversation so far, and the space the reply needs to be written into.</p><p>That last one catches people out. The reply is generated <em>into</em> the same window, so a full prompt leaves nowhere to answer.</p>
-                </div>
-                <div>
-                    <h3>What the KV cache is</h3>
+                    <h3 id="vz-s-what-the-kv-cache-is">What the KV cache is</h3>
                     <p>Generation is one token at a time, and each new token attends to every token before it. Attention needs a key and a value vector for each earlier position &mdash; and those never change once computed, because a token's key and value depend only on the tokens up to it.</p><p>So the model keeps them. That store is the KV cache. With it, producing token n means computing one new key/value pair and attending over n cached ones. Without it, the model recomputes every key and value from the start for every token, and the total work over a reply of length g grows with the square of the sequence rather than linearly.</p><p>cache bytes = 2 &times; layers &times; kv_heads &times; head_dim &times; tokens &times; bytes_per_value</p><p>The 2 is for K and V. Every term is fixed by the model except the token count, which is why cache memory grows in a straight line with context length &mdash; and why long contexts are a memory problem before they are a compute problem.</p>
                 </div>
                 <div>
-                    <h3>Things to try</h3>
+                    <h3 id="vz-s-things-to-try">Things to try</h3>
                     <ol><li><strong>Fill the window.</strong> Push <strong>Retrieved Documents</strong> up until the bar turns red. The overflow readout tells you how much does not fit; in a real system that is where a request either errors or silently drops the oldest turns.</li><li><strong>Watch the reply get squeezed.</strong> The reply needs room too. Fill the prompt to within 200 tokens of the window and ask for a 600-token answer: the last part of the answer has nowhere to go.</li><li><strong>Turn the cache off.</strong> The count of key/value vectors computed jumps by orders of magnitude, because every reply token rebuilds them for the entire context instead of adding one. This is the difference between a chatbot that streams and one that stalls.</li><li><strong>Grow the context with the cache on.</strong> Cache size climbs in a straight line with tokens &mdash; at 32 KV heads and fp16, half a megabyte per token, so a full 8k window is about 4 GB of memory <em>per concurrent request</em>.</li><li><strong>Switch to the GQA model.</strong> Same size, 8 KV heads instead of 32, and the cache drops to a quarter. This is the entire reason grouped-query attention exists, and why almost every model released since 2023 uses it.</li><li><strong>Try the 70B.</strong> More layers multiply the cache again. Context length is cheap to advertise and expensive to serve.</li></ol>
                 </div>
                 <div>
-                    <h3>What this explains</h3>
+                    <h3 id="vz-s-what-this-explains">What this explains</h3>
                     <ul><li><strong>Why long chats get slower and pricier.</strong> Every turn re-sends the whole history, so cost grows with the square of the conversation unless the history is trimmed or summarised.</li><li><strong>Why prompt caching exists.</strong> If the first few thousand tokens are identical between requests &mdash; a system prompt, a document &mdash; their keys and values can be computed once and reused, which is what providers sell as prompt or context caching.</li><li><strong>Why batching is awkward.</strong> Each concurrent request needs its own cache, so a server's ceiling is usually KV memory rather than compute. Paged attention exists to stop that memory being wasted on fragmentation.</li><li><strong>Why the middle gets ignored.</strong> A long context is not uniformly attended: models reliably use the beginning and the end better than the middle. Filling the window is not the same as being understood.</li><li><strong>Why quantised caches are a thing.</strong> Storing K and V in 8 bits instead of 16 halves the biggest memory consumer in serving, at some cost in quality.</li></ul>
                 </div>
                 <div>
-                    <h3>Worth remembering</h3>
+                    <h3 id="vz-s-worth-remembering">Worth remembering</h3>
                     <p>The context window is the model's entire working memory, re-sent on every request, and it is shared between the system prompt, retrieved context, the conversation and the reply being written into it. The KV cache turns generation from quadratic work into linear by storing each token's key and value once, and it is paid for in memory that scales with layers, KV heads and sequence length &mdash; half a megabyte per token on a 7B model with full multi-head attention, a quarter of that with grouped-query attention. Long contexts are therefore a serving-memory problem first, a cost problem second, and an attention-quality problem third.</p>
                 </div>
             </div>

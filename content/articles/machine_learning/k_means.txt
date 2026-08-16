@@ -12,13 +12,32 @@ Each step can only reduce the total within-cluster sum of squares &mdash; reassi
 
 What it does <em>not</em> guarantee is arriving at the best solution. It converges to a local minimum, and which one depends entirely on where the centroids started.
 
+## What clustering is for, in plain words
+
+Most machine learning you meet first is <strong>supervised</strong>: someone hands you examples that are already labelled &mdash; this email is spam, that house sold for &pound;320,000 &mdash; and the model learns to copy those labels on new data.
+
+Clustering is the other situation. Nobody labelled anything. You have a pile of rows and a suspicion that they are not all the same kind of thing, and you want the data to tell you what the groups are.
+
+A shop with 10,000 customers has no column called "customer type". It has spending totals, visit frequency and basket sizes. Clustering looks at those numbers and says: these 3,000 people behave alike, those 2,000 behave alike, and this group of 400 behaves like nobody else. What the groups <em>mean</em> is still your job to name &mdash; the algorithm just finds them.
+
+K-means is the simplest useful way to do this, and it is the one almost everyone tries first. The name is literal: **k** is how many groups you want, and **means** is how it decides where each group sits &mdash; the mean, the plain average, of the points inside it.
+
+## The tidying-up analogy
+
+Imagine a room with hundreds of books on the floor and you want them in five piles.
+
+You have no system, so you just drop five sticky notes on the floor at random. Those are your centroids. Then you repeat two steps until you get bored:
+
+1. Walk to every book and put it next to whichever sticky note is nearest.
+2. Look at each pile that formed and move the sticky note to the middle of its own pile.
+
+Moving a note to the middle of its pile changes which note is nearest for some books near the edges, so on the next pass a few books move over. Each round, fewer books change piles, until one round happens where nothing moves at all. That is convergence, and that is the entire algorithm.
+
+Two things fall straight out of the analogy. First, the piles you end up with depend on where you happened to throw the sticky notes &mdash; drop two in the same corner and that corner gets split into two piles while the far side gets crushed into one. Second, you decided on five piles before you looked at a single book; the room never gets a vote.
+
 ## Initialisation decides the answer
 
-Place two initial centroids inside the same true cluster and k-means will happily split that cluster in half while merging two others. The result is stable, self-consistent and wrong.
-
-<strong>k-means++</strong> is the standard fix and the default in most libraries. It chooses the first centroid at random, then chooses each subsequent one with probability proportional to its squared distance from the nearest existing centroid &mdash; so new centroids tend to land far from the ones already placed. This costs one extra pass and dramatically improves both the quality and the consistency of the result.
-
-The complementary defence is to run the whole algorithm several times from different seeds and keep the best (<span class="mono-font">n_init</span> in scikit-learn).
+<p>Place two initial centroids inside the same true cluster and k-means will happily split that cluster in half while merging two others. The result is stable, self-consistent and wrong.</p><strong>k-means++</strong> is the standard fix and the default in most libraries. It chooses the first centroid at random, then chooses each subsequent one with probability proportional to its squared distance from the nearest existing centroid &mdash; so new centroids tend to land far from the ones already placed. This costs one extra pass and dramatically improves both the quality and the consistency of the result.<p>The complementary defence is to run the whole algorithm several times from different seeds and keep the best (<span class="mono-font">n_init</span> in scikit-learn).</p>
 
 ## Choosing k
 
@@ -27,6 +46,66 @@ K-means cannot tell you how many clusters there are; k is an input. Two standard
 The <strong>elbow method</strong> plots within-cluster sum of squares against k. It always decreases &mdash; more centroids always fit better, and at k = n it reaches zero &mdash; so you look for the bend where the improvement flattens. It is subjective, and frequently there is no clear elbow.
 
 The <strong>silhouette score</strong> measures, for each point, how much closer it is to its own cluster than to the next nearest, on a scale from &minus;1 to 1. Averaged over all points it gives a single number per k, and picking the maximum is less arbitrary than eyeballing a bend.
+
+## A worked example you can check by hand
+
+Six customers, two numbers each &mdash; visits per month and average spend in pounds &mdash; and we ask for k = 2.
+
+|Customer|Visits|Spend|
+|---|---|---|
+|A|1|20|
+|B|2|25|
+|C|2|30|
+|D|9|180|
+|E|10|200|
+|F|11|190|
+
+Suppose the random start puts centroid 1 at (2, 25) and centroid 2 at (9, 180).
+
+<strong>Round 1, assign.</strong> Customer A is 5 units of spend away from centroid 1 and 160 away from centroid 2, so A joins cluster 1. Doing the same for the rest, A, B and C land in cluster 1 and D, E and F land in cluster 2.
+
+<strong>Round 1, update.</strong> Cluster 1's new centre is the average of its members: visits (1 + 2 + 2) / 3 = 1.67, spend (20 + 25 + 30) / 3 = 25. Cluster 2's is (9 + 10 + 11) / 3 = 10 and (180 + 200 + 190) / 3 = 190.
+
+<strong>Round 2, assign.</strong> Every customer is still nearest to the same centroid it had before. Nothing moved, so the algorithm stops after two rounds and reports two clusters: three low-spending occasional visitors and three high-spending regulars.
+
+Now notice what the arithmetic actually did. The spend column ranges over 180 units and the visits column over 10, so the distances were decided almost entirely by spend. Visits barely mattered. That is not a quirk of this example &mdash; it is the single most common way k-means goes wrong in real work, and it is why scaling the columns first is not optional.
+
+## The same run in scikit-learn
+
+```python
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+
+# One row per customer: [visits per month, average spend]
+X = [[1, 20], [2, 25], [2, 30], [9, 180], [10, 200], [11, 190]]
+
+model = make_pipeline(
+    StandardScaler(),                  # put both columns on the same footing
+    KMeans(n_clusters=2,               # k, chosen by you
+           init="k-means++",           # the smart start, and the default
+           n_init=10,                  # 10 restarts, keep the best
+           random_state=0),            # so the same data gives the same answer
+)
+labels = model.fit_predict(X)          # array([0, 0, 0, 1, 1, 1])
+```
+
+Four of those arguments are the whole practical story of k-means. `n_clusters` is the decision the algorithm refuses to make for you. `StandardScaler` fixes the units problem from the worked example above. `n_init` runs the whole thing ten times from different random starts and keeps whichever result has the smallest total distance. `random_state` freezes the randomness, so your notebook shows the same clusters tomorrow.
+
+To read the result, look at `model[-1].cluster_centers_` &mdash; but remember they come back scaled. Inverse-transform them before showing anyone: "cluster 1 averages 10 visits and &pound;190" is a sentence a colleague can act on, and "cluster 1 is centred at (1.2, 1.1)" is not.
+
+## Choosing k with the elbow, step by step
+
+The elbow method sounds vaguer than it is. Concretely:
+
+1. Run k-means for k = 1, 2, 3, … up to maybe 10.
+2. For each run, record `inertia_` &mdash; the total squared distance from every point to its own centroid.
+3. Plot k on the x-axis against inertia on the y-axis.
+4. Look for the point where the curve stops dropping steeply and starts crawling.
+
+A typical curve on data with three real groups reads something like 5400, 1900, 700, 640, 590, 550. The falls from k = 1 to 3 are huge; after that each extra cluster buys almost nothing. The bend at k = 3 is the elbow.
+
+When the curve is a smooth slide with no bend, that is information too: your data probably has no clean group structure, and any k you pick is a slice through a continuum rather than a discovery.
 
 ## Guided experiments
 
@@ -42,6 +121,51 @@ The <strong>silhouette score</strong> measures, for each point, how much closer 
 - <strong>Running it once.</strong> A single run from a single initialisation is a coin flip. Use k-means++ and multiple restarts.
 - <strong>Reading the elbow as objective.</strong> The curve always decreases; the bend is a judgement call. Cross-check with silhouette.
 - <strong>Ignoring outliers.</strong> Centroids are means, so a single extreme point drags its centroid noticeably. Consider k-medoids when outliers are present.
+
+## Where it earns its keep
+
+- <strong>Customer segmentation.</strong> The classic. Cluster on recency, frequency and monetary value, then write one email for each segment instead of one email for everybody.
+- <strong>Colour reduction in images.</strong> Treat every pixel as a point in (red, green, blue) space and cluster with k = 16. Replace each pixel with its centroid colour and a photograph of millions of colours becomes a sixteen-colour image that still looks like the original. This is a genuinely elegant use, and it is a good way to see clustering with your own eyes.
+- <strong>Compressing sensor or log data.</strong> Store the centroid identifiers instead of the raw readings when the exact values do not matter.
+- <strong>A starting point for something else.</strong> Cluster labels make useful extra features for a supervised model, and cluster centres make sensible initial guesses for a Gaussian mixture model.
+- <strong>Document grouping.</strong> Turn documents into vectors, cluster them, and skim one document per cluster to find out what a large pile of text is about.
+
+The pattern behind all five: k-means is at its best when you want a rough, cheap, honest partition of a lot of data, and you can live with the boundaries being approximate.
+
+## How it compares with the neighbours
+
+|Method|Needs k?|Cluster shapes|Handles outliers|Speed|
+|---|---|---|---|---|
+|K-means|Yes|Round, similar sizes|Poorly &mdash; means get dragged|Very fast|
+|K-medoids|Yes|Round|Better &mdash; uses real points as centres|Slower|
+|DBSCAN|No|Any shape|Well &mdash; labels them as noise|Fast to moderate|
+|Hierarchical|No, cut later|Any shape, depends on linkage|Moderate|Slow on big data|
+|Gaussian mixture|Yes|Ellipses, different sizes|Moderate|Moderate|
+
+A short decision rule. If the groups look like blobs and there is a lot of data, use k-means. If they look like rings, ribbons or anything winding, use DBSCAN. If you want soft memberships &mdash; "this point is 70% cluster A" &mdash; use a Gaussian mixture. If you want to see the whole family of possible groupings before committing to a number, use hierarchical clustering and cut the tree where it looks right.
+
+## Questions people ask
+
+<strong>Does k-means give the same answer every time?</strong> Not by default, because the starting centroids are random. Fix `random_state` and it will. That makes it repeatable, not correct &mdash; a repeatable bad local minimum is still a bad local minimum, which is what `n_init` is for.
+
+<strong>What happens if a cluster ends up empty?</strong> It can happen when a centroid starts somewhere no point is nearest to. Libraries handle it by relocating that centroid, usually to the point furthest from any existing centre, and carrying on.
+
+<strong>Can I use it on categorical data like city or product type?</strong> Not directly, because averaging "London" and "Leeds" is meaningless. One-hot encoding is a poor fix, since the distances it creates are all similar. Use k-modes for purely categorical data, or k-prototypes for a mix.
+
+<strong>How many rows do I need?</strong> There is no minimum in principle, but clusters found in a few dozen rows are usually just noise. Thousands of rows and a handful of well-chosen columns is the comfortable range.
+
+<strong>Why squared distance rather than plain distance?</strong> Because the mean is exactly the point that minimises the sum of squared distances. Using squares is what makes "move the centroid to the average" the correct update rather than an approximation. Minimising plain distance gives you k-medians, where the update is the median instead.
+
+<strong>Should I run PCA first?</strong> Often, yes, if you have many columns. Distances get less meaningful as dimensions pile up, and reducing to a handful of components before clustering usually makes the groups both cleaner and easier to plot.
+
+## Recap in one screen
+
+- k-means splits data into k groups by repeating two steps: assign each point to the nearest centre, then move each centre to the average of its points.
+- It always stops, because every step lowers the total within-cluster distance and there are finitely many ways to assign points.
+- Where it stops depends on where it started. Use k-means++ and several restarts.
+- You choose k. The elbow curve and the silhouette score are how you argue for a number, not how you look one up.
+- Scale your columns first, or the widest-ranging column becomes the whole model.
+- It assumes round, roughly equal clusters. Different shape, different algorithm.
 
 ## The short version
 

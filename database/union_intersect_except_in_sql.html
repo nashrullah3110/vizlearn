@@ -453,32 +453,29 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Set operators combine whole result sets vertically, stacking rows rather than widening them. That is the difference from a JOIN, and it is the point people miss most often.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Stacking, not joining</h3>
-                    <p>A JOIN combines tables <strong>horizontally</strong>: matching rows are linked and the result has the columns of both. A set operator combines result sets <strong>vertically</strong>: rows from the second query are stacked under rows from the first, and the column count does not change.</p><p>So the question a set operator answers is “which rows appear in these two result sets?”, not “what belongs together?”. If you want columns from two tables, you need a JOIN; if you want the rows from two similar queries treated as one collection, you need these.</p>
-                </div>
-                <div>
-                    <h3>The three operators</h3>
+                    <h3 id="vz-s-the-three-operators">The three operators</h3>
                     <p>Take two result sets, A = {1, 2, 3} and B = {2, 3, 4}:</p><p>A UNION B&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr; 1, 2, 3, 4&nbsp;&nbsp;&nbsp;in either, duplicates removed<br>A UNION ALL B&nbsp;&rarr; 1,2,3,2,3,4&nbsp;&nbsp;everything, duplicates kept<br>A INTERSECT B &rarr; 2, 3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in both<br>A EXCEPT B&nbsp;&nbsp;&nbsp;&nbsp;&rarr; 1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in A but not B</p><p>Two things are worth noting. <strong>EXCEPT is not symmetric</strong> &mdash; <span class="mono-font">B EXCEPT A</span> gives 4, a different answer. And UNION, INTERSECT and EXCEPT all remove duplicates by default, which is a genuine cost: the database must sort or hash the entire result to find them.</p><p>Some databases spell EXCEPT as MINUS (Oracle), and the semantics are the same.</p>
                 </div>
                 <div>
-                    <h3>The rules every set operator enforces</h3>
+                    <h3 id="vz-s-the-rules-every-set-operator-enforces">The rules every set operator enforces</h3>
                     <ul><li><strong>Same number of columns</strong> in both queries.</li><li><strong>Compatible types</strong>, position by position &mdash; the first column of one must be comparable with the first column of the other.</li><li><strong>Column names come from the first query.</strong> The second query’s aliases are ignored entirely.</li><li><strong>ORDER BY applies to the whole result</strong> and may appear only once, at the very end. It cannot be attached to an individual branch.</li></ul><p>Note that matching is <em>positional</em>, not by name. If the first query selects (id, name) and the second selects (name, id), and both are text-compatible, the query runs and silently returns nonsense.</p>
                 </div>
                 <div>
-                    <h3>Exploration guide</h3>
+                    <h3 id="vz-s-exploration-guide">Exploration guide</h3>
                     <ol><li><strong>Compare UNION with UNION ALL.</strong> Switch <strong>Operator</strong> between them and count the rows. The difference is exactly the duplicates &mdash; and UNION paid to find them.<button class="vz-run" type="button" data-vz-run="0" aria-label="Run this experiment in the visualisation: Compare UNION with UNION ALL"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Look at INTERSECT.</strong> Only rows present in both sides survive. This is the set equivalent of an inner join on every column at once.<button class="vz-run" type="button" data-vz-run="1" aria-label="Run this experiment in the visualisation: Look at INTERSECT"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Reverse EXCEPT.</strong> Note which rows survive, then imagine swapping the two queries. The answer changes completely &mdash; order matters here and nowhere else among the three.<button class="vz-run" type="button" data-vz-run="2" aria-label="Run this experiment in the visualisation: Reverse EXCEPT"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Watch the duplicate handling.</strong> With duplicates present in the source, see which operators collapse them and which do not.</li></ol>
                 </div>
                 <div>
-                    <h3>UNION ALL is usually the one you want</h3>
+                    <h3 id="vz-s-union-all-is-usually-the-one-you-want">UNION ALL is usually the one you want</h3>
                     <p>UNION performs a deduplication pass over the combined result, which means a sort or a hash of every row. When you know the two sets cannot overlap &mdash; last month’s orders and this month’s orders, or partitioned tables split by region &mdash; that work finds nothing and you have paid for it anyway.</p><p>UNION ALL simply concatenates and is frequently several times faster on large result sets. Use UNION only when duplicates are genuinely possible <em>and</em> you want them removed; reach for UNION ALL by default and add the deduplication deliberately.</p>
                 </div>
                 <div>
-                    <h3>What trips people up</h3>
+                    <h3 id="vz-s-what-trips-people-up">What trips people up</h3>
                     <ul><li><strong>Using UNION out of habit.</strong> The unnecessary deduplication is one of the more common avoidable costs in reporting queries.</li><li><strong>Mismatched column order.</strong> Positional matching means compatible-but-wrong orderings run happily and return garbage.</li><li><strong>Expecting EXCEPT to be symmetric.</strong> Swapping the operands gives a different result.</li><li><strong>Putting ORDER BY on a branch.</strong> It belongs once, at the end, and applies to the whole combined set.</li><li><strong>Reaching for a set operator when a JOIN is needed.</strong> If you want columns from both tables, no set operator will do it &mdash; they only ever stack rows.</li></ul>
                 </div>
                 <div>
-                    <h3>What to remember</h3>
+                    <h3 id="vz-s-what-to-remember">What to remember</h3>
                     <p>UNION, INTERSECT and EXCEPT combine result sets vertically, requiring the same column count and compatible types matched by position rather than name. All three deduplicate by default, which costs a full sort or hash &mdash; so prefer UNION ALL unless you specifically need duplicates removed. EXCEPT is the only one where operand order changes the answer, and none of them is a substitute for a JOIN.</p>
                 </div>
             </div>

@@ -476,24 +476,21 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Two small keywords behind every "Next page" button &mdash; and two traps that bite at scale.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Quick Context</h3>
-                    <span class="mono-font kw">LIMIT n</span> returns at most <span class="mono-font">n</span> rows. <span class="mono-font kw">OFFSET m</span> throws away the first <span class="mono-font">m</span> rows before it starts counting. Together they cut a window out of a result set, which is how page 3 of a product listing gets built.<p>Syntax varies: PostgreSQL, MySQL and SQLite use <span class="mono-font">LIMIT ... OFFSET ...</span>; SQL Server uses <span class="mono-font">OFFSET ... FETCH NEXT ... ROWS ONLY</span>; older Oracle used <span class="mono-font">ROWNUM</span>. The idea is identical.</p>
-                </div>
-                <div>
-                    <h3>Trap 1: LIMIT Without ORDER BY Is Meaningless</h3>
+                    <h3 id="vz-s-trap-1-limit-without-order-by-is-meaningless">Trap 1: LIMIT Without ORDER BY Is Meaningless</h3>
                     <p>SQL tables are <strong>unordered sets</strong>. Without an explicit <span class="mono-font">ORDER BY</span>, the database may return rows in any order it finds convenient &mdash; and that order can change between runs, after an update, or when the query plan changes.</p><p>So "the first 10 rows" is not a defined concept without ordering. Select "no ORDER BY" in this lab and press "Re-run the same query" a few times: the same query returns different rows. In production this shows up as items mysteriously appearing on two pages, or never appearing at all.</p><strong>Always pair pagination with a deterministic ORDER BY</strong> &mdash; and if the sort column has ties, add a unique tiebreaker such as the primary key.
                 </div>
                 <div>
-                    <h3>Trap 2: Deep OFFSET Gets Slower and Slower</h3>
+                    <h3 id="vz-s-trap-2-deep-offset-gets-slower-and-slower">Trap 2: Deep OFFSET Gets Slower and Slower</h3>
                     <p>The database cannot jump straight to row 100,000. It must generate and discard every row before the offset. Watch the "rows scanned" figure in this lab climb while "rows returned" stays fixed &mdash; the red portion of the bar is pure wasted work.</p><p>At page 5 nobody notices. At <span class="mono-font">OFFSET 500000</span> the query is reading half a million rows to hand back ten. This is why deep pagination is a classic source of slow queries.</p><p>The fix is <strong>keyset pagination</strong> (also called seek pagination): instead of counting rows to skip, remember the last value you saw and filter on it.</p><p>Keyset stays fast at any depth, and it does not skip or duplicate rows when data changes underneath you. The trade-off is that you can only move forward and backward, not jump to an arbitrary page number.</p>
                 </div>
                 <div>
-                    <h3>Exploration guide</h3>
+                    <h3 id="vz-s-exploration-guide">Exploration guide</h3>
                     <ol><li><strong>Set LIMIT to 4 and step the page buttons.</strong> The highlighted window slides down the full result set &mdash; OFFSET is just where the window starts.</li><li><strong>Push OFFSET high</strong> and watch the red "skipped" portion of the cost bar grow while the green returned portion stays the same size.</li><li><strong>Switch to "no ORDER BY" and re-run repeatedly.</strong> The returned rows change even though the query text does not.</li><li><strong>Set OFFSET beyond the table size.</strong> You get zero rows &mdash; not an error. A common cause of mysteriously blank final pages.</li></ol>
                 </div>
                 <div>
-                    <h3>Worth remembering</h3>
+                    <h3 id="vz-s-worth-remembering">Worth remembering</h3>
                     <p>LIMIT and OFFSET slice a result set, but only after ORDER BY has made that set deterministic. Offset pagination is fine for the first few pages and quietly quadratic beyond them &mdash; reach for keyset pagination when the data gets big.</p>
                 </div>
             </div>

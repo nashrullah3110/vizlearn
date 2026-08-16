@@ -11,10 +11,56 @@ The goal of the ID3 algorithm is to build a tree that separates the data into pu
 
 <h4 class="font-bold" style="color: var(--text-main);">Entropy: A Measure of Impurity</h4>
 
-First, we measure the "impurity" or "randomness" of a set of data using a metric called <strong>Entropy</strong>. A dataset with a perfect mix of all classes (e.g., 50% 'Yes', 50% 'No') has the highest entropy (maximum uncertainty). A dataset with only one class (e.g., 100% 'Yes') has zero entropy (perfect certainty).
-<h4 class="font-bold" style="color: var(--text-main);">Information Gain: The Reduction in Entropy</h4>
+First, we measure the "impurity" or "randomness" of a set of data using a metric called <strong>Entropy</strong>. A dataset with a perfect mix of all classes (e.g., 50% 'Yes', 50% 'No') has the highest entropy (maximum uncertainty). A dataset with only one class (e.g., 100% 'Yes') has zero entropy (perfect certainty). <h4 class="font-bold" style="color: var(--text-main);">Information Gain: The Reduction in Entropy</h4>
 
 For each feature, the algorithm calculates what the entropy <em>would be</em> after splitting the data based on that feature's values. <strong>Information Gain</strong> is simply the initial entropy minus the weighted average entropy after the split. The feature with the highest information gain is chosen for the split because it does the best job of creating purer, more organized subgroups.
+
+## The twenty questions analogy
+
+A decision tree is the game of twenty questions, learned from data instead of played by instinct.
+
+Each internal node asks one question about one feature &mdash; "is income above &pound;40,000?", "is the weather sunny?" &mdash; and each answer sends you down a branch. Keep answering until you reach a leaf, and the leaf holds the prediction: a class for classification, an average value for regression.
+
+That is why trees are the model you can show to a non-technical colleague without apologising. The path from root to leaf reads as a sentence: "applicants under 25 with less than two years of credit history and an existing loan were rejected 82% of the time." No other family of models hands you that for free.
+
+The only real question in building one is which feature to ask about first, and the answer is: whichever question separates the classes best. A good first question splits a mixed pile into two much purer piles. A bad one leaves both halves as mixed as the original.
+
+## Measuring "purer", with real numbers
+
+Two measures dominate, and both answer the same question: how mixed is this group?
+
+<strong>Gini impurity</strong> is the chance you would label a randomly chosen item wrongly if you guessed labels at the group's own proportions. For a group that is a fraction p positive:
+
+<p class="mono-font">Gini = 1 &minus; (p&sup2; + (1&minus;p)&sup2;)</p>
+
+<strong>Entropy</strong> measures the same idea in bits of surprise:
+
+<p class="mono-font">Entropy = &minus;p log&#8322;(p) &minus; (1&minus;p) log&#8322;(1&minus;p)</p>
+
+Both are 0 for a pure group and highest for a 50/50 group &mdash; 0.5 for Gini, 1.0 bit for entropy.
+
+Work one split through. Start with 10 items: 5 yes, 5 no. Entropy = 1.0 bit, as mixed as it gets. Now split on "is it sunny?":
+
+- <strong>Sunny</strong>: 4 items, 4 yes, 0 no. Entropy = 0.
+- <strong>Not sunny</strong>: 6 items, 1 yes, 5 no. Entropy = &minus;(1/6)log&#8322;(1/6) &minus; (5/6)log&#8322;(5/6) = 0.65 bits.
+
+The weighted entropy after the split is (4/10)&times;0 + (6/10)&times;0.65 = 0.39 bits. The <strong>information gain</strong> is 1.0 &minus; 0.39 = <strong>0.61 bits</strong>. The algorithm computes exactly this for every feature and every possible threshold, and keeps the winner. Then it repeats on each child, and keeps going until a stopping rule fires.
+
+In practice Gini and entropy pick the same split the vast majority of the time. Gini is marginally cheaper because it has no logarithm, which is why it is scikit-learn's default. This is not a choice worth agonising over.
+
+## Why an unpruned tree always overfits
+
+Left alone, a tree keeps splitting until every leaf is pure. On training data that means 100% accuracy, and on new data it means trouble, because the last few splits were made to accommodate individual rows &mdash; a leaf holding one customer is a rule about that customer, not about customers.
+
+The controls that stop this are the ones worth knowing by name:
+
+- <strong>max_depth</strong> &mdash; how many questions deep the tree may go. The bluntest and most effective control. Depths of 3 to 8 cover most tabular problems.
+- <strong>min_samples_leaf</strong> &mdash; refuse to create a leaf with fewer than this many rows. Setting it to 20 or 50 kills the one-row rules directly.
+- <strong>min_samples_split</strong> &mdash; refuse to split a node that is already small.
+- <strong>max_features</strong> &mdash; consider only a random subset of features at each split. Mostly used inside forests.
+- <strong>ccp_alpha</strong> &mdash; cost-complexity pruning. Grow the tree fully, then remove the branches that do not pay for their complexity. Often the cleanest approach of all.
+
+There is a second, subtler instability. Change a handful of training rows and the root split can change, which changes everything below it, which produces a visibly different tree that performs about the same. This high variance is not a bug you can tune away &mdash; it is the reason random forests and gradient boosting exist, and why a single tree is more often a communication tool than a production model.
 
 ## How to Use the Interactive Lab
 
@@ -39,3 +85,41 @@ Follow these steps to see the algorithm in action.
 - <strong>Interpretability is a Superpower:</strong> The final tree structure is easy for humans to read and understand. You can trace the path for any new data point to see exactly how the model arrived at its prediction.
 - <strong>Foundation for Advanced Models:</strong> While simple, decision trees are the building blocks for more powerful ensemble models like Random Forests and Gradient Boosted Trees (like XGBoost).
 - <strong>Overfitting Risk:</strong> If a decision tree is grown too deep, it can perfectly memorize the training data, including its noise. This leads to overfitting. Techniques like pruning or setting a maximum depth are used to combat this.
+
+## Where trees are used, and where they are not
+
+Trees handle several things that trip other models up. They need no feature scaling, because a threshold on income does not care whether income is in pounds or thousands of pounds. They cope with a mix of numeric and categorical features. They find interactions on their own &mdash; "young <em>and</em> in London" is just two levels of the same branch. And missing values can be handled by sending them down a default branch rather than being imputed.
+
+What they are bad at is equally specific. A smooth linear relationship needs a staircase of many splits to approximate, so a plain line beats a tree on genuinely linear data. They cannot extrapolate at all: a tree trained on houses up to 200 square metres predicts the same value for a 500-square-metre house, because it has no leaf beyond the range it saw. And a single tree's predictions jump in steps rather than moving smoothly.
+
+|Situation|Single tree|Random forest|Gradient boosting|
+|---|---|---|---|
+|You must explain every decision|Best|Hard|Hard|
+|Highest accuracy on tabular data|Weakest|Good|Usually best|
+|Sensitive to noisy labels|Very|Less|More than a forest|
+|Training cost|Trivial|Moderate, parallel|Higher, sequential|
+|Tuning needed|Little|Little|Considerable|
+
+The honest summary: use one tree when a human has to read the model, and an ensemble of trees when a machine has to act on it.
+
+## Questions people ask
+
+<strong>Do decision trees need scaled features?</strong> No. Splits are comparisons on one feature at a time, so units are irrelevant. This is one of the few places you can genuinely skip the scaler.
+
+<strong>Gini or entropy?</strong> Either. They agree on the split almost always; Gini is faster. Spend the effort on depth and leaf size instead.
+
+<strong>How do trees handle categories?</strong> Depends on the library. Scikit-learn expects numbers, so you encode first; LightGBM and CatBoost handle categorical columns natively, which is usually better because one-hot encoding a high-cardinality column produces many weak, sparse splits.
+
+<strong>Why does feature importance disagree with my intuition?</strong> The built-in importance counts how much each feature reduced impurity, which is biased towards high-cardinality features &mdash; a column with many distinct values gets more chances to look useful. Permutation importance is a fairer measure.
+
+<strong>Can trees do regression?</strong> Yes. Everything is identical except that the split criterion becomes variance reduction (or mean squared error) and each leaf predicts the average of its rows.
+
+<strong>Why did my tree change completely after adding ten rows?</strong> That is the high-variance behaviour, not a bug. If stability matters, use a forest, or prune harder so the tree depends on broad patterns rather than fine ones.
+
+## Recap in one screen
+
+- A tree is a chain of yes/no questions ending in a prediction, learned greedily one split at a time.
+- Each split is chosen to make the resulting groups purer, measured by Gini impurity or entropy.
+- Grown without limits it will memorise the training data, so depth, leaf size and pruning are not optional.
+- No scaling needed, handles mixed data types, finds interactions, cannot extrapolate.
+- One tree to explain, an ensemble of trees to predict.

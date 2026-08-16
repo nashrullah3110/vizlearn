@@ -929,7 +929,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn ANN indexing: HNSW and IVF | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "BM25 and Sparse Lexical Retrieval",
@@ -969,7 +969,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn Completeness in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Context Windows and the KV Cache",
@@ -985,7 +985,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn Context-aware chunking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Corrective RAG (CRAG)",
@@ -993,7 +993,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn Corrective RAG (CRAG) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Correctness in LLM evaluation",
@@ -1001,7 +1001,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn Correctness in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Distributed retrieval and sharding",
@@ -1009,7 +1009,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn Distributed retrieval and sharding | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Dot Product vs Cosine Similarity for Retrieval",
@@ -1041,7 +1041,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn Groundedness in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Hallucination and Grounding",
@@ -1081,7 +1081,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn Indexing in vector databases | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Knowledge Distillation in LLMs",
@@ -1129,7 +1129,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn Permission filtering in RAG retrieval | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Quantization in LLMs",
@@ -1153,7 +1153,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn Query, embedding and prompt caching | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Re-ranking: Bi-Encoders vs Cross-Encoders",
@@ -1169,7 +1169,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn Recursive chunking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Relevance in LLM evaluation",
@@ -1177,7 +1177,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn Relevance in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Retrieval Evaluation Metrics",
@@ -1209,7 +1209,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn Semantic chunking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Structure-aware chunking",
@@ -1217,7 +1217,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn Structure-aware chunking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "TF-IDF",
@@ -1225,7 +1225,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn TF-IDF | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What are Queries, Keys and Values in an LLM?",
@@ -1233,7 +1233,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn What are Queries, Keys and Values in an LLM? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What is Hit Rate@k?",
@@ -1241,7 +1241,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn What is Hit Rate@k? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What is MRR (Mean Reciprocal Rank)?",
@@ -1249,7 +1249,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn What is MRR (Mean Reciprocal Rank)? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What is Masked Language Modeling?",
@@ -1265,7 +1265,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn What is Precision@k? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What is Recall@k?",
@@ -1273,7 +1273,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": ""
+  "desc": "Learn What is Recall@k? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "3Sum",
@@ -1281,7 +1281,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn 3Sum | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Are two strings anagrams?",
@@ -1289,7 +1289,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Are two strings anagrams? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Check whether a string is a palindrome",
@@ -1297,7 +1297,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Check whether a string is a palindrome | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Count things with a dictionary",
@@ -1305,7 +1305,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Count things with a dictionary | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Design an LRU cache",
@@ -1313,7 +1313,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Design an LRU cache | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Does len() count characters or bytes?",
@@ -1321,7 +1321,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Does len() count characters or bytes? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Edit distance (Levenshtein)",
@@ -1329,7 +1329,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Edit distance (Levenshtein) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Find the duplicate number",
@@ -1337,7 +1337,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Find the duplicate number | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "First non-repeating character",
@@ -1345,7 +1345,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn First non-repeating character | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Group anagrams together",
@@ -1353,7 +1353,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Group anagrams together | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Group records and invert a dictionary",
@@ -1361,7 +1361,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Group records and invert a dictionary | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "How does a Python dict work?",
@@ -1369,7 +1369,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn How does a Python dict work? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Implement a hash map from scratch",
@@ -1377,7 +1377,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Implement a hash map from scratch | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Implement substring search (strStr)",
@@ -1385,7 +1385,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Implement substring search (strStr) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Isomorphic strings",
@@ -1393,7 +1393,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Isomorphic strings | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Kth largest element",
@@ -1401,7 +1401,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Kth largest element | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Longest common prefix",
@@ -1409,7 +1409,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Longest common prefix | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Longest consecutive sequence",
@@ -1417,7 +1417,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Longest consecutive sequence | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Longest palindromic substring",
@@ -1425,7 +1425,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Longest palindromic substring | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Longest substring without repeating characters",
@@ -1433,7 +1433,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Longest substring without repeating characters | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Maximum subarray sum (Kadane)",
@@ -1441,7 +1441,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Maximum subarray sum (Kadane) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Memoisation: caching with a dictionary",
@@ -1449,7 +1449,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Memoisation: caching with a dictionary | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Merge overlapping intervals",
@@ -1457,7 +1457,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Merge overlapping intervals | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Minimum window substring",
@@ -1465,7 +1465,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Minimum window substring | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Product of array except self",
@@ -1473,7 +1473,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Product of array except self | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Remove duplicates from a sorted array in place",
@@ -1481,7 +1481,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Remove duplicates from a sorted array in place | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Reverse a string",
@@ -1489,7 +1489,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Reverse a string | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Rotate an array by k",
@@ -1497,7 +1497,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Rotate an array by k | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Run-length string compression",
@@ -1505,7 +1505,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Run-length string compression | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Search in a rotated sorted array",
@@ -1513,7 +1513,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Search in a rotated sorted array | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Sliding window maximum",
@@ -1521,7 +1521,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Sliding window maximum | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Sort an array of 0s, 1s and 2s",
@@ -1529,7 +1529,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Sort an array of 0s, 1s and 2s | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Subarray sum equals k",
@@ -1537,7 +1537,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Subarray sum equals k | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Trapping rain water",
@@ -1545,7 +1545,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Trapping rain water | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Two Sum",
@@ -1553,7 +1553,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Two Sum | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Valid parentheses",
@@ -1561,7 +1561,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Valid parentheses | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What does slicing a string cost?",
@@ -1569,7 +1569,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What does slicing a string cost? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What happens if you modify a collection while looping over it?",
@@ -1577,7 +1577,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What happens if you modify a collection while looping over it? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What is a Python list underneath?",
@@ -1585,7 +1585,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What is a Python list underneath? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What is the complexity of this code?",
@@ -1593,7 +1593,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What is the complexity of this code? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What is the difference between str and bytes?",
@@ -1601,7 +1601,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What is the difference between str and bytes? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "When should you use a set instead of a list?",
@@ -1609,7 +1609,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn When should you use a set instead of a list? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why are Python strings immutable?",
@@ -1617,7 +1617,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why are Python strings immutable? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why does [[0]*3]*3 break?",
@@ -1625,7 +1625,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why does [[0]*3]*3 break? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why does `is` sometimes work on strings?",
@@ -1633,7 +1633,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why does `is` sometimes work on strings? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why is `in` slow on a list but fast on a set?",
@@ -1641,7 +1641,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why is `in` slow on a list but fast on a set? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why must dictionary keys be hashable?",
@@ -1649,7 +1649,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why must dictionary keys be hashable? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "find() vs index() vs `in` — which one?",
@@ -1657,7 +1657,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn find() vs index() vs `in` — which one? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "list vs tuple vs deque vs array — which and why?",
@@ -1665,7 +1665,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn list vs tuple vs deque vs array — which and why? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Bias vs Variance",

@@ -6225,8 +6225,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Imagine two arrows starting from the same point (the origin). Cosine similarity doesn't care about the length of these arrows (their \"magnitude\"); it only cares about the direction they are pointing."
    },
    {
-    "t": "What does this module say about “How It's Calculated”?",
-    "ans": "The similarity score is literally the cosine of the angle ($\\theta$) between the two vectors, $\\vec{A}$ and $\\vec{B}$. The formula looks like this:"
+    "t": "What does this module say about “Why angle rather than distance”?",
+    "ans": "Here is the situation cosine similarity was invented for. Take two documents about football. One is a 200-word match report; the other is a 4,000-word essay on the same match. Count the words in each and you get two vectors: the essay's numbers are all roughly twenty times bigger."
    }
   ]
  },
@@ -6352,16 +6352,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
+    "t": "What does this module say about “What clustering is for, in plain words”?",
+    "ans": "Most machine learning you meet first is supervised : someone hands you examples that are already labelled — this email is spam, that house sold for £320,000 — and the model learns to copy those labels on new data."
+   },
+   {
+    "t": "What does this module say about “The tidying-up analogy”?",
+    "ans": "Imagine a room with hundreds of books on the floor and you want them in five piles."
+   },
+   {
     "t": "What does this module say about “Initialisation decides the answer”?",
     "ans": "Place two initial centroids inside the same true cluster and k-means will happily split that cluster in half while merging two others. The result is stable, self-consistent and wrong."
-   },
-   {
-    "t": "What does this module say about “Choosing k”?",
-    "ans": "K-means cannot tell you how many clusters there are; k is an input. Two standard ways to choose it:"
-   },
-   {
-    "t": "What does this module say about “Common mistakes”?",
-    "ans": "K-means alternates assigning points to the nearest centroid and moving each centroid to its points’ mean, which always converges but only to a local optimum determined by the initialisation — so use k-means++ and several restarts. It requires you to choose k, assumes roughly spherical clusters of similar size, and relies on Euclidean distance, which makes feature scaling mandatory rather than advisable."
    }
   ]
  },

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check every terminal palette against WCAG contrast, in both modes.
+"""Check every theme palette against WCAG contrast, in both modes.
 
 A theme meant to be lived in for years is a readability claim, and a
 readability claim should be measured rather than asserted. This computes the
@@ -22,7 +22,7 @@ and a light background at pure white.
 
 import sys
 
-from terminal_variants import VARIANTS
+from phosphor_variants import VARIANTS
 
 
 def _srgb(c):

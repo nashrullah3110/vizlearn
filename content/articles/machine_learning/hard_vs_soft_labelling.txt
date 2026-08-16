@@ -11,10 +11,44 @@ Imagine you're training a model to classify the sentiment of a tweet as 'Negativ
 
 <h4 class="font-bold" style="color: var(--text-main);">Hard Labelling (One-Hot Encoding)</h4>
 
-This is the most common approach. You are 100% certain about the class. The correct class gets a value of 1, and all other classes get a 0. It's a "winner-takes-all" method. <br><strong>Example Vector:</strong> For a 'Positive' tweet, the hard label is <strong>[0, 0, 1]</strong>. This tells the model, "This tweet is positive, and nothing else."
-<h4 class="font-bold" style="color: var(--text-main);">Soft Labelling (Probabilistic)</h4>
+This is the most common approach. You are 100% certain about the class. The correct class gets a value of 1, and all other classes get a 0. It's a "winner-takes-all" method. <br><strong>Example Vector:</strong> For a 'Positive' tweet, the hard label is <strong>[0, 0, 1]</strong>. This tells the model, "This tweet is positive, and nothing else." <h4 class="font-bold" style="color: var(--text-main);">Soft Labelling (Probabilistic)</h4>
 
 This method acknowledges that the world is messy and some data points are ambiguous. Instead of picking one class, you assign a probability distribution across all classes. <br><strong>Example Vector:</strong> For a tweet that is mostly positive but has a hint of neutrality, the soft label might be <strong>[0.1, 0.2, 0.7]</strong>. This tells the model, "I'm pretty sure this is positive, but there's a small chance it's neutral or even slightly negative."
+
+## The two ways to say what the answer is
+
+A hard label is a single confident claim: this image <em>is</em> a cat. Written as a vector for three classes, that is [0, 1, 0] &mdash; all the probability mass on one class, none anywhere else.
+
+A soft label spreads the claim: [0.05, 0.90, 0.05], or for a genuinely ambiguous image, [0.30, 0.60, 0.10]. It says what the answer probably is <em>and</em> how sure anyone is.
+
+The difference sounds cosmetic and is not, because of what it does to the loss. With cross-entropy loss and a hard label, the model is pushed to output 1.0 for the true class and 0.0 for everything else. It can never reach those values &mdash; softmax outputs are strictly between 0 and 1 &mdash; so the pressure never stops. The model keeps growing its weights to push the winning logit further from the others, long after the classification itself is correct.
+
+That endless pressure produces a specific and well-documented failure: a network that is 99.9% confident about images it gets wrong. The confidence has stopped tracking the probability of being right.
+
+## Where soft labels come from
+
+Soft targets are not something you invent by hand. Four sources supply them naturally:
+
+- <strong>Multiple annotators.</strong> Ask seven radiologists whether a scan shows a tumour and five say yes. The honest label is 0.71, not 1.0. Averaging the votes into a hard majority throws away exactly the information about which cases are difficult.
+- <strong>Label smoothing.</strong> A mechanical version: take the hard label and move a small amount &epsilon; (typically 0.1) off the true class, spread evenly across the others. [0, 1, 0] becomes [0.05, 0.90, 0.05]. One line of code, and it is standard in modern image classification training recipes.
+- <strong>Knowledge distillation.</strong> Train a large model, then use its full output distribution as the target for a small model. The large model's "this is a cat, but there is something dog-ish about it" carries far more information per example than the word "cat", which is why a distilled small model beats the same model trained on hard labels.
+- <strong>Mixup and similar augmentations.</strong> Blend two training images by 70/30 and blend their labels by 70/30 too. The soft label is the honest description of what the blended image contains.
+
+## What it buys you, and what it costs
+
+|Aspect|Hard labels|Soft labels|
+|---|---|---|
+|Confidence calibration|Typically overconfident|Much closer to honest|
+|Robustness to label noise|Poor &mdash; one wrong label is learned absolutely|Better &mdash; error is diluted|
+|Information per example|One class name|A full distribution over classes|
+|Peak training accuracy|Higher|Slightly lower by design|
+|Cost to produce|Cheap|More annotators, or a teacher model|
+
+The middle row is the practical headline. If 3% of your labels are wrong &mdash; which is normal for large annotated datasets &mdash; hard labels demand that the model memorise those mistakes perfectly. Soft labels leave room for the model to remain unconvinced.
+
+The fourth row is the honest cost. Label smoothing usually lowers training accuracy a little, because you have explicitly told the model not to be certain. Test accuracy and calibration generally improve, which is the trade you wanted.
+
+One caveat worth knowing: label smoothing tightens the clusters a network forms for each class, which is good for classification but has been shown to hurt when you later want to distil <em>from</em> that network, or use its embeddings for retrieval. Smooth the student, think twice about smoothing the teacher.
 
 ## Things to try
 
@@ -32,3 +66,38 @@ While hard labelling is simpler, soft labelling offers several key advantages, a
 - <strong>Robustness to Noise:</strong> Real-world datasets often contain mislabeled examples. Soft labels can account for this uncertainty, making the training process more stable and less susceptible to noisy data.
 - <strong>Capturing Inter-Class Relationships:</strong> Soft labels can implicitly teach the model about the relationships between classes. For example, it can learn that 'sarcastic' is closer to 'negative' than it is to 'positive'.
 - <strong>Knowledge Distillation:</strong> Soft labels are the foundation of knowledge distillation, where the probabilistic outputs of a large, complex model are used as soft targets to train a smaller, more efficient model.
+
+## Reading a model's confidence honestly
+
+Once you care about soft labels you inevitably start caring about <strong>calibration</strong>: does a predicted 0.8 mean the model is right about 80% of the time?
+
+The way to check is a reliability diagram. Bucket the predictions by confidence &mdash; 0.5&ndash;0.6, 0.6&ndash;0.7, and so on &mdash; and for each bucket plot average confidence against actual accuracy. A perfectly calibrated model traces the diagonal. A typical modern network traces a curve sagging below it: the 0.9 bucket is right only 75% of the time.
+
+The single number that summarises this is <strong>expected calibration error</strong>, the average gap between confidence and accuracy across the buckets.
+
+Two standard repairs, both applied after training on a held-out set:
+
+- <strong>Temperature scaling.</strong> Divide the logits by a single learned number T before the softmax. T &gt; 1 softens every prediction. One parameter, does not change any prediction's ranking, and it fixes most of the problem. This is the default choice.
+- <strong>Isotonic regression or Platt scaling.</strong> More flexible mappings from raw score to calibrated probability, useful for non-neural models. Isotonic needs more data to avoid overfitting the calibration set itself.
+
+Calibration matters wherever the number is used rather than just the argmax: a medical triage threshold, an expected-value calculation, or a downstream system that combines several models' probabilities.
+
+## Questions people ask
+
+<strong>Should I always use label smoothing?</strong> For large image and text classifiers, it is close to a free improvement at &epsilon; = 0.1. For small datasets, calibrated-probability-critical tasks, or when you plan to distil from the model, test it rather than assuming.
+
+<strong>Do soft labels need a different loss function?</strong> No. Cross-entropy already accepts a full target distribution; the hard-label case is just the special case where one entry is 1. Most frameworks accept either.
+
+<strong>How do I combine several annotators' opinions?</strong> The simple average is a reasonable start. Better methods weight annotators by their measured reliability, which requires overlapping assignments so agreement can be estimated.
+
+<strong>Does this apply to regression?</strong> The label-smoothing form does not, but the idea does: predicting a distribution rather than a point value &mdash; quantile regression, or a model that outputs a mean and a variance &mdash; is the regression version of admitting uncertainty.
+
+<strong>Can soft labels hide a genuinely bad model?</strong> They can flatter the loss, so keep reporting accuracy and a proper calibration measure alongside it. Low confidence everywhere is not the same as being well calibrated.
+
+## Recap in one screen
+
+- A hard label asserts one class; a soft label gives a probability across classes.
+- Training on hard labels with cross-entropy pushes a model towards unwarranted certainty.
+- Soft targets come from multiple annotators, label smoothing, distillation, or mixup-style augmentation.
+- They usually cost a little training accuracy and buy calibration and noise tolerance.
+- Check calibration with a reliability diagram; fix it with temperature scaling.

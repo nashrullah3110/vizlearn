@@ -192,6 +192,11 @@ TAG = re.compile(r"<(/?)([a-zA-Z][-a-zA-Z0-9]*)\b[^>]*?(/?)>")
 
 def elements(fragment):
     """(tag, inner_html, outer_html) for each top-level element."""
+    return [(t, i, o) for t, i, o, _s, _e in _elements(fragment)]
+
+
+def _elements(fragment):
+    """As elements(), plus each element's (start, end) in the fragment."""
     out = []
     depth = 0
     start = name = None
@@ -200,7 +205,7 @@ def elements(fragment):
         closing, tag, selfclose = m.group(1), m.group(2).lower(), m.group(3)
         if selfclose or tag in VOID:
             if depth == 0:
-                out.append((tag, "", m.group(0)))
+                out.append((tag, "", m.group(0), m.start(), m.end()))
             continue
         if not closing:
             if depth == 0:
@@ -210,10 +215,25 @@ def elements(fragment):
             depth -= 1
             if depth == 0:
                 out.append((name, fragment[inner_from:m.start()],
-                            fragment[start:m.end()]))
+                            fragment[start:m.end()], start, m.end()))
             if depth < 0:
                 depth = 0
     return out
+
+
+def loose_text(fragment):
+    """True if the fragment has text sitting outside any top-level element.
+
+    Those sections are the ones where splitting into blocks would drop
+    something - a bare `<strong>Lead-in.</strong> then a sentence` with no
+    paragraph around it - so they are copied through as raw HTML instead.
+    """
+    at = 0
+    for _t, _i, _o, s, e in _elements(fragment):
+        if fragment[at:s].strip():
+            return True
+        at = e
+    return bool(fragment[at:].strip())
 
 
 RUN_BTN = re.compile(r'<button class="vz-run"[^>]*>.*?</button>', re.S)
@@ -236,10 +256,16 @@ def _li_lines(inner, marker):
 
 def to_text(fragment):
     """A section body's HTML -> the text format, as losslessly as it can."""
+    if loose_text(fragment):
+        return _clean(fragment)
     out = []
     for tag, inner, outer in elements(fragment):
         if tag == "p":
-            out.append(_clean(inner))
+            text = _clean(inner)
+            # A paragraph opening with an inline tag (<strong>Mistake.</strong>
+            # ...) would be read back as a raw-HTML block and lose its <p>,
+            # so those keep the wrapper.
+            out.append("<p>%s</p>" % text if text.startswith("<") else text)
         elif tag == "ul":
             out.extend(_li_lines(inner, "-"))
         elif tag == "ol":

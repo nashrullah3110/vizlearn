@@ -15,6 +15,96 @@ Imagine two arrows starting from the same point (the origin). Cosine similarity 
 
 This focus on direction is why cosine similarity is so useful. For example, in text analysis, the documents "the cat sat on the mat" and "a cat was sitting on a mat" are different in length and exact wording, but their vector representations will point in very similar directions, resulting in a high cosine similarity score.
 
+## Why angle rather than distance
+
+Here is the situation cosine similarity was invented for. Take two documents about football. One is a 200-word match report; the other is a 4,000-word essay on the same match. Count the words in each and you get two vectors: the essay's numbers are all roughly twenty times bigger.
+
+Measure the straight-line distance between those two vectors and they look completely different, because one is much longer than the other. But they are about the same thing, in the same proportions &mdash; roughly the same share of "goal", "keeper", "penalty". Cosine similarity ignores the lengths and compares only the directions, so the two documents come out nearly identical.
+
+That is the whole idea: <strong>length is loudness, direction is meaning</strong>. Cosine similarity throws away the loudness.
+
+The output always sits between &minus;1 and 1:
+
+- <strong>1.0</strong> &mdash; the vectors point the same way. Same mix of features, whatever the magnitudes.
+- <strong>0.0</strong> &mdash; they are at right angles. No shared direction at all; in text, no words in common.
+- <strong>&minus;1.0</strong> &mdash; they point in exactly opposite directions.
+
+With word counts or TF-IDF vectors no value can be negative, so scores land between 0 and 1. With learned embeddings, which do have negative components, the negative half of the range becomes reachable &mdash; though in practice most unrelated pairs cluster near 0 rather than at &minus;1.
+
+## Two vectors, worked through
+
+Take three words as the whole vocabulary &mdash; goal, keeper, tax &mdash; and two documents:
+
+- <strong>A</strong> = [3, 2, 0] &mdash; a short match report.
+- <strong>B</strong> = [30, 20, 0] &mdash; a long essay on the same match.
+
+The dot product is 3&times;30 + 2&times;20 + 0&times;0 = 90 + 40 = 130.
+
+The lengths are &radic;(9 + 4 + 0) = 3.61 and &radic;(900 + 400 + 0) = 36.06.
+
+So the similarity is 130 / (3.61 &times; 36.06) = 130 / 130.2 = <strong>1.00</strong>. Identical direction, exactly as expected: B is A multiplied by ten.
+
+Now add <strong>C</strong> = [0, 1, 5], a piece about tax policy that mentions a keeper once. Against A: dot product = 0 + 2 + 0 = 2; lengths 3.61 and 5.10; similarity = 2 / 18.4 = <strong>0.11</strong>. Almost nothing in common, which is the right answer.
+
+Compare that with Euclidean distance: A to B is 33.3, A to C is 5.9. By distance, the tax article is five times "closer" to the match report than the essay about the same match is. That single comparison is the entire argument for using cosine in text.
+
+## Where you meet it in real systems
+
+- <strong>Search and RAG.</strong> A question and a stored paragraph are both turned into embedding vectors; the paragraphs with the highest cosine similarity to the question are the ones fed to the language model. Every vector database you have heard of is, at heart, a machine for finding high cosine similarity quickly.
+- <strong>Recommendations.</strong> Represent each user by what they watched and each film by who watched it, then recommend the films whose vectors point in a similar direction to the user's.
+- <strong>Duplicate detection.</strong> Support tickets, product listings and news articles above about 0.9 similarity are usually the same thing said twice.
+- <strong>Face and voice matching.</strong> A face recogniser turns an image into a vector; two photographs of the same person land at similarity around 0.7&ndash;0.9, two different people much lower. The system is a threshold on a cosine.
+- <strong>Clustering text.</strong> Cosine distance (1 &minus; similarity) is the usual distance for grouping documents, because raw length should not decide which cluster a document joins.
+
+## Cosine, dot product and Euclidean
+
+|Measure|Sensitive to length?|Range|Use it when|
+|---|---|---|---|
+|Cosine similarity|No|&minus;1 to 1|Comparing meaning or composition, especially text|
+|Dot product|Yes|Unbounded|Length carries real information, e.g. confidence or popularity|
+|Euclidean distance|Yes|0 upwards|Coordinates in real space, where distance is literal|
+|Manhattan distance|Yes|0 upwards|Grid-like movement, or many sparse dimensions|
+
+Two facts worth carrying around. First, on <strong>normalised</strong> vectors &mdash; ones scaled to length 1 &mdash; the dot product and cosine similarity are the same number, which is why embedding libraries normalise on the way in and then use fast dot products. Second, on normalised vectors, ranking by cosine similarity and ranking by Euclidean distance give the same order, because squared distance = 2 &minus; 2&times;cosine. The choice only matters when the vectors are not normalised.
+
+## In code, and the trap in it
+
+```python
+import numpy as np
+
+def cosine(a, b):
+    a, b = np.array(a, float), np.array(b, float)
+    denom = np.linalg.norm(a) * np.linalg.norm(b)
+    return float(a @ b / denom) if denom else 0.0   # guard the zero vector
+
+cosine([3, 2, 0], [30, 20, 0])   # 1.0
+cosine([3, 2, 0], [0, 1, 5])     # 0.108...
+```
+
+The guard on the last line is not pedantry. An empty document, a row of all zeros after filtering, or a user who has clicked nothing all produce a zero vector, and dividing by its length is a division by zero. Left unhandled it becomes a `nan` that quietly poisons every average downstream.
+
+For anything bigger than a toy, use `sklearn.metrics.pairwise.cosine_similarity`, which takes two matrices and returns every pairwise score at once, or normalise your vectors once and use a dot product &mdash; a matrix multiply is orders of magnitude faster than a Python loop over pairs.
+
+## Questions people ask
+
+<strong>Is high cosine similarity the same as "means the same thing"?</strong> Only as far as the vectors are good. On raw word counts, "the match was excellent" and "the match was awful" score highly because they share three words out of four. Modern sentence embeddings handle this far better, but the similarity is always a statement about the representation, not about truth.
+
+<strong>What counts as a "high" score?</strong> It depends on the embedding model, so calibrate rather than guess. Score a few hundred pairs you know are related and a few hundred you know are not, then look at where the two distributions separate. For many sentence embedding models unrelated text still scores 0.2&ndash;0.4, so a threshold of 0.5 lets a lot of noise through.
+
+<strong>Why do all my scores look high?</strong> Some embedding models pack everything into a narrow cone of the space, so absolute values bunch up. Relative ranking still works: care about which pairs score highest, not whether the number crosses a round threshold.
+
+<strong>Does it work with more than three dimensions?</strong> The formula is identical for 768 or 3,072 dimensions &mdash; sum the products, divide by the two lengths. Only the picture in your head stops at three.
+
+<strong>Should I remove very common words first?</strong> With plain counts, yes: "the" appearing everywhere inflates every score. TF-IDF weighting does this automatically by discounting words that appear in most documents. Learned embeddings handle it internally.
+
+## Recap in one screen
+
+- Cosine similarity measures the angle between two vectors and ignores their lengths.
+- The formula is the dot product divided by both lengths; the result runs from &minus;1 to 1.
+- It is the default for text, embeddings, search and recommendations, because a longer document should not be a different document.
+- On length-1 vectors it equals the dot product, and it ranks identically to Euclidean distance.
+- Calibrate your threshold against known pairs, and always guard against zero-length vectors.
+
 ## How It's Calculated
 
 The similarity score is literally the cosine of the angle ($\theta$) between the two vectors, $\vec{A}$ and $\vec{B}$. The formula looks like this:
@@ -25,8 +115,7 @@ Let's break that down:
 
 <h4 class="font-bold" style="color: var(--text-main);">A · B (The Dot Product)</h4>
 
-This measures how much the vectors "agree." You calculate it by multiplying the corresponding components of each vector and summing the results. (A.x * B.x) + (A.y * B.y) + ...
-<h4 class="font-bold" style="color: var(--text-main);">||A|| and ||B|| (The Magnitudes)</h4>
+This measures how much the vectors "agree." You calculate it by multiplying the corresponding components of each vector and summing the results. (A.x * B.x) + (A.y * B.y) + ... <h4 class="font-bold" style="color: var(--text-main);">||A|| and ||B|| (The Magnitudes)</h4>
 
 This is the length of each vector, calculated using the Pythagorean theorem. By dividing by the magnitudes, we "normalize" the vectors, effectively ignoring their lengths and focusing only on their direction.
 
