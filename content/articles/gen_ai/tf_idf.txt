@@ -53,6 +53,67 @@ TF-IDF is rarely the ranker any more &mdash; <a href="bm25_and_sparse_retrieval.
 
 <p><strong>As the explanation.</strong> Every score decomposes into per-term contributions, so you can say exactly why a document ranked where it did. No dense retriever can do that, and in regulated settings it is sometimes the deciding factor.</p>
 
+## Weighting words by how informative they are
+
+Counting words treats "the" and "encephalopathy" as equally interesting. TF-IDF corrects that by multiplying two terms:
+
+<p class="mono-font">TF-IDF(t, d) = TF(t, d) &times; log(N / DF(t))</p>
+
+<strong>Term frequency</strong> &mdash; how often the term appears in this document. More mentions, more relevance.
+
+<strong>Inverse document frequency</strong> &mdash; the logarithm of the total number of documents divided by how many contain the term. Rare terms score high; ubiquitous terms score near zero.
+
+Worked through with 1,000 documents:
+
+|Term|Documents containing it|IDF|
+|---|---|---|
+|"the"|1,000|log(1) = <strong>0</strong>|
+|"policy"|200|log(5) = 1.61|
+|"parental"|30|log(33) = 3.50|
+|"encephalopathy"|2|log(500) = 6.21|
+
+A term in every document contributes <strong>exactly nothing</strong>, whatever its frequency. That is automatic stop-word removal, derived from the corpus rather than from a list &mdash; and it is the single most useful property of the method.
+
+## Why the logarithm
+
+Without it, a term in 1 document out of 1,000 would get a weight of 1,000 and a term in 10 would get 100 &mdash; a tenfold difference that vastly overstates how much more informative the first is.
+
+The logarithm compresses that: 6.9 against 4.6. Rare terms still win, and not by an absurd margin.
+
+The same reasoning motivates <strong>sublinear term frequency</strong>: using `1 + log(TF)` instead of the raw count, because a term appearing 50 times is not 50 times more relevant than one appearing once. Scikit-learn exposes this as `sublinear_tf=True`, and it usually helps.
+
+Two more refinements that matter in practice:
+
+<strong>L2 normalisation</strong> of each document's vector, so long documents do not dominate simply by containing more words. Applied by default in most implementations.
+
+<strong>Smoothing</strong> the IDF denominator (`log(1 + N/DF)`) so a term appearing in no documents does not divide by zero.
+
+## Building a working baseline
+
+```python
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+
+model = make_pipeline(
+    TfidfVectorizer(
+        ngram_range=(1, 2),      # unigrams and bigrams
+        min_df=3,                # drop terms in fewer than 3 documents
+        max_features=50_000,
+        sublinear_tf=True,
+        stop_words=None,         # IDF already suppresses common words
+    ),
+    LogisticRegression(max_iter=1000),
+)
+model.fit(train_texts, train_labels)
+```
+
+That is a strong text classifier in eight lines. It trains in seconds on tens of thousands of documents, runs on a CPU, and is fully interpretable &mdash; the model's coefficients map directly to words, so you can read what it learned.
+
+<strong>`min_df` is doing the heavy lifting.</strong> Dropping terms that appear in fewer than three documents typically removes most of the vocabulary and almost none of the signal, because the long tail is mostly typos and one-off tokens.
+
+<strong>`ngram_range=(1, 2)`</strong> adds bigrams, which is what lets the model represent "not good" &mdash; the single most valuable addition for sentiment tasks.
+
 ## Things to try
 
 1. Turn <strong>idf</strong> off and query <em>the</em>. Every document scores, and the ranking is driven by a word that distinguishes nothing.
@@ -62,3 +123,68 @@ TF-IDF is rarely the ranker any more &mdash; <a href="bm25_and_sparse_retrieval.
 ## What to remember
 
 TF-IDF weights a term by how often it appears here times how rare it is everywhere. A term in every document has an idf of zero and drops out by arithmetic rather than by a list. It knows nothing about meaning, which is why a synonym scores zero and why dense retrieval runs alongside it.
+
+## What it cannot do
+
+<strong>No sense of similar words.</strong> "Excellent" and "superb" are unrelated columns. A model trained on documents containing one learns nothing about documents containing the other. This is the fundamental limitation, and it is what embeddings fix.
+
+<strong>No word order beyond n-grams.</strong> Bigrams capture adjacent pairs; anything longer-range is invisible.
+
+<strong>No handling of unseen vocabulary.</strong> A term absent from the training corpus has no column, so it contributes nothing at prediction time.
+
+<strong>Very high dimensionality.</strong> Fifty thousand features, almost all zero per document. Manageable with sparse matrices and sparse-aware models, and it rules out anything that requires dense input.
+
+|&nbsp;|TF-IDF|Embeddings|
+|---|---|---|
+|Similar words related|No|Yes|
+|Dimensionality|Tens of thousands, sparse|Hundreds, dense|
+|Interpretable|Yes &mdash; coefficients are words|No|
+|Needs a model to compute|No|Yes|
+|Exact term matching|Excellent|Weak|
+|Handles paraphrase|No|Yes|
+
+That table is the argument for using both, which is exactly what hybrid retrieval does.
+
+## Where it is still the right tool
+
+<strong>As the first baseline for any text classification task.</strong> It is fast enough to try in five minutes, and it frequently comes within a few points of a fine-tuned transformer on topic classification with adequate labels. Not measuring it means not knowing whether the transformer was worth it.
+
+<strong>Keyword retrieval,</strong> usually in its refined form BM25, which adds term-frequency saturation and document-length normalisation. Every search engine is built on this.
+
+<strong>Keyness analysis</strong> &mdash; comparing two corpora to find the terms that distinguish them. Far more informative than a word cloud.
+
+<strong>Interpretable models</strong> in regulated settings, where "the model weighted these words" is a required explanation.
+
+<strong>Low-resource environments</strong> &mdash; no GPU, no model download, no inference latency.
+
+## BM25, briefly
+
+BM25 is TF-IDF with two corrections, and it is what you should use for retrieval rather than plain TF-IDF:
+
+<strong>Term-frequency saturation.</strong> The contribution of repeated occurrences flattens, controlled by `k₁` (around 1.2). A document mentioning a term twenty times is not twenty times more relevant.
+
+<strong>Document-length normalisation</strong> relative to the corpus average, controlled by `b` (around 0.75). A long document will contain most query terms by chance.
+
+Both corrections address ways raw TF-IDF over-rewards documents. For classification features TF-IDF is fine; for ranking search results, BM25 is meaningfully better.
+
+## Questions people ask
+
+<strong>Do I need stop-word removal?</strong> Not really &mdash; IDF drives ubiquitous terms to zero. Removing them shrinks the vocabulary, which is the only benefit.
+
+<strong>Should I stem or lemmatise?</strong> For TF-IDF, yes &mdash; it pools evidence across word forms and shrinks the vocabulary. Never for transformers.
+
+<strong>What `min_df` should I use?</strong> 2&ndash;5 for most corpora. It removes the long tail of typos and one-offs.
+
+<strong>Is TF-IDF outdated?</strong> No. It is a strong baseline, the basis of keyword retrieval, and interpretable in ways embeddings are not.
+
+<strong>Should I use it with embeddings?</strong> Yes &mdash; hybrid retrieval combining BM25 with dense search beats either alone on most real corpora.
+
+<strong>Why is my matrix enormous?</strong> Bigrams without `min_df` or `max_features`. Cap both.
+
+## Recap in one screen
+
+- TF-IDF multiplies how often a term appears here by how rare it is across the corpus.
+- A term in every document gets an IDF of zero &mdash; automatic, corpus-derived stop-word removal.
+- The logarithm stops rare terms getting absurd weights; sublinear TF does the same for repetition.
+- TF-IDF plus logistic regression is a fast, interpretable baseline worth measuring before anything heavier.
+- It cannot relate similar words, which is what embeddings add &mdash; and BM25 is the version to use for retrieval.

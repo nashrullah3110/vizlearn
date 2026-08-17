@@ -41,6 +41,61 @@ Two problems decide most real vector-database choices, and neither is about near
 
 Benchmarks almost always measure static-corpus query performance, which is the easy half.
 
+## What a vector database stores
+
+Three things per record, and all three matter:
+
+<strong>The vector</strong> &mdash; the embedding, typically 384 to 1,536 floats.
+
+<strong>The payload</strong> &mdash; the text itself, or a reference to it, so the retrieved chunk can be put in a prompt.
+
+<strong>The metadata</strong> &mdash; source, date, document type, permissions, heading path. This is what makes filtering possible, and it must be populated at indexing time; adding a field later means re-indexing.
+
+The index is the structure built over the vectors so that a nearest-neighbour query does not have to compare against all of them. Everything else the database provides &mdash; persistence, filtering, updates, replication &mdash; is why you use one rather than a NumPy array.
+
+## The indexing pipeline
+
+```python
+for doc in documents:
+    chunks = chunk(doc)                                   # 1. split
+    vecs = model.encode([c.text for c in chunks],         # 2. embed, batched
+                        normalize_embeddings=True, batch_size=64)
+    store.upsert([                                        # 3. write
+        {"id": c.id, "vector": v, "payload": {"text": c.text,
+                                              "source": doc.id,
+                                              "heading": c.heading,
+                                              "acl": doc.acl,
+                                              "updated": doc.updated}}
+        for c, v in zip(chunks, vecs)
+    ])
+```
+
+Four things in that snippet are the ones that go wrong in practice.
+
+<strong>Batch the embedding calls.</strong> One call per chunk is dominated by overhead; batches of 32&ndash;128 are several times faster.
+
+<strong>Normalise once, here.</strong> Then every query is a dot product rather than a cosine computation.
+
+<strong>Use deterministic ids</strong> derived from the source and chunk position, so re-indexing a changed document replaces its chunks rather than duplicating them.
+
+<strong>Upsert, not insert.</strong> Re-running the pipeline should be idempotent, and it will be run again.
+
+## Keeping the index fresh
+
+Documents change, and a stale index is a correctness problem rather than a performance one &mdash; a retrieved chunk from a superseded policy will be used confidently.
+
+Three strategies:
+
+<strong>Full rebuild.</strong> Re-index everything on a schedule. Simple, and it wastes work and leaves a window where the index is being rebuilt.
+
+<strong>Incremental upsert.</strong> Track a content hash per document; re-embed only what changed. This is what most systems should do.
+
+<strong>Change-data capture.</strong> Subscribe to source-system events and update on write. Lowest latency, most integration work.
+
+The detail that catches people: <strong>deletions</strong>. When a document is removed, its chunks must be removed too. Most indexes handle deletes with tombstones, so space and quality degrade until a compaction or rebuild. Plan for periodic rebuilds even with incremental updates.
+
+Also plan for <strong>re-embedding</strong>. Changing the embedding model invalidates the entire index, because vectors from different models are not comparable. Record which model produced the index, and treat a model upgrade as a full rebuild &mdash; ideally into a new collection, with an atomic switch.
+
 ## Things to try
 
 1. Set <strong>clusters probed</strong> to 1. Recall collapses &mdash; most true neighbours live in clusters the search never opened.
@@ -50,3 +105,67 @@ Benchmarks almost always measure static-corpus query performance, which is the e
 ## What to remember
 
 Without an index, finding the nearest vector means comparing against every stored vector. An index prunes most of them and pays for it in recall, so the metric is recall@k measured against an exact search. Recall, latency and memory are the three knobs, and every index type exposes them under different names.
+
+## Filtering, and the interaction that surprises people
+
+Real queries carry constraints: only this user's documents, only from the last year, only policies.
+
+Two ways to apply them:
+
+<strong>Pre-filter</strong> &mdash; restrict the candidate set, then search within it. Correct, and it can defeat the index structure, because the graph or clusters were built over everything.
+
+<strong>Post-filter</strong> &mdash; search, then discard non-matching results. Fast, and it can return fewer than k results, or none, when the top matches are all filtered away.
+
+Modern vector databases implement <strong>filtered search</strong> that navigates the index while respecting the predicate, which is the right answer and why using a real database beats a raw index library once filtering matters.
+
+For permissions specifically, the filter must be applied <em>inside</em> the search, server-side. Retrieving first and filtering in the application means documents the user cannot see have already influenced which results came back &mdash; and in the worst case, their content has already crossed a trust boundary.
+
+## Choosing a store
+
+|Store|Character|
+|---|---|
+|FAISS|A library, not a service &mdash; fast, in-process, no persistence layer|
+|Qdrant|Rust, strong filtering, good defaults|
+|Weaviate|Built-in hybrid search and modules|
+|Milvus|Built for very large scale, more operational weight|
+|pgvector|Postgres extension &mdash; one database for everything|
+|Pinecone / hosted|Managed, no operations, per-vector pricing|
+|Elasticsearch / OpenSearch|Strong BM25 plus vector support &mdash; hybrid in one system|
+
+Two observations that save a lot of unnecessary infrastructure.
+
+<strong>Below about 100,000 vectors, you may not need any of these.</strong> A NumPy array plus a dot product is exact and fast, and a million-vector brute-force search takes tens of milliseconds with a good BLAS.
+
+<strong>pgvector is often the right answer</strong> for a system that already uses Postgres. One database to operate, transactional consistency with the rest of the data, and SQL for the filtering. It is slower than a dedicated store at very large scale, and that scale is further away than most projects reach.
+
+## Operational details worth deciding up front
+
+<strong>Collection layout.</strong> One collection per tenant isolates cleanly and multiplies index overhead; one collection with a tenant field in the metadata scales better and relies on filtering being correct.
+
+<strong>Backups.</strong> The index is derivable from the documents, so the question is whether re-indexing is acceptable as recovery. For a large corpus that may be hours, which argues for snapshotting.
+
+<strong>Monitoring.</strong> Track query latency percentiles, recall against a periodic exact-search sample, index size, and the age of the oldest un-refreshed document.
+
+<strong>Cost.</strong> Memory-resident indexes are priced by vector count and dimension. Reducing dimensions from 1,536 to 384 is a fourfold saving and often a small accuracy cost &mdash; some models support truncating dimensions deliberately.
+
+## Questions people ask
+
+<strong>Do I need a vector database?</strong> Below 100k vectors, no. Above that, yes &mdash; as much for filtering, persistence and updates as for the index.
+
+<strong>How do I handle document updates?</strong> Deterministic ids plus upsert, driven by a content hash. And plan periodic rebuilds to clean up deletions.
+
+<strong>What happens if I change embedding models?</strong> The whole index must be rebuilt. Version it and switch atomically.
+
+<strong>Should the text live in the vector store?</strong> Convenient, and for large documents a reference to a document store is cleaner. Either way the retrieved text must be reachable.
+
+<strong>How do I enforce permissions?</strong> Filter inside the search, server-side, on metadata written at indexing time. Never filter after retrieval.
+
+<strong>Can I store several vectors per document?</strong> Yes, and it is common &mdash; one per chunk, or several representations (dense, sparse, per-language) per chunk.
+
+## Recap in one screen
+
+- Store the vector, the text and the metadata &mdash; and populate metadata at indexing time, because adding it later means re-indexing.
+- Batch the embedding calls, normalise once, use deterministic ids, and upsert.
+- Update incrementally by content hash, and rebuild periodically to reclaim deleted space.
+- Filtering must happen inside the search for permissions to be enforced correctly.
+- Below 100k vectors a plain array is enough; pgvector is often the pragmatic choice above that.

@@ -23,6 +23,65 @@ Both ignore order entirely &mdash; a relevant document at position 1 and at posi
 
 <strong>MRR</strong> (mean reciprocal rank) uses only the position of the <em>first</em> relevant result, averaged over queries:<p>MRR = mean(1 / rank of first relevant)</p><p>First position scores 1.0, second 0.5, third 0.33. It is the right metric when the user needs one good answer and will stop reading once they have it &mdash; question answering, navigational search &mdash; and it deliberately ignores everything after the first hit.</p><strong>NDCG</strong> (normalised discounted cumulative gain) is the most complete of the four. It handles <em>graded</em> relevance rather than a binary label, applies a logarithmic discount so later positions contribute less, and normalises by the score of the ideal ranking so the result lands in [0, 1] and is comparable across queries.<p>Use NDCG when relevance comes in degrees and the whole ordering matters; use MRR when only the first hit does.</p>
 
+## Measuring the stage that usually fails
+
+Almost all RAG failures are retrieval failures: the right chunk never reached the model. Debugging the prompt while recall is 0.4 is wasted effort, so retrieval needs its own metrics, measured separately.
+
+What you need is a small evaluation set &mdash; 50 to 200 real questions, each with the id of the chunk (or chunks) that actually answers it. Building it is the unglamorous part and it is what makes every subsequent decision measurable rather than anecdotal.
+
+The metrics divide into two families:
+
+<strong>Did we find it?</strong> Recall@k, hit rate@k. Binary, per query.
+
+<strong>Where did we find it?</strong> MRR, nDCG, precision@k. Rank-sensitive.
+
+|Metric|Question it answers|
+|---|---|
+|Recall@k|What share of the relevant documents are in the top k?|
+|Hit rate@k|In what share of queries is at least one relevant doc in the top k?|
+|Precision@k|What share of the top k are relevant?|
+|MRR|How high is the first relevant document, on average?|
+|nDCG@k|How good is the whole ranking, with graded relevance?|
+
+## Recall@k is the one that matters most for RAG
+
+Because the model only sees the top k, <strong>recall@k is a ceiling on the whole system</strong>. If the answer is not in the retrieved set, no prompt engineering recovers it.
+
+<p class="mono-font">recall@k = (relevant documents in the top k) / (all relevant documents)</p>
+
+With one relevant document per question, recall@k equals hit rate@k, and that is the common case for factoid evaluation sets.
+
+Measure it at several k and read the curve:
+
+|k|Recall|Interpretation|
+|---|---|---|
+|1|0.42|Ranking is imprecise|
+|5|0.71|Usable|
+|20|0.94|The right chunk is nearly always in the top 20|
+|50|0.96|Diminishing|
+
+That table diagnoses precisely. Recall@20 of 0.94 with recall@5 of 0.71 means the retrieval <em>finds</em> the document but does not <em>rank</em> it highly &mdash; which is a reranking problem, not a chunking or embedding problem. If recall@50 were 0.6, the document is not being found at all, and reranking cannot help.
+
+That distinction &mdash; find versus rank &mdash; is the single most useful thing these metrics tell you.
+
+## Rank-sensitive metrics
+
+<strong>MRR (mean reciprocal rank)</strong> averages 1/rank of the first relevant result:
+
+|First relevant at rank|Reciprocal rank|
+|---|---|
+|1|1.00|
+|2|0.50|
+|3|0.33|
+|10|0.10|
+|Not found|0|
+
+MRR is appropriate when there is essentially one right answer and its position matters &mdash; which describes most question answering. It is harsh on rank 2 versus rank 1, which is arguably correct given how much more attention a model pays to the first chunk.
+
+<strong>nDCG@k</strong> handles <em>graded</em> relevance: a document can be highly relevant, somewhat relevant or irrelevant, and the metric discounts gains logarithmically by position. It is the standard in information retrieval research and requires graded judgements, which are more expensive to collect than binary ones.
+
+<strong>Precision@k</strong> matters less for RAG than the others, because passing a few irrelevant chunks alongside the right one is usually tolerable. It matters when context budget is tight or when irrelevant context measurably degrades answers &mdash; which it does.
+
 ## Interactive Exploration Guide
 
 1. <strong>Move the cutoff.</strong> Slide <strong>k</strong> from 1 to 10 and watch precision@k and recall@k move in opposite directions. A larger k almost always raises recall and lowers precision.
@@ -47,3 +106,66 @@ Set k to the number of chunks you actually pass to the model and measure recall 
 ## Key takeaway
 
 Retrieval returns a ranking, so metrics are computed at a cutoff k and differ mainly in whether they care about position. Precision@k and recall@k ignore order within the cutoff; MRR looks only at the first relevant result; NDCG discounts by position and handles graded relevance. For RAG, recall@k at your actual context size is the number to optimise, because the model can survive a bad chunk but not a missing one.
+
+## Building the evaluation set
+
+This is the work that makes everything else possible, and there are three routes.
+
+<strong>Hand-written.</strong> Domain experts write questions and identify the answering chunk. Highest quality, slowest. 50 questions is enough to start and enough to catch large regressions.
+
+<strong>Generated from documents.</strong> For each chunk, ask a model to write a question it answers. Fast, and it produces questions phrased like the document, which flatters retrieval &mdash; the vocabulary gap that causes real failures is absent by construction.
+
+<strong>Mined from logs.</strong> Real user queries paired with the documents that were clicked, cited or rated helpful. The most realistic, and it requires a system already in production.
+
+The practical compromise: generate a first set to get moving, then replace it with mined real queries as they become available, and keep a hand-written set of known-hard cases as a regression suite.
+
+Two habits that matter. Include <strong>negative cases</strong> &mdash; questions the corpus genuinely cannot answer &mdash; so you can measure whether the system declines rather than inventing. And version the set, so a change in the score means a change in the system rather than a change in the questions.
+
+## Measuring end to end as well
+
+Retrieval metrics are necessary and not sufficient. The generation stage has its own failure modes, and the standard measures are:
+
+|Metric|Question|
+|---|---|
+|Groundedness / faithfulness|Is every claim supported by the retrieved context?|
+|Answer relevance|Does the answer address the question asked?|
+|Completeness|Does it cover everything the question needed?|
+|Correctness|Is it right, against a known answer?|
+
+Groundedness and correctness can diverge informatively. An answer that is <em>correct but ungrounded</em> means the model answered from its own knowledge rather than the documents &mdash; which looks like success and will fail silently on anything the model did not memorise.
+
+Frameworks such as RAGAS and TruLens implement these with a model as judge. Model-graded metrics are noisy and directionally useful; validate them against human judgement on a sample before trusting the absolute numbers.
+
+## What to do with the numbers
+
+|Symptom|Likely cause|Action|
+|---|---|---|
+|Low recall@50|Not found at all|Chunking, embedding model, hybrid search|
+|Good recall@20, poor recall@5|Found but badly ranked|Add a cross-encoder reranker|
+|Good recall, poor groundedness|Model ignoring context|Prompt constraints, fewer chunks|
+|Good retrieval, poor correctness|Wrong document is relevant-looking|Better evaluation set, or a real gap in the corpus|
+|High precision, low recall|Too selective|Retrieve more candidates|
+
+Work top to bottom. Fixing retrieval before generation, and finding before ranking, is the ordering that avoids wasted effort.
+
+## Questions people ask
+
+<strong>How many evaluation questions do I need?</strong> 50 catches large regressions; 200 gives reasonably stable comparisons between similar configurations.
+
+<strong>Which metric should I optimise?</strong> Recall@k where k is the number of chunks you pass to the model. That is the system's ceiling.
+
+<strong>Should I use generated questions?</strong> To get started, yes &mdash; while knowing they understate the vocabulary gap and therefore overstate your recall.
+
+<strong>What is a good recall@5?</strong> Corpus-dependent. Compare against your own baseline rather than an absolute target, and track it over time.
+
+<strong>Do I need graded relevance?</strong> Only if you are using nDCG. Binary judgements suffice for recall, hit rate and MRR.
+
+<strong>How do I evaluate when there is no single right chunk?</strong> Mark all acceptable chunks as relevant and use recall, or move to graded judgements and nDCG.
+
+## Recap in one screen
+
+- Measure retrieval separately: it is where nearly all RAG failures are.
+- Recall@k is the ceiling on the whole system, because the model only sees the top k.
+- Comparing recall at several k separates "not found" from "found but badly ranked" &mdash; different fixes.
+- MRR suits single-answer questions; nDCG needs graded judgements.
+- Build 50&ndash;200 questions with known answers, include unanswerable ones, and version the set.

@@ -37,6 +37,56 @@ In a modern RAG stack the two are usually optimised at different stages. The ret
 
 <p><strong>Degrees of usefulness.</strong> Binary relevance forces a yes/no on documents that are genuinely partial. If your judgements are graded, nDCG uses that information and precision discards it.</p>
 
+## What share of what you returned is useful
+
+<p class="mono-font">precision@k = (relevant documents in the top k) / k</p>
+
+If 3 of the top 5 results are relevant, precision@5 = 0.6. The denominator is always k, whether or not that many relevant documents exist.
+
+That last detail matters and is a known limitation: if only 2 relevant documents exist in the whole corpus, precision@5 cannot exceed 0.4 however perfect the retrieval. For that reason precision@k is best read alongside recall, not alone.
+
+Worked through. Top 5 results for "parental leave entitlement", with relevance marked:
+
+|Rank|Document|Relevant?|
+|---|---|---|
+|1|Parental leave entitlement section|Yes|
+|2|Parental leave application form|Yes|
+|3|Annual leave policy|No|
+|4|Parental leave &mdash; return to work|Yes|
+|5|Expenses policy|No|
+
+precision@5 = 3/5 = <strong>0.6</strong>. precision@3 = 2/3 = 0.67. precision@1 = 1.0.
+
+Note that precision@k does not care <em>where</em> the relevant results sit. Ranks 1, 2, 4 and ranks 3, 4, 5 give the same precision@5, which is why rank-sensitive metrics exist.
+
+## Why it matters less than recall for RAG &mdash; but still matters
+
+For a retrieval system feeding a language model, the two errors are not symmetric. A <strong>missing</strong> relevant chunk means the answer cannot be produced. An <strong>extra</strong> irrelevant chunk costs context budget and some attention.
+
+So the retrieval stage should be tuned for recall, and precision is recovered downstream by reranking and by passing only a few chunks to the model.
+
+That does not make precision irrelevant, for three reasons:
+
+<strong>Context budget.</strong> Passing 20 chunks when 3 are relevant wastes tokens that cost money and latency.
+
+<strong>Irrelevant context degrades answers.</strong> Models do use what they are given, and contradictory or off-topic passages measurably reduce correctness.
+
+<strong>Attention dilution.</strong> More context means each relevant chunk gets proportionally less attention, and material in the middle of a long context is attended to less reliably.
+
+So the target is high recall in stage one and high precision in what finally reaches the prompt &mdash; which is precisely what a reranker delivers.
+
+## Where precision is the primary metric
+
+<strong>User-facing search results.</strong> Someone scanning a result list judges the system by the first few entries. Precision@1, @3 and @5 are what they experience; recall@50 is invisible to them.
+
+<strong>Recommendations.</strong> A carousel of five items is judged on whether those five are good.
+
+<strong>Alerting and triage.</strong> Every false positive costs human review time, so precision is the operational constraint.
+
+<strong>Anything with a tight context budget</strong> &mdash; a small model, a long prompt, or a per-request cost limit.
+
+In those cases the trade runs the other way: favour precision, accept lower recall, and give the user a way to ask for more.
+
 ## Things to try
 
 1. Drag <strong>k</strong> up from 1. Precision generally falls while recall rises &mdash; that opposition is the whole reason both numbers are quoted together.
@@ -50,3 +100,79 @@ Precision@k is the fraction of the returned k that was relevant, with k always a
 All four of these read the same object: an ordered list of retrieved results, with each one labelled relevant or not by a human or a strong model. They differ only in what they choose to notice about it &mdash; which is why quoting one without saying which is close to meaningless, and why the visualisation above shows all four at once.
 
 The labels are the expensive part. A relevance judgement per query-document pair is human work, and an evaluation set of fifty queries with judged results is worth more than any amount of metric sophistication on top of unjudged data. Build the set first.
+
+## Combining the two
+
+Neither metric alone describes a retrieval system, and there are standard ways to combine them.
+
+<strong>F1@k</strong> is the harmonic mean of precision@k and recall@k. One number, and it punishes imbalance: precision 1.0 with recall 0.0 gives an F1 of 0, which is the correct verdict.
+
+<strong>Precision-recall curve.</strong> Sweep k and plot the pair. The shape shows the whole trade-off rather than one point on it.
+
+<strong>Average precision (AP)</strong> averages the precision at each rank where a relevant document appears &mdash; so it rewards putting relevant documents early, unlike plain precision@k. Averaged across queries it gives <strong>MAP</strong>, a standard information-retrieval measure.
+
+<strong>nDCG@k</strong> handles graded relevance and discounts by position logarithmically. The most complete measure, and it needs graded judgements rather than binary ones.
+
+|Metric|Sensitive to rank order?|Needs graded labels?|
+|---|---|---|
+|Precision@k|No|No|
+|Recall@k|No|No|
+|MRR|Yes &mdash; first relevant only|No|
+|MAP|Yes|No|
+|nDCG@k|Yes|Yes|
+
+For most RAG work, recall@k plus MRR is sufficient. Add nDCG if you have graded judgements and are comparing configurations closely.
+
+## Measuring it
+
+```python
+def precision_at_k(retrieved, relevant, k):
+    top_k = retrieved[:k]
+    return sum(1 for d in top_k if d in relevant) / k
+
+def f1_at_k(retrieved, relevant, k):
+    p = precision_at_k(retrieved, relevant, k)
+    r = len(set(retrieved[:k]) & set(relevant)) / len(relevant)
+    return 2 * p * r / (p + r) if (p + r) else 0.0
+```
+
+Two practical notes on interpretation.
+
+<strong>Precision@k is bounded by the number of relevant documents.</strong> With 2 relevant documents, precision@10 cannot exceed 0.2. Compare precision at a k close to the number of relevant items, or use MAP.
+
+<strong>Judgement quality dominates.</strong> A document marked irrelevant that a user would have found useful lowers measured precision without lowering real quality. Binary judgements are cheap and blunt; graded ones are expensive and better.
+
+## What moves precision
+
+|Change|Effect|
+|---|---|
+|Add a cross-encoder reranker|Largest gain &mdash; this is what rerankers do|
+|Reduce k|Mechanically increases precision, lowers recall|
+|Better chunking|Fewer fragmentary near-misses|
+|Deduplication or MMR|Removes redundant results occupying slots|
+|Metadata filtering|Removes structurally irrelevant candidates|
+|Hybrid search|Helps both, mostly recall|
+
+Reranking is the direct instrument. A cross-encoder reads the query and each candidate together and scores them far more accurately than a comparison of precomputed vectors, which is exactly the operation that raises precision within a fixed candidate set.
+
+## Questions people ask
+
+<strong>Precision or recall for RAG?</strong> Recall in the retrieval stage, precision in what reaches the prompt. The two-stage pipeline delivers both.
+
+<strong>Why is my precision@10 low even though results look good?</strong> Probably because fewer than 10 relevant documents exist. Check the denominator problem.
+
+<strong>Should I use F1?</strong> Useful as a single summary. Report precision and recall separately as well, since the trade-off is the interesting part.
+
+<strong>How many chunks should I pass to the model?</strong> 3&ndash;10. Measure answer correctness against the number passed &mdash; it usually peaks and then declines.
+
+<strong>Does high precision mean good answers?</strong> Necessary and not sufficient. Generation can still fail with perfect retrieval.
+
+<strong>What is MAP?</strong> Mean average precision &mdash; average precision at each relevant rank, averaged over queries. Rank-sensitive, and a better single number than precision@k.
+
+## Recap in one screen
+
+- Precision@k is the share of the top k that is relevant, with k always as the denominator.
+- For RAG, a missing chunk is fatal and an extra chunk is wasteful &mdash; so favour recall first.
+- Irrelevant context still costs money, latency and answer quality, so precision matters in what reaches the prompt.
+- Precision@k ignores order and is capped by the number of relevant documents; MAP and nDCG fix both.
+- Reranking is the direct way to raise precision within a fixed candidate set.

@@ -47,6 +47,59 @@ Enrichment is easy to add and easy to overdo, and the only way to tell which you
 
 Watching only the first will lead you to enrich more and more, because recall keeps improving right up until the point where the top-k fills with near-identical chunks from the same section &mdash; at which point recall still looks fine and answers get worse.
 
+## The missing-context problem
+
+A chunk is retrieved and passed to the model on its own. Frequently it cannot be understood on its own:
+
+<blockquote>"This must be requested at least 8 weeks in advance, and the form requires a manager's signature."</blockquote>
+
+What must? Requested from whom? The chunk before it said "Parental leave", and that chunk is not in the context.
+
+This is the central weakness of chunking, and it has nothing to do with where the boundaries fall &mdash; even a perfectly-placed boundary produces chunks that reference their surroundings. Documents are written to be read in order; chunks are retrieved out of order.
+
+Context-aware chunking is the family of techniques that give each chunk enough surrounding information to stand alone.
+
+## Four ways to add the missing context
+
+|Technique|What is added|Cost|
+|---|---|---|
+|Heading path prefix|The document's section hierarchy|Free|
+|Overlap|The neighbouring boundary text|Storage|
+|Parent-child|Retrieve small, return the parent section|Storage, complexity|
+|Contextual summary|A generated sentence describing the chunk's place|One model call per chunk|
+
+<strong>The heading path</strong> is the cheapest and often the most effective. Prepending "Handbook &gt; Leave &gt; Parental Leave &gt; Applying" to that chunk resolves "this" immediately, improves the embedding, and costs nothing beyond capturing the structure at indexing time.
+
+<strong>Overlap</strong> of 10&ndash;20% means a sentence spanning a boundary appears whole in at least one chunk. It handles the boundary case and not the "referenced three paragraphs earlier" case.
+
+<strong>Parent-child</strong> indexes small chunks for precise matching and returns the larger enclosing section for context. It resolves references within the section by construction.
+
+<strong>Contextual retrieval</strong> is the newest of the four: ask a model, at indexing time, to write a sentence or two situating each chunk within its document, and prepend that to the chunk before embedding.
+
+## Contextual retrieval, concretely
+
+The prompt is short and the effect is substantial:
+
+```
+Here is a document:
+<document>{full_document}</document>
+
+Here is a chunk from it:
+<chunk>{chunk_text}</chunk>
+
+Write 1-2 sentences of context situating this chunk within the document,
+so it can be understood on its own. Reply with the context only.
+```
+
+The generated context is prepended to the chunk text, and the combined text is embedded and stored.
+
+<blockquote><strong>Generated:</strong> "This passage is from the parental leave section of the employee handbook, describing the application process for eligible employees."</blockquote>
+<blockquote><strong>Chunk:</strong> "This must be requested at least 8 weeks in advance..."</blockquote>
+
+Now the chunk is retrievable by a query about applying for parental leave, and interpretable when retrieved.
+
+The reported effect on retrieval failure rates is large &mdash; substantial reductions when combined with hybrid search and reranking. The cost is one model call per chunk at indexing time, which for a large corpus is significant. Two mitigations: use a small fast model, and exploit prompt caching, since the full document is repeated across all of its chunks' prompts.
+
 ## Things to try
 
 1. Start with everything off. The raw chunk is about refunds, never says so, and cannot be retrieved.
@@ -56,3 +109,61 @@ Watching only the first will lead you to enrich more and more, because recall ke
 ## What to remember
 
 Context-aware chunking changes what is stored rather than where the cut falls. A chunk full of pronouns and back-references is unusable by the generator and invisible to retrieval, so title, heading path and resolved references are added back. Keep the enrichment short relative to the chunk, or shared context dominates the embedding and chunks stop being distinguishable.
+
+## Choosing among them
+
+The techniques are not alternatives so much as layers, and they have a clear cost ordering.
+
+<strong>Always do:</strong> capture the structure and prepend the heading path. Free, and it addresses the most common case.
+
+<strong>Usually do:</strong> 10&ndash;20% overlap. Cheap insurance against boundary loss.
+
+<strong>Often worth it:</strong> parent-child retrieval, if chunks need to be small for precision. It resolves intra-section references without a model call.
+
+<strong>Consider:</strong> contextual retrieval, when the corpus is high-value, the documents are long, and retrieval quality is the bottleneck. Measure the gain against the indexing cost.
+
+<strong>Emerging:</strong> late chunking &mdash; embed the whole document with a long-context embedding model, then pool token embeddings into chunk vectors. Each chunk's vector is informed by the entire document without any per-chunk generation. Promising, and it requires a suitable embedding model.
+
+## Testing whether a chunk stands alone
+
+There is a simple and effective test, and it is worth running on a sample before indexing a whole corpus.
+
+Take twenty chunks at random and read each one cold. For each, ask:
+
+1. Can I tell what topic this is about?
+2. Do all the pronouns and references resolve?
+3. If someone asked a question this chunk answers, would this text answer it?
+
+If the answer to any is no, the chunk needs more context. That is a five-minute exercise that predicts retrieval quality better than most metrics, and it directly identifies which of the four techniques above is needed.
+
+Following it up quantitatively: measure recall@k with and without the context addition on a question set. The heading path alone frequently moves recall by several points.
+
+## Common mistakes
+
+- <strong>Adding context after embedding.</strong> The context must be present in the text that gets embedded, or it improves readability without improving retrieval.
+- <strong>Prepending so much context that it dominates the embedding.</strong> A 200-token context on a 100-token chunk means the vector is mostly about the context. Keep it to a sentence or two.
+- <strong>Not storing the original chunk separately,</strong> so citations quote generated context as if it were source text.
+- <strong>Generating context per chunk without prompt caching,</strong> paying for the full document repeatedly.
+- <strong>Assuming overlap solves reference resolution.</strong> It handles boundaries, not distant antecedents.
+
+## Questions people ask
+
+<strong>Is the heading path enough?</strong> Often, for well-structured documents. It is always worth doing first because it is free.
+
+<strong>How much does contextual retrieval cost?</strong> One model call per chunk. With a small model and prompt caching over the shared document, considerably less than it first appears.
+
+<strong>Does the generated context risk hallucination?</strong> It can misdescribe a chunk. Keep it to situating rather than summarising content, and store the original text separately for citation.
+
+<strong>Should context be embedded or only stored?</strong> Embedded &mdash; that is the point. Store the original separately for display.
+
+<strong>Does this replace good chunking?</strong> No, it complements it. Bad boundaries plus added context is worse than good boundaries plus added context.
+
+<strong>What is late chunking?</strong> Embedding the whole document first and pooling token vectors into chunk vectors, so each chunk's embedding already carries document context.
+
+## Recap in one screen
+
+- Chunks routinely reference material outside themselves, and retrieval delivers them out of order.
+- Prepend the heading path always &mdash; free, and it fixes the most common case.
+- Overlap handles boundary loss; parent-child retrieval handles intra-section references.
+- Contextual retrieval generates a situating sentence per chunk at indexing time, and measurably reduces retrieval failures.
+- Read twenty chunks cold and ask whether each stands alone &mdash; the cheapest diagnostic available.

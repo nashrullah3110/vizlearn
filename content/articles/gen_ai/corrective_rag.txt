@@ -57,6 +57,60 @@ Corrective RAG is one of a family that all add a decision point to the straight-
 
 CRAG is the cheapest of the four and needs no training, which is why it is usually the first one to add. The others are what you reach for once you have measured that grading alone is not enough.
 
+## Checking the retrieval before trusting it
+
+A plain RAG pipeline retrieves, then generates. It has no step that asks whether the retrieved documents are any good, so when retrieval fails the model still produces an answer &mdash; fluently, with citations, from irrelevant context.
+
+Corrective RAG adds an evaluation step between the two:
+
+<p class="mono-font">query &rarr; retrieve &rarr; <strong>grade the documents</strong> &rarr; act on the grade &rarr; generate</p>
+
+The grader assesses each retrieved chunk for relevance to the question, and the pipeline branches on the result:
+
+|Grade|Action|
+|---|---|
+|All documents relevant|Generate normally|
+|Some relevant|Discard the rest, generate from what remains|
+|None relevant|Do something else &mdash; rewrite, search elsewhere, or refuse|
+
+That third row is where the value is. A plain pipeline's worst case is a confident answer from unrelated documents; a corrective pipeline's worst case is an honest refusal or a second attempt.
+
+## Grading the documents
+
+The grader is a cheap model call per chunk, or one call over all of them:
+
+```
+Question: {question}
+Document: {chunk}
+
+Is this document relevant to answering the question? Reply with JSON:
+{"relevant": true|false, "reason": "<one short sentence>"}
+```
+
+Three design choices matter here:
+
+<strong>Grade relevance, not correctness.</strong> The grader is deciding whether the chunk is <em>about</em> the question, which is a much easier and more reliable judgement than whether it answers it.
+
+<strong>Use a small fast model.</strong> This runs per chunk on every query, so it is in the latency path. A small model does this adequately.
+
+<strong>Batch the calls.</strong> Grading five chunks in one call is cheaper and faster than five calls, at some loss of independence.
+
+The trade is explicit: an extra 200&ndash;600ms and a per-query cost, in exchange for knowing whether the context is usable before answering from it.
+
+## What to do when retrieval failed
+
+The corrective branch is the interesting part, and there are four responses in increasing order of cost.
+
+<strong>Refuse.</strong> "The available documents do not cover this." Honest, instant, and often the correct answer. Any corrective system should have this as its floor.
+
+<strong>Rewrite the query and retry.</strong> The failure may be phrasing. Ask a model to reformulate and search again &mdash; one extra round trip, and it recovers a meaningful share of failures.
+
+<strong>Broaden the search.</strong> Drop filters, raise k, add keyword search, try a different index.
+
+<strong>Fall back to an external source.</strong> Web search, or another corpus. This is what the original Corrective RAG paper proposed for the no-relevant-documents case, and it is appropriate when the corpus is genuinely incomplete rather than badly searched.
+
+A cap on retries is essential. Two attempts then refuse is a reasonable policy; without a limit, a hard query can loop.
+
 ## Things to try
 
 1. Select <em>capital of Peru</em>. Nothing clears the threshold, and the pipeline declines &mdash; the answer naive RAG cannot give.
@@ -66,3 +120,80 @@ CRAG is the cheapest of the four and needs no training, which is why it is usual
 ## What to remember
 
 Corrective RAG grades retrieved documents before generating, and takes a different path when they are poor: rewrite the query, fall back to another source, or decline. Retrieval never fails loudly &mdash; it always returns its nearest k &mdash; so without a grader a query with no answer still produces a confident, sourced-looking one.
+
+## The family of self-checking pipelines
+
+Corrective RAG is one of several patterns that add evaluation loops, and they check different things.
+
+|Pattern|Checks|Acts by|
+|---|---|---|
+|Corrective RAG|Are the retrieved documents relevant?|Re-retrieving or falling back|
+|Self-RAG|Is retrieval needed? Is the answer supported?|Retrieving on demand, critiquing output|
+|Adaptive RAG|How hard is this question?|Routing to a cheaper or richer path|
+|Agentic RAG|Anything, iteratively|A planning loop with tools|
+
+<strong>Self-RAG</strong> adds two further checks: whether retrieval is needed at all (many questions do not need it), and whether the generated answer is supported by what was retrieved &mdash; regenerating if not.
+
+<strong>Adaptive RAG</strong> classifies the query first. A simple factoid goes straight to single-pass retrieval; a complex multi-hop question goes to a decomposition path. This saves latency on the easy majority.
+
+<strong>Agentic RAG</strong> is the general case: a loop where the model decides what to retrieve, evaluates what it got, and iterates. Most capable, least predictable, and hardest to bound in cost.
+
+The common thread is <strong>replacing a fixed pipeline with a conditional one</strong>. The cost is latency and unpredictability; the gain is not answering confidently from nothing.
+
+## The cost, and when it is worth paying
+
+|&nbsp;|Plain RAG|Corrective RAG|
+|---|---|---|
+|Model calls per query|1|2&ndash;4|
+|Latency|Baseline|+30&ndash;100%|
+|Answers from bad context|Yes|Rarely|
+|Refuses appropriately|Only if prompted|By design|
+|Predictable cost|Yes|No &mdash; depends on branching|
+
+Worth paying when a wrong answer is expensive &mdash; regulated advice, medical or legal information, anything customer-facing where a confident error damages trust. Also worth paying when the corpus has known gaps, so refusal is a frequent correct answer.
+
+Not worth paying when latency is tight, when retrieval quality is already high (measure recall@k first), or when the cost of a wrong answer is low. A well-tuned plain pipeline with a good refusal instruction covers a great deal of the same ground for a fraction of the latency.
+
+That ordering matters: <strong>fix retrieval before adding a corrective loop</strong>. Grading documents is a way of detecting poor retrieval, not a substitute for improving it. If recall@k is 0.6, the grader will simply confirm that most retrievals are bad.
+
+## Implementation sketch
+
+```python
+def corrective_rag(question, max_retries=1):
+    query = question
+    for attempt in range(max_retries + 1):
+        docs = retrieve(query, k=10)
+        keep = [d for d in docs if grade(question, d)["relevant"]]
+
+        if keep:
+            return generate(question, keep)
+
+        if attempt < max_retries:
+            query = rewrite(question)          # try a different phrasing
+        else:
+            return refuse(question)            # honest floor
+```
+
+Two things to log for every request: <strong>how many documents were graded relevant</strong>, and <strong>which branch was taken</strong>. Those two numbers turn the pipeline into a monitoring signal &mdash; a rising share of no-relevant-documents branches is an early warning that the corpus or the index has drifted, and it is visible before users complain.
+
+## Questions people ask
+
+<strong>Does the grader need a large model?</strong> No. Judging topical relevance is a narrow task, and a small fast model is adequate and much cheaper in the latency path.
+
+<strong>How much latency does it add?</strong> One batched grading call, typically 200&ndash;600ms, plus a full retry cycle when it triggers.
+
+<strong>Is it better than reranking?</strong> They do different things. A reranker reorders; a grader decides whether to proceed at all. Use both &mdash; rerank, then grade the top few.
+
+<strong>What if the grader is wrong?</strong> A false negative discards a good document; a false positive lets a bad one through. Validate the grader against human judgement on a sample, as with any model judge.
+
+<strong>Should it fall back to web search?</strong> Only if the corpus is genuinely expected to be incomplete, and be explicit in the answer about which source was used.
+
+<strong>Is this the same as agentic RAG?</strong> Corrective RAG is a fixed, bounded loop. Agentic RAG is an open-ended one with tools and planning.
+
+## Recap in one screen
+
+- Corrective RAG grades the retrieved documents before generating, and branches on the result.
+- Its floor is an honest refusal instead of a confident answer from irrelevant context.
+- The corrective branch can rewrite the query, broaden the search, or fall back to another source &mdash; with a retry cap.
+- It costs one extra model call plus occasional retries; worth it where a wrong answer is expensive.
+- Fix retrieval first &mdash; grading detects poor retrieval, it does not improve it.

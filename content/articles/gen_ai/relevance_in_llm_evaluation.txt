@@ -39,6 +39,58 @@ The resolution is to score both and watch them together, the same way precision 
 
 Note also that relevance is the dimension most affected by your prompt rather than your retrieval. "Answer in at most three sentences, addressing only what was asked" moves it substantially, and costs nothing.
 
+## Did it answer the question that was asked?
+
+Relevance asks whether the response addresses the user's actual question. It is separate from correctness, and a system can fail on it while being entirely factual.
+
+<blockquote><strong>Question:</strong> "How do I cancel my subscription?"</blockquote>
+<blockquote><strong>Answer A:</strong> "Go to Settings, then Billing, then Cancel." &mdash; relevant</blockquote>
+<blockquote><strong>Answer B:</strong> "Our subscription plans include Basic at &pound;9 and Pro at &pound;29." &mdash; true, and not an answer</blockquote>
+<blockquote><strong>Answer C:</strong> "Cancellation is available. You may also downgrade, pause, transfer or gift your subscription, and our refund policy states..." &mdash; buried|</blockquote>
+
+B is the classic retrieval-driven failure: the model was given documents about subscriptions and produced something about subscriptions. C is the padding failure, which is common in tuned models and genuinely reduces usefulness.
+
+Three distinguishable problems hide under low relevance:
+
+|Problem|Symptom|
+|---|---|
+|Off-topic|Answers a different question|
+|Partial|Addresses one part of a multi-part question|
+|Padded|Correct answer buried in unrequested material|
+
+## Measuring it
+
+Relevance has no ground-truth answer to compare against &mdash; it is judged against the <em>question</em>, not against a reference. That makes it a natural fit for a model judge, and it means the judging prompt has to be precise about what is being asked.
+
+```
+Question: {question}
+Answer: {answer}
+
+Does the answer directly address what was asked? Ignore whether it is
+factually correct - judge only whether it responds to the question.
+
+Reply as JSON: {"verdict": "relevant" | "partially_relevant" | "irrelevant",
+                "reason": "<one sentence>"}
+```
+
+The instruction to ignore correctness matters. Without it, judges conflate the two and the metric stops being independently useful.
+
+An alternative measurement worth knowing: <strong>answer-to-question similarity via generated questions</strong>. Ask a model what question the answer appears to be answering, embed both that and the original question, and compare. A large gap indicates the answer drifted. It is cheaper than a judge and cruder.
+
+## Why answers drift off-topic
+
+Diagnosing low relevance means knowing the causes, and most of them are not the model's fault.
+
+<strong>Retrieval returned topically-related but unhelpful chunks.</strong> The model uses what it is given, so context about subscription pricing produces an answer about pricing. This is the most common cause, and it is a retrieval problem.
+
+<strong>The question was ambiguous.</strong> "How do I change it?" needs the conversation history resolved before retrieval; without contextualisation, both retrieval and generation guess.
+
+<strong>Multi-part questions</strong> get partially answered, because the model addresses the first part and the retrieved context only covers that part.
+
+<strong>The prompt encourages padding.</strong> Instructions to be "helpful and thorough" reliably produce answers with unrequested extras.
+
+<strong>Instruction tuning bias.</strong> Models tuned on preference data tend towards longer answers, because human raters mildly prefer them. That is a systematic pull towards padding.
+
 ## Things to try
 
 1. The 24/7 phone claim is marked correct but off topic. Relevance drops while correctness and groundedness stay put &mdash; this is the padding case, visible only here.
@@ -52,3 +104,65 @@ Answer relevance measures how much of the answer addresses the question asked. D
 These four are usually measured with an <strong>LLM as judge</strong>: a strong model is shown the question, the retrieved context, the answer and sometimes a reference, and asked to score one dimension at a time. Judging one dimension per call is not a stylistic choice &mdash; a single prompt asking for all four produces correlated, mushy scores, because the model settles on a general impression and applies it everywhere.
 
 Two habits make judge scores trustworthy. Ask for a decision and a justification, so a human can audit disagreements. And calibrate against a small human-labelled set before believing any of it &mdash; a judge that agrees with your annotators 70% of the time is not measuring what you think it is measuring.
+
+## What improves it
+
+<strong>Fix retrieval first.</strong> If the retrieved chunks are about the right topic and the wrong question, the answer will be too. Measure recall@k on the specific failing queries before touching the prompt.
+
+<strong>Contextualise the question</strong> against conversation history before retrieving. A follow-up question is meaningless as a standalone search, and this single step fixes a large share of relevance failures in chat interfaces.
+
+<strong>Decompose multi-part questions,</strong> retrieve for each part, and instruct the model to address each explicitly.
+
+<strong>Constrain the shape of the answer.</strong> "Answer in at most three sentences. Do not include information that was not asked for." Blunt, and effective against padding.
+
+<strong>Ask for the direct answer first,</strong> then any caveats. This helps even when the extra material stays, because the useful part is no longer buried.
+
+<strong>Reduce the number of chunks.</strong> Ten chunks invite the model to synthesise across all of them; three keep it focused.
+
+## Relevance within the metric suite
+
+|Metric|Question|Independent of|
+|---|---|---|
+|Recall@k|Was the answer retrieved?|Generation|
+|Groundedness|Is each claim supported by the context?|Truth|
+|Correctness|Is the answer right?|Style|
+|Relevance|Does it address the question?|Truth and completeness|
+|Completeness|Does it cover everything asked?|Concision|
+
+Relevance and completeness pull against each other, which is worth naming explicitly. A terse answer scores well on relevance and may miss required detail; an exhaustive one covers everything and buries the answer.
+
+Reporting both, and reading them as a pair, is how you find the balance. High relevance with low completeness means answers are too narrow; the reverse means they are padded.
+
+## Practical evaluation setup
+
+Three things make a relevance measurement trustworthy:
+
+<strong>Use real user questions.</strong> Generated questions tend to be well-formed and single-part, which is exactly the case relevance failures do not occur in. Mine logs where possible.
+
+<strong>Include multi-part and ambiguous questions deliberately.</strong> These are where relevance breaks, and a set of clean factoid questions will show 0.95 and tell you nothing.
+
+<strong>Validate the judge on a sample.</strong> Grade 50 answers yourself and measure agreement. Judges are more consistent on relevance than on correctness, because the question is narrower &mdash; and it is still worth checking.
+
+Track it per question type as well as in aggregate. Relevance is frequently high on single-part factoid questions and much lower on comparative or procedural ones, and the aggregate hides that.
+
+## Questions people ask
+
+<strong>Is relevance the same as correctness?</strong> No. An answer can be entirely true and not address the question.
+
+<strong>How is it different from precision@k?</strong> Precision measures retrieved documents; relevance measures the generated answer.
+
+<strong>Can I measure it without ground truth?</strong> Yes &mdash; it is judged against the question, which is what makes it cheaper to evaluate than correctness.
+
+<strong>Why are my answers so long?</strong> Instruction-tuned models are biased towards length, because preference raters mildly prefer it. Constrain it explicitly in the prompt.
+
+<strong>Should a refusal count as relevant?</strong> A well-targeted refusal &mdash; "the documents do not cover this" &mdash; is relevant. Track refusal rate separately so over-refusal is visible.
+
+<strong>What if the question itself is unclear?</strong> Asking a clarifying question is arguably the most relevant response. Decide whether your evaluation set rewards that.
+
+## Recap in one screen
+
+- Relevance asks whether the answer addresses the question, independently of whether it is true.
+- Three failure shapes: off-topic, partial, and correct-but-buried.
+- The most common cause is retrieval returning topically-related but unhelpful chunks.
+- Contextualise follow-up questions, decompose multi-part ones, and constrain answer length.
+- Read it alongside completeness &mdash; the two pull in opposite directions.

@@ -9,9 +9,41 @@ Some structures must not be split at all. A table split down the middle loses it
 
 ## Carrying the heading path
 
-The half that gets missed. A chunk reading "must be requested within 14 days" is useless in isolation &mdash; 14 days of what? Prepending the heading path &mdash; <code>Refund policy &gt; Exceptions</code> &mdash; makes the chunk self-describing.
+The single most valuable thing this approach enables is context injection.
 
-It improves retrieval as well as generation, because the heading words are now in the embedded text and match queries that use the section's vocabulary. Store the path as metadata too, so it can be filtered and displayed as a citation.
+A chunk taken from deep inside a handbook might read: "The entitlement is 39 weeks, of which 6 are at full pay." Retrieved on its own, it does not say what kind of leave, or for whom.
+
+Structure-aware chunking knows exactly where it came from, so the path can be prepended:
+
+<p class="mono-font">Employee Handbook &gt; Leave &gt; Parental Leave &gt; Entitlement</p>
+<p class="mono-font">The entitlement is 39 weeks, of which 6 are at full pay.</p>
+
+That transforms the chunk in two ways. Its <strong>embedding</strong> now contains the topic words, so a query about parental leave matches it. And the <strong>retrieved text</strong> is self-contained, so the model can answer without guessing.
+
+This is cheap, mechanical, and one of the highest-value improvements available to a retrieval pipeline over naive chunking.
+
+```python
+import re
+
+def chunk_markdown(text, max_chars=1500):
+    chunks, path, buf = [], [], []
+    for line in text.split("\n"):
+        m = re.match(r"^(#{1,6})\s+(.*)", line)
+        if m:
+            if buf:
+                chunks.append((" > ".join(path), "\n".join(buf)))
+                buf = []
+            level = len(m.group(1))
+            path = path[: level - 1] + [m.group(2)]
+        else:
+            buf.append(line)
+            if sum(len(b) for b in buf) > max_chars:
+                chunks.append((" > ".join(path), "\n".join(buf)))
+                buf = []
+    if buf:
+        chunks.append((" > ".join(path), "\n".join(buf)))
+    return chunks
+```
 
 ## What it needs from you
 
@@ -49,6 +81,40 @@ Store the path as metadata as well as prepending it. As metadata it supports fil
 
 One caution: on a deep hierarchy the path can grow long enough to dominate a short chunk's embedding, which is the dilution problem described under <a href="context_aware_chunking.html">context-aware chunking</a>. Two or three levels is usually the useful limit.
 
+## Using the boundaries the author already wrote
+
+Every structured document contains explicit markers of where topics change: headings, sections, list items, table boundaries, code blocks. Structure-aware chunking uses those instead of guessing.
+
+The advantage over recursive splitting is that a heading is a <em>semantic</em> boundary asserted by the person who wrote the document. No similarity computation can be more authoritative than that, and it is free to use.
+
+|Format|Structural markers|
+|---|---|
+|Markdown|`#`, `##`, `###`, lists, code fences|
+|HTML|`<h1>`&ndash;`<h6>`, `<section>`, `<article>`, `<table>`|
+|PDF|Outline/bookmarks, font-size hierarchy|
+|Word|Heading styles|
+|Code|Classes, functions, imports|
+|Notebooks|Cells|
+|Slides|Slide boundaries|
+
+The corresponding rule: <strong>split on the highest-level heading that produces chunks within your size budget</strong>, and fall back to finer boundaries inside sections that are too large.
+
+## Handling elements that must not be split
+
+Structure also tells you what to keep whole, which fixed-size chunking cannot know.
+
+<strong>Tables.</strong> Splitting a table mid-row destroys it &mdash; the header is in one chunk and the data in another, and neither is interpretable. Extract each table as its own chunk, and store a short text description alongside it for embedding, since a grid of numbers embeds poorly.
+
+<strong>Code blocks.</strong> Keep whole. A half-function is not retrievable knowledge.
+
+<strong>Lists.</strong> Keep short lists whole. A list of eight steps split after step three is worse than useless, because the retrieved fragment looks complete.
+
+<strong>Definitions and glossary entries.</strong> One entry per chunk is usually right.
+
+<strong>Figures and captions.</strong> Keep the caption with its reference.
+
+The general rule: <strong>any element whose meaning depends on its own completeness gets its own chunk, whatever the size budget says.</strong> Variable chunk sizes are correct here, not a compromise.
+
 ## Things to try
 
 1. Compare <em>structure first</em> with <em>fixed size</em> at the same chunk size. The character splitter cuts through the heading; the structure-aware one does not.
@@ -58,3 +124,69 @@ One caution: on a deep hierarchy the path can grow long enough to dominate a sho
 ## What to remember
 
 Structure-aware chunking splits along the document's own markup &mdash; headings, list items, table rows &mdash; because those boundaries were placed by the author and cost nothing to find. Carrying the heading path into each chunk is the half people miss: it makes a fragment self-describing and puts the section's vocabulary into the embedded text.
+
+## Extraction is the hard part
+
+The method depends on being able to see the structure, and for several common formats that is where the work is.
+
+<strong>Markdown and HTML</strong> are easy &mdash; the structure is explicit and parseable.
+
+<strong>PDF</strong> is the difficult one. A PDF is a description of marks on a page, not a document tree. Headings must be inferred from font size, weight and position; multi-column layouts are frequently extracted in the wrong reading order; and tables often come out as a jumble.
+
+The practical advice is to <strong>check the extracted text before indexing thousands of documents</strong>. Extract ten, read them, and look for interleaved columns, missing headings and mangled tables. A layout-aware extractor is worth the effort where quality matters.
+
+<strong>Scanned documents</strong> need OCR first, which loses structure and introduces character errors. Expect to fall back to semantic or recursive chunking for these.
+
+<strong>Word documents</strong> carry heading styles, which is usable structure if the author applied them &mdash; and many do not, using bold text instead.
+
+## Where it sits among the strategies
+
+|Strategy|Uses|Cost|Best on|
+|---|---|---|---|
+|Fixed size|Character count|Lowest|Nothing, really|
+|Recursive|Separator hierarchy|Lowest|A safe default|
+|Structure-aware|The document's own markup|Low|Structured documents|
+|Semantic|Embedding similarity|High|Unstructured prose|
+|Parent-child|Two granularities|Moderate|Long structured documents|
+
+Structure-aware chunking is the right default <em>where structure exists</em>, and it composes with the others:
+
+- Split on headings first, then <strong>recursively</strong> within any oversized section.
+- Split on headings, then use <strong>parent-child</strong> so small precise chunks return their section.
+- Fall back to <strong>semantic</strong> chunking for documents whose extraction produced no usable structure.
+
+That layered arrangement handles a mixed corpus, which is what real corpora are.
+
+## Metadata worth capturing while you have it
+
+The structural pass is the moment when this information is available, and capturing it later means re-indexing:
+
+- <strong>Heading path</strong> &mdash; prepend to the text and store as a field.
+- <strong>Heading level</strong> &mdash; useful for weighting or filtering.
+- <strong>Page number</strong> and character offsets &mdash; needed for precise citations.
+- <strong>Element type</strong> &mdash; paragraph, table, code, list. Enables filtering to tables when a question asks for figures.
+- <strong>Document title, date, source</strong> and access control.
+
+Citations are the practical payoff: "Handbook, section 4.2, page 17" is verifiable, and "one of the retrieved chunks" is not.
+
+## Questions people ask
+
+<strong>What if the document has no headings?</strong> Fall back to recursive splitting, or semantic chunking if it is continuous prose.
+
+<strong>How do I handle a very long section?</strong> Split it recursively inside, keeping the heading path on every resulting chunk.
+
+<strong>Should chunk sizes be uniform?</strong> No. A table, a code block or a glossary entry should be one chunk whatever its length.
+
+<strong>Is prepending the heading path really worth it?</strong> Yes &mdash; it improves both the embedding and the usability of the retrieved text, for almost no cost.
+
+<strong>What about PDFs?</strong> Use a layout-aware extractor and inspect the output. This is where most structure-aware pipelines actually fail.
+
+<strong>Can I combine this with semantic chunking?</strong> Yes, and it is a good arrangement: headings first, semantic splitting within oversized sections.
+
+## Recap in one screen
+
+- Headings and sections are boundaries the author asserted &mdash; more authoritative than any inferred split.
+- Prepend the heading path to each chunk: it sharpens the embedding and makes the retrieved text self-contained.
+- Keep tables, code blocks and short lists whole, whatever the size budget says.
+- Extraction is the hard part, and PDFs are where it usually goes wrong &mdash; inspect before bulk indexing.
+- Capture heading path, page, element type and permissions during the structural pass, because adding them later means re-indexing.

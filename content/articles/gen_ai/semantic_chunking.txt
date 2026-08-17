@@ -9,9 +9,18 @@ The threshold should be relative. A fixed number like 0.7 means something differ
 
 ## What it costs
 
-One embedding call per sentence at index time, against one per chunk for the alternatives. On a large corpus that is a real bill and a slow re-index, though it is paid once rather than per query.
+The cost is real and worth stating plainly: <strong>one embedding call per sentence at indexing time</strong>.
 
-It is also brittle on short sentences. "Yes." and "See above." have unstable embeddings, so a document full of them produces noisy similarity and boundaries in odd places. Buffering each sentence with its neighbours before embedding is the usual mitigation.
+A 100,000-document corpus averaging 200 sentences each is 20 million embedding calls, against perhaps 400,000 for fixed chunking. That is a fifty-fold increase in indexing cost.
+
+|Strategy|Indexing cost|Quality|
+|---|---|---|
+|Fixed size|Lowest|Poor &mdash; cuts mid-sentence|
+|Recursive|Lowest|Good|
+|Structure-aware|Low|Better where structure exists|
+|Semantic|High|Best on unstructured prose|
+
+Whether that trade is worth it depends on one thing: <strong>does the document have usable structure?</strong> If it has headings and sections, structure-aware chunking gets most of the benefit for almost none of the cost, because the author already marked where the topics change. Semantic chunking earns its cost on continuous unstructured prose &mdash; transcripts, scanned text, articles without headings.
 
 ## When to reach for it
 
@@ -49,6 +58,52 @@ The four strategies answer genuinely different questions, which is why they comp
 
 A sensible production pipeline is usually structure first, recursive to enforce the size limit, and context enrichment on the result. Semantic chunking enters when the documents have no structure to exploit.
 
+## Splitting where the meaning changes
+
+Fixed-size chunking cuts every 500 characters regardless of what is there. Recursive chunking respects paragraph and sentence boundaries. Neither knows whether a boundary is a <em>topic</em> boundary.
+
+Semantic chunking finds those boundaries by measuring meaning directly:
+
+1. Split the document into sentences.
+2. Embed each sentence.
+3. Compute the similarity between each consecutive pair.
+4. Split where the similarity drops below a threshold.
+
+Where two consecutive sentences are semantically close, they belong together. Where the similarity falls sharply, the topic has changed and that is where the chunk should end.
+
+<p class="mono-font">sim(s&#7522;, s&#7522;&#8330;&#8321;) high &rarr; same chunk &nbsp;&nbsp;&nbsp; sim low &rarr; boundary</p>
+
+The result is chunks that are each about one thing, at whatever length that takes &mdash; which is what an embedding wants, since a vector representing one topic is sharp and one representing three is a blurred average.
+
+## The threshold, and how to set it
+
+An absolute similarity threshold does not transfer between documents or models, because typical similarity levels vary enormously.
+
+The robust approach is a <strong>percentile of the distances within this document</strong>: compute all consecutive-sentence distances, and split at the ones above the 90th or 95th percentile.
+
+|Percentile|Effect|
+|---|---|
+|80th|Many boundaries, small chunks|
+|90th|A reasonable default|
+|95th|Fewer boundaries, larger chunks|
+
+Two refinements that materially improve results:
+
+<strong>Use a buffer.</strong> Compare a small window of sentences either side of the candidate boundary rather than single sentences. A single short sentence &mdash; "This is important." &mdash; produces a spurious dip on its own.
+
+<strong>Enforce size limits.</strong> Semantic boundaries can produce a 4,000-token chunk or a 30-token one. Cap the maximum and merge below a minimum, or the downstream context budget becomes unpredictable.
+
+```python
+import numpy as np
+
+sents = split_sentences(text)
+vecs = model.encode(sents, normalize_embeddings=True)
+sims = [float(vecs[i] @ vecs[i+1]) for i in range(len(vecs)-1)]
+
+threshold = np.percentile(sims, 10)         # lowest 10% of similarities
+boundaries = [i+1 for i, s in enumerate(sims) if s < threshold]
+```
+
 ## Things to try
 
 1. Raise the <strong>split percentile</strong> to 70. It splits almost everywhere, producing chunks too small to carry an idea.
@@ -58,3 +113,61 @@ A sensible production pipeline is usually structure first, recursive to enforce 
 ## What to remember
 
 Semantic chunking embeds each sentence and cuts where the similarity between neighbours drops, so boundaries land at topic changes rather than at character counts. It costs one embedding per sentence at index time, and it is usually not worth it on documents that already carry headings.
+
+## Where it helps and where it does not
+
+<strong>It helps on:</strong>
+
+- Meeting and interview transcripts, where topics shift with no markup.
+- Long-form articles and books without useful headings.
+- OCR output, where structure was lost in extraction.
+- Documents whose headings are decorative rather than topical.
+
+<strong>It does not help on:</strong>
+
+- Well-structured technical documentation. The headings are better boundaries than any similarity measure, and free.
+- Short documents already about one thing &mdash; FAQ entries, product descriptions, tickets.
+- Highly uniform text, where consecutive-sentence similarity is flat and no clear boundaries exist.
+- Code, where structural boundaries (functions, classes) are what matter.
+
+There is a further honest caveat: <strong>the measured benefit is often smaller than expected</strong>. Published comparisons on well-structured corpora frequently find semantic chunking roughly level with recursive chunking. It is worth evaluating rather than adopting on principle.
+
+## Variants
+
+<strong>Statistical / gradient-based.</strong> Instead of a percentile threshold, look for the largest local drops in similarity &mdash; the points of steepest change &mdash; which adapts better to documents with varying similarity levels.
+
+<strong>Double-pass.</strong> Chunk semantically, then merge adjacent chunks whose embeddings are similar. Cleans up over-splitting.
+
+<strong>LLM-based (agentic) chunking.</strong> Ask a model to propose boundaries, or to group sentences into topics. Highest quality on difficult text, and by far the most expensive &mdash; usually reserved for small high-value corpora.
+
+<strong>Late chunking.</strong> A recent alternative worth knowing: embed the <em>whole</em> document with a long-context embedding model, then pool the token embeddings into chunk vectors. Each chunk's vector is informed by the entire document, which addresses the missing-context problem without needing per-sentence calls.
+
+## Practical guidance
+
+Start with <strong>recursive or structure-aware chunking</strong> and a proper evaluation set. Measure recall@k. Then, if retrieval is the bottleneck <em>and</em> the documents lack structure, try semantic chunking and measure the difference.
+
+That ordering matters because chunking is one of several levers, and it is not usually the largest. Hybrid search and reranking typically give bigger gains for less effort, and they are worth exhausting first.
+
+Whatever strategy you choose, two things help regardless: <strong>prepend the heading path</strong> to each chunk so it carries context, and consider <strong>parent-child retrieval</strong> so small precise chunks can return larger context.
+
+## Questions people ask
+
+<strong>Is semantic chunking worth the cost?</strong> On unstructured prose, often. On documents with real headings, usually not &mdash; measure it.
+
+<strong>What embedding model for the sentence comparisons?</strong> A small fast one is adequate; it is comparing adjacent sentences, not doing retrieval.
+
+<strong>How do I stop chunks becoming enormous?</strong> Enforce a maximum size and split at the weakest internal boundary when exceeded.
+
+<strong>Does it replace overlap?</strong> Largely &mdash; boundaries at genuine topic shifts lose less than arbitrary ones. A small overlap is still cheap insurance.
+
+<strong>Can I combine it with structure?</strong> Yes, and this is often the best answer: split on headings first, then semantically within any oversized section.
+
+<strong>Is late chunking better?</strong> Promising, and it needs a long-context embedding model. Worth evaluating if one is available.
+
+## Recap in one screen
+
+- Embed sentences, measure consecutive similarity, and split where it drops &mdash; boundaries at real topic changes.
+- Use a percentile of the document's own distances rather than an absolute threshold.
+- Add a comparison buffer and enforce minimum and maximum sizes.
+- It costs one embedding call per sentence, which is a large indexing overhead.
+- Worth it on unstructured prose; structure-aware chunking usually wins where headings exist.

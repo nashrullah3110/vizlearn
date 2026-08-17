@@ -33,6 +33,66 @@ Plotting hit rate against k is more informative than any single value. If it cli
 
 That diagnostic split is the most valuable thing hit rate gives you, and it costs one evaluation run.
 
+## Did we find anything useful at all?
+
+Hit rate@k is the simplest retrieval metric: for what share of queries does <em>at least one</em> relevant document appear in the top k?
+
+<p class="mono-font">hit rate@k = (queries with &ge;1 relevant result in the top k) / (total queries)</p>
+
+It is binary per query. Ten relevant documents in the top k counts the same as one, and position within the top k is ignored entirely.
+
+Worked example over five queries at k = 5:
+
+|Query|Relevant found in top 5?|
+|---|---|
+|1|Yes, at rank 2|
+|2|Yes, at rank 1|
+|3|No|
+|4|Yes, at rank 5|
+|5|Yes, at ranks 1 and 3|
+
+<p class="mono-font">hit rate@5 = 4/5 = <strong>0.80</strong></p>
+
+Note that when each question has exactly one relevant document &mdash; the common case for factoid evaluation sets &mdash; hit rate@k and recall@k are the <strong>same number</strong>. The distinction only appears when questions have several relevant documents.
+
+## Why the crudeness is sometimes what you want
+
+Hit rate throws away information, and that is occasionally the point.
+
+<strong>It is the right framing for question answering.</strong> If a single chunk answers the question, finding it once is success. Finding it twice adds nothing, and MRR's penalty for it appearing at rank 3 rather than rank 1 may not reflect anything a user experiences.
+
+<strong>It is easy to communicate.</strong> "In 87% of cases we retrieve at least one document that answers the question" is a sentence a stakeholder understands immediately. "MRR is 0.64" is not.
+
+<strong>It is a clean ceiling.</strong> Since the model can only answer from what it was given, hit rate@k where k is the number of chunks passed is an upper bound on the system's answerable share.
+
+|Metric|Counts|Position matters|Several relevant docs|
+|---|---|---|---|
+|Hit rate@k|Any hit|No|Ignored|
+|Recall@k|Share found|No|Counted|
+|Precision@k|Share useful|No|Counted|
+|MRR|First hit|Yes|Ignored|
+|nDCG@k|All, graded|Yes|Counted|
+
+## Reading it across k
+
+As with recall, a single figure is far less useful than the curve.
+
+|k|Hit rate|
+|---|---|
+|1|0.51|
+|3|0.72|
+|5|0.81|
+|10|0.90|
+|20|0.95|
+
+Two readings from that table.
+
+<strong>Hit rate@20 of 0.95 with hit rate@5 of 0.81</strong> means 14% of queries have their answer between ranks 6 and 20 &mdash; found, but not passed to the model at k = 5. That is a reranking opportunity, and it is the most common actionable finding.
+
+<strong>The remaining 5% at k = 20</strong> are outright retrieval failures. Look at those queries individually: they usually cluster around a cause &mdash; a vocabulary the embedding model does not cover, a document type that chunked badly, a question the corpus genuinely cannot answer.
+
+That second habit matters more than the aggregate. Twenty failing queries read individually will tell you more about what to fix than any amount of averaging.
+
 ## Things to try
 
 1. Set <strong>k</strong> to 1. Hit rate is 1 only if the very first result is relevant &mdash; this is the strictest possible reading, and the closest to what a single-chunk pipeline experiences.
@@ -46,3 +106,77 @@ Hit Rate@k is the proportion of queries with at least one relevant result in the
 All four of these read the same object: an ordered list of retrieved results, with each one labelled relevant or not by a human or a strong model. They differ only in what they choose to notice about it &mdash; which is why quoting one without saying which is close to meaningless, and why the visualisation above shows all four at once.
 
 The labels are the expensive part. A relevance judgement per query-document pair is human work, and an evaluation set of fifty queries with judged results is worth more than any amount of metric sophistication on top of unjudged data. Build the set first.
+
+## Choosing k
+
+The k that matters is the number of chunks you actually pass to the model, because that is where the ceiling sits.
+
+|Purpose|k|
+|---|---|
+|The ceiling on your current pipeline|The number passed to the model, usually 3&ndash;10|
+|Whether reranking would help|A larger k, 20&ndash;50|
+|Diagnosing outright failures|The largest k you can afford to inspect|
+
+Reporting hit rate at a k you do not use is a common mistake. Hit rate@100 of 0.99 says almost nothing about a system that passes 5 chunks to the model.
+
+The complementary measurement is worth making at the same time: <strong>answer correctness as a function of the number of chunks passed</strong>. It usually rises, peaks, and then declines as irrelevant context starts to interfere. That peak is the k to operate at, and it is often smaller than people expect.
+
+## Measuring it
+
+```python
+def hit_at_k(retrieved_ids, relevant_ids, k):
+    return int(bool(set(retrieved_ids[:k]) & set(relevant_ids)))
+
+def hit_rate(eval_set, retriever, k):
+    return sum(
+        hit_at_k(retriever(q["question"], k=k), q["relevant_ids"], k)
+        for q in eval_set
+    ) / len(eval_set)
+
+for k in (1, 3, 5, 10, 20):
+    print(k, round(hit_rate(eval_set, retrieve, k), 3))
+```
+
+Two caveats on interpretation:
+
+<strong>It depends on the labels.</strong> If the evaluation set marks one chunk as relevant when three would answer the question, hit rate is understated &mdash; the system may have retrieved a perfectly good chunk that was not labelled.
+
+<strong>It hides degradation.</strong> A system whose relevant results all move from rank 1 to rank 5 has the same hit rate@5 and is materially worse, because models attend more to earlier context. Pair it with MRR.
+
+## Which metrics to report together
+
+For a RAG system, a defensible minimum set:
+
+<strong>Hit rate or recall@k</strong> at the k you pass to the model &mdash; the ceiling.
+
+<strong>MRR</strong> &mdash; whether the answer is arriving near the top.
+
+<strong>Groundedness</strong> &mdash; whether the model is using the context.
+
+<strong>Correctness</strong> &mdash; whether the final answer is right.
+
+<strong>Refusal rate</strong> on unanswerable questions &mdash; whether it declines rather than inventing.
+
+Those five cover the two stages and the two failure directions, and they take one evaluation run to produce. Adding nDCG and completeness is worthwhile when comparing closely-matched configurations.
+
+## Questions people ask
+
+<strong>Is hit rate the same as recall?</strong> Identical when each question has one relevant document. Recall counts the share found when there are several.
+
+<strong>What is a good hit rate?</strong> Corpus-dependent. Above 0.9 at your operating k is a reasonable ambition for a well-tuned pipeline; compare against your own baseline.
+
+<strong>Should I report hit rate or MRR?</strong> Both. Hit rate is the ceiling and easy to communicate; MRR shows whether the ordering is good.
+
+<strong>Does hit rate improve with a reranker?</strong> Not at the same k in the retrieval stage &mdash; reranking reorders. It improves hit rate at the smaller k finally passed to the model.
+
+<strong>What k should I evaluate at?</strong> The one you pass to the model, plus a larger one to see whether reranking would help.
+
+<strong>Why is my hit rate high but answers poor?</strong> Retrieval is fine and generation is not &mdash; check groundedness, the prompt, and whether too many chunks are being passed.
+
+## Recap in one screen
+
+- Hit rate@k is the share of queries with at least one relevant result in the top k &mdash; binary per query.
+- It equals recall@k when there is one relevant document per question.
+- Crude by design: it ignores position and extra relevant documents, and it communicates well.
+- Read it across several k: a gap between k = 5 and k = 20 is a reranking opportunity.
+- Read the failing queries individually &mdash; they cluster around causes the aggregate hides.

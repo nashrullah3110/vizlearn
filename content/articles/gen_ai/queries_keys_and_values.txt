@@ -33,6 +33,62 @@ A decoder must not attend to tokens it has not generated yet, so the scores abov
 
 The cache's cost is memory, and it is the usual limit on how many requests a GPU can serve at once: roughly 2 &times; layers &times; heads &times; head dimension &times; sequence length &times; batch, per precision byte. Grouped-query and multi-query attention exist mostly to shrink it, by sharing K and V across heads while keeping separate queries &mdash; a large memory saving for a small quality cost.
 
+## A lookup that returns a blend
+
+Attention is easiest to read as a dictionary lookup that returns a mixture rather than one entry.
+
+An ordinary dictionary takes a key and returns exactly one value. Attention takes a <strong>query</strong>, compares it against <em>every</em> key, and returns a weighted mixture of all the values &mdash; weighted by how well each key matched.
+
+- <strong>Query</strong> &mdash; what this position is looking for.
+- <strong>Key</strong> &mdash; the label each position advertises.
+- <strong>Value</strong> &mdash; what each position contributes when selected.
+
+All three are linear projections of the same input, with separate learned matrices:
+
+<p class="mono-font">Q = XW<sub>Q</sub>&nbsp;&nbsp;&nbsp;K = XW<sub>K</sub>&nbsp;&nbsp;&nbsp;V = XW<sub>V</sub></p>
+
+That is where every parameter in the mechanism lives. Attention itself has no weights &mdash; it is a fixed formula applied to those three projections.
+
+## Why three separate projections
+
+If all three come from the same input, why not use the input directly for all of them?
+
+Because the three roles want different information. What a token is <em>looking for</em> is not the same as how it wants to <em>be found</em>, and neither is the same as what it should <em>contribute</em>.
+
+Take "it" in "The cat sat on the mat because it was warm". As a query, "it" needs to search for a nearby noun that could plausibly be warm. As a key, "mat" needs to advertise itself as a warmable surface. As a value, "mat" contributes its full semantic content.
+
+The clean demonstration is that Q and K are used <em>only</em> to compute compatibility, and V <em>only</em> to produce output. A token can therefore be attended to for one reason and contribute something quite different &mdash; which a single shared projection could not express.
+
+## The computation, with shapes
+
+<p class="mono-font">Attention(Q, K, V) = softmax(QK&#7488; / &radic;d<sub>k</sub>) V</p>
+
+For 4 tokens with head dimension 64:
+
+|Step|Operation|Shape|
+|---|---|---|
+|1|`QKᵀ` &mdash; every query against every key|4&times;4|
+|2|Divide by `√64` = 8|4&times;4|
+|3|Softmax over each row|4&times;4, rows sum to 1|
+|4|Multiply by V|4&times;64|
+
+Row i of the 4&times;4 matrix is token i's attention weights over all tokens. Multiplying by V replaces token i's representation with the weighted mixture.
+
+The `√dₖ` division is not cosmetic. Dot products of d-dimensional vectors grow with d, so without scaling the scores reach the tens or hundreds, the softmax saturates into something nearly one-hot, and the gradient through it approaches zero. Dividing by `√dₖ` keeps the score variance near 1 regardless of dimension.
+
+```python
+import torch, torch.nn.functional as F
+
+def attention(x, Wq, Wk, Wv, mask=None):
+    Q, K, V = x @ Wq, x @ Wk, x @ Wv
+    scores = Q @ K.transpose(-2, -1) / (K.size(-1) ** 0.5)
+    if mask is not None:
+        scores = scores.masked_fill(mask == 0, float("-inf"))
+    return F.softmax(scores, dim=-1) @ V
+```
+
+Setting a score to negative infinity makes its softmax weight exactly zero &mdash; which is how both causal masking and padding masks work.
+
 ## Things to try
 
 1. Attend from <em>sat</em>. It puts most of its weight on <em>cat</em>, its subject &mdash; which a token searching with its own embedding could never do.
@@ -42,3 +98,63 @@ The cache's cost is memory, and it is the usual limit on how many requests a GPU
 ## What to remember
 
 Q, K and V are three learned projections of one embedding. The query is what a token looks for, the key is what it advertises, the value is what it contributes. Scores come from Q&middot;K and the output is a weighted sum of V. Because K and V for a token never change once computed, they can be cached &mdash; which is what makes generation linear rather than quadratic.
+
+## Self-attention and cross-attention
+
+In <strong>self-attention</strong>, Q, K and V all come from the same sequence &mdash; a sentence relating its own words to each other.
+
+In <strong>cross-attention</strong>, the queries come from one sequence and the keys and values from another. A decoder queries an encoder's output; a text query attends to image patches in a multimodal model.
+
+|Type|Q from|K, V from|
+|---|---|---|
+|Encoder self-attention|The sequence|The same sequence|
+|Decoder self-attention (masked)|The sequence|The same sequence|
+|Cross-attention|The decoder|The encoder|
+
+That asymmetry has a practical consequence during generation, and it underpins the most important inference optimisation in language models.
+
+## Why the KV cache exists
+
+When generating token by token, the keys and values of all previous tokens do not change &mdash; only the new token's query is new.
+
+<strong>Without a cache,</strong> generating the 1,000th token means recomputing keys and values for all 999 previous tokens. Generation is quadratic in output length.
+
+<strong>With a KV cache,</strong> each new token computes its own K and V, appends them to the stored ones, and attends against the cache. Generation becomes linear.
+
+The cost is memory: two tensors per layer per token. The size is calculable:
+
+<p class="mono-font">bytes = 2 &times; layers &times; heads &times; head_dim &times; tokens &times; bytes_per_value</p>
+
+For a 32-layer model with 32 heads of dimension 128, at 16-bit, with 8,000 tokens: about <strong>4.2GB for one request</strong>. Ten concurrent requests exceed most single GPUs before the weights are counted.
+
+That arithmetic is why <strong>grouped-query attention</strong> exists: sharing key and value projections across groups of query heads shrinks the cache several-fold. With 32 query heads and 8 KV groups it is a quarter the size, with quality close to full multi-head. It is an architectural choice driven entirely by inference economics.
+
+## Multiple heads
+
+Multi-head attention runs several of these computations in parallel with different projections, then concatenates and projects once more.
+
+With a model dimension of 512 and 8 heads, each head works in 64 dimensions, so the total cost is roughly that of one 512-dimensional head &mdash; and the model gets 8 independent views of the sequence rather than 1.
+
+Inspected in trained models, heads specialise: some track the previous token, some link verbs to subjects, some match brackets, some connect pronouns to referents, and some do very little. Pruning studies find many can be removed with minimal loss, which suggests the redundancy helps training rather than inference.
+
+## Questions people ask
+
+<strong>Why the names query, key and value?</strong> By analogy with a database lookup. The analogy is genuinely useful; the mechanism is soft rather than exact.
+
+<strong>Must Q and K be the same size?</strong> Yes &mdash; they are dotted together. V can differ in principle and is usually the same in practice.
+
+<strong>Why divide by `√dₖ`?</strong> To stop the softmax saturating in high dimensions, which would kill the gradient.
+
+<strong>Where are the parameters?</strong> In the three projection matrices per head, plus one output projection per layer. The attention formula itself has none.
+
+<strong>Can K and V come from elsewhere?</strong> That is exactly cross-attention, and it is how decoders read encoders and how modalities are connected.
+
+<strong>Why is the KV cache so large?</strong> Two tensors per layer per token, and it grows with context length &mdash; which is why long-context serving is a memory problem.
+
+## Recap in one screen
+
+- Query is what a position seeks, key is how a position advertises itself, value is what it contributes.
+- All three are learned linear projections; the attention formula itself has no parameters.
+- Score with `QKᵀ`, scale by `√dₖ`, softmax, then weight the values.
+- Masking by setting scores to negative infinity gives causal generation and correct padding.
+- Keys and values never change during generation, which is what makes KV caching &mdash; and linear decoding &mdash; possible.

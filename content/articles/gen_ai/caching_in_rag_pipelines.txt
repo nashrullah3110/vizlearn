@@ -35,6 +35,60 @@ The query cache is the opposite. It stores a conclusion drawn from a corpus at a
 
 Prompt caching sidesteps the question because it caches computation rather than conclusions. The model recomputes the same thing it would have anyway, so there is nothing to go stale &mdash; which is why it is the safest of the three and the one to reach for first.
 
+## Four places a RAG pipeline repeats work
+
+A retrieval pipeline does the same expensive things over and over. Each stage can be cached, and they have very different hit rates and risks.
+
+|Layer|What is cached|Keyed on|Typical saving|
+|---|---|---|---|
+|Embedding|Query vectors|Normalised query text|One model call|
+|Retrieval|Result ids|Query + filters|One index search|
+|Reranking|Scores|Query + document id|One cross-encoder pass|
+|Generation|Final answers|Query + context|The whole LLM call|
+|Prompt prefix|KV cache for a shared prefix|Prefix tokens|Prefill compute|
+
+The last row is different in kind and is the one with the best return in production: if every request begins with the same long system prompt, its KV cache can be computed once and reused, removing that prefill work from every subsequent request.
+
+## Exact caching, and its keys
+
+The simplest and safest form. Normalise the query, hash it, look up the result.
+
+```python
+import hashlib, json
+
+def cache_key(query, filters, user_groups):
+    payload = json.dumps({
+        "q": " ".join(query.lower().split()),   # normalise whitespace and case
+        "f": filters,
+        "g": sorted(user_groups),               # permissions are part of the key
+    }, sort_keys=True)
+    return hashlib.sha256(payload.encode()).hexdigest()
+```
+
+Two things in that function are the ones that go wrong.
+
+<strong>Normalise the query text,</strong> or "How do I reset my password?" and "how do i reset my password" are separate entries and the hit rate collapses.
+
+<strong>Include the permission context in the key.</strong> This is not an optimisation detail &mdash; a cache keyed only on query text will serve one user's authorised results to another user who is not authorised to see them. It is the most common way a correctly-built permission filter is defeated, because caching is added later by someone optimising latency.
+
+## Semantic caching, and why it is risky
+
+Exact caching only helps on repeated queries. Semantic caching extends it: embed the query, and if it is within some similarity threshold of a cached query, return that entry.
+
+The appeal is a much higher hit rate &mdash; "reset password", "how to change my password" and "forgot password" all hit one entry.
+
+The risk is that <strong>similar is not the same</strong>. Consider:
+
+|Query A|Query B|Cosine|Same answer?|
+|---|---|---|---|
+|"refund policy"|"refund policy for digital goods"|0.92|<strong>No</strong>|
+|"how to cancel"|"how to cancel a subscription"|0.94|Maybe|
+|"is X supported"|"is X not supported"|0.96|<strong>No</strong>|
+
+The negation row is the dangerous one, and it is a known weakness of embeddings: "is X supported" and "is X not supported" are near-identical vectors and opposite questions.
+
+So semantic caching needs a high threshold (0.97 and above), and it is unsuitable wherever a wrong answer is costly. A safer variant caches only the <em>retrieval</em> stage semantically &mdash; returning similar documents for a similar query is far more defensible than returning a previous answer.
+
 ## Things to try
 
 1. Push <strong>exact repeats</strong> to 70%. The query cache dominates &mdash; and it is the cache that goes stale the moment a document changes.
@@ -44,3 +98,65 @@ Prompt caching sidesteps the question because it caches computation rather than 
 ## What to remember
 
 Three different caches share the name. The query cache stores a finished answer keyed on the question and saves the most per hit, at the risk of serving a stale one. The embedding cache stores a vector keyed on the text and is permanently valid until the model changes. Prompt caching lives in the provider and only helps when the shared text comes first in the prompt.
+
+## Invalidation, which is the hard part
+
+A cache that never expires eventually serves answers from documents that have been superseded &mdash; which is a correctness failure, not a performance one.
+
+Four strategies, in increasing order of effort:
+
+<strong>Time-based (TTL).</strong> Entries expire after an hour, a day, a week. Simple, and it guarantees a staleness window.
+
+<strong>Version-based.</strong> Include a corpus version or index build id in the cache key. Re-indexing changes the version, so every entry misses and is naturally replaced. Clean and effective.
+
+<strong>Event-based.</strong> When a document changes, invalidate the cached entries that cited it. Requires recording which documents each entry used &mdash; worth doing, and it is the only approach that is both fresh and efficient.
+
+<strong>Manual.</strong> A flush endpoint for when something has gone wrong. Always have one.
+
+The version-in-the-key approach is the one to reach for by default, because it makes staleness structurally impossible after a re-index rather than relying on a timer.
+
+## What is worth caching, and what is not
+
+<strong>Cache the embedding layer always.</strong> Deterministic, cheap to store, no correctness risk, and query repetition is high in real traffic.
+
+<strong>Cache retrieval results</strong> with the permission context and corpus version in the key.
+
+<strong>Cache the prompt prefix's KV</strong> if you control the serving stack. A long shared system prompt or a fixed instruction block is prefilled once instead of per request.
+
+<strong>Be cautious caching generated answers.</strong> The saving is largest and so is the risk: a stale or mis-keyed answer is served with full confidence and a citation. Use exact keys, a short TTL, and a corpus version.
+
+<strong>Do not cache when</strong> the answer depends on time ("what is outstanding today"), on per-user data beyond permissions, or on anything with legal or safety weight.
+
+## Measuring it
+
+Three numbers tell you whether the cache is earning its place:
+
+<strong>Hit rate</strong> per layer. Embedding caches often reach 30&ndash;60% on real traffic; generation caches much less, because full queries repeat rarely.
+
+<strong>Latency at the percentiles.</strong> A cache improves the median dramatically and may not move p99, which is what users notice.
+
+<strong>Cost saved,</strong> in model calls avoided &mdash; usually the number that justifies the work.
+
+And one to watch: <strong>staleness incidents</strong>. If nobody is measuring how often a cached answer was wrong, the cache is untested. A sampled comparison &mdash; recompute a small fraction of cached responses and diff them &mdash; catches invalidation bugs before users do.
+
+## Questions people ask
+
+<strong>Where should I start?</strong> Embedding caching &mdash; safe, cheap, and immediately useful. Then prompt-prefix caching if you control serving.
+
+<strong>Is semantic caching safe?</strong> Only with a high threshold, and preferably applied to retrieval rather than to final answers. Negation and qualifiers break it.
+
+<strong>How do I stop a cache leaking across users?</strong> Include the permission context in the key. Nothing else is sufficient.
+
+<strong>What TTL?</strong> Matched to how often the corpus changes &mdash; and prefer a corpus version in the key over a timer.
+
+<strong>Does caching hurt quality?</strong> Only through staleness and mis-keying, and both are avoidable. The cached computation is identical.
+
+<strong>What hit rate should I expect?</strong> Highly traffic-dependent. Embeddings often 30&ndash;60%; exact answer caches frequently under 10%.
+
+## Recap in one screen
+
+- Cache embeddings, retrieval results, rerank scores, answers and the shared prompt prefix &mdash; different savings and risks each.
+- Normalise the query text before hashing, or the hit rate collapses.
+- Include the permission context in every key, or the cache defeats your access control.
+- Put the corpus version in the key so re-indexing invalidates naturally.
+- Semantic caching raises hit rates and breaks on negation and qualifiers &mdash; use a high threshold, and prefer caching retrieval over answers.

@@ -49,6 +49,60 @@ The default list &mdash; paragraph, line, sentence, word, character &mdash; assu
 
 Every one of these is a few characters of configuration against an embedding-model migration, and they routinely produce more improvement.
 
+## Splitting on the largest natural boundary that fits
+
+Fixed-size chunking cuts at character 500 whatever is there &mdash; mid-sentence, mid-word, between a heading and its content. Recursive chunking fixes that with one idea: try a list of separators in order, from coarsest to finest, and use the largest unit that fits the size limit.
+
+The default separator list, in order:
+
+<p class="mono-font">["\n\n", "\n", ". ", " ", ""]</p>
+
+Paragraph break, then line break, then sentence end, then word boundary, then individual characters as a last resort.
+
+The algorithm: try to split the text on the first separator. If the resulting pieces are all within the size limit, done. If a piece is still too large, recurse into it with the <em>next</em> separator. The empty string at the end guarantees termination &mdash; a 600-character word will be cut, because it has to be.
+
+That is the whole method, and it is the sensible default for almost every corpus. It costs nothing extra, respects natural boundaries the vast majority of the time, and degrades gracefully.
+
+## Why boundaries matter
+
+A chunk cut mid-sentence damages retrieval in two specific ways.
+
+<strong>The embedding is of a fragment.</strong> "the entitlement is 39 weeks provided that the employee has completed two years of" is a partial thought, and its vector is correspondingly muddled &mdash; it does not sit where either complete idea would sit.
+
+<strong>The retrieved text is unusable.</strong> Even if it matches, passing a truncated sentence to the model means the answer is incomplete, or the model completes it from imagination.
+
+Compare with a chunk that ends at a paragraph break: complete thoughts, a sharp embedding, and text that can be quoted.
+
+|Split at|Chunk quality|
+|---|---|
+|Character count|Fragments, broken words|
+|Word boundary|Complete words, broken sentences|
+|Sentence end|Complete sentences, possibly mid-topic|
+|Paragraph break|Complete thoughts &mdash; the target|
+|Section heading|Complete topics &mdash; better still|
+
+Recursive splitting reaches for the highest row it can.
+
+## Size and overlap
+
+```python
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,          # characters, not tokens - check which your tool uses
+    chunk_overlap=150,        # ~15%
+    separators=["\n\n", "\n", ". ", " ", ""],
+    length_function=len,
+)
+chunks = splitter.split_text(document)
+```
+
+<strong>Size</strong> is a compromise between context and precision. 200&ndash;500 tokens (roughly 800&ndash;2,000 characters) is the usual range. Too small and the chunk lacks context; too large and the embedding averages over several topics.
+
+<strong>Overlap</strong> of 10&ndash;20% means consecutive chunks share their boundary text, so a sentence spanning a split appears whole in at least one chunk. The cost is duplicated storage and occasionally two near-identical results, which deduplication or MMR handles.
+
+One detail that catches people: <strong>character count is not token count</strong>. `chunk_size=1000` in characters is roughly 250 tokens for English prose and considerably fewer for code or non-Latin scripts. If the downstream constraint is a token budget, measure in tokens &mdash; most splitters accept a token-counting length function.
+
 ## Things to try
 
 1. Drop the <strong>chunk size</strong> to 60. More pieces fall through to sentence and then word level, and chunks start ending mid-sentence.
@@ -58,3 +112,77 @@ Every one of these is a few characters of configuration against an embedding-mod
 ## What to remember
 
 Recursive chunking splits on the largest natural boundary that fits, descending through a priority list of separators only when a piece is still oversized. The separator list is the whole configuration, and tailoring it to the document type is the cheapest large improvement available to a RAG pipeline.
+
+## Custom separators for real formats
+
+The default list is tuned for prose. Other content wants different boundaries, and specifying them is where most of the available improvement lies.
+
+<strong>Markdown:</strong>
+
+<p class="mono-font">["\n## ", "\n### ", "\n\n", "\n", ". ", " ", ""]</p>
+
+Headings first, so a section stays whole where possible.
+
+<strong>Code:</strong>
+
+<p class="mono-font">["\nclass ", "\ndef ", "\n\n", "\n", " ", ""]</p>
+
+Class and function boundaries first. A half-function is not retrievable knowledge, and this ordering keeps definitions intact.
+
+<strong>HTML:</strong> strip tags first, or use a splitter that understands the tag structure. Splitting raw HTML on newlines produces chunks full of markup.
+
+<strong>Transcripts:</strong> split on speaker turns (`"\nSpeaker: "`) before paragraphs.
+
+<strong>Legal text:</strong> section and clause numbering (`"\nSection "`, `"\n("`) carries the structure.
+
+Most splitter libraries ship language-aware variants for common programming languages, which encode exactly this idea.
+
+## Where it sits among the strategies
+
+|Strategy|Cost|Quality|
+|---|---|---|
+|Fixed size|Lowest|Poor &mdash; broken sentences|
+|Recursive|Lowest|Good &mdash; the sensible default|
+|Structure-aware|Low|Better where markup exists|
+|Semantic|High &mdash; an embedding per sentence|Best on unstructured prose|
+|Parent-child|Moderate|Best of precision and context|
+
+Recursive chunking is the right starting point because it is nearly free and captures most of the benefit. The upgrades worth considering after it:
+
+<strong>Structure-aware</strong> if the documents have real headings &mdash; use them, and prepend the heading path to each chunk so it carries context.
+
+<strong>Parent-child</strong> if chunks need to be small for precision and large for context. Index small, return the parent section.
+
+<strong>Semantic</strong> only if the documents are continuous prose with no usable structure, and only after measuring that chunking is genuinely the bottleneck.
+
+## Common mistakes
+
+- <strong>Confusing characters with tokens,</strong> so chunks are four times smaller than intended.
+- <strong>No overlap,</strong> so a sentence spanning a boundary is lost from both chunks.
+- <strong>Too much overlap</strong> (50%+), which duplicates storage and fills results with near-identical chunks.
+- <strong>Using prose separators on code,</strong> splitting functions in half.
+- <strong>Splitting tables,</strong> which destroys them. Extract tables separately and keep each whole.
+- <strong>Not storing the source and position,</strong> so citations cannot be produced later.
+- <strong>Chunking before cleaning,</strong> so boilerplate and navigation text become chunks.
+
+## Questions people ask
+
+<strong>What chunk size should I use?</strong> Start at 300&ndash;500 tokens with 15% overlap, then evaluate recall@k on your own question set.
+
+<strong>Is recursive chunking better than semantic?</strong> Cheaper and frequently comparable on structured documents. Semantic wins on unstructured prose &mdash; measure rather than assume.
+
+<strong>Should overlap be characters or sentences?</strong> Either. Sentence-based overlap is cleaner because it never cuts mid-thought.
+
+<strong>How do I handle very long paragraphs?</strong> The recursion handles it &mdash; it falls through to sentence and then word boundaries.
+
+<strong>Can chunk sizes vary within one index?</strong> Yes, and it is often right: a table or a function is one chunk whatever its length.
+
+<strong>Does the separator order matter?</strong> Substantially. It encodes which boundaries you consider most important, and putting headings first is usually the largest single improvement.
+
+## Recap in one screen
+
+- Try separators from coarsest to finest, taking the largest unit that fits &mdash; paragraphs, then lines, then sentences, then words.
+- The empty separator at the end guarantees termination on pathological input.
+- 200&ndash;500 tokens with 10&ndash;20% overlap covers most corpora.
+- Customise the separator list for the format: headings for Markdown, `def`/`class` for code, speaker turns for transcripts.
+- Measure in tokens if the downstream budget is tokens, and store source and position for citations.

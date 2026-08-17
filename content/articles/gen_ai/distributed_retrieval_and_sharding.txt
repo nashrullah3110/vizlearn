@@ -41,6 +41,53 @@ Once shards exist, so does partial failure. Scatter-gather waits for everyone, s
 
 Decide explicitly whether a degraded answer is acceptable. For search it usually is. For a RAG answer that will be presented as authoritative, silently dropping a shard means silently dropping evidence, and the user has no way to know.
 
+## When one machine is not enough
+
+A vector index has to fit in memory to be fast. That gives a hard ceiling per machine:
+
+<p class="mono-font">memory &asymp; vectors &times; dimensions &times; bytes &times; index overhead</p>
+
+For 100 million 768-dimensional vectors at 4 bytes each, that is 307GB before the HNSW graph's 1.5&ndash;2&times; overhead &mdash; so 450&ndash;600GB. Beyond a single machine.
+
+Three separate reasons drive distribution, and they want different architectures:
+
+<strong>Capacity.</strong> The index does not fit. Split it &mdash; sharding.
+
+<strong>Throughput.</strong> Too many queries per second. Copy it &mdash; replication.
+
+<strong>Availability.</strong> A machine failure must not take the system down. Replication again.
+
+Most production systems need both: shards for capacity, replicas of each shard for throughput and resilience.
+
+## Sharding, and how to split
+
+|Strategy|Split by|Query cost|
+|---|---|---|
+|Random|Hash of the id|Every shard, every query|
+|Semantic|Cluster of the vector|One or a few shards|
+|Metadata|Tenant, language, date|Only matching shards|
+|Time|Ingestion period|Recent shards first|
+
+<strong>Random sharding</strong> distributes evenly and requires querying <em>every</em> shard for every request, then merging. Simple, predictable, and the cost grows with shard count.
+
+<strong>Metadata sharding</strong> is usually the best choice when the data has a natural partition. Shard by tenant, and each query touches one shard. Shard by language, and a query in French touches the French shard. The saving is proportional to the selectivity.
+
+<strong>Semantic sharding</strong> clusters similar vectors together so a query only needs the nearest clusters. Attractive in principle, and it risks recall loss when the answer sits in an unqueried shard, and it needs rebalancing as the distribution shifts.
+
+<strong>Time-based sharding</strong> suits corpora where recency matters: query the recent shards first, and older ones only if needed. It also makes retention easy &mdash; drop an old shard.
+
+## Scatter-gather, and the detail that breaks it
+
+With random or semantic sharding, a query fans out and the results are merged:
+
+1. Send the query to all (or the selected) shards.
+2. Each shard returns its local top k.
+3. Merge, sort by score, take the global top k.
+
+The correctness condition is easy to get wrong: <strong>each shard must return its own top k, not top k/n</strong>. If the global top 10 all happen to live in one shard, asking each of five shards for 2 results loses 8 of them.
+
+The latency condition is different and equally important: the query takes as long as the <strong>slowest</strong> shard. With ten shards, the chance that at least one is having a slow moment is ten times higher than with one &mdash; so tail latency degrades as shard count grows. This is the standard fan-out problem, and the standard mitigations are hedged requests (send to a replica after a short delay and take whichever answers first) and a timeout with partial results.
+
 ## Things to try
 
 1. Switch to <em>semantic</em> sharding. Recall collapses: every relevant document is on one shard, whose local top-k discards the rest.
@@ -50,3 +97,66 @@ Decide explicitly whether a degraded answer is acceptable. For search it usually
 ## What to remember
 
 Scatter-gather sends the query to every shard, takes a local top-k from each and merges. Shard randomly rather than by topic, or the relevant documents concentrate in one shard and its local k throws most of them away. Latency becomes the slowest shard's, not the average, so p99 gets worse with every shard added. Shards solve data that will not fit; replicas solve query volume.
+
+## Replication
+
+Copying each shard serves more queries and survives failures.
+
+|Aspect|Effect|
+|---|---|
+|Read throughput|Scales roughly linearly with replicas|
+|Availability|Survives replica loss|
+|Write cost|Every write goes to every replica|
+|Consistency|Replicas can lag behind|
+
+That last row matters for retrieval specifically. A document indexed a moment ago may be present on one replica and not another, so two identical queries can return different results. For most retrieval that is acceptable; where it is not &mdash; a user searching for something they just uploaded &mdash; the usual fix is to route that user's reads to the replica that accepted the write, or to accept the lag and say so in the interface.
+
+The routing choice is between <strong>load balancing</strong> (any replica, best throughput) and <strong>consistent routing</strong> (the same replica for a session, better cache behaviour and freshness). Consistent routing also improves cache hit rates, which is a meaningful secondary benefit.
+
+## The metadata and filtering problem
+
+Distribution interacts badly with filtering unless it is planned for.
+
+<strong>A selective filter across random shards</strong> means every shard is queried and most return nothing. The work is done and thrown away. Sharding by the filtered attribute instead makes the filter a routing decision.
+
+<strong>Permissions</strong> must be enforced per shard, inside each shard's search, not merged afterwards. Filtering after the gather step means unauthorised content has already crossed the boundary and has already occupied result slots.
+
+<strong>Global statistics break.</strong> BM25's IDF term depends on how many documents in the <em>corpus</em> contain a term, and each shard only knows its own counts. With random sharding the local approximation is usually close enough; with metadata sharding it can be badly skewed, and correcting it requires distributing global term statistics.
+
+That last point is a real and under-discussed source of ranking inconsistency in sharded hybrid search.
+
+## Operational realities
+
+<strong>Rebalancing.</strong> Adding a shard means moving data. Consistent hashing limits how much moves; semantic sharding may require re-clustering the whole index.
+
+<strong>Rebuilds.</strong> Changing the embedding model invalidates everything. Build into a new set of shards and switch atomically rather than migrating in place.
+
+<strong>Monitoring per shard.</strong> Aggregate latency hides a single slow shard. Track per-shard latency, size and error rate.
+
+<strong>Deletions.</strong> Tombstones accumulate per shard, so schedule compactions.
+
+<strong>Cost.</strong> Memory-resident indexes are the expensive part. Reducing dimensions &mdash; 1,536 to 384 &mdash; is a fourfold saving and often a small accuracy cost, and it is usually a better first move than adding machines.
+
+That last point is worth trying before distributing at all: <strong>quantisation and dimension reduction frequently keep a corpus on one machine</strong>, which removes every problem above.
+
+## Questions people ask
+
+<strong>When do I need to shard?</strong> When the index no longer fits in one machine's memory after quantisation and dimension reduction. Try those first.
+
+<strong>How many shards?</strong> As few as fit. Each additional shard adds fan-out cost and tail latency.
+
+<strong>Should each shard return k or k/n?</strong> k. Returning k/n loses results when relevance is concentrated.
+
+<strong>Does sharding hurt recall?</strong> Random sharding with per-shard top-k does not. Semantic sharding can, if the answer is in an unqueried shard.
+
+<strong>How do I handle multi-tenancy?</strong> Shard by tenant where volumes allow &mdash; it gives natural isolation and cheap filtering. Very many small tenants are better served by one index with a tenant field.
+
+<strong>What about BM25 across shards?</strong> IDF becomes shard-local. Acceptable with random sharding; distribute global term statistics if the skew matters.
+
+## Recap in one screen
+
+- Shard for capacity, replicate for throughput and availability &mdash; most systems need both.
+- Shard by metadata where a natural partition exists, so a query touches one shard instead of all of them.
+- In scatter-gather, each shard must return its own top k, and latency is set by the slowest shard.
+- Enforce permission filters inside each shard's search, never after the merge.
+- Try quantisation and fewer dimensions first &mdash; staying on one machine avoids every problem here.

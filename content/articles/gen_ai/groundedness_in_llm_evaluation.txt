@@ -39,6 +39,61 @@ The other common cause is a prompt that does not permit abstention. A model told
 
 Watch for the degenerate optimum, too. An answer that quotes the context verbatim and says nothing else scores 1.0 on groundedness and may be useless. Groundedness has to be read next to <a href="completeness_in_llm_evaluation.html">completeness</a> and <a href="relevance_in_llm_evaluation.html">relevance</a>, or you will optimise your way into a system that recites.
 
+## Is every claim supported by the sources?
+
+Groundedness &mdash; also called faithfulness &mdash; asks a narrow question: does each statement in the answer follow from the retrieved context?
+
+It deliberately does <em>not</em> ask whether the answer is true. Those are separate measurements, and separating them is what makes the pair diagnostic.
+
+<blockquote><strong>Context:</strong> "Parental leave is 39 weeks. The first 6 weeks are paid at 90% of salary."</blockquote>
+<blockquote><strong>Answer A:</strong> "You get 39 weeks, with the first 6 at 90% pay." &mdash; grounded</blockquote>
+<blockquote><strong>Answer B:</strong> "You get 39 weeks, with the first 6 at full pay." &mdash; not grounded (the context says 90%)</blockquote>
+<blockquote><strong>Answer C:</strong> "You get 39 weeks. You must give 8 weeks' notice." &mdash; the second sentence is unsupported, even if true</blockquote>
+
+Answer C is the case that matters most in practice. The claim may well be correct, and it did not come from the provided documents &mdash; so the citation is misleading and the system will produce similar unsupported claims where they happen to be wrong.
+
+## Measuring it, claim by claim
+
+Groundedness is scored per claim rather than per answer, because an answer is usually part supported and part not.
+
+The standard procedure:
+
+1. <strong>Decompose</strong> the answer into atomic claims.
+2. <strong>Check</strong> each claim against the retrieved context.
+3. <strong>Score</strong> as the share of claims that are supported.
+
+```
+Context:
+{retrieved_chunks}
+
+Claim: {claim}
+
+Is this claim fully supported by the context above? Answer "supported",
+"contradicted" or "not_found", with the sentence from the context that
+supports it if applicable. Reply as JSON.
+```
+
+<p class="mono-font">groundedness = supported claims / total claims</p>
+
+The decomposition step is where the difficulty lies. "Parental leave is 39 weeks, of which the first 6 are at 90% pay, and it must be requested 8 weeks in advance" is three claims, and scoring it as one loses the information that two are supported and one is not.
+
+Frameworks such as RAGAS implement this pipeline with a model as judge. The three-way verdict &mdash; supported, contradicted, not found &mdash; is more useful than a binary one, because contradiction and absence have different causes: contradiction usually means the model mis-read the context, absence means it drew on its own knowledge.
+
+## The four-way diagnosis
+
+Groundedness is most useful read against correctness:
+
+|Grounded|Correct|What happened|What to do|
+|---|---|---|---|
+|Yes|Yes|Working|Nothing|
+|Yes|No|Wrong document retrieved, faithfully used|Fix retrieval|
+|No|Yes|Answered from the model's own knowledge|Tighten the prompt &mdash; this will fail silently|
+|No|No|Hallucination|Fix retrieval and the prompt|
+
+The third row deserves emphasis because it presents as success. A system answering correctly from parametric memory rather than from its sources passes any correctness test built on well-known facts, and fails the moment a question concerns something specific to your organisation &mdash; which is the entire reason the system exists.
+
+Measuring groundedness is how you detect that before it reaches users.
+
 ## Things to try
 
 1. Click the digital-goods claim, which the context does not support. Groundedness falls while correctness is unaffected &mdash; the two dimensions move independently.
@@ -52,3 +107,74 @@ Groundedness is the proportion of an answer's claims that the retrieved context 
 These four are usually measured with an <strong>LLM as judge</strong>: a strong model is shown the question, the retrieved context, the answer and sometimes a reference, and asked to score one dimension at a time. Judging one dimension per call is not a stylistic choice &mdash; a single prompt asking for all four produces correlated, mushy scores, because the model settles on a general impression and applies it everywhere.
 
 Two habits make judge scores trustworthy. Ask for a decision and a justification, so a human can audit disagreements. And calibrate against a small human-labelled set before believing any of it &mdash; a judge that agrees with your annotators 70% of the time is not measuring what you think it is measuring.
+
+## What improves it
+
+<strong>Better retrieval, first.</strong> Most ungrounded answers are the model doing its best with context that did not contain the answer. If recall@k is 0.6, groundedness cannot be high &mdash; and prompt work will not fix it.
+
+<strong>An explicit refusal option.</strong> A model with no permission to say "not in the documents" will always produce something. One sentence in the prompt removes a large class of unsupported claims.
+
+<strong>Required citations.</strong> Asking for a source id per claim makes unsupported statements structurally awkward and independently verifiable.
+
+<strong>Fewer, better chunks.</strong> Contradictory or irrelevant context actively causes unsupported claims. Three relevant chunks beat ten containing three.
+
+<strong>Temperature 0.</strong> Sampling variation in factual output is error.
+
+<strong>Structured output.</strong> Requiring JSON with a `source` field per claim makes the constraint explicit.
+
+The prompt that does most of this work:
+
+```
+Answer using only the context below. Cite the source number after each
+claim. If the context does not contain the answer, reply exactly:
+"Not found in the provided documents."
+```
+
+## The judge's limitations
+
+Groundedness scored by a model has known weaknesses, and knowing them determines how much weight to put on the number.
+
+<strong>Implicit inference.</strong> If the context says "39 weeks" and the answer says "just under 10 months", is that supported? A strict judge says no; a reasonable reader says yes. Judges are inconsistent on paraphrase and arithmetic.
+
+<strong>Multi-hop support.</strong> A claim following from two chunks combined may be marked unsupported by a judge examining chunks individually.
+
+<strong>Decomposition quality.</strong> Badly split claims produce meaningless verdicts.
+
+<strong>Judge bias.</strong> Judges tend to be lenient towards fluent text and towards answers from the same model family.
+
+The mitigation is the same as for any model-graded metric: validate against human judgement on a sample of 50, and if agreement is below about 80%, treat the absolute number as unusable while relative comparisons between configurations may still hold.
+
+## Where it sits in the metric suite
+
+|Metric|Question|
+|---|---|
+|Recall@k|Was the answer retrieved?|
+|Groundedness|Is every claim supported by what was retrieved?|
+|Correctness|Is the answer right?|
+|Relevance|Does it address the question?|
+|Completeness|Does it cover everything asked?|
+|Refusal rate|Does it decline when it should?|
+
+Groundedness is the one that specifically measures whether the retrieval-augmented part of the system is doing anything. A high correctness score with low groundedness means you have built an expensive pipeline whose documents the model is ignoring.
+
+## Questions people ask
+
+<strong>Is groundedness the same as correctness?</strong> No. Groundedness asks whether claims follow from the context; correctness asks whether they are true. Both are needed.
+
+<strong>Can an answer be grounded but wrong?</strong> Yes &mdash; if the retrieved document is wrong or out of date. That is a retrieval or corpus problem, not a generation one.
+
+<strong>How do I decompose an answer into claims?</strong> With a model, prompted to split into atomic factual statements. It is imperfect and works well enough in practice.
+
+<strong>Should a refusal count as grounded?</strong> Yes &mdash; there are no unsupported claims. Track refusal rate separately so over-refusal is visible.
+
+<strong>What score should I aim for?</strong> Above 0.9 for systems where citations matter. Below 0.7 indicates the model is regularly drawing on its own knowledge.
+
+<strong>Does it detect subtle numeric errors?</strong> Inconsistently &mdash; "39 weeks" against "40 weeks" is often caught, unit and percentage changes less so. Worth spot-checking numbers separately.
+
+## Recap in one screen
+
+- Groundedness asks whether every claim follows from the retrieved context, not whether it is true.
+- Score it per claim: decompose the answer, check each against the context, take the supported share.
+- Correct-but-ungrounded means the model answered from memory &mdash; it looks like success and fails silently.
+- Better retrieval, an explicit refusal option and required citations are what move it.
+- Validate the model judge against human grading before trusting absolute numbers.

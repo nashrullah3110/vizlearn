@@ -39,6 +39,54 @@ Two design rules cover most of the damage.
 
 Also: filtering is not deletion. A document removed for legal or privacy reasons must leave the index and any cached answers derived from it, or it remains recoverable by anyone who can still see it &mdash; which is a different and worse problem than a missing result.
 
+## The failure mode that matters most
+
+A RAG system retrieves documents and puts them in a prompt. If the retrieval does not respect who is asking, the model will faithfully summarise a document the user was never allowed to see &mdash; and it will do so fluently, with a citation.
+
+That is a data breach with a helpful tone, and it is the most consequential thing that can go wrong in an enterprise retrieval system. Unlike a hallucination, it is not a quality problem; it is a security one.
+
+The requirement is straightforward to state and easy to implement incorrectly: <strong>the set of documents considered must be exactly the set this user may read</strong>.
+
+## Where the filter has to be applied
+
+There are three places it could go, and only one is correct.
+
+<strong>After generation</strong> &mdash; check the answer for leaked content. Hopeless: the content is already in the output, and paraphrase makes detection unreliable.
+
+<strong>After retrieval, before the prompt</strong> &mdash; retrieve k documents, discard the ones the user cannot see, pass the rest. Better, and still wrong in two ways: the unauthorised documents occupied slots, so fewer authorised ones were considered; and their content has already been loaded into the application's memory.
+
+<strong>Inside the search</strong> &mdash; the index only ever considers documents matching the user's permissions. This is the correct answer, and it requires the store to support filtered search.
+
+```python
+results = store.search(
+    query_vector=q,
+    k=10,
+    filter={"acl": {"$in": user.group_ids}},   # applied during the search
+)
+```
+
+The difference between the second and third options is not theoretical. With post-filtering, a user in a small group querying a corpus dominated by other groups' documents may get zero results while relevant authorised documents exist &mdash; because all ten retrieved slots went to documents they cannot see.
+
+## Modelling permissions in metadata
+
+The filter can only express what the metadata records, so the model has to be decided at indexing time.
+
+|Model|Metadata|Filter|
+|---|---|---|
+|Group-based|`acl: [group_ids]`|user's groups intersect the list|
+|Role-based|`min_role: "manager"`|user's role rank is sufficient|
+|Owner-based|`owner_id`|owner matches, or is shared with|
+|Attribute-based|`region`, `department`, `classification`|several predicates combined|
+|Row-level via source|Reference to the source system|Resolve at query time|
+
+<strong>Group-based ACLs</strong> cover most cases and are what most source systems already provide. Store the list of group ids permitted to read each document, and filter on intersection with the requesting user's groups.
+
+Two hard parts:
+
+<strong>Inherited permissions.</strong> A document in a restricted folder inherits its restriction. The indexing pipeline must resolve inheritance and write the effective ACL, not the document's own.
+
+<strong>Permission changes.</strong> When someone leaves a group, or a document is reclassified, the index is stale and will over-share until it is updated. Permissions change far more often than document content, so they need their own refresh path &mdash; ideally event-driven, and at minimum on a short schedule.
+
 ## Things to try
 
 1. Drop <strong>corpus visible</strong> to 5%. Post-filtering returns almost nothing while pre-filtering still returns k &mdash; the control fails worst for the most restricted user.
@@ -48,3 +96,67 @@ Also: filtering is not deletion. A document removed for legal or privacy reasons
 ## What to remember
 
 Permission filtering has to happen inside the search, not around it. Post-filtering ranks first and drops afterwards, so it silently returns fewer results than requested and degrades worst for the most restricted users. Filtering after generation is not a control at all &mdash; the model has already read the text. Index a group id and resolve membership per request, because stale permissions fail open.
+
+## Late-binding permissions
+
+An alternative to storing ACLs in the index is to resolve them at query time against the source system.
+
+<strong>Store only a reference</strong> &mdash; the source id &mdash; and after retrieving candidates, ask the source system which of them this user may read.
+
+|&nbsp;|ACLs in the index|Resolve at query time|
+|---|---|---|
+|Staleness|Possible, needs refresh|None &mdash; always current|
+|Latency|None extra|An extra call per query|
+|Correctness during changes|Window of over-sharing|Correct immediately|
+|Filtering inside the search|Yes|No &mdash; post-filter only|
+
+The trade is sharp: resolving at query time is always correct and forces post-filtering, which brings back the slot-wastage problem.
+
+The pragmatic combination used in practice is <strong>both</strong>: filter inside the search using indexed ACLs to get a correct-enough candidate set efficiently, then verify the final selection against the source system before showing anything. The index filter does the heavy lifting; the verification catches the staleness window.
+
+## Failure modes to test for explicitly
+
+Permission bugs do not announce themselves, so they have to be tested deliberately:
+
+- <strong>A user with no groups</strong> should retrieve nothing, not everything. A missing or empty filter that matches all documents is the classic catastrophic bug.
+- <strong>A filter on a field that does not exist</strong> should fail closed, not open. Some stores silently ignore unknown fields.
+- <strong>Inherited restrictions</strong> on documents in restricted containers.
+- <strong>Deleted users and revoked groups.</strong>
+- <strong>Documents with no ACL recorded</strong> &mdash; decide whether the default is deny (correct) or allow (dangerous), and make it explicit.
+- <strong>Cached results.</strong> A cache keyed only on the query text will serve one user's authorised results to another. Cache keys must include the permission context.
+
+That last one is worth stating plainly because caching is added later, as a performance improvement, by someone who is not thinking about permissions.
+
+## What else leaks
+
+Retrieval is the main channel and not the only one.
+
+<strong>Conversation history</strong> carries content forward. If a user's permissions change mid-session, earlier retrieved content is still in the context.
+
+<strong>Logs and traces.</strong> Prompt logging captures retrieved document content, so log storage inherits the documents' classification.
+
+<strong>Embeddings themselves.</strong> Research has shown that text can be partially reconstructed from its embedding, so a vector store holding sensitive content is itself sensitive and needs the same protections as the documents.
+
+<strong>Aggregate answers.</strong> A user may be permitted to see individual documents but not a synthesis that reveals a pattern across them. This is a policy question rather than a technical one, and worth asking.
+
+## Questions people ask
+
+<strong>Can I filter after retrieval?</strong> It is not secure enough and it wastes retrieval slots. Filter inside the search.
+
+<strong>What if my vector store does not support filtered search?</strong> Over-retrieve heavily and post-filter as an interim measure, and treat it as a reason to change store.
+
+<strong>How do I keep permissions fresh?</strong> Event-driven updates from the source system, with a scheduled reconciliation as a backstop. Permissions change more often than content.
+
+<strong>Should documents with no ACL be readable?</strong> Default deny. An explicit allow-all marker is safer than an absent field.
+
+<strong>Does the embedding leak content?</strong> Partially reconstructable, so treat the vector store as holding the data itself.
+
+<strong>How do I cache safely?</strong> Include the user's permission context in the cache key, or cache only at the query-embedding level rather than the results level.
+
+## Recap in one screen
+
+- An unfiltered retrieval will faithfully summarise documents the user may not read.
+- Apply the filter <em>inside</em> the search; post-filtering both leaks and wastes retrieval slots.
+- Store effective ACLs at indexing time, resolving inheritance, and refresh them independently of content.
+- Default to deny for documents with no recorded permissions, and test the no-groups case explicitly.
+- Caches, logs, conversation history and the vectors themselves are all additional leak channels.
