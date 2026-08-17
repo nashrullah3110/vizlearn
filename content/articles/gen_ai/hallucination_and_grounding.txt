@@ -15,6 +15,70 @@ So the mass lands on whatever is most plausible: a real researcher who works in 
 - <strong>Prompts that presuppose.</strong> Ask about a paper that does not exist and the likeliest continuation is a description of it, not a correction.
 - <strong>Stale or absent knowledge.</strong> Anything after the cutoff, or behind a login, was never there to be recalled.
 
+## Why a model invents things
+
+A language model is trained to produce text that looks like its training data. It is not trained to be true, and it has no mechanism for checking.
+
+So when it does not know something, it does not stop &mdash; it produces the most plausible continuation. A fabricated citation looks exactly like a real one, because "author, year, journal" is a pattern the model has seen tens of thousands of times.
+
+That is the whole explanation, and it has an important consequence: <strong>fluency and accuracy are unrelated</strong>. The confident tone is a property of the text distribution, not evidence about the content.
+
+The recognisable categories:
+
+|Type|Example|
+|---|---|
+|Fabricated facts|A plausible statistic with no source|
+|Fabricated citations|A paper that does not exist, by real authors|
+|Wrong details in a true frame|Correct event, wrong date|
+|Contradicting the provided context|Retrieved document says 30 days; answer says 14|
+|Overconfident guessing|Answering a question about a document it was not given|
+|Reasoning errors|Valid-looking steps to a wrong conclusion|
+
+The fourth is the one that matters most in RAG systems, and the one that is measurable.
+
+## Grounding: constraining the answer to sources
+
+Grounding means every claim in the output traces to a supplied document. It is the main defence, and it works at three levels.
+
+<strong>Retrieval.</strong> Put the relevant documents in the context. If the answer is not there, no prompt will conjure it.
+
+<strong>Prompting.</strong> Instruct the model to use only the context, to cite the source of each claim, and &mdash; crucially &mdash; to say when the answer is absent.
+
+```
+Answer using only the context below. Cite the source number after each
+claim. If the context does not contain the answer, reply exactly:
+"Not found in the provided documents."
+
+Context:
+[1] {chunk}
+[2] {chunk}
+
+Question: {question}
+```
+
+<strong>Verification.</strong> Check the output against the context afterwards, either with a model asked "is this claim supported by this passage?" or by matching cited spans.
+
+The escape hatch is the part people leave out. A model given no permission to fail will always produce something, and what it produces will be plausible.
+
+## Measuring it
+
+Two metrics, and they answer different questions:
+
+<strong>Groundedness (faithfulness)</strong> &mdash; is every claim in the answer supported by the retrieved context? Measured by splitting the answer into claims and checking each against the context, usually with a model as judge.
+
+<strong>Correctness</strong> &mdash; is the answer right, against a known ground truth?
+
+They can diverge, and the divergence is informative:
+
+|Grounded|Correct|Diagnosis|
+|---|---|---|
+|Yes|Yes|Working|
+|Yes|No|Retrieval brought the wrong document, faithfully used|
+|No|Yes|Model answered from memory and happened to be right &mdash; unreliable|
+|No|No|Hallucination|
+
+The third row is the dangerous one, because it looks like success. A system that answers correctly from parametric knowledge rather than from sources will fail silently the moment the question moves outside what the model memorised.
+
 ## Guided tour
 
 1. <strong>Start on thin ice.</strong> With evidence at 2.0 the correct name holds about half the mass and three plausible wrong ones hold the other half, so the hallucination rate reads 49.6%. Nothing here is broken; this is what a weak memory looks like written as a distribution.
@@ -37,3 +101,57 @@ What does <em>not</em> help: asking the model whether it is sure. Self-reported 
 ## What to remember
 
 A model hallucinates because it answers by sampling a distribution that has no state for "I do not know" &mdash; the mass has to go somewhere, and when the true fact is thinly represented it goes onto whatever is most plausible instead. That makes hallucination a property of the setup rather than a defect to be patched out: thin evidence, high temperature and prompts that presuppose all raise it, while putting the fact in the context, allowing an explicit abstention, constraining the output and verifying claims afterwards all lower it. Every mitigation trades coverage for precision, so the honest question is not "has it stopped hallucinating" but "how often does it answer, and how often is it right when it does".
+
+## What reduces it, ranked by effect
+
+<strong>1. Better retrieval.</strong> The largest single factor. Most "hallucinations" in a RAG system are the model doing its best with context that did not contain the answer. Measure recall@k first.
+
+<strong>2. An explicit "I don't know" option.</strong> Costs one sentence in the prompt and removes a large class of fabrication.
+
+<strong>3. Required citations.</strong> Asking for a source per claim makes the answer checkable, and appears to reduce unsupported claims by itself.
+
+<strong>4. Temperature 0.</strong> Sampling introduces variation, and variation in factual output is error.
+
+<strong>5. Smaller, cleaner context.</strong> Contradictory or irrelevant chunks actively cause wrong answers. Fewer, better chunks beat more.
+
+<strong>6. A verification pass.</strong> A second call asking whether each claim is supported. Doubles cost, catches a lot.
+
+<strong>7. Structured output.</strong> Requiring JSON with a `source` field per claim makes unsupported statements structurally awkward to produce.
+
+Note what is <em>not</em> on that list: telling the model to "be accurate" or "do not hallucinate". Instructions of that kind have little measurable effect, because the model is not knowingly inventing.
+
+## Where it cannot be fixed by prompting
+
+Some limitations are structural and need a different tool:
+
+<strong>Arithmetic and counting.</strong> Tokenisation fragments numbers, so calculation is unreliable. Give the model a calculator tool.
+
+<strong>Current events past the training cut-off.</strong> No amount of prompting supplies information the model does not have. Retrieval or a search tool.
+
+<strong>Precise quotations from memory.</strong> Verbatim recall is unreliable. Retrieve the source and quote from it.
+
+<strong>Its own uncertainty.</strong> A model's stated confidence is poorly calibrated, and asking "how sure are you?" produces a plausible number rather than a measured one.
+
+The general principle: <strong>if a fact must be right, it should come from a source in the context, not from the weights.</strong>
+
+## Questions people ask
+
+<strong>Can hallucination be eliminated?</strong> Not entirely with current models. It can be reduced substantially and, importantly, made <em>detectable</em> through citations and verification.
+
+<strong>Do bigger models hallucinate less?</strong> Generally yes on well-covered topics, and they remain confident when wrong, which can make errors harder to spot.
+
+<strong>Does RAG solve it?</strong> It addresses the root cause for domain facts, and only if retrieval works. A RAG system with poor recall hallucinates while appearing grounded.
+
+<strong>How do I detect it automatically?</strong> A model-as-judge groundedness check per claim, or entailment models. Neither is perfect; both are far better than nothing.
+
+<strong>Does temperature 0 stop it?</strong> It removes sampling variance, not fabrication. A deterministic wrong answer is still wrong.
+
+<strong>Why does it invent citations specifically?</strong> Because citation format is a very strong pattern in the training data, and filling a pattern is exactly what the model does.
+
+## Recap in one screen
+
+- Models produce plausible text, not true text, and fluency carries no information about accuracy.
+- Grounding constrains answers to supplied documents: retrieve, instruct, verify.
+- Give an explicit "not in the documents" option &mdash; without one, the model will always produce something.
+- Groundedness and correctness are different metrics, and a correct-but-ungrounded answer is a warning, not a success.
+- Better retrieval reduces hallucination more than any prompt wording.

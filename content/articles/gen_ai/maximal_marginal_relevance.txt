@@ -11,6 +11,70 @@ MMR = argmax<sub>d &isin; remaining</sub> [ &lambda; &middot; relevance(d, query
 
 Selection happens one document at a time, not all at once. The first pick is whatever is most relevant, exactly like ordinary retrieval. Every pick after that is penalised by how similar it is to whatever has already been chosen — so a document that would have ranked highly on relevance alone can lose to a less relevant document that covers new ground.
 
+## The problem with taking the top five
+
+A vector search returns the five chunks closest to the query. On a corpus with any redundancy, those five are frequently near-duplicates of each other.
+
+Ask "what is the refund policy?" of a corpus containing the policy in the handbook, in the FAQ, in a support macro and in two versions of the terms page, and the top five results are five statements of the same thing. Four slots wasted, and any nuance &mdash; the exceptions, the timescales, the process &mdash; is not retrieved at all.
+
+<strong>Maximal marginal relevance</strong> fixes this by selecting results one at a time, each chosen to be relevant to the query <em>and</em> different from what has already been selected:
+
+<p class="mono-font">MMR = argmax<sub>d</sub> [ &lambda; &middot; sim(d, q) &minus; (1 &minus; &lambda;) &middot; max<sub>s &isin; selected</sub> sim(d, s) ]</p>
+
+The first term is relevance. The second is a penalty for similarity to anything already chosen. `λ` sets the balance.
+
+## The lambda dial
+
+|&lambda;|Behaviour|
+|---|---|
+|1.0|Pure relevance &mdash; identical to plain top-k|
+|0.7|Mostly relevance, some diversity &mdash; the usual default|
+|0.5|Balanced|
+|0.3|Diversity-heavy; marginal results start appearing|
+|0.0|Maximum diversity, relevance ignored|
+
+0.5&ndash;0.7 is the range that works for most retrieval. Below about 0.3 the algorithm starts selecting documents chosen mainly for being unlike the others, which is not what you want.
+
+The algorithm itself is greedy and short:
+
+```python
+def mmr(query_vec, cand_vecs, lam=0.7, k=5):
+    sim_q = cand_vecs @ query_vec                  # relevance to the query
+    selected = [int(sim_q.argmax())]
+
+    while len(selected) < k:
+        best, best_score = None, -1e9
+        for i in range(len(cand_vecs)):
+            if i in selected:
+                continue
+            redundancy = max(cand_vecs[i] @ cand_vecs[j] for j in selected)
+            score = lam * sim_q[i] - (1 - lam) * redundancy
+            if score > best_score:
+                best, best_score = i, score
+        selected.append(best)
+    return selected
+```
+
+Note that it operates on a <em>candidate set</em>, not the whole corpus. Retrieve 30&ndash;50 by plain similarity first, then apply MMR to select the final 5. Running it over a million vectors would be quadratic and pointless.
+
+## A worked selection
+
+Query: "refund policy". Suppose five candidates with these similarities to the query, and high mutual similarity among the first three:
+
+|Doc|Relevance to query|
+|---|---|
+|A: Handbook refund section|0.89|
+|B: FAQ refund entry|0.87|
+|C: Terms page refunds|0.86|
+|D: Refund processing timescales|0.71|
+|E: Exceptions for digital goods|0.68|
+
+<strong>Plain top-3</strong> returns A, B, C &mdash; three statements of the same policy.
+
+<strong>MMR with &lambda; = 0.6</strong> picks A first (highest relevance). For the second slot, B scores 0.6&times;0.87 &minus; 0.4&times;0.93 = 0.15, while D scores 0.6&times;0.71 &minus; 0.4&times;0.35 = 0.29. D wins despite being less relevant, because it adds information.
+
+The result is A, D, E &mdash; the policy, the timescales and the exceptions. That is a far better context for answering the question, and it came from the same candidate set.
+
 ## Guided experiments
 
 1. <strong>Read the pairwise similarity grid.</strong> Three of the six candidates are near-duplicates of each other — high similarity across that block — while the rest cover different ground.
@@ -22,3 +86,65 @@ Selection happens one document at a time, not all at once. The first pick is wha
 ## What to remember
 
 MMR selects documents one at a time, and after the first pick, every subsequent choice is weighed against how similar it is to what has already been selected — trading some relevance for coverage. &lambda; controls the trade directly: 1.0 is ordinary top-k relevance ranking, 0.0 ignores relevance and maximises spread, and everything between balances the two. It costs one similarity comparison against the selected set per candidate per step, which is cheap next to embedding or reranking and is standard in any RAG system retrieving more than a couple of chunks per query.
+
+## Where diversity helps and where it hurts
+
+<strong>It helps when the question has several facets.</strong> "What are the risks of this approach?" wants several distinct risks, not five phrasings of the biggest one.
+
+<strong>It helps on redundant corpora.</strong> Documentation that repeats itself, support content duplicated across channels, versioned documents.
+
+<strong>It helps summarisation and overview tasks,</strong> where coverage matters more than precision.
+
+<strong>It hurts on narrow factual questions.</strong> "What is the notice period?" has one answer, and the best three chunks are probably all about it. Diversity here means introducing less relevant material.
+
+<strong>It hurts when the corpus is already diverse.</strong> If there is no redundancy, the penalty term does nothing except distort the ordering slightly.
+
+That split suggests treating &lambda; as query-dependent rather than fixed: high for lookup questions, lower for exploratory ones. Some systems classify the query type and set it accordingly.
+
+## The alternatives
+
+|Method|How it deduplicates|
+|---|---|
+|MMR|Penalises similarity to already-selected results|
+|Exact deduplication|Hash the text, drop identical chunks|
+|Near-duplicate filtering|Drop candidates above a similarity threshold to an earlier result|
+|Clustering|Group candidates, take one per cluster|
+|Parent deduplication|Collapse children of the same parent document|
+
+<strong>Threshold filtering</strong> is the simpler cousin of MMR and often sufficient: go down the ranked list and skip anything with cosine similarity above 0.95 to something already kept. It handles the near-duplicate case without changing the ordering of genuinely distinct results.
+
+<strong>Parent deduplication</strong> is worth doing regardless if you use parent-child retrieval, and it addresses a specific and common source of redundancy.
+
+The pragmatic recommendation: start with threshold-based near-duplicate filtering, which is cheap and rarely harmful. Add MMR when the queries are genuinely multi-faceted.
+
+## Practical notes
+
+<strong>It needs the candidate vectors,</strong> not just their ids &mdash; the redundancy term compares candidates with each other. Retrieval must return the embeddings, or they must be re-fetched.
+
+<strong>Order matters after selection.</strong> MMR chooses a set; the order in which it is presented to the model still matters, because attention favours the ends of a long context. Keep the most relevant first.
+
+<strong>It interacts with reranking.</strong> A cross-encoder gives more accurate relevance scores; running MMR on reranked candidates using cross-encoder scores for the relevance term and embedding similarity for the redundancy term works well.
+
+<strong>Cost is negligible</strong> on 30&ndash;50 candidates &mdash; a few thousand dot products.
+
+## Questions people ask
+
+<strong>What &lambda; should I use?</strong> 0.5&ndash;0.7 as a default. Higher for factual lookup, lower for exploratory questions.
+
+<strong>Is MMR better than simple deduplication?</strong> More principled, and more likely to change the result set. Threshold deduplication is simpler and adequate when the problem is exact repeats.
+
+<strong>Does it improve answer quality?</strong> On multi-faceted questions and redundant corpora, measurably. On narrow factual questions it can reduce it slightly.
+
+<strong>How many candidates should I pass it?</strong> 30&ndash;50. Too few and there is nothing diverse to choose; too many and the penalty term starts favouring outliers.
+
+<strong>Can I use it with hybrid search?</strong> Yes &mdash; fuse the ranked lists first, then apply MMR to the fused candidates.
+
+<strong>Does it help with the "lost in the middle" problem?</strong> Indirectly, by making every retrieved chunk carry distinct information, so fewer slots are wasted.
+
+## Recap in one screen
+
+- Plain top-k on a redundant corpus returns several statements of the same thing.
+- MMR selects greedily, scoring each candidate for relevance minus similarity to what is already selected.
+- `λ` balances the two; 0.5&ndash;0.7 suits most retrieval, higher for narrow factual questions.
+- Apply it to a candidate set of 30&ndash;50, not to the whole corpus.
+- Simpler near-duplicate threshold filtering is often enough; MMR earns its place on multi-faceted queries.

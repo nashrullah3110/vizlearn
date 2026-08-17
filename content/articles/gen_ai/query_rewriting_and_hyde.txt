@@ -9,6 +9,64 @@ A user's question and the passage that answers it are usually written in differe
 
 <strong>Query expansion</strong> adds related terms to the original query — synonyms, likely technical vocabulary — widening what it can match against. <strong>HyDE (Hypothetical Document Embeddings)</strong> goes further: ask a language model to draft a plausible answer to the question, without ever checking whether that answer is true, and embed <em>that hypothetical answer</em> instead of the question. A fabricated but stylistically realistic answer sits much closer in embedding space to a real answer than a terse question ever does — the retrieval step never sees or uses the hypothetical text's truth, only its vocabulary and register.
 
+## The vocabulary gap
+
+Users do not phrase questions the way documents phrase answers.
+
+<blockquote>User: "why is my thing not working"</blockquote>
+<blockquote>Document: "Troubleshooting connection failures in the client library"</blockquote>
+
+Nothing overlaps. The embedding similarity is low, keyword overlap is zero, and the right document is not retrieved &mdash; even though it is the answer.
+
+That mismatch has a name, the vocabulary gap, and it is one of the largest sources of retrieval failure in real systems. Two families of technique address it, both by changing the query rather than the index.
+
+## Query rewriting
+
+Use a model to reformulate the question before searching. Several distinct operations hide under the same name:
+
+<strong>Expansion.</strong> Add synonyms and related terms. "car" becomes "car automobile vehicle".
+
+<strong>Clarification.</strong> Turn a vague question into a specific one. "why is my thing not working" becomes "why is the client library failing to connect".
+
+<strong>Decomposition.</strong> Split a multi-part question into parts, retrieve for each, and combine. "How do refunds and exchanges differ?" becomes two searches.
+
+<strong>Contextualisation.</strong> Resolve references against conversation history. "What about for premium users?" becomes "What is the refund policy for premium users?" &mdash; and this one is essential in any chat interface, because a follow-up question is meaningless as a standalone search.
+
+<strong>Multi-query.</strong> Generate several rewrites, search with each, and fuse the results. Broader recall at the cost of several searches.
+
+```python
+prompt = """Rewrite this question as 3 different search queries that would
+find relevant documents. Return one per line, no numbering.
+
+Question: {question}"""
+
+queries = model.generate(prompt).strip().split("\n")
+results = rrf([index.search(q, k=20) for q in queries])
+```
+
+Contextualisation deserves emphasis because it is the one that is always needed and often forgotten. Without it, the second turn of every conversation retrieves badly.
+
+## HyDE: search with a fabricated answer
+
+HyDE &mdash; hypothetical document embeddings &mdash; takes an unintuitive approach that works surprisingly well.
+
+Instead of embedding the question, ask a model to <strong>write a plausible answer</strong>, then embed <em>that</em> and search with it.
+
+<blockquote>Question: "why is my thing not working"</blockquote>
+<blockquote>Hypothetical answer: "Connection failures in the client library are usually caused by an expired API token, an incorrect endpoint URL, or a firewall blocking outbound requests on port 443. Check the token expiry first..."</blockquote>
+
+That fabricated passage is written in the same register as the documents you are searching &mdash; technical, declarative, using the vocabulary answers use. Its embedding sits much closer to real answer passages than the question's embedding did.
+
+The generated answer may be factually wrong, and that does not matter. It is never shown to the user; it is used only as a search key, and what makes it useful is its <em>style and vocabulary</em>, not its accuracy.
+
+|&nbsp;|Question embedding|Hypothetical answer embedding|
+|---|---|---|
+|Register|Interrogative, informal|Declarative, domain vocabulary|
+|Length|Short|Paragraph|
+|Match against documents|Weak|Strong|
+
+Two practical variants: generate several hypothetical answers and average their embeddings, which is more robust; and combine the hypothetical embedding with the original question's rather than replacing it.
+
 ## Experiments to try
 
 1. <strong>Read the raw query's ranking.</strong> A passage about data drift in production beats the overfitting passage — it happens to share more surface words ("model", "worse", "new", "data") with the terse question, even though the overfitting passage is the intended answer.
@@ -23,3 +81,70 @@ HyDE embeds a fabrication. If the hypothetical answer is confidently wrong about
 ## The short of it
 
 Retrieval quality is not only a property of the index and the similarity metric — it depends on how close the embedded query text sits to the embedded document text in vocabulary and register. Query expansion narrows that gap cheaply by adding terms; HyDE narrows it further by replacing the question with a fabricated answer written in the target register, at the cost of an extra generation step and the risk of chasing a plausible-sounding but wrong hypothesis.
+
+## What each costs
+
+Every one of these techniques adds a model call before retrieval starts.
+
+|Technique|Extra calls|Extra latency|
+|---|---|---|
+|Contextualisation|1|200&ndash;500ms|
+|Single rewrite|1|200&ndash;500ms|
+|Multi-query (3 rewrites)|1, then 3 searches|300&ndash;700ms|
+|HyDE|1 generation|500&ndash;1500ms &mdash; it generates a paragraph|
+
+HyDE is the most expensive because it generates substantially more text. A small fast model is usually adequate for the generation, which brings the cost down considerably.
+
+Three mitigations worth having:
+
+<strong>Cache by query text.</strong> Repeated and similar questions are common, and the rewrite is deterministic at temperature 0.
+
+<strong>Run rewrites in parallel</strong> with the original query's search, so the latency is the maximum rather than the sum.
+
+<strong>Apply selectively.</strong> Short vague queries benefit; long specific ones usually do not. A length or specificity heuristic avoids paying the cost when there is nothing to gain.
+
+## When these help, and when they hurt
+
+<strong>They help most with:</strong> short vague queries, conversational follow-ups, domain jargon the user does not know, and multi-part questions.
+
+<strong>They hurt when:</strong> the query already contains exact identifiers &mdash; rewriting "error E4471" can lose the code, which was the most useful part. Guard by keeping the original query in the fused search alongside any rewrites.
+
+<strong>HyDE specifically hurts</strong> when the model has no knowledge of the domain and generates a hypothetical answer that is not merely wrong but off-topic, pulling retrieval in an unhelpful direction.
+
+The safe general pattern is <strong>additive rather than substitutive</strong>: search with the original query <em>and</em> the rewrites, and fuse. That way a bad rewrite dilutes the results slightly rather than replacing them.
+
+## Where they sit in a pipeline
+
+A realistic ordering, with each stage added only if it measures better:
+
+1. <strong>Contextualise</strong> against conversation history &mdash; almost always worth it in chat.
+2. <strong>Self-query</strong> to extract metadata filters, if the corpus has metadata.
+3. <strong>Rewrite or HyDE</strong> to close the vocabulary gap.
+4. <strong>Hybrid retrieval</strong> &mdash; dense plus BM25 &mdash; with the original and rewritten queries.
+5. <strong>Fuse</strong> with reciprocal rank fusion.
+6. <strong>Rerank</strong> with a cross-encoder.
+7. <strong>Deduplicate</strong> or apply MMR.
+
+Measure each addition on a question set with known answers. In most systems hybrid search and reranking give the largest gains, and query transformation matters most where users phrase things very differently from the documents.
+
+## Questions people ask
+
+<strong>Does HyDE need a large model?</strong> No &mdash; the hypothetical answer only needs the right register and vocabulary. A small fast model works well.
+
+<strong>Does it matter that the hypothetical answer is wrong?</strong> Not for retrieval, since it is used only as a search key. It would matter if you showed it to the user, which you should not.
+
+<strong>Should I replace the original query?</strong> No &mdash; search with both and fuse. That way a poor rewrite cannot destroy the results.
+
+<strong>How many rewrites for multi-query?</strong> Three to five. Beyond that, returns flatten and latency grows.
+
+<strong>Is query rewriting better than a better embedding model?</strong> A better embedding model helps every query; rewriting helps the badly-phrased ones. Try the model first.
+
+<strong>Can I cache these?</strong> Yes, and you should &mdash; keyed on the query text, at temperature 0.
+
+## Recap in one screen
+
+- Users phrase questions differently from how documents phrase answers, and that gap causes retrieval failures.
+- Query rewriting expands, clarifies, decomposes or contextualises the question before searching.
+- Contextualising against conversation history is essential in chat, and frequently forgotten.
+- HyDE generates a plausible answer and searches with its embedding, matching the documents' register.
+- Search with the original query as well as the rewrites, and fuse &mdash; never substitute blindly.

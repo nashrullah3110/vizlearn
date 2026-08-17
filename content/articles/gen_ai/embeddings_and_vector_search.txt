@@ -21,6 +21,64 @@ The standard fix is to partition the space. Cluster the vectors once, keep a cen
 
 That chance is what recall@k measures &mdash; the share of the true top k that the approximate search actually returned. It is a dial, not a defect: probing more cells raises recall and costs comparisons.
 
+## Meaning as coordinates
+
+An embedding turns text into a vector positioned so that similar meanings land near each other. Vector search is then a geometry problem: find the stored vectors closest to the query's vector.
+
+That is what lets a search for "how do I reset my password" retrieve a document titled "Credential recovery procedure" &mdash; no shared words, similar meaning, nearby vectors.
+
+The pipeline:
+
+1. <strong>Embed</strong> every chunk once, at indexing time.
+2. <strong>Store</strong> the vectors with their metadata.
+3. <strong>Embed</strong> the query at search time, with the same model.
+4. <strong>Compare</strong> against the stored vectors and return the nearest k.
+
+Step 3's "same model" is not negotiable. Vectors from two different models occupy unrelated spaces, and comparing them produces noise that looks like results.
+
+## Cosine similarity, and why length is discarded
+
+The standard comparison is the angle between vectors:
+
+<p class="mono-font">similarity = (a &middot; b) / (&#8214;a&#8214; &#8214;b&#8214;)</p>
+
+Length in an embedding tends to reflect frequency or confidence rather than meaning, so ignoring it is deliberate: a long document and a short one about the same subject should be close.
+
+On vectors normalised to length 1, cosine similarity and the dot product are identical, and Euclidean distance ranks the same way. That is why libraries normalise on the way in and then use fast dot products &mdash; a matrix multiply is far cheaper than computing norms per comparison.
+
+Calibrate the threshold rather than assuming one. Many sentence-embedding models score unrelated text at 0.2&ndash;0.4, so a threshold of 0.5 admits considerable noise. Score a few hundred known-related and known-unrelated pairs and put the cut where the distributions separate.
+
+## Approximate search, and why exact does not scale
+
+Comparing a query against every stored vector is exact and linear. With a million 768-dimensional vectors that is 768 million multiply-adds per query &mdash; tolerable in a batch job, too slow for an interactive request at any real volume.
+
+<strong>Approximate nearest neighbour</strong> indexes trade a small amount of recall for orders of magnitude of speed.
+
+|Index|How it works|Character|
+|---|---|---|
+|Flat|Compare against everything|Exact, slow, fine below ~100k|
+|IVF|Cluster, search only nearby clusters|Fast, needs training, tunable|
+|HNSW|A navigable graph of neighbours|Very fast, high recall, memory-hungry|
+|PQ / compression|Store compressed vectors|Large memory saving, some accuracy loss|
+
+<strong>HNSW</strong> is the common default: build a multi-layer graph where each vector links to its neighbours, then walk it greedily from a coarse layer down to a fine one. Query time grows logarithmically rather than linearly.
+
+The parameter to understand is the search-time breadth (`ef_search` in HNSW, `nprobe` in IVF). Higher means better recall and slower queries &mdash; a dial you set from measured recall against exact search, not from intuition.
+
+## Filtering, and the interaction that surprises people
+
+Real systems need constraints: only documents this user may see, only from the last year, only of a certain type.
+
+Two ways to apply them, and the difference matters:
+
+<strong>Pre-filter</strong> &mdash; restrict the candidate set, then search within it. Correct results, and it can defeat the index structure, since the graph or clusters were built over everything.
+
+<strong>Post-filter</strong> &mdash; search first, then discard non-matching results. Fast, and it can return fewer than k results, or none, if the top matches are all filtered out.
+
+Modern vector databases implement filtered search that navigates the index while respecting the filter, which is the right answer. Where that is unavailable, the workaround is to over-retrieve &mdash; ask for 10&times; k and filter &mdash; and accept that a highly selective filter may still come up short.
+
+For permissions specifically, filtering must be enforced server-side at query time. Retrieving first and filtering in the application means the vectors of documents the user cannot see have already influenced what was returned.
+
 ## Guided tour
 
 1. <strong>Look at the space.</strong> Four topics, four visible clumps. Nothing arranged them by keyword; they are grouped because their meanings are.
@@ -42,3 +100,64 @@ That chance is what recall@k measures &mdash; the share of the true top k that t
 ## The short of it
 
 An embedding puts meaning somewhere in space, so similarity becomes geometry and retrieval becomes nearest-neighbour search, ranked by cosine because vector length carries length rather than meaning. Exact search costs one comparison per document and does not survive scale, so production indexes partition the space and probe only the nearest few cells &mdash; buying a large drop in work for a small, measurable chance of missing a true neighbour. That chance is recall@k, and it moves with how many cells you probe, which makes vector search a tuning problem rather than a solved one.
+
+## Why hybrid search wins
+
+Embeddings are strong at paraphrase and weak at exact tokens. They will happily return a document about "annual leave" for a query about "holiday allowance" &mdash; and will blur "invoice INV-2024-8871" into every other invoice number.
+
+Keyword retrieval (BM25) is the opposite: precise on names, codes, numbers and rare terms, and blind to paraphrase.
+
+Combining them beats either alone, reliably enough that it is the standard recommendation. <strong>Reciprocal rank fusion</strong> is the usual merge:
+
+<p class="mono-font">score(d) = &Sigma;<sub>lists</sub> 1 / (k + rank(d))</p>
+
+with k around 60. It needs no score normalisation between the two systems, which is what makes it practical &mdash; BM25 scores and cosine similarities are not on comparable scales.
+
+Add a <strong>reranker</strong> on top: retrieve 50 candidates from the hybrid stage, then score each against the query with a cross-encoder that reads both together rather than comparing precomputed vectors. Substantially more accurate, and affordable because it runs on 50 items.
+
+## Practical notes
+
+```python
+from sentence_transformers import SentenceTransformer
+import numpy as np
+
+model = SentenceTransformer("all-MiniLM-L6-v2")
+vecs = model.encode(chunks, normalize_embeddings=True,
+                    batch_size=64, show_progress_bar=True)
+
+q = model.encode([question], normalize_embeddings=True)
+scores = vecs @ q[0]                       # dot product = cosine, normalised
+top = np.argsort(-scores)[:5]
+```
+
+Four things that matter at scale:
+
+<strong>Batch the embedding calls.</strong> One call per chunk is dominated by overhead; batches of 32&ndash;128 are far faster.
+
+<strong>Normalise once, at indexing time.</strong> Then every query is a dot product.
+
+<strong>Store the dimension you need.</strong> 384 dimensions instead of 1,536 is a quarter of the memory and search time, and often a small accuracy cost. Some models support truncating dimensions deliberately (Matryoshka embeddings).
+
+<strong>Version your index.</strong> Changing the embedding model means re-embedding everything, so record which model produced the index.
+
+## Questions people ask
+
+<strong>Which embedding model should I use?</strong> Start with a well-regarded general model, then evaluate alternatives on your own question set. Public benchmarks are a weaker signal than your own data.
+
+<strong>Do I need a vector database?</strong> Below ~100,000 vectors, a NumPy array and a dot product is genuinely fine. Above that, an index earns its place.
+
+<strong>How do I choose k?</strong> 3&ndash;10 chunks for generation. Measure recall@k on known answers to find where returns flatten.
+
+<strong>Why does search miss obvious matches?</strong> Usually vocabulary the embedding model has not seen, or an exact identifier that embeddings blur. Hybrid search is the fix.
+
+<strong>Can I search across languages?</strong> With a multilingual embedding model, yes &mdash; a query in one language retrieves documents in another.
+
+<strong>What about updating documents?</strong> Re-embed the changed chunks and upsert them. HNSW handles insertions well and deletions less well; periodic rebuilds are normal.
+
+## Recap in one screen
+
+- Embeddings place similar meanings near each other, so search becomes finding the nearest vectors.
+- Cosine similarity ignores length; on normalised vectors it is just a dot product.
+- Exact search is linear and does not scale &mdash; HNSW and IVF trade a little recall for large speed gains.
+- Filtering must happen inside the search for permissions to be enforced correctly.
+- Hybrid retrieval plus a cross-encoder reranker is the reliable recipe for quality.

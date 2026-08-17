@@ -19,6 +19,51 @@ Only steps 3 to 5 happen per question. Steps 1 and 2 happen once, when the docum
 
 The scores on this page are real cosine similarities over word-frequency vectors rather than a neural embedding, so the retrieval you are watching genuinely runs. A production system embeds meaning rather than words, which is exactly why it can match "descale" to "limescale" where this cannot.
 
+## Giving a model documents instead of retraining it
+
+A language model knows what was in its training data, up to a cut-off date. It does not know your company's handbook, last week's incident report, or the contents of a customer's account.
+
+Two ways to fix that. <strong>Fine-tuning</strong> updates the weights on your data &mdash; expensive, slow to iterate, and it teaches style and format far better than it teaches facts. <strong>Retrieval-augmented generation</strong> leaves the model alone and puts the relevant documents into the prompt.
+
+The pipeline has two halves, and the first is done once:
+
+<strong>Indexing (offline).</strong> Split documents into chunks, embed each chunk into a vector, store the vectors in an index.
+
+<strong>Retrieval and generation (per query).</strong> Embed the question, find the nearest chunks, paste them into the prompt with the question, and let the model answer from them.
+
+<p class="mono-font">question &rarr; embed &rarr; search &rarr; top k chunks &rarr; prompt &rarr; answer + citations</p>
+
+## Why it is usually the right first choice
+
+|&nbsp;|RAG|Fine-tuning|
+|---|---|---|
+|Adds new facts|Yes|Poorly|
+|Update cost|Re-index a document|Retrain|
+|Citations|Natural &mdash; you know the source|Impossible|
+|Access control|Filter at retrieval|Baked into weights|
+|Teaches format and tone|Weakly|Well|
+|Inference cost|Higher &mdash; longer prompts|Unchanged|
+
+The citation row is the one that decides most enterprise deployments. If an answer must be traceable to a source document, retrieval gives you that for free and fine-tuning cannot give it at all.
+
+The access-control row matters nearly as much. Fine-tuning on documents means the model can reproduce them for anyone; retrieval means permissions can be enforced at query time, per user.
+
+## Where RAG systems actually fail
+
+Almost never in the language model. The failures are in retrieval, and they have distinct causes:
+
+<strong>The right chunk was never retrieved.</strong> The most common failure by a wide margin. Poor chunking, an embedding model that does not cover the domain vocabulary, or a query phrased differently from the document.
+
+<strong>The chunk was retrieved but incomplete.</strong> A table split down the middle, or a paragraph whose subject was named in the previous chunk.
+
+<strong>The right chunk was buried.</strong> Retrieved at position 9 of 10, where models attend to it less &mdash; the "lost in the middle" effect.
+
+<strong>Contradictory chunks.</strong> Two versions of a policy retrieved together, and the model picks one arbitrarily.
+
+<strong>The model ignored the context</strong> and answered from its parametric knowledge instead.
+
+That distribution is why the practical advice is: <strong>measure retrieval separately from generation</strong>. Recall@k on a set of question-and-known-answer pairs tells you whether the right chunk is even reaching the model. Debugging the prompt when recall is 0.4 is wasted effort.
+
 ## Guided tour
 
 1. <strong>Turn retrieval off.</strong> Set <strong>Chunks Retrieved</strong> to 0. The prompt is the bare question, and the answer is what a model does when it has nothing: something plausible and unsupported, flagged in red.
@@ -44,3 +89,72 @@ Retrieval also has a property fine-tuning cannot offer: you can show the user wh
 ## What to remember
 
 RAG answers questions a model was never trained on by finding relevant passages and putting them in the prompt, so generation becomes reading rather than recall. The retrieval step is ordinary similarity search and it always returns something, which makes the quality of your chunking, your ranking and your "I could not find it" path the whole ballgame. Raising k buys robustness against a bad ranking and costs latency, money and attention, so it is a trade rather than a setting. Use retrieval for facts that change or need citing, fine-tuning for behaviour that needs to change, and never assume the top result was actually relevant.
+
+## The decisions that determine quality
+
+<strong>Chunk size.</strong> 200&ndash;500 tokens is the usual range. Too small and the chunk lacks context; too large and the embedding is a blurred average of several topics, and the prompt fills up. Overlap of 10&ndash;20% keeps sentences that straddle a boundary intact.
+
+<strong>Chunking strategy.</strong> Splitting on structure &mdash; headings, sections, paragraphs &mdash; beats splitting on a fixed character count almost always, because it respects where topics actually change.
+
+<strong>Hybrid retrieval.</strong> Combine dense embedding search with keyword search (BM25). Embeddings catch paraphrase; keywords catch names, codes, numbers and exact terms that embeddings blur. Reciprocal rank fusion merges the two ranked lists. This is the single highest-value improvement in most systems.
+
+<strong>Reranking.</strong> Retrieve 50 candidates cheaply, then score each against the query with a cross-encoder that reads both together. Far more accurate than embedding similarity, affordable because it runs on 50 items rather than a million.
+
+<strong>How many chunks to pass.</strong> 3&ndash;10 typically. More is not better: irrelevant context degrades answers, and the middle of a long context receives less attention.
+
+## Prompting the generation step
+
+Three instructions do most of the work:
+
+```
+Answer using only the provided context. If the context does not contain
+the answer, say "I don't know based on the available documents."
+Cite the source id after each claim.
+
+Context:
+[1] {chunk_1}
+[2] {chunk_2}
+
+Question: {question}
+```
+
+<strong>"Only the provided context"</strong> reduces the model answering from memory, which is what produces confident wrong answers about your domain.
+
+<strong>An explicit escape hatch</strong> matters more than it looks. Without permission to say "I don't know", a model will construct something plausible from whatever it was given.
+
+<strong>Numbered sources</strong> make citations checkable, which is what turns an answer into something an auditor can verify.
+
+## Measuring it
+
+Evaluate the two stages separately, then end to end:
+
+|Stage|Metric|
+|---|---|
+|Retrieval|Recall@k, MRR, nDCG|
+|Generation, faithfulness|Groundedness &mdash; is every claim supported by the context?|
+|Generation, usefulness|Relevance and completeness against the question|
+|End to end|Correctness against known answers|
+
+Build a small evaluation set &mdash; 50&ndash;100 real questions with known correct answers and known source documents &mdash; before optimising anything. Without it, changes to chunk size and prompt wording are guesswork, and the usual outcome is a system that feels better and measures worse.
+
+## Questions people ask
+
+<strong>RAG or fine-tuning?</strong> RAG for facts, currency, citations and access control. Fine-tuning for format, tone and task-specific behaviour. They combine.
+
+<strong>How large a corpus can this handle?</strong> Millions of chunks, with an approximate index. Below about 100,000, a plain vector matrix and a dot product is adequate.
+
+<strong>Do long context windows make RAG obsolete?</strong> No. Retrieval is cheaper, more precise, and it tells you which source an answer came from. Stuffing a million tokens is expensive and dilutes attention.
+
+<strong>Why does it hallucinate even with the right context?</strong> Usually the prompt does not constrain it firmly enough, or the context is contradictory, or the answer genuinely is not there and it has no permission to say so.
+
+<strong>Which embedding model?</strong> Start with a strong general one, then test domain-specific alternatives on your own evaluation set. The benchmark leaderboard is a weaker signal than your own data.
+
+<strong>Should I re-embed when I change models?</strong> Yes &mdash; vectors from different models are not comparable, so the whole corpus must be re-indexed.
+
+## Recap in one screen
+
+- Index documents as embedded chunks; at query time retrieve the nearest and put them in the prompt.
+- It adds facts, supports citations and enforces permissions &mdash; none of which fine-tuning does well.
+- Almost all failures are retrieval failures, so measure recall separately before touching the prompt.
+- Hybrid search plus reranking is the highest-value improvement in most systems.
+- Instruct the model to use only the context and to admit when the answer is absent.

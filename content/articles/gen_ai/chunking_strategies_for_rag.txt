@@ -13,6 +13,51 @@ Every piece of <a href="rag.html" style="color: var(--accent-primary)">RAG</a> d
 
 Even a well-placed boundary loses something: whatever came just before a chunk starts is not in it, even though it might be exactly the context needed to make the chunk's first sentence make sense. Overlap re-includes the last few words of the previous chunk at the start of the next one, at the direct cost of storing and embedding the same words twice.
 
+## Why documents have to be split
+
+Three reasons, and they compound.
+
+<strong>Embeddings blur when the input is long.</strong> A vector representing a 20-page document is an average of everything in it, so it is close to nothing in particular. Retrieval precision collapses.
+
+<strong>The context window is finite,</strong> and shared with the question and the answer. Ten full documents will not fit.
+
+<strong>Precision needs granularity.</strong> The user asked one question; the answer is one paragraph. Retrieving the whole document buries it.
+
+So documents are split into chunks, each embedded separately. The chunk becomes the unit of retrieval, and how you choose its boundaries determines the ceiling on the whole system's quality.
+
+## The strategies, from crude to careful
+
+|Strategy|Splits on|Quality|
+|---|---|---|
+|Fixed size|Character or token count|Poor &mdash; cuts mid-sentence|
+|Recursive|Paragraph, then sentence, then word|Good default|
+|Structure-aware|Headings, sections, list items|Better for structured documents|
+|Semantic|Where the topic shifts, measured by embedding distance|Best quality, highest cost|
+|Sentence windows|One sentence, with neighbours as context|Good precision, needs expansion|
+|Parent-child|Retrieve small, return large|Best of both|
+
+<strong>Fixed-size</strong> splitting at 500 characters cuts sentences in half, separates a heading from its content and splits tables. It is the default in many tutorials and the first thing worth replacing.
+
+<strong>Recursive</strong> splitting tries separators in order &mdash; paragraph break, then newline, then sentence end, then space &mdash; taking the largest unit that fits. It respects natural boundaries most of the time and costs nothing extra. This is the sensible default.
+
+<strong>Structure-aware</strong> splitting uses the document's own markup: Markdown headings, HTML sections, PDF outline. A chunk is then a semantically coherent unit by construction, and the heading path can be prepended to give the chunk context ("Handbook &gt; Leave &gt; Parental leave").
+
+<strong>Semantic</strong> chunking embeds each sentence and splits where consecutive sentences become dissimilar. It finds real topic boundaries and costs an embedding call per sentence at indexing time.
+
+## Size and overlap
+
+<strong>Size</strong> is a trade-off between context and precision:
+
+|Chunk size|Effect|
+|---|---|
+|100 tokens|Precise retrieval, often missing context|
+|200&ndash;500 tokens|The usual sweet spot|
+|1,000+ tokens|Good context, blurred embeddings, fills the prompt|
+
+<strong>Overlap</strong> of 10&ndash;20% means consecutive chunks share their boundary text, so a sentence spanning a split appears whole in at least one chunk. The cost is duplicated storage and occasionally two near-identical chunks in the results, which reranking or maximal marginal relevance handles.
+
+The number that matters is not the token count in isolation but whether a chunk can <strong>answer a question on its own</strong>. A chunk beginning "This means that the limit is 30 days" is useless without knowing what "this" refers to &mdash; which is the argument for prepending the heading path, or for the parent-child pattern.
+
 ## Experiments to try
 
 1. <strong>Start at 30 words, fixed-size.</strong> Several chunks end mid-sentence — the cut counter is not zero.
@@ -23,3 +68,60 @@ Even a well-placed boundary loses something: whatever came just before a chunk s
 ## The short of it
 
 Fixed-size chunking is simple and fast but blind to meaning, and will cut sentences in half whenever the count lands mid-sentence. Semantic chunking respects real boundaries at the cost of variable chunk sizes. Overlap recovers some of the context lost at any boundary by duplicating a small window of text between neighbouring chunks. None of this is free — every choice trades simplicity, storage, or coherence against the others, and the right trade depends on how structured the source documents already are.
+
+## Parent-child, and sentence windows
+
+Two patterns resolve the size trade-off rather than compromising on it.
+
+<strong>Parent-child (small-to-big).</strong> Index small chunks for precise matching, but return their larger parent section to the model. Retrieval operates on 100-token units; generation sees the 800-token section they came from. You get the precision of small chunks and the context of large ones.
+
+<strong>Sentence windows.</strong> Index each sentence individually, and at retrieval time expand to include the two or three sentences either side. Same idea, finer granularity.
+
+Both require storing the relationship between the indexed unit and its context, which every serious vector store supports through metadata.
+
+## What to store alongside the vector
+
+Metadata is what makes a retrieval system usable in production, and it is easy to under-invest in at indexing time:
+
+- <strong>Source</strong> &mdash; document id, title, URL. Needed for citations.
+- <strong>Location</strong> &mdash; page number, section heading, character offsets.
+- <strong>Heading path</strong> &mdash; prepend it to the chunk text as well as storing it.
+- <strong>Dates</strong> &mdash; created and modified, so stale content can be filtered or down-weighted.
+- <strong>Access control</strong> &mdash; the groups permitted to see it, filtered at query time.
+- <strong>Document type</strong> &mdash; so a query about policy can be restricted to policy documents.
+
+Adding metadata after the fact means re-indexing. Deciding it up front costs nothing.
+
+## Document types that need special handling
+
+<strong>Tables.</strong> Splitting a table mid-row destroys it. Extract tables separately, keep each whole, and store a text summary alongside for embedding.
+
+<strong>Code.</strong> Split on function and class boundaries, not line counts. A half-function is not retrievable knowledge.
+
+<strong>PDFs.</strong> Multi-column layouts are frequently extracted in the wrong reading order. Check the extracted text before indexing thousands of documents; a layout-aware extractor is worth the effort.
+
+<strong>Transcripts.</strong> Split on speaker turns or topic shifts, and keep timestamps in the metadata.
+
+<strong>Slides.</strong> One slide per chunk usually works, with the deck title prepended.
+
+## Questions people ask
+
+<strong>What chunk size should I use?</strong> Start at 300&ndash;500 tokens with 15% overlap and recursive splitting, then evaluate against your own question set.
+
+<strong>Is semantic chunking worth the cost?</strong> Often yes for heterogeneous documents, and the gain over structure-aware chunking on well-structured documents is usually small.
+
+<strong>Should chunks overlap?</strong> Yes, 10&ndash;20%. It is cheap insurance against boundary loss.
+
+<strong>How do I keep context in small chunks?</strong> Prepend the heading path, or use parent-child retrieval.
+
+<strong>Can chunk size differ within one index?</strong> Yes, and it is often sensible &mdash; a table or a code function is one chunk whatever its length.
+
+<strong>How do I know my chunking is bad?</strong> Low recall@k on questions whose answers you know are in the corpus. Then read the retrieved chunks: fragments and mid-sentence cuts are the diagnosis.
+
+## Recap in one screen
+
+- Chunks are the unit of retrieval, so their boundaries set the ceiling on system quality.
+- Recursive splitting on natural separators is the sensible default; structure-aware is better where structure exists.
+- 200&ndash;500 tokens with 10&ndash;20% overlap covers most cases.
+- The real test is whether a chunk can answer a question alone &mdash; hence heading paths and parent-child retrieval.
+- Store source, location, dates and permissions at indexing time; adding them later means re-indexing.

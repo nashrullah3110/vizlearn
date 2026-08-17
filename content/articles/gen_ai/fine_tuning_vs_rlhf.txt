@@ -11,6 +11,56 @@ Two more stages turn that into an assistant. <strong>Supervised fine-tuning</str
 
 <p>Every preference method optimises the same objective: get more reward without drifting far from the model you started with. That constraint has a closed form,</p><p>&pi;(y) &prop; &pi;<sub>ref</sub>(y) &middot; exp( r(y) / &beta; )</p><p>which is exactly what this page computes. The reference policy is the SFT model, <span class="mono-font">r</span> is the reward, and <span class="mono-font">&beta;</span> is the leash: large &beta; keeps the tuned model close to its reference, small &beta; lets it chase reward wherever that leads. The drift readout is the <a href="../maths/cross_entropy_and_kl_divergence.html" style="color: var(--accent-primary)">KL divergence</a> between the two, which is the quantity the penalty is penalising.</p><strong>RLHF</strong> gets <span class="mono-font">r</span> from a reward model trained on human comparisons, then optimises against it with PPO. <strong>DPO</strong> skips the reward model entirely: the same optimum can be reached by a supervised-looking loss on the preference pairs themselves. Same target, far less machinery, which is why DPO and its relatives took over so quickly.
 
+## Three stages, three different jobs
+
+A usable assistant is not produced in one training run. Three stages follow one another, each teaching something the previous one cannot.
+
+<strong>1. Pretraining</strong> &mdash; next-token prediction over enormous quantities of text. This is where knowledge and language competence come from. It costs millions of pounds and produces a <em>base model</em> that completes text rather than answering questions.
+
+<strong>2. Supervised fine-tuning (SFT)</strong> &mdash; training on curated examples of instructions and good responses. This teaches the <em>format</em>: that a question should be answered, that output should be structured a particular way, that a conversation has turns.
+
+<strong>3. Preference optimisation</strong> &mdash; RLHF, DPO or similar. Humans compare pairs of responses and the model is tuned towards the preferred one. This teaches the qualities that are easy to <em>recognise</em> and hard to <em>demonstrate</em>: helpfulness, appropriate caution, tone, refusing what should be refused.
+
+|Stage|Data needed|Teaches|
+|---|---|---|
+|Pretraining|Trillions of tokens|Knowledge, language|
+|SFT|Thousands of examples|Format, task behaviour|
+|Preference|Thousands of comparisons|Quality, tone, safety|
+
+## Why preference learning exists at all
+
+The natural question: if SFT can learn from good examples, why add a stage?
+
+Because for many qualities, writing an ideal example is harder than judging between two candidates. Asked to produce the perfect response to a sensitive question, most annotators struggle. Shown two responses and asked which is better, they answer quickly and consistently.
+
+Preference data is therefore <em>cheaper and more reliable to collect</em> for exactly the qualities that matter most in an assistant.
+
+There is a second reason, which is about the loss function. SFT maximises the likelihood of one target response, so anything not in the target is implicitly wrong &mdash; even if it is equally good. Preference training instead pushes the model's distribution towards a whole region of preferred behaviour, which suits problems with many valid answers.
+
+## RLHF, and how DPO simplified it
+
+<strong>RLHF</strong> has three moving parts:
+
+1. Collect human comparisons of response pairs.
+2. Train a <strong>reward model</strong> to predict which response a human would prefer.
+3. Optimise the language model against that reward with reinforcement learning (PPO), including a KL penalty keeping it close to the SFT model.
+
+The KL penalty is not optional. Without it the policy drifts into degenerate text that scores highly on the reward model and is useless &mdash; <em>reward hacking</em>, and it is the characteristic failure of the method.
+
+Practically, RLHF is complicated: two models in memory, an RL loop that is sensitive to hyperparameters, and a reward model that can be gamed.
+
+<strong>DPO (direct preference optimisation)</strong> removes the reward model and the RL loop. It shows that the same objective can be optimised directly on the preference pairs with a simple classification-style loss &mdash; increase the likelihood of the preferred response, decrease the likelihood of the rejected one, relative to a frozen reference model.
+
+|&nbsp;|RLHF (PPO)|DPO|
+|---|---|---|
+|Reward model|Required|Not needed|
+|Training loop|RL, sensitive|Supervised, stable|
+|Memory|Policy + reward + reference|Policy + reference|
+|Quality|Strong, well-proven|Comparable in most reports|
+|Complexity|High|Low|
+
+DPO's simplicity is why it became the default for open models. Variants &mdash; IPO, KTO, ORPO, SimPO &mdash; adjust the loss or remove the reference model; the family is still moving.
+
 ## Guided tour
 
 1. <strong>Start at pretraining.</strong> With SFT at 0 and no preference method, the dense jargon answer is the most likely one. That is what "most probable continuation" looks like when the text you trained on is the internet.
@@ -38,3 +88,60 @@ Two more stages turn that into an assistant. <strong>Supervised fine-tuning</str
 ## Worth remembering
 
 Pretraining supplies knowledge and fluency, supervised fine-tuning supplies behaviour by imitation, and preference optimisation supplies judgement between answers that are all plausible. RLHF and DPO reach the same optimum &mdash; a policy proportional to the reference times the exponentiated reward &mdash; with DPO skipping the reward model that RLHF has to train and then defend. The beta term is the leash, and slackening it produces exactly the failure you would predict: reward climbs, human ratings fall, and the model drifts into whatever the proxy overrates. None of these stages is a way to teach a model new facts; that is what retrieval is for.
+
+## What each stage cannot fix
+
+This is the practically useful part, because it determines which stage to reach for.
+
+<strong>Fine-tuning does not reliably add facts.</strong> It can be made to memorise, and doing so is inefficient, hard to update, and produces confident errors on anything nearby that was not memorised. Facts belong in retrieval.
+
+<strong>Preference training does not add capability.</strong> It shapes which of the model's existing behaviours are expressed. A model that cannot do arithmetic will not learn to from preference data.
+
+<strong>Neither fixes a knowledge cut-off.</strong> Only retrieval or a tool does.
+
+<strong>SFT on a narrow task can cause forgetting.</strong> Heavy fine-tuning on one domain degrades general ability &mdash; the alignment tax. LoRA reduces it, as does mixing general data into the fine-tuning set.
+
+So the decision table most projects need:
+
+|Goal|Approach|
+|---|---|
+|Add current or private facts|RAG|
+|Enforce an output format|SFT, or a structured-output constraint|
+|Teach a specialised task|SFT, usually with LoRA|
+|Adjust tone and helpfulness|Preference optimisation|
+|Reduce unwanted responses|Preference optimisation plus system prompting|
+|Get started quickly|Prompting with few-shot examples|
+
+## Practical guidance
+
+<strong>Try prompting first.</strong> With few-shot examples and a clear system prompt, a strong model handles a great many tasks without any training. Fine-tuning is a commitment to a pipeline, a dataset and a retraining cadence.
+
+<strong>If fine-tuning, use LoRA.</strong> A few hundred to a few thousand well-curated examples, adapters rather than full weights, and evaluation against a held-out set that existed before you started.
+
+<strong>Data quality dominates quantity.</strong> A thousand carefully written examples beat ten thousand scraped ones. The well-known result here is that a small, high-quality instruction set can produce a surprisingly capable assistant.
+
+<strong>Preference optimisation is rarely the first move</strong> for an application team. It matters when you are shipping a model whose tone and refusal behaviour you own.
+
+<strong>Evaluate on what you care about.</strong> Fine-tuning improves the target metric and can degrade others. Keep a general capability check alongside the task-specific one.
+
+## Questions people ask
+
+<strong>RAG or fine-tuning?</strong> RAG for facts, currency and citations. Fine-tuning for format, style and task behaviour. They are complementary and frequently used together.
+
+<strong>How much data do I need for SFT?</strong> A few hundred examples can shift format noticeably; a few thousand for a substantial task change.
+
+<strong>Is DPO strictly better than RLHF?</strong> Simpler and comparable in most published comparisons. Well-executed PPO still leads on some benchmarks.
+
+<strong>What is the alignment tax?</strong> The capability lost when tuning for helpfulness and safety. Real, and usually small relative to the gain.
+
+<strong>Can I fine-tune a hosted model?</strong> Several providers offer it, usually LoRA-based, with your data and their infrastructure.
+
+<strong>Does fine-tuning make a model smaller or faster?</strong> No &mdash; that is distillation or quantisation. Fine-tuning changes behaviour, not size.
+
+## Recap in one screen
+
+- Pretraining gives knowledge, SFT gives format, preference optimisation gives quality and tone.
+- Preference data exists because judging two responses is easier and more reliable than writing an ideal one.
+- RLHF needs a reward model and an RL loop; DPO achieves comparable results with a supervised loss.
+- Fine-tuning does not reliably add facts &mdash; use retrieval for that.
+- Try prompting first, then LoRA on a few thousand carefully curated examples.

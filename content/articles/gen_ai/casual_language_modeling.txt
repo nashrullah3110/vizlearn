@@ -24,6 +24,56 @@ The simplest method is to always choose the token with the highest probability. 
 
 To add creativity, we introduce randomness via a "temperature" setting. A low temperature makes the model's choices more conservative (closer to greedy), while a high temperature increases randomness, allowing it to pick less likely tokens and produce more surprising (but potentially less coherent) text.
 
+## Predicting forward, and only forward
+
+Causal language modelling is the training objective behind every generative model: predict the next token from the tokens before it, and never look ahead.
+
+<p class="mono-font">P(w&#8321;, w&#8322;, &hellip;, w&#8345;) = &prod;&#7511; P(w&#7511; | w&#8321; &hellip; w&#7511;&#8331;&#8321;)</p>
+
+The word "causal" refers to that one-directional flow: token t may depend on its past and never on its future. (It is often written "casual" by accident, including in some published code.)
+
+The mechanism enforcing it is a <strong>mask</strong>. Attention scores for future positions are set to negative infinity before the softmax, so their weights become exactly zero:
+
+```
+        the   cat   sat   on
+the      .     -inf  -inf  -inf
+cat      .     .     -inf  -inf
+sat      .     .     .     -inf
+on       .     .     .     .
+```
+
+Without that mask, predicting "cat" from a context including "cat" would be trivial at training time and impossible at inference, where the future does not exist.
+
+## Why one pass trains every position
+
+The masking has an efficiency consequence that is easy to miss and is central to why this objective scales.
+
+For a sequence of 1,000 tokens, a single forward pass produces predictions at <em>all</em> 1,000 positions simultaneously, each correctly conditioned only on its own past. The loss is averaged over all of them.
+
+So one pass over a document yields as many training signals as the document has tokens. No labelling, no annotation &mdash; any text at all is training data, and the supervision is free.
+
+That property is the reason next-token prediction won. The available training set is the written output of humanity, and every token in it is a labelled example.
+
+|&nbsp;|Causal LM|Masked LM|
+|---|---|---|
+|Sees|Past only|Both directions|
+|Predictions per pass|Every position|Only the masked 15%|
+|Can generate|Yes|No|
+|Natural at|Generation|Understanding|
+|Models|GPT, Llama, Claude|BERT, RoBERTa|
+
+The second row is a real efficiency difference: masked language modelling extracts a training signal from roughly 15% of tokens per pass, causal modelling from all of them.
+
+## What emerges from it
+
+Trained at sufficient scale, next-token prediction produces capabilities nobody specified.
+
+To predict text well a model must track syntax, resolve pronouns, hold facts, maintain consistency over long passages, and continue patterns. All of those reduce prediction error, so all of them are learned.
+
+<strong>In-context learning</strong> is the most striking. Show three worked examples in the prompt and the model continues the pattern with no weight updates at all. That is pattern continuation, which is precisely what the objective rewards &mdash; and research on "induction heads" traces the ability to identifiable attention circuits that copy and complete earlier patterns.
+
+Two things it does not produce, and both follow from the objective. <strong>Truthfulness</strong>, because likelihood is not truth: a plausible falsehood scores well. And <strong>calibrated uncertainty</strong>, because the model outputs a distribution over tokens rather than a belief about the world.
+
 ## Things to try
 
 Use the controls to build intuition for how these models behave.
@@ -38,3 +88,53 @@ Use the controls to build intuition for how these models behave.
 - <strong>Generation is One Token at a Time:</strong> Text is generated sequentially. The model predicts the next token, adds it to the sequence, and then uses that new, longer sequence to predict the token after that.
 - <strong>Temperature Controls Creativity:</strong> Temperature is a key parameter for controlling the randomness and "creativity" of the generated output.
 - <strong>Context is King:</strong> The model's predictions are entirely dependent on the preceding tokens (the context). Changing even one word in the prompt can drastically alter the probability distribution for the next token.
+
+## From base model to assistant
+
+A causal language model trained only on this objective is a <strong>base model</strong>. It continues text. Ask it a question and it may produce more questions, because that is what a list of questions looks like in the training data.
+
+Two further stages make it an assistant:
+
+<strong>Supervised fine-tuning</strong> on instruction-response pairs teaches the format &mdash; that a question should be answered, that output has a structure, that a conversation has turns.
+
+<strong>Preference optimisation</strong> (RLHF or DPO) tunes helpfulness, tone and refusal behaviour from human comparisons.
+
+Neither changes the mechanism. The model is still predicting the next token; the distribution it has been tuned to predict is different.
+
+This distinction matters practically: base models and instruction-tuned models behave very differently on the same prompt, and a base model is usually the wrong thing to build a product on.
+
+## Sampling: turning a distribution into text
+
+The model gives probabilities; something must choose.
+
+|Setting|Effect|
+|---|---|
+|Temperature 0|Always the most likely token &mdash; deterministic|
+|Temperature 0.7|Moderate variety|
+|Temperature &gt;1.2|Usually incoherent|
+|Top-p 0.9|Sample from the smallest set summing to 0.9|
+|Repetition penalty|Down-weight tokens already used|
+
+Two facts worth carrying. <strong>Greedy decoding is not optimal</strong> &mdash; picking the most likely token at each step does not give the most likely sequence, which is why beam search exists and why greedy output tends to repeat. And <strong>temperature 0 is the right default for anything factual</strong>: variety in a factual answer is error.
+
+## Questions people ask
+
+<strong>Why "causal"?</strong> Because information flows in one direction only, past to future &mdash; the same sense as in causal systems. It is frequently misspelled "casual".
+
+<strong>Is this the same as autoregressive?</strong> Effectively yes. "Causal" describes the masking; "autoregressive" describes feeding outputs back as inputs.
+
+<strong>Why not train bidirectionally and generate anyway?</strong> A bidirectional model has no notion of "next", and its training task assumes the surrounding context exists. Attempts to generate by iterative filling work poorly.
+
+<strong>Does the model plan the whole sentence?</strong> Architecturally it emits one token at a time, and there is evidence internal states encode information about upcoming tokens. Whether that is planning is an open question.
+
+<strong>Why does it repeat itself?</strong> Low temperature and greedy decoding favour high-probability continuations, and repetition is high-probability. Raise temperature, use top-p, or apply a repetition penalty.
+
+<strong>Can a causal model do classification?</strong> Yes &mdash; by prompting, or by reading the final hidden state. At scale it matches encoders on most understanding benchmarks despite the one-directional constraint.
+
+## Recap in one screen
+
+- Predict the next token from the past only; a causal mask sets future attention scores to negative infinity.
+- One forward pass trains every position at once, and any text is training data &mdash; which is why the objective scales.
+- Generation is the same model applied repeatedly, appending its own output.
+- Capabilities including in-context learning emerge from the objective rather than being specified.
+- A base model continues text; instruction tuning and preference optimisation make it an assistant.

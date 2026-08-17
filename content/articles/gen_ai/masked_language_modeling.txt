@@ -21,6 +21,55 @@ The reason is a train/test mismatch: <span class="mono-font">[MASK]</span> never
 
 Mask too little and each sentence teaches the model almost nothing &mdash; training is slow because most positions carry no loss. Mask too much and you destroy the very context needed to make a prediction. Around 15% is the long-standing sweet spot, though later work has shown much higher rates can work with large enough models. Drag the rate slider and watch the sentence degrade: at 50% the remaining context often cannot pin the answer down.
 
+## Filling in the blanks
+
+Masked language modelling hides some tokens and trains the model to recover them from <em>both</em> sides of the gap.
+
+<p class="mono-font">"The cat sat on the [MASK]" &rarr; predict "mat"</p>
+
+The difference from causal modelling is the direction of information flow. Here the model sees everything except the masked positions, so a token can be predicted from the words after it as well as before. That bidirectional context is what makes the resulting representations strong for understanding tasks &mdash; and it is exactly why the model cannot generate, since there is no notion of "next".
+
+BERT's specific recipe masks 15% of tokens, and the composition is deliberate:
+
+|Treatment|Share of masked tokens|
+|---|---|
+|Replaced with `[MASK]`|80%|
+|Replaced with a random token|10%|
+|Left unchanged|10%|
+
+The last two look odd and solve a real problem. `[MASK]` never appears at fine-tuning or inference time, so a model trained only on it would be mismatched with how it is used. Including corrupted and unchanged tokens forces the model to build a good representation of <em>every</em> position, not just the masked ones.
+
+## Why 15%, and the efficiency cost
+
+Too little masking and each pass teaches almost nothing. Too much and there is not enough context left to make prediction possible.
+
+15% became the convention, and later work suggests the optimum is task- and scale-dependent &mdash; some studies find 40% works better for larger models.
+
+There is a real efficiency consequence either way:
+
+|&nbsp;|Masked LM|Causal LM|
+|---|---|---|
+|Predictions per forward pass|15% of tokens|100% of tokens|
+|Sees|Both directions|Past only|
+|Can generate|No|Yes|
+
+A causal model extracts a training signal from every position in one pass; a masked model from roughly one in seven. That is a substantial difference in training efficiency, and it is one of several reasons the field shifted towards causal modelling for large-scale pretraining.
+
+ELECTRA addressed it directly with a different objective &mdash; a small generator replaces tokens, and the main model classifies every position as original or replaced, giving a signal at all positions.
+
+## What it produces, and what it is for
+
+The output of masked pretraining is a model whose hidden states are excellent <strong>contextual representations</strong>. That is the product; the mask-filling task was only the means.
+
+Those representations are what get used:
+
+- <strong>Embeddings</strong> for search, similarity and clustering &mdash; particularly after contrastive fine-tuning, as in Sentence-BERT.
+- <strong>Token classification</strong> &mdash; named entities, part of speech, where bidirectional context genuinely helps.
+- <strong>Sentence classification</strong> &mdash; sentiment, intent, topic, via the `[CLS]` position or pooled states.
+- <strong>Span extraction</strong> &mdash; extractive question answering, predicting start and end positions.
+
+For all of these, an encoder fine-tuned on a few thousand labelled examples is often as accurate as prompting a much larger model, and orders of magnitude cheaper to run. A DistilBERT classifier answers in milliseconds on a CPU.
+
 ## Exploration guide
 
 1. <strong>Mask a single strongly-constrained token</strong> such as <span class="mono-font">mat</span>. The top candidate should dominate &mdash; the surrounding words leave little freedom.
@@ -35,3 +84,84 @@ Predictions come from a small context-scoring model built live in your browser f
 ## In one line
 
 MLM turns any raw text into supervised training data by deleting parts of it. Because the blank is surrounded rather than trailing, the model learns deep bidirectional understanding &mdash; ideal for classification, retrieval and question answering, and unsuitable for generation. That generative job belongs to causal models, which predict strictly forward.
+
+## The variants that improved on BERT
+
+|Model|What changed|
+|---|---|
+|RoBERTa|More data, longer training, dynamic masking, no next-sentence prediction|
+|ALBERT|Parameter sharing across layers, factorised embeddings|
+|DeBERTa|Disentangled attention for content and position|
+|ELECTRA|Replaced-token detection instead of masking|
+|DistilBERT|Distilled from BERT: 40% smaller, 60% faster, ~97% of the quality|
+
+<strong>RoBERTa</strong> is the instructive one. Same architecture, same objective, and substantially better results &mdash; from training longer on more data with larger batches, masking dynamically (a different mask each epoch rather than one fixed at preprocessing), and dropping BERT's next-sentence-prediction objective, which turned out to be unhelpful.
+
+That is a useful general lesson: BERT's original recipe was not optimal, and a large part of the subsequent improvement came from training procedure rather than architecture.
+
+<strong>Next-sentence prediction</strong> asked whether two segments were adjacent in the original text. It was intended to teach discourse relationships and mostly taught topic matching, which the masked objective already provided.
+
+## Masked versus causal, in practice
+
+The split looked permanent for several years &mdash; encoders for understanding, decoders for generation. What changed is scale: a large decoder, prompted appropriately, does classification and extraction well enough that the bidirectional advantage stopped being decisive for most applications.
+
+So current practice is roughly:
+
+|Need|Reach for|
+|---|---|
+|Embeddings for search or clustering|A masked-pretrained encoder, contrastively fine-tuned|
+|Cheap high-volume classification|A fine-tuned small encoder|
+|Token-level labelling|An encoder|
+|Generation of any kind|A decoder|
+|Zero-shot or few-shot on an unknown task|A decoder|
+|Lowest possible inference cost|An encoder|
+
+The rows favouring encoders share a shape: a <em>fixed</em> task with labelled data and a cost or latency constraint. That describes a great many production systems, which is why BERT-family models remain very widely deployed despite receiving far less attention.
+
+## Practical notes
+
+```python
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+import torch
+
+tok = AutoTokenizer.from_pretrained("bert-base-uncased")
+model = AutoModelForMaskedLM.from_pretrained("bert-base-uncased")
+
+text = "The capital of France is [MASK]."
+ids = tok(text, return_tensors="pt")
+logits = model(**ids).logits
+
+pos = (ids.input_ids[0] == tok.mask_token_id).nonzero(as_tuple=True)[0]
+top = logits[0, pos].topk(5).indices[0]
+print(tok.convert_ids_to_tokens(top))     # ['paris', 'lyon', 'marseille', ...]
+```
+
+Three things worth knowing when fine-tuning one:
+
+<strong>Continued pretraining helps on specialised domains.</strong> Running the masked objective on your own unlabelled corpus before supervised fine-tuning often gives a measurable gain, and needs no labels.
+
+<strong>The `[CLS]` representation is not a good sentence embedding</strong> out of the box &mdash; it was not trained for similarity. Use a model fine-tuned contrastively, or masked mean pooling.
+
+<strong>512 tokens is the usual limit.</strong> Longer documents need chunking, or a long-context variant such as Longformer.
+
+## Questions people ask
+
+<strong>Why can BERT not generate text?</strong> It has no notion of "next" &mdash; its objective assumes surrounding context exists. Iterative mask-filling works poorly.
+
+<strong>Is masked language modelling obsolete?</strong> Not for embeddings and cheap classification, where encoders remain the practical choice. For general-purpose models, causal pretraining dominates.
+
+<strong>Why the 80/10/10 split?</strong> Because `[MASK]` does not exist at fine-tuning time; the random and unchanged cases prevent the model relying on the token's presence.
+
+<strong>Should I continue pretraining on my domain?</strong> If you have a substantial unlabelled domain corpus, usually yes &mdash; it is cheap and often helps.
+
+<strong>What is `[CLS]` for?</strong> A position whose final representation is used as a sequence summary for classification.
+
+<strong>Can I use a decoder for embeddings?</strong> Yes, by pooling hidden states, and purpose-trained embedding models generally do better because they are trained with a similarity objective.
+
+## Recap in one screen
+
+- Hide about 15% of tokens and predict them from both directions; the representations are the real product.
+- The 80/10/10 masking split exists because `[MASK]` never appears at fine-tuning time.
+- Bidirectional context is why encoders excel at understanding and cannot generate.
+- Causal modelling trains on every position per pass, which is a large efficiency advantage at scale.
+- Encoders remain the right tool for embeddings, token labelling and cheap high-volume classification.

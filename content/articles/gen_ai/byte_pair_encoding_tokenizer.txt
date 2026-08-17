@@ -23,6 +23,63 @@ The merge list is <strong>ordered</strong>, and that order matters at encoding t
 
 Notice that the earliest merges are almost always extremely common fragments (<span class="mono-font">e</span>+<span class="mono-font">s</span>, <span class="mono-font">t</span>+<span class="mono-font">h</span>), while later merges assemble whole frequent words. The vocabulary discovers morphology &mdash; prefixes, suffixes, stems &mdash; without ever being told that such things exist.
 
+## Building a vocabulary by merging
+
+Byte-pair encoding starts from individual characters and repeatedly merges the most frequent adjacent pair, recording each merge as a new vocabulary entry.
+
+Worked through on a tiny corpus &mdash; the words "low", "lower", "newest", "widest", with the counts they appear:
+
+1. Start with characters: `l o w e r n s t i d`
+2. The most frequent adjacent pair is `e` + `s` &rarr; merge into `es`
+3. Next most frequent: `es` + `t` &rarr; `est`
+4. Next: `l` + `o` &rarr; `lo`
+5. Next: `lo` + `w` &rarr; `low`
+
+Continue until the vocabulary reaches the target size &mdash; 30,000 or 100,000 entries in practice. The merges are recorded in order, and applying them in that same order is how new text is tokenised.
+
+The outcome is a vocabulary that spends its budget where the text actually is. Frequent words become single tokens; rare words remain as fragments; and because the individual characters (or bytes) are always in the vocabulary, <strong>nothing is ever unrepresentable</strong>.
+
+That last property is why the `<UNK>` token has essentially disappeared from modern models.
+
+## What it produces on real text
+
+```python
+from transformers import AutoTokenizer
+tok = AutoTokenizer.from_pretrained("gpt2")
+
+tok.tokenize("tokenization")        # ['token', 'ization']
+tok.tokenize("Tokenization")        # ['Token', 'ization']  -- case matters
+tok.tokenize("antidisestablishmentarianism")
+# ['ant', 'id', 'ises', 't', 'ablish', 'ment', 'arian', 'ism']
+tok.tokenize(" hello")              # ['Ġhello']  -- Ġ marks a leading space
+```
+
+Three observations from those lines.
+
+<strong>Common words are single tokens</strong>; long or rare ones fragment into pieces that were frequent in the training corpus.
+
+<strong>Leading spaces are part of the token.</strong> GPT-style tokenisers treat " hello" and "hello" as different tokens, which is why a prompt ending in a space can change the output noticeably.
+
+<strong>Case matters.</strong> "Token" and "token" are different entries, so capitalisation consumes vocabulary and affects tokenisation.
+
+## Byte-level BPE, and why it matters
+
+Plain BPE over characters has a gap: a character never seen in training cannot be represented. With Unicode's 149,000+ code points, that gap is real.
+
+<strong>Byte-level BPE</strong> operates on UTF-8 <em>bytes</em> rather than characters. There are only 256 possible bytes, all of which are in the base vocabulary, so <em>any</em> text in any script &mdash; plus emoji, plus binary noise &mdash; is representable.
+
+The cost is efficiency for non-Latin scripts. A Chinese character is three UTF-8 bytes, so it costs at least one token and often more; the same sentence in Chinese and in English can differ severalfold in token count.
+
+|Text|Approximate tokens|
+|---|---|
+|English prose|~1.3 per word|
+|Code|~2 per word, more with symbols|
+|Chinese / Japanese|~1 per character|
+|Cyrillic, Arabic|~2&ndash;3 per word|
+|Emoji|1&ndash;4 each|
+
+That table is a real cost and latency difference when calling an API, and it is why multilingual models often use larger vocabularies to compensate.
+
 ## Experiments to try
 
 1. <strong>Set merges to 0.</strong> Every word shatters into individual characters &mdash; the tokens-per-word figure is at its worst.
@@ -34,3 +91,54 @@ Notice that the earliest merges are almost always extremely common fragments (<s
 ## Where that leaves you
 
 BPE is a compression algorithm repurposed as a vocabulary builder: merge what is frequent, leave the rest in pieces. This lab runs the genuine training loop on whatever corpus you paste in &mdash; the merge table you see is the actual product of counting pairs, not a stored example. Real tokenizers add byte-level fallbacks and pre-tokenization rules, but the core loop is exactly this.
+
+## The variants
+
+|Algorithm|Merge criterion|Used by|
+|---|---|---|
+|BPE|Most frequent adjacent pair|GPT-2, GPT-3, Llama|
+|WordPiece|Pair that most increases corpus likelihood|BERT, DistilBERT|
+|Unigram|Start large, prune the least useful tokens|T5, XLNet, mBART|
+|SentencePiece|A wrapper implementing BPE or Unigram on raw text|T5, Llama, many multilingual models|
+
+<strong>WordPiece</strong> differs from BPE only in the merge criterion: rather than raw frequency, it picks the merge that most improves the likelihood of the corpus under a unigram model. In practice the vocabularies are similar. It marks continuations with `##` &mdash; "token", "##ization".
+
+<strong>Unigram</strong> works backwards: begin with a large candidate vocabulary and iteratively remove the tokens whose loss hurts least. It can produce several valid segmentations of the same word with probabilities, which enables subword regularisation during training.
+
+<strong>SentencePiece</strong> is worth understanding as a different kind of thing &mdash; not an algorithm but an implementation that treats input as a raw byte stream with no pre-tokenisation on whitespace. That matters for languages that do not separate words with spaces, and it makes detokenisation exactly reversible.
+
+## What tokenisation decides for the model
+
+Several well-known model behaviours trace directly back to this step.
+
+<strong>Poor spelling and character counting.</strong> "strawberry" may be two or three tokens, none of which is a letter. Asking how many r's it contains asks the model to reason about something it cannot see.
+
+<strong>Inconsistent arithmetic.</strong> "1234" might be one token or several depending on the tokeniser and the surrounding text, so digits are not consistently represented. Some newer models tokenise digits individually to improve this.
+
+<strong>Context limits in tokens, not words.</strong> A 128,000-token window is roughly 96,000 English words, and far fewer for code or other scripts.
+
+<strong>Sensitivity to trailing spaces.</strong> Because the space is part of the token, a prompt ending with a space tokenises differently from one that does not.
+
+<strong>The tokeniser must ship with the model.</strong> Token id 1,547 means one thing in one vocabulary and something else in another. A mismatch produces fluent nonsense rather than an error.
+
+## Questions people ask
+
+<strong>How large should the vocabulary be?</strong> 30,000&ndash;50,000 for a single language; 100,000&ndash;250,000 for multilingual models. Larger means shorter sequences and a bigger embedding table.
+
+<strong>Can I train my own tokeniser?</strong> Yes, with `tokenizers` or SentencePiece &mdash; worth it for a specialised domain or language, and it means the model must be trained or substantially adapted with it.
+
+<strong>Why does my word split oddly?</strong> Because those fragments were the frequent merges in the training corpus. It looks arbitrary and is entirely determined by corpus statistics.
+
+<strong>Is BPE reversible?</strong> Yes &mdash; concatenating the tokens reconstructs the original text exactly, which is why byte-level variants are careful about spaces.
+
+<strong>Do I need to lowercase first?</strong> No, for a cased tokeniser. It was trained on cased text and lowercasing loses information.
+
+<strong>How do I count tokens before an API call?</strong> With the model's own tokeniser &mdash; `tiktoken` for OpenAI models, the `transformers` tokeniser otherwise. Estimating from word count is unreliable.
+
+## Recap in one screen
+
+- BPE starts from characters and repeatedly merges the most frequent adjacent pair until the vocabulary is full.
+- Frequent words become single tokens; rare ones fragment; characters remain as a fallback, so nothing is unknown.
+- Byte-level BPE works on UTF-8 bytes, so any text is representable &mdash; at more tokens for non-Latin scripts.
+- WordPiece, Unigram and SentencePiece are variations on the same idea with different merge or pruning criteria.
+- Tokenisation explains poor spelling, inconsistent arithmetic, token-based context limits and trailing-space sensitivity.

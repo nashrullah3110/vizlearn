@@ -11,6 +11,52 @@ score(D,Q) = &Sigma;<sub>t&isin;Q</sub> IDF(t) &middot; f(t,D)(k1+1) / (f(t,D) +
 
 Three ideas, one formula. <strong>IDF(t)</strong> — a term that appears in fewer documents is more informative, so it is weighted higher. <strong>f(t,D)</strong> — more occurrences of a query term help, but with diminishing returns, controlled by <strong>k1</strong>. <strong>|D|/avgdl</strong> — a document's raw term count is normalised against its own length, controlled by <strong>b</strong>, so a long document does not win purely by containing more words.
 
+## Scoring by term overlap, carefully
+
+BM25 is the keyword retrieval function that most search engines are built on. It scores a document against a query by adding up a contribution per matching term:
+
+<p class="mono-font">score(d, q) = &Sigma;<sub>t &isin; q</sub> IDF(t) &times; (f(t,d) &times; (k&#8321;+1)) / (f(t,d) + k&#8321; &times; (1 &minus; b + b &times; |d|/avgdl))</p>
+
+That looks worse than it is. Three ideas are encoded in it, and each fixes a specific defect of naive term counting.
+
+<strong>Rare terms count more (IDF).</strong> A match on "encephalopathy" is far more informative than a match on "the". The inverse document frequency term weights each match by how rare the term is across the collection.
+
+<strong>Repetition saturates.</strong> A document mentioning a term twenty times is not twenty times more relevant than one mentioning it once. The `k₁` parameter controls how quickly the contribution flattens &mdash; typically around 1.2, which means the third and fourth occurrences add much less than the first.
+
+<strong>Long documents are penalised.</strong> A 10,000-word document will contain most query terms by chance. Dividing by document length relative to the average corrects for it, with `b` (typically 0.75) controlling how strongly.
+
+Those three corrections are the entire difference between BM25 and TF-IDF, and they are why BM25 has been the standard for thirty years.
+
+## Where it beats embeddings
+
+Sparse retrieval matches tokens, which is exactly what embeddings are bad at:
+
+|Query|BM25|Dense|
+|---|---|---|
+|"error code E4471"|Exact match|Blurs into other error codes|
+|"section 12.3(b)"|Exact match|Approximate|
+|"Nakamura et al 2019"|Exact match|Similar-looking citations|
+|"holiday allowance"|Misses "annual leave"|Finds it|
+|"cheapest shipping"|Misses "lowest-cost delivery"|Finds it|
+
+The pattern: <strong>identifiers, names, codes and rare technical terms belong to BM25; paraphrase belongs to embeddings.</strong> Their failures do not overlap, which is the argument for using both.
+
+Three further advantages that matter operationally. BM25 needs no model, no GPU and no embedding step, so indexing is fast and cheap. It handles a brand-new term the moment it is indexed, where an embedding model has never seen it. And it is transparent &mdash; you can explain exactly why a document scored highly, which matters for debugging and for audit.
+
+## Building an index
+
+Sparse retrieval is an inverted index: for each term, the list of documents containing it and their term frequencies. A query touches only the lists for its own terms, which is why it is fast even over very large collections.
+
+Preprocessing matters more here than for dense retrieval, because matching is literal:
+
+- <strong>Lowercase</strong>, so "Password" matches "password".
+- <strong>Tokenise</strong> consistently between indexing and querying &mdash; a mismatch means nothing matches.
+- <strong>Remove stop words,</strong> or accept that IDF already suppresses them.
+- <strong>Stem or lemmatise</strong> so "running" matches "run". Apply the same treatment to the query.
+- <strong>Keep identifiers intact.</strong> A tokeniser that splits "E4471" into "E" and "4471" has destroyed the thing BM25 was best at.
+
+That last point is the one that goes wrong most often in practice, and it is worth testing explicitly with a few known identifiers.
+
 ## Things to try
 
 1. <strong>Read the default ranking.</strong> D2 leads — it repeats "list" four times and mentions every query term at least twice, and that repetition still wins even after the default length normalization is applied.
@@ -26,3 +72,51 @@ BM25 gets exact terms right where embeddings can blur them — product codes, er
 ## What to remember
 
 BM25 scores a document by summing, over each query term it contains, that term's rarity across the corpus times a saturating function of how often it appears, normalised by document length. b controls how much long documents are penalised for being long; k1 controls how much repeated terms are rewarded before diminishing returns kick in. No embeddings, no training — and still the metric most search engines reach for first.
+
+## In code
+
+```python
+from rank_bm25 import BM25Okapi
+
+corpus = [doc.lower().split() for doc in documents]     # consistent tokenising
+bm25 = BM25Okapi(corpus, k1=1.5, b=0.75)
+
+scores = bm25.get_scores("annual leave policy".lower().split())
+top = sorted(range(len(scores)), key=lambda i: -scores[i])[:10]
+```
+
+For anything beyond a prototype, use a real search engine &mdash; Elasticsearch, OpenSearch, Lucene, Tantivy or a vector database with built-in sparse support. They provide the inverted index, incremental updates, filtering, and analysers that handle identifiers and multiple languages properly.
+
+Parameter guidance: `k₁` between 1.2 and 2.0, `b` around 0.75. Neither is sensitive, and the defaults are almost always fine. Effort spent on tokenisation and analysers pays far better than tuning these.
+
+## Learned sparse retrieval
+
+A newer family keeps the inverted-index machinery and learns the weights.
+
+<strong>SPLADE</strong> uses a transformer to predict, for each document, a sparse weight over the whole vocabulary &mdash; including terms that do not literally appear. A document about "annual leave" can be given weight on "holiday", so the sparse index gains some semantic matching.
+
+The result sits between the two worlds: it retains the exact-match strength and index efficiency of sparse retrieval while handling some paraphrase. The cost is a model pass per document at indexing time, and larger posting lists.
+
+Whether it beats BM25-plus-dense-hybrid depends on the corpus, and it is worth evaluating rather than assuming.
+
+## Questions people ask
+
+<strong>Is BM25 outdated?</strong> No. It remains a strong baseline that dense retrieval alone often fails to beat, particularly on technical corpora.
+
+<strong>Do I need both BM25 and embeddings?</strong> For most real corpora, yes &mdash; hybrid retrieval is the standard recommendation and usually the largest single quality gain.
+
+<strong>What is the difference from TF-IDF?</strong> Term-frequency saturation and document-length normalisation. Both matter, and both make BM25 better.
+
+<strong>Should I remove stop words?</strong> IDF already suppresses them, so it is optional. Removing them shrinks the index.
+
+<strong>Does it work for other languages?</strong> Yes, with appropriate tokenisation and stemming. Languages without whitespace word boundaries need a proper analyser.
+
+<strong>How do I combine it with dense scores?</strong> Reciprocal rank fusion, which uses ranks only and needs no score normalisation.
+
+## Recap in one screen
+
+- BM25 scores term overlap with three corrections: rare terms count more, repetition saturates, long documents are penalised.
+- It excels at identifiers, codes, names and rare terms &mdash; exactly where embeddings blur.
+- It needs no model or GPU, indexes instantly, and is fully explainable.
+- Tokenisation must match between index and query, and must not split identifiers.
+- Combine with dense retrieval via reciprocal rank fusion; learned sparse models such as SPLADE blur the boundary.
