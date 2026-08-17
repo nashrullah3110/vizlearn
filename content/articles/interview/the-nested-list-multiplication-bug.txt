@@ -1,6 +1,105 @@
 title: Why does [[0]*3]*3 break?
 intro: What does [[0] * 3] * 3 create, and why does writing to one row change all of them?
 
+## The bug
+
+```python
+grid = [[0] * 3] * 3
+grid[0][0] = 1
+
+grid        # [[1, 0, 0], [1, 0, 0], [1, 0, 0]]
+```
+
+One assignment changed all three rows. The reason is that `* 3` on a list <strong>copies references, not objects</strong> &mdash; so `grid` holds three pointers to the <em>same</em> inner list.
+
+```python
+grid = [[0] * 3] * 3
+grid[0] is grid[1]        # True -- the same object
+id(grid[0]) == id(grid[1])  # True
+```
+
+The inner `[0] * 3` is fine, because integers are immutable &mdash; there is nothing to share dangerously. The outer `* 3` is the problem, because a list is mutable and now has three names.
+
+## The fix
+
+```python
+grid = [[0] * 3 for _ in range(3)]      # a fresh list per row
+grid[0][0] = 1
+grid        # [[1, 0, 0], [0, 0, 0], [0, 0, 0]]
+```
+
+The comprehension <em>evaluates</em> `[0] * 3` on every iteration, so each row is a distinct object.
+
+|Expression|Rows are|Safe to mutate|
+|---|---|---|
+|`[[0] * 3] * 3`|The same object|<strong>No</strong>|
+|`[[0] * 3 for _ in range(3)]`|Distinct|Yes|
+|`[[0, 0, 0] for _ in range(3)]`|Distinct|Yes|
+|`[list(row) for row in template]`|Distinct copies|Yes|
+|`copy.deepcopy(template)`|Fully independent|Yes|
+|`[[0] * 3] * 3` of immutables only|Shared, unobservably|Read-only|
+
+The last row is why the bug is subtle: sharing immutable objects is harmless and invisible. `[0] * 1000` shares one integer object a thousand times and nothing can go wrong, because integers cannot be modified in place. The trouble begins only when the repeated element is mutable.
+
+## The same mistake, other costumes
+
+<strong>Mutable default arguments</strong> &mdash; the most consequential version, because the sharing spans calls:
+
+```python
+def add(item, target=[]):        # created ONCE, at definition
+    target.append(item)
+    return target
+
+add(1)     # [1]
+add(2)     # [1, 2]  -- the same list, still there
+```
+
+```python
+def add(item, target=None):      # the fix
+    if target is None:
+        target = []
+    target.append(item)
+    return target
+```
+
+<strong>Class attributes</strong> &mdash; sharing across instances:
+
+```python
+class Basket:
+    items = []                   # ONE list for the whole class
+
+a, b = Basket(), Basket()
+a.items.append("apple")
+b.items                          # ['apple']  -- shared
+```
+
+```python
+class Basket:
+    def __init__(self):
+        self.items = []          # per instance
+```
+
+<strong>`dict.fromkeys` with a mutable default:</strong>
+
+```python
+d = dict.fromkeys(["a", "b"], [])
+d["a"].append(1)
+d                                 # {'a': [1], 'b': [1]}
+
+d = {k: [] for k in ["a", "b"]}  # the fix
+```
+
+<strong>Shallow copies of nested structures:</strong>
+
+```python
+original = [[1, 2], [3, 4]]
+shallow = original[:]            # or list(original), or copy.copy
+shallow[0].append(99)
+original                         # [[1, 2, 99], [3, 4]]  -- inner lists shared
+```
+
+All four are the same rule: <strong>Python assigns and copies references. A copy of a container duplicates the pointers, not the objects behind them.</strong>
+
 ## What multiplication actually does
 
 <p><code>[x] * 3</code> builds a list holding the same reference three times. For immutable contents that is invisible &mdash; <code>[0] * 3</code> is fine, because you can never mutate a <code>0</code>. For a mutable inner object it is a trap, because all three names lead to one object.</p>
@@ -18,3 +117,71 @@ This is one instance of a general rule: assignment and shallow copies duplicate 
 Any <code>* n</code> where the repeated element is a list, a dict, a set or a custom object is suspicious. The same rule explains the mutable default argument bug: <code>def f(acc=[])</code> creates the list once, when the function is <em>defined</em>, and every call that omits the argument shares it.
 
 The fix in both cases is the same &mdash; build the mutable thing at the moment it is needed rather than once, up front.
+
+## Copy semantics, precisely
+
+|Operation|Copies|Nested objects|
+|---|---|---|
+|`b = a`|Nothing &mdash; a second name|Shared|
+|`a[:]`, `list(a)`, `copy.copy(a)`|The outer container|<strong>Shared</strong>|
+|`copy.deepcopy(a)`|Everything, recursively|Independent|
+|`[f(x) for x in a]`|Per-element result|Depends on `f`|
+
+`deepcopy` is the correct tool when independence is required at every level, and it is not free: it walks the whole structure, tracks already-copied objects to handle cycles, and can be surprisingly slow on large graphs. For a list of lists, `[list(row) for row in grid]` is faster and clearer.
+
+For grids specifically, <strong>NumPy sidesteps the question</strong>:
+
+```python
+import numpy as np
+grid = np.zeros((3, 3), dtype=int)
+grid[0, 0] = 1                        # no aliasing: one contiguous buffer
+```
+
+Note that NumPy has its own version of the distinction &mdash; <strong>slices are views, not copies</strong>:
+
+```python
+a = np.arange(6)
+b = a[2:4]
+b[0] = 99
+a            # array([ 0,  1, 99,  3,  4,  5])  -- a changed too
+c = a[2:4].copy()                      # explicit copy when needed
+```
+
+The lesson generalises: whenever a library offers cheap slicing, ask whether you received a view or a copy.
+
+## How to detect it
+
+<strong>`is` and `id`</strong> answer the question directly:
+
+```python
+grid[0] is grid[1]              # True means shared
+len({id(row) for row in grid})  # 1 means every row is the same object
+```
+
+<strong>Mutate one element and look</strong> &mdash; the fastest check during debugging. Set `grid[0][0] = 1` and print the whole structure.
+
+<strong>Watch for `*` on a list of mutables,</strong> and for any default argument or class attribute that is a list, dict or set. Linters flag mutable defaults (`B006` in flake8-bugbear, `W0102` in pylint), and enabling that rule catches the most damaging variant automatically.
+
+## Questions people ask
+
+<strong>Why does `[0] * 3` work fine?</strong> Integers are immutable, so sharing them is unobservable.
+
+<strong>Is `*` ever right for nested lists?</strong> Only if you never mutate the inner lists &mdash; and then a tuple of tuples states the intent better.
+
+<strong>Why does the comprehension fix it?</strong> The expression is re-evaluated per iteration, creating a new object each time.
+
+<strong>Does this affect tuples?</strong> `((0,) * 3,) * 3` is safe, because nothing can be mutated. A tuple containing a list has the same problem.
+
+<strong>When do I need `deepcopy`?</strong> When nesting is arbitrarily deep or unknown. For a known two-level structure, a comprehension is faster.
+
+<strong>Is `list(a)` a deep copy?</strong> No. Shallow &mdash; inner objects stay shared.
+
+<strong>Why is a mutable default evaluated once?</strong> Default arguments are evaluated at function definition, and stored on the function object.
+
+## Recap in one screen
+
+- `[[0] * 3] * 3` creates three references to one inner list, so mutating one row changes all of them.
+- Use `[[0] * 3 for _ in range(3)]` &mdash; the comprehension builds a fresh object per row.
+- The same rule causes mutable default arguments, shared class attributes, and `dict.fromkeys` with a list.
+- Slicing and `list()` are shallow copies; `deepcopy` is the recursive one, and it is slow.
+- Test for aliasing with `grid[0] is grid[1]`, and let a linter catch mutable defaults for you.

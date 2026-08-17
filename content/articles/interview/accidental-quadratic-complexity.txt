@@ -1,6 +1,108 @@
 title: What is the complexity of this code?
 intro: Here is a loop. What is its complexity? (The four traps interviewers actually use.)
 
+## The pattern
+
+Quadratic code rarely looks quadratic. There is no visible nested loop &mdash; instead, an O(n) operation hides inside an O(n) loop, and the cost multiplies.
+
+The reason it survives review and testing is scale. A thousand items finish in milliseconds; a hundred thousand takes minutes. The bug ships because the test data was small.
+
+|n|O(n) work|O(n&sup2;) work|
+|---|---|---|
+|1,000|1 thousand|1 million &mdash; still instant|
+|10,000|10 thousand|100 million &mdash; noticeable|
+|100,000|100 thousand|10 billion &mdash; minutes|
+|1,000,000|1 million|10<sup>12</sup> &mdash; hours|
+
+The skill being tested is <strong>knowing which innocent-looking operations are O(n)</strong>, so you can spot them inside a loop.
+
+## The five that account for most of it
+
+<strong>1. Membership testing against a list.</strong>
+
+```python
+# O(n^2): `in` on a list scans it
+seen = []
+for item in items:
+    if item not in seen:        # O(n) scan, every iteration
+        seen.append(item)
+
+# O(n): `in` on a set hashes
+seen = set()
+for item in items:
+    if item not in seen:        # O(1)
+        seen.add(item)
+```
+
+This is the most common instance by a wide margin, and the fix is one word.
+
+<strong>2. String concatenation in a loop.</strong>
+
+```python
+# O(n^2): each += builds a whole new string
+out = ""
+for word in words:
+    out += word
+
+# O(n): one allocation at the end
+out = "".join(words)
+```
+
+<strong>3. `list.pop(0)` or `insert(0, x)`.</strong>
+
+```python
+# O(n^2): every element shifts on each pop
+while queue:
+    item = queue.pop(0)
+
+# O(n): a deque pops from the left in O(1)
+from collections import deque
+queue = deque(queue)
+while queue:
+    item = queue.popleft()
+```
+
+<strong>4. Repeated `min`, `max`, `sum` or `len` on a growing structure.</strong>
+
+```python
+# O(n^2): max rescans everything each time
+for x in data:
+    running.append(x)
+    print(max(running))
+
+# O(n): track it incrementally
+best = float("-inf")
+for x in data:
+    best = max(best, x)
+    print(best)
+```
+
+<strong>5. Slicing inside a loop or recursion.</strong>
+
+```python
+# O(n^2): each slice copies the remainder
+while s:
+    process(s[0])
+    s = s[1:]
+
+# O(n): move an index
+for i in range(len(s)):
+    process(s[i])
+```
+
+|Operation|Cost|The O(1) or O(n) alternative|
+|---|---|---|
+|`x in list`|O(n)|`x in set` or `x in dict`|
+|`s += x` in a loop|O(n)|`"".join(parts)`|
+|`lst.pop(0)`|O(n)|`deque.popleft()`|
+|`lst.insert(0, x)`|O(n)|`deque.appendleft()`|
+|`lst.remove(x)`|O(n)|Set, or mark as deleted|
+|`max(lst)` repeatedly|O(n)|Running maximum, or a heap|
+|`s[1:]` repeatedly|O(n)|Index arithmetic|
+|`del lst[0]`|O(n)|`deque`|
+|`lst.index(x)`|O(n)|Dict from value to index|
+|`sorted()` inside a loop|O(n log n)|Sort once outside|
+
 ## The four shapes
 
 <p><strong>1. <code>x in a_list</code> inside a loop.</strong> The membership test is O(n). Fix: build a <code>set</code> once, before the loop.</p>
@@ -22,3 +124,88 @@ The habit worth building is to read the cost of a line rather than its appearanc
 Name the shape, give the complexity, and give the fix in one sentence: <em>"the membership test is a linear scan, so it's O(n&sup2;) &mdash; build a set before the loop and it's O(n)"</em>. Do not hedge; these have definite answers.
 
 If asked to prove it, double the input and show the time going up fourfold. That is what the program below does for all four.
+
+## The ones that hide better
+
+<strong>Dictionary key ordering.</strong> Nothing wrong here, and it is easy to write the list version by habit:
+
+```python
+# O(n^2)
+for key in data:
+    if key not in list(seen.keys()):   # list() then a linear scan
+        ...
+
+# O(n)
+for key in data:
+    if key not in seen:                 # dict membership is O(1)
+        ...
+```
+
+<strong>Nested comprehensions over the same data.</strong>
+
+```python
+# O(n^2): the inner comprehension runs per outer element
+dupes = [x for x in items if items.count(x) > 1]
+
+# O(n): count once
+from collections import Counter
+counts = Counter(items)
+dupes = [x for x in items if counts[x] > 1]
+```
+
+`list.count` inside a loop is the same mistake as `in`, and it reads even more innocently.
+
+<strong>Pandas row-by-row growth.</strong>
+
+```python
+# O(n^2): each concat copies the whole frame
+df = pd.DataFrame()
+for row in rows:
+    df = pd.concat([df, pd.DataFrame([row])])
+
+# O(n): build a list, construct once
+df = pd.DataFrame(rows)
+```
+
+<strong>Database queries in a loop</strong> &mdash; the N+1 problem. Not quadratic in CPU, and the same shape: n round trips where one query would do. `SELECT ... WHERE id IN (...)` or an ORM `join`/`prefetch` replaces it, and the win is often larger than any algorithmic fix, because each round trip costs milliseconds.
+
+<strong>Re-reading a file inside a loop</strong>, and re-compiling a regular expression per iteration. `re.compile` outside the loop, or rely on the module's internal cache.
+
+## How to find it
+
+<strong>Test with big input.</strong> The fastest diagnostic there is: run with 1,000 and then 10,000 items. Linear code takes 10&times; longer; quadratic code takes 100&times;. That ratio identifies the class of the bug before any profiling.
+
+<strong>Profile.</strong>
+
+```python
+import cProfile
+cProfile.run("main()", sort="cumtime")
+```
+
+Look for a line whose call count scales with n² rather than n &mdash; `ncalls` is often more revealing than the time column.
+
+<strong>`timeit` for micro-comparisons</strong> when deciding between two formulations.
+
+<strong>Read every loop and ask what each line costs.</strong> The habit worth building: when scanning a loop body, mentally annotate each operation as O(1) or O(n). Anything O(n) inside an O(n) loop is the bug.
+
+<strong>Know your data structures.</strong> Most of these fixes are the same fix &mdash; swap a list for a set or dict when the question is "is this present", and swap a list for a deque when the question is "what is at the front".
+
+## What it is testing
+
+<strong>Can you spot O(n) operations that look constant?</strong> `in`, `count`, `index`, `pop(0)`, slicing, and string `+=`.
+
+<strong>Do you reach for the right structure?</strong> Set for membership, dict for lookup, deque for both-ends access, `Counter` for frequencies.
+
+<strong>Do you know why `+=` on strings is quadratic?</strong> Immutability &mdash; each concatenation allocates and copies.
+
+<strong>Can you diagnose it empirically?</strong> The 10&times;-input test distinguishes linear from quadratic in seconds.
+
+<strong>Do you avoid premature optimisation?</strong> Quadratic behaviour on a ten-element list is not worth fixing. Knowing when it matters is part of the answer.
+
+## Recap in one screen
+
+- Quadratic code usually has no nested loop &mdash; it has an O(n) operation inside an O(n) loop.
+- The frequent offenders: `in` on a list, `+=` on strings, `pop(0)`, `count`, repeated `max`, and slicing.
+- The fixes are almost always a data-structure swap: set, dict, deque, or `Counter`.
+- Test with 1,000 then 10,000 items: 10&times; slower is linear, 100&times; is quadratic.
+- The same shape appears as N+1 database queries, where the cost is round trips rather than CPU.
