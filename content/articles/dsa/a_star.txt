@@ -31,6 +31,71 @@ Overestimate, and that breaks. An inflated h can make the true best route look w
 
 Note that Manhattan is <em>not</em> admissible if diagonal movement is allowed, because the diagonal route is shorter than |dx| + |dy|. That mismatch is the most common way people accidentally break optimality.
 
+## Dijkstra, pointed at the goal
+
+Dijkstra's algorithm expands outwards in all directions, treating every unexplored node as equally worth visiting. On a map, searching from London for a route to Manchester, it spends effort exploring towards Cornwall.
+
+A* fixes that with one change to the priority:
+
+<p class="mono-font">f(n) = g(n) + h(n)</p>
+
+`g(n)` is the known cost from the start &mdash; exactly what Dijkstra uses. `h(n)` is a <strong>heuristic estimate</strong> of the remaining cost to the goal. Prioritising by their sum focuses the search along promising directions.
+
+```python
+import heapq
+
+def a_star(start, goal, neighbours, cost, h):
+    g = {start: 0}
+    prev = {start: None}
+    pq = [(h(start), start)]
+
+    while pq:
+        _, node = heapq.heappop(pq)
+        if node == goal:
+            break
+        for nxt in neighbours(node):
+            ng = g[node] + cost(node, nxt)
+            if ng < g.get(nxt, float("inf")):
+                g[nxt] = ng
+                prev[nxt] = node
+                heapq.heappush(pq, (ng + h(nxt), nxt))   # g + h
+    return reconstruct(prev, goal)
+```
+
+The only difference from Dijkstra is `ng + h(nxt)` where Dijkstra pushes `ng`. With `h = 0`, A* <em>is</em> Dijkstra.
+
+## Admissibility: the condition for correctness
+
+A* returns the optimal path if the heuristic is <strong>admissible</strong> &mdash; it never overestimates the true remaining cost.
+
+The reasoning: if h underestimates, then `f(n) = g(n) + h(n)` is a lower bound on the true cost of any path through n. So when the goal is popped with the smallest f, no unexplored path can be shorter, and the path found is optimal.
+
+If h <em>over</em>estimates, A* may pop the goal while a better path is still queued, and it returns a suboptimal route quickly. Sometimes that is an acceptable trade &mdash; deliberately inflating h ("weighted A*") gives faster, slightly worse paths, and games use it routinely.
+
+|Heuristic|Admissible for|
+|---|---|
+|0|Anything &mdash; this is Dijkstra|
+|Straight-line (Euclidean) distance|Movement in any direction|
+|Manhattan distance|Grid movement, 4 directions only|
+|Diagonal (Chebyshev) distance|Grid movement, 8 directions|
+|Actual remaining cost|Perfect &mdash; explores only the optimal path|
+
+A stronger property, <strong>consistency</strong> (or monotonicity), means h never decreases by more than the edge cost along any edge. A consistent heuristic guarantees each node is finalised once, so no node needs reopening &mdash; which is why standard implementations can use a closed set safely.
+
+## Choosing the heuristic is the whole design
+
+The heuristic decides how much better than Dijkstra A* is, and getting it wrong is the usual failure.
+
+<strong>Too weak</strong> (close to 0) and A* degenerates towards Dijkstra, exploring almost everything.
+
+<strong>Not admissible</strong> and the result is suboptimal. The classic mistake on a 4-directional grid is using Euclidean distance: it underestimates correctly, so it is admissible &mdash; but Manhattan distance is a <em>tighter</em> underestimate and therefore explores far less. Conversely, using Manhattan distance when diagonal movement is allowed <em>over</em>estimates and breaks optimality.
+
+<strong>Too expensive to compute</strong> and the per-node saving is lost. h is evaluated for every node examined.
+
+The practical rule: <strong>use the tightest admissible estimate that is cheap to compute</strong>, and match it to the actual movement rules.
+
+For road networks the straight-line distance is admissible but weak, because roads are not straight. Production routing engines use landmark-based heuristics: precompute distances from a few hundred landmark nodes, and use the triangle inequality to derive much tighter bounds. That is one of the techniques that makes continental route planning interactive.
+
 ## Guided experiments
 
 1. <strong>See the search become directional.</strong> Press <strong>Run Algorithm</strong> and watch the explored region. It stretches toward the goal rather than spreading in a circle &mdash; that elongation is h doing its job.
@@ -48,3 +113,62 @@ Note that Manhattan is <em>not</em> admissible if diagonal movement is allowed, 
 ## What to remember
 
 A* orders its priority queue by f = g + h, where g is the cost so far and h estimates the cost remaining, which focuses the search along the direction of the goal instead of expanding uniformly. Provided h never overestimates, the path returned is still optimal &mdash; and the better the estimate, the fewer nodes get expanded. With h = 0 it degenerates exactly to Dijkstra, which is the cleanest way to see what the heuristic is buying.
+
+## Where it is used
+
+- <strong>Game pathfinding.</strong> The default algorithm for moving units around a map, usually on a grid or navigation mesh.
+- <strong>Robotics.</strong> Motion planning over occupancy grids, often with variants handling continuous space.
+- <strong>Route planning.</strong> Real navigation systems use A* with landmark heuristics, or contraction hierarchies which precompute shortcuts.
+- <strong>Puzzle solving.</strong> Sliding tiles, Rubik's cube and similar, where the heuristic is a relaxation of the puzzle &mdash; for the 15-puzzle, the sum of Manhattan distances of each tile from its home.
+- <strong>Word ladders and state-space search</strong> generally, where the graph is generated on demand.
+- <strong>Automated planning</strong> in AI, where the state space is enormous and heuristics are essential.
+
+The puzzle case illustrates a general technique for inventing heuristics: <strong>solve a relaxed version of the problem</strong>. Ignoring that tiles block each other gives the Manhattan-distance heuristic, which is admissible because the real puzzle can only be harder.
+
+## The variants
+
+|Variant|Change|Use|
+|---|---|---|
+|Weighted A*|f = g + w&times;h with w &gt; 1|Faster, suboptimal by at most a factor of w|
+|IDA*|Iterative deepening with an f-limit|Memory-constrained; puzzles|
+|Bidirectional A*|Search from both ends|Long paths|
+|Jump point search|Skip symmetric grid paths|Uniform-cost grids &mdash; large speed-up|
+|D* / D* Lite|Repair the path when the map changes|Robotics with unknown obstacles|
+|Anytime A*|Return a path quickly, improve it|Real-time constraints|
+
+<strong>Memory is A*'s real weakness.</strong> It stores every node it has seen, and on a large state space that exhausts memory long before time becomes the constraint. IDA* addresses this by using depth-first search with an increasing f-limit and O(depth) memory, at the cost of re-expanding nodes.
+
+<strong>Jump point search</strong> is worth knowing for grid games: on a uniform-cost grid, many paths are symmetric &mdash; going right-then-up is the same cost as up-then-right &mdash; and JPS skips all but one representative. It can be an order of magnitude faster than plain A* on open maps.
+
+## Comparing the search algorithms
+
+|Algorithm|Priority|Optimal|Explores|
+|---|---|---|---|
+|BFS|Insertion order|Yes, unweighted|Everything within distance d|
+|Dijkstra|g(n)|Yes|Uniformly outwards|
+|Greedy best-first|h(n)|<strong>No</strong>|Straight at the goal|
+|A*|g(n) + h(n)|Yes, if h is admissible|Towards the goal|
+
+Greedy best-first search is the instructive contrast: prioritising by h alone is fast and can produce badly suboptimal paths, because it ignores the cost already incurred. A* is exactly the correction &mdash; balance what the path has cost against what remains.
+
+## Questions people ask
+
+<strong>Is A* always better than Dijkstra?</strong> When a useful heuristic exists, yes &mdash; it explores far fewer nodes for the same answer. Without one, it <em>is</em> Dijkstra.
+
+<strong>What if my heuristic overestimates?</strong> The path found may be suboptimal. That is sometimes an acceptable trade for speed.
+
+<strong>Which heuristic for a grid?</strong> Manhattan for 4-directional movement, diagonal/Chebyshev for 8-directional, Euclidean for free movement.
+
+<strong>Why does it use so much memory?</strong> It keeps every discovered node. IDA* trades time for memory when that binds.
+
+<strong>Can it handle negative weights?</strong> No &mdash; like Dijkstra, its correctness assumes non-negative edges.
+
+<strong>How do I get the path, not just the cost?</strong> Record each node's predecessor when its g value improves, then walk back from the goal.
+
+## Recap in one screen
+
+- A* prioritises by `g + h`: cost so far plus an estimate of what remains.
+- With `h = 0` it is Dijkstra; with a good heuristic it explores dramatically fewer nodes.
+- The heuristic must never overestimate (admissible) or the path may be suboptimal.
+- Use the tightest cheap estimate matching the movement rules &mdash; Manhattan for 4-way grids, not Euclidean.
+- Memory is the practical limit; IDA*, jump point search and weighted A* are the standard responses.
