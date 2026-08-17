@@ -21,6 +21,89 @@ The eight queens problem asks for eight queens on a chessboard with none attacki
 
 Same search space, same guarantee of finding every solution, five orders of magnitude less work. The algorithm did not get cleverer about queens; it just stopped exploring branches that were already known to fail.
 
+## Try, recurse, undo
+
+Backtracking explores a space of partial solutions. At each step it makes a choice, recurses, and then <strong>undoes</strong> the choice before trying the next one.
+
+That undo step is what distinguishes it from plain recursion, and it is what makes exhaustive search possible with a single shared state rather than a copy per branch.
+
+```python
+def permutations(items):
+    result, current, used = [], [], [False] * len(items)
+
+    def backtrack():
+        if len(current) == len(items):
+            result.append(current[:])        # copy - current keeps changing
+            return
+        for i, item in enumerate(items):
+            if used[i]:
+                continue
+            current.append(item); used[i] = True     # choose
+            backtrack()                              # explore
+            current.pop();       used[i] = False     # UNDO
+        return
+
+    backtrack()
+    return result
+```
+
+Three lines carry the whole pattern: choose, explore, undo. Every backtracking solution has that shape, and the `current[:]` copy on line 6 is the detail people miss &mdash; appending `current` itself stores a reference to a list that will keep changing.
+
+## Pruning is what makes it feasible
+
+Without pruning, backtracking is brute force with a stack. With pruning, it is often practical on spaces that are astronomically large.
+
+The n-queens problem places n queens on an n&times;n board with none attacking another. There are 64 choose 8 = 4.4 billion arrangements for n = 8. Backtracking with pruning examines about 15,000 positions.
+
+The saving comes from abandoning a branch the moment it cannot succeed:
+
+```python
+def solve_queens(n):
+    cols, diag1, diag2 = set(), set(), set()
+    board, out = [], []
+
+    def place(row):
+        if row == n:
+            out.append(board[:])
+            return
+        for col in range(n):
+            if col in cols or (row-col) in diag1 or (row+col) in diag2:
+                continue                     # PRUNE - cannot possibly work
+            cols.add(col); diag1.add(row-col); diag2.add(row+col)
+            board.append(col)
+            place(row + 1)
+            board.pop()
+            cols.discard(col); diag1.discard(row-col); diag2.discard(row+col)
+
+    place(0)
+    return out
+```
+
+The three sets are the pruning mechanism, and the diagonal encoding is the neat part: all squares on a descending diagonal share `row - col`, and all on an ascending diagonal share `row + col`. That turns an O(n) attack check into O(1).
+
+<strong>Better pruning beats a faster machine.</strong> That is the practical lesson of this whole topic.
+
+## Recognising a backtracking problem
+
+The signals:
+
+- The answer is a <strong>sequence of choices</strong> &mdash; a permutation, a subset, an assignment, a path.
+- Choices <strong>constrain</strong> later choices.
+- You need <strong>all</strong> solutions, or one satisfying constraints, rather than an optimum computed from subproblems.
+- The state can be <strong>undone</strong> cheaply.
+
+|Problem|Choice at each step|
+|---|---|
+|Permutations|Which unused item comes next|
+|Subsets|Include this item or not|
+|N-queens|Which column in this row|
+|Sudoku|Which digit in this cell|
+|Word search|Which adjacent cell to move to|
+|Graph colouring|Which colour for this vertex|
+|Combination sum|Which candidate to add next|
+
+If the problem instead asks for a maximum or a count computable from overlapping subproblems, dynamic programming is usually the better tool &mdash; it reuses work where backtracking re-derives it.
+
 ## Things to try
 
 1. <strong>Watch a path get committed.</strong> Press <strong>Step</strong> repeatedly. The search extends along a single route, taking the first available direction each time &mdash; the same depth-first commitment as DFS.
@@ -30,13 +113,14 @@ Same search space, same guarantee of finding every solution, five orders of magn
 
 ## Where it is used
 
-Backtracking is the standard approach whenever a problem is “find an assignment satisfying these constraints”:
+- <strong>Constraint solvers</strong> &mdash; SAT solvers, scheduling, timetabling. Backtracking with sophisticated pruning is the core of DPLL, which underlies modern SAT solving.
+- <strong>Puzzles</strong> &mdash; sudoku, crosswords, n-queens, knight's tour.
+- <strong>Regular expression matching</strong> &mdash; backtracking regex engines try alternatives and undo, which is also why pathological patterns can take exponential time.
+- <strong>Parsing</strong> &mdash; recursive descent with backtracking for ambiguous grammars.
+- <strong>Compiler register allocation</strong> as graph colouring.
+- <strong>Test generation</strong> and combinatorial coverage.
 
-- <strong>Sudoku and N-queens</strong> &mdash; the canonical examples, both solved instantly with constraint checking and hopeless without.
-- <strong>Permutations, combinations and subsets</strong> &mdash; generating all arrangements of a set.
-- <strong>Maze and path finding</strong> when any route will do.
-- <strong>Graph colouring</strong> and general constraint satisfaction, where it is the basis of real CSP solvers.
-- <strong>Regular expression matching</strong> &mdash; and the reason a pathological pattern can hang: catastrophic backtracking is this algorithm failing to prune.
+The regex point is worth noting because it has real security implications: catastrophic backtracking on adversarial input is a denial-of-service vector, which is why some engines use non-backtracking automata instead.
 
 ## What trips people up
 
@@ -48,3 +132,71 @@ Backtracking is the standard approach whenever a problem is “find an assignmen
 ## In one line
 
 Backtracking explores the space of partial solutions depth-first, abandoning a branch as soon as it violates a constraint and undoing its state on the way back out. The undo is what makes it correct and the early constraint check is what makes it fast &mdash; without pruning it is exhaustive search, and with it, problems with billions of arrangements resolve in thousands of steps. The complexity remains exponential in the worst case; the art is in pruning hard enough that the worst case rarely arrives.
+
+## Avoiding duplicate results
+
+A recurring difficulty: when the input contains duplicates, naive backtracking produces the same solution several times.
+
+The standard fix is to sort the input and skip a candidate that equals its predecessor at the same recursion depth:
+
+```python
+def subsets_with_dup(nums):
+    nums.sort()
+    out, cur = [], []
+
+    def go(start):
+        out.append(cur[:])
+        for i in range(start, len(nums)):
+            if i > start and nums[i] == nums[i-1]:
+                continue                 # skip duplicates at this level
+            cur.append(nums[i])
+            go(i + 1)
+            cur.pop()
+
+    go(0)
+    return out
+```
+
+The condition `i > start` is precise and easy to get wrong: it skips a repeated value only when it is a <em>sibling</em> choice at the same level, not when it is used deeper in the same branch. Writing `i > 0` instead would incorrectly exclude legitimate solutions containing the value twice.
+
+## Complexity, and what to expect
+
+Backtracking is exponential in general, and the exponent depends on the problem's shape.
+
+|Problem|Complexity|
+|---|---|
+|Permutations of n|O(n! &times; n)|
+|Subsets of n|O(2&#8319; &times; n)|
+|N-queens|O(n!) worst case, far less with pruning|
+|Sudoku|Exponential; instant in practice with good pruning|
+|Combination sum|Depends on the target and candidates|
+
+The gap between worst case and practice is the whole point. Sudoku's search space is enormous and a constraint-propagating solver finishes a newspaper puzzle in milliseconds, because most branches die immediately.
+
+Two techniques beyond basic pruning:
+
+<strong>Constraint propagation.</strong> After each choice, deduce forced consequences &mdash; a Sudoku cell with only one possible digit must take it. This can solve many puzzles with almost no search.
+
+<strong>Ordering heuristics.</strong> Choose the most constrained variable next (the cell with fewest candidates), so failures are discovered early rather than deep in the tree.
+
+## Questions people ask
+
+<strong>What is the difference from brute force?</strong> Backtracking prunes branches that cannot lead to a solution. Brute force enumerates everything.
+
+<strong>How is it different from DFS?</strong> It <em>is</em> DFS over a state space, with explicit undo and pruning.
+
+<strong>When should I use DP instead?</strong> When subproblems overlap and you want an optimum or a count. Backtracking enumerates; DP reuses.
+
+<strong>Why do I need to copy the current state?</strong> Because it is mutated in place. Storing a reference gives you a list that changes underneath you.
+
+<strong>How do I stop after the first solution?</strong> Return a boolean up the recursion and stop exploring once it is true.
+
+<strong>Why is my solution too slow?</strong> Almost always insufficient pruning. Add constraints that fail earlier, and order choices so failures are found sooner.
+
+## Recap in one screen
+
+- Choose, explore, undo &mdash; the undo is what distinguishes backtracking from ordinary recursion.
+- Pruning is what makes it practical: n-queens goes from billions of arrangements to thousands of positions.
+- Copy the state when recording a solution, or you store a reference to something still changing.
+- Sort and skip equal siblings to avoid duplicate results on duplicate input.
+- Constraint propagation and choosing the most constrained variable next are the two upgrades that matter.

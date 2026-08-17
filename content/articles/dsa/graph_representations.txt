@@ -42,6 +42,73 @@ Similarly, Dijkstra is O(V&sup2;) with a matrix and simple scanning, but O((V+E)
 
 Simply a list of <span class="mono-font">(u, v, weight)</span> triples. Terrible for asking "who are u's neighbours?" but ideal when an algorithm processes every edge in sorted order &mdash; which is exactly what Kruskal's MST algorithm does.
 
+## Two ways to store the same graph
+
+A graph is a set of vertices and the edges between them. How you store the edges determines what is cheap.
+
+Take this graph: A&mdash;B, A&mdash;C, B&mdash;D, C&mdash;D.
+
+<strong>Adjacency list</strong> &mdash; each vertex holds its neighbours:
+
+```python
+graph = {
+    "A": ["B", "C"],
+    "B": ["A", "D"],
+    "C": ["A", "D"],
+    "D": ["B", "C"],
+}
+```
+
+<strong>Adjacency matrix</strong> &mdash; a V&times;V grid where entry [i][j] says whether an edge exists:
+
+```
+    A  B  C  D
+A [ 0  1  1  0 ]
+B [ 1  0  0  1 ]
+C [ 1  0  0  1 ]
+D [ 0  1  1  0 ]
+```
+
+|Operation|Adjacency list|Adjacency matrix|
+|---|---|---|
+|Is there an edge u&mdash;v?|O(degree of u)|O(1)|
+|List u's neighbours|O(degree of u)|O(V)|
+|Add an edge|O(1)|O(1)|
+|Remove an edge|O(degree)|O(1)|
+|Space|O(V + E)|O(V&sup2;)|
+|Iterate all edges|O(V + E)|O(V&sup2;)|
+
+## Sparse or dense decides it
+
+The space row is what usually settles the choice.
+
+A social network with a million users averaging 200 friends has 200 million edges. An adjacency list stores 200 million entries. An adjacency matrix stores 10¹² &mdash; a trillion cells, almost all zero. That is not a trade-off; it is impossible.
+
+<strong>Sparse graphs</strong> (E much less than V²) are the common case in practice: road networks, social graphs, dependency graphs, web links. Adjacency lists win decisively.
+
+<strong>Dense graphs</strong> (E approaching V²) do occur &mdash; complete graphs, distance matrices between all cities, correlation networks &mdash; and there the matrix is competitive and its O(1) edge lookup is genuinely useful.
+
+The practical rule: <strong>use an adjacency list unless the graph is dense or you need constant-time edge queries</strong>. Most graph algorithms iterate over neighbours, which is exactly what a list makes fast, and their O(V+E) complexity assumes a list.
+
+## Weights, direction and the variations
+
+<strong>Weighted edges</strong> store the weight alongside the neighbour:
+
+```python
+graph = {
+    "A": [("B", 4), ("C", 2)],
+    "B": [("A", 4), ("D", 5)],
+}
+```
+
+In a matrix, the cell holds the weight rather than 1, with infinity (or `None`) for absence &mdash; note that 0 is a poor choice for "no edge" when zero-weight edges are legal.
+
+<strong>Directed graphs</strong> store each edge once, in the source's list only. An undirected graph stores it twice, once in each endpoint's list &mdash; and forgetting the second insertion is one of the most common graph bugs, producing a graph that is silently directed.
+
+<strong>Self-loops and parallel edges</strong> need deciding: a list handles both naturally, a simple matrix cannot represent parallel edges without storing counts.
+
+For very large sparse graphs there is a third representation worth knowing: <strong>compressed sparse row</strong>, which stores all neighbours in one flat array with an index array marking where each vertex's neighbours begin. No per-vertex list objects, excellent cache behaviour, and it is what serious graph libraries use internally. The cost is that it is expensive to modify.
+
 ## Experiments to try
 
 1. <strong>Start at 30% density.</strong> The matrix is mostly zeros &mdash; every one of them still occupies memory.
@@ -53,3 +120,77 @@ Simply a list of <span class="mono-font">(u, v, weight)</span> triples. Terrible
 ## In one line
 
 A matrix buys O(1) edge lookup with O(V²) memory; a list buys O(V+E) memory with O(degree) lookup. Because real graphs are sparse, adjacency lists are the default &mdash; and that choice is what makes BFS and DFS O(V+E) rather than O(V²).
+
+## Building one in Python
+
+The idiomatic approach uses `defaultdict` so nodes appear on first use:
+
+```python
+from collections import defaultdict
+
+def build(edges, directed=False):
+    g = defaultdict(list)
+    for u, v in edges:
+        g[u].append(v)
+        if not directed:
+            g[v].append(u)          # the line people forget
+    return g
+
+edges = [("A","B"), ("A","C"), ("B","D"), ("C","D")]
+graph = build(edges)
+```
+
+Two details worth building in from the start:
+
+<strong>Isolated vertices.</strong> A vertex with no edges never appears in an edge list, so it will be missing from the graph. If it matters, add all vertices explicitly first.
+
+<strong>`defaultdict` creates keys on read.</strong> `graph["Z"]` returns an empty list <em>and inserts Z</em>, which silently grows the graph during traversal. Use `graph.get(node, [])` when only reading.
+
+For anything substantial, use a library: `networkx` for analysis and convenience, `scipy.sparse` plus `scipy.sparse.csgraph` for large numerical graphs, and `igraph` or `graph-tool` when performance matters.
+
+## Where the matrix genuinely wins
+
+Adjacency matrices are not merely the textbook alternative &mdash; they have real uses.
+
+<strong>Constant-time edge queries.</strong> Algorithms that repeatedly ask "is there an edge between these two?" &mdash; triangle counting, clique detection &mdash; benefit directly.
+
+<strong>Linear algebra on graphs.</strong> The matrix is a matrix, so it can be multiplied. Aⁿ[i][j] counts walks of length n from i to j. The <strong>Laplacian</strong> (degree matrix minus adjacency matrix) has eigenvalues that reveal connectivity and cluster structure, which is what spectral clustering uses.
+
+<strong>Dense graph algorithms.</strong> Floyd-Warshall computes all-pairs shortest paths in O(V³) operating directly on the matrix, and it is the right choice when the graph is dense and all pairs are needed.
+
+<strong>GPU computation.</strong> Matrix operations parallelise; pointer-chasing through adjacency lists does not. Graph neural networks operate on sparse matrix representations for this reason.
+
+So the choice is not simply "lists are better". It is: lists for traversal on sparse graphs, matrices for algebra and dense algorithms.
+
+## Other representations
+
+|Representation|Structure|Use|
+|---|---|---|
+|Edge list|A list of (u, v) pairs|Simple input format; Kruskal's algorithm sorts it|
+|Incidence matrix|V&times;E|Rare; some theoretical work|
+|Compressed sparse row|Flat arrays plus offsets|Large static graphs, numerical libraries|
+|Implicit|A function generating neighbours|Puzzle states, infinite graphs|
+
+The last row matters more than its obscurity suggests. Many graph problems have no stored graph at all: chess positions, sliding-tile puzzles, word ladders. Neighbours are <em>generated</em> on demand by applying legal moves, and BFS or DFS explores a graph that never exists in memory. The traversal code is identical.
+
+## Questions people ask
+
+<strong>Which should I use by default?</strong> An adjacency list. Most real graphs are sparse and most algorithms iterate over neighbours.
+
+<strong>How do I know if my graph is dense?</strong> Compare E with V². Above roughly V²/10, matrix representations become competitive.
+
+<strong>Do I need to store both directions for an undirected graph?</strong> Yes, in an adjacency list. Forgetting it makes the graph directed without any error.
+
+<strong>How do I represent a weighted graph?</strong> Tuples of (neighbour, weight) in a list, or weights in the matrix cells with infinity for absence.
+
+<strong>What about multigraphs?</strong> Adjacency lists handle parallel edges naturally; a matrix needs to store counts rather than booleans.
+
+<strong>Should I use `networkx`?</strong> For analysis, prototyping and algorithms you would otherwise implement, yes. For hot loops over millions of edges it is slow &mdash; use scipy sparse or a compiled library.
+
+## Recap in one screen
+
+- Adjacency lists store each vertex's neighbours: O(V+E) space, fast neighbour iteration.
+- Adjacency matrices store a V&times;V grid: O(1) edge lookup, O(V&sup2;) space.
+- Sparsity decides &mdash; and most real graphs are sparse, so lists are the default.
+- Undirected edges must be inserted twice in a list; forgetting the second is a silent bug.
+- Matrices win for edge queries, linear-algebra methods, dense all-pairs algorithms and GPU work.

@@ -31,6 +31,96 @@ Practical fixes: use a hash map of children instead of a fixed array, or switch 
 
 Watch the "saved by sharing" figure as you add words with common prefixes &mdash; sharing is what claws some of that memory back.
 
+## A tree where the path spells the word
+
+A trie stores strings by their characters. Each edge is a character, so the path from the root to a node spells a prefix, and words sharing a prefix share that path.
+
+Storing "cat", "car", "card", "dog":
+
+```
+        root
+       /    \
+      c      d
+      |      |
+      a      o
+     / \     |
+    t*  r*   g*
+        |
+        d*
+```
+
+The asterisks mark nodes where a complete word ends &mdash; needed because "car" is a word and also a prefix of "card".
+
+```python
+class TrieNode:
+    def __init__(self):
+        self.children = {}
+        self.is_word = False
+
+class Trie:
+    def __init__(self):
+        self.root = TrieNode()
+
+    def insert(self, word):
+        node = self.root
+        for ch in word:
+            node = node.children.setdefault(ch, TrieNode())
+            node.is_word = node.is_word          # no-op; kept for clarity
+        node.is_word = True
+
+    def search(self, word):
+        node = self._walk(word)
+        return node is not None and node.is_word
+
+    def starts_with(self, prefix):
+        return self._walk(prefix) is not None
+
+    def _walk(self, s):
+        node = self.root
+        for ch in s:
+            if ch not in node.children:
+                return None
+            node = node.children[ch]
+        return node
+```
+
+Every operation is O(length of the string) &mdash; <strong>independent of how many words are stored</strong>. That is the trie's defining property: looking up a 10-character word takes 10 steps whether the trie holds a hundred words or ten million.
+
+## What it does that a hash table cannot
+
+A hash set answers "is this exact string present?" in O(1). A trie answers several questions a hash set cannot answer at all.
+
+|Query|Trie|Hash set|
+|---|---|---|
+|Exact lookup|O(m)|O(1) average|
+|Does any word start with this prefix?|O(m)|O(n) &mdash; scan everything|
+|All words with this prefix|O(m + output)|O(n)|
+|Longest prefix of this string that is a word|O(m)|Not directly|
+|Lexicographic iteration|Natural|Requires sorting|
+|Fuzzy match within edit distance k|Feasible|Not directly|
+
+The prefix rows are the point. Autocomplete needs "all words starting with 'car'", and a trie walks three nodes and then collects the subtree. A hash set has no structure to exploit and must examine every key.
+
+The <strong>longest-prefix match</strong> row matters in networking: IP routing tables answer "which routing rule has the longest matching prefix for this address?" and a trie over address bits does it in one pass. That is what a radix trie in a router is doing.
+
+## Space, and the two compressed variants
+
+A naive trie is memory-hungry: one node per character per distinct prefix, and each node carries a dictionary. Storing a large English dictionary can use more memory than the strings themselves.
+
+Two standard compressions:
+
+<strong>Radix trie (Patricia trie)</strong> merges chains of single-child nodes into one edge labelled with a substring. A trie storing only "internationalisation" becomes two nodes rather than twenty-one. This is the variant used in routing tables and in some database indexes.
+
+<strong>DAWG (directed acyclic word graph)</strong> also merges identical <em>suffixes</em>, so "running" and "jumping" share their "ing" ending. Far smaller, and it cannot store values per word, so it suits membership testing rather than mapping.
+
+|Structure|Space|Supports values|
+|---|---|---|
+|Standard trie|Largest|Yes|
+|Radix trie|Much smaller|Yes|
+|DAWG|Smallest|No|
+
+For most applications a standard trie with dictionary children is fine, and a radix trie is worth the extra complexity when the key set is large and shares long prefixes.
+
 ## Things to try
 
 1. <strong>Load the sample words</strong> and note how <em>car</em>, <em>card</em>, <em>care</em> and <em>careful</em> all share one path for 'c-a-r'.
@@ -42,3 +132,76 @@ Watch the "saved by sharing" figure as you add words with common prefixes &mdash
 ## Worth remembering
 
 A trie stores strings as paths, sharing common prefixes. Lookup is O(word length) regardless of dictionary size, and prefix queries fall out of the structure for free — which no hash table can match. The price is memory, mitigated by hash-map children or radix compression.
+
+## Autocomplete, the canonical application
+
+Collecting every word under a prefix is a DFS from the prefix's node:
+
+```python
+def with_prefix(self, prefix, limit=10):
+    node = self._walk(prefix)
+    if node is None:
+        return []
+
+    out = []
+    def dfs(node, path):
+        if len(out) >= limit:
+            return
+        if node.is_word:
+            out.append(prefix + path)
+        for ch, child in sorted(node.children.items()):
+            dfs(child, path + ch)
+
+    dfs(node, "")
+    return out
+```
+
+Sorting the children gives lexicographic order; iterating unsorted is faster and gives arbitrary order.
+
+Real autocomplete needs <strong>ranking</strong>, not just alphabetical order &mdash; the most popular completions first. The standard approach stores a score at each word node and, at each internal node, the best score in its subtree. A priority-queue traversal then emits completions in score order without exploring the whole subtree.
+
+That refinement is what separates a working autocomplete from a fast one: without the subtree-maximum, finding the top 10 of a million completions requires visiting all of them.
+
+## Where tries are used
+
+- <strong>Autocomplete and type-ahead search</strong> in editors, search boxes and shells.
+- <strong>Spell checking</strong> &mdash; membership plus fuzzy matching within an edit distance, done by walking the trie while tracking a dynamic programming row.
+- <strong>IP routing tables</strong> &mdash; longest-prefix match on address bits, using a radix trie.
+- <strong>Word games</strong> &mdash; Boggle and Scrabble solvers prune impossible branches the moment a prefix leaves the trie.
+- <strong>T9 and predictive text</strong> on numeric keypads.
+- <strong>Aho-Corasick multi-pattern search</strong> &mdash; a trie of all patterns plus failure links, which finds every occurrence of many patterns in one pass.
+- <strong>Suffix tries and suffix trees</strong> for substring search and bioinformatics.
+
+The word-game case illustrates the pruning value nicely: a Boggle solver walking a grid abandons a path as soon as the letters so far are not a prefix of any word, which removes almost all of an enormous search space.
+
+## Practical notes
+
+<strong>Use a dictionary for children,</strong> not a fixed array of 26. The dictionary handles arbitrary alphabets, Unicode and case, and it does not waste space on absent characters.
+
+<strong>Store values at word nodes</strong> if you need a map rather than a set &mdash; frequency, id, payload.
+
+<strong>Deletion is fiddly.</strong> Removing a word means clearing `is_word` and then pruning nodes upwards while they have no children and are not words themselves. It is easy to prune too far and delete a shorter word's ending.
+
+<strong>Consider whether you need one.</strong> For a few thousand strings and infrequent prefix queries, sorting the list and using `bisect` to find the prefix range is simpler and uses far less memory. A trie earns its place with many keys, frequent prefix queries, or shared long prefixes.
+
+## Questions people ask
+
+<strong>How is a trie different from a binary search tree?</strong> A BST compares whole keys and branches two ways; a trie branches on one character at a time, with one child per possible next character.
+
+<strong>Is a trie faster than a hash set for exact lookup?</strong> Usually slightly slower &mdash; O(m) character steps against one hash computation. Its advantage is prefix queries, not exact lookup.
+
+<strong>How much memory does it use?</strong> Considerably more than the strings, in the naive form. Radix compression or a DAWG reduces it substantially.
+
+<strong>Can it store non-string keys?</strong> Yes &mdash; any sequence. Tries over bytes, bits, integers as digit sequences, or lists of tokens all work.
+
+<strong>What is Aho-Corasick?</strong> A trie of all search patterns with failure links, which matches every pattern against a text in one linear pass. It is what `grep -F` with many patterns uses.
+
+<strong>Do I need `is_word`?</strong> Yes, whenever one word is a prefix of another &mdash; without it, "car" would be indistinguishable from a mere prefix of "card".
+
+## Recap in one screen
+
+- Each edge is a character, so the path spells a prefix and shared prefixes are stored once.
+- Every operation is O(word length), independent of how many words are stored.
+- Prefix queries are what a hash set cannot do: autocomplete, longest-prefix match, ordered iteration.
+- Space is the cost; radix tries merge single-child chains and DAWGs also merge suffixes.
+- Store a subtree-maximum score at each node if autocomplete needs ranked rather than alphabetical results.

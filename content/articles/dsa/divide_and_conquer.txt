@@ -33,6 +33,64 @@ Dividing is usually trivial &mdash; compute a midpoint. The interesting engineer
 
 Divide and conquer parallelises naturally &mdash; independent subproblems can run on different cores, which is why it underpins MapReduce and most parallel frameworks. It is also the pattern behind Karatsuba multiplication, the Fast Fourier Transform, and closest-pair-of-points.
 
+## Split, solve, combine
+
+Divide and conquer solves a problem by breaking it into independent subproblems of the same kind, solving those recursively, and combining the results.
+
+Three steps, and the third is where the algorithms differ:
+
+<strong>Divide</strong> the problem into smaller instances.
+<strong>Conquer</strong> each recursively, until a base case is trivial.
+<strong>Combine</strong> the sub-results into the answer.
+
+|Algorithm|Divide|Combine|
+|---|---|---|
+|Merge sort|Split in half|Merge two sorted halves &mdash; O(n)|
+|Quick sort|Partition around a pivot|Nothing &mdash; work done in the divide|
+|Binary search|Halve the range|Nothing &mdash; one side is discarded|
+|Karatsuba multiplication|Split the digits|Three products and some additions|
+|Strassen's matrix product|Split into quadrants|Seven products and additions|
+|Closest pair of points|Split by x-coordinate|Check the strip near the boundary|
+
+Note that quick sort and merge sort are mirror images: quick sort does its work partitioning before recursing, merge sort does it merging afterwards. Binary search is the degenerate case where one subproblem is discarded entirely, which is why it is O(log n) rather than O(n log n).
+
+## The master theorem, informally
+
+For a recurrence of the form
+
+<p class="mono-font">T(n) = a &middot; T(n/b) + f(n)</p>
+
+&mdash; `a` subproblems, each of size n/b, plus f(n) work to divide and combine &mdash; the complexity depends on which term dominates.
+
+|Case|Condition|Result|
+|---|---|---|
+|Combine dominates|f(n) grows faster than n^(log_b a)|O(f(n))|
+|Balanced|f(n) &asymp; n^(log_b a)|O(f(n) log n)|
+|Recursion dominates|f(n) grows slower|O(n^(log_b a))|
+
+Applied to merge sort: two subproblems of half the size plus O(n) merging &mdash; a = 2, b = 2, so n^(log₂2) = n, which matches f(n) = n. Balanced case, giving <strong>O(n log n)</strong>.
+
+Applied to binary search: one subproblem of half the size plus O(1) &mdash; a = 1, b = 2, so n^(log₂1) = n⁰ = 1, matching f(n) = 1. Balanced case, giving <strong>O(log n)</strong>.
+
+The useful intuition without the algebra: <strong>count the levels of recursion (log_b n) and the work per level</strong>. If the work per level is constant in total, the answer is that work times the number of levels.
+
+## Divide and conquer against dynamic programming
+
+The distinction is one word: <strong>independence</strong>.
+
+<strong>Divide and conquer</strong> applies when subproblems do not overlap. Merge sort's two halves share nothing, so each is solved once and there is nothing to cache.
+
+<strong>Dynamic programming</strong> applies when they do overlap. Fibonacci's `fib(n-1)` and `fib(n-2)` share almost everything, so solving each independently is exponentially wasteful and memoisation is essential.
+
+|&nbsp;|Divide and conquer|Dynamic programming|
+|---|---|---|
+|Subproblems|Independent|Overlapping|
+|Caching|Pointless|Essential|
+|Typical direction|Top-down recursion|Either|
+|Examples|Merge sort, binary search|Fibonacci, edit distance, knapsack|
+
+Recursive Fibonacci written as divide and conquer is O(2ⁿ) precisely because the subproblems overlap and nothing is cached. Adding `@lru_cache` converts it to dynamic programming and O(n). Recognising which situation you are in decides whether caching is the fix.
+
 ## Experiments to try
 
 1. <strong>Step through merge sort at n = 8.</strong> Watch the tree split down to single elements, then merge back upward.
@@ -44,3 +102,71 @@ Divide and conquer parallelises naturally &mdash; independent subproblems can ru
 ## Where that leaves you
 
 Divide and conquer gets its log factor from tree depth: halving repeatedly takes log n levels. Multiply that by the work per level and you have the complexity. Recursing into every branch gives O(n log n); discarding all but one gives O(log n).
+
+## Why it parallelises well
+
+Independent subproblems can be solved simultaneously, which is the structural reason divide and conquer maps well onto multiple cores.
+
+Merge sort's two halves can be sorted concurrently; only the merge must wait. Quick sort's two partitions likewise. That is why parallel sorting libraries are built on these algorithms rather than on insertion or bubble sort.
+
+The practical pattern is a threshold: recurse in parallel while the subproblem is large, and switch to sequential below a size where thread overhead dominates.
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+def parallel_merge_sort(arr, threshold=10_000, pool=None):
+    if len(arr) <= 1:
+        return arr
+    if len(arr) < threshold:
+        return sorted(arr)                     # sequential below the threshold
+    mid = len(arr) // 2
+    with ThreadPoolExecutor(2) as ex:
+        left = ex.submit(parallel_merge_sort, arr[:mid], threshold)
+        right = ex.submit(parallel_merge_sort, arr[mid:], threshold)
+    return merge(left.result(), right.result())
+```
+
+In Python the GIL limits the benefit for pure-Python work, so this pattern matters more with `multiprocessing`, or in languages without a global lock. The <em>structure</em> is the point: the recursion tree is a natural task graph.
+
+The same shape underlies MapReduce &mdash; divide the data, process independently, combine &mdash; which is divide and conquer across machines rather than cores.
+
+## Algorithms worth knowing beyond sorting
+
+<strong>Karatsuba multiplication.</strong> Multiplying two n-digit numbers naively takes O(n²) digit products. Karatsuba splits each number in half and observes that three products suffice rather than four, giving O(n^1.585). Python's integers use it above a threshold, which is why multiplying very large integers is faster than the schoolbook method would suggest.
+
+<strong>Strassen's algorithm.</strong> The same trick for matrices: seven multiplications of quadrants instead of eight, giving O(n^2.807) instead of O(n³). Rarely used in practice because of numerical stability and constant factors, and it proved that the obvious bound was not the limit.
+
+<strong>Closest pair of points.</strong> Sort by x, split, recurse, then check only the narrow strip near the dividing line. O(n log n) rather than the obvious O(n²).
+
+<strong>Fast Fourier transform.</strong> Divide and conquer on the frequency domain, O(n log n) instead of O(n²) &mdash; and arguably the most consequential algorithm in the list, underlying signal processing, audio and image compression, and fast polynomial multiplication.
+
+## Common mistakes
+
+- <strong>Using it where subproblems overlap.</strong> That is dynamic programming, and without caching the cost is exponential.
+- <strong>Forgetting the base case,</strong> giving infinite recursion.
+- <strong>An expensive combine step</strong> that dominates and negates the saving.
+- <strong>Recursion depth</strong> on large inputs in Python &mdash; convert to iteration or raise the limit.
+- <strong>Ignoring the constant factor.</strong> Recursion has overhead; below a threshold a simple loop wins, which is why real sorts switch to insertion sort for small subarrays.
+- <strong>Copying data at every level.</strong> `arr[:mid]` allocates; passing indices into one array avoids it.
+
+## Questions people ask
+
+<strong>How is this different from plain recursion?</strong> Divide and conquer specifically splits into <em>several</em> independent subproblems and combines their results. Simple recursion may reduce the problem by one step.
+
+<strong>When should I use dynamic programming instead?</strong> When subproblems overlap, so caching pays.
+
+<strong>Does it always give O(n log n)?</strong> No &mdash; it depends on how many subproblems, how much smaller they are, and the combine cost. The master theorem gives the answer.
+
+<strong>Why do real sorts switch to insertion sort?</strong> Recursion overhead exceeds the asymptotic benefit below roughly 32 elements.
+
+<strong>Is binary search divide and conquer?</strong> Yes, in the degenerate form where one subproblem is discarded rather than solved.
+
+<strong>Does it parallelise?</strong> Naturally, because the subproblems are independent &mdash; which is what makes it the basis for parallel sorting and MapReduce.
+
+## Recap in one screen
+
+- Divide into independent subproblems, solve recursively, combine the results.
+- The master theorem gives the complexity from the number of subproblems, their size, and the combine cost.
+- Independence is what distinguishes it from dynamic programming, where overlap makes caching essential.
+- Independent subproblems parallelise naturally, which is why parallel sorts and MapReduce have this shape.
+- Watch the constant factor: real implementations switch to a simple loop below a size threshold.

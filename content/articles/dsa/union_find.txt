@@ -34,6 +34,81 @@ It is not technically constant, but it is constant for every practical purpose &
 - <strong>Percolation and clustering</strong> &mdash; does a path exist from top to bottom?
 - <strong>Account or record merging</strong> &mdash; treating "these two IDs are the same person" as a union.
 
+## Tracking which things are connected
+
+Union-Find (a disjoint-set union structure) answers one question extremely fast: <strong>are these two elements in the same group?</strong> And it supports merging groups.
+
+Two operations:
+
+<strong>find(x)</strong> &mdash; return a representative of x's set.
+<strong>union(x, y)</strong> &mdash; merge the sets containing x and y.
+
+Two elements are connected exactly when `find(x) == find(y)`.
+
+Each set is stored as a tree, with every element pointing at its parent and the root representing the set. The root points to itself.
+
+```python
+class UnionFind:
+    def __init__(self, n):
+        self.parent = list(range(n))       # each element its own root
+        self.rank = [0] * n
+
+    def find(self, x):
+        while self.parent[x] != x:
+            self.parent[x] = self.parent[self.parent[x]]   # path compression
+            x = self.parent[x]
+        return x
+
+    def union(self, x, y):
+        rx, ry = self.find(x), self.find(y)
+        if rx == ry:
+            return False                   # already connected
+        if self.rank[rx] < self.rank[ry]:  # union by rank
+            rx, ry = ry, rx
+        self.parent[ry] = rx
+        if self.rank[rx] == self.rank[ry]:
+            self.rank[rx] += 1
+        return True
+```
+
+## Why the two optimisations matter
+
+Without them, the trees can degenerate into chains and `find` becomes O(n). Two techniques together make it effectively constant.
+
+<strong>Union by rank</strong> (or by size) always attaches the shorter tree under the taller one, so depth grows logarithmically at worst rather than linearly.
+
+<strong>Path compression</strong> flattens the tree during `find`: every node on the path is re-pointed closer to the root, so subsequent finds are shorter. The line `self.parent[x] = self.parent[self.parent[x]]` is path halving &mdash; simpler than full compression and just as effective in practice.
+
+Together they give an amortised complexity of <strong>O(&alpha;(n))</strong>, where &alpha; is the inverse Ackermann function. For any n that fits in the universe, &alpha;(n) &lt; 5 &mdash; so it is constant for all practical purposes.
+
+|Optimisations|Complexity per operation|
+|---|---|
+|Neither|O(n)|
+|Union by rank only|O(log n)|
+|Path compression only|O(log n) amortised|
+|Both|O(&alpha;(n)) &mdash; effectively O(1)|
+
+That is one of the most striking results in data structures: two short additions to an obvious algorithm take it from linear to essentially constant.
+
+## Kruskal's algorithm, the canonical use
+
+Union-Find exists largely because of this. Kruskal's minimum spanning tree algorithm sorts all edges by weight and adds each one <em>unless</em> it would form a cycle &mdash; and "would form a cycle" means "both endpoints are already connected".
+
+```python
+def kruskal(n, edges):
+    uf = UnionFind(n)
+    mst, total = [], 0
+    for weight, u, v in sorted(edges):
+        if uf.union(u, v):                 # False if already connected
+            mst.append((u, v, weight))
+            total += weight
+    return mst, total
+```
+
+The `union` returning False <em>is</em> the cycle check. There is no separate cycle detection, because Union-Find already knows.
+
+O(E log E) for the sort, plus effectively O(E) for the unions &mdash; so sorting dominates, and the connectivity bookkeeping is free.
+
 ## Guided tour
 
 1. <strong>Union a few pairs</strong> and watch separate trees form. The group counter drops by one per successful merge.
@@ -45,3 +120,69 @@ It is not technically constant, but it is constant for every practical purpose &
 ## Worth remembering
 
 Union-Find answers "same group?" and "merge groups" in effectively constant time, using union by rank to keep trees shallow and path compression to flatten them on the way. It is the structure that makes Kruskal's algorithm and fast connected-component queries possible.
+
+## Where else it is used
+
+- <strong>Connected components</strong> in a static or growing graph &mdash; union every edge, then count distinct roots.
+- <strong>Cycle detection in an undirected graph.</strong> A union that returns False means the edge closes a cycle.
+- <strong>Percolation and network reliability</strong> &mdash; adding links and asking when the network becomes connected.
+- <strong>Image segmentation</strong> &mdash; merging adjacent similar pixels into regions.
+- <strong>Least common ancestor</strong> offline (Tarjan's algorithm).
+- <strong>Equivalence classes</strong> &mdash; type unification in compilers, merging duplicate records in entity resolution.
+- <strong>Grid problems</strong> &mdash; counting islands, or determining when a path exists across a grid as cells are opened.
+
+The grid case is a good example of the structure's fit: cells are unioned as they are opened, and asking whether the top and bottom are connected is one `find` comparison. Re-running BFS after each change would be far more expensive.
+
+## What it cannot do
+
+The critical limitation: <strong>Union-Find supports merging, not splitting.</strong> There is no efficient `disconnect(x, y)`.
+
+That is because path compression destroys the tree's original shape &mdash; the structure knows which elements are together and not how they came to be, so it cannot undo a union.
+
+Consequences:
+
+<strong>Dynamic connectivity with deletions</strong> needs a different structure (link-cut trees, or offline processing).
+
+<strong>Time-travel queries</strong> &mdash; "were these connected at step k?" &mdash; need a persistent or rollback variant. A rollback version exists, and it must forgo path compression, giving O(log n) instead.
+
+<strong>Directed connectivity</strong> is not what it does. Union-Find handles undirected, symmetric relationships; strongly connected components need Tarjan's or Kosaraju's algorithm.
+
+|Need|Structure|
+|---|---|
+|Merge groups, test membership|Union-Find|
+|Deletions as well|Link-cut trees, or offline|
+|Directed reachability|DFS, transitive closure|
+|Shortest paths|BFS or Dijkstra|
+|Component sizes|Union-Find with a size array|
+
+## Practical variations
+
+<strong>Tracking component sizes.</strong> Keep a `size` array updated on union. Useful for "largest component" queries and for union by size, which performs comparably to union by rank.
+
+<strong>Counting components.</strong> Start at n and decrement on each successful union. One integer, and it answers "is the graph connected yet?" in O(1).
+
+<strong>Weighted Union-Find.</strong> Store an offset alongside each parent pointer to maintain relative values &mdash; used for problems involving equations between variables, or relative positions.
+
+<strong>Union-Find on arbitrary keys.</strong> Replace the arrays with dictionaries so elements need not be integers 0..n&minus;1.
+
+## Questions people ask
+
+<strong>What does O(&alpha;(n)) mean?</strong> The inverse Ackermann function, below 5 for any conceivable n. Treat it as constant.
+
+<strong>Can I undo a union?</strong> Not with path compression. A rollback variant exists without it, at O(log n).
+
+<strong>Union by rank or by size?</strong> Both work and give the same complexity. Size is slightly more intuitive and lets you query component sizes for free.
+
+<strong>Does it work for directed graphs?</strong> No &mdash; it models symmetric connectivity only.
+
+<strong>Why does path compression not break correctness?</strong> Because only the <em>root</em> identifies the set, and re-pointing nodes closer to the same root changes nothing about membership.
+
+<strong>How does it compare with BFS for connectivity?</strong> BFS answers one query in O(V+E). Union-Find answers many queries on a growing graph in near-constant time each.
+
+## Recap in one screen
+
+- `find` returns a set's representative; `union` merges two sets; equality of representatives means connected.
+- Union by rank keeps trees shallow; path compression flattens them during `find`.
+- Together they give amortised O(&alpha;(n)) &mdash; effectively constant for any real input.
+- Kruskal's MST algorithm is the canonical use, where `union` returning False <em>is</em> the cycle check.
+- It supports merging only &mdash; no efficient deletion, and no directed reachability.

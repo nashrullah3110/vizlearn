@@ -19,6 +19,80 @@ When k is O(n) this is linear and beats every comparison sort. When k is large i
 
 So the honest rule is that counting sort is linear <em>in n and k together</em>, and it is only a good idea when k is comparable to n or smaller.
 
+## Sorting without comparing
+
+Every comparison-based sort needs at least O(n log n) comparisons &mdash; that is a proven lower bound. Counting sort avoids it by not comparing at all.
+
+Instead it counts how many times each value occurs, then reconstructs the array in order from the counts.
+
+Sorting [4, 2, 2, 8, 3, 3, 1] with values in the range 0&ndash;8:
+
+|Step|Result|
+|---|---|
+|Count occurrences|`[0,1,2,2,1,0,0,0,1]` &mdash; index is the value|
+|Read back in order|[1, 2, 2, 3, 3, 4, 8]|
+
+```python
+def counting_sort(arr, k):
+    """k is the exclusive upper bound on values (0 <= x < k)."""
+    counts = [0] * k
+    for x in arr:
+        counts[x] += 1
+    out = []
+    for value, c in enumerate(counts):
+        out.extend([value] * c)
+    return out
+```
+
+That is O(n + k) time &mdash; one pass to count, one pass over the count array &mdash; and it beats O(n log n) whenever k is not much larger than n.
+
+## The catch: k
+
+Counting sort's complexity contains the <em>range</em> of the values, not just their number.
+
+|n|Value range k|Counting sort|Comparison sort|
+|---|---|---|---|
+|1,000|0&ndash;100|Excellent|Slower|
+|1,000|0&ndash;1,000,000|Terrible &mdash; a million-element array|Fine|
+|1,000,000|0&ndash;255|Excellent|Slower|
+|1,000|Arbitrary floats|Not applicable|The only option|
+
+So the requirements are strict:
+
+<strong>Keys must be integers,</strong> or mappable to a small integer range. Floats and arbitrary strings do not qualify.
+
+<strong>The range must be known</strong> in advance, or computed in an extra pass.
+
+<strong>The range must be small</strong> relative to n. Sorting 100 values spread over 0 to a billion allocates a billion counters.
+
+That last point is the practical filter. Counting sort is not a general-purpose sort; it is a specialised tool for bounded small-integer keys, and it is excellent there.
+
+## The stable version
+
+The simple version above discards the original objects &mdash; it reconstructs values from counts, which is fine for plain integers and useless when each key has associated data.
+
+The stable version computes <strong>cumulative</strong> counts to determine each element's output position, then places elements by walking the input backwards:
+
+```python
+def counting_sort_stable(arr, key, k):
+    counts = [0] * k
+    for x in arr:
+        counts[key(x)] += 1
+
+    for i in range(1, k):
+        counts[i] += counts[i - 1]        # cumulative: end position of each key
+
+    out = [None] * len(arr)
+    for x in reversed(arr):               # backwards preserves stability
+        counts[key(x)] -= 1
+        out[counts[key(x)]] = x
+    return out
+```
+
+Two details are load-bearing. The cumulative counts give each key's ending position in the output. And iterating the input <strong>backwards</strong> is what makes it stable: the last occurrence of a key is placed last, preserving the original relative order.
+
+That stability is not a nicety &mdash; it is what makes radix sort possible.
+
 ## Exploration guide
 
 1. <strong>Watch the tally build.</strong> Set <strong>Array Size</strong> to 20 and <strong>Max Value Limit (K)</strong> to 5, then press <strong>Next Step</strong> through the counting pass. No two input elements are ever compared &mdash; each one simply increments a bucket.
@@ -44,3 +118,66 @@ Stability is not a nicety here: it is the entire reason <strong>radix sort</stro
 ## Key takeaway
 
 Counting sort tallies occurrences, converts the tallies to positions with a prefix sum, and writes elements straight to their final slots &mdash; no comparisons, so the &Omega;(n log n) bound does not apply. It runs in O(n + k) and is only worth using when the value range k is comparable to n. Its stability, which comes from that backwards final pass, is what makes radix sort possible.
+
+## Radix sort: counting sort applied digit by digit
+
+Counting sort fails on large ranges. Radix sort fixes that by sorting on one digit at a time, using counting sort for each pass.
+
+Sorting 32-bit integers: instead of a range of 4 billion, do four passes over bytes, each with a range of 256.
+
+<p class="mono-font">O(d &times; (n + k))&nbsp;&nbsp;where d = number of digits, k = base</p>
+
+For 32-bit integers in base 256: d = 4, k = 256, so O(4(n + 256)) &mdash; effectively linear.
+
+The crucial requirement is that each pass must be <strong>stable</strong>, or earlier digits' ordering is destroyed. That is exactly why the stable version of counting sort matters, and why the two topics belong together.
+
+<strong>Least significant digit first</strong> is the usual direction: sort by the last digit, then the next, and so on. After the final pass the array is fully sorted, because each pass preserves the previous ones' work.
+
+Radix sort is genuinely used: for fixed-width integer keys at scale it outperforms comparison sorts, and it appears in database sorting, GPU sorting libraries and some string sorting.
+
+## Bucket sort, the third of the family
+
+<strong>Bucket sort</strong> distributes elements into buckets by value range, sorts each bucket (often with insertion sort), and concatenates.
+
+It works well when values are <strong>uniformly distributed</strong>: with n buckets and n elements uniformly spread, each bucket holds about one element and the total is O(n).
+
+It degrades to O(n²) when the distribution is skewed and everything lands in one bucket &mdash; which is its main weakness, and why it is less robust than radix sort.
+
+|Sort|Requires|Complexity|Stable|
+|---|---|---|---|
+|Counting|Small integer range|O(n + k)|Yes, in the cumulative form|
+|Radix|Fixed-width keys|O(d(n + k))|Yes, and must be|
+|Bucket|Uniform distribution|O(n) average, O(n&sup2;) worst|Depends on the inner sort|
+
+## Where these are used
+
+- <strong>Sorting by age, score, grade, priority</strong> &mdash; naturally small integer ranges.
+- <strong>Character and byte counting</strong> &mdash; the counts array is the histogram, and often the histogram is what you wanted.
+- <strong>Image processing</strong> &mdash; pixel intensity histograms are counting sort's count array.
+- <strong>Radix sort in databases and GPU libraries</strong> for large integer key sets.
+- <strong>Suffix array construction,</strong> which uses radix sort internally.
+- <strong>As a subroutine</strong> wherever keys are bounded integers and linear time matters.
+
+Note the histogram point: computing the count array is frequently useful in itself, and the sorting is a bonus.
+
+## Questions people ask
+
+<strong>Why is counting sort not O(n log n)-bound?</strong> The lower bound applies to comparison-based sorts. Counting sort never compares two elements.
+
+<strong>When is it worth using?</strong> When keys are integers in a range comparable to n. If k is much larger than n, it is worse than sorting normally.
+
+<strong>Can it handle negative numbers?</strong> Yes &mdash; offset by the minimum value, or index the count array from the minimum.
+
+<strong>Can it sort floats or strings?</strong> Not directly. Radix sort handles fixed-width strings; floats need bit-level tricks or a different sort.
+
+<strong>Is it stable?</strong> The cumulative-count version is, and it must be for radix sort to work.
+
+<strong>What does Python use?</strong> Timsort, a comparison sort, because it must handle arbitrary comparable objects. Counting sort is something you write for a specific bounded-key case.
+
+## Recap in one screen
+
+- Count occurrences and read back in order: O(n + k), with no comparisons at all.
+- k is the value <em>range</em>, so it only wins when the range is comparable to the number of elements.
+- The cumulative-count version is stable and preserves associated data, which the naive version discards.
+- Radix sort applies stable counting sort digit by digit, making large integer ranges linear.
+- Bucket sort is the distribution-dependent cousin: O(n) when values are uniform, O(n&sup2;) when skewed.

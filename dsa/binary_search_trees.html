@@ -495,12 +495,71 @@
                     <p>A hash table is faster for pure lookup &mdash; O(1) versus O(log n). But a BST keeps its data <strong>ordered</strong>, which a hash table cannot. Use a tree when you need sorted iteration, range queries ("all values between 20 and 50"), or nearest-neighbour lookups. Use a hash table when you only ever ask "is this exact key present?".</p>
                 </div>
                 <div>
+                    <h3>Ordered structure, not just storage</h3>
+                    <p>A binary search tree keeps one invariant at every node:</p><strong>Everything in the left subtree is smaller; everything in the right subtree is larger.</strong><p>That single rule makes search work like binary search: compare, then discard half the tree.</p><pre><code>        8
+      /   \
+     3     10
+    / \      \
+   1   6      14
+      / \    /
+     4   7  13</code></pre><p>Searching for 6: 6 &lt; 8 so go left; 6 &gt; 3 so go right; found. Three comparisons for seven nodes.</p><div class="vz-table-wrap"><table><thead><tr><th>Operation</th><th>Balanced</th><th>Degenerate</th></tr></thead><tbody><tr><td>Search</td><td>O(log n)</td><td>O(n)</td></tr><tr><td>Insert</td><td>O(log n)</td><td>O(n)</td></tr><tr><td>Delete</td><td>O(log n)</td><td>O(n)</td></tr><tr><td>In-order traversal</td><td>O(n)</td><td>O(n)</td></tr><tr><td>Minimum / maximum</td><td>O(log n)</td><td>O(n)</td></tr></tbody></table></div><p>The difference between those columns is the whole subject, and it is what balanced trees exist to guarantee.</p>
+                </div>
+                <div>
+                    <h3>Why an in-order traversal is sorted</h3>
+                    <p>Visit the left subtree, then the node, then the right subtree, and values come out in ascending order &mdash; because everything left is smaller and everything right is larger, recursively.</p><pre><code class="language-python">def inorder(node, out):
+    if node:
+        inorder(node.left, out)
+        out.append(node.value)
+        inorder(node.right, out)</code></pre><p>That is the property hash tables cannot offer, and it is why BSTs are used where ordering matters:</p><ul><li><strong>Range queries</strong> &mdash; all values between 10 and 50, found by traversing a subtree.</li><li><strong>Nearest neighbour</strong> &mdash; the closest value to a target.</li><li><strong>Sorted iteration</strong> without sorting.</li><li><strong>Successor and predecessor</strong> of a given value.</li><li><strong>Minimum and maximum</strong> &mdash; walk left or right to the end.</li></ul><p>A hash table does none of those. That is the trade: O(1) unordered lookup, or O(log n) with order.</p>
+                </div>
+                <div>
+                    <h3>The degenerate case</h3>
+                    <p>Insert 1, 2, 3, 4, 5 into an empty BST in that order and every node becomes the right child of the last. The tree is a linked list, and every operation is O(n).</p><strong>Sorted input produces the worst possible tree.</strong> That is not a rare pathological case &mdash; inserting records in id order, or in date order, is entirely normal.<p>Three responses:</p><strong>Self-balancing trees.</strong> AVL and red-black trees rotate on insertion to keep the height O(log n) automatically. This is what production implementations use.<strong>Randomised insertion order,</strong> if you control it. Expected height O(log n).<strong>A different structure.</strong> A sorted array with binary search, or a skip list, or a B-tree for disk-based data.<div class="vz-table-wrap"><table><thead><tr><th>Tree</th><th>Balance rule</th><th>Character</th></tr></thead><tbody><tr><td>AVL</td><td>Heights differ by at most 1</td><td>Strictly balanced; faster lookups</td></tr><tr><td>Red-black</td><td>Colour rules bound the height</td><td>Fewer rotations; faster insertion</td></tr><tr><td>B-tree</td><td>Many keys per node</td><td>Designed for disk pages</td></tr><tr><td>Treap</td><td>Random priorities</td><td>Simple, probabilistic balance</td></tr></tbody></table></div><p>Red-black trees are what most standard libraries use for ordered maps &mdash; C++'s <code>std::map</code>, Java's <code>TreeMap</code> &mdash; because they balance insertion and lookup cost well.</p>
+                </div>
+                <div>
                     <h3>Guided tour</h3>
                     <ol><li><strong>Insert a few values</strong> and watch each one walk down the tree, going left or right at every comparison.</li><li><strong>Search for something.</strong> The highlighted path shows roughly half the remaining tree being discarded at each step.</li><li><strong>Press In-order traversal.</strong> The values come out perfectly sorted &mdash; that is the BST rule paying off.</li><li><strong>Press Sorted input.</strong> The tree collapses into a straight line and the height jumps to n &mdash; every search is now linear.<button class="vz-run" type="button" data-vz-run="0" aria-label="Run this experiment in the visualisation: Press Sorted input"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Delete a node with two children</strong> and note which value replaces it: the in-order successor, the only choice that keeps the ordering intact.</li></ol>
                 </div>
                 <div>
                     <h3>In one line</h3>
                     <p>A BST turns the binary-search idea into a living structure with O(log n) search, insert and delete &mdash; but only while it stays bushy. Sorted input degenerates it to a linked list, which is precisely why self-balancing variants exist and why they, not plain BSTs, are what production libraries ship.</p>
+                </div>
+                <div>
+                    <h3>Deletion, the awkward operation</h3>
+                    <p>Insertion and search are straightforward. Deletion has three cases, and the third is where implementations go wrong.</p><strong>A leaf.</strong> Remove it.<strong>One child.</strong> Replace the node with its child.<strong>Two children.</strong> Replace the node's value with its <strong>in-order successor</strong> &mdash; the smallest value in its right subtree &mdash; then delete that successor, which by construction has at most one child.<pre><code class="language-python">def delete(node, value):
+    if not node:
+        return None
+    if value &lt; node.value:
+        node.left = delete(node.left, value)
+    elif value &gt; node.value:
+        node.right = delete(node.right, value)
+    else:
+        if not node.left:
+            return node.right
+        if not node.right:
+            return node.left
+        succ = node.right                      # find the in-order successor
+        while succ.left:
+            succ = succ.left
+        node.value = succ.value
+        node.right = delete(node.right, succ.value)
+    return node</code></pre><p>The predecessor (largest in the left subtree) works equally well. Either choice preserves the ordering invariant, which is what matters.</p><p>Note that repeated deletions can unbalance a tree even if insertions were balanced &mdash; another argument for a self-balancing implementation.</p>
+                </div>
+                <div>
+                    <h3>Where trees beat hash tables</h3>
+                    <div class="vz-table-wrap"><table><thead><tr><th>Need</th><th>Structure</th></tr></thead><tbody><tr><td>Lookup by exact key</td><td>Hash table &mdash; O(1)</td></tr><tr><td>Range queries</td><td>Tree</td></tr><tr><td>Sorted iteration</td><td>Tree</td></tr><tr><td>Nearest key</td><td>Tree</td></tr><tr><td>Minimum or maximum</td><td>Tree, or a heap</td></tr><tr><td>Predictable worst case</td><td>Balanced tree &mdash; O(log n) guaranteed</td></tr></tbody></table></div><p>The last row is worth noting: a hash table's O(1) is an average, with an O(n) worst case; a balanced tree's O(log n) is a guarantee. For latency-sensitive systems that certainty sometimes wins.</p><p>In Python specifically, there is no built-in balanced tree. The practical alternatives are <code>dict</code> for unordered lookup, <code>bisect</code> on a sorted list for range queries when insertions are rare, and the third-party <code>sortedcontainers</code> package, which provides sorted list, dict and set types with excellent constant factors.</p>
+                </div>
+                <div>
+                    <h3>B-trees, and why databases use them</h3>
+                    <p>A B-tree node holds many keys &mdash; hundreds &mdash; rather than one, so the tree is very shallow: a few levels for millions of records.</p><p>The reason is disk. Reading from disk or SSD happens in pages of several kilobytes, and the cost is dominated by the number of page reads rather than the comparisons within a page. A binary tree with a million nodes is 20 levels deep, meaning up to 20 page reads. A B-tree with 200 keys per node is 3 levels deep &mdash; 3 reads.</p><p>That is why <strong>every relational database index is a B-tree</strong> (usually a B+ tree, with all values in the leaves and the leaves linked for range scans). It is the same ordering invariant, restructured around the hardware.</p>
+                </div>
+                <div>
+                    <h3>Questions people ask</h3>
+                    <strong>Why not always use a hash table?</strong> Because it has no order. Range queries, sorted iteration and nearest-key lookups all need a tree.<strong>What makes a tree balanced?</strong> Height O(log n). AVL and red-black trees enforce it with rotations on insertion and deletion.<strong>What happens with sorted insertions?</strong> An unbalanced tree degrades to a linked list &mdash; O(n) operations. This is common in practice, not a corner case.<strong>How do I do a range query?</strong> Traverse in order, pruning subtrees entirely outside the range.<strong>Does Python have a balanced tree?</strong> Not in the standard library. Use `bisect` on a sorted list, or `sortedcontainers`.<strong>What is the difference between a BST and a heap?</strong> A BST orders left-node-right for sorted access; a heap only orders parent against children, giving O(1) access to the extreme value and no ordering otherwise.
+                </div>
+                <div>
+                    <h3>Recap in one screen</h3>
+                    <ul><li>Left subtree smaller, right subtree larger &mdash; that invariant gives O(log n) search on a balanced tree.</li><li>An in-order traversal yields sorted values, which is what hash tables cannot do.</li><li>Sorted insertions produce a degenerate O(n) tree, so self-balancing (AVL, red-black) is what production uses.</li><li>Deletion with two children replaces the node with its in-order successor.</li><li>B-trees widen the nodes to match disk pages, which is why every database index is one.</li></ul>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->
