@@ -33,6 +33,85 @@ Naive Fibonacci is O(2&#8319;); with DP it is O(n). At n = 40 that is roughly a 
 - <strong>Edit distance</strong> &mdash; minimum insertions, deletions and substitutions to turn one string into another. Powers spell-checkers and diff tools.
 - <strong>Coin change</strong> &mdash; fewest coins making a target. A greedy approach fails on awkward denominations; DP always succeeds.
 
+## Remembering instead of recomputing
+
+Dynamic programming applies when a problem has two properties:
+
+<strong>Overlapping subproblems.</strong> The same smaller problem is solved many times.
+
+<strong>Optimal substructure.</strong> The best solution is built from the best solutions to its subproblems.
+
+Naive recursive Fibonacci demonstrates the first spectacularly:
+
+```python
+def fib(n):
+    return n if n < 2 else fib(n-1) + fib(n-2)
+```
+
+Computing `fib(40)` makes about 331 million calls, because `fib(35)` is recomputed millions of times. It is O(2ⁿ).
+
+Store each result the first time it is computed and the tree collapses:
+
+```python
+from functools import lru_cache
+
+@lru_cache(maxsize=None)
+def fib(n):
+    return n if n < 2 else fib(n-1) + fib(n-2)
+```
+
+O(n) time, and `fib(40)` returns instantly. One decorator, three orders of magnitude.
+
+|n|Naive calls|Memoised calls|
+|---|---|---|
+|10|177|11|
+|20|21,891|21|
+|40|331,160,281|41|
+
+## Top-down and bottom-up
+
+Two ways to write the same solution, and they differ in style rather than complexity.
+
+<strong>Memoisation (top-down)</strong> is recursion plus a cache. Write the recurrence naturally and add `@lru_cache`. Only the subproblems actually needed are computed, which matters when the state space is large and sparsely visited.
+
+<strong>Tabulation (bottom-up)</strong> fills a table from the base cases upwards, iteratively. No recursion, so no stack limit, and usually a smaller constant factor.
+
+```python
+def fib_table(n):
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a                    # O(n) time, O(1) space
+```
+
+That last version illustrates the further optimisation available to many DP solutions: if each state depends only on the previous one or two, the whole table is unnecessary and two variables suffice. Space drops from O(n) to O(1).
+
+|&nbsp;|Memoisation|Tabulation|
+|---|---|---|
+|Style|Recursive|Iterative|
+|Computes|Only needed states|All states|
+|Stack risk|Yes|No|
+|Space optimisation|Harder|Often easy|
+|Easier to write|Usually|Usually not|
+
+Write it top-down first, because the recurrence is what you actually have to think about. Convert to bottom-up if recursion depth or constant factors matter.
+
+## Recognising a DP problem
+
+The signals are recognisable once you have seen a few:
+
+<strong>"Find the maximum/minimum/number of ways"</strong> over a set of choices.
+
+<strong>Each step has a small number of options,</strong> and the choices interact.
+
+<strong>Brute force is exponential</strong> because the same situations recur.
+
+<strong>The answer for n depends on answers for smaller inputs.</strong>
+
+The method is always the same four steps: define the <strong>state</strong> (what distinguishes one subproblem from another), write the <strong>recurrence</strong> (how a state's answer follows from smaller states), identify the <strong>base cases</strong>, and decide the <strong>order</strong> of computation.
+
+Defining the state is the hard part. Everything else is mechanical once the state is right.
+
 ## Things to try
 
 1. <strong>Run Fibonacci and step through.</strong> Each cell reads exactly two earlier cells &mdash; highlighted in amber &mdash; and is computed once and only once.
@@ -44,3 +123,64 @@ Naive Fibonacci is O(2&#8319;); with DP it is O(n). At n = 40 that is roughly a 
 ## Worth remembering
 
 Dynamic programming is recursion plus memory. Spot repeated subproblems, define a recurrence, fill a table in dependency order, and exponential work collapses to polynomial. The difficulty is never the code &mdash; it is finding the recurrence.
+
+## The classic problems, by state shape
+
+|Problem|State|Recurrence sketch|
+|---|---|---|
+|Fibonacci|`i`|`f(i) = f(i-1) + f(i-2)`|
+|Climbing stairs|`i`|Same as Fibonacci|
+|Coin change|`amount`|`min over coins of 1 + f(amount - coin)`|
+|0/1 knapsack|`(item, capacity)`|Take it or leave it, whichever is better|
+|Longest common subsequence|`(i, j)`|Match: `1 + f(i-1, j-1)`, else max of skipping either|
+|Edit distance|`(i, j)`|Insert, delete or substitute, whichever is cheapest|
+|Longest increasing subsequence|`i`|`1 + max over previous smaller elements`|
+
+Two observations from that table.
+
+<strong>The state dimension determines the complexity.</strong> A one-dimensional state over n values is O(n) states; a two-dimensional state over two strings is O(nm). Multiply by the work per state to get the total.
+
+<strong>Two-dimensional string problems are one family.</strong> Longest common subsequence, edit distance and sequence alignment share a shape: compare the current characters, and either match them or skip one. Learning one gives you the others.
+
+## Where it is used in practice
+
+- <strong>`diff` and version control</strong> &mdash; longest common subsequence on lines.
+- <strong>Spell checking and fuzzy matching</strong> &mdash; edit distance.
+- <strong>Bioinformatics</strong> &mdash; Needleman-Wunsch and Smith-Waterman sequence alignment are DP.
+- <strong>Speech recognition</strong> &mdash; the Viterbi algorithm finds the most likely state sequence.
+- <strong>Resource allocation and scheduling</strong> &mdash; knapsack variants.
+- <strong>Text justification</strong> &mdash; the line-breaking algorithm in TeX.
+- <strong>Reinforcement learning</strong> &mdash; value iteration is DP over states.
+
+That list is worth noticing because DP has a reputation as an interview topic. It is in fact behind several tools you use daily.
+
+## Common mistakes
+
+- <strong>A state that does not capture everything relevant.</strong> If two situations with the same state have different answers, the state is wrong. This is the root cause of most incorrect DP solutions.
+- <strong>Missing or wrong base cases.</strong> Off-by-one at the boundary propagates everywhere.
+- <strong>Mutable default arguments as caches.</strong> `def f(n, memo={})` shares one cache across all calls, which sometimes helps and sometimes leaks between unrelated inputs.
+- <strong>Recursion depth.</strong> Top-down on n = 100,000 exceeds Python's stack limit. Convert to iteration.
+- <strong>Unhashable arguments with `lru_cache`.</strong> Lists cannot be cached; convert to tuples.
+- <strong>Filling the table in the wrong order,</strong> so a state is computed before its dependencies.
+
+## Questions people ask
+
+<strong>How do I know a problem is DP?</strong> Exponential brute force, overlapping subproblems, and an answer built from smaller answers. "Count the ways" or "find the optimum over choices" are strong hints.
+
+<strong>Memoisation or tabulation?</strong> Write memoisation first &mdash; it is easier to get right. Convert if you hit stack limits or need the space optimisation.
+
+<strong>What is the difference from divide and conquer?</strong> Divide and conquer splits into <em>independent</em> subproblems (merge sort). DP applies when they overlap, so caching pays.
+
+<strong>What is the difference from greedy?</strong> Greedy commits to a locally best choice and never reconsiders. DP considers all choices and keeps the best. Greedy is faster and only correct for some problems.
+
+<strong>Can I always reduce the space?</strong> Only when each state depends on a bounded window of earlier states. A full two-dimensional dependency needs the table.
+
+<strong>Is `lru_cache` enough?</strong> For most top-down solutions, yes &mdash; it is C-speed and handles eviction. Use an explicit dict when you need to inspect or control the cache.
+
+## Recap in one screen
+
+- DP applies when subproblems overlap and the optimum is built from sub-optima.
+- Memoisation is recursion plus a cache; tabulation fills a table iteratively from the base cases.
+- Defining the state correctly is the whole problem; the recurrence follows from it.
+- Complexity is the number of states times the work per state.
+- It powers `diff`, spell checking, sequence alignment, Viterbi decoding and scheduling &mdash; not only interviews.

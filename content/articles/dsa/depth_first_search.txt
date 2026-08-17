@@ -27,6 +27,75 @@ DFS is <strong>O(V + E)</strong>: every vertex is pushed and popped once, and ev
 
 The visited set is not an optimisation, it is a correctness requirement. Without it, any cycle sends the search around forever, and even in an acyclic graph a diamond shape causes exponential re-exploration of shared subgraphs.
 
+## Following one path to the end
+
+Depth-first search goes as deep as it can along one branch before backtracking to try another.
+
+The mechanism is a <strong>stack</strong> &mdash; explicitly, or implicitly through recursion. Recursion is the natural expression:
+
+```python
+def dfs(graph, node, visited=None):
+    if visited is None:
+        visited = set()
+    visited.add(node)
+    for nbr in graph[node]:
+        if nbr not in visited:
+            dfs(graph, nbr, visited)
+    return visited
+```
+
+The iterative form makes the stack explicit, and it is what you need when the graph is deep enough to exceed Python's recursion limit of about 1,000 frames:
+
+```python
+def dfs_iter(graph, start):
+    visited, stack = set(), [start]
+    while stack:
+        node = stack.pop()               # from the END - that is what makes it DFS
+        if node in visited:
+            continue
+        visited.add(node)
+        stack.extend(graph[node])
+    return visited
+```
+
+The single difference from BFS is `stack.pop()` against `queue.popleft()`. Last-in-first-out gives depth-first; first-in-first-out gives breadth-first. Everything else is identical.
+
+## Three orders for trees
+
+On a tree, <em>when</em> you process a node relative to its children gives three traversals, and each has a purpose:
+
+|Order|Sequence|Use|
+|---|---|---|
+|Pre-order|Node, left, right|Copying a tree, serialising, prefix expressions|
+|In-order|Left, node, right|<strong>Sorted order</strong> in a binary search tree|
+|Post-order|Left, right, node|Deleting a tree, evaluating expressions, computing sizes|
+
+```python
+def inorder(node, out):
+    if node:
+        inorder(node.left, out)
+        out.append(node.value)          # between the two recursions
+        inorder(node.right, out)
+```
+
+The in-order row is the important one: an in-order traversal of a binary search tree visits values in ascending order, which is why BSTs support sorted iteration and hash tables do not.
+
+Post-order is the one to reach for when a node's result depends on its children &mdash; computing subtree sizes, heights, or deleting nodes safely.
+
+## What DFS is naturally good at
+
+<strong>Connectivity.</strong> Run DFS from a node; whatever it reaches is that node's connected component.
+
+<strong>Cycle detection.</strong> A cycle exists if DFS encounters a node currently on the recursion stack. Note the distinction: <em>on the stack</em>, not merely <em>visited</em> &mdash; a visited node not on the current path is a cross edge, not a cycle.
+
+<strong>Topological sorting.</strong> The reverse of the post-order finishing sequence is a valid topological order for a directed acyclic graph.
+
+<strong>Path finding and backtracking.</strong> Exploring a decision tree &mdash; sudoku, n-queens, permutations &mdash; is DFS with undo.
+
+<strong>Strongly connected components.</strong> Tarjan's and Kosaraju's algorithms are both built on DFS.
+
+BFS can do connectivity too. What BFS cannot easily do is anything requiring knowledge of the current path, which is exactly what the recursion stack gives DFS for free.
+
 ## Things to try
 
 1. <strong>Watch it commit to one branch.</strong> Press <strong>Start Search</strong> and then <strong>Step</strong> repeatedly. The frontier is always a single path running away from the start &mdash; nothing fans out sideways.
@@ -54,3 +123,79 @@ DFS answers questions about structure and connectivity rather than distance:
 ## In one line
 
 Depth-first search uses a stack to follow one path to exhaustion before backtracking, running in O(V + E) with O(h) stack space. It answers structural questions &mdash; cycles, components, topological order &mdash; extremely cheaply, and it is the wrong tool for anything involving distance, because it will happily visit a direct neighbour of the start last.
+
+## Cycle detection, done correctly
+
+In a <strong>directed</strong> graph, three states are needed rather than two:
+
+```python
+WHITE, GREY, BLACK = 0, 1, 2         # unvisited, on the stack, finished
+
+def has_cycle(graph):
+    colour = {n: WHITE for n in graph}
+
+    def visit(n):
+        colour[n] = GREY
+        for m in graph[n]:
+            if colour[m] == GREY:     # back edge to the current path
+                return True
+            if colour[m] == WHITE and visit(m):
+                return True
+        colour[n] = BLACK
+        return False
+
+    return any(visit(n) for n in graph if colour[n] == WHITE)
+```
+
+The grey state is the whole point. Meeting a <strong>grey</strong> node means an edge back to something on the current path &mdash; a cycle. Meeting a <strong>black</strong> node means an already-finished subtree, which is not a cycle. Using a single visited set conflates the two and reports cycles that do not exist.
+
+In an <strong>undirected</strong> graph it is simpler: a cycle exists if DFS reaches an already-visited node that is not the immediate parent.
+
+## Recursion depth, the practical limit
+
+Python's default recursion limit is about 1,000 frames. A graph that is a long chain &mdash; a linked list, a path graph, a deep tree &mdash; will exceed it.
+
+Three responses:
+
+<strong>Convert to the iterative form</strong> with an explicit stack. Always available, and it is what production code should use for arbitrary input.
+
+<strong>Raise the limit</strong> with `sys.setrecursionlimit`. Works up to the actual C stack size, and a segmentation fault is the failure mode rather than a clean exception.
+
+<strong>Increase the thread stack size</strong> and run the search in a thread. Occasionally used, and awkward.
+
+The iterative version has one subtlety: to replicate post-order (needed for topological sort), the node must be pushed back with a marker after its children, or visited in two phases. That is why recursive DFS is preferred where depth allows &mdash; the ordering comes free.
+
+## Complexity and where each is cheaper
+
+<strong>Time:</strong> O(V + E) for both DFS and BFS &mdash; each node and edge examined once.
+
+<strong>Space:</strong> DFS is O(depth), BFS is O(width). That difference decides which is usable on a large graph.
+
+|Graph shape|Cheaper|
+|---|---|
+|Deep and narrow (a long chain)|BFS &mdash; small frontier|
+|Wide and shallow (a social graph)|DFS &mdash; short path|
+|Balanced tree|Similar|
+|Grid|Similar; BFS if you need distance|
+
+## Questions people ask
+
+<strong>Recursive or iterative?</strong> Recursive is clearer and hits Python's stack limit on deep graphs. Use iterative for arbitrary input.
+
+<strong>Does DFS find the shortest path?</strong> No. It finds <em>a</em> path, which may be much longer than the shortest. Use BFS on unweighted graphs.
+
+<strong>Why three colours for cycle detection?</strong> To distinguish an edge back to the current path (a cycle) from an edge into a finished subtree (not a cycle).
+
+<strong>Can DFS handle disconnected graphs?</strong> Run it from every unvisited node; each run finds one component.
+
+<strong>What is the difference from backtracking?</strong> Backtracking is DFS over a state space with explicit undo, and usually with pruning of branches that cannot succeed.
+
+<strong>How do I get a topological order?</strong> Reverse the post-order finishing sequence, and check for cycles &mdash; a cyclic graph has no topological order.
+
+## Recap in one screen
+
+- A stack &mdash; explicit or via recursion &mdash; makes exploration go deep before wide.
+- Pre-, in- and post-order differ only in when the node is processed; in-order on a BST gives sorted output.
+- The recursion stack encodes the current path, which is what makes cycle detection and topological sorting natural.
+- Directed cycle detection needs three states: unvisited, on-stack, finished.
+- O(V+E) time and O(depth) space &mdash; cheaper than BFS on wide graphs, more likely to hit the recursion limit on deep ones.

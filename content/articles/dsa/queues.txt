@@ -32,6 +32,69 @@ One data-structure choice completely changes the traversal order &mdash; and wit
 - <strong>Priority queue</strong> &mdash; serves the <em>highest priority</em> item rather than the oldest. Usually built on a heap, and the engine behind Dijkstra and A*.
 - <strong>Blocking queue</strong> &mdash; waits when empty or full. The standard tool for passing work between threads.
 
+## First in, first out
+
+A queue adds at one end and removes from the other. The oldest item is served first, which is what "queue" means outside computing too.
+
+|Operation|Meaning|Cost|
+|---|---|---|
+|enqueue|Add to the back|O(1)|
+|dequeue|Remove from the front|O(1)|
+|peek|Look at the front|O(1)|
+|is_empty|Nothing left|O(1)|
+
+In Python, use `collections.deque` and not a list:
+
+```python
+from collections import deque
+
+q = deque()
+q.append(1)          # enqueue at the back
+q.append(2)
+q.popleft()          # 1 - dequeue from the front, O(1)
+```
+
+<strong>A list is the wrong choice.</strong> `list.pop(0)` shifts every remaining element, so it is O(n), and a loop dequeuing n items becomes O(n²). This is the single most common queue performance bug, and it is easy to miss because the code looks correct and works on small inputs.
+
+`deque` is implemented as a doubly linked list of fixed-size blocks, giving O(1) at both ends with far better cache behaviour than one node per element.
+
+## Why BFS needs a queue
+
+The clearest use, and the reason it appears in every graph algorithm discussion.
+
+Breadth-first search must process all nodes at distance 1 before any at distance 2. A queue's first-in-first-out order produces exactly that: neighbours added later are processed later, so exploration proceeds in rings.
+
+```python
+def bfs(graph, start):
+    visited = {start}
+    q = deque([start])
+    while q:
+        node = q.popleft()
+        for nbr in graph[node]:
+            if nbr not in visited:
+                visited.add(nbr)
+                q.append(nbr)
+    return visited
+```
+
+Swap `popleft()` for `pop()` and the same code becomes depth-first search. The data structure <em>is</em> the algorithm's traversal order &mdash; which is the neatest illustration of why choosing the right structure matters.
+
+## The variants
+
+|Type|Behaviour|Python|
+|---|---|---|
+|Simple queue|FIFO|`collections.deque`|
+|Deque|Add and remove at both ends|`collections.deque`|
+|Priority queue|Highest priority first|`heapq`|
+|Circular buffer|Fixed size; overwrites oldest|`deque(maxlen=n)`|
+|Blocking queue|Waits when empty or full|`queue.Queue`|
+
+<strong>`deque(maxlen=n)`</strong> deserves a mention because it is genuinely useful and under-known: it silently discards from the opposite end when full, which gives you a rolling window of the last n items in one line. Ideal for recent-events buffers and moving-window statistics.
+
+<strong>Priority queues</strong> are not FIFO at all &mdash; they serve by priority, and they are heaps. Dijkstra's algorithm is BFS with a priority queue substituted for the plain queue.
+
+<strong>`queue.Queue`</strong> adds locking for producer-consumer communication between threads. It is slower than `deque` and that is the price of thread safety; use `deque` in single-threaded code.
+
 ## Experiments to try
 
 1. <strong>Enqueue A, B, C then dequeue.</strong> A comes out first &mdash; the opposite of a stack.
@@ -43,3 +106,63 @@ One data-structure choice completely changes the traversal order &mdash; and wit
 ## Worth remembering
 
 A queue preserves arrival order with O(1) work at both ends, provided you move pointers rather than data. Its most important property in algorithms is level-by-level processing &mdash; swapping a stack for a queue turns depth-first search into breadth-first search and nothing else changes.
+
+## Where queues appear in systems
+
+- <strong>Task and job queues.</strong> Celery, RabbitMQ, SQS &mdash; work is enqueued by producers and processed by workers. This is the dominant pattern for decoupling components in distributed systems.
+- <strong>Request handling.</strong> Web servers queue incoming connections when all workers are busy.
+- <strong>Print spoolers and scheduling.</strong> The original example, and still accurate.
+- <strong>Buffering between fast and slow components</strong> &mdash; keyboard input, network packets, audio samples.
+- <strong>Rate limiting.</strong> A queue of timestamps gives a sliding-window limiter.
+- <strong>BFS and level-order traversal.</strong>
+- <strong>Producer-consumer pipelines,</strong> where a bounded queue provides backpressure.
+
+That last point is worth expanding. A <strong>bounded</strong> queue is a design decision, not a limitation: when it fills, producers block, which propagates backpressure upstream instead of allowing unbounded memory growth. An unbounded queue under sustained overload does not fail gracefully &mdash; it consumes memory until the process dies.
+
+So queue depth is a monitoring signal. A steadily growing queue means consumers cannot keep up, and it is a leading indicator of failure well before latency becomes visible to users.
+
+## Circular buffers
+
+A fixed-size array with two indices &mdash; head and tail &mdash; that wrap around using modulo arithmetic.
+
+<p class="mono-font">next index = (index + 1) % capacity</p>
+
+The advantages are no allocation after construction and perfect cache behaviour, which is why they are used in embedded systems, audio processing and network drivers where allocation during operation is unacceptable.
+
+The design decision is what to do when full: reject the new item, block until space is available, or overwrite the oldest. `deque(maxlen=n)` takes the third option, which is right for "keep the most recent n" and wrong for a work queue where losing tasks is unacceptable.
+
+## Queue against stack
+
+|&nbsp;|Queue|Stack|
+|---|---|---|
+|Order|First in, first out|Last in, first out|
+|Graph traversal|Breadth-first|Depth-first|
+|Memory during traversal|The frontier width|The path depth|
+|Natural for|Fairness, scheduling, distance|Backtracking, nesting, undo|
+|Python|`collections.deque`|`list`|
+
+The memory row decides which is usable on a large graph: a queue holds an entire level, which on a wide graph can be enormous; a stack holds one path.
+
+Two stacks can simulate a queue, and two queues can simulate a stack &mdash; a classic exercise that illustrates the relationship, and not something to do in practice.
+
+## Questions people ask
+
+<strong>Why not use a list as a queue?</strong> `pop(0)` is O(n) because it shifts every element. Use `deque`.
+
+<strong>Is `deque` thread-safe?</strong> `append` and `popleft` are atomic thanks to the GIL, so it works for simple producer-consumer use. `queue.Queue` adds proper blocking semantics.
+
+<strong>What is a priority queue?</strong> A queue ordered by priority rather than arrival, implemented as a heap. Not FIFO.
+
+<strong>How do I limit a queue's size?</strong> `deque(maxlen=n)` to discard the oldest, or `queue.Queue(maxsize=n)` to block producers.
+
+<strong>Why do distributed systems use queues?</strong> They decouple producers from consumers, absorb bursts, allow retries, and let the two sides scale and fail independently.
+
+<strong>What is backpressure?</strong> Slowing producers when the queue fills, so overload propagates upstream rather than exhausting memory.
+
+## Recap in one screen
+
+- Add at the back, remove from the front; the oldest item is served first.
+- Use `collections.deque` &mdash; a list's `pop(0)` is O(n) and turns traversals quadratic.
+- A queue makes graph traversal breadth-first, exactly as a stack makes it depth-first.
+- `deque(maxlen=n)` gives a rolling window of the last n items for free.
+- In systems, queues decouple components and provide backpressure &mdash; and queue depth is an early warning signal.

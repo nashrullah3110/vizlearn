@@ -503,12 +503,82 @@
                     <p>Reach for a sliding window when the problem asks about a <strong>contiguous</strong> subarray or substring, and phrases it as longest/shortest/maximum/minimum satisfying a condition.</p><p>The critical requirement is that the running summary can be updated incrementally. Sums and counts work. If the condition needs the whole window recomputed &mdash; a median, say &mdash; you need a heavier structure such as a heap or balanced tree alongside the window.</p>
                 </div>
                 <div>
+                    <h3>A window that grows and shrinks</h3>
+                    <p>The sliding window technique handles problems about <strong>contiguous</strong> subarrays or substrings. Instead of examining every possible window &mdash; O(n²) of them &mdash; it maintains one window with two pointers and adjusts it in a single pass.</p><p>Two variants, and knowing which you need is most of the work.</p><strong>Fixed size.</strong> The window is always k wide. Slide it forward, adding the new element and removing the old one:<pre><code class="language-python">def max_sum_k(arr, k):
+    window = sum(arr[:k])
+    best = window
+    for i in range(k, len(arr)):
+        window += arr[i] - arr[i - k]     # add new, remove old - O(1) per step
+        best = max(best, window)
+    return best</code></pre><p>Recomputing the sum for each window would be O(nk). Updating incrementally makes it O(n), and that incremental update is the whole idea.</p><strong>Variable size.</strong> The window grows while a condition holds and shrinks when it is violated:<pre><code class="language-python">def longest_unique(s):
+    seen = {}
+    left = best = 0
+    for right, ch in enumerate(s):
+        if ch in seen and seen[ch] &gt;= left:
+            left = seen[ch] + 1           # shrink past the duplicate
+        seen[ch] = right
+        best = max(best, right - left + 1)
+    return best</code></pre><p>The pattern is: expand <code>right</code> unconditionally, and move <code>left</code> only as far as needed to restore validity. Each pointer moves at most n times in total, so the whole scan is O(n) despite the nested appearance.</p>
+                </div>
+                <div>
+                    <h3>Recognising the shape</h3>
+                    <p>The signals are consistent:</p><ul><li>The problem mentions a <strong>contiguous</strong> subarray, substring or run.</li><li>It asks for the longest, shortest, or a count of windows satisfying a condition.</li><li>The condition can be <strong>updated incrementally</strong> as elements enter and leave.</li></ul><p>That third point is the real constraint. Sliding window works when adding and removing an element is cheap. Sum, count, and character frequencies all qualify. "Contains a specific permutation" does after being expressed as a frequency comparison. "The subarray's median" does not, cheaply.</p><div class="vz-table-wrap"><table><thead><tr><th>Problem</th><th>Window type</th><th>Condition</th></tr></thead><tbody><tr><td>Max sum of k elements</td><td>Fixed</td><td>&mdash;</td></tr><tr><td>Longest substring without repeats</td><td>Variable</td><td>All characters distinct</td></tr><tr><td>Smallest subarray with sum &ge; target</td><td>Variable</td><td>Running sum &ge; target</td></tr><tr><td>Longest substring with at most k distinct</td><td>Variable</td><td>Distinct count &le; k</td></tr><tr><td>Anagram or permutation in a string</td><td>Fixed</td><td>Frequency map matches</td></tr><tr><td>Max of every k-window</td><td>Fixed</td><td>Needs a monotonic deque</td></tr></tbody></table></div>
+                </div>
+                <div>
+                    <h3>The template worth memorising</h3>
+                    <p>Most variable-window problems fit one shape:</p><pre><code class="language-python">def sliding_window(arr):
+    left = 0
+    state = init_state()
+    best = 0
+    for right in range(len(arr)):
+        add(state, arr[right])              # expand
+
+        while not valid(state):             # shrink until valid again
+            remove(state, arr[left])
+            left += 1
+
+        best = max(best, right - left + 1)  # record
+    return best</code></pre><p>Two variants of the middle block distinguish the two families of question:</p><strong>Longest valid window:</strong> shrink only while <em>invalid</em>, and record after shrinking &mdash; as above.<strong>Shortest valid window:</strong> shrink while <em>still valid</em>, recording before each shrink, because the goal is the smallest window that satisfies the condition.<p>Getting that inversion wrong is the most common sliding-window bug, and the symptom is an answer that is consistently too long or too short.</p>
+                </div>
+                <div>
                     <h3>Try it yourself</h3>
                     <ol><li><strong>Run max-sum with k = 3.</strong> Watch each slide subtract one value and add one &mdash; two operations, never three.</li><li><strong>Raise k to 5.</strong> The naive cost climbs while the sliding-window operation count stays flat. That is the whole point.</li><li><strong>Switch to shortest subarray ≥ target.</strong> The window now grows and shrinks; note that both edges only move rightward.<button class="vz-run" type="button" data-vz-run="0" aria-label="Run this experiment in the visualisation: Switch to shortest subarray ≥ target"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Run longest substring without repeats.</strong> The left edge jumps forward only when a duplicate is found.</li><li><strong>Count total pointer movements.</strong> Each index is entered once and left once &mdash; that is why nested loops still give O(n).</li></ol>
                 </div>
                 <div>
                     <h3>Where that leaves you</h3>
                     <p>A sliding window keeps a running summary and updates it at the edges instead of rebuilding it. Fixed windows add-and-remove; variable windows expand and contract. Because both pointers only move forward, the total cost stays linear even when the code looks nested.</p>
+                </div>
+                <div>
+                    <h3>The monotonic deque variant</h3>
+                    <p>One family needs more than a running counter: the maximum of every k-length window.</p><p>Recomputing the maximum per window is O(nk). A heap gives O(n log k). A <strong>monotonic deque</strong> gives O(n).</p><p>The deque holds indices whose values are in decreasing order. Before appending a new index, pop everything smaller from the back &mdash; those can never be the maximum again, because the new element is larger and stays in the window longer. Pop from the front when it falls out of the window.</p><pre><code class="language-python">from collections import deque
+
+def max_sliding_window(arr, k):
+    dq, out = deque(), []
+    for i, x in enumerate(arr):
+        while dq and arr[dq[-1]] &lt;= x:
+            dq.pop()                       # smaller values can never win
+        dq.append(i)
+        if dq[0] &lt;= i - k:
+            dq.popleft()                   # out of the window
+        if i &gt;= k - 1:
+            out.append(arr[dq[0]])         # front is the maximum
+    return out</code></pre><p>Each index is pushed and popped at most once, so it is O(n) despite the inner <code>while</code>. The front of the deque is always the current window's maximum.</p><p>This structure generalises: the same idea supports minimum-in-window, and it appears inside some dynamic programming optimisations.</p>
+                </div>
+                <div>
+                    <h3>Where it is used</h3>
+                    <ul><li><strong>Rate limiting.</strong> Requests in the last 60 seconds is a sliding window over timestamps.</li><li><strong>Streaming statistics.</strong> Moving averages, rolling maxima, and any windowed aggregate over a data stream.</li><li><strong>Network protocols.</strong> TCP's sliding window controls how much unacknowledged data may be in flight.</li><li><strong>Time-series features.</strong> Rolling means and standard deviations for forecasting models.</li><li><strong>Text processing.</strong> Finding substrings with given character properties; n-gram extraction.</li><li><strong>Anomaly detection.</strong> Comparing a recent window against a baseline.</li></ul><p>The rate-limiting case is worth noting as the everyday production use: a sliding window log or counter is how APIs enforce quotas, and the fixed-window alternative allows twice the intended rate at the boundary between windows.</p>
+                </div>
+                <div>
+                    <h3>Common mistakes</h3>
+                    <ul><li><strong>Shrinking in the wrong condition</strong> &mdash; the longest/shortest inversion described above.</li><li><strong>Recording the answer at the wrong point,</strong> before rather than after restoring validity.</li><li><strong>Not removing from the state when shrinking,</strong> so counts drift.</li><li><strong>Using it on non-contiguous problems.</strong> Sliding window is only for runs; subsequences need dynamic programming.</li><li><strong>Recomputing the aggregate from scratch,</strong> which discards the entire advantage.</li><li><strong>Off-by-one in the window size:</strong> the width is <code>right - left + 1</code>.</li></ul>
+                </div>
+                <div>
+                    <h3>Questions people ask</h3>
+                    <strong>Fixed or variable window?</strong> Fixed when the problem states a size k; variable when it asks for the longest or shortest window satisfying a condition.<strong>Is it always O(n)?</strong> Yes when each pointer only moves forward and the state update is O(1). Both pointers traverse the array at most once.<strong>How is it different from two pointers?</strong> It is a two-pointer technique, specialised to contiguous ranges with a maintained condition.<strong>Can it handle negative numbers?</strong> For sum-based conditions, not straightforwardly &mdash; the running sum is no longer monotonic as the window grows. Prefix sums plus a hash map is the usual alternative.<strong>What about subsequences rather than subarrays?</strong> Not applicable &mdash; subsequences are not contiguous. That is dynamic programming territory.<strong>Why a deque for window maximum?</strong> Because it discards elements that can never win, giving amortised O(1) per element rather than a heap's O(log k).
+                </div>
+                <div>
+                    <h3>Recap in one screen</h3>
+                    <ul><li>One window with two forward-moving pointers replaces examining every subarray.</li><li>Fixed windows update incrementally: add the entering element, remove the leaving one.</li><li>Variable windows expand always and shrink only to restore validity &mdash; and the longest/shortest cases shrink under opposite conditions.</li><li>Only works when the condition can be updated cheaply as elements enter and leave, and only for contiguous ranges.</li><li>A monotonic deque gives window maximum in O(n), where a heap would give O(n log k).</li></ul>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

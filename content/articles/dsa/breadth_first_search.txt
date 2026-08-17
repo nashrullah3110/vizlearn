@@ -37,6 +37,75 @@ Every traversal keeps a collection of nodes it has discovered but not yet proces
 
 Swap the stack for a queue in a DFS implementation and you have written BFS. Nothing else changes.
 
+## Exploring level by level
+
+Breadth-first search visits every node at distance 1 from the start, then every node at distance 2, and so on. It expands outwards in rings.
+
+The mechanism is a <strong>queue</strong>: take the next node from the front, add its unvisited neighbours to the back. Because the queue is first-in-first-out, nodes are processed in order of distance.
+
+```python
+from collections import deque
+
+def bfs(graph, start):
+    visited = {start}
+    queue = deque([start])
+    order = []
+    while queue:
+        node = queue.popleft()          # front of the queue
+        order.append(node)
+        for nbr in graph[node]:
+            if nbr not in visited:
+                visited.add(nbr)        # mark on ENQUEUE, not on dequeue
+                queue.append(nbr)
+    return order
+```
+
+The comment on line 11 matters. Marking a node visited when it is <em>added</em> to the queue rather than when it is removed prevents the same node being queued several times, which would otherwise produce exponential blow-up on dense graphs.
+
+## Why it finds shortest paths
+
+BFS reaches every node by the fewest possible edges, and the argument is direct: it processes all nodes at distance d before any at distance d+1, so the first time a node is reached is by a shortest path.
+
+That gives shortest paths on <strong>unweighted</strong> graphs for free. Recording each node's predecessor lets the path be reconstructed:
+
+```python
+def shortest_path(graph, start, goal):
+    prev = {start: None}
+    queue = deque([start])
+    while queue:
+        node = queue.popleft()
+        if node == goal:
+            break
+        for nbr in graph[node]:
+            if nbr not in prev:
+                prev[nbr] = node
+                queue.append(nbr)
+    if goal not in prev:
+        return None
+    path = []
+    while goal is not None:
+        path.append(goal)
+        goal = prev[goal]
+    return path[::-1]
+```
+
+The crucial limitation: <strong>this only works when every edge costs the same</strong>. With weights, the fewest-edges path is not the cheapest path, and Dijkstra's algorithm &mdash; BFS with a priority queue instead of a plain queue &mdash; is required.
+
+## BFS against DFS
+
+|&nbsp;|BFS|DFS|
+|---|---|---|
+|Structure|Queue|Stack (or recursion)|
+|Explores|Level by level|One branch to the end|
+|Shortest path (unweighted)|Yes|No|
+|Memory|O(width of the graph)|O(depth of the graph)|
+|Finds a nearby target|Quickly|Possibly after a long detour|
+|Natural for|Distance, layers, spreading|Connectivity, cycles, backtracking|
+
+The memory row decides the choice on large graphs. BFS holds an entire frontier, which on a wide graph &mdash; a social network, where one node may have millions of neighbours &mdash; can be enormous. DFS holds only the current path.
+
+So: BFS when you need distance or the target is likely close; DFS when the graph is wide, or when the problem is about connectivity, cycles or exhaustive exploration.
+
 ## Exploration guide
 
 1. <strong>Confirm inorder is sorted.</strong> Press <strong>Random</strong> to build a fresh tree, then press <strong>Inorder</strong>. Whatever shape the tree has, the output sequence comes out in ascending order.
@@ -63,3 +132,78 @@ All four are O(n) time, since each node is visited once. Space differs: DFS cost
 ## Key takeaway
 
 All four traversals visit every node once in O(n); they differ only in when a node is handled relative to its children, and breadth-first differs from the rest only in using a queue instead of a stack. Inorder yields sorted output on a BST, preorder serialises, postorder frees, and level order finds the nearest thing first. Choose by which of those you need, then check whether O(h) or O(w) memory is the one you can afford.
+
+## Where it is used
+
+- <strong>Shortest path in unweighted graphs</strong> &mdash; maze solving, grid navigation, puzzle states.
+- <strong>Social network degrees of separation</strong> &mdash; "friends of friends" is BFS to depth 2.
+- <strong>Web crawling</strong> &mdash; crawl by depth from the seed pages so shallow, important pages are fetched first.
+- <strong>Level-order tree traversal</strong> &mdash; printing a tree row by row, or finding its width.
+- <strong>Connected components</strong> &mdash; run BFS from each unvisited node.
+- <strong>Bipartite checking</strong> &mdash; two-colour the graph by level; an edge within a level means it is not bipartite.
+- <strong>Flood fill</strong> &mdash; the paint-bucket tool, and region labelling in image processing.
+- <strong>Broadcast and infection modelling</strong> &mdash; spread happens in rings, which is exactly BFS's shape.
+
+On a grid, the neighbour generation is the only change:
+
+```python
+def grid_bfs(grid, start):
+    rows, cols = len(grid), len(grid[0])
+    dist = {start: 0}
+    q = deque([start])
+    while q:
+        r, c = q.popleft()
+        for dr, dc in ((1,0), (-1,0), (0,1), (0,-1)):
+            nr, nc = r + dr, c + dc
+            if 0 <= nr < rows and 0 <= nc < cols \
+               and grid[nr][nc] != "#" and (nr, nc) not in dist:
+                dist[(nr, nc)] = dist[(r, c)] + 1
+                q.append((nr, nc))
+    return dist
+```
+
+## Variants worth knowing
+
+<strong>Multi-source BFS.</strong> Seed the queue with several starting nodes at distance 0. The result gives each node its distance to the <em>nearest</em> source, in one pass. This is how "distance to the nearest hospital" or "how long until the whole grid is infected" problems are solved &mdash; and doing it as separate BFS runs per source is the common inefficient mistake.
+
+<strong>0-1 BFS.</strong> When edges have weights of only 0 or 1, a double-ended queue works: push 0-weight neighbours to the front and 1-weight to the back. O(V+E), avoiding Dijkstra's log factor.
+
+<strong>Bidirectional BFS.</strong> Search forwards from the start and backwards from the goal, stopping when they meet. If the branching factor is b and the distance d, this reduces the work from roughly b^d to 2b^(d/2) &mdash; a large saving on long paths.
+
+<strong>BFS on implicit graphs.</strong> The graph need not exist as a data structure. Puzzle states (Rubik's cube, sliding tiles, word ladders) are generated on demand, and BFS explores them by move count.
+
+## Complexity and practical notes
+
+<strong>Time:</strong> O(V + E) &mdash; every node dequeued once, every edge examined once.
+
+<strong>Space:</strong> O(V) for the visited set, plus the queue, whose maximum size is the graph's widest level.
+
+Three implementation details that matter:
+
+<strong>Use `collections.deque`, not a list.</strong> `list.pop(0)` is O(n) because it shifts every element, turning the whole traversal into O(V²). This is the most common BFS performance bug.
+
+<strong>Mark visited on enqueue.</strong> As above &mdash; otherwise nodes are queued repeatedly.
+
+<strong>Store distances in the visited structure.</strong> A dictionary from node to distance serves as both the visited set and the result, which is simpler than maintaining two.
+
+## Questions people ask
+
+<strong>Does BFS work on weighted graphs?</strong> Not for shortest paths &mdash; it minimises edge count, not cost. Use Dijkstra, or 0-1 BFS if weights are only 0 and 1.
+
+<strong>Why a queue rather than a stack?</strong> The queue's first-in-first-out order is what produces level-by-level exploration. A stack gives DFS.
+
+<strong>Can BFS be recursive?</strong> Not naturally &mdash; recursion gives a stack, which is DFS. BFS needs an explicit queue.
+
+<strong>What if the graph has cycles?</strong> The visited set handles them. Without it, BFS loops forever.
+
+<strong>How do I find the shortest path itself?</strong> Record each node's predecessor and walk backwards from the goal.
+
+<strong>Which uses less memory?</strong> DFS on wide graphs, BFS on deep ones. The frontier width against the path depth.
+
+## Recap in one screen
+
+- A queue makes exploration proceed level by level, in order of distance from the start.
+- That gives shortest paths on unweighted graphs, recorded via predecessors.
+- Mark nodes visited when enqueued, and use `deque` &mdash; `list.pop(0)` makes it quadratic.
+- Memory is the frontier width, which can be enormous on wide graphs where DFS is cheaper.
+- Multi-source BFS answers "distance to the nearest" in one pass; bidirectional BFS halves the exponent.

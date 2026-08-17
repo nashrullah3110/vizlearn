@@ -27,6 +27,79 @@ When the pivot is consistently the smallest or largest element, one side gets n&
 
 The saving grace is that the average is robustly O(n log n). Even a split as lopsided as 90/10 at every level still gives logarithmic depth, just with a larger base. You need consistently near-worst pivots to reach quadratic, and randomising the pivot makes that vanishingly unlikely for any fixed input.
 
+## Partition, then recurse
+
+Quick sort picks an element as the <strong>pivot</strong>, rearranges the array so everything smaller sits left of it and everything larger sits right, and then sorts each side recursively.
+
+After one partition the pivot is in its final position, and the two sides are independent problems.
+
+Sorting [38, 27, 43, 3, 9, 82, 10] with 10 as the pivot:
+
+|Step|Result|
+|---|---|
+|Partition on 10|[3, 9] 10 [38, 27, 43, 82]|
+|Sort left|[3, 9]|
+|Sort right on pivot 43|[27, 38] 43 [82]|
+|Combined|[3, 9, 10, 27, 38, 43, 82]|
+
+No merge step is needed, which is the structural difference from merge sort: quick sort does its work <em>before</em> recursing, merge sort after.
+
+## Why the pivot decides everything
+
+A good pivot splits the array roughly in half, giving `log n` levels of recursion with O(n) work each &mdash; O(n log n).
+
+A bad pivot splits off one element, giving n levels &mdash; O(n²).
+
+|Pivot quality|Recursion depth|Complexity|
+|---|---|---|
+|Median every time|log n|O(n log n)|
+|Random|~1.4 log n expected|O(n log n) expected|
+|Always the smallest|n|O(n&sup2;)|
+
+The classic trap: choosing the <strong>first element</strong> as the pivot makes <em>already-sorted</em> input the worst case. Sorted input is extremely common in practice, so this is not a theoretical concern &mdash; it is the most likely input in many systems.
+
+Two standard fixes:
+
+<strong>Randomised pivot.</strong> Choose uniformly at random. The worst case still exists and requires adversarial luck; expected time is O(n log n).
+
+<strong>Median-of-three.</strong> Take the median of the first, middle and last elements. Cheap, deterministic, and it handles sorted and reverse-sorted input well.
+
+Production implementations go further: <strong>introsort</strong> starts with quick sort, tracks recursion depth, and switches to heap sort if it exceeds `2 log n` &mdash; guaranteeing O(n log n) while keeping quick sort's speed in the common case. That is what C++'s `std::sort` does.
+
+## Lomuto partitioning
+
+The simpler of the two classic schemes, and the one worth memorising:
+
+```python
+def quicksort(arr, lo=0, hi=None):
+    if hi is None:
+        hi = len(arr) - 1
+    if lo >= hi:
+        return
+    p = partition(arr, lo, hi)
+    quicksort(arr, lo, p - 1)
+    quicksort(arr, p + 1, hi)
+
+def partition(arr, lo, hi):
+    import random
+    random.seed()                              # randomised pivot
+    r = random.randint(lo, hi)
+    arr[r], arr[hi] = arr[hi], arr[r]          # move pivot to the end
+
+    pivot = arr[hi]
+    i = lo                                     # boundary of the "smaller" region
+    for j in range(lo, hi):
+        if arr[j] < pivot:
+            arr[i], arr[j] = arr[j], arr[i]
+            i += 1
+    arr[i], arr[hi] = arr[hi], arr[i]          # pivot into place
+    return i
+```
+
+The invariant is what makes it work: everything left of `i` is smaller than the pivot, everything from `i` to `j` is larger, and `j` scans forward. When the loop ends, swapping the pivot into position `i` puts it exactly where it belongs.
+
+Note the in-place property: no auxiliary array, only swaps. That is quick sort's main advantage over merge sort.
+
 ## Exploration guide
 
 1. <strong>Watch a pivot settle permanently.</strong> Set <strong>Array Size</strong> to 15 and press <strong>Next Step</strong> through one partition. When it completes, the pivot is in its final position and is never moved again &mdash; unlike merge sort, elements finish one at a time.
@@ -54,3 +127,60 @@ Production implementations defend the worst case rather than accepting it: <stro
 ## The short version
 
 Quick sort partitions around a pivot, placing that pivot permanently and recursing on both sides with no combine step. In-place, cache-friendly and with a small constant factor, it is the fastest general-purpose array sort in practice &mdash; provided the pivot is chosen so that sorted input is not the worst case. Its O(n&sup2;) ceiling is real but avoidable, and every serious implementation avoids it by randomising the pivot or by falling back to heap sort when the recursion runs too deep.
+
+## Quick sort against merge sort
+
+|&nbsp;|Quick sort|Merge sort|
+|---|---|---|
+|Average time|O(n log n)|O(n log n)|
+|Worst time|O(n&sup2;)|O(n log n)|
+|Extra space|O(log n) stack|O(n)|
+|Stable|No|Yes|
+|Cache behaviour|Excellent|Good|
+|Typical speed|Faster|Slower constant factor|
+
+Quick sort wins in practice on arrays despite the worse guarantee, for two reasons. It sorts <strong>in place</strong>, so no large auxiliary allocation. And its memory access pattern is sequential within each partition, which suits CPU caches well.
+
+Merge sort wins where its guarantees matter: <strong>stability</strong> (equal elements keep their relative order, which matters when sorting by one key after another), a hard O(n log n) bound, and external sorting of data too large for memory.
+
+Python's `sorted` uses <strong>Timsort</strong>, a merge sort variant that detects existing sorted runs and merges them, giving O(n) on nearly-sorted input &mdash; and it is stable, which Python guarantees.
+
+## Duplicates, and three-way partitioning
+
+Plain Lomuto partitioning handles many equal elements badly. If every element is identical, each partition splits off one element and the algorithm degrades to O(n²).
+
+<strong>Three-way partitioning</strong> (the Dutch national flag arrangement) splits into three regions &mdash; less than, equal to, and greater than the pivot &mdash; and recurses only on the outer two. All the equal elements are placed in one pass.
+
+That turns an array of many duplicates from the worst case into the <em>best</em> case: sorting n identical elements becomes O(n).
+
+It is worth knowing because arrays with few distinct values are common in real data &mdash; status flags, categories, boolean columns &mdash; and this is the variant that handles them.
+
+## Quickselect: the same idea for the k-th element
+
+Partitioning tells you the pivot's final position. If that position is k, the pivot <em>is</em> the k-th smallest element and no further work is needed. If not, recurse into only the side containing k.
+
+<strong>Quickselect</strong> is that algorithm, and it finds the k-th smallest element in O(n) expected time rather than the O(n log n) of sorting.
+
+Uses: finding a median, the top k items, or a percentile without sorting the whole array. Python's `heapq.nlargest` uses a heap instead, which is better when k is small; quickselect wins for a median.
+
+## Questions people ask
+
+<strong>Why use quick sort if the worst case is O(n²)?</strong> With randomised or median-of-three pivots the worst case is practically unreachable, and its in-place operation and cache behaviour make it faster than merge sort in the average case.
+
+<strong>Is quick sort stable?</strong> No &mdash; partitioning swaps distant elements. Use merge sort or Timsort if stability matters.
+
+<strong>How much extra memory does it use?</strong> O(log n) for the recursion stack, and O(n) in the degenerate case. Tail-call elimination on the larger side bounds it.
+
+<strong>What does Python use?</strong> Timsort, which is a stable merge sort exploiting existing runs. `list.sort()` and `sorted()` both use it.
+
+<strong>When is merge sort better?</strong> Linked lists (no random access needed), external sorting, and whenever stability or a hard worst-case bound is required.
+
+<strong>What is introsort?</strong> Quick sort that switches to heap sort when recursion gets too deep, giving a guaranteed O(n log n) with quick sort's typical speed.
+
+## Recap in one screen
+
+- Partition around a pivot so the pivot lands in its final position, then recurse on each side.
+- The pivot choice decides everything: randomised or median-of-three, never the first element.
+- In-place with good cache behaviour, which is why it beats merge sort in practice despite the O(n&sup2;) worst case.
+- Not stable; use Timsort or merge sort when equal elements must keep their order.
+- Three-way partitioning handles many duplicates, and quickselect finds the k-th element in O(n).

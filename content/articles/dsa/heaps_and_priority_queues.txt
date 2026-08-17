@@ -33,6 +33,73 @@ A <strong>priority queue</strong> serves the highest-priority item rather than t
 - <strong>Top-k problems</strong> &mdash; keep a size-k heap and you find the largest k items in O(n log k) without sorting everything.
 - <strong>Schedulers and event simulations</strong> &mdash; always process the next-earliest event.
 
+## A tree that keeps its smallest element on top
+
+A binary heap is a complete binary tree with one rule &mdash; the <strong>heap property</strong>:
+
+<strong>Min-heap:</strong> every parent is less than or equal to its children.
+<strong>Max-heap:</strong> every parent is greater than or equal to its children.
+
+Note what the rule does <em>not</em> say: siblings are unordered, and the tree is not sorted. The only guarantee is that the smallest (or largest) element is at the root, which is exactly what a priority queue needs.
+
+That weaker guarantee is what makes a heap fast. Maintaining full sorted order on every insertion would cost O(n); maintaining only the parent-child relation costs O(log n).
+
+|Operation|Heap|Sorted array|Unsorted array|
+|---|---|---|---|
+|Find minimum|O(1)|O(1)|O(n)|
+|Insert|O(log n)|O(n)|O(1)|
+|Remove minimum|O(log n)|O(n) or O(1) at the end|O(n)|
+|Build from n items|O(n)|O(n log n)|O(1)|
+
+The last row is worth noting: building a heap from an existing list is O(n), not O(n log n) &mdash; `heapq.heapify` does it in place by sifting down from the middle.
+
+## Stored as an array, not as nodes
+
+A heap needs no pointers. Because the tree is complete, the structure is implicit in the array indices:
+
+<p class="mono-font">parent of i = (i &minus; 1) // 2&nbsp;&nbsp;&nbsp;children of i = 2i + 1 and 2i + 2</p>
+
+So [1, 3, 6, 5, 9, 8] represents a tree whose root is 1, with children 3 and 6, and so on. No allocation per node, and excellent cache behaviour because the whole structure is contiguous.
+
+The two operations that maintain the property:
+
+<strong>Sift up (after insertion).</strong> Add the element at the end, then swap it with its parent while it is smaller. At most `log n` swaps.
+
+<strong>Sift down (after removing the root).</strong> Move the last element to the root, then swap it with its smaller child while it is larger. At most `log n` swaps.
+
+Both walk one path from root to leaf, which is why both are O(log n).
+
+## Using it in Python
+
+```python
+import heapq
+
+h = []
+heapq.heappush(h, 5)
+heapq.heappush(h, 1)
+heapq.heappush(h, 3)
+heapq.heappop(h)                     # 1 - always the smallest
+
+nums = [5, 1, 8, 3, 9]
+heapq.heapify(nums)                  # O(n), in place
+heapq.nlargest(3, nums)              # [9, 8, 5]
+heapq.nsmallest(3, nums)             # [1, 3, 5]
+```
+
+Two practical points about Python specifically.
+
+<strong>It is a min-heap only.</strong> For a max-heap, negate the values on the way in and out &mdash; `heappush(h, -x)` and `-heappop(h)`. There is no max-heap variant.
+
+<strong>Priorities go in tuples.</strong> `heappush(h, (priority, item))` sorts by priority. If two priorities tie, Python compares the second element, so items must be comparable &mdash; or push a counter as a tiebreaker:
+
+```python
+import itertools
+counter = itertools.count()
+heapq.heappush(h, (priority, next(counter), task))   # never compares task
+```
+
+That counter pattern is worth memorising; the alternative is an occasional `TypeError` in production when two priorities happen to match.
+
 ## Try it yourself
 
 1. <strong>Insert a value smaller than the root.</strong> Watch it bubble all the way to the top &mdash; one swap per level, never more.
@@ -44,3 +111,67 @@ A <strong>priority queue</strong> serves the highest-priority item rather than t
 ## Where that leaves you
 
 A heap keeps only the extreme value ordered, and that weaker guarantee is what makes it fast: O(1) peek, O(log n) insert and extract, in a pointer-free array. Whenever an algorithm repeatedly asks for the smallest or largest remaining item, a heap is the answer.
+
+## What heaps are used for
+
+<strong>Dijkstra's algorithm and A*.</strong> The priority queue of nodes by tentative distance is a heap, and it is what gives those algorithms their log factor rather than a linear scan.
+
+<strong>Top-k problems.</strong> To find the k largest of n items, keep a min-heap of size k: push each item, and pop when the heap exceeds k. O(n log k) time and O(k) space, against O(n log n) for sorting everything. When k is small and n is huge, this is the difference between feasible and not.
+
+```python
+def top_k(items, k):
+    h = []
+    for x in items:
+        heapq.heappush(h, x)
+        if len(h) > k:
+            heapq.heappop(h)          # discard the smallest
+    return sorted(h, reverse=True)
+```
+
+<strong>Heap sort.</strong> Heapify, then repeatedly extract the minimum. O(n log n) guaranteed, in place, and not stable.
+
+<strong>Merging sorted sequences.</strong> `heapq.merge` performs a k-way merge lazily, which is how external sorting combines sorted runs.
+
+<strong>Task schedulers and event simulation.</strong> Process the earliest-deadline or earliest-timestamp item next.
+
+<strong>Median maintenance.</strong> Two heaps &mdash; a max-heap of the lower half and a min-heap of the upper half &mdash; give the running median of a stream in O(log n) per element.
+
+<strong>Huffman coding.</strong> Repeatedly combine the two least frequent symbols, which is a priority queue by construction.
+
+## The limitation: no efficient search or update
+
+A heap answers "what is the smallest?" and nothing else. Finding an arbitrary element requires scanning &mdash; O(n) &mdash; because siblings are unordered.
+
+That matters for algorithms that want to <strong>decrease a key</strong>: Dijkstra ideally updates a node's priority in place, and a binary heap cannot locate that node quickly. The standard workaround is lazy deletion &mdash; push a new entry and skip stale ones when popped &mdash; which is why Dijkstra implementations carry that check.
+
+If you need both priority access and lookup, the usual answer is a heap plus a dictionary from item to its position, maintained together. That is more code and it is what a proper indexed priority queue provides.
+
+|Need|Structure|
+|---|---|
+|Smallest or largest, repeatedly|Heap|
+|Sorted iteration|Sorted list, or a balanced tree|
+|Lookup by key|Hash table|
+|Range queries|Balanced tree|
+|Priority plus lookup|Heap plus an index dictionary|
+
+## Questions people ask
+
+<strong>Is a heap sorted?</strong> No. Only the root is guaranteed to be the extreme value; siblings are unordered.
+
+<strong>How do I get a max-heap in Python?</strong> Negate the values, or store `(-priority, item)` tuples.
+
+<strong>Why is building a heap O(n) rather than O(n log n)?</strong> Sifting down from the middle backwards does less work at the deep levels, and the sum works out to O(n).
+
+<strong>What is the difference from `queue.PriorityQueue`?</strong> It wraps `heapq` with locking for thread safety, which costs performance. Use `heapq` in single-threaded code.
+
+<strong>Can a heap have duplicates?</strong> Yes, without any problem.
+
+<strong>Is heap sort used in practice?</strong> Rarely on its own &mdash; quick sort is faster in the average case. It appears as introsort's fallback, providing the worst-case guarantee.
+
+## Recap in one screen
+
+- A heap keeps the extreme element at the root; parents are ordered against children and siblings are not.
+- It is stored as a plain array, with children at `2i+1` and `2i+2` &mdash; no pointers, good cache behaviour.
+- Push and pop are O(log n); finding the minimum is O(1); building from a list is O(n).
+- Python's `heapq` is a min-heap only, and tuple priorities need a tiebreaker to avoid comparing payloads.
+- Ideal for priority queues, top-k with O(k) memory, k-way merges, schedulers and running medians.

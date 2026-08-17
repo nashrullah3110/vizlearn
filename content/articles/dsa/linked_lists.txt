@@ -30,6 +30,70 @@ Big-O says linked lists should beat arrays for insertion-heavy work. In practice
 
 This is a good reminder that Big-O counts operations, not time. Modern advice: reach for a dynamic array by default, and a linked list when you specifically need O(1) splicing with a node reference already in hand.
 
+## Nodes joined by references
+
+A linked list stores each element in a <strong>node</strong> that holds a value and a reference to the next node. Nothing is contiguous in memory, and there is no index.
+
+```python
+class Node:
+    def __init__(self, value, nxt=None):
+        self.value = value
+        self.next = nxt
+
+# 1 -> 2 -> 3 -> None
+head = Node(1, Node(2, Node(3)))
+```
+
+That single design difference from an array produces every trade-off:
+
+|Operation|Linked list|Array / Python list|
+|---|---|---|
+|Access by index|O(n) &mdash; must walk|O(1)|
+|Insert at front|O(1)|O(n) &mdash; shifts everything|
+|Insert after a known node|O(1)|O(n)|
+|Insert at end|O(1) with a tail pointer|O(1) amortised|
+|Delete a known node|O(1)|O(n)|
+|Search|O(n)|O(n)|
+|Memory per element|Value plus a pointer|Value only|
+|Cache behaviour|Poor|Excellent|
+
+The last two rows are why Python's `list` is used almost everywhere despite the theoretical advantages above. A pointer per element is substantial overhead, and following pointers to scattered memory addresses defeats the CPU cache &mdash; frequently making an O(n) array scan faster in practice than an O(n) list walk.
+
+## Why insertion is O(1) only if you are already there
+
+The advertised advantage &mdash; O(1) insertion and deletion &mdash; has a precondition that is easy to gloss over: you must <strong>already hold a reference</strong> to the relevant node.
+
+Inserting after a node you have is three assignments. Inserting at position 500 means walking 500 nodes first, so the operation is O(n) overall.
+
+That is why linked lists win in specific situations rather than generally: when you are already traversing, when you hold node references from elsewhere, or when you only ever touch the ends.
+
+```python
+def insert_after(node, value):
+    node.next = Node(value, node.next)      # O(1), given the node
+
+def delete_after(node):
+    if node.next:
+        node.next = node.next.next          # O(1), and the node is orphaned
+```
+
+For deleting a node you hold in a <em>singly</em> linked list, you need its predecessor &mdash; which you do not have. That is what doubly linked lists solve.
+
+## Singly, doubly, circular
+
+|Type|Each node holds|Enables|
+|---|---|---|
+|Singly linked|next|Minimal memory; forward traversal only|
+|Doubly linked|next and prev|Backwards traversal; O(1) delete given the node|
+|Circular|Last points to first|Round-robin iteration|
+
+<strong>Doubly linked</strong> is the practically important variant, because O(1) deletion given only the node is exactly what an LRU cache needs: a hash table maps keys to nodes, and the node can be unlinked and moved to the front in constant time.
+
+That combination &mdash; hash table plus doubly linked list &mdash} is the standard LRU implementation, and it is the clearest example of a linked list being the right tool.
+
+<strong>Circular</strong> lists suit round-robin scheduling and buffers where there is no natural end.
+
+The sentinel or dummy-head trick is worth knowing: allocate one node before the real head, so insertion and deletion never need a special case for the first element. It removes most of the null checks that make linked-list code error-prone.
+
 ## Try it yourself
 
 1. <strong>Insert at position 0.</strong> Zero traversal steps &mdash; genuinely O(1), the linked list's best case.
@@ -41,3 +105,83 @@ This is a good reminder that Big-O counts operations, not time. Modern advice: r
 ## Where that leaves you
 
 Linked lists make insertion and deletion cheap and access expensive &mdash; the exact opposite of arrays. Use them when you hold a reference to the node you need and are splicing constantly; otherwise an array's cache behaviour usually beats the theory.
+
+## The classic manipulations
+
+<strong>Reversal</strong> is the canonical exercise, and the three-pointer form is worth knowing by heart:
+
+```python
+def reverse(head):
+    prev = None
+    while head:
+        head.next, prev, head = prev, head, head.next
+    return prev
+```
+
+Each step redirects one node's pointer backwards. The tuple assignment does it without a temporary, and the order matters: `head.next` is read on the right before being overwritten.
+
+<strong>Finding the middle</strong> in one pass, with fast and slow pointers:
+
+```python
+def middle(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow, fast = slow.next, fast.next.next
+    return slow
+```
+
+<strong>Cycle detection</strong> (Floyd's algorithm) uses the same pointers and checks whether they meet. Resetting one to the head after they meet and advancing both by one finds the cycle's entry point.
+
+<strong>Merging two sorted lists</strong> requires only pointer rearrangement and no extra allocation, which is why merge sort on a linked list uses O(1) extra space where merge sort on an array uses O(n).
+
+Those four cover most linked-list problems, and all four are single-pass with constant extra memory.
+
+## When to actually use one
+
+<strong>Genuinely good uses:</strong>
+
+- <strong>LRU caches</strong> &mdash; doubly linked list plus hash map.
+- <strong>Queues and deques</strong> &mdash; though `collections.deque` uses a block-based structure that is better than a pure linked list.
+- <strong>Adjacency lists</strong> in some graph representations.
+- <strong>Free lists</strong> in memory allocators.
+- <strong>Undo stacks</strong> and version chains where nodes are held by reference.
+- <strong>Immutable and persistent lists</strong> in functional languages, where sharing a tail between versions is free.
+
+<strong>Poor uses:</strong>
+
+- Anything needing indexed access.
+- Anything where a Python `list` would do, which is most application code.
+- Large collections traversed frequently &mdash; the cache penalty is real and often decisive.
+
+In Python specifically, you will rarely implement one. `list` covers dynamic arrays, `collections.deque` covers double-ended queues efficiently. Linked lists appear as interview material and inside libraries rather than in ordinary code &mdash; which does not make them unimportant, because the pointer-manipulation reasoning transfers to trees and graphs.
+
+## Common mistakes
+
+- <strong>Losing the head reference</strong> while traversing, so the list becomes unreachable.
+- <strong>Not handling the empty list or single node.</strong> Most linked-list bugs live at these boundaries; a sentinel node removes them.
+- <strong>Assigning pointers in the wrong order,</strong> orphaning the rest of the list. Read what you need before overwriting it.
+- <strong>Forgetting to update the tail pointer</strong> when appending or deleting at the end.
+- <strong>Creating a cycle accidentally,</strong> which turns any traversal into an infinite loop.
+- <strong>Deleting a node in a singly linked list without its predecessor,</strong> which cannot be done properly &mdash; the usual hack copies the next node's value and deletes that node instead, and it fails on the last node.
+
+## Questions people ask
+
+<strong>Why use a linked list when arrays are faster?</strong> For O(1) insertion and deletion at a held reference, and when there is no capacity to resize. Those cases are narrower than textbooks suggest.
+
+<strong>Is a Python list a linked list?</strong> No &mdash; it is a dynamic array of pointers, contiguous, with O(1) indexing.
+
+<strong>How do I find the length?</strong> Walk it: O(n). Maintain a counter if the length is needed often.
+
+<strong>Singly or doubly linked?</strong> Doubly if you need backwards traversal or O(1) deletion given a node; singly to save the pointer.
+
+<strong>Why is `collections.deque` fast?</strong> It is a doubly linked list of fixed-size blocks, so it gets O(1) ends with much better cache behaviour than one node per element.
+
+<strong>Are linked lists still relevant?</strong> As a data structure in application code, rarely. As the reasoning behind trees, graphs, allocators and persistent structures, very.
+
+## Recap in one screen
+
+- Each node holds a value and a reference; nothing is contiguous and there is no index.
+- O(1) insertion and deletion &mdash; but only at a node you already hold; reaching position k is O(n).
+- Doubly linked lists enable O(1) deletion given the node, which is what LRU caches rely on.
+- Poor cache behaviour and a pointer per element make arrays faster in practice for most work.
+- Use a sentinel head to remove the empty-list and first-element special cases that cause most bugs.

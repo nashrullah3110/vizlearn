@@ -489,12 +489,45 @@
                     <p>The technique depends on knowing what moving a pointer <em>does</em>. On a sorted array, moving left rightwards can only increase the sum &mdash; that guarantee is what makes it safe to discard everything you skipped.</p><p>On unsorted data no such guarantee exists, and the method is simply wrong. If your input is not sorted you must either sort first (O(n log n)) or use a hash set instead (O(n) time, O(n) space).</p>
                 </div>
                 <div>
-                    <h3>The Three Patterns</h3>
-                    <ul><li><strong>Converging</strong> &mdash; start at both ends and move inward. Pair sum, palindromes, container with most water.</li><li><strong>Same direction (fast/slow)</strong> &mdash; both start at the left, one advances faster. Removing duplicates in place, finding the middle of a linked list, cycle detection.</li><li><strong>Two sequences</strong> &mdash; one pointer per array. Merging sorted arrays, which is exactly the merge step in merge sort.</li></ul>
+                    <h3>The three patterns</h3>
+                    <div class="vz-table-wrap"><table><thead><tr><th>Pattern</th><th>Pointers</th><th>Typical use</th></tr></thead><tbody><tr><td>Opposite ends</td><td>Start and end, moving inwards</td><td>Two-sum on sorted data, palindromes, container problems</td></tr><tr><td>Same direction</td><td>Both forward, at different speeds</td><td>Removing duplicates, partitioning in place</td></tr><tr><td>Fast and slow</td><td>One moves twice as fast</td><td>Cycle detection, finding the middle</td></tr></tbody></table></div><strong>Same direction</strong> is the in-place editing pattern. One pointer reads, the other writes:<pre><code class="language-python">def remove_duplicates(arr):          # arr is sorted; edit in place
+    if not arr:
+        return 0
+    write = 1
+    for read in range(1, len(arr)):
+        if arr[read] != arr[write - 1]:
+            arr[write] = arr[read]
+            write += 1
+    return write                     # new length</code></pre><p>The invariant: everything before <code>write</code> is the deduplicated result so far. That framing &mdash; naming what is true about the region behind each pointer &mdash; is how these are reasoned about and debugged.</p><strong>Fast and slow</strong> is the cycle-detection pattern, and the reason it works is worth understanding rather than memorising.
                 </div>
                 <div>
                     <h3>Container With Most Water</h3>
                     <p>A subtler case worth understanding. Given heights, pick two lines forming the largest water container. Area is <span class="mono-font">min(height) &times; width</span>.</p><p>Start wide and always move the <strong>shorter</strong> line inward. Why is that safe? Moving the taller one can only reduce the width while the area stays capped by the same shorter line &mdash; so it can never improve. Moving the shorter one at least gives a chance of a taller limit. That single argument is what makes the greedy pointer movement correct.</p>
+                </div>
+                <div>
+                    <h3>Two indices instead of two loops</h3>
+                    <p>The two-pointer technique replaces a nested loop with two indices moving through the data, turning O(n²) into O(n).</p><p>It applies when the data has structure &mdash; usually sortedness &mdash; that tells you which pointer to move.</p><strong>The canonical problem:</strong> find two numbers in a sorted array that sum to a target.<p>Brute force checks every pair: O(n²). With two pointers, one at each end:</p><p>Array [2, 7, 11, 15], target 18:</p><div class="vz-table-wrap"><table><thead><tr><th>left</th><th>right</th><th>Sum</th><th>Action</th></tr></thead><tbody><tr><td>2</td><td>15</td><td>17</td><td>Too small &mdash; move left right</td></tr><tr><td>7</td><td>15</td><td>22</td><td>Too large &mdash; move right left</td></tr><tr><td>7</td><td>11</td><td>18</td><td>Found</td></tr></tbody></table></div><p>Three steps instead of six comparisons, and the saving grows with n. The logic is what makes it correct: if the sum is too small, the only way to increase it is a larger left value; if too large, a smaller right value. No possibility is skipped.</p><pre><code class="language-python">def two_sum_sorted(arr, target):
+    lo, hi = 0, len(arr) - 1
+    while lo &lt; hi:
+        s = arr[lo] + arr[hi]
+        if s == target:
+            return lo, hi
+        if s &lt; target:
+            lo += 1
+        else:
+            hi -= 1
+    return None</code></pre>
+                </div>
+                <div>
+                    <h3>Floyd's cycle detection</h3>
+                    <p>Move one pointer one step at a time and another two steps. If there is a cycle, the fast one laps the slow one and they meet. If there is no cycle, the fast one reaches the end.</p><pre><code class="language-python">def has_cycle(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow = slow.next
+        fast = fast.next.next
+        if slow is fast:
+            return True
+    return False</code></pre><p>Why they must meet: once both are inside the cycle, the gap between them closes by exactly one position per step, so it reaches zero. It cannot be jumped over.</p><p>The extension finds the cycle's <em>start</em>: after they meet, reset one pointer to the head and advance both one step at a time. They meet at the entry point. That result follows from the distances involved and is not obvious &mdash; it is worth trusting rather than deriving under time pressure.</p><p>The same technique finds the middle of a list in one pass: when the fast pointer reaches the end, the slow one is at the midpoint.</p>
                 </div>
                 <div>
                     <h3>Guided tour</h3>
@@ -503,6 +536,50 @@
                 <div>
                     <h3>Where that leaves you</h3>
                     <p>Two pointers replaces nested loops with a single coordinated pass, in O(1) extra space. It works only when moving a pointer changes the result predictably — usually because the data is sorted. Recognising that condition is the whole skill.</p>
+                </div>
+                <div>
+                    <h3>Where it applies, and where it does not</h3>
+                    <strong>It applies when:</strong><ul><li>The array is <strong>sorted</strong>, or can be sorted cheaply.</li><li>The problem is about <strong>pairs or triplets</strong> satisfying a condition.</li><li>You are editing an array <strong>in place</strong> and want O(1) extra space.</li><li>The structure is a <strong>linked list</strong> and you need position without a length.</li><li>A monotonic condition tells you unambiguously which pointer to move.</li></ul><strong>It does not apply when:</strong><ul><li>The data is unsorted and sorting is not affordable.</li><li>Moving a pointer might skip a valid answer, because the condition is not monotonic.</li><li>The problem needs arbitrary lookups &mdash; a hash table is the right tool.</li></ul><p>That last row is a real alternative worth naming. Unsorted two-sum is solved with a dictionary in O(n) and O(n) space:</p><pre><code class="language-python">def two_sum(arr, target):
+    seen = {}
+    for i, x in enumerate(arr):
+        if target - x in seen:
+            return seen[target - x], i
+        seen[x] = i</code></pre><p>So the choice is: <strong>sorted input plus O(1) space</strong> (two pointers) against <strong>unsorted input plus O(n) space</strong> (hash table). Both are O(n) after sorting is accounted for.</p>
+                </div>
+                <div>
+                    <h3>Three-sum, and the pattern that generalises</h3>
+                    <p>The standard extension: find all triplets summing to zero. Sort, fix one element, and two-pointer the rest.</p><pre><code class="language-python">def three_sum(nums):
+    nums.sort()
+    out = []
+    for i in range(len(nums) - 2):
+        if i and nums[i] == nums[i-1]:
+            continue                          # skip duplicate first elements
+        lo, hi = i + 1, len(nums) - 1
+        while lo &lt; hi:
+            s = nums[i] + nums[lo] + nums[hi]
+            if s &lt; 0:
+                lo += 1
+            elif s &gt; 0:
+                hi -= 1
+            else:
+                out.append((nums[i], nums[lo], nums[hi]))
+                lo += 1
+                while lo &lt; hi and nums[lo] == nums[lo-1]:
+                    lo += 1                   # skip duplicate second elements
+                hi -= 1
+    return out</code></pre><p>O(n²) rather than the O(n³) of three nested loops. The duplicate-skipping lines are what most implementations get wrong, and they matter whenever the output must contain no repeats.</p><p>That structure &mdash; fix k&minus;2 elements with loops, two-pointer the last two &mdash; generalises to four-sum and beyond, at O(n^(k-1)).</p>
+                </div>
+                <div>
+                    <h3>Related techniques</h3>
+                    <strong>Sliding window</strong> is the same idea with both pointers moving forward and a condition maintained between them &mdash; used for subarray and substring problems.<strong>Merging</strong> two sorted arrays uses one pointer per array, which is exactly merge sort's combine step.<strong>In-place partitioning</strong> in quick sort is a same-direction two-pointer scan.<strong>Dutch national flag</strong> uses three pointers to partition into three regions in one pass.<p>Recognising the family matters more than memorising each: all of them replace nested iteration with coordinated single-pass movement, justified by an invariant about the regions the pointers bound.</p>
+                </div>
+                <div>
+                    <h3>Questions people ask</h3>
+                    <strong>Does the array need to be sorted?</strong> For opposite-end patterns, yes &mdash; the monotonic relationship is what justifies moving a pointer. Same-direction and fast-slow patterns do not require it.<strong>Is sorting first worth the cost?</strong> Sorting is O(n log n) and two pointers is O(n), so the total is O(n log n) &mdash; still far better than O(n²), and it uses O(1) extra space where a hash table uses O(n).<strong>How do I know which pointer to move?</strong> From the condition: if the current value is too small, move the pointer that increases it. If that is ambiguous, two pointers is not the right technique.<strong>Why does Floyd's algorithm work?</strong> The gap between the pointers shrinks by one each step inside the cycle, so it must reach zero.<strong>What is the space complexity?</strong> O(1) &mdash; just the two indices. That is the technique's main advantage over a hash-table solution.<strong>Can it be used on a linked list?</strong> Yes, and fast-slow is designed for it &mdash; no random access needed.
+                </div>
+                <div>
+                    <h3>Recap in one screen</h3>
+                    <ul><li>Two coordinated indices replace a nested loop, turning O(n&sup2;) into O(n) with O(1) extra space.</li><li>Opposite ends for sorted-pair problems, same direction for in-place editing, fast-slow for cycles and midpoints.</li><li>Correctness comes from an invariant: what is guaranteed true about the region each pointer bounds.</li><li>Unsorted pair problems are usually a hash-table job instead &mdash; O(n) time, O(n) space.</li><li>Three-sum is a loop plus two pointers at O(n&sup2;), and skipping duplicates is the part that is easy to get wrong.</li></ul>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

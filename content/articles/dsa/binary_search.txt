@@ -27,6 +27,62 @@ n / 2<sup>k</sup> = 1 &nbsp;&rarr;&nbsp; 2<sup>k</sup> = n &nbsp;&rarr;&nbsp; k 
 
 That is the definition of a logarithm, not an analogy for it. Doubling the array adds exactly one comparison. Going from 1,000 to 1,000,000 elements &mdash; a thousandfold increase &mdash; adds ten.
 
+## Halving the search space
+
+Binary search finds a value in a <strong>sorted</strong> array by repeatedly discarding half of it.
+
+Look at the middle element. If it matches, done. If the target is smaller, everything from the middle rightwards is irrelevant. If larger, everything leftwards is. Repeat on what remains.
+
+Searching for 23 in [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]:
+
+|Step|Range|Middle|Comparison|
+|---|---|---|---|
+|1|0&ndash;9|16 (index 4)|23 &gt; 16, search right|
+|2|5&ndash;9|38 (index 7)|23 &lt; 38, search left|
+|3|5&ndash;6|23 (index 5)|Found|
+
+Three comparisons for ten elements. Linear search would have taken six.
+
+The scaling is what makes it important:
+
+|Array size|Linear search|Binary search|
+|---|---|---|
+|100|100|7|
+|1,000,000|1,000,000|20|
+|1,000,000,000|1,000,000,000|30|
+
+Thirty comparisons for a billion items. That is the practical meaning of O(log n).
+
+## Getting it right
+
+Binary search is famously easy to write incorrectly &mdash; a well-known observation is that a large share of published implementations contained bugs for years.
+
+```python
+def binary_search(arr, target):
+    lo, hi = 0, len(arr) - 1
+    while lo <= hi:                      # <= not <, or the last element is missed
+        mid = lo + (hi - lo) // 2        # avoids overflow in fixed-width languages
+        if arr[mid] == target:
+            return mid
+        if arr[mid] < target:
+            lo = mid + 1                 # +1, or it can loop forever
+        else:
+            hi = mid - 1                 # -1, same reason
+    return -1
+```
+
+Four details in those eight lines are the ones that go wrong:
+
+<strong>`lo <= hi`, not `lo < hi`.</strong> With `<`, a single-element range is never examined.
+
+<strong>`mid + 1` and `mid - 1`.</strong> Without the adjustment, a two-element range can fail to shrink and the loop never terminates.
+
+<strong>`lo + (hi - lo) // 2`</strong> rather than `(lo + hi) // 2`. In Python integers are unbounded so it does not matter; in C or Java the sum can overflow, and this was a real bug in widely-used library code.
+
+<strong>The array must be sorted.</strong> On unsorted input it returns a wrong answer silently, which is worse than failing.
+
+In practice, use the standard library: Python's `bisect_left` and `bisect_right` are correct, tested and C-speed.
+
 ## Experiments to try
 
 1. <strong>Count the halvings.</strong> Set <strong>Array Size</strong> to 25 and press <strong>Next Step</strong> repeatedly, watching the shaded region shrink. It takes about five steps, because 2<sup>5</sup> = 32 is the first power of two above 25.
@@ -44,3 +100,85 @@ That is the definition of a logarithm, not an analogy for it. Doubling the array
 ## The short version
 
 Binary search converts a sorted array into an O(log n) lookup by throwing away half the remaining candidates with every comparison. The cost is the precondition: something must keep the data sorted, and if that guarantee ever lapses the algorithm fails silently rather than loudly. Sort once and search many times and it is close to unbeatable; sort in order to search once and you have spent O(n log n) to save O(n).
+
+## The variants that matter more than the basic version
+
+Finding an exact match is the least useful form. The valuable variants find <em>boundaries</em>.
+
+<strong>Leftmost insertion point</strong> (`bisect_left`) &mdash; the first position where the target could be inserted keeping the array sorted. With duplicates, this is the first occurrence.
+
+<strong>Rightmost insertion point</strong> (`bisect_right`) &mdash; one past the last occurrence.
+
+Together they give the range of a duplicated value, and therefore its count, in O(log n):
+
+```python
+from bisect import bisect_left, bisect_right
+
+lo = bisect_left(arr, target)
+hi = bisect_right(arr, target)
+count = hi - lo                    # occurrences of target
+exists = lo < len(arr) and arr[lo] == target
+```
+
+<strong>First element ≥ target</strong> is `bisect_left`; <strong>last element ≤ target</strong> is `bisect_right(arr, target) - 1`. Those two cover most real uses &mdash; finding the price band, the applicable tax bracket, the most recent record before a timestamp.
+
+## Binary search on an answer
+
+The most powerful application is not searching an array at all. If a problem has a <strong>monotonic</strong> predicate &mdash; something that is false up to a threshold and true after it &mdash; you can binary search for the threshold.
+
+<blockquote>"What is the minimum ship capacity needed to deliver all packages within D days?"</blockquote>
+
+Capacity is monotonic: if capacity C works, so does C+1. So binary search over capacity, and for each candidate check feasibility in O(n):
+
+```python
+def min_capacity(weights, days):
+    def feasible(cap):
+        used, load = 1, 0
+        for w in weights:
+            if load + w > cap:
+                used, load = used + 1, 0
+            load += w
+        return used <= days
+
+    lo, hi = max(weights), sum(weights)
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if feasible(mid):
+            hi = mid                 # mid might be the answer, keep it
+        else:
+            lo = mid + 1
+    return lo
+```
+
+Note the different loop shape: `lo < hi` and `hi = mid` rather than `mid - 1`, because we are converging on a boundary rather than looking for a match. That is the template for this whole family of problems, and it is worth memorising separately from the exact-match version.
+
+## Where it is used
+
+- <strong>Database indexes.</strong> A B-tree is binary search generalised to disk pages.
+- <strong>`bisect.insort`</strong> for maintaining a sorted list.
+- <strong>Version bisection</strong> &mdash; `git bisect` is binary search over commits.
+- <strong>Numerical root finding</strong> &mdash; bisection on a continuous function.
+- <strong>Rate limiting and capacity planning</strong> &mdash; the answer-search pattern above.
+- <strong>Timestamp lookups</strong> in log and time-series data.
+
+## Questions people ask
+
+<strong>Does the array have to be sorted?</strong> Yes. On unsorted input it returns a wrong answer without any error.
+
+<strong>Is sorting first worth it?</strong> For one search, no &mdash; sorting is O(n log n) and a linear scan is O(n). For many searches on the same data, absolutely.
+
+<strong>What about duplicates?</strong> Plain binary search finds <em>some</em> occurrence. Use `bisect_left` and `bisect_right` for the first, last, or count.
+
+<strong>Why is it so easy to get wrong?</strong> The off-by-one boundaries. Use the standard library, or memorise one template and reuse it.
+
+<strong>Can it work on a linked list?</strong> Not usefully &mdash; reaching the middle requires walking there, which is O(n) per step and destroys the advantage.
+
+<strong>What is interpolation search?</strong> A variant that guesses the position from the value's magnitude, assuming a uniform distribution. O(log log n) when the assumption holds and O(n) when it does not.
+
+## Recap in one screen
+
+- Halve the search space each comparison: 30 steps for a billion sorted items.
+- The array must be sorted, or the result is silently wrong.
+- `lo <= hi`, `mid + 1`, `mid - 1` &mdash; the three off-by-one details that break implementations.
+- The useful variants find boundaries, not exact matches; `bisect_left` and `bisect_right` give first, last and count.
+- Binary searching an <em>answer</em> works whenever feasibility is monotonic, and it is the most powerful form.

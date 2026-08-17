@@ -24,15 +24,59 @@ There are infinitely many possible keys and only a finite number of buckets, so 
 
 Switch between the two with the same keys and watch where the colliding entries end up.
 
-## Load Factor and Resizing
+## Load factor and resizing
 
-As the load factor climbs, collisions become common and performance decays toward O(n). Implementations therefore <strong>resize</strong> &mdash; typically doubling the bucket count and rehashing every key &mdash; once the load factor passes a threshold (0.75 in Java's HashMap, around 0.66 in Python's dict).
+The <strong>load factor</strong> is entries divided by slots. As it rises, collisions become more frequent and operations slow down.
 
-Rehashing is an expensive O(n) operation, but it happens rarely enough that the <em>amortised</em> cost of insertion stays O(1). Add keys here and watch the load-factor warning appear.
+So hash tables <strong>resize</strong>: when the load factor crosses a threshold (0.66 in CPython, 0.75 in Java), a larger table is allocated and every entry is rehashed into it.
+
+That resize is O(n), which means an individual insertion can be expensive. Averaged over many insertions it is O(1) &mdash; this is what <strong>amortised</strong> constant time means, and it is the same mechanism behind Python list append.
+
+The practical consequence: if you know roughly how many entries you will store, pre-sizing avoids repeated rehashing. In Python that is rarely exposed; in other languages the constructor takes a capacity.
+
+The worst case remains O(n) per operation, when every key collides. That requires either a terrible hash function or adversarially chosen keys &mdash; which was a real denial-of-service vector until languages began randomising their hash seeds per process. That is why Python's string hashes differ between runs unless `PYTHONHASHSEED` is fixed.
 
 ## Why This Matters to You
 
 Python's <span class="mono-font">dict</span>, JavaScript's <span class="mono-font">Map</span> and object, Java's <span class="mono-font">HashMap</span>, Go's <span class="mono-font">map</span> &mdash; all hash tables. When someone says "just use a dictionary for O(1) lookup", this is the machinery they are invoking. It is also why dictionary keys must be <em>hashable</em> and immutable: mutating a key after insertion changes its hash, and the entry becomes permanently unreachable.
+
+## Turning a key into an address
+
+A hash table stores key-value pairs and finds any of them in roughly constant time, whatever the size.
+
+The mechanism: a <strong>hash function</strong> converts the key into an integer, that integer is reduced modulo the table size to give an index, and the pair is stored there.
+
+<p class="mono-font">"apple" &rarr; hash() &rarr; 1839274 &rarr; % 16 &rarr; slot 10</p>
+
+Lookup does the same computation and goes straight to slot 10. No scanning, no comparison against other keys &mdash; one calculation and one memory access.
+
+That is the whole idea, and it is why dictionaries are the workhorse of practical programming:
+
+|Operation|Hash table|Sorted array|Linked list|
+|---|---|---|---|
+|Lookup|O(1)|O(log n)|O(n)|
+|Insert|O(1)|O(n)|O(1)|
+|Delete|O(1)|O(n)|O(n) to find|
+|Ordered traversal|Insertion order|Sorted|Insertion order|
+
+The trade is that nothing is sorted. If you need range queries or ordered iteration by key, a tree structure is the right choice.
+
+## Collisions, and the two ways to handle them
+
+Two different keys can hash to the same slot. With 16 slots and 10 keys, collisions are not unlikely &mdash; they are near-certain, by the same reasoning as the birthday problem.
+
+<strong>Chaining</strong> stores a list at each slot. Colliding keys are appended, and lookup walks the short list comparing keys. Simple, and it degrades gracefully.
+
+<strong>Open addressing</strong> stores everything in the table itself: on collision, probe for the next free slot by a defined rule. Better cache behaviour, and deletion is awkward &mdash; a removed entry must leave a tombstone, or probe sequences break.
+
+|&nbsp;|Chaining|Open addressing|
+|---|---|---|
+|Extra memory|Pointers per entry|None|
+|Cache behaviour|Poorer &mdash; pointer chasing|Better &mdash; contiguous|
+|Deletion|Straightforward|Needs tombstones|
+|Behaviour when full|Degrades gradually|Degrades sharply|
+
+Python's `dict` uses open addressing with a randomised probe sequence. Java's `HashMap` uses chaining, switching a long chain to a tree above a threshold to bound the worst case.
 
 ## Experiments to try
 
@@ -45,3 +89,86 @@ Python's <span class="mono-font">dict</span>, JavaScript's <span class="mono-fon
 ## What to remember
 
 Hashing replaces searching with computing an address. Collisions are unavoidable and must be resolved by chaining or probing; the load factor governs how often they happen. Keep it low and lookups stay effectively constant &mdash; let it climb and a hash table quietly becomes a linked list.
+
+## What makes a valid key
+
+A key must be <strong>hashable</strong>, which means two things: it has a hash value that never changes, and it can be compared for equality.
+
+That is why mutable types cannot be keys:
+
+```python
+d = {}
+d[(1, 2)] = "ok"          # tuple - immutable, hashable
+d[[1, 2]] = "error"       # TypeError: unhashable type: 'list'
+```
+
+If a list could be a key, mutating it after insertion would change its hash, and the entry would become unreachable &mdash; stored in a slot the new hash does not point to.
+
+The contract between hashing and equality has two rules, and breaking the first causes genuinely confusing bugs:
+
+<strong>Equal objects must have equal hashes.</strong> Otherwise two objects that compare equal land in different slots and both exist in the table.
+
+<strong>Unequal objects may share a hash.</strong> That is just a collision, handled normally.
+
+For a custom class, implement both together:
+
+```python
+class Point:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+    def __eq__(self, other):
+        return isinstance(other, Point) and (self.x, self.y) == (other.x, other.y)
+
+    def __hash__(self):
+        return hash((self.x, self.y))     # hash the same fields as __eq__
+```
+
+Defining `__eq__` without `__hash__` makes the class unhashable in Python 3 &mdash; a deliberate safeguard against exactly this inconsistency.
+
+## Where hash tables show up
+
+- <strong>Dictionaries and sets</strong> in every modern language.
+- <strong>Caches and memoisation</strong> &mdash; a dictionary from arguments to results.
+- <strong>Deduplication</strong> &mdash; `set(items)` in one pass.
+- <strong>Counting and grouping</strong> &mdash; `Counter`, `defaultdict(list)`.
+- <strong>Database indexes</strong> for equality lookups (though B-trees dominate, because they also support ranges).
+- <strong>Symbol tables</strong> in compilers and interpreters &mdash; the objects in a Python program are themselves stored in dictionaries.
+
+The pattern that matters most in everyday code:
+
+```python
+# O(n^2): for each order, scan every customer
+for order in orders:
+    for c in customers:
+        if c.id == order.customer_id: ...
+
+# O(n): build the index once
+by_id = {c.id: c for c in customers}
+for order in orders:
+    c = by_id[order.customer_id]
+```
+
+Building a dictionary to replace a repeated scan is the most common and most effective optimisation available in ordinary code.
+
+## Questions people ask
+
+<strong>Why is lookup O(1) if collisions exist?</strong> Because with a good hash function and a bounded load factor, the expected chain length is a small constant. The worst case is O(n) and is not encountered in practice.
+
+<strong>Are Python dictionaries ordered?</strong> They preserve insertion order, guaranteed since 3.7. That is not the same as sorted.
+
+<strong>Why can a list not be a dictionary key?</strong> Mutating it would change its hash and orphan the entry. Use a tuple.
+
+<strong>How much memory does a dictionary use?</strong> More than a list of the same values &mdash; it stores hashes and keeps spare slots. Lookup speed is what you are buying.
+
+<strong>What is hash randomisation?</strong> Per-process randomisation of string hashes, added to prevent denial-of-service attacks that deliberately collide keys.
+
+<strong>When should I not use a hash table?</strong> When you need sorted order, range queries, or a nearest-key lookup. Use a tree.
+
+## Recap in one screen
+
+- A hash function maps a key to a slot, so lookup is one computation and one access.
+- Collisions are inevitable and are handled by chaining or open addressing.
+- Load factor drives resizing, which is O(n) occasionally and O(1) amortised.
+- Keys must be immutable, and `__eq__` and `__hash__` must agree.
+- Replacing a repeated scan with a pre-built dictionary is the standard way to turn quadratic code linear.
