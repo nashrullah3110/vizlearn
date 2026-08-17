@@ -1,6 +1,73 @@
 title: Group records and invert a dictionary
 intro: Group a list of records by a field. Then invert a dictionary so the values become keys.
 
+## The two operations
+
+<strong>Grouping</strong> turns a flat sequence into a dictionary of lists, keyed on some property. <strong>Inverting</strong> swaps keys and values. Both are one-liners once the right tool is known, and both have a trap.
+
+```python
+words = ["apple", "avocado", "banana", "blueberry", "cherry"]
+
+# Grouping by first letter
+from collections import defaultdict
+groups = defaultdict(list)
+for w in words:
+    groups[w[0]].append(w)
+# {'a': ['apple', 'avocado'], 'b': ['banana', 'blueberry'], 'c': ['cherry']}
+```
+
+`defaultdict(list)` is what makes this three lines instead of five. Without it, every append needs a guard:
+
+```python
+groups = {}
+for w in words:
+    if w[0] not in groups:            # the boilerplate defaultdict removes
+        groups[w[0]] = []
+    groups[w[0]].append(w)
+```
+
+`setdefault` is the middle ground and works on a plain dict &mdash; `groups.setdefault(w[0], []).append(w)` &mdash; which is useful when the result must be a real `dict` rather than a `defaultdict`.
+
+## The defaultdict trap
+
+A `defaultdict` <strong>creates entries on read</strong>. Merely looking a key up inserts it:
+
+```python
+d = defaultdict(list)
+if d["missing"]:                      # this INSERTS 'missing': []
+    ...
+len(d)                                # 1, not 0
+"missing" in d                        # True
+```
+
+That surprises people debugging a size or an iteration. Two ways to avoid it: use `d.get(key, [])` for reads, or convert to a plain dict once building is finished with `dict(d)`.
+
+The related habit worth having: <strong>never pass a `defaultdict` out of a function</strong> as a return value if callers will read arbitrary keys. Convert it first, and the mutation-on-read behaviour stays inside the code that wanted it.
+
+## Inverting a dictionary
+
+```python
+ages = {"alice": 30, "bob": 25, "carol": 30}
+
+inverted = {v: k for k, v in ages.items()}
+# {30: 'carol', 25: 'bob'}   -- alice is GONE
+```
+
+<strong>Duplicate values collide,</strong> and the last one wins. `alice` and `carol` are both 30, so only `carol` survives. This is the single most common bug with inversion, and the fix is to invert into lists:
+
+```python
+from collections import defaultdict
+
+inverted = defaultdict(list)
+for k, v in ages.items():
+    inverted[v].append(k)
+# {30: ['alice', 'carol'], 25: ['bob']}
+```
+
+Which is the same operation as grouping &mdash; grouping the keys by their value. The two topics are one topic.
+
+The other requirement: <strong>values must be hashable</strong> to become keys. Inverting `{"a": [1, 2]}` raises `TypeError`, and converting the list to a tuple first fixes it.
+
 ## Three ways to group
 
 <p><code>setdefault(key, []).append(x)</code> &mdash; no import, and it makes the default explicit. It does construct an empty list on every call, which is why the next form is usually preferred.</p>
@@ -18,3 +85,105 @@ intro: Group a list of records by a field. Then invert a dictionary so the value
 ## Where this shows up
 
 Grouping is the shape behind most "organise this data" questions: anagram groups keyed on sorted letters, files keyed on their hash, log lines keyed on their level. Recognising it saves you from writing a nested loop that scans for an existing group &mdash; the accidental O(n&sup2;) this idiom exists to avoid.
+
+## `itertools.groupby` and why it surprises people
+
+The standard library has a `groupby`, and it does not do what the name suggests to anyone coming from SQL or pandas.
+
+```python
+from itertools import groupby
+
+words = ["apple", "banana", "avocado", "blueberry"]
+for key, group in groupby(words, key=lambda w: w[0]):
+    print(key, list(group))
+# a ['apple']
+# b ['banana']
+# a ['avocado']         <- 'a' appears TWICE
+# b ['blueberry']
+```
+
+`itertools.groupby` groups <strong>consecutive</strong> runs only. It does not collect scattered items. To get SQL-like behaviour the input must be sorted by the same key first:
+
+```python
+for key, group in groupby(sorted(words, key=lambda w: w[0]), key=lambda w: w[0]):
+    ...
+```
+
+Which costs O(n log n), while the `defaultdict` version is O(n). <strong>Prefer `defaultdict`</strong> unless the data is already sorted or the runs themselves are what you want &mdash; compressing repeated values, detecting consecutive duplicates, run-length encoding.
+
+The other sharp edge: the group is an <em>iterator sharing the underlying stream</em>. It is exhausted as soon as you advance to the next group, so `list(group)` must happen before moving on. `groups = [(k, g) for k, g in groupby(x)]` yields empty groups for exactly this reason.
+
+## The grouping patterns worth having ready
+
+<strong>Group by a computed key.</strong>
+
+```python
+by_length = defaultdict(list)
+for w in words:
+    by_length[len(w)].append(w)
+```
+
+<strong>Group by several keys</strong> &mdash; use a tuple:
+
+```python
+by_both = defaultdict(list)
+for w in words:
+    by_both[(w[0], len(w))].append(w)
+```
+
+<strong>Count instead of collect</strong> &mdash; `Counter` is the specialised form:
+
+```python
+from collections import Counter
+Counter(w[0] for w in words)          # {'a': 2, 'b': 2, 'c': 1}
+```
+
+<strong>Aggregate while grouping</strong> &mdash; `defaultdict(int)` for sums, `defaultdict(set)` for deduplicated members:
+
+```python
+totals = defaultdict(int)
+for name, amount in sales:
+    totals[name] += amount
+```
+
+<strong>Group anagrams,</strong> the classic interview form &mdash; the key is a canonical form:
+
+```python
+groups = defaultdict(list)
+for w in words:
+    groups["".join(sorted(w))].append(w)
+return list(groups.values())
+```
+
+|Need|Tool|
+|---|---|
+|Collect items|`defaultdict(list)`|
+|Count items|`Counter`|
+|Sum values|`defaultdict(int)`|
+|Deduplicated members|`defaultdict(set)`|
+|Nested grouping|`defaultdict(lambda: defaultdict(list))`|
+|Consecutive runs only|`itertools.groupby`|
+
+The nested case needs a `lambda` because `defaultdict(defaultdict(list))` is wrong &mdash; the argument must be a callable that <em>produces</em> the default, not an instance.
+
+## Questions people ask
+
+<strong>Why `defaultdict` over `setdefault`?</strong> Cleaner in a loop and slightly faster, since `setdefault` builds the default list on every call even when the key exists. Use `setdefault` when the result must be a plain dict.
+
+<strong>What happens when inverting with duplicate values?</strong> Later keys overwrite earlier ones. Invert into lists to keep all of them.
+
+<strong>Can any value become a key?</strong> Only hashable ones. Convert lists to tuples.
+
+<strong>Why does `itertools.groupby` split my groups?</strong> It only groups consecutive items; sort by the key first.
+
+<strong>How do I stop `defaultdict` inserting on read?</strong> Use `.get()`, or wrap in `dict()` when done building.
+
+<strong>Is `Counter` a dict?</strong> Yes, a subclass &mdash; and it returns 0 for missing keys rather than raising, without inserting them.
+
+## Recap in one screen
+
+- `defaultdict(list)` is the grouping idiom; `setdefault` is the plain-dict equivalent.
+- A `defaultdict` inserts keys on read &mdash; use `.get()` or convert with `dict()` before handing it out.
+- Inverting with a comprehension silently drops duplicate values; invert into lists instead.
+- Values becoming keys must be hashable.
+- `itertools.groupby` groups only consecutive runs and its groups are single-use iterators; sort first, or use `defaultdict`.

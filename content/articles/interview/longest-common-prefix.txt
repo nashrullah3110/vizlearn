@@ -1,6 +1,91 @@
 title: Longest common prefix
 intro: Find the longest common prefix of a list of strings.
 
+## The problem
+
+Given a list of strings, find the longest prefix shared by all of them.
+
+|Input|Answer|
+|---|---|
+|`["flower", "flow", "flight"]`|`"fl"`|
+|`["dog", "racecar", "car"]`|`""` &mdash; nothing shared|
+|`["interspecies", "interstellar", "interstate"]`|`"inters"`|
+|`["abc"]`|`"abc"` &mdash; a single string is its own prefix|
+|`[]`|`""`|
+|`["", "abc"]`|`""` &mdash; an empty string forces an empty answer|
+
+Simple to state, and the interest is in how many correct approaches exist and which reads best.
+
+## Vertical scanning
+
+Compare the same position across all strings, and stop at the first disagreement.
+
+```python
+def longest_common_prefix(strs):
+    if not strs:
+        return ""
+    for i in range(len(strs[0])):
+        ch = strs[0][i]
+        for other in strs[1:]:
+            if i >= len(other) or other[i] != ch:
+                return strs[0][:i]
+    return strs[0]
+```
+
+O(S) where S is the total number of characters, and O(1) extra space.
+
+The two conditions in the inner `if` are both necessary: `i >= len(other)` catches a string that ends early, and `other[i] != ch` catches a mismatch. Omitting the length check raises `IndexError` on `["flower", "flow"]`, which is the most common bug here.
+
+The early exit is what makes this fast in practice. If the first characters differ, it returns after one comparison, regardless of how long the strings are.
+
+## Horizontal scanning
+
+Take the first string as a running answer, and shorten it against each subsequent string.
+
+```python
+def lcp_horizontal(strs):
+    if not strs:
+        return ""
+    prefix = strs[0]
+    for s in strs[1:]:
+        while not s.startswith(prefix):
+            prefix = prefix[:-1]              # shorten by one
+            if not prefix:
+                return ""
+    return prefix
+```
+
+Same O(S) worst case. Slower in the bad case &mdash; the `while` loop can shorten one character at a time &mdash; but it reads clearly and `startswith` does the character comparison in C.
+
+Both are acceptable answers. Vertical scanning exits earlier on the common case of an immediate mismatch; horizontal scanning is shorter. Being able to say which is better and why is what the comparison is for.
+
+## The two shortcuts worth knowing
+
+<strong>Sort and compare the ends.</strong> After sorting lexicographically, the strings most unlike each other are first and last, so their common prefix is the answer for the whole list:
+
+```python
+def lcp_sorted(strs):
+    if not strs:
+        return ""
+    strs = sorted(strs)
+    first, last = strs[0], strs[-1]
+    i = 0
+    while i < len(first) and i < len(last) and first[i] == last[i]:
+        i += 1
+    return first[:i]
+```
+
+O(n log n &middot; m) because of the sort &mdash; asymptotically worse, but the reasoning is neat and it is a legitimate answer if explained.
+
+<strong>The `os.path.commonprefix` one-liner.</strong> The standard library has it, despite the misleading module:
+
+```python
+import os
+os.path.commonprefix(["flower", "flow", "flight"])   # 'fl'
+```
+
+It is a character-wise prefix, not path-aware &mdash; `commonprefix(["/usr/lib", "/usr/local"])` returns `"/usr/l"`, which is not a directory. For paths, `os.path.commonpath` is the correct function. Mention it after writing the loop.
+
 ## The shrinking candidate
 
 The answer is a prefix of every string, so it is certainly a prefix of the first one. Start there and remove characters as each new word disagrees. Because it only shrinks, no backtracking is possible and one pass is enough.
@@ -16,3 +101,89 @@ Sort the list and compare only the first and last strings. In lexicographic orde
 The other framing compares column by column: check index 0 across every word, then index 1, stopping at the first disagreement. Same complexity, and it exits earlier when the prefix is short and the strings are long.
 
 If the question becomes "answer this repeatedly for many queries", the answer is a trie: insert every word, then walk down from the root while each node has exactly one child and ends no word. That is the structure this question is a warm-up for.
+
+## The trie approach
+
+Insert every string into a trie, then walk down from the root while each node has exactly one child and is not the end of a word.
+
+```python
+class TrieNode:
+    def __init__(self):
+        self.children = {}
+        self.is_end = False
+
+def lcp_trie(strs):
+    if not strs:
+        return ""
+    root = TrieNode()
+    for s in strs:
+        node = root
+        for ch in s:
+            node = node.children.setdefault(ch, TrieNode())
+        node.is_end = True
+
+    out = []
+    node = root
+    while len(node.children) == 1 and not node.is_end:
+        ch, node = next(iter(node.children.items()))
+        out.append(ch)
+    return "".join(out)
+```
+
+<strong>Overkill for a single query</strong> &mdash; building the trie costs O(S) and the scan is O(m), so it is no better than vertical scanning while using far more memory.
+
+It becomes the right answer when the list is fixed and <em>many</em> prefix queries follow: autocomplete, prefix counting, finding all strings starting with a given prefix. If asked "what if I need to answer this repeatedly as strings are added?", the trie is the reason to bring it up.
+
+The `not node.is_end` condition is easy to miss: for `["ab", "abc"]` the answer is `"ab"`, and the node after `b` marks the end of a word even though it still has one child.
+
+|Approach|Time|Space|Use when|
+|---|---|---|---|
+|Vertical scan|O(S)|O(1)|<strong>Default</strong>|
+|Horizontal scan|O(S)|O(1)|Slightly shorter code|
+|Sort, compare ends|O(n log n &middot; m)|O(n)|The reasoning is the point|
+|Divide and conquer|O(S)|O(m log n)|Parallelisable|
+|Trie|O(S) build, O(m) query|O(S)|Many queries|
+|Binary search on length|O(S log m)|O(1)|Rarely|
+
+## Edge cases
+
+|Case|Result|
+|---|---|
+|Empty list|`""` &mdash; guard first, or `strs[0]` raises|
+|One string|That string|
+|Any empty string present|`""`|
+|All identical|The whole string|
+|First character differs|`""`, after one comparison|
+|One string is a prefix of the rest|That string|
+|Unicode|Works per code point &mdash; see the caveat below|
+
+The <strong>Unicode caveat</strong> is worth a sentence if the interviewer is interested: comparing code points means `"café"` written with a combining accent and `"café"` with a precomposed one share only `"caf"`. Normalising with `unicodedata.normalize("NFC", s)` first fixes it. Rarely required, and knowing it exists is the signal.
+
+## Where it is used
+
+- <strong>Autocomplete.</strong> Given the typed prefix, the common prefix of all matches can be filled in automatically &mdash; which is what shell tab-completion does.
+- <strong>File path handling.</strong> Finding the common root directory of a set of paths, with `commonpath` rather than `commonprefix`.
+- <strong>IP routing.</strong> Longest-prefix matching on address bits, implemented as a trie over bits.
+- <strong>DNA sequence analysis,</strong> finding shared leading segments.
+- <strong>URL routing</strong> in web frameworks, matching the longest registered path prefix.
+- <strong>Compression.</strong> Front coding stores each string as a shared prefix length plus a suffix.
+
+## What it is testing
+
+<strong>Do you guard the empty list?</strong> `strs[0]` on an empty list raises, and it is the first line of the solution.
+
+<strong>Do you handle a short string?</strong> The `i >= len(other)` check, without which `["flower", "flow"]` raises `IndexError`.
+
+<strong>Can you compare approaches?</strong> Several are correct; choosing one and justifying it is the answer.
+
+<strong>Do you spot the early exit?</strong> Vertical scanning returns after one comparison when the first characters differ.
+
+<strong>Do you know when a trie earns its cost?</strong> Not for one query; yes for repeated prefix queries.
+
+## Recap in one screen
+
+- Vertical scanning compares position by position across all strings and exits on the first mismatch &mdash; O(S) time, O(1) space.
+- Check `i >= len(other)` as well as inequality, or a shorter string raises `IndexError`.
+- Guard the empty list before touching `strs[0]`.
+- Sorting and comparing only the first and last string works, at O(n log n &middot; m).
+- A trie is the right structure only when many prefix queries follow, not for one answer.

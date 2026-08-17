@@ -1,6 +1,89 @@
 title: Implement a hash map from scratch
 intro: Implement a hash map with put, get and remove, without using a dict.
 
+## The requirement
+
+Implement `put`, `get` and `remove` with O(1) average time, without using the language's built-in dictionary.
+
+The design has three parts, and stating them upfront is the expected opening:
+
+<strong>An array of buckets</strong> &mdash; the storage.
+<strong>A hash function</strong> mapping keys to bucket indices.
+<strong>A collision strategy</strong> for when two keys land in the same bucket.
+
+## Chaining: the straightforward answer
+
+Each bucket holds a list of key-value pairs. On collision, append.
+
+```python
+class MyHashMap:
+    def __init__(self, capacity=16):
+        self.cap = capacity
+        self.size = 0
+        self.buckets = [[] for _ in range(capacity)]
+
+    def _index(self, key):
+        return hash(key) % self.cap
+
+    def get(self, key):
+        for k, v in self.buckets[self._index(key)]:
+            if k == key:
+                return v
+        return None
+
+    def put(self, key, value):
+        bucket = self.buckets[self._index(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:
+                bucket[i] = (key, value)       # update in place
+                return
+        bucket.append((key, value))
+        self.size += 1
+        if self.size / self.cap > 0.75:
+            self._resize()
+
+    def remove(self, key):
+        bucket = self.buckets[self._index(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:
+                bucket.pop(i)
+                self.size -= 1
+                return True
+        return False
+
+    def _resize(self):
+        old = self.buckets
+        self.cap *= 2
+        self.buckets = [[] for _ in range(self.cap)]
+        self.size = 0
+        for bucket in old:
+            for k, v in bucket:
+                self.put(k, v)                 # rehash everything
+```
+
+O(1) average for all three operations, O(n) worst case when every key collides.
+
+Two details are load-bearing:
+
+<strong>`put` must check for an existing key</strong> before appending, or updating a value inserts a duplicate and `get` returns the stale one.
+
+<strong>Resizing rehashes every entry,</strong> because the bucket index depends on the capacity. Copying buckets across without rehashing puts keys in the wrong places, and they become unreachable.
+
+## Why the load factor matters
+
+The <strong>load factor</strong> is entries divided by buckets. As it rises, buckets hold longer chains and lookups degrade from O(1) towards O(n).
+
+|Load factor|Average chain length|Behaviour|
+|---|---|---|
+|0.25|~1.1|Fast, memory-wasteful|
+|0.75|~1.4|The usual threshold|
+|2.0|~2.4|Noticeably slower|
+|10|~10|Effectively a linked list|
+
+Resizing at 0.75 is the common choice (Java's `HashMap` uses exactly this; CPython uses about 2/3). Doubling the capacity is O(n), and amortised across the insertions that fit in the new space it is O(1) per operation &mdash; the same argument as list `append`.
+
+Choosing a <strong>power-of-two capacity</strong> allows `hash & (cap - 1)` instead of a modulo, which is faster. It also means only the low bits of the hash are used, so a hash function that varies mainly in its high bits clusters badly &mdash; which is why Java's `HashMap` mixes the high bits down before masking.
+
 ## Chaining versus open addressing
 
 <p><strong>Separate chaining</strong> puts colliding entries in a list per bucket. Simple, deletion is trivial, and it tolerates a high load factor. This is what to implement under time pressure.</p>
@@ -18,3 +101,79 @@ The fix is a <strong>tombstone</strong>: mark the slot deleted rather than empty
 Lookup is O(1) only while buckets stay short. Once entries divided by buckets passes roughly 0.75, chains lengthen and every operation drifts towards O(n).
 
 So the table doubles and <em>every key is rehashed</em>, because the index is <code>hash(key) % size</code> and the size just changed. That single resize is O(n), and amortised over the insertions that caused it each insert is still O(1) &mdash; but any individual insert can be the expensive one.
+
+## Open addressing, the alternative
+
+Instead of a list per bucket, store entries directly in the array and probe for another slot on collision.
+
+|&nbsp;|Chaining|Open addressing|
+|---|---|---|
+|Storage|List per bucket|One flat array|
+|Extra memory|Pointers per entry|None|
+|Cache behaviour|Poorer &mdash; pointer chasing|Better &mdash; contiguous|
+|Deletion|Straightforward|Needs tombstones|
+|Load factor tolerance|Above 1 is workable|Must stay well below 1|
+
+<strong>Deletion is the awkward part.</strong> Removing an entry outright breaks probe sequences that passed through that slot &mdash; a later lookup would stop at the gap and report the key missing. So deleted slots hold a <strong>tombstone</strong> marker meaning "empty, but keep probing".
+
+Tombstones accumulate and degrade performance until a resize clears them, which is why open-addressed tables need periodic rehashing even without growth.
+
+CPython uses open addressing with a scattering probe sequence; Java uses chaining, converting long chains into trees above a threshold to bound the worst case.
+
+## The hash function
+
+For an interview, `hash(key) % capacity` is acceptable. If asked to write one:
+
+```python
+def string_hash(s, cap):
+    h = 0
+    for ch in s:
+        h = (h * 31 + ord(ch)) % cap      # 31: a common odd prime multiplier
+    return h
+```
+
+Three properties a hash function needs:
+
+<strong>Deterministic.</strong> The same key must always give the same value, or entries become unreachable.
+
+<strong>Uniform.</strong> Keys should spread across buckets. A hash returning a constant is valid and turns the table into a linked list.
+
+<strong>Fast.</strong> It runs on every operation.
+
+It does <em>not</em> need to be cryptographic &mdash; that is a different requirement, and orders of magnitude slower.
+
+Worth mentioning: Python randomises string hashes per process to prevent deliberate-collision denial-of-service attacks, which is why `hash("abc")` differs between runs.
+
+## Follow-up questions
+
+<strong>"What if keys are integers 0 to 1,000,000?"</strong> Use direct addressing &mdash; an array indexed by the key. No hashing, no collisions, O(1) guaranteed. Only viable when the key space is small and dense.
+
+<strong>"How would you make it thread-safe?"</strong> A single lock serialises everything; striped locking &mdash; one lock per group of buckets &mdash; allows concurrency. Java's `ConcurrentHashMap` does this.
+
+<strong>"What is the worst case?"</strong> O(n) when all keys collide. Java mitigates it by treeifying long chains, giving O(log n).
+
+<strong>"How do you iterate in insertion order?"</strong> Maintain a doubly linked list of entries alongside the table &mdash; which is exactly `OrderedDict` and CPython's compact dict layout.
+
+<strong>"What about memory?"</strong> Chaining costs a pointer per entry plus list overhead; open addressing wastes empty slots. Both trade memory for speed.
+
+## What it is testing
+
+<strong>Do you name the three components?</strong> Buckets, hash function, collision strategy.
+
+<strong>Do you handle collisions explicitly?</strong> A design without a collision answer is incomplete.
+
+<strong>Do you resize?</strong> Without it, performance degrades to O(n) as the table fills.
+
+<strong>Do you rehash on resize?</strong> Copying buckets without recomputing indices is the classic bug.
+
+<strong>Do you check for an existing key in `put`?</strong> Otherwise updates create duplicates.
+
+<strong>Do you know the real implementations?</strong> CPython open-addresses, Java chains and treeifies &mdash; knowing that grounds the answer in reality.
+
+## Recap in one screen
+
+- Three components: an array of buckets, a hash function, and a collision strategy.
+- Chaining stores a list per bucket; open addressing probes for another slot and needs tombstones for deletion.
+- Resize when the load factor exceeds about 0.75, and <strong>rehash every entry</strong> because indices depend on the capacity.
+- `put` must update an existing key rather than appending a duplicate.
+- O(1) average, O(n) worst case; Java bounds the worst case by treeifying long chains.

@@ -1,6 +1,72 @@
 title: Minimum window substring
 intro: Find the smallest substring of s that contains every character of t, including duplicates.
 
+## The problem
+
+Find the shortest substring of `s` containing all characters of `t`, including duplicates.
+
+|s|t|Answer|
+|---|---|---|
+|`"ADOBECODEBANC"`|`"ABC"`|`"BANC"`|
+|`"a"`|`"a"`|`"a"`|
+|`"a"`|`"aa"`|`""` &mdash; not enough copies|
+|`"ab"`|`"b"`|`"b"`|
+
+Three details to pin down before writing anything:
+
+<strong>Duplicates count.</strong> If `t = "AABC"`, the window needs two As. This is why a set is insufficient and a frequency count is required.
+<strong>Order does not matter.</strong> The characters may appear in any arrangement.
+<strong>The substring is contiguous</strong>, and characters not in `t` are allowed inside the window.
+
+The brute force checks every substring: O(n²) substrings, each validated in O(m), so O(n²m). The answer is a sliding window in O(n + m).
+
+## The shape of the solution
+
+Expand the window's right edge until it is <em>valid</em> &mdash; contains everything needed. Then contract the left edge as far as possible while it stays valid, recording the best window seen. Repeat.
+
+The mechanism that makes this efficient is a counter of <strong>how many required characters are still missing</strong>, so validity is an O(1) check rather than a comparison of two dictionaries.
+
+```python
+from collections import Counter
+
+def min_window(s, t):
+    if not s or not t or len(t) > len(s):
+        return ""
+
+    need = Counter(t)
+    missing = len(t)                    # total characters still required
+    best = (float("inf"), 0, 0)
+    left = 0
+
+    for right, ch in enumerate(s):
+        if need[ch] > 0:                # this copy is actually needed
+            missing -= 1
+        need[ch] -= 1                   # may go negative: surplus
+
+        if missing == 0:                # window is valid -- now shrink
+            while need[s[left]] < 0:    # left char is surplus
+                need[s[left]] += 1
+                left += 1
+            if right - left + 1 < best[0]:
+                best = (right - left + 1, left, right)
+            # release the left character and resume expanding
+            need[s[left]] += 1
+            missing += 1
+            left += 1
+
+    return "" if best[0] == float("inf") else s[best[1]:best[2] + 1]
+```
+
+O(n + m) time. Space is O(k) for the alphabet.
+
+Two lines carry the design.
+
+<strong>`if need[ch] > 0: missing -= 1`</strong> &mdash; the guard is essential. Decrementing `missing` for every character would count surplus copies as progress. Only a copy that is still required reduces what is missing.
+
+<strong>`need[ch] -= 1` unconditionally,</strong> allowing negative values. A negative count means surplus, and it is exactly the condition the shrink loop tests: `need[s[left]] < 0` means the character at the left edge is present more often than needed, so it can be dropped.
+
+After recording a candidate, the left character is released and `missing` incremented &mdash; which invalidates the window deliberately, so the outer loop resumes expanding to find the next candidate.
+
 ## The grow-then-shrink shape
 
 Two phases alternating. Extend <code>hi</code> until the window satisfies the requirement; then advance <code>lo</code> as far as possible while it still does, recording the best window each time. When it stops being valid, go back to growing.
@@ -18,3 +84,71 @@ Increment or decrement it only when a character's count crosses <em>exactly</em>
 If <code>t</code> is <code>"AABC"</code> the window needs two <code>A</code>s. Counting rather than set membership handles that for free, and a set-based solution silently accepts one.
 
 Handle <code>t</code> longer than <code>s</code>, either being empty, and no valid window existing &mdash; the last returns the empty string, which needs a sentinel that cannot be confused with a real window of length zero.
+
+## Tracing `"ADOBECODEBANC"` with `"ABC"`
+
+|right|Character|Window when valid|Length|Best so far|
+|---|---|---|---|---|
+|5|C|`ADOBEC`|6|`"ADOBEC"`|
+|10|A|`CODEBA` (left advanced past D, O, B, E)|6|`"ADOBEC"`|
+|12|C|`BANC`|4|<strong>`"BANC"`</strong>|
+
+The shrink step is the interesting part. At `right = 5` the window `"ADOBEC"` is valid, and `A` at the left is not surplus, so nothing shrinks. The candidate is recorded, `A` is released, and expansion resumes.
+
+Later, when the second `A` arrives at index 10, the window is valid again and the left edge advances past every surplus character &mdash; `D`, `O`, `B`, `E` &mdash; stopping at the `C` that is still needed. By `right = 12` the window has narrowed to `"BANC"`, length 4, which is the answer.
+
+Recording `(length, left, right)` as a tuple lets a single comparison handle both "is this shorter" and "remember where it was", which is tidier than three separate variables.
+
+## The template this belongs to
+
+The same expand-then-contract skeleton solves a large family. What varies is the validity condition and what is recorded.
+
+|Problem|Valid when|Optimise|
+|---|---|---|
+|Minimum window substring|All required characters present|Minimise length|
+|Longest substring without repeats|No character appears twice|Maximise length|
+|Longest substring with at most k distinct|Distinct count &le; k|Maximise length|
+|Permutation in string|Window length = m and counts match|Existence|
+|Find all anagrams|Same|Collect all positions|
+|Minimum size subarray sum &ge; k|Sum &ge; k, values positive|Minimise length|
+|Longest repeating character replacement|Length &minus; most frequent &le; k|Maximise length|
+
+<strong>Minimise-length problems shrink while valid; maximise-length problems shrink while invalid.</strong> That single distinction determines the loop structure, and mixing them up is the most common way these solutions go wrong.
+
+The precondition for the whole family is that validity be <strong>monotonic</strong> in the window &mdash; extending a valid window keeps it valid, or extending an invalid one can only help. When that fails, as with negative numbers and a sum target, prefix sums replace the window.
+
+## Edge cases
+
+|Case|Result|
+|---|---|
+|`t` longer than `s`|`""` &mdash; check upfront|
+|Either string empty|`""`|
+|`t` has repeats, `s` has fewer|`""`|
+|`s == t`|`s`|
+|Several windows of equal minimum length|Any one; confirm which is expected|
+|Characters in `s` not in `t`|Allowed inside the window|
+|Case sensitivity|`"a"` and `"A"` are distinct unless told otherwise|
+
+The "not enough copies" row is the one that catches set-based solutions: `s = "a"`, `t = "aa"` must return `""`, and a set-based check reports success.
+
+## What it is testing
+
+<strong>Do you handle duplicate requirements?</strong> A `Counter`, not a set.
+
+<strong>Do you find the O(1) validity check?</strong> A single `missing` counter, rather than comparing dictionaries on every step.
+
+<strong>Do you guard the `missing` decrement?</strong> Only characters still needed count as progress.
+
+<strong>Do you allow negative counts?</strong> They encode surplus, which is what the shrink loop keys on.
+
+<strong>Do you shrink at the right time?</strong> Minimise-length shrinks while the window stays valid.
+
+<strong>Can you place it in the template?</strong> Recognising the family, and naming the shrink-while-valid versus shrink-while-invalid distinction, is what makes the pattern reusable.
+
+## Recap in one screen
+
+- Expand the right edge until the window is valid, then contract the left edge while it stays valid, recording the shortest.
+- Use a `Counter` for requirements and a single `missing` total so validity is O(1).
+- Decrement `missing` only for characters that are still needed; let counts go negative to mark surplus.
+- After recording a candidate, release the left character to resume expanding.
+- O(n + m) time; minimise-length problems shrink while valid, maximise-length problems shrink while invalid.

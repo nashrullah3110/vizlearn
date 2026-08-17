@@ -1,6 +1,72 @@
 title: Memoisation: caching with a dictionary
 intro: How would you speed up a recursive function that recomputes the same values? What does functools.lru_cache do?
 
+## The technique
+
+Cache a function's results keyed on its arguments. On a repeat call, return the stored value instead of recomputing.
+
+The canonical demonstration is Fibonacci:
+
+```python
+def fib(n):
+    return n if n < 2 else fib(n-1) + fib(n-2)
+```
+
+`fib(40)` makes about 331 million calls, because `fib(35)` is recomputed millions of times. It is O(2ⁿ).
+
+```python
+from functools import lru_cache
+
+@lru_cache(maxsize=None)
+def fib(n):
+    return n if n < 2 else fib(n-1) + fib(n-2)
+```
+
+O(n), and `fib(40)` returns instantly. One decorator.
+
+|n|Naive calls|Memoised calls|
+|---|---|---|
+|10|177|11|
+|20|21,891|21|
+|40|331,160,281|41|
+
+## The manual version, and why to know it
+
+```python
+def fib_manual(n, memo=None):
+    if memo is None:
+        memo = {}
+    if n in memo:
+        return memo[n]
+    result = n if n < 2 else fib_manual(n-1, memo) + fib_manual(n-2, memo)
+    memo[n] = result
+    return result
+```
+
+Note `memo=None` rather than `memo={}`. A mutable default argument is created <strong>once, at function definition</strong>, and shared by every call that does not supply one &mdash; so results leak between unrelated invocations. It happens to work for a pure function like Fibonacci and is a genuine bug in general, and interviewers watch for it.
+
+The manual version is worth knowing because it is what you write when the cache needs to be inspected, bounded by a custom rule, or shared explicitly between calls.
+
+## When memoisation applies
+
+Three conditions, and all three are required:
+
+<strong>The function is pure</strong> &mdash; same arguments always give the same result, with no side effects. Memoising a function that reads a database or the clock returns stale answers.
+
+<strong>Arguments are hashable.</strong> Lists and dictionaries cannot be cache keys; convert to tuples or frozensets.
+
+<strong>Subproblems repeat.</strong> Caching a function called once per distinct argument adds overhead for nothing.
+
+That third point is the one that separates memoisation from a general speed-up. It is exactly the "overlapping subproblems" condition of dynamic programming &mdash; memoisation <em>is</em> top-down dynamic programming.
+
+|Problem|Overlapping subproblems|Memoisation helps|
+|---|---|---|
+|Fibonacci|Heavily|Enormously|
+|Edit distance|Yes|Yes|
+|Merge sort|No &mdash; independent halves|No|
+|Binary search|No|No|
+|Grid paths|Yes|Yes|
+
 ## Why it works at all
 
 Naive recursion on overlapping subproblems recomputes the same values an exponential number of times. Memoisation does not make each call faster; it makes the repeated ones disappear, so the work drops to the number of <em>distinct</em> subproblems.
@@ -18,3 +84,78 @@ This is dynamic programming from the top down. The bottom-up table computes the 
 <p><code>@lru_cache(maxsize=None)</code> is an unbounded dictionary and is what you want for a recursion. A finite <code>maxsize</code> evicts least-recently-used entries, which matters when the key space is large and unbounded &mdash; an in-memory cache with no eviction is a memory leak with good manners.</p>
 
 It also gives you <code>cache_info()</code> for hits and misses, and <code>cache_clear()</code>. <code>functools.cache</code> is the unbounded alias added in 3.9. Mention that a manual dict is fine and the decorator is what you would actually ship.
+
+## `lru_cache` in practice
+
+```python
+from functools import lru_cache, cache
+
+@lru_cache(maxsize=128)          # bounded: evicts least recently used
+def expensive(x): ...
+
+@cache                            # Python 3.9+: unbounded, same as maxsize=None
+def expensive(x): ...
+
+expensive.cache_info()            # hits, misses, maxsize, currsize
+expensive.cache_clear()
+```
+
+`cache_info()` is the practically useful part: it tells you whether the cache is earning its place. A hit rate near zero means the arguments rarely repeat and the decorator is pure overhead.
+
+Four constraints worth knowing:
+
+<strong>Arguments must be hashable.</strong> `lru_cache` keys on the argument tuple, so a list argument raises `TypeError`.
+
+<strong>Keyword and positional arguments key differently.</strong> `f(1)` and `f(x=1)` are separate cache entries, which doubles memory and halves the hit rate if callers are inconsistent.
+
+<strong>`maxsize=None` never evicts.</strong> On unbounded input that is a memory leak; a bounded size is safer in long-running processes.
+
+<strong>Methods keep `self` in the key,</strong> so instances are held alive by the cache &mdash; a real source of leaks. `cachetools` or an explicit per-instance dictionary avoids it.
+
+## Memoisation against tabulation
+
+Two ways to write the same dynamic programming solution.
+
+|&nbsp;|Memoisation (top-down)|Tabulation (bottom-up)|
+|---|---|---|
+|Style|Recursive plus a cache|Iterative, fills a table|
+|Computes|Only the states reached|All states|
+|Recursion limit|Yes &mdash; about 1,000 frames|No|
+|Space optimisation|Harder|Often easy|
+|Easier to write|Usually|Usually not|
+
+Memoisation's advantage is that only the subproblems actually needed are computed &mdash; which matters when the state space is large and sparsely visited. Tabulation's advantages are no recursion limit and easier space reduction.
+
+Write memoisation first, because the recurrence is the part you have to think about. Convert to tabulation if you hit Python's recursion limit or need the O(1) space version.
+
+## Where it is used beyond interviews
+
+- <strong>Web response caching.</strong> Keyed on the request, with a TTL.
+- <strong>Database query caching.</strong> Same query, same result, until the data changes.
+- <strong>Expensive pure computations</strong> &mdash; parsing, compiling regular expressions (`re.compile` is itself cached), rendering templates.
+- <strong>Property caching</strong> &mdash; `functools.cached_property` computes once per instance.
+- <strong>API clients</strong> caching immutable lookups such as currency codes or country lists.
+
+And the counterpart: <strong>invalidation is the hard part</strong>. A cache with no invalidation strategy eventually serves stale data, and "when does this become wrong?" is the question to ask before adding one. For pure functions the answer is never, which is why memoisation is the easy case.
+
+## Questions people ask
+
+<strong>Why `memo=None` instead of `memo={}`?</strong> A mutable default is created once at definition and shared across calls.
+
+<strong>Is `lru_cache` thread-safe?</strong> Yes, its bookkeeping is &mdash; and the wrapped function may still be called twice concurrently for the same key.
+
+<strong>What if arguments are unhashable?</strong> Convert to tuples or frozensets, or hash a canonical serialisation.
+
+<strong>How large should `maxsize` be?</strong> Large enough for the working set, small enough to bound memory. Use `cache_info()` to check the hit rate.
+
+<strong>Does it help every recursive function?</strong> Only when subproblems repeat. Merge sort gains nothing.
+
+<strong>What is `cached_property`?</strong> A decorator computing a property once per instance and storing the result on the instance.
+
+## Recap in one screen
+
+- Store results keyed on arguments; return the stored value on a repeat call.
+- `@lru_cache` or `@cache` turns exponential recursion into linear in one line.
+- Requires a pure function, hashable arguments, and genuinely repeating subproblems.
+- Never use a mutable default argument as the cache &mdash; it is shared across all calls.
+- Memoisation is top-down dynamic programming; tabulation is the iterative form without a recursion limit.

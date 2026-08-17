@@ -1,6 +1,78 @@
 title: Design an LRU cache
 intro: Design a cache with O(1) get and put that evicts the least recently used entry.
 
+## The requirement
+
+A cache holding at most `capacity` items, evicting the least recently used when full, with <strong>O(1)</strong> `get` and `put`.
+
+That complexity requirement is what makes it a design question rather than a coding exercise. Two operations must both be constant time:
+
+<strong>Find an item by key</strong> &mdash; a hash table.
+<strong>Reorder items by recency, and remove the oldest</strong> &mdash; a doubly linked list.
+
+Neither structure alone suffices. A hash table has no order; a linked list has no lookup. The answer is to use both, with the hash table storing <em>pointers into</em> the list.
+
+|Structure alone|Problem|
+|---|---|
+|Dict only|No order &mdash; finding the oldest is O(n)|
+|List only|No lookup &mdash; finding a key is O(n)|
+|Sorted structure|Reordering is O(log n), not O(1)|
+|Dict + doubly linked list|<strong>Both O(1)</strong>|
+
+## The implementation
+
+```python
+class Node:
+    __slots__ = ("key", "value", "prev", "next")
+    def __init__(self, key=None, value=None):
+        self.key, self.value = key, value
+        self.prev = self.next = None
+
+class LRUCache:
+    def __init__(self, capacity):
+        self.cap = capacity
+        self.map = {}                          # key -> Node
+        self.head = Node()                     # sentinel: most recent side
+        self.tail = Node()                     # sentinel: least recent side
+        self.head.next = self.tail
+        self.tail.prev = self.head
+
+    def _remove(self, node):
+        node.prev.next = node.next
+        node.next.prev = node.prev
+
+    def _add_front(self, node):
+        node.next = self.head.next
+        node.prev = self.head
+        self.head.next.prev = node
+        self.head.next = node
+
+    def get(self, key):
+        if key not in self.map:
+            return -1
+        node = self.map[key]
+        self._remove(node)
+        self._add_front(node)                  # mark as most recent
+        return node.value
+
+    def put(self, key, value):
+        if key in self.map:
+            node = self.map[key]
+            node.value = value
+            self._remove(node)
+            self._add_front(node)
+            return
+        if len(self.map) >= self.cap:
+            lru = self.tail.prev               # least recently used
+            self._remove(lru)
+            del self.map[lru.key]              # remove from BOTH structures
+        node = Node(key, value)
+        self.map[key] = node
+        self._add_front(node)
+```
+
+The line to point at is `del self.map[lru.key]`. Evicting from the list without removing from the dictionary leaves a dangling entry, and the cache reports hits for items it has discarded. That is why the node stores its own key &mdash; the list gives you the node, and you need the key to clean up the map.
+
 ## Why one structure is not enough
 
 A dictionary gives O(1) lookup and knows nothing about order. A list keeps order and needs O(n) to find and remove an arbitrary element. The requirement is both at once, so you carry both.
@@ -9,12 +81,100 @@ The join between them is the important part: the map's value is not the cached v
 
 ## Why the list must be doubly linked
 
-Removing a node in O(1) requires knowing the node before it. A singly linked list would need a scan to find the predecessor, which puts you back at O(n). The backward pointer is the whole reason for the extra memory.
+To move a node to the front on access, it must be unlinked from its current position &mdash; which requires knowing its <em>predecessor</em>.
 
-Most implementations also use sentinel head and tail nodes, so no insertion or removal is ever a special case &mdash; the same trick as the dummy head in a linked-list delete.
+In a singly linked list, finding the predecessor means walking from the head: O(n). A doubly linked list stores `prev`, so unlinking is four pointer assignments and O(1).
+
+That is the specific reason for the "doubly" in the answer, and being able to say it is what distinguishes understanding from recall.
+
+The other implementation detail worth building in from the start is <strong>sentinel nodes</strong> &mdash; a dummy head and tail. They remove every special case for inserting at the front, removing from the back, and handling an empty list, which is where a hand-rolled version usually breaks.
 
 ## The Python answer
 
 <p><code>collections.OrderedDict</code> is exactly a dict plus a doubly linked list, and it exposes <code>move_to_end</code> and <code>popitem(last=False)</code>. That is the version to write in real code, and the ten-line implementation is a fine answer if you can also explain what it is doing underneath.</p>
 
 Say which one the interviewer wants. "Implement it from scratch" means the nodes; "use it" means <code>OrderedDict</code>, or <code>functools.lru_cache</code> if it is memoisation rather than a cache you control.
+
+## The Python shortcut
+
+`OrderedDict` maintains insertion order with O(1) reordering, which collapses the whole implementation:
+
+```python
+from collections import OrderedDict
+
+class LRUCache:
+    def __init__(self, capacity):
+        self.cap = capacity
+        self.od = OrderedDict()
+
+    def get(self, key):
+        if key not in self.od:
+            return -1
+        self.od.move_to_end(key)               # mark as most recent
+        return self.od[key]
+
+    def put(self, key, value):
+        if key in self.od:
+            self.od.move_to_end(key)
+        self.od[key] = value
+        if len(self.od) > self.cap:
+            self.od.popitem(last=False)        # evict the oldest
+```
+
+`move_to_end` and `popitem(last=False)` are both O(1), because `OrderedDict` is itself a dict plus a doubly linked list &mdash; the same design, provided by the standard library.
+
+In an interview, <strong>write the manual version</strong> unless told otherwise; the question is about the data structure choice. Mentioning `OrderedDict` afterwards shows you know the library, and mentioning `functools.lru_cache` &mdash; which is a C implementation of this for function memoisation &mdash; shows you know where it is already used.
+
+## Eviction policies
+
+LRU is one choice among several, and knowing the alternatives is a common follow-up.
+
+|Policy|Evicts|Good when|
+|---|---|---|
+|LRU|Least recently used|Recent access predicts future access|
+|LFU|Least frequently used|Some items are persistently popular|
+|FIFO|Oldest inserted|Simple; access does not matter|
+|MRU|Most recently used|Sequential scans that will not revisit|
+|Random|An arbitrary item|Cheap, and surprisingly competitive|
+|TTL|Anything expired|Freshness matters more than recency|
+|ARC / 2Q|Adaptive between recency and frequency|Mixed workloads|
+
+<strong>LRU's weakness</strong> is a sequential scan larger than the cache: it evicts everything useful while caching items that will never be read again. That is the case LFU and the adaptive policies exist to handle, and databases use variants of 2Q or ARC for exactly this reason.
+
+<strong>LFU's weakness</strong> is the mirror image: an item popular once stays cached forever unless counts decay.
+
+## Making it production-ready
+
+An interview answer stops at the data structure. The follow-up questions usually go here:
+
+<strong>Thread safety.</strong> Every operation mutates both structures, so concurrent access needs a lock &mdash; and a single lock makes the cache a contention point. Sharding by key hash into several independently-locked caches is the standard fix.
+
+<strong>Memory limits by size, not count.</strong> Real caches bound total bytes, so each entry carries a size and eviction continues until the total fits.
+
+<strong>TTL alongside LRU.</strong> Entries expire on time as well as on pressure, which usually means a lazy check on access plus a background sweep.
+
+<strong>Metrics.</strong> Hit rate is the number that justifies the cache's existence, and eviction rate indicates whether it is too small.
+
+<strong>Distributed caching.</strong> Once there are several machines, consistent hashing decides which node owns a key, and invalidation becomes the hard problem.
+
+## Questions people ask
+
+<strong>Why not a singly linked list?</strong> Unlinking a node needs its predecessor, which costs O(n) to find without a `prev` pointer.
+
+<strong>Why store the key in the node?</strong> Eviction finds the node from the list and must delete the corresponding dictionary entry.
+
+<strong>Is `OrderedDict` acceptable in an interview?</strong> Mention it, and write the manual version &mdash; the question is about the design.
+
+<strong>What is `functools.lru_cache`?</strong> A C implementation of exactly this, for memoising function calls. Keyed on the arguments, which must be hashable.
+
+<strong>How do sentinels help?</strong> They remove the empty-list and first/last-element special cases that cause most pointer bugs.
+
+<strong>When is LRU the wrong policy?</strong> Sequential scans larger than the cache, where it evicts everything useful. LFU or an adaptive policy handles that.
+
+## Recap in one screen
+
+- Hash table for O(1) lookup, doubly linked list for O(1) reordering and eviction &mdash; neither works alone.
+- The list must be doubly linked because unlinking a node requires its predecessor.
+- Use sentinel head and tail nodes to eliminate boundary special cases.
+- On eviction, remove from <em>both</em> the list and the dictionary &mdash; hence storing the key in the node.
+- `OrderedDict` and `functools.lru_cache` are the library versions of the same design.

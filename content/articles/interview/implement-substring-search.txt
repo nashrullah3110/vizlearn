@@ -1,6 +1,90 @@
 title: Implement substring search (strStr)
 intro: Find the first occurrence of a pattern in a text, without using the built-in.
 
+## The problem
+
+Find the first index where a pattern occurs in a text, or &minus;1 if it does not.
+
+|Text|Pattern|Answer|
+|---|---|---|
+|`"hello world"`|`"world"`|6|
+|`"aaaaa"`|`"bba"`|&minus;1|
+|`"abc"`|`""`|<strong>0</strong> &mdash; the empty pattern matches at 0|
+|`"abc"`|`"abcd"`|&minus;1 &mdash; pattern longer than text|
+|`"mississippi"`|`"issip"`|4|
+
+In Python this is `text.find(pattern)`. The exercise is implementing it, and the interesting part is why the obvious method is slow and what fixes it.
+
+The empty-pattern convention is worth confirming out loud: by convention it matches at index 0, and both `str.find` and the standard algorithms agree.
+
+## The naive approach, and its failure case
+
+```python
+def naive_search(text, pattern):
+    n, m = len(text), len(pattern)
+    if m == 0:
+        return 0
+    for i in range(n - m + 1):
+        if text[i:i+m] == pattern:
+            return i
+    return -1
+```
+
+Correct, and O(nm) in the worst case.
+
+The worst case is not artificial-looking but it is specific: text `"aaaaaaaaab"` with pattern `"aaab"`. At every starting position the comparison matches three characters and fails on the fourth, so nearly all m comparisons happen n times.
+
+|Text|Pattern|Comparisons|
+|---|---|---|
+|Random English|Any word|~n &mdash; fails fast|
+|`"a" * 10000`|`"a" * 100 + "b"`|~1,000,000|
+|`"ab" * 5000`|`"ab" * 100 + "c"`|~1,000,000|
+
+For most real text the naive method is fine, because mismatches happen on the first character. Repetitive data &mdash; DNA, binary formats, log files &mdash; is where it degrades, and that is what motivates the better algorithms.
+
+## KMP: never re-examine the text
+
+Knuth-Morris-Pratt is O(n + m), and the idea is that <strong>a partial match already tells you something about the text</strong>. After matching `"aab"` and failing, there is no need to restart two positions later &mdash; the characters just read are known.
+
+The machinery is the <strong>failure function</strong>: for each prefix of the pattern, the length of the longest proper prefix that is also a suffix.
+
+For `"ababaca"`:
+
+|i|0|1|2|3|4|5|6|
+|---|---|---|---|---|---|---|---|
+|char|a|b|a|b|a|c|a|
+|`lps[i]`|0|0|1|2|3|0|1|
+
+`lps[4] = 3` because `"ababa"` has `"aba"` as both a prefix and a suffix. On a mismatch after position 4, the pattern shifts so that `"aba"` lines up, rather than restarting.
+
+```python
+def kmp_search(text, pattern):
+    n, m = len(text), len(pattern)
+    if m == 0:
+        return 0
+
+    lps = [0] * m                              # longest prefix-suffix
+    k = 0
+    for i in range(1, m):
+        while k and pattern[i] != pattern[k]:
+            k = lps[k-1]
+        if pattern[i] == pattern[k]:
+            k += 1
+            lps[i] = k
+
+    k = 0                                      # matched length so far
+    for i in range(n):
+        while k and text[i] != pattern[k]:
+            k = lps[k-1]                       # fall back, never rewind i
+        if text[i] == pattern[k]:
+            k += 1
+            if k == m:
+                return i - m + 1
+    return -1
+```
+
+The key property: `i` only ever increases. The text is read once.
+
 ## What naive search wastes
 
 Align the pattern at position 0, compare until a mismatch, then restart at position 1. The waste is that the comparisons already made are thrown away: on <code>"aaaaaab"</code> against <code>"aaab"</code>, almost every alignment re-reads the same characters.
@@ -18,3 +102,78 @@ The table is built in O(m) using itself &mdash; on a mismatch while building, it
 <p><code>i</code> never decreases. Every character of the text is examined a bounded number of times, so the search is O(n) after an O(m) preprocessing pass.</p>
 
 Say what you would actually ship: <code>text.find(pattern)</code>, which in CPython is a tuned hybrid of Boyer-Moore and Horspool. The point of implementing KMP is the reasoning, and interviewers know that.
+
+## Rabin-Karp: compare hashes, not characters
+
+Hash the pattern once, then hash each window of the text and compare numbers. The trick is the <strong>rolling hash</strong> &mdash; the next window's hash is computed from the previous one in O(1) by removing the leading character and adding the trailing one.
+
+```python
+def rabin_karp(text, pattern, base=256, mod=1_000_000_007):
+    n, m = len(text), len(pattern)
+    if m == 0:
+        return 0
+    if m > n:
+        return -1
+
+    high = pow(base, m - 1, mod)
+    p_hash = t_hash = 0
+    for i in range(m):
+        p_hash = (p_hash * base + ord(pattern[i])) % mod
+        t_hash = (t_hash * base + ord(text[i])) % mod
+
+    for i in range(n - m + 1):
+        if p_hash == t_hash and text[i:i+m] == pattern:   # verify: hashes collide
+            return i
+        if i < n - m:
+            t_hash = ((t_hash - ord(text[i]) * high) * base
+                      + ord(text[i+m])) % mod
+    return -1
+```
+
+O(n + m) expected, O(nm) worst case when hashes collide constantly.
+
+The <strong>verification step</strong> is not optional. Equal hashes do not prove equal strings, so a confirming comparison is required &mdash; skipping it is a correctness bug, not an optimisation.
+
+Rabin-Karp's real advantage is <strong>multiple pattern search</strong>: hash all the patterns into a set, and each window is one hash and one set lookup. That is what plagiarism detectors and `rsync` use.
+
+## Choosing between them
+
+|Algorithm|Time|Space|Best for|
+|---|---|---|---|
+|Naive|O(nm)|O(1)|Short patterns, non-repetitive text|
+|KMP|O(n+m)|O(m)|Guaranteed linear; streaming input|
+|Rabin-Karp|O(n+m) expected|O(1)|Multiple patterns at once|
+|Boyer-Moore|O(n/m) best|O(m+k)|<strong>Long patterns &mdash; what grep uses</strong>|
+|Aho-Corasick|O(n + total)|O(total)|Many patterns simultaneously|
+
+<strong>Boyer-Moore</strong> is the practical winner for long patterns and the counter-intuitive one: it compares the pattern <em>right to left</em>, so a mismatch on a character absent from the pattern lets it skip m positions at once. That makes it <em>sublinear</em> &mdash; it does not read every character of the text. Python's `str.find` uses a hybrid of Boyer-Moore-Horspool and a naive scan for short patterns.
+
+<strong>Aho-Corasick</strong> generalises KMP to a set of patterns with one automaton, which is how intrusion-detection systems and virus scanners match thousands of signatures in one pass.
+
+## What to say in an interview
+
+Start with the naive solution and its complexity &mdash; it is correct and takes thirty seconds. Then name the worst case concretely (`"aaaaab"` against `"aab"`), which shows you know <em>why</em> a better algorithm exists rather than that one does.
+
+Then offer KMP, explain the failure function in one sentence, and write it if asked. If the follow-up is "what if there are many patterns?", the answer is Rabin-Karp or Aho-Corasick. If it is "what does the standard library do?", the answer is a Boyer-Moore variant.
+
+Being able to say <strong>"in production I would call `str.find`, which is a tuned C implementation"</strong> is the right closing note &mdash; the exercise is about understanding, not about replacing the library.
+
+## What it is testing
+
+<strong>Do you handle the empty pattern?</strong> It returns 0, and it is one line at the top.
+
+<strong>Do you know the naive worst case?</strong> Naming a concrete repetitive input is the substance.
+
+<strong>Do you verify after a hash match?</strong> Rabin-Karp without verification is wrong.
+
+<strong>Do you understand the failure function?</strong> "The longest proper prefix that is also a suffix" &mdash; and why that lets the text pointer never move backwards.
+
+<strong>Do you know what real implementations use?</strong> Boyer-Moore variants, chosen for skipping rather than for asymptotic tidiness.
+
+## Recap in one screen
+
+- Naive search is O(nm), fine for ordinary text, and quadratic on repetitive input like `"aaaaab"` against `"aab"`.
+- KMP is O(n+m) using a failure function so the text pointer never rewinds.
+- Rabin-Karp rolls a hash over each window in O(1) and <em>must</em> verify matches, since hashes collide.
+- Boyer-Moore scans right to left and can skip m characters at a time, making it sublinear &mdash; which is why libraries use it.
+- The empty pattern matches at index 0 by convention.

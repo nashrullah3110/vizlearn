@@ -1,6 +1,86 @@
 title: Trapping rain water
 intro: Given bar heights, how much water is trapped between them?
 
+## The problem
+
+Given an elevation map as an array of bar heights, compute how much water is trapped after rain.
+
+For `[0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1]` the answer is <strong>6</strong>.
+
+The whole problem reduces to one observation about a single position:
+
+<p class="mono-font">water[i] = min(max height to the left, max height to the right) &minus; height[i]</p>
+
+Water at a position is held by the shorter of the two walls surrounding it, and the bar itself occupies part of that space. If the result is negative &mdash; the bar is taller than one of its bounding walls &mdash; the water is zero.
+
+Getting that formula stated is 80% of the problem. Everything after it is about computing the two maxima efficiently.
+
+## The brute force, then the fix
+
+Scanning left and right from every position is O(n²):
+
+```python
+def trap_brute(height):
+    total = 0
+    for i in range(len(height)):
+        left = max(height[:i+1])
+        right = max(height[i:])
+        total += min(left, right) - height[i]
+    return total
+```
+
+The wasted work is obvious: the same maxima are recomputed at every index. <strong>Precompute them once.</strong>
+
+```python
+def trap_prefix(height):
+    if not height:
+        return 0
+    n = len(height)
+    left = [0] * n
+    right = [0] * n
+
+    left[0] = height[0]
+    for i in range(1, n):
+        left[i] = max(left[i-1], height[i])
+
+    right[n-1] = height[n-1]
+    for i in range(n-2, -1, -1):
+        right[i] = max(right[i+1], height[i])
+
+    return sum(min(left[i], right[i]) - height[i] for i in range(n))
+```
+
+O(n) time, O(n) space. Three passes, and each is a one-line recurrence. This is a perfectly good answer, and it is the clearest one to reason about.
+
+## The two-pointer solution: O(1) space
+
+The insight that removes the arrays: <strong>only the smaller of the two running maxima matters.</strong>
+
+If `left_max < right_max`, then whatever lies between, the water level at the left pointer is decided by `left_max` &mdash; because a wall at least as tall as `right_max` exists somewhere to the right, and `right_max` is the larger of the two. So the left position can be finalised without knowing the exact right-hand maximum.
+
+```python
+def trap(height):
+    left, right = 0, len(height) - 1
+    left_max = right_max = 0
+    total = 0
+
+    while left < right:
+        if height[left] < height[right]:
+            left_max = max(left_max, height[left])
+            total += left_max - height[left]     # decided by left_max
+            left += 1
+        else:
+            right_max = max(right_max, height[right])
+            total += right_max - height[right]   # decided by right_max
+            right -= 1
+
+    return total
+```
+
+O(n) time, <strong>O(1) space</strong>, one pass.
+
+The comparison `height[left] < height[right]` is what guarantees the shorter side is being processed, and therefore that the running maximum on that side is the binding constraint. Because the maximum is updated before the addition, `left_max - height[left]` is never negative &mdash; which is why no `max(0, ...)` guard is needed.
+
 ## The per-bar formula
 
 Water sits above a bar up to the level of the lower of the two walls containing it: <code>min(max to the left, max to the right) &minus; height</code>, or zero if that is negative.
@@ -18,3 +98,94 @@ That is the whole argument, and it is worth stating explicitly. Candidates who w
 A monotonic decreasing stack also solves it in O(n), filling water horizontally layer by layer rather than column by column. It is harder to get right under pressure and worth naming as an alternative.
 
 The same "maximum to the left and right of each element" shape appears in largest-rectangle-in-a-histogram and stock-span, so recognising it is worth more than memorising this one solution.
+
+## Working through the example
+
+`[0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1]`, computing per-position water with the prefix arrays:
+
+|i|0|1|2|3|4|5|6|7|8|9|10|11|
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+|height|0|1|0|2|1|0|1|3|2|1|2|1|
+|left max|0|1|1|2|2|2|2|3|3|3|3|3|
+|right max|3|3|3|3|3|3|3|3|2|2|2|1|
+|min|0|1|1|2|2|2|2|3|2|2|2|1|
+|<strong>water</strong>|0|0|<strong>1</strong>|0|<strong>1</strong>|<strong>2</strong>|<strong>1</strong>|0|0|<strong>1</strong>|0|0|
+
+Total: 1 + 1 + 2 + 1 + 1 = <strong>6</strong>.
+
+Two rows are instructive. At i = 7 the bar is height 3 and is the tallest, so `min(3, 3) - 3 = 0` &mdash; the peak holds nothing. At i = 5 the bar is 0 with walls of 2 and 3, so it holds 2 units, bounded by the shorter wall.
+
+## The stack solution
+
+A monotonic decreasing stack also solves it, filling water in horizontal layers as each new bar pops shorter bars off:
+
+```python
+def trap_stack(height):
+    stack = []                       # indices, heights decreasing
+    total = 0
+    for i, h in enumerate(height):
+        while stack and height[stack[-1]] < h:
+            bottom = stack.pop()
+            if not stack:
+                break                # no left wall
+            width = i - stack[-1] - 1
+            depth = min(height[stack[-1]], h) - height[bottom]
+            total += width * depth
+        stack.append(i)
+    return total
+```
+
+O(n) time, O(n) space. It computes the same total by <em>region</em> rather than by column, which is why the arithmetic looks so different.
+
+Worth knowing because the monotonic-stack pattern solves an entire family &mdash; largest rectangle in a histogram, next greater element, daily temperatures. For this problem specifically, two pointers is the better answer: less code, less space, easier to explain.
+
+|Approach|Time|Space|Notes|
+|---|---|---|---|
+|Brute force|O(n&sup2;)|O(1)|The baseline|
+|Prefix maxima|O(n)|O(n)|Clearest to explain|
+|<strong>Two pointers</strong>|<strong>O(n)</strong>|<strong>O(1)</strong>|<strong>The best answer</strong>|
+|Monotonic stack|O(n)|O(n)|Same pattern as histogram problems|
+
+## Edge cases
+
+|Case|Answer|
+|---|---|
+|`[]`|0|
+|`[1]`, `[1, 2]`|0 &mdash; needs at least three bars|
+|Monotonically increasing|0 &mdash; no right wall|
+|Monotonically decreasing|0 &mdash; no left wall|
+|`[3, 0, 3]`|3|
+|All equal heights|0|
+|`[0, 0, 0]`|0|
+
+The monotonic rows are the useful mental check: water needs a wall on <em>both</em> sides, so any sorted input traps nothing.
+
+## The related problems
+
+<strong>Container with most water.</strong> Also two pointers, and a different rule &mdash; there the area is `min(h[l], h[r]) * (r - l)` and the shorter side is moved because it is the limiting factor.
+
+<strong>Largest rectangle in a histogram.</strong> Monotonic stack, and the closest relative of the stack solution here.
+
+<strong>Trapping rain water II</strong> (2D grid). Substantially harder: a min-heap starting from the boundary, processing cells in increasing height order &mdash; essentially Dijkstra's algorithm.
+
+<strong>Product of array except self.</strong> Unrelated in topic, identical in technique: prefix and suffix arrays, then combine.
+
+## What it is testing
+
+<strong>Do you find the per-position formula?</strong> `min(left_max, right_max) - height[i]` is the insight; without it there is nothing to optimise.
+
+<strong>Do you eliminate the repeated maxima?</strong> Precomputing them is the step from O(n&sup2;) to O(n).
+
+<strong>Do you reach O(1) space?</strong> The two-pointer argument &mdash; only the smaller maximum binds &mdash; is the part that requires real thought.
+
+<strong>Can you justify moving the shorter side?</strong> Being able to explain why that is safe distinguishes understanding from memorisation.
+
+<strong>Do you check the degenerate inputs?</strong> Empty, sorted, and fewer than three bars.
+
+## Recap in one screen
+
+- Water above a bar is `min(left_max, right_max) - height[i]`, never negative.
+- Precomputing the two maxima arrays gives O(n) time and O(n) space in three simple passes.
+- Two pointers reach O(1) space: process whichever side is shorter, since its running maximum is the binding wall.
+- A monotonic stack solves it by regions instead of columns &mdash; the same pattern as the histogram problems.
+- Any monotonic input traps nothing, because water needs walls on both sides.
