@@ -1,6 +1,73 @@
 title: Longest substring without repeating characters
 intro: Find the length of the longest substring with no repeated character.
 
+## The problem
+
+Find the length of the longest substring containing no repeated character.
+
+|Input|Answer|Substring|
+|---|---|---|
+|`"abcabcbb"`|3|`"abc"`|
+|`"bbbbb"`|1|`"b"`|
+|`"pwwkew"`|3|`"wke"`|
+|`""`|0|&mdash;|
+|`"dvdf"`|3|`"vdf"`|
+
+<strong>Substring means contiguous.</strong> The `"pwwkew"` case is the one that catches people: the answer is `"wke"`, not `"pwke"`, because the latter is not contiguous.
+
+The `"dvdf"` case catches a different mistake, covered below.
+
+## The sliding window
+
+Expand the window rightwards; when a repeat appears, shrink from the left until it is gone.
+
+```python
+def length_of_longest_substring(s):
+    last = {}                                  # char -> last index seen
+    left = best = 0
+    for right, ch in enumerate(s):
+        if ch in last and last[ch] >= left:
+            left = last[ch] + 1                # jump past the duplicate
+        last[ch] = right
+        best = max(best, right - left + 1)
+    return best
+```
+
+O(n) time &mdash; each pointer moves forward at most n times &mdash; and O(k) space where k is the alphabet size.
+
+Two details carry the correctness:
+
+<strong>`last[ch] >= left`</strong> is essential. Without it, a character seen <em>before</em> the current window would drag `left` backwards. That is the `"dvdf"` case: at the second `d`, the first `d` is at index 0 but the window has already moved past it, so `left` must not jump back.
+
+<strong>Jumping rather than stepping.</strong> `left = last[ch] + 1` moves in one operation. Stepping one at a time while removing from a set is also O(n) overall and is easier to get subtly wrong.
+
+## The set-based variant
+
+Some prefer the explicit shrink loop, which reads more like the general sliding-window template:
+
+```python
+def length_of_longest_substring_set(s):
+    window = set()
+    left = best = 0
+    for right, ch in enumerate(s):
+        while ch in window:                    # shrink until valid
+            window.discard(s[left])
+            left += 1
+        window.add(ch)
+        best = max(best, right - left + 1)
+    return best
+```
+
+Same complexity. The `while` loop looks quadratic and is not: `left` only ever advances, so across the whole run it moves at most n times.
+
+|&nbsp;|Index map|Set with shrink loop|
+|---|---|---|
+|Left pointer|Jumps|Steps|
+|Subtle bug risk|The `>= left` check|None|
+|Reads as the standard template|Less|More|
+
+Either is acceptable. Offering the set version first and then the jump optimisation is a reasonable way to present it.
+
 ## Why brute force is quadratic
 
 Checking every substring is O(n&sup2;) substrings, each needing a uniqueness test &mdash; O(n&sup3;) naively, O(n&sup2;) with a set per start. The waste is that each restart throws away everything the previous one learned.
@@ -18,3 +85,83 @@ The guard is the subtle part: only jump if <code>seen[ch] &gt;= start</code>. Wi
 Time is O(n): the right edge advances n times and the left edge only ever moves forwards, so both pointers together make at most 2n moves. Space is O(k) in the size of the alphabet, not O(n) &mdash; the map holds one entry per distinct character.
 
 Interviewers like the space answer because most candidates say O(n).
+
+## Tracing the awkward cases
+
+`"pwwkew"` with the index-map version:
+
+|right|ch|last|left|Window|best|
+|---|---|---|---|---|---|
+|0|p|{p:0}|0|`p`|1|
+|1|w|{p:0, w:1}|0|`pw`|2|
+|2|w|{p:0, w:2}|2|`w`|2|
+|3|k|…|2|`wk`|2|
+|4|e|…|2|`wke`|<strong>3</strong>|
+|5|w|w last at 2, &ge; left|3|`kew`|3|
+
+`"dvdf"` &mdash; the case the `>= left` guard protects:
+
+|right|ch|left before|Action|left after|
+|---|---|---|---|---|
+|0|d|0|New|0|
+|1|v|0|New|0|
+|2|d|0|`last[d]=0 >= 0`, jump|1|
+|3|f|1|New|1|
+
+Final window is `"vdf"`, length 3. Without the guard, a later repeat of `d` would try to set `left` back to 1 when it had already advanced further &mdash; producing a window containing a duplicate and an answer that is too large.
+
+## Returning the substring
+
+A common follow-up. Track where the best window started:
+
+```python
+def longest_substring(s):
+    last = {}
+    left = best = best_start = 0
+    for right, ch in enumerate(s):
+        if ch in last and last[ch] >= left:
+            left = last[ch] + 1
+        last[ch] = right
+        if right - left + 1 > best:
+            best, best_start = right - left + 1, left
+    return s[best_start:best_start + best]
+```
+
+One extra variable, captured only when a new best is found. Note that `best_start` must be recorded at the moment `best` improves, not afterwards &mdash; `left` will keep moving.
+
+## The related window problems
+
+|Problem|Condition maintained|
+|---|---|
+|No repeating characters|All distinct|
+|At most k distinct characters|`len(counts) <= k`|
+|Exactly k distinct|At most k, minus at most k&minus;1|
+|Longest with at most one replacement|`window_size - max_count <= 1`|
+|Minimum window containing all of a pattern|All required counts satisfied|
+|Anagram substring of a pattern|Counts match exactly|
+
+The "at most k distinct" variant is the natural generalisation &mdash; this problem is the k = window-size case &mdash; and it uses a count dictionary rather than a set, shrinking while the number of distinct characters exceeds k.
+
+The <strong>exactly k</strong> trick is worth knowing: "exactly k" equals "at most k" minus "at most k&minus;1". Computing two at-most windows is easier than maintaining an exactly-k invariant directly.
+
+The <strong>minimum window</strong> variant inverts the shrink condition: shrink while the window is <em>still valid</em>, recording before each shrink, because the goal is the smallest satisfying window rather than the largest. Getting that inversion wrong is the most common sliding-window error, and the symptom is an answer consistently too long or too short.
+
+## What it is testing
+
+<strong>Do you recognise a sliding window?</strong> "Longest contiguous run satisfying a condition" is the signature.
+
+<strong>Do you get O(n)?</strong> The nested `while` looks quadratic; explaining that each pointer advances at most n times is part of the answer.
+
+<strong>Do you handle the stale-index case?</strong> `"dvdf"` is in every test suite for this problem.
+
+<strong>Do you know it is contiguous?</strong> Answering 4 for `"pwwkew"` means you solved the subsequence problem instead.
+
+<strong>Can you state the space complexity?</strong> O(min(n, k)) &mdash; bounded by the alphabet, not the string.
+
+## Recap in one screen
+
+- Expand the window rightwards; on a repeat, move the left edge past the previous occurrence.
+- Check `last[ch] >= left` or the left pointer moves backwards on characters outside the window.
+- O(n) time despite the inner loop, because both pointers only advance; O(k) space for the alphabet.
+- Substring means contiguous &mdash; `"pwwkew"` answers 3, not 4.
+- The family generalises to at-most-k distinct, minimum window, and anagram substrings, with the shrink condition inverted for minimum problems.

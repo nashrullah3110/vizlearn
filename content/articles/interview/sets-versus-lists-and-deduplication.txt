@@ -1,6 +1,84 @@
 title: When should you use a set instead of a list?
 intro: What does a set give you that a list does not, and how do you deduplicate while keeping order?
 
+## Deduplicating, three ways
+
+```python
+items = [3, 1, 2, 3, 1]
+
+list(set(items))                 # [1, 2, 3] - order LOST
+list(dict.fromkeys(items))       # [3, 1, 2] - order PRESERVED
+sorted(set(items))               # [1, 2, 3] - sorted
+```
+
+All three are O(n). The difference is what happens to the order, and choosing wrongly produces a bug that appears only when the output order matters to someone downstream.
+
+<strong>`set`</strong> is the fastest and gives no order guarantee. It looks sorted for small integers because of how they hash, which is a coincidence and not a guarantee &mdash; that coincidence is responsible for a lot of misplaced confidence.
+
+<strong>`dict.fromkeys`</strong> exploits the guarantee that dictionaries preserve insertion order, so the first occurrence of each value is kept in its original position. This is the idiomatic order-preserving deduplication in modern Python.
+
+<strong>Manual</strong>, when a key function is needed:
+
+```python
+def dedupe_by(items, key):
+    seen, out = set(), []
+    for x in items:
+        k = key(x)
+        if k not in seen:
+            seen.add(k)
+            out.append(x)
+    return out
+
+dedupe_by(users, key=lambda u: u.email)      # unique by email, order kept
+```
+
+That last version is the one to reach for with objects, because it deduplicates by a chosen field while keeping the full object.
+
+## Why the set is fast
+
+A list must scan to know whether it already contains something &mdash; O(n) per check, so O(n²) to deduplicate by repeated scanning.
+
+A set hashes the value and looks in one place &mdash; O(1) on average, so O(n) overall.
+
+```python
+# O(n^2) - the membership test scans the growing list
+out = []
+for x in items:
+    if x not in out:
+        out.append(x)
+
+# O(n) - the membership test is a hash lookup
+seen, out = set(), []
+for x in items:
+    if x not in seen:
+        seen.add(x); out.append(x)
+```
+
+Both versions preserve order. The first is quadratic and is what people write before they think about it, and on 100,000 items it takes minutes rather than milliseconds.
+
+Keeping the list <em>and</em> a set alongside it is the standard pattern: the list holds the ordered output, the set answers the membership question.
+
+## The requirement: hashable elements
+
+Sets and dictionaries need hashable elements, so deduplication by value fails on mutable ones:
+
+```python
+set([[1, 2], [1, 2]])              # TypeError: unhashable type: 'list'
+set([(1, 2), (1, 2)])              # {(1, 2)} - tuples are fine
+```
+
+For unhashable items, convert to a hashable canonical form:
+
+|Item type|Canonical key|
+|---|---|
+|`list`|`tuple(x)`|
+|`set`|`frozenset(x)`|
+|`dict`|`tuple(sorted(x.items()))`|
+|Nested structure|`json.dumps(x, sort_keys=True)`|
+|Custom object|A tuple of its identifying fields|
+
+The JSON option works and is slow, and it is sensitive to types &mdash; `1` and `1.0` serialise differently. Prefer an explicit tuple of the fields that define identity.
+
 ## What you gain and what you give up
 
 <p><strong>Gain:</strong> membership in O(1) rather than O(n), and uniqueness enforced for free.</p>
@@ -22,3 +100,72 @@ Converting costs O(n), so a single membership test on a small list is not worth 
 <p><code>a &amp; b</code> intersection, <code>a | b</code> union, <code>a - b</code> difference, <code>a ^ b</code> symmetric difference, <code>a &lt;= b</code> subset. Each replaces a loop with a membership test inside it &mdash; which is to say, each replaces an accidental O(n&middot;m) with an O(n + m).</p>
 
 "Which users are in A but not B" is <code>a - b</code>. Writing that as a comprehension over a list is the most common form of the quadratic trap.
+
+## Choosing between the containers
+
+|&nbsp;|`list`|`set`|`dict`|
+|---|---|---|---|
+|Ordered|Yes|No|Yes (insertion)|
+|Duplicates|Yes|No|Keys unique|
+|`in`|O(n)|O(1)|O(1) on keys|
+|Indexing|Yes|No|By key|
+|Elements must be hashable|No|Yes|Keys only|
+|Memory|Lowest|Higher|Highest|
+
+The decision is usually straightforward:
+
+<strong>Need order and duplicates</strong> &rarr; list.
+<strong>Need membership testing only</strong> &rarr; set.
+<strong>Need associated data</strong> &rarr; dict.
+<strong>Need order without duplicates</strong> &rarr; `dict.fromkeys`, or a list plus a set.
+
+And the sets themselves support the operations that make them worth reaching for beyond deduplication:
+
+```python
+a, b = {1, 2, 3}, {2, 3, 4}
+
+a & b            # {2, 3}     intersection - in both
+a | b            # {1,2,3,4}  union
+a - b            # {1}        difference - in a only
+a ^ b            # {1, 4}     symmetric difference
+a <= b           # False      subset test
+a.isdisjoint(b)  # False      no overlap
+```
+
+Those replace loops. "Which users are in both groups?" is `a & b`, not a nested loop &mdash; and it runs in C at O(min(len(a), len(b))).
+
+## Where deduplication goes wrong
+
+<strong>Assuming a set is sorted.</strong> `set([3, 1, 2])` may print as `{1, 2, 3}` for small integers because of how they hash. Add a string or a larger number and the illusion vanishes. Never rely on it.
+
+<strong>Deduplicating floats.</strong> `0.1 + 0.2` and `0.3` are different values, so they do not deduplicate. Round to a fixed precision first if that is the intent.
+
+<strong>`1 == True` and `1.0 == 1`.</strong> These are equal and hash equally, so `{1, True, 1.0}` is `{1}`. Surprising and correct.
+
+<strong>Case and whitespace.</strong> `"Alice"` and `"alice "` are distinct. Normalise before deduplicating &mdash; strip, casefold, and NFC-normalise Unicode.
+
+<strong>Deduplicating objects by identity.</strong> Two distinct objects with identical field values are different set members unless `__eq__` and `__hash__` are defined.
+
+<strong>Memory on large inputs.</strong> Deduplicating a hundred million items builds a set of them all. For a stream where approximate counting suffices, a Bloom filter or HyperLogLog uses a tiny fraction of the memory.
+
+## Questions people ask
+
+<strong>Does `set` preserve order?</strong> No. Use `dict.fromkeys` when order matters.
+
+<strong>Which is fastest?</strong> `set()` is fastest, `dict.fromkeys` is close, and both are O(n). The quadratic list version is the one to avoid.
+
+<strong>Why is a set unhashable itself?</strong> It is mutable. `frozenset` is the hashable version and can be a set member.
+
+<strong>How do I deduplicate by one field?</strong> A `seen` set of that field's values, appending the full object when the field is new.
+
+<strong>Is a set always better than a list for membership?</strong> Above about ten elements, yes. Below that, a scan wins on constant factors.
+
+<strong>How do I deduplicate a huge stream?</strong> A set if it fits; a Bloom filter or HyperLogLog if approximate counting is acceptable.
+
+## Recap in one screen
+
+- `list(set(x))` loses order; `list(dict.fromkeys(x))` preserves it; both are O(n).
+- Deduplicating by scanning a growing list is O(n&sup2;) &mdash; keep a `seen` set alongside the output list.
+- Elements must be hashable; convert lists to tuples and dicts to sorted item tuples.
+- Set operations (`&`, `|`, `-`, `^`) replace nested loops and run in C.
+- Normalise case, whitespace and Unicode before deduplicating, and never assume a set is sorted.

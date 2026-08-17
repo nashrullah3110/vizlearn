@@ -1,6 +1,54 @@
 title: Find the duplicate number
 intro: An array of n+1 integers holds values from 1 to n. Find the duplicate without modifying the array and in O(1) space.
 
+## The problem, and why it is unusual
+
+An array of n+1 integers, each between 1 and n. By the pigeonhole principle at least one value repeats. Find it.
+
+<p class="mono-font">[1, 3, 4, 2, 2]&nbsp;&rarr;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;[3, 1, 3, 4, 2]&nbsp;&rarr;&nbsp;3</p>
+
+The constraints are what make it interesting, and they are usually stated explicitly:
+
+<strong>Do not modify the array.</strong> Rules out sorting.
+<strong>Use O(1) extra space.</strong> Rules out a set.
+<strong>Run in better than O(n&sup2;).</strong> Rules out the nested loop.
+
+Each constraint eliminates one obvious solution, which is the point of the question &mdash; and the expected first move is to state those obvious solutions and why they are excluded.
+
+## The solutions, in order
+
+<strong>Set:</strong> O(n) time, O(n) space.
+
+```python
+def find_duplicate_set(nums):
+    seen = set()
+    for x in nums:
+        if x in seen:
+            return x
+        seen.add(x)
+```
+
+<strong>Sort:</strong> O(n log n) time, O(1) extra space &mdash; but it modifies the array.
+
+<strong>Binary search on the value range:</strong> O(n log n) time, O(1) space, no modification.
+
+```python
+def find_duplicate_binary(nums):
+    lo, hi = 1, len(nums) - 1
+    while lo < hi:
+        mid = (lo + hi) // 2
+        count = sum(1 for x in nums if x <= mid)
+        if count > mid:                 # too many small values
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo
+```
+
+The reasoning: if there are more than `mid` values less than or equal to `mid`, the duplicate must be in `[lo, mid]` by pigeonhole. This is binary searching the <em>answer</em> rather than an array &mdash; a technique worth recognising, because it applies whenever a predicate over the answer space is monotonic.
+
+<strong>Floyd's cycle detection:</strong> O(n) time, O(1) space, no modification &mdash; the intended answer.
+
 ## Read the constraints first
 
 The easy answers are all excluded on purpose. A <code>set</code> is O(n) space. Sorting modifies the array. Marking visited indices by negating them modifies it too. Each constraint removes one obvious solution, and what is left is the intended one &mdash; which is why reading the constraints aloud is a real technique, not a stall.
@@ -16,3 +64,95 @@ There are n+1 slots and only n distinct values, so two slots share a value, so t
 Once the pointers meet inside the loop, the distance from the head to the loop entrance equals the distance from the meeting point to the entrance. So walking one pointer from the start and one from the meeting point, one step at a time, makes them meet exactly at the entrance.
 
 It looks like magic and falls out of the arithmetic. Say that the same two-phase structure detects a cycle in an actual linked list &mdash; the interviewer is usually checking whether you recognise the algorithm rather than whether you can rederive the proof.
+
+## Why it is a cycle problem
+
+The reframing is the insight, and it is not obvious.
+
+Treat the array as a function: from index `i`, jump to index `nums[i]`. Since every value is between 1 and n, every jump lands on a valid index, so following the jumps from index 0 traces a path.
+
+That path must eventually repeat, because there are finitely many indices &mdash; so it enters a cycle. And <strong>the entrance to the cycle is the duplicated value</strong>, because two different indices point at it.
+
+For `[1, 3, 4, 2, 2]`: 0 &rarr; 1 &rarr; 3 &rarr; 2 &rarr; 4 &rarr; 2 &rarr; 4 &rarr; … The cycle is 2 &rarr; 4 &rarr; 2, entered at 2, which is the answer.
+
+So the problem is "find the entry point of a cycle in a linked list", and Floyd's tortoise-and-hare algorithm solves that in O(1) space:
+
+```python
+def find_duplicate(nums):
+    slow = fast = nums[0]
+    while True:                          # phase 1: find a meeting point
+        slow = nums[slow]
+        fast = nums[nums[fast]]
+        if slow == fast:
+            break
+
+    slow = nums[0]                        # phase 2: find the entrance
+    while slow != fast:
+        slow = nums[slow]
+        fast = nums[fast]
+    return slow
+```
+
+Phase 1 finds <em>some</em> point inside the cycle. Phase 2 resets one pointer to the start and advances both one step at a time; they meet at the cycle's entrance. That second phase is a result about the distances involved, and it is worth knowing rather than deriving under pressure.
+
+## The constraints and which solution each allows
+
+|Constraint|Set|Sort|Binary search|Floyd|
+|---|---|---|---|---|
+|O(1) space|No|Yes|Yes|Yes|
+|No modification|Yes|<strong>No</strong>|Yes|Yes|
+|O(n) time|Yes|No|No|<strong>Yes</strong>|
+|Easy to explain|Yes|Yes|Moderate|Hard|
+
+Floyd's is the only one satisfying all three constraints, which is why the constraints are stated as they are.
+
+In an interview, the right sequence is to give the set solution immediately, note that it uses O(n) space, then binary search for O(1) space at O(n log n), and then Floyd's for O(n) with O(1) space. Presenting the progression demonstrates more than jumping to the final answer, and it is a safer route if the cycle insight does not arrive.
+
+## Edge cases and assumptions
+
+|Case|Behaviour|
+|---|---|
+|`[1, 1]`|Returns 1|
+|Value repeated many times|Returns that value|
+|Several distinct duplicates|Returns one of them &mdash; ask which is wanted|
+|Values outside 1..n|Floyd's breaks &mdash; the guarantee is required|
+|Zero present|Breaks &mdash; index 0 would be part of a cycle from the start|
+|Array of length 1|No duplicate can exist; the constraints exclude it|
+
+The zero case matters: Floyd's relies on index 0 not being a target, so that the path from 0 leads <em>into</em> the cycle rather than starting inside it. That is why the problem specifies values from 1 to n rather than 0 to n&minus;1.
+
+## The related problems
+
+<strong>Find all duplicates.</strong> Floyd's finds one. For all of them, either use a set (O(n) space), or if modification is allowed, mark visited values by negating `nums[abs(x)-1]` &mdash; O(1) space using the array itself as the marker.
+
+<strong>Find the missing number.</strong> XOR all values with 1..n, or use the sum formula. Different technique.
+
+<strong>Find both a missing and a duplicated number.</strong> Sum and sum-of-squares gives two equations in two unknowns.
+
+<strong>Linked list cycle detection.</strong> The original setting for Floyd's algorithm.
+
+<strong>Happy number.</strong> Also Floyd's &mdash; iterating a function and detecting whether it cycles.
+
+The unifying idea: <strong>Floyd's algorithm applies to any function iterated on itself</strong>, not only to linked lists. Recognising that a problem is "iterate a function, find where it cycles" is what makes the technique available.
+
+## Questions people ask
+
+<strong>Why does treating the array as a linked list work?</strong> Every value is a valid index, so `i -> nums[i]` is a total function, and iterating it from any start must eventually repeat.
+
+<strong>Why is the cycle entrance the duplicate?</strong> Two different indices hold the same value, so two nodes point at the same successor &mdash; which is exactly a cycle entrance.
+
+<strong>What if there are several duplicates?</strong> Floyd's returns one. Ask whether that is acceptable.
+
+<strong>Why must values be 1 to n rather than 0 to n&minus;1?</strong> So that index 0 is outside the cycle and the traversal enters it from the start.
+
+<strong>Is binary search here searching the array?</strong> No &mdash; it searches the value range, using a counting predicate. That is the "binary search the answer" pattern.
+
+<strong>Which should I present first?</strong> The set version, then the space-constrained ones. Explaining the progression is worth more than producing only the clever answer.
+
+## Recap in one screen
+
+- n+1 values in 1..n guarantees a duplicate by pigeonhole.
+- The constraints &mdash; O(1) space, no modification, better than O(n&sup2;) &mdash; each eliminate one obvious solution.
+- Treating the array as `i -> nums[i]` makes it a cycle-detection problem, with the duplicate at the cycle's entrance.
+- Floyd's tortoise and hare finds it in O(n) time and O(1) space.
+- Binary searching the value range is the easier-to-explain O(1)-space answer at O(n log n).

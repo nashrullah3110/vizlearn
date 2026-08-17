@@ -1,6 +1,59 @@
 title: Maximum subarray sum (Kadane)
 intro: Find the contiguous subarray with the largest sum.
 
+## The problem
+
+Find the contiguous subarray with the largest sum.
+
+<p class="mono-font">[&minus;2, 1, &minus;3, 4, &minus;1, 2, 1, &minus;5, 4]&nbsp;&nbsp;&rarr;&nbsp;&nbsp;6&nbsp;&nbsp;(from [4, &minus;1, 2, 1])</p>
+
+"Contiguous" is the word that makes it tractable. A subsequence version &mdash; any subset, not necessarily adjacent &mdash; is trivial: take every positive number.
+
+The brute force checks every subarray: O(n²) with running sums, O(n³) if the sum is recomputed each time. Kadane's algorithm does it in one pass.
+
+## Kadane's algorithm
+
+```python
+def max_subarray(nums):
+    best = current = nums[0]
+    for x in nums[1:]:
+        current = max(x, current + x)     # extend, or start fresh here
+        best = max(best, current)
+    return best
+```
+
+O(n) time, O(1) space, four lines.
+
+The whole algorithm is that one decision: <strong>at each element, either extend the subarray ending at the previous element, or start a new one here</strong>. Extending is worth it only if the running sum so far is positive &mdash; if it is negative, it can only reduce whatever follows, so discard it.
+
+Equivalently:
+
+```python
+current = current + x if current > 0 else x
+```
+
+Both forms are the same rule. The `max(x, current + x)` version is the one usually written, because it reads as the decision it encodes.
+
+## Tracing it
+
+`[-2, 1, -3, 4, -1, 2, 1, -5, 4]`:
+
+|x|current|best|Decision|
+|---|---|---|---|
+|&minus;2|&minus;2|&minus;2|Start|
+|1|1|1|Start fresh &mdash; &minus;2+1 = &minus;1 is worse than 1|
+|&minus;3|&minus;2|1|Extend (1&minus;3 = &minus;2 beats &minus;3)|
+|4|4|4|Start fresh|
+|&minus;1|3|4|Extend|
+|2|5|5|Extend|
+|1|6|<strong>6</strong>|Extend|
+|&minus;5|1|6|Extend|
+|4|5|6|Extend|
+
+The answer is 6. Note that `current` drops to 1 at the &minus;5 and never recovers enough to beat 6 &mdash; which is why `best` is tracked separately rather than returned as the final `current`.
+
+That separation is the most common bug: returning `current` gives the best subarray <em>ending at the last element</em>, not the best overall.
+
 ## The one decision
 
 At element <em>i</em> there are exactly two candidates for the best subarray ending there: the previous best-ending-here extended by <code>values[i]</code>, or <code>values[i]</code> alone. Take the larger. Then the global answer is the largest of those per-element bests.
@@ -18,3 +71,88 @@ Ask whether the empty subarray counts. If it does, zero is the right floor; if n
 The usual follow-up. Track where the current run started, and when you beat the best, record that start and the current index. Two extra variables and no change to the complexity &mdash; but you must update <code>start</code> at the moment you restart, not when you improve.
 
 The other follow-up is divide and conquer: split, solve both halves, and handle the crossing case separately. O(n&nbsp;log&nbsp;n), worse than Kadane, and worth knowing because it is the classic example of the crossing-subproblem pattern.
+
+## The all-negative case
+
+The trap that catches most first attempts. With `[-3, -1, -2]`, what is the answer?
+
+<strong>If the subarray must be non-empty:</strong> &minus;1, the least bad single element. The code above handles this correctly, because it initialises `best` to `nums[0]` rather than to 0.
+
+<strong>If an empty subarray is allowed:</strong> 0. Then initialise `best = 0`.
+
+Initialising `best = 0` when the subarray must be non-empty is wrong, and it only shows up on all-negative input &mdash; which is exactly why interviewers include that test case.
+
+<strong>Ask which convention applies.</strong> It is a legitimate clarifying question and demonstrates that you spotted the ambiguity.
+
+## Returning the subarray, not just the sum
+
+Frequently the follow-up. Track where the current run started:
+
+```python
+def max_subarray_indices(nums):
+    best = current = nums[0]
+    start = best_start = best_end = 0
+    for i, x in enumerate(nums[1:], start=1):
+        if current + x < x:
+            current, start = x, i          # start fresh here
+        else:
+            current = current + x
+        if current > best:
+            best, best_start, best_end = current, start, i
+    return best, nums[best_start:best_end + 1]
+```
+
+The addition is one variable and one branch. The `start` moves whenever a new run begins, and `best_start` is captured only when a new best is found &mdash; keeping those separate is the part that needs care.
+
+## The variants
+
+|Problem|Change|
+|---|---|
+|Maximum product subarray|Track both max and min &mdash; a negative times a negative flips|
+|Circular maximum subarray|The answer is either normal Kadane, or total minus the minimum subarray|
+|At most k elements|Sliding window with a deque, or prefix sums|
+|Maximum sum with one deletion allowed|Two DP states: with and without a deletion used|
+|2D maximum submatrix|Fix a column pair, compress rows, run Kadane &mdash; O(n&sup2;m)|
+|Longest subarray with sum &le; k|Prefix sums plus binary search or a monotonic structure|
+
+<strong>Maximum product</strong> is the most common escalation, and the reason it is harder is instructive: with sums, a negative running total is always worth discarding. With products, a very negative running product becomes the maximum as soon as another negative appears &mdash; so both the maximum and minimum must be tracked.
+
+<strong>Circular</strong> is elegant: either the best subarray does not wrap, in which case plain Kadane finds it, or it does wrap, in which case its complement is a non-wrapping <em>minimum</em> subarray. Compute both and take the larger, with a special case when every element is negative.
+
+## Why it is a dynamic programming problem
+
+Kadane's algorithm is dynamic programming with the table collapsed to a single variable.
+
+The DP formulation: let `dp[i]` be the maximum sum of a subarray <em>ending at index i</em>. Then
+
+<p class="mono-font">dp[i] = max(nums[i], dp[i&minus;1] + nums[i])</p>
+
+and the answer is `max(dp)`.
+
+Because `dp[i]` depends only on `dp[i-1]`, the array is unnecessary &mdash; one variable suffices, and space drops from O(n) to O(1).
+
+That reduction is worth recognising as a general technique: <strong>when a DP state depends only on a bounded window of previous states, the table collapses to a few variables.</strong> The same trick turns Fibonacci from O(n) space to O(1), and applies to a large family of one-dimensional DP problems.
+
+Framing Kadane as DP is also the better answer in an interview, because it shows the structure rather than a memorised trick.
+
+## Questions people ask
+
+<strong>What if all numbers are negative?</strong> Return the largest single element, unless an empty subarray is allowed. Ask which convention applies.
+
+<strong>Why track `best` separately from `current`?</strong> `current` is the best subarray ending at the current position; the overall answer may have ended earlier.
+
+<strong>Is this greedy or dynamic programming?</strong> DP with an O(1) space optimisation. It is greedy-looking because the state is one variable.
+
+<strong>How do I return the indices?</strong> Track where the current run started, and capture the bounds when a new best is found.
+
+<strong>Does it work with zeros?</strong> Yes &mdash; a zero neither helps nor hurts, and extending across it is handled by the same comparison.
+
+<strong>What about the maximum product version?</strong> Track the running maximum <em>and</em> minimum, because multiplying by a negative swaps them.
+
+## Recap in one screen
+
+- At each element, either extend the previous subarray or start fresh &mdash; extend only if the running sum is positive.
+- O(n) time, O(1) space, and track `best` separately from `current`.
+- Initialise `best` to the first element, not to 0, or all-negative input returns the wrong answer.
+- It is dynamic programming with the table collapsed to one variable, which is the better way to describe it.
+- The standard escalations are maximum product, circular arrays and returning the subarray itself.

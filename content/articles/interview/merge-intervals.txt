@@ -1,6 +1,51 @@
 title: Merge overlapping intervals
 intro: Given a list of intervals, merge the ones that overlap.
 
+## The problem
+
+Given a list of intervals, merge any that overlap.
+
+<p class="mono-font">[[1,3], [2,6], [8,10], [15,18]]&nbsp;&rarr;&nbsp;[[1,6], [8,10], [15,18]]</p>
+
+`[1,3]` and `[2,6]` overlap, so they become `[1,6]`. The others do not touch anything.
+
+The key realisation, and the first thing to say: <strong>sort by start time first</strong>. Once sorted, any interval can only overlap the one immediately before it in the output, which turns the problem into a single pass.
+
+## The solution
+
+```python
+def merge(intervals):
+    if not intervals:
+        return []
+    intervals.sort(key=lambda x: x[0])           # by start
+    out = [intervals[0]]
+    for start, end in intervals[1:]:
+        last_start, last_end = out[-1]
+        if start <= last_end:                     # overlaps
+            out[-1] = [last_start, max(last_end, end)]
+        else:
+            out.append([start, end])
+    return out
+```
+
+O(n log n) time &mdash; dominated by the sort &mdash; and O(n) space for the output, or O(1) extra if merging in place is allowed.
+
+Two details carry the correctness:
+
+<strong>`start <= last_end`</strong> treats touching intervals as overlapping, so `[1,3]` and `[3,5]` merge into `[1,5]`. If touching should stay separate, use `<`. <strong>Ask which is wanted</strong> &mdash; it is a genuine ambiguity and interviewers use it.
+
+<strong>`max(last_end, end)`</strong> is necessary because the new interval may be entirely contained in the previous one. Assigning `end` directly would shrink `[1,10]` to `[1,3]` when merging `[2,3]` into it &mdash; a bug that only appears on nested intervals.
+
+## Why sorting is what makes it work
+
+Without sorting, an interval can overlap any other, so every pair must be checked and merges cascade &mdash; O(n²) at best, with awkward bookkeeping.
+
+Sorted by start, the invariant is: <strong>the output list's last interval is the only one the next input interval can extend</strong>. Everything earlier in the output ends before the current interval begins, because starts are non-decreasing and the output's earlier entries were finalised.
+
+That invariant is the argument for correctness, and stating it is worth more in an interview than the code &mdash; it explains why one comparison per interval suffices.
+
+Note what sorting by <em>end</em> instead would give: that is the activity-selection greedy criterion for choosing the maximum number of non-overlapping intervals, a different problem with a different rule. Which field you sort by encodes which question you are answering.
+
 ## Why sorting collapses the problem
 
 Unsorted, any interval can overlap any other, so you are looking at pairs &mdash; O(n&sup2;). Sorted by start, an interval's only possible overlap is with the merged block immediately behind it, because everything earlier starts earlier and has already been absorbed.
@@ -16,3 +61,76 @@ The other decision is whether touching counts as overlapping. <code>[1, 3]</code
 ## What it generalises to
 
 Meeting rooms, calendar conflicts, genome ranges, IP blocks &mdash; all the same sweep. The variants change only the merge rule: count how many rooms are needed simultaneously (a sweep line with +1 and &minus;1 events), insert one interval into an already-merged list, or find the gaps rather than the blocks.
+
+## Edge cases
+
+|Case|Input|Result|
+|---|---|---|
+|Empty|`[]`|`[]`|
+|Single interval|`[[1,3]]`|`[[1,3]]`|
+|Fully nested|`[[1,10],[2,3]]`|`[[1,10]]` &mdash; needs the `max`|
+|Touching|`[[1,3],[3,5]]`|`[[1,5]]` or two, depending on the convention|
+|Identical|`[[1,3],[1,3]]`|`[[1,3]]`|
+|Already sorted|Any|The sort is still O(n log n)|
+|Reverse sorted|Any|Sorting handles it|
+|Zero-length interval|`[[2,2]]`|Valid point interval; confirm it is allowed|
+
+The nested case is the one that breaks naive implementations, and it is worth constructing deliberately when testing: `[[1,10],[2,3],[4,5]]` must give `[[1,10]]`.
+
+## The interval-problem family
+
+Once the sort-then-sweep shape is recognised, a whole family follows:
+
+<strong>Insert an interval</strong> into a sorted list. Three phases: intervals ending before the new one, intervals overlapping it (merge them all), and intervals starting after. O(n) without re-sorting.
+
+<strong>Does any pair overlap?</strong> Sort by start and check consecutive pairs &mdash; O(n log n), and it is what a meeting-room double-booking check does.
+
+<strong>Minimum meeting rooms.</strong> The number of concurrently active intervals at the busiest moment. Two standard approaches: a min-heap of end times, or separating starts and ends into events and sweeping.
+
+<strong>Erase overlapping intervals.</strong> Sort by <em>end</em> and greedily keep non-overlapping ones &mdash; the activity-selection problem, and the reason sorting by end matters.
+
+<strong>Interval intersection</strong> of two sorted lists. Two pointers, advancing whichever interval ends first.
+
+<strong>Employee free time.</strong> Merge all busy intervals, then take the gaps.
+
+## The sweep line technique
+
+For the "how many are active at once" questions, the general tool is a <strong>sweep line</strong>: convert each interval into two events and process them in time order.
+
+```python
+def max_concurrent(intervals):
+    events = []
+    for start, end in intervals:
+        events.append((start, 1))       # +1 active
+        events.append((end, -1))        # -1 active
+    events.sort()                        # ends before starts at the same time
+    active = peak = 0
+    for _, delta in events:
+        active += delta
+        peak = max(peak, active)
+    return peak
+```
+
+The sort order at ties matters: `(t, -1)` sorts before `(t, 1)` because &minus;1 &lt; 1, so an interval ending at time t frees its slot before one starting at t claims it. That is the touching convention again, and choosing the other convention means adjusting the tie-break.
+
+Sweep line generalises well: it handles maximum overlap, total covered length, and the same questions in two dimensions (rectangle area, skyline problems).
+
+## What it is testing
+
+<strong>Do you sort first?</strong> The whole problem hinges on it, and volunteering it immediately is the expected opening.
+
+<strong>Do you handle the nested case?</strong> `max(last_end, end)` rather than assignment.
+
+<strong>Do you ask about touching intervals?</strong> A real ambiguity in the specification.
+
+<strong>Do you state the complexity correctly?</strong> O(n log n) from the sort, not O(n).
+
+<strong>Do you recognise the family?</strong> Meeting rooms, insert interval and activity selection are all follow-ups, and knowing which field to sort by distinguishes them.
+
+## Recap in one screen
+
+- Sort by start; then each interval can only extend the last one in the output.
+- Merge when `start <= last_end`, and take `max` of the ends to handle nested intervals.
+- O(n log n) from the sort, O(n) output.
+- Ask whether touching intervals count as overlapping &mdash; it changes the comparison.
+- Sort by <em>end</em> instead for activity selection, and use a sweep line for concurrency questions.
