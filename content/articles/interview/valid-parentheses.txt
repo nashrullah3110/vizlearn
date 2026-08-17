@@ -1,6 +1,60 @@
 title: Valid parentheses
 intro: Check whether a string of brackets is balanced.
 
+## The problem
+
+Given a string of brackets &mdash; `()`, `[]`, `{}` &mdash; determine whether they are correctly balanced and nested.
+
+|Input|Valid?|Why|
+|---|---|---|
+|`"()"`|Yes|Matched|
+|`"()[]{}"`|Yes|Sequential pairs|
+|`"([{}])"`|Yes|Properly nested|
+|`"(]"`|No|Wrong closing type|
+|`"([)]"`|No|Crossed &mdash; wrong nesting order|
+|`"("`|No|Never closed|
+|`")("`|No|Closes before opening|
+|`""`|Yes|Vacuously balanced|
+
+The fourth and fifth rows are what make this a stack problem rather than a counting problem, and they are the cases a weak solution gets wrong.
+
+## The solution
+
+```python
+def is_valid(s):
+    pairs = {")": "(", "]": "[", "}": "{"}
+    stack = []
+    for ch in s:
+        if ch in "([{":
+            stack.append(ch)
+        elif ch in pairs:
+            if not stack or stack.pop() != pairs[ch]:
+                return False
+    return not stack
+```
+
+O(n) time, O(n) space. Four lines of logic, and each guards a specific failure:
+
+<strong>`stack.append(ch)`</strong> records an unresolved opening bracket.
+
+<strong>`not stack`</strong> catches a closing bracket with nothing open &mdash; `")("`.
+
+<strong>`stack.pop() != pairs[ch]`</strong> catches a mismatched type &mdash; `"(]"` and `"([)]"`.
+
+<strong>`return not stack`</strong> catches unclosed brackets &mdash; `"("`. This is the line people forget, and omitting it makes `"((("` valid.
+
+## Why a counter does not work
+
+The tempting simplification is to count openings and closings and check they balance. It fails on two of the cases above.
+
+<strong>`"([)]"`</strong> has one of each bracket, and every count balances. It is invalid because the nesting crosses, and a counter cannot see order.
+
+<strong>`")("`</strong> also balances by count, and closes before anything is open.
+
+Three separate counters do not help either &mdash; the problem is that <strong>the most recent unclosed bracket is the one that must close next</strong>, and that is last-in-first-out. A stack is not one possible implementation; it is the structure the problem describes.
+
+Saying that explicitly is worth doing in an interview, because it shows you understand <em>why</em> rather than having memorised the solution.
+
 ## Why a stack and not a counter
 
 With one bracket type, counting works: increment on open, decrement on close, fail if it goes negative or ends non-zero. With several types it does not &mdash; <code>"([)]"</code> has balanced counts and is wrong.
@@ -17,4 +71,70 @@ A stack captures the thing a counter loses: not just how many are open, but <em>
 
 ## What it generalises to
 
-This is the shape of every nesting problem: matching HTML tags, checking JSON structure, the call stack itself, and the shunting-yard algorithm that turns infix expressions into postfix. Once you see "most recent unclosed thing" in a problem, the answer is a stack.
+The same LIFO shape appears in every situation where the most recent unresolved item must be resolved first:
+
+- <strong>HTML and XML tag matching</strong> &mdash; `<div>` must close before its enclosing `<section>`.
+- <strong>Expression evaluation</strong> and the shunting-yard algorithm.
+- <strong>Compiler and interpreter block structure</strong> &mdash; scopes open and close in nesting order.
+- <strong>Undo stacks</strong> and transaction nesting.
+- <strong>The call stack itself</strong> &mdash; the most recent call returns first.
+
+Recognising the shape is what matters. When a problem says "matching", "nesting" or "most recent", a stack is usually the answer.
+
+## The three failure modes, traced
+
+`"([)]"` &mdash; the case that separates a stack from a counter:
+
+|Character|Stack before|Action|Result|
+|---|---|---|---|
+|`(`|[]|Push|[`(`]|
+|`[`|[`(`]|Push|[`(`, `[`]|
+|`)`|[`(`, `[`]|Pop gives `[`, expected `(`|<strong>Invalid</strong>|
+
+`"("` &mdash; caught by the final check:
+
+|Character|Stack|
+|---|---|
+|`(`|[`(`]|
+|End of string|Non-empty &rarr; <strong>invalid</strong>|
+
+`")"` &mdash; caught by the empty-stack guard:
+
+|Character|Stack|Action|
+|---|---|---|
+|`)`|[]|Nothing to pop &rarr; <strong>invalid</strong>|
+
+Walking through those three in an interview covers every branch of the code, which is a concise way to demonstrate the solution is complete.
+
+## Edge cases and variations
+
+|Case|Handling|
+|---|---|
+|Empty string|Valid &mdash; the loop does not run and the stack is empty|
+|Non-bracket characters|Ignored by the `elif`; confirm that is wanted|
+|Only opening brackets|Caught by `return not stack`|
+|Only closing brackets|Caught by the `not stack` guard|
+|Very long input|O(n) is fine; the stack can grow to n|
+|Single bracket type|A counter <em>would</em> suffice &mdash; worth mentioning|
+
+That last row is a good observation to volunteer: with only one bracket type, a counter works, and the stack is needed precisely because there are several types whose nesting must be tracked.
+
+## The follow-ups
+
+<strong>"What if the input can contain other characters?"</strong> The code already ignores them. Confirm whether that is intended, or whether they should be an error.
+
+<strong>"Return the position of the first error."</strong> Track the index in the loop and return it instead of `False`. This is what an editor's bracket matcher does.
+
+<strong>"What if brackets can be wildcards?"</strong> The "valid parenthesis string with `*`" variant, where `*` can be `(`, `)` or empty. The stack approach no longer suffices; the standard solution tracks a <em>range</em> of possible open counts, or uses two counters for the minimum and maximum.
+
+<strong>"Find the longest valid substring."</strong> A different problem &mdash; stack of indices, or dynamic programming. Considerably harder, and a common escalation.
+
+<strong>"What if brackets can be removed to make it valid?"</strong> Minimum removals: count unmatched brackets in one pass, which is the counter approach applied correctly to a different question.
+
+## Recap in one screen
+
+- Push openings; on a closing bracket, pop and check the type matches.
+- Four guards: push, empty-stack check, type check, and the final "stack must be empty".
+- A counter cannot solve it, because `"([)]"` balances numerically and nests wrongly &mdash; order matters.
+- O(n) time and O(n) space; the stack can reach the length of the input.
+- Same shape as tag matching, expression parsing and scope tracking &mdash; "most recent first" means stack.

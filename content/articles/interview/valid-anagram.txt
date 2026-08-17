@@ -1,6 +1,88 @@
 title: Are two strings anagrams?
 intro: Check whether two strings are anagrams of each other.
 
+## The problem
+
+Two strings are anagrams if one is a rearrangement of the other &mdash; same characters, same counts, different order.
+
+|Input|Anagram?|
+|---|---|
+|`"listen"`, `"silent"`|Yes|
+|`"anagram"`, `"nagaram"`|Yes|
+|`"rat"`, `"car"`|No|
+|`"a"`, `"ab"`|No &mdash; different lengths|
+|`""`, `""`|Yes|
+
+The first thing to establish, and a legitimate clarifying question: <strong>is it case sensitive, and do spaces and punctuation count?</strong> "Dormitory" and "dirty room" are anagrams under one interpretation and not under another.
+
+## Two solutions, and the trade between them
+
+<strong>Sorting:</strong>
+
+```python
+def is_anagram_sort(s, t):
+    return sorted(s) == sorted(t)
+```
+
+One line, O(n log n) time, O(n) space. Correct, and it does more work than the question requires &mdash; the order of the sorted characters is irrelevant to the answer.
+
+<strong>Counting:</strong>
+
+```python
+from collections import Counter
+
+def is_anagram(s, t):
+    return len(s) == len(t) and Counter(s) == Counter(t)
+```
+
+O(n) time, O(k) space where k is the alphabet size. The length check is a cheap early exit and is not strictly necessary, since unequal lengths give unequal counters.
+
+|&nbsp;|Sorting|Counting|
+|---|---|---|
+|Time|O(n log n)|O(n)|
+|Space|O(n)|O(k) &mdash; bounded by the alphabet|
+|One-liner|Yes|Nearly|
+|Extends to grouping anagrams|Yes &mdash; sorted string as a key|Yes &mdash; count tuple as a key|
+
+Mention both. Sorting shows you can produce a correct answer immediately; counting shows you noticed the sort was unnecessary work.
+
+## The manual counting version
+
+If asked to avoid library helpers:
+
+```python
+def is_anagram_manual(s, t):
+    if len(s) != len(t):
+        return False
+    counts = {}
+    for ch in s:
+        counts[ch] = counts.get(ch, 0) + 1
+    for ch in t:
+        if ch not in counts:
+            return False
+        counts[ch] -= 1
+        if counts[ch] == 0:
+            del counts[ch]
+    return not counts
+```
+
+One dictionary, two passes, and the second pass decrements rather than building a second count &mdash; which is the version worth knowing, because it uses half the space of comparing two dictionaries.
+
+For a known small alphabet, an array of 26 integers replaces the dictionary and is faster:
+
+```python
+def is_anagram_array(s, t):
+    if len(s) != len(t):
+        return False
+    counts = [0] * 26
+    for a, b in zip(s, t):
+        counts[ord(a) - 97] += 1
+        counts[ord(b) - 97] -= 1
+    return all(c == 0 for c in counts)
+```
+
+Single pass over both strings simultaneously, incrementing for one and decrementing for the other. Worth offering as the optimised version when the input is guaranteed lowercase ASCII &mdash; and worth noting that it breaks on Unicode, which is exactly the follow-up.
+
 ## Sorting versus counting
 
 <p><code>sorted(a) == sorted(b)</code> is correct, obvious and O(n&nbsp;log&nbsp;n). It is a perfectly good answer to give first, and then improve.</p>
@@ -18,3 +100,76 @@ Say out loud that this assumes an alphabet. For arbitrary Unicode the fixed arra
 ## The follow-up that catches people
 
 "Group all the anagrams in a list of words." The instinct is to compare every pair, which is O(n&sup2;) comparisons of O(m) strings. The answer is to give every word a <em>canonical key</em> &mdash; its sorted letters, or its count tuple &mdash; and group by that key in one pass. That is the next question on this track.
+
+## Unicode, the interesting complication
+
+The array version assumes 26 lowercase letters. Real text does not.
+
+<strong>Accented characters.</strong> "café" and "éfac" are anagrams, and `ord('é') - 97` is out of range for a 26-element array.
+
+<strong>Composed and decomposed forms.</strong> "é" can be one code point or an "e" plus a combining accent. Those two strings look identical, contain different characters, and would be reported as non-anagrams. `unicodedata.normalize("NFC", s)` resolves it, and it should be the first step for any text from the outside world.
+
+<strong>Case folding.</strong> If case is to be ignored, `casefold()` is more correct than `lower()` &mdash; it handles cases such as the German &szlig; expanding to "ss".
+
+```python
+import unicodedata
+from collections import Counter
+
+def is_anagram_unicode(s, t):
+    norm = lambda x: unicodedata.normalize("NFC", x).casefold()
+    return Counter(norm(s)) == Counter(norm(t))
+```
+
+Raising the normalisation point unprompted is a strong signal in an interview, because it shows awareness that "same characters" is not as simple as it appears.
+
+## Edge cases
+
+|Case|Answer|
+|---|---|
+|Both empty|Yes|
+|Different lengths|No &mdash; check first, it is O(1)|
+|Same string|Yes &mdash; a string is an anagram of itself|
+|Spaces and punctuation|Depends on the definition; ask|
+|Case differences|Depends; ask|
+|Very long strings|Counting is O(n) and preferable|
+|Non-ASCII|Normalise first, and use a dictionary rather than a fixed array|
+
+## The follow-ups
+
+<strong>"Group all anagrams together."</strong> The standard escalation. Use the sorted string, or a tuple of counts, as a dictionary key:
+
+```python
+from collections import defaultdict
+
+def group_anagrams(words):
+    groups = defaultdict(list)
+    for w in words:
+        groups[tuple(sorted(w))].append(w)      # or "".join(sorted(w))
+    return list(groups.values())
+```
+
+O(n &times; m log m) for n words of length m. A count tuple as the key gives O(n &times; m) at the cost of a fixed-size key.
+
+<strong>"Find all anagrams of a pattern inside a longer string."</strong> A sliding window of the pattern's length with a running character count, updated incrementally as the window moves &mdash; O(n) rather than re-counting each window.
+
+<strong>"What if you cannot use extra space?"</strong> Sorting in place, if the strings are mutable. In Python they are not, so this is a question about other languages.
+
+<strong>"How would you check a million pairs?"</strong> Precompute a canonical form &mdash; the sorted string or a count signature &mdash; once per string, and compare those. That turns each comparison into a hash lookup.
+
+## What it is testing
+
+<strong>Do you notice that sorting is more work than needed?</strong> Both answers are correct, and recognising the O(n) alternative is the point.
+
+<strong>Do you ask about the definition?</strong> Case, whitespace and punctuation all change the answer, and asking is expected rather than pedantic.
+
+<strong>Do you check lengths first?</strong> A one-line early exit that is free.
+
+<strong>Do you see the grouping follow-up coming?</strong> Using a canonical form as a dictionary key is the transferable idea, and it appears in deduplication, caching and indexing far beyond this problem.
+
+## Recap in one screen
+
+- Anagram means identical character counts, so compare counts &mdash; O(n) &mdash; rather than sorting at O(n log n).
+- `Counter(s) == Counter(t)` is the practical answer; a 26-element array is the optimised ASCII version.
+- Ask about case, whitespace and punctuation before coding.
+- Normalise Unicode before comparing, or visually identical strings compare as different.
+- The canonical-form-as-dictionary-key idea is what generalises, and grouping anagrams is the standard follow-up.

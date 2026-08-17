@@ -1,6 +1,69 @@
 title: Why is `in` slow on a list but fast on a set?
 intro: What is the complexity of `x in my_list`, and how do you make it faster?
 
+## The question, and the answer
+
+`x in my_list` walks the list comparing each element until it finds a match or reaches the end. That is O(n).
+
+`x in my_set` computes `hash(x)`, jumps to the corresponding slot, and compares whatever is there. That is O(1) on average, regardless of how many elements the set holds.
+
+|Container|`in` complexity|Why|
+|---|---|---|
+|`list`|O(n)|Linear scan; nothing is indexed by value|
+|`tuple`|O(n)|Same|
+|`set`|O(1) average|Hash lookup|
+|`dict`|O(1) average|Hash lookup on keys|
+|`str`|O(n&times;m) worst|Substring search, C-optimised|
+|`deque`|O(n)|Linear scan|
+
+The list has no structure relating a value to a position, so there is nothing to exploit &mdash; it must look at everything.
+
+## Why it matters: the accidental quadratic
+
+The cost only becomes visible when the membership test is inside a loop:
+
+```python
+# O(n * m) - the membership test scans every time
+for x in items:
+    if x in other_list:
+        ...
+
+# O(n + m) - build the set once
+other = set(other_list)
+for x in items:
+    if x in other:
+        ...
+```
+
+With 10,000 items on each side that is 100 million comparisons against 20,000 operations. The first version takes seconds; the second is instant.
+
+This is the single most common performance bug in Python code, and it is dangerous precisely because <strong>both versions look correct and both are fast on small input</strong>. It passes review, it passes tests on a fixture of twenty records, and it becomes a production incident when the data grows.
+
+The habit worth building: when you see a membership test, ask what container it is testing against, and whether it is inside a loop.
+
+## What a set costs
+
+Converting to a set is not free, and the trade is almost always worth it:
+
+<strong>Time:</strong> O(n) to build, then O(1) per lookup. Break-even is roughly one lookup &mdash; if you test membership more than once, the set wins.
+
+<strong>Memory:</strong> a set uses more than a list of the same values, because it stores hashes and keeps spare capacity to bound collisions. Typically two to three times a list's overhead.
+
+<strong>Requirements:</strong> the elements must be hashable. Lists and dictionaries cannot go in a set; tuples and frozensets can.
+
+<strong>Order:</strong> a set does not preserve it. If order matters, `dict.fromkeys()` deduplicates while keeping insertion order.
+
+```python
+seen = set()
+for row in rows:                    # a growing set is still O(1) per check
+    if row.id in seen:
+        continue
+    seen.add(row.id)
+    process(row)
+```
+
+That pattern &mdash; a set that grows as you scan &mdash; is the standard way to deduplicate a stream, and it stays constant-time per element throughout.
+
 ## The two mechanisms
 
 A list has no idea where anything is, so <code>in</code> walks it comparing element by element. Best case one comparison, worst case n, and a value that is absent always costs n.
@@ -20,3 +83,81 @@ That is O(n&middot;m). Building a set from <code>seen_list</code> once, before t
 Building the set costs O(n) and some memory, so for a single membership test on a small list it is not worth it. The rule of thumb: if you will test more than a couple of times, or the collection is large, convert.
 
 Sets also require hashable elements and lose ordering and duplicates. If you need order, a dict works as an ordered set since 3.7 &mdash; and <code>dict.fromkeys(seq)</code> deduplicates while preserving order in one line.
+
+## When a list is the right container anyway
+
+The answer is not always "use a set". Lists are correct when:
+
+<strong>Order matters</strong> and you need indexing.
+
+<strong>Duplicates matter</strong> &mdash; a set collapses them.
+
+<strong>The collection is tiny.</strong> For fewer than about ten elements, a linear scan is faster than hashing, because the constant factor of computing a hash exceeds a few comparisons.
+
+<strong>Elements are unhashable</strong> &mdash; lists of lists, or of dictionaries.
+
+<strong>You need every match,</strong> not just whether one exists.
+
+The practical guidance: keep the list as the primary data, and build a set alongside it for membership testing. They are not mutually exclusive.
+
+```python
+items = [...]                       # the ordered data
+index = set(items)                  # for O(1) membership
+```
+
+If the collection changes, the set must be kept in sync &mdash; which is a real maintenance cost and the main argument against doing it prematurely.
+
+## The related traps
+
+The same "looks fine, is linear" pattern appears in several other list operations:
+
+|Operation|Complexity|Better|
+|---|---|---|
+|`x in lst`|O(n)|`set`|
+|`lst.index(x)`|O(n)|A dict from value to index|
+|`lst.remove(x)`|O(n)|`set.discard`, or mark and filter|
+|`lst.count(x)`|O(n)|`Counter`|
+|`lst.pop(0)`|O(n)|`deque.popleft()`|
+|`lst.insert(0, x)`|O(n)|`deque.appendleft()`|
+|`min(lst)` in a loop|O(n) each time|A heap, or compute once|
+|`sorted(lst)` in a loop|O(n log n) each time|Sort once outside|
+
+Every row is a linear operation that reads as constant-time. Recognising the shape &mdash; a linear operation inside a loop &mdash; is worth more than memorising the table.
+
+## How to demonstrate it
+
+If asked to prove the difference, timing is more convincing than asserting:
+
+```python
+import timeit
+
+setup = "data = list(range(100_000)); s = set(data)"
+timeit.timeit("99_999 in data", setup, number=100)     # ~0.15s
+timeit.timeit("99_999 in s", setup, number=100)        # ~0.000005s
+```
+
+Roughly four orders of magnitude, and the gap grows with the collection.
+
+The other convincing demonstration is scaling: double the input and time it again. The list version takes twice as long per lookup; the set version does not change. That is what distinguishes O(n) from O(1) empirically, and it is the right way to answer "how do you know?"
+
+## Questions people ask
+
+<strong>Why does `in` not use an index on a list?</strong> A list is an ordered sequence of arbitrary objects with no value-based structure. Maintaining an index would change what a list is, and cost memory and insertion time.
+
+<strong>Is `in` on a string slow?</strong> It is a substring search, implemented in C with a tuned algorithm. Fast in practice, and still O(n&times;m) in the worst case.
+
+<strong>Are sets always faster?</strong> No &mdash; below about ten elements a list scan wins, and building the set costs O(n).
+
+<strong>What about `frozenset`?</strong> Same lookup performance, immutable, and therefore hashable and usable as a dictionary key.
+
+<strong>Does a set preserve order?</strong> No. Use `dict.fromkeys()` to deduplicate while keeping order.
+
+<strong>Why is the set worst case O(n)?</strong> If every element hashes to the same slot. That requires a pathological hash function or adversarially chosen keys, which is why Python randomises string hashes per process.
+
+## Recap in one screen
+
+- A list has no value-based structure, so `in` must scan &mdash; O(n).
+- A set hashes the value and looks in one place &mdash; O(1) on average.
+- The bug is a membership test inside a loop: O(n&times;m) that looks correct and is fast on small input.
+- Building a set is O(n) and pays for itself after roughly one lookup.
+- The same shape applies to `index`, `remove`, `count` and `pop(0)` &mdash; linear operations that read as constant.

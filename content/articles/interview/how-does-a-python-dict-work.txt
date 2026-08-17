@@ -1,6 +1,52 @@
 title: How does a Python dict work?
 intro: How is a dictionary implemented, and why is lookup O(1)?
 
+## What happens on a lookup
+
+A dictionary is a hash table. Three steps happen on `d[key]`:
+
+1. <strong>Hash the key.</strong> `hash(key)` produces an integer.
+2. <strong>Map it to a slot.</strong> The low bits of the hash index into an internal array.
+3. <strong>Compare.</strong> If the slot holds an entry, compare the stored key with the requested one; if they differ, probe the next slot.
+
+<p class="mono-font">"apple" &rarr; hash() &rarr; 8342987234 &rarr; low bits &rarr; slot 5</p>
+
+That is one arithmetic operation and one or two memory accesses, which is why lookup is O(1) on average and does not depend on how many keys the dictionary holds.
+
+The comparison in step 3 is necessary because two different keys can hash to the same slot. Hashes are checked first &mdash; comparing integers is cheap &mdash; and only if the hashes match are the keys compared with `==`.
+
+## Collisions and probing
+
+With a finite number of slots, collisions are inevitable. CPython uses <strong>open addressing</strong>: on a collision, probe for another slot using a sequence derived from the hash.
+
+<strong>Chaining</strong> is the other classic approach &mdash; a linked list per slot &mdash; used by Java's `HashMap`. Open addressing keeps everything in one contiguous array, which is better for CPU caches.
+
+CPython's probe sequence is deliberately not a simple linear step; it uses the higher bits of the hash to scatter probes, which reduces clustering.
+
+When the table becomes too full, collisions become frequent and lookups slow down. So the dictionary <strong>resizes</strong>: once it is about two thirds full, a larger table is allocated and every entry is rehashed into it.
+
+That resize is O(n). Averaged over the insertions that fit in the new capacity, insertion is O(1) <strong>amortised</strong> &mdash; individual insertions can be expensive, the sequence is cheap. The same mechanism underlies list `append`.
+
+## Why keys must be immutable
+
+A key's slot is determined by its hash. If the key changed after insertion, its hash would change, and the entry would sit in a slot the new hash does not point to &mdash; unreachable, and effectively lost.
+
+```python
+d = {}
+d[(1, 2)] = "ok"        # tuple: immutable, hashable
+d[[1, 2]] = "error"     # TypeError: unhashable type: 'list'
+```
+
+So Python requires keys to be hashable, and mutable built-in types deliberately are not.
+
+The contract between hashing and equality has two rules:
+
+<strong>Equal objects must have equal hashes.</strong> Otherwise two keys that compare equal land in different slots and both exist in the dictionary.
+
+<strong>Unequal objects may share a hash.</strong> That is a collision, handled by probing.
+
+For a custom class, define both together &mdash; and defining `__eq__` without `__hash__` makes the class unhashable in Python 3, which is a deliberate safeguard against violating the first rule.
+
 ## Computing an address instead of searching
 
 Two steps: hash the key to a number, then fold that number into a slot index. The lookup goes straight to that slot and compares keys there. Neither step depends on how many entries the dictionary holds, which is the entire O(1) claim.
@@ -18,3 +64,66 @@ So the table grows before that becomes a problem &mdash; past roughly two-thirds
 If every key hashes to the same slot, every operation degrades to a linear scan. That is not hypothetical: it was a real denial-of-service attack, where an attacker sent form fields chosen to collide. Python's answer is <strong>hash randomisation</strong> &mdash; string hashes are salted per process, so an attacker cannot precompute a colliding set.
 
 That is also why dictionary iteration order must never be assumed to be hash order, and why <code>hash('x')</code> differs between runs.
+
+## Insertion order, and the compact layout
+
+Since Python 3.7, dictionaries preserve insertion order, and this is a <strong>language guarantee</strong> rather than an implementation accident. (It appeared as an implementation detail in 3.6.)
+
+The mechanism is the <strong>compact dict</strong> layout introduced in 3.6, which splits the structure in two:
+
+<strong>An indices array</strong> &mdash; the hash table proper, holding small integers pointing into the entries array.
+
+<strong>An entries array</strong> &mdash; the actual (hash, key, value) triples, appended in insertion order.
+
+That split has two consequences. Iteration walks the entries array, which is contiguous and in insertion order &mdash; hence both the ordering guarantee and better cache behaviour. And the sparse array holds small indices rather than full triples, so memory use dropped by roughly 20&ndash;25% compared with the older layout.
+
+It is a good example of an optimisation whose side effect became a language feature.
+
+## Hash randomisation
+
+Python randomises the hashes of strings and bytes per process. Run the same script twice and `hash("hello")` differs.
+
+The reason is security. Without randomisation, an attacker who knows the hash function can craft input where every key collides &mdash; turning O(1) lookups into O(n) and every dictionary operation into a denial of service. Web frameworks parsing untrusted keys were the vulnerable case.
+
+Practical consequences:
+
+<strong>Do not persist hash values</strong> or use them as stable identifiers across processes. Use a cryptographic hash if you need stability.
+
+<strong>Set `PYTHONHASHSEED=0`</strong> to disable it when you need reproducibility, in tests for instance.
+
+<strong>Small integers are not randomised</strong> &mdash; `hash(n) == n` for small ints, which is a deliberate simplification and occasionally surprising.
+
+## Performance in practice
+
+|Operation|Average|Worst|
+|---|---|---|
+|Lookup|O(1)|O(n)|
+|Insert|O(1) amortised|O(n) on resize|
+|Delete|O(1)|O(n)|
+|Iteration|O(n)|O(n)|
+
+The worst cases require every key to collide, which needs either a bad custom `__hash__` or adversarially chosen keys &mdash; and hash randomisation addresses the second.
+
+Two practical notes. Deletion leaves a marker rather than a gap, because removing an entry outright would break probe sequences that passed through it; heavy deletion therefore leaves the table sparse until it is resized. And memory use is higher than a list of the same values, which is the price of the lookup speed.
+
+## Questions people ask
+
+<strong>Why is dictionary lookup O(1)?</strong> The hash computes the slot directly, so the work does not depend on the number of keys. The average chain length is bounded by keeping the table two thirds empty.
+
+<strong>Are dictionaries ordered?</strong> Insertion order is guaranteed since 3.7. That is not sorted order.
+
+<strong>Why can a list not be a key?</strong> Mutating it would change its hash and orphan the entry.
+
+<strong>Chaining or open addressing?</strong> CPython uses open addressing with a scattering probe sequence; Java uses chaining, upgrading long chains to trees.
+
+<strong>What is the load factor?</strong> The fill ratio that triggers a resize &mdash; about 2/3 in CPython.
+
+<strong>Why do string hashes change between runs?</strong> Deliberate per-process randomisation, to prevent collision-based denial-of-service attacks.
+
+## Recap in one screen
+
+- Hash the key, index into a slot array, compare &mdash; one calculation and a memory access, so O(1) on average.
+- Collisions are inevitable and are resolved by probing; the table resizes at about two thirds full.
+- Keys must be immutable, because a changing hash would orphan the entry, and `__eq__` and `__hash__` must agree.
+- The compact layout stores entries contiguously in insertion order, which gives both the ordering guarantee and lower memory use.
+- String hashes are randomised per process to prevent deliberate-collision attacks.

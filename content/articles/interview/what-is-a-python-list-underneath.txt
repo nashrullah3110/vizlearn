@@ -1,6 +1,66 @@
 title: What is a Python list underneath?
 intro: What is a Python list actually implemented as, and why does that make append O(1) but insert(0, x) O(n)?
 
+## A dynamic array of pointers
+
+A Python list is a contiguous C array of pointers to objects, plus a length and a capacity.
+
+<p class="mono-font">[ptr, ptr, ptr, ptr, &mdash;, &mdash;, &mdash;]&nbsp;&nbsp;length 4, capacity 7</p>
+
+Two facts follow, and between them they explain every performance characteristic a list has.
+
+<strong>It is contiguous,</strong> so `lst[i]` is a single offset calculation &mdash; O(1) &mdash; and iteration reads sequential memory, which CPU prefetchers handle very well.
+
+<strong>It holds pointers, not values.</strong> A list can contain objects of different types, because every slot is the same size regardless of what it points at. That flexibility costs memory: 8 bytes per pointer plus the object itself.
+
+It is emphatically <strong>not</strong> a linked list, despite the name. There are no per-element next pointers, and indexed access is constant time.
+
+## Why append is O(1) amortised
+
+The list holds spare capacity beyond its length. `append` writes into that space and increments the length &mdash; a couple of operations.
+
+When capacity runs out, CPython allocates a larger block, copies every pointer across, and frees the old one. The growth is roughly `new = old + old/8 + constant`, so about 12.5% over-allocation rather than doubling.
+
+That resize is O(n). Spread across the many appends the new capacity accommodates, the average per append is constant &mdash; which is what <strong>amortised O(1)</strong> means.
+
+|Operation|Complexity|Why|
+|---|---|---|
+|`lst[i]`|O(1)|Offset into a contiguous block|
+|`append`|O(1) amortised|Writes into spare capacity|
+|`pop()`|O(1)|Removes from the end|
+|`insert(0, x)`|O(n)|Shifts every pointer right|
+|`pop(0)`|O(n)|Shifts every pointer left|
+|`x in lst`|O(n)|Linear scan|
+|`len(lst)`|O(1)|Stored, not counted|
+|`lst[a:b]`|O(b&minus;a)|Allocates and copies|
+
+The two O(n) rows at the front are the practical trap: `pop(0)` in a loop is O(n²) and reads as ordinary code. `collections.deque` gives O(1) at both ends.
+
+## Memory, and NumPy's advantage
+
+A list of a million small integers holds a million 8-byte pointers, and each integer is a separate heap object with a header &mdash; 28 bytes each in CPython.
+
+```python
+import sys
+lst = list(range(1_000_000))
+sys.getsizeof(lst)            # ~8 MB - the pointer array alone
+```
+
+The total including the integer objects is far more &mdash; roughly 40MB.
+
+A NumPy array of the same data stores raw 64-bit values contiguously: <strong>8MB total</strong>, with no per-element objects. That is the memory argument, and there is a speed argument too: operations run in C over the whole array, and the data is cache-friendly because the values themselves are adjacent rather than scattered pointers.
+
+|&nbsp;|Python list|NumPy array|
+|---|---|---|
+|Stores|Pointers to objects|Raw values|
+|Mixed types|Yes|No &mdash; one dtype|
+|1M integers|~40MB|8MB|
+|Element access|Fast|Fast|
+|Whole-array arithmetic|Loop in Python|Vectorised in C|
+|Append|O(1) amortised|Expensive &mdash; reallocates|
+
+The last row matters: NumPy arrays are for fixed-size numeric data, and building one by appending defeats the purpose.
+
 ## An array of pointers, not of objects
 
 The block holds <em>references</em>, all the same size, which is why one list can hold an int, a string and another list at once. It is also why <code>sys.getsizeof</code> on a list of a million integers is far smaller than the integers themselves &mdash; the list only stores the pointers.
@@ -18,3 +78,73 @@ Because the growth is geometric, the copies are rare enough that the cost spread
 <p><code>insert(0, x)</code> and <code>pop(0)</code> both have to move every other element one slot, so both are O(n). Doing either in a loop is O(n&sup2;), and that is the single most common accidental quadratic in Python &mdash; usually written as a queue.</p>
 
 <p><code>collections.deque</code> is the fix: a doubly linked list of blocks, O(1) at both ends. It gives up O(1) random access in exchange, which is almost always the right trade when you only touch the ends.</p>
+
+## The aliasing consequences
+
+Because a list holds references, copying has two levels &mdash; and this is where the bugs are.
+
+```python
+a = [1, 2, 3]
+b = a               # NOT a copy - another name for the same list
+b.append(4)
+print(a)            # [1, 2, 3, 4]
+
+c = a.copy()        # shallow: a new list, the SAME objects inside
+```
+
+Shallow copying is enough for immutable contents and not for nested mutable ones:
+
+```python
+grid = [[0, 0], [0, 0]]
+flat = grid.copy()
+flat[0].append(9)
+print(grid)         # [[0, 0, 9], [0, 0]] - inner lists are shared
+```
+
+And the famous one:
+
+```python
+board = [[0] * 3] * 3        # three references to ONE row
+board[0][0] = 1
+print(board)                 # [[1,0,0], [1,0,0], [1,0,0]]
+
+board = [[0] * 3 for _ in range(3)]     # correct
+```
+
+`[x] * n` repeats the reference n times. Harmless for immutable values, a bug for mutable ones. Understanding that a list holds pointers is exactly what makes this predictable rather than mysterious.
+
+## Choosing another container
+
+|Need|Use|Why|
+|---|---|---|
+|Add/remove at both ends|`deque`|O(1) at the front|
+|Membership testing|`set`|O(1) instead of O(n)|
+|Key-value lookup|`dict`|O(1)|
+|Fixed record|`tuple`|Immutable, hashable, less memory|
+|Numeric arrays|`numpy.ndarray`|Contiguous values, vectorised|
+|Homogeneous numbers, no maths|`array.array`|Raw values, standard library|
+|Sorted order maintained|`bisect.insort` or `sortedcontainers`|Ordered operations|
+
+`array.array` is the under-known one: it stores raw values like NumPy but is in the standard library and supports append efficiently. Useful when you want the memory saving without a NumPy dependency.
+
+## Questions people ask
+
+<strong>Is a Python list a linked list?</strong> No &mdash; a contiguous dynamic array of pointers, with O(1) indexing.
+
+<strong>Why is `insert(0, x)` slow?</strong> Every existing pointer shifts one position. Use `deque.appendleft`.
+
+<strong>By how much does it grow?</strong> Roughly 12.5% over-allocation, not doubling &mdash; a compromise between memory and copy frequency.
+
+<strong>Why can a list hold mixed types?</strong> Because it stores pointers, and every pointer is the same size whatever it points at.
+
+<strong>Does `del lst[i]` free memory?</strong> It removes the reference and shifts the remainder. The object is freed when nothing references it.
+
+<strong>When should I use NumPy?</strong> Homogeneous numeric data, especially with arithmetic over the whole array &mdash; roughly five times less memory and far faster.
+
+## Recap in one screen
+
+- A contiguous array of pointers with spare capacity, plus a stored length.
+- Contiguity gives O(1) indexing and cache-friendly iteration; pointers allow mixed types at a memory cost.
+- Append is O(1) amortised because of over-allocation; operations at the front are O(n) because everything shifts.
+- Holding references is why `b = a` shares, `copy()` is shallow, and `[[0]*3]*3` repeats one row.
+- For homogeneous numeric data, NumPy or `array.array` stores raw values and uses a fraction of the memory.
