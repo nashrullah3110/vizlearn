@@ -1,6 +1,86 @@
 title: find() vs index() vs `in` — which one?
 intro: What is the difference between str.find and str.index, and when would you use each?
 
+## The difference
+
+Both locate a substring. They differ only in what happens when it is absent.
+
+```python
+s = "hello world"
+
+s.find("world")      # 6
+s.index("world")     # 6      -- identical
+
+s.find("xyz")        # -1     -- a sentinel value
+s.index("xyz")       # ValueError: substring not found
+```
+
+<strong>`find` returns &minus;1; `index` raises `ValueError`.</strong> That is the whole distinction, and the interesting question is which to use when.
+
+|&nbsp;|`find`|`index`|
+|---|---|---|
+|Not found|Returns &minus;1|Raises `ValueError`|
+|Available on `str`|Yes|Yes|
+|Available on `list`|<strong>No</strong>|Yes|
+|Reverse variant|`rfind`|`rindex`|
+|Best when|Absence is expected|Absence is a bug|
+
+The `list` row surprises people: lists have `index` but no `find`. So `[1, 2, 3].find(4)` is an `AttributeError`, and testing membership on a list means `4 in lst` first, or catching `ValueError`.
+
+## Which one to use
+
+The rule follows from how the two report failure:
+
+<strong>Use `find` when absence is a normal outcome</strong> you plan to branch on.
+
+```python
+pos = line.find("=")
+if pos != -1:
+    key, value = line[:pos], line[pos+1:]
+else:
+    key, value = line, None
+```
+
+<strong>Use `index` when absence means something is wrong</strong> and should not be silently absorbed.
+
+```python
+header_end = data.index(b"\r\n\r\n")     # malformed input SHOULD raise
+```
+
+The failure mode of choosing wrongly is specific and worth naming: <strong>&minus;1 is a valid index in Python.</strong> Forgetting the check does not crash &mdash; it silently reads from the end of the string.
+
+```python
+s = "hello"
+pos = s.find("z")        # -1
+s[pos]                   # 'o'  -- the LAST character, no error at all
+s[pos:]                  # 'o'
+```
+
+A missing check with `index` raises immediately, at the line that caused it. With `find`, the wrong answer propagates. That is why `index` is the safer default when a match is genuinely expected, and it is the opposite of most people's instinct.
+
+## The optional start and end arguments
+
+Both accept a search region, and using it avoids slicing:
+
+```python
+s = "abcabcabc"
+s.find("abc")          # 0
+s.find("abc", 1)       # 3   -- start searching at index 1
+s.find("abc", 1, 5)    # -1  -- searches s[1:5] only
+s.rfind("abc")         # 6   -- last occurrence
+```
+
+`s.find(sub, i)` searches in place; `s[i:].find(sub)` copies the remainder first and returns an offset relative to the slice, which then needs `+ i` to be meaningful. The in-place form is both faster and less error-prone &mdash; and iterating occurrences is the case where it matters:
+
+```python
+pos = 0
+while (pos := s.find("abc", pos)) != -1:
+    print(pos)
+    pos += 1                                  # advance past this match
+```
+
+Advancing by 1 finds overlapping matches; advancing by `len(sub)` finds only non-overlapping ones. `"aaa".find("aa")` occurring at both 0 and 1 is the case that distinguishes them, and which behaviour is wanted should be stated rather than assumed.
+
 ## The same search, three reports
 
 <p><code>find</code> returns the index of the first occurrence, or <code>-1</code>. <code>index</code> returns the same index, or raises <code>ValueError</code>. <code>in</code> answers only yes or no, and reads better when that is all you need.</p>
@@ -18,3 +98,64 @@ All three are the same O(n&middot;m) scan underneath, so this is not a performan
 Use <code>in</code> when you only need to know whether it is there. Use <code>find</code> when a miss is a normal outcome you will branch on. Use <code>index</code> when a miss means something upstream is already broken and you would rather have a traceback at the real cause than a <code>-1</code> propagating three functions away.
 
 That last point is the answer interviewers are listening for: it is a question about error handling wearing a string-methods costume.
+
+## The other ways to ask the same question
+
+|Question|Best tool|
+|---|---|
+|Is it present?|`sub in s` &mdash; clearest and fastest|
+|Where is it?|`find` or `index`|
+|Does it start with this?|`startswith` &mdash; also accepts a tuple|
+|Does it end with this?|`endswith`|
+|How many times?|`count`|
+|All positions?|Loop with `find(sub, pos)`, or `re.finditer`|
+|Split around it?|`partition` or `split`|
+
+<strong>`in` rather than `find(...) != -1`</strong> when only presence matters. It reads better and avoids the comparison entirely.
+
+<strong>`str.partition`</strong> is the underused one. It splits at the first occurrence and returns three parts, so no index arithmetic is needed:
+
+```python
+key, sep, value = "name=value".partition("=")
+# ('name', '=', 'value')
+
+key, sep, value = "noseparator".partition("=")
+# ('noseparator', '', '')     -- sep is empty when not found
+```
+
+Checking `if sep:` is a clean way to distinguish found from not-found, and the split is done in the same call. `rpartition` splits at the last occurrence, which is how you separate a file extension.
+
+## What the complexity actually is
+
+`find` is not a naive scan. CPython uses a hybrid of Crochemore-Perrin ("two-way") and Boyer-Moore-Horspool, with a simpler loop for short needles.
+
+|Case|Cost|
+|---|---|
+|Typical text|~O(n), often sublinear via skipping|
+|Worst case|O(n &middot; m)|
+|Single character|O(n), heavily optimised|
+|Not found|Full scan &mdash; O(n)|
+
+The practical implication is that <strong>a hand-written Python loop will not beat it</strong>. Even implementing KMP in pure Python is slower than calling `find`, because the C implementation's constant factor is far smaller. Write the loop in an interview to demonstrate understanding; call `find` in real code.
+
+## Questions people ask
+
+<strong>Why does `list` have `index` but not `find`?</strong> A historical asymmetry. Use `in` first, or catch `ValueError`.
+
+<strong>Is `in` faster than `find`?</strong> Effectively the same algorithm; `in` avoids constructing the index and is marginally quicker.
+
+<strong>Do `bytes` have both?</strong> Yes, with the same semantics &mdash; and the argument must be `bytes`, not `str`.
+
+<strong>What does `find("")` return?</strong> 0. The empty string is found at every position, including in an empty string.
+
+<strong>How do I find all overlapping occurrences?</strong> Loop with `find(sub, pos)` and `pos += 1`. `re.finditer` skips overlaps unless you use a lookahead pattern.
+
+<strong>Which is more Pythonic?</strong> "Ask for forgiveness, not permission" favours `index` with a `try`; branching on a value favours `find`. Both are idiomatic &mdash; matching the choice to whether absence is exceptional is the point.
+
+## Recap in one screen
+
+- `find` returns &minus;1 when absent; `index` raises `ValueError`. Nothing else differs.
+- &minus;1 is a valid Python index, so an unchecked `find` silently reads the last character instead of failing.
+- Use `index` when a match is required and `find` when absence is an expected branch.
+- Pass `start` and `end` rather than slicing &mdash; slicing copies and shifts the returned offset.
+- Prefer `in` for presence, `startswith`/`endswith` for edges, and `partition` to split without index arithmetic.
