@@ -1,6 +1,49 @@
 title: Rotate an array by k
 intro: Rotate an array right by k positions, in place.
 
+## The problem
+
+Rotate an array right by k positions, in place.
+
+<p class="mono-font">[1,2,3,4,5,6,7], k = 3&nbsp;&rarr;&nbsp;[5,6,7,1,2,3,4]</p>
+
+The Python one-liner is `nums[:] = nums[-k:] + nums[:-k]`, which allocates O(n) extra space. The interview version asks for O(1) extra space, and there is a neat answer.
+
+First, normalise k: `k %= len(nums)`. Rotating by the length is a no-op, and k can be larger than the array &mdash; forgetting this is the most common bug.
+
+## The three-reversal trick
+
+```python
+def rotate(nums, k):
+    n = len(nums)
+    k %= n                                  # handle k >= n
+    if k == 0:
+        return
+
+    def reverse(lo, hi):
+        while lo < hi:
+            nums[lo], nums[hi] = nums[hi], nums[lo]
+            lo += 1
+            hi -= 1
+
+    reverse(0, n - 1)                       # whole array
+    reverse(0, k - 1)                       # first k
+    reverse(k, n - 1)                       # the rest
+```
+
+O(n) time, O(1) space, and three simple loops.
+
+Tracing `[1,2,3,4,5,6,7]` with k = 3:
+
+|Step|Array|
+|---|---|
+|Start|[1,2,3,4,5,6,7]|
+|Reverse all|[7,6,5,4,3,2,1]|
+|Reverse first 3|[<strong>5,6,7</strong>,4,3,2,1]|
+|Reverse last 4|[5,6,7,<strong>1,2,3,4</strong>]|
+
+Why it works: reversing the whole array puts the last k elements at the front, in reverse order, and the first n&minus;k at the back, also reversed. Reversing each section separately un-reverses them. Every element ends where it should.
+
 ## Why three reversals work
 
 A right rotation by k moves the last k elements to the front and slides the rest along. Reversing the whole array puts those k at the front immediately &mdash; but reversed, and the other block reversed too. Reversing each block separately undoes exactly that.
@@ -15,6 +58,99 @@ Negative k is a left rotation. Python's <code>%</code> already returns a non-neg
 
 ## The alternatives
 
-<p><strong>Slicing.</strong> <code>a[-k:] + a[:-k]</code> is the Pythonic answer, obviously correct, and O(n) extra memory. Give it first, then offer the in-place version.</p>
+<strong>Slice assignment</strong> &mdash; the Pythonic answer, O(n) space:
 
-<p><strong>Cyclic replacement.</strong> Follow the cycle of positions, moving each element directly to its destination. It moves every element exactly once rather than twice, but the number of cycles is gcd(n, k), so it needs an outer loop and is much easier to get wrong.</p>
+```python
+nums[:] = nums[-k:] + nums[:-k]
+```
+
+The `nums[:] =` is important: assigning `nums = ...` rebinds the local name and leaves the caller's list unchanged. In-place modification requires slice assignment.
+
+<strong>Cyclic replacement</strong> &mdash; O(1) space, moving each element directly to its final position:
+
+```python
+def rotate_cyclic(nums, k):
+    n = len(nums)
+    k %= n
+    count = 0
+    start = 0
+    while count < n:
+        current, value = start, nums[start]
+        while True:
+            nxt = (current + k) % n
+            nums[nxt], value = value, nums[nxt]
+            current = nxt
+            count += 1
+            if current == start:
+                break
+        start += 1
+```
+
+Correct, O(1) space, and considerably harder to get right &mdash; the outer loop exists because the permutation may consist of several disjoint cycles, and the number of cycles is `gcd(n, k)`.
+
+<strong>`collections.deque.rotate(k)`</strong> does it in one call if the container can be a deque, and it is O(k).
+
+|Approach|Time|Space|Clarity|
+|---|---|---|---|
+|Slice assignment|O(n)|O(n)|Best|
+|Three reversals|O(n)|O(1)|Good|
+|Cyclic replacement|O(n)|O(1)|Poor|
+|`deque.rotate`|O(k)|O(1)|Best, if a deque is allowed|
+
+## Edge cases
+
+|Case|Handling|
+|---|---|
+|`k = 0`|No change &mdash; return early|
+|`k = n`|No change, after `k %= n`|
+|`k > n`|`k %= n` reduces it|
+|`k` negative|Left rotation; convert with `k %= n` in Python, which handles it|
+|Empty array|`k %= 0` raises &mdash; guard first|
+|Single element|No change|
+
+The empty-array case is worth handling explicitly, because `%` by zero raises `ZeroDivisionError` and the guard is one line.
+
+Python's `%` on negatives is helpful here: `-3 % 7` is 4, so a negative k automatically becomes the equivalent right rotation. In languages where `%` follows the sign of the dividend, that needs an explicit adjustment &mdash; a good detail to mention.
+
+## Rotating left, and by other units
+
+<strong>Left rotation by k</strong> is right rotation by `n - k`. Either convert, or reorder the three reversals: reverse the first k, reverse the rest, reverse the whole thing.
+
+<strong>Rotating a matrix by 90&deg;</strong> is a related classic and uses a similar decomposition: transpose, then reverse each row. Same idea &mdash; a rotation expressed as two simpler in-place operations.
+
+<strong>Rotating a linked list</strong> requires finding the new tail by walking `n - k` nodes, then relinking. O(n) time, O(1) space, and no reversal needed.
+
+<strong>Rotating a string</strong> is the same three-reversal algorithm on a character list, which is how `"abcdef"` becomes `"defabc"`.
+
+A neat related check: <strong>is B a rotation of A?</strong> Test whether `B in A + A`, which works because every rotation of A appears as a substring of A doubled.
+
+## Where rotation appears in practice
+
+- <strong>Circular buffers.</strong> Ring buffers in audio, networking and logging are rotation by index arithmetic rather than by moving data &mdash; which is the better answer when it is available.
+- <strong>Round-robin scheduling</strong> and load balancing.
+- <strong>Caesar and rotation ciphers.</strong>
+- <strong>Image and matrix transforms.</strong>
+- <strong>Carousel and slideshow interfaces.</strong>
+- <strong>Rotated sorted array search,</strong> the common follow-up problem &mdash; binary search on an array that has been rotated by an unknown amount.
+
+The circular-buffer point is the practically important one: <strong>if you find yourself rotating an array repeatedly, you probably want an offset variable instead</strong>. Keeping a logical start index and computing `(i + offset) % n` on access is O(1) per rotation and moves no data at all.
+
+## What it is testing
+
+<strong>Do you normalise k?</strong> `k %= n` is the line most first attempts omit, and `k > n` is always in the test suite.
+
+<strong>Do you get O(1) space?</strong> The slice version is correct and allocates; the three-reversal version is the expected improvement.
+
+<strong>Do you know `nums[:] =` versus `nums =`?</strong> A real Python distinction, and rebinding silently fails to modify the caller's list.
+
+<strong>Can you explain <em>why</em> three reversals work?</strong> Reciting the steps is weaker than explaining that reversing the whole array places the sections correctly but internally backwards.
+
+<strong>Do you suggest an offset instead</strong> when told rotation happens often? That is the answer a systems-minded interviewer is hoping for.
+
+## Recap in one screen
+
+- Normalise with `k %= n` first; k can exceed the length, and that is always tested.
+- Reverse the whole array, then the first k, then the rest &mdash; O(n) time, O(1) space.
+- `nums[:] = ...` modifies in place; `nums = ...` only rebinds the local name.
+- Left rotation by k is right rotation by n&minus;k.
+- If rotation is frequent, keep an offset and index modulo n rather than moving data.

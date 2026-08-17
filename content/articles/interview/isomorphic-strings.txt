@@ -1,6 +1,70 @@
 title: Isomorphic strings
 intro: Do two strings have the same character pattern? &#x27;egg&#x27; and &#x27;add&#x27; do; &#x27;foo&#x27; and &#x27;bar&#x27; do not.
 
+## The problem
+
+Two strings are isomorphic if the characters of one can be replaced by the characters of the other consistently, preserving order.
+
+|s|t|Isomorphic?|Why|
+|---|---|---|---|
+|`"egg"`|`"add"`|Yes|e&rarr;a, g&rarr;d|
+|`"foo"`|`"bar"`|No|o would map to both a and r|
+|`"paper"`|`"title"`|Yes|p&rarr;t, a&rarr;i, e&rarr;l, r&rarr;e|
+|`"badc"`|`"baba"`|<strong>No</strong>|d and c would both map to a|
+|`"ab"`|`"aa"`|No|Same reason|
+
+The critical requirement is that the mapping must be a <strong>bijection</strong> &mdash; one-to-one in both directions. The `"badc"` / `"baba"` case is the one that catches solutions checking only one direction.
+
+## Two maps, not one
+
+```python
+def is_isomorphic(s, t):
+    if len(s) != len(t):
+        return False
+    forward, backward = {}, {}
+    for a, b in zip(s, t):
+        if a in forward and forward[a] != b:
+            return False
+        if b in backward and backward[b] != a:
+            return False
+        forward[a] = b
+        backward[b] = a
+    return True
+```
+
+O(n) time, O(k) space where k is the alphabet size.
+
+Checking only `forward` accepts `"badc"` / `"baba"`: `b&rarr;b`, `a&rarr;a`, `d&rarr;b`... which conflicts, so that particular pair is caught. But `"ab"` / `"aa"` is not &mdash; `a&rarr;a` and `b&rarr;a` are both consistent forwards, and they map two characters to one.
+
+The second map is what enforces injectivity, and stating why it is needed &mdash; with a counterexample &mdash; is the substance of a good answer.
+
+## The pattern-normalisation alternative
+
+An elegant one-liner: two strings are isomorphic exactly when their <strong>occurrence patterns</strong> match.
+
+```python
+def is_isomorphic_pattern(s, t):
+    def pattern(x):
+        return [x.index(ch) for ch in x]      # first-occurrence index per char
+    return pattern(s) == pattern(t)
+```
+
+`"egg"` gives `[0, 1, 1]` and `"add"` gives `[0, 1, 1]` &mdash; equal, so isomorphic. `"foo"` gives `[0, 1, 1]` and `"bar"` gives `[0, 1, 2]` &mdash; different.
+
+This automatically handles both directions, because the pattern is a canonical form. The catch is that `x.index(ch)` is O(n), making the whole thing O(n²). Fixing it with a dictionary restores O(n):
+
+```python
+def pattern(x):
+    first = {}
+    out = []
+    for i, ch in enumerate(x):
+        first.setdefault(ch, i)
+        out.append(first[ch])
+    return out
+```
+
+Worth offering as the canonical-form view after the two-map version, because it is the same idea that solves the "group anagrams" family &mdash; normalise, then compare.
+
 ## What isomorphic means here
 
 There must be a one-to-one correspondence between the characters: replacing every character of the first string according to a fixed rule produces the second, and no two characters map to the same target. "Same shape, different letters".
@@ -18,3 +82,57 @@ The reverse map catches it: <code>b</code> is already claimed by <code>b</code>,
 Normalise each string to the pattern of first appearances &mdash; <code>"paper"</code> and <code>"title"</code> both become <code>[0,1,2,0,3]</code> &mdash; and compare the patterns. One pass each, no paired bookkeeping, and it extends naturally to comparing many strings at once by using the pattern as a dictionary key.
 
 That is the same "canonicalise, then compare" idea as grouping anagrams, which is worth pointing out.
+
+## Edge cases
+
+|Case|Result|
+|---|---|
+|Different lengths|False &mdash; check first, it is O(1)|
+|Both empty|True|
+|Single characters|True, whatever they are|
+|Same string|True &mdash; the identity mapping|
+|`"aa"` / `"ab"`|False &mdash; a cannot map to two characters|
+|`"ab"` / `"aa"`|False &mdash; needs the backward map|
+|All distinct in both|True, if lengths match|
+|Unicode|Works &mdash; dictionaries handle any hashable character|
+
+The two `"ab"`/`"aa"` rows are the pair to test: one direction catches the first, and only the second map catches the second. Mentioning both demonstrates that the bijection requirement is understood rather than copied.
+
+## The related problems
+
+<strong>Word pattern.</strong> The same problem with words instead of characters: does `"dog cat cat dog"` match the pattern `"abba"`? Identical structure over `s.split()`.
+
+<strong>Group isomorphic strings.</strong> Use the normalised pattern as a dictionary key, exactly as sorted characters group anagrams. The canonical-form technique again.
+
+<strong>Isomorphic graphs.</strong> Superficially related and vastly harder &mdash; graph isomorphism has no known polynomial algorithm. Worth knowing the distinction if it comes up, because the name invites confusion.
+
+<strong>Find and replace with a consistent mapping.</strong> The practical version: applying a cipher or a tokenisation consistently.
+
+|Problem|Canonical form|
+|---|---|
+|Isomorphic strings|First-occurrence index pattern|
+|Anagrams|Sorted characters, or a count tuple|
+|Rotations|Smallest rotation, or `b in a + a`|
+|Case-insensitive equality|Casefolded string|
+
+That table is the transferable lesson: <strong>when a problem asks whether two things are equivalent under some transformation, compute a canonical form and compare.</strong> It turns an equivalence test into a hash lookup, which is what makes grouping possible.
+
+## What it is testing
+
+<strong>Do you require a bijection?</strong> The one-map solution is the trap, and the interviewer will have `"ab"` / `"aa"` ready.
+
+<strong>Do you check lengths first?</strong> One line, O(1), and it avoids the whole loop.
+
+<strong>Do you know it is order-sensitive?</strong> Isomorphism preserves position, unlike anagrams &mdash; conflating the two is a conceptual error.
+
+<strong>Do you see the canonical-form view?</strong> Offering the pattern-normalisation solution shows you can reframe rather than only implement.
+
+<strong>Is your `index`-based version O(n) or O(n&sup2;)?</strong> The elegant one-liner is quadratic, and noticing that is the difference between neat and correct.
+
+## Recap in one screen
+
+- Isomorphic means a consistent one-to-one character mapping preserving order.
+- Two dictionaries are required &mdash; forward and backward &mdash; or `"ab"` / `"aa"` passes incorrectly.
+- O(n) time, O(k) space; check lengths first.
+- Normalising each string to its first-occurrence index pattern gives a canonical form that handles both directions.
+- Use `str.index` inside a comprehension and the elegant version becomes O(n&sup2;); a dictionary restores O(n).

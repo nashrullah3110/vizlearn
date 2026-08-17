@@ -1,6 +1,84 @@
 title: Longest palindromic substring
 intro: Find the longest palindromic substring.
 
+## The problem
+
+Find the longest contiguous substring that reads the same forwards and backwards.
+
+|Input|Answer|
+|---|---|
+|`"babad"`|`"bab"` or `"aba"` &mdash; either is valid|
+|`"cbbd"`|`"bb"`|
+|`"a"`|`"a"`|
+|`"ac"`|`"a"` or `"c"` &mdash; any single character|
+
+<strong>Substring, not subsequence</strong> &mdash; contiguous. And when several answers tie in length, any one is acceptable, which is worth confirming.
+
+The brute force checks every substring for palindromicity: O(n³). Two better approaches exist, and one of them is short enough to write confidently under pressure.
+
+## Expand around centres
+
+Every palindrome has a centre. There are 2n&minus;1 possible centres &mdash; n single characters for odd-length palindromes, and n&minus;1 gaps between characters for even-length ones. Expand outwards from each.
+
+```python
+def longest_palindrome(s):
+    if not s:
+        return ""
+    best_start, best_len = 0, 1
+
+    def expand(lo, hi):
+        while lo >= 0 and hi < len(s) and s[lo] == s[hi]:
+            lo -= 1
+            hi += 1
+        return lo + 1, hi - lo - 1           # start, length
+
+    for i in range(len(s)):
+        for lo, hi in ((i, i), (i, i + 1)):  # odd centre, then even
+            start, length = expand(lo, hi)
+            if length > best_len:
+                best_start, best_len = start, length
+
+    return s[best_start:best_start + best_len]
+```
+
+O(n²) time, O(1) space.
+
+The two centre types are the detail that gets forgotten. Checking only `(i, i)` finds `"aba"` and misses `"abba"` entirely, because an even-length palindrome has no single central character.
+
+The `lo + 1, hi - lo - 1` adjustment accounts for the loop having stepped one past the valid range on both sides &mdash; a small off-by-one worth deriving carefully rather than guessing.
+
+## The dynamic programming alternative
+
+`dp[i][j]` is True when `s[i..j]` is a palindrome:
+
+<p class="mono-font">dp[i][j] = (s[i] == s[j]) and (j &minus; i &lt; 2 or dp[i+1][j&minus;1])</p>
+
+```python
+def longest_palindrome_dp(s):
+    n = len(s)
+    if n < 2:
+        return s
+    dp = [[False] * n for _ in range(n)]
+    best_start, best_len = 0, 1
+
+    for i in range(n):
+        dp[i][i] = True
+
+    for length in range(2, n + 1):                  # by increasing length
+        for i in range(n - length + 1):
+            j = i + length - 1
+            if s[i] == s[j] and (length == 2 or dp[i+1][j-1]):
+                dp[i][j] = True
+                if length > best_len:
+                    best_start, best_len = i, length
+
+    return s[best_start:best_start + best_len]
+```
+
+O(n²) time and <strong>O(n²) space</strong> &mdash; strictly worse than expanding around centres, which achieves the same time in O(1) space.
+
+Worth knowing because it makes the substructure explicit, and because the same table answers related questions such as counting all palindromic substrings. For this specific problem, expand-around-centre is the better answer.
+
 ## Why 2n − 1 centres
 
 An odd-length palindrome like <code>aba</code> is centred on a character. An even-length one like <code>abba</code> is centred on the gap between two. So there are n character centres and n&nbsp;&minus;&nbsp;1 gap centres.
@@ -18,3 +96,66 @@ Mention the DP version, then say why you are not using it. Recognising that two 
 Manacher's algorithm is O(n): it reuses the palindromes already found to skip work, in the same spirit as KMP's prefix table. It is long, fiddly, and almost never expected.
 
 Name it, say it exists and that you would look it up rather than reconstruct it under time pressure. That reads as calibration; attempting it from memory and stalling does not.
+
+## Manacher's algorithm
+
+The O(n) solution. It is rarely expected in an interview, and knowing it exists is worth a sentence.
+
+The idea: while expanding around centres, information from previously computed palindromes can be reused. If a centre lies inside a larger palindrome already found, its mirror position's radius gives a lower bound, so expansion can start from there rather than from zero.
+
+Combined with a clever handling of odd and even lengths &mdash; interleaving separator characters so every palindrome becomes odd-length &mdash; it achieves linear time.
+
+|Approach|Time|Space|Practical|
+|---|---|---|---|
+|Brute force|O(n&sup3;)|O(1)|No|
+|Dynamic programming|O(n&sup2;)|O(n&sup2;)|Rarely|
+|Expand around centres|O(n&sup2;)|O(1)|<strong>Yes</strong>|
+|Manacher's|O(n)|O(n)|Only if asked|
+
+The honest answer in an interview: <strong>offer expand-around-centre, state that Manacher's achieves O(n), and mention that it is complex enough that you would look it up rather than reproduce it from memory.</strong> That is a more credible position than attempting it and getting it wrong.
+
+## Edge cases
+
+|Case|Result|
+|---|---|
+|`""`|`""`|
+|Single character|That character|
+|All identical, `"aaaa"`|The whole string|
+|No palindrome longer than 1, `"abcd"`|Any single character|
+|Even-length answer, `"cbbd"`|`"bb"` &mdash; requires the even centre|
+|Whole string is a palindrome|The whole string|
+|Several equal-length answers|Any one; confirm which is expected|
+
+The `"cbbd"` row is the test that catches implementations handling only odd centres.
+
+## The related problems
+
+<strong>Count all palindromic substrings.</strong> Same expansion, but count every successful expansion rather than tracking the maximum. O(n²).
+
+<strong>Longest palindromic subsequence.</strong> Not contiguous, so a different DP &mdash; and it equals the longest common subsequence of the string and its reverse, which is a neat reduction worth knowing.
+
+<strong>Minimum insertions to make a palindrome.</strong> Length minus the longest palindromic subsequence.
+
+<strong>Palindrome partitioning.</strong> Split the string into the fewest palindromic pieces &mdash; DP over the palindrome table.
+
+<strong>Shortest palindrome by prepending characters.</strong> Solved with KMP's failure function on `s + separator + reversed(s)`, which is an unexpected and elegant connection.
+
+## What it is testing
+
+<strong>Do you handle both centre types?</strong> The single most common failure.
+
+<strong>Do you reach O(1) space?</strong> The DP solution is correct and uses O(n²) space; expand-around-centre is the improvement.
+
+<strong>Do you get the index arithmetic right?</strong> Returning the substring requires careful start and length computation after the loop overshoots.
+
+<strong>Do you know substring means contiguous?</strong> Answering the subsequence problem is a different, and wrong, answer.
+
+<strong>Are you honest about Manacher's?</strong> Mentioning it and declining to write it from memory is a better signal than a broken attempt.
+
+## Recap in one screen
+
+- Every palindrome has a centre; there are 2n&minus;1 of them, counting gaps for even lengths.
+- Expand outwards from each centre and keep the longest &mdash; O(n&sup2;) time, O(1) space.
+- Handling only single-character centres misses all even-length palindromes.
+- The DP table is O(n&sup2;) in both time and space, so it is strictly worse here.
+- Manacher's is O(n) by reusing mirrored radii; mention it rather than attempting it under pressure.

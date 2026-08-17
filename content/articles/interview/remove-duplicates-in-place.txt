@@ -1,6 +1,51 @@
 title: Remove duplicates from a sorted array in place
 intro: Remove duplicates from a sorted array in place and return the new length.
 
+## The problem
+
+Given a <strong>sorted</strong> array, remove duplicates in place and return the new length. The elements beyond that length do not matter.
+
+<p class="mono-font">[1, 1, 2, 2, 3]&nbsp;&rarr;&nbsp;length 3, array starts [1, 2, 3, ...]</p>
+
+Two constraints define it. <strong>In place</strong> means O(1) extra space &mdash; no new array. <strong>Sorted</strong> means duplicates are adjacent, which is what makes a single pass possible.
+
+The sortedness is doing the work: on unsorted input, adjacency tells you nothing and a set (O(n) space) or a sort (O(n log n)) is needed.
+
+## Two pointers, read and write
+
+```python
+def remove_duplicates(nums):
+    if not nums:
+        return 0
+    write = 1                              # next position to write
+    for read in range(1, len(nums)):
+        if nums[read] != nums[write - 1]:
+            nums[write] = nums[read]
+            write += 1
+    return write
+```
+
+O(n) time, O(1) space.
+
+The invariant is what makes it correct: <strong>everything before `write` is the deduplicated result so far</strong>. Naming that invariant out loud is worth more than the code, because it is what lets you verify the comparison is right.
+
+The comparison is against `nums[write - 1]` &mdash; the last value <em>kept</em> &mdash; not against `nums[read - 1]`, the previous value read. On sorted input those coincide, and using the kept value generalises correctly to the variants below.
+
+## Tracing it
+
+`[1, 1, 2, 2, 3]`:
+
+|read|nums[read]|nums[write&minus;1]|Action|Array|write|
+|---|---|---|---|---|---|
+|1|1|1|Skip &mdash; duplicate|[1,1,2,2,3]|1|
+|2|2|1|Write at 1|[1,<strong>2</strong>,2,2,3]|2|
+|3|2|2|Skip|[1,2,2,2,3]|2|
+|4|3|2|Write at 2|[1,2,<strong>3</strong>,2,3]|3|
+
+Returns 3, and `nums[:3]` is `[1, 2, 3]`. The tail `[2, 3]` is leftover and explicitly allowed to be anything.
+
+That leftover is worth pointing out, because the natural expectation is that the array is fully cleaned. The contract is only about the first `write` elements.
+
 ## Why sorted matters
 
 Duplicates in a sorted array are adjacent, so "have I seen this before?" collapses to "is it the same as the last one I kept?" &mdash; one comparison, no set, no memory.
@@ -18,3 +63,89 @@ Compare against <code>values[write - 1]</code>, the last element actually kept, 
 Nothing is reallocated, so the array keeps its original size and everything past <code>write</code> is leftover data. The caller uses <code>values[:n]</code>. This is the C-style convention the question comes from, and returning a new list instead would defeat the O(1) space requirement the question exists to test.
 
 The same pattern solves "move zeroes to the end", "remove all instances of a value", and "allow at most two duplicates" &mdash; only the keep condition changes.
+
+## The variants
+
+<strong>Allow up to k duplicates.</strong> The generalisation, and it is elegant &mdash; compare against the element k positions back:
+
+```python
+def remove_duplicates_k(nums, k):
+    write = 0
+    for x in nums:
+        if write < k or x != nums[write - k]:
+            nums[write] = x
+            write += 1
+    return write
+```
+
+With k = 1 this is the original; with k = 2 it allows each value twice. The `write < k` guard handles the start, and comparing against `nums[write - k]` asks "have I already kept k copies of this value?"
+
+<strong>Remove all occurrences of a specific value:</strong>
+
+```python
+def remove_element(nums, val):
+    write = 0
+    for x in nums:
+        if x != val:
+            nums[write] = x
+            write += 1
+    return write
+```
+
+Same shape, different condition. Recognising that these are one pattern with a varying predicate is the useful observation.
+
+<strong>Move zeros to the end</strong> is the same again: write the non-zeros forward, then fill the remainder with zeros.
+
+<strong>Unsorted input.</strong> Requires a set for O(n) time and O(n) space, or sorting first for O(1) space at O(n log n). State the trade rather than pretending in-place O(n) is available.
+
+## Edge cases
+
+|Case|Result|
+|---|---|
+|`[]`|0|
+|`[1]`|1|
+|All identical, `[2,2,2]`|1|
+|All distinct|Unchanged length|
+|Two elements equal|1|
+|Not actually sorted|<strong>Wrong answer</strong>, silently|
+
+The last row is the important one. The algorithm relies on duplicates being adjacent, and on unsorted input it removes only adjacent repeats and returns a length that is too large. It fails without any error, which is worse than raising.
+
+If sortedness is not guaranteed, say so and ask &mdash; do not assume.
+
+## Why the write-pointer pattern generalises
+
+This is one instance of a broader technique: <strong>a read pointer scanning and a write pointer compacting</strong>, used whenever an array must be filtered in place.
+
+|Problem|Write condition|
+|---|---|
+|Remove duplicates (sorted)|Differs from the last kept|
+|Remove a value|Not equal to the value|
+|Move zeros to the end|Non-zero|
+|Keep at most k duplicates|Differs from k positions back|
+|Partition by a predicate|Predicate holds|
+|Dutch national flag|Three regions, three pointers|
+
+All of them are O(n) time and O(1) space, and all of them are the same loop with a different `if`. Recognising the family means you write it correctly the first time rather than re-deriving it.
+
+The corresponding out-of-place version is a list comprehension &mdash; `[x for x in nums if x != val]` &mdash; which is clearer and uses O(n) space. Choose in-place only when the constraint requires it.
+
+## What it is testing
+
+<strong>Do you use two pointers rather than deleting from the list?</strong> `nums.remove(x)` or `del nums[i]` inside a loop is O(n) per operation and shifts the elements you are iterating over &mdash; a double mistake.
+
+<strong>Do you state the invariant?</strong> "Everything before `write` is the answer so far" is what makes the solution verifiable.
+
+<strong>Do you compare against the last kept element,</strong> not the previous read one?
+
+<strong>Do you notice that sortedness is required?</strong> And ask if it is not stated.
+
+<strong>Do you know the tail is allowed to be garbage?</strong> The contract is the returned length, not the whole array.
+
+## Recap in one screen
+
+- Sorted input means duplicates are adjacent, which allows one pass with O(1) space.
+- A read pointer scans; a write pointer marks where the next kept element goes.
+- Compare against the last <em>kept</em> element, `nums[write - 1]`, not the previous read one.
+- Elements past the returned length are undefined &mdash; that is part of the contract.
+- The read/write compaction pattern covers remove-value, move-zeros and keep-at-most-k with a different condition.

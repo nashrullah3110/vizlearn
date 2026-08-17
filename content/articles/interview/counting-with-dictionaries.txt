@@ -1,6 +1,93 @@
 title: Count things with a dictionary
 intro: Count the frequency of each item in a sequence. Now find the k most common.
 
+## Four ways, and which to use
+
+Counting occurrences is the most common dictionary task, and Python offers four spellings.
+
+```python
+from collections import Counter, defaultdict
+
+# 1. Counter - the right answer
+counts = Counter(words)
+
+# 2. defaultdict
+counts = defaultdict(int)
+for w in words:
+    counts[w] += 1
+
+# 3. dict.get
+counts = {}
+for w in words:
+    counts[w] = counts.get(w, 0) + 1
+
+# 4. explicit check - avoid
+counts = {}
+for w in words:
+    if w not in counts:
+        counts[w] = 0
+    counts[w] += 1
+```
+
+All four are O(n). `Counter` is idiomatic, C-optimised for iterables, and comes with `most_common`. Use it unless there is a reason not to.
+
+`defaultdict(int)` is right when counting happens as part of a larger loop that does other work. `dict.get` is right when you want a plain `dict` in the output &mdash; `Counter` and `defaultdict` are dict subclasses and mostly interchangeable, and they are not identical.
+
+## What Counter adds
+
+```python
+c = Counter("mississippi")
+
+c.most_common(2)          # [('i', 4), ('s', 4)]
+c["z"]                    # 0 - missing keys return zero, no KeyError
+c.total()                 # 11 (Python 3.10+)
+list(c.elements())        # 'm','i','i','i','i','s',... - expanded back out
+
+a, b = Counter("aab"), Counter("abb")
+a + b                     # Counter({'a': 3, 'b': 3})
+a - b                     # Counter({'a': 1}) - negatives DROPPED
+a & b                     # Counter({'a': 1, 'b': 1}) - minimum of each
+a | b                     # Counter({'a': 2, 'b': 2}) - maximum of each
+```
+
+The `c["z"]` behaviour is the difference from `defaultdict`: `Counter` returns 0 for a missing key <strong>without inserting it</strong>, where `defaultdict` inserts a 0 entry. That matters when iterating &mdash; reading a missing key from a `defaultdict` during a loop changes its size.
+
+The `a - b` behaviour is the trap: subtraction discards non-positive counts. Use `c.subtract(other)` to keep negatives.
+
+## The everyday patterns
+
+<strong>Most frequent element:</strong>
+
+```python
+Counter(items).most_common(1)[0][0]
+```
+
+<strong>Anagram check:</strong>
+
+```python
+Counter(s) == Counter(t)
+```
+
+<strong>Are all characters unique?</strong>
+
+```python
+max(Counter(s).values()) == 1        # or len(set(s)) == len(s)
+```
+
+<strong>Elements appearing more than k times:</strong>
+
+```python
+[x for x, n in Counter(items).items() if n > k]
+```
+
+<strong>Counting by a derived key:</strong>
+
+```python
+Counter(u.country for u in users)          # a generator, no list built
+```
+
+That last one is worth noting: `Counter` accepts any iterable, so a generator expression counts by any computed key without materialising an intermediate list.
+
 ## The four idioms
 
 <p><code>counts[x] = counts.get(x, 0) + 1</code> needs no import and makes the default explicit. <code>counts.setdefault(x, 0)</code> is the same idea and reads worse for counting. <code>defaultdict(int)</code> lets you write <code>counts[x] += 1</code> directly. <code>Counter(seq)</code> does the whole loop in C.</p>
@@ -18,3 +105,93 @@ Use <code>.get()</code> or <code>in</code> when you are only asking. <code>Count
 Sorting all the counts is O(m&nbsp;log&nbsp;m) in the number of distinct items. Keeping a heap of size k is O(m&nbsp;log&nbsp;k), which is what <code>heapq.nlargest</code> and <code>Counter.most_common(k)</code> do.
 
 For "top 10 of a billion" that is the difference between a practical job and an impossible one, and it is the answer the question is actually fishing for. Bucket sort by count is O(m) when the counts are bounded &mdash; worth mentioning as the linear option.
+
+## Grouping, the sibling problem
+
+Counting collapses items to a number; grouping keeps them.
+
+```python
+from collections import defaultdict
+
+groups = defaultdict(list)
+for u in users:
+    groups[u.country].append(u)
+```
+
+`defaultdict(list)` creates an empty list on first access, which removes the "if the key is absent, initialise it" branch. Without it:
+
+```python
+groups = {}
+for u in users:
+    groups.setdefault(u.country, []).append(u)     # works, slightly slower
+```
+
+`itertools.groupby` is the one to be careful with: it groups <strong>consecutive</strong> equal items, so the input must be sorted by the same key first. Using it on unsorted data produces many small groups and is a common surprise.
+
+```python
+from itertools import groupby
+users.sort(key=lambda u: u.country)                # REQUIRED
+for country, group in groupby(users, key=lambda u: u.country):
+    ...
+```
+
+`defaultdict` needs no sorting and is usually the better choice.
+
+## Counting in a sliding window
+
+The incremental form, which appears in several interview problems:
+
+```python
+def find_anagrams(s, pattern):
+    need = Counter(pattern)
+    window = Counter()
+    out = []
+    for i, ch in enumerate(s):
+        window[ch] += 1
+        if i >= len(pattern):
+            left = s[i - len(pattern)]
+            window[left] -= 1
+            if window[left] == 0:
+                del window[left]          # delete, or the == comparison fails
+        if window == need:
+            out.append(i - len(pattern) + 1)
+    return out
+```
+
+The `del` is essential. A `Counter` holding `{'a': 0}` does not compare equal to one without the key, so leaving zero entries breaks the comparison. That is the single most common bug in window-counting solutions.
+
+## Edge cases and gotchas
+
+|Case|Behaviour|
+|---|---|
+|`Counter([])`|Empty counter; `most_common()` returns `[]`|
+|`max(counts.values())` on empty|`ValueError` &mdash; guard it|
+|Ties in `most_common`|Insertion order among equals; not documented as stable|
+|`counts["missing"]`|0 from `Counter`, inserts 0 in `defaultdict`|
+|Unhashable items|`TypeError` &mdash; convert lists to tuples|
+|Counting floats|`0.1 + 0.2` is not `0.3`; round first|
+|`c - other`|Drops non-positive counts; use `subtract`|
+
+The ties row is worth knowing: `most_common` sorts by count, and elements with equal counts appear in the order first encountered. That is current behaviour rather than a guarantee, so do not depend on it for correctness.
+
+## Questions people ask
+
+<strong>Counter or defaultdict?</strong> `Counter` for pure counting; `defaultdict(int)` when counting is part of a larger loop; `defaultdict(list)` for grouping.
+
+<strong>Is Counter faster?</strong> For counting a whole iterable, yes &mdash; the loop is in C. For incremental `+= 1` in Python, they are comparable.
+
+<strong>Why does `c["missing"]` return 0?</strong> `Counter` defines `__missing__` to return 0 without inserting, which makes counting code cleaner.
+
+<strong>Why did my Counter comparison fail?</strong> Zero-valued keys. Delete them when a count reaches zero.
+
+<strong>How do I count by a field?</strong> `Counter(x.field for x in items)`.
+
+<strong>Is a Counter a dict?</strong> A subclass, so all dict operations work &mdash; and it is not hashable, so it cannot itself be a dictionary key.
+
+## Recap in one screen
+
+- `Counter(iterable)` is the idiomatic count; `defaultdict(list)` is the idiomatic grouping.
+- `Counter` returns 0 for missing keys without inserting; `defaultdict` inserts.
+- Delete zero-valued keys before comparing Counters, or equality fails.
+- `Counter` subtraction drops non-positive counts &mdash; `subtract` keeps them.
+- `itertools.groupby` needs the input sorted by the same key; `defaultdict` does not.

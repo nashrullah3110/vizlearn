@@ -1,6 +1,67 @@
 title: Run-length string compression
 intro: Compress &#x27;aabcccccaaa&#x27; to &#x27;a2b1c5a3&#x27;. Return the original if the compressed form is not shorter.
 
+## The problem
+
+Compress a character array in place by replacing runs of the same character with the character followed by its count. Counts of 1 are written as the character alone. Return the new length.
+
+<p class="mono-font">["a","a","b","b","c","c","c"]&nbsp;&rarr;&nbsp;["a","2","b","2","c","3"], length 6</p>
+<p class="mono-font">["a"]&nbsp;&rarr;&nbsp;["a"], length 1</p>
+<p class="mono-font">["a","b"]&nbsp;&rarr;&nbsp;["a","b"], length 2</p>
+
+Two details make it more than a formatting exercise. Counts of 1 are omitted, so `"ab"` does not become `"a1b1"`. And a count above 9 becomes <strong>several characters</strong> &mdash; 12 is `"1"` and `"2"` &mdash; which is where most implementations break.
+
+## The solution
+
+```python
+def compress(chars):
+    write = 0
+    read = 0
+    n = len(chars)
+
+    while read < n:
+        ch = chars[read]
+        count = 0
+        while read < n and chars[read] == ch:
+            read += 1
+            count += 1
+
+        chars[write] = ch
+        write += 1
+        if count > 1:
+            for digit in str(count):            # multi-digit counts
+                chars[write] = digit
+                write += 1
+
+    return write
+```
+
+O(n) time, O(1) extra space.
+
+Two mechanisms carry it:
+
+<strong>The inner `while`</strong> consumes an entire run and counts it. Both pointers advance independently, and `read` always stays ahead of `write` &mdash; which is why writing in place cannot clobber unread input.
+
+<strong>`for digit in str(count)`</strong> handles counts of any size. Writing `chars[write] = str(count)` puts a multi-character string into one slot, which is the bug for runs longer than nine.
+
+## Why in-place is safe
+
+The natural worry is that writing over the array destroys data still to be read. It does not, and the reason is worth stating.
+
+For a run of length L, the output is 1 + digits(L) characters. That is at most L for every L &ge; 1:
+
+|Run length|Output length|
+|---|---|
+|1|1 (`a`)|
+|2|2 (`a2`)|
+|9|2 (`a9`)|
+|10|3 (`a10`)|
+|100|4 (`a100`)|
+
+So the compressed form is never longer than the input, and `write` never overtakes `read`. Compression that could expand the data would need a temporary buffer &mdash; and this encoding cannot expand it.
+
+That argument is what an interviewer wants to hear before you write the code, because it justifies the whole approach.
+
 ## The algorithm, and the trap inside it
 
 Two pointers: one at the start of the current run, one scanning forward while the character stays the same. When it changes, emit <code>char</code> and <code>count</code> and move on. One pass, O(n).
@@ -16,3 +77,98 @@ A common refinement is to bail out early once the output has already exceeded th
 ## The in-place variant
 
 The harder version gives you a character array and asks you to compress it in place, returning the new length. Because the compressed form is never longer than the original when it wins, a read-pointer/write-pointer pair works: read scans runs, write emits behind it, and write never overtakes read. That is the same two-pointer shape as the in-place dedupe.
+
+## Edge cases
+
+|Input|Output|Length|
+|---|---|---|
+|`[]`|`[]`|0|
+|`["a"]`|`["a"]`|1|
+|`["a","a"]`|`["a","2"]`|2|
+|`["a","b","c"]`|`["a","b","c"]`|3 &mdash; no counts added|
+|Run of 10|`["a","1","0"]`|3|
+|Run of 100|`["a","1","0","0"]`|4|
+|All identical, 1000 chars|`["a","1","0","0","0"]`|5|
+|Mixed case `["a","A"]`|Two runs &mdash; case sensitive|2|
+
+The run-of-10 and run-of-100 rows are the ones to test explicitly. An implementation that passes `"aabbccc"` and fails `"a" * 12` is the common outcome.
+
+## The string version
+
+If the input is a string rather than a character array, in-place is impossible &mdash; strings are immutable &mdash; so build a list and join:
+
+```python
+def compress_string(s):
+    if not s:
+        return ""
+    out = []
+    i = 0
+    while i < len(s):
+        j = i
+        while j < len(s) and s[j] == s[i]:
+            j += 1
+        out.append(s[i])
+        if j - i > 1:
+            out.append(str(j - i))
+        i = j
+    return "".join(out)
+```
+
+Or with `itertools.groupby`, which is the idiomatic Python:
+
+```python
+from itertools import groupby
+
+def compress_groupby(s):
+    return "".join(
+        ch + (str(n) if (n := len(list(g))) > 1 else "")
+        for ch, g in groupby(s)
+        for n in [0]                      # awkward; see below
+    )
+```
+
+That last version is a good example of when <em>not</em> to be clever &mdash; the walrus placement fights the comprehension. The explicit loop is clearer:
+
+```python
+def compress_groupby(s):
+    parts = []
+    for ch, group in groupby(s):
+        n = sum(1 for _ in group)
+        parts.append(ch if n == 1 else f"{ch}{n}")
+    return "".join(parts)
+```
+
+`groupby` groups <em>consecutive</em> equal items, which is exactly what run-length encoding needs &mdash; and is why it works here without sorting, unlike its usual grouping use.
+
+## Run-length encoding in practice
+
+This is <strong>run-length encoding</strong>, one of the oldest compression schemes, and it is still used where the data has long runs.
+
+- <strong>Fax and bitonal images.</strong> Scanned documents are mostly white, giving very long runs. TIFF's Group 3 and 4 encodings are RLE-based.
+- <strong>BMP and PCX</strong> image formats.
+- <strong>Sparse matrices</strong> and bitmap indexes in databases, where long runs of zeros dominate.
+- <strong>Inside other algorithms.</strong> The Burrows-Wheeler transform rearranges data to create runs, and then RLE compresses them &mdash; which is how bzip2 works.
+
+Its weakness is equally clear: <strong>data without runs expands</strong>. Under a naive scheme that always writes a count, `"abcdef"` becomes `"a1b1c1d1e1f1"` &mdash; twice the size. This problem's rule of omitting counts of 1 is precisely the fix, and it is why the compressed output can never exceed the input.
+
+Real formats handle it with escape codes distinguishing literal runs from repeated runs, which is what PackBits does.
+
+## What it is testing
+
+<strong>Do you handle multi-digit counts?</strong> The primary trap, and it is what separates a working solution from one that passes the sample.
+
+<strong>Do you omit counts of 1?</strong> The specification says so, and skipping it changes every answer.
+
+<strong>Do you justify in-place safety?</strong> Explaining that output never exceeds input is the reasoning step.
+
+<strong>Do you keep two independent pointers?</strong> Read and write advance at different rates, which is the pattern.
+
+<strong>Do you know it is run-length encoding,</strong> and where it is used and why it can expand data?
+
+## Recap in one screen
+
+- Count each run, write the character, and write the count only when it exceeds 1.
+- Multi-digit counts must be written digit by digit &mdash; the main bug.
+- In place is safe because 1 + digits(L) &le; L for every run, so output never exceeds input.
+- Read and write pointers advance independently; read always stays ahead.
+- This is run-length encoding: excellent on data with long runs, and it expands data without them unless counts of 1 are omitted.

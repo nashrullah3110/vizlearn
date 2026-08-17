@@ -1,6 +1,64 @@
 title: Sort an array of 0s, 1s and 2s
 intro: Sort an array containing only 0, 1 and 2 in a single pass, in place.
 
+## The problem
+
+An array contains only 0s, 1s and 2s. Sort it in a single pass with O(1) extra space.
+
+<p class="mono-font">[2, 0, 2, 1, 1, 0]&nbsp;&rarr;&nbsp;[0, 0, 1, 1, 2, 2]</p>
+
+Two easy solutions are excluded by the constraints. <strong>Counting sort</strong> &mdash; count each value, then overwrite &mdash; is two passes. <strong>Any comparison sort</strong> is O(n log n) and does more than needed.
+
+The single-pass answer is the <strong>Dutch national flag</strong> partition, named for the three-striped flag.
+
+## Three pointers, three regions
+
+```python
+def sort_colors(nums):
+    low, mid, high = 0, 0, len(nums) - 1
+    while mid <= high:
+        if nums[mid] == 0:
+            nums[low], nums[mid] = nums[mid], nums[low]
+            low += 1
+            mid += 1
+        elif nums[mid] == 1:
+            mid += 1
+        else:                                  # nums[mid] == 2
+            nums[mid], nums[high] = nums[high], nums[mid]
+            high -= 1                          # do NOT advance mid
+    return nums
+```
+
+The invariant is the whole algorithm, and it must be stated to reason about the code:
+
+<p class="mono-font">[0 &hellip; low&minus;1] all 0s&nbsp;&nbsp;[low &hellip; mid&minus;1] all 1s&nbsp;&nbsp;[mid &hellip; high] unknown&nbsp;&nbsp;[high+1 &hellip;] all 2s</p>
+
+Each branch preserves it:
+
+<strong>A 0</strong> is swapped to the front of the unknown region and both `low` and `mid` advance &mdash; the swapped-in element came from the 1s region, so it is a 1 and correctly placed.
+
+<strong>A 1</strong> is already in the right place; `mid` advances.
+
+<strong>A 2</strong> is swapped to the end and `high` retreats. <strong>`mid` must not advance</strong>, because the element swapped in came from the unknown region and has not been examined.
+
+That last detail is the one bug this problem exists to catch. Advancing `mid` after a 2-swap skips an unexamined element, and the array comes out unsorted on inputs like `[2, 0, 1]`.
+
+## Tracing it
+
+`[2, 0, 2, 1, 1, 0]`:
+
+|low|mid|high|nums[mid]|Action|Array|
+|---|---|---|---|---|---|
+|0|0|5|2|Swap with 5, high&minus;&minus;|[0,0,2,1,1,2]|
+|0|0|4|0|Swap with 0 (self), both++|[0,0,2,1,1,2]|
+|1|1|4|0|Swap with 1 (self), both++|[0,0,2,1,1,2]|
+|2|2|4|2|Swap with 4, high&minus;&minus;|[0,0,1,1,2,2]|
+|2|2|3|1|mid++|[0,0,1,1,2,2]|
+|2|3|3|1|mid++|[0,0,1,1,2,2]|
+|&mdash;|4|3|&mdash;|`mid > high`, stop|[0,0,1,1,2,2]|
+
+Sorted, one pass, six iterations. Note the two self-swaps &mdash; harmless, and avoidable with a check that costs more than it saves.
+
 ## The counting alternative
 
 Count the 0s, 1s and 2s, then overwrite the array. Two passes, trivially correct, and usually the first answer. The question asks for one pass to rule it out &mdash; and because counting sort does not generalise to sorting objects by a three-way key, which the partition does.
@@ -16,3 +74,67 @@ Being able to state the invariant is most of the answer here. Writing the three 
 After swapping a 0 into the low region, the value that came back is from the region already known to be 1s, so <code>mid</code> can safely advance. After swapping a 2 into the high region, the value that came back is from the <em>unexamined</em> region &mdash; so <code>mid</code> must stay and look at it.
 
 Advancing in both cases is the classic bug: the array comes out almost sorted, with stray 2s left in the middle. It is exactly what the question is testing.
+
+## The loop condition
+
+`while mid <= high`, not `mid < high`. With `<`, the final element in the unknown region is never examined, and an input ending in a misplaced value comes out wrong.
+
+That is the second of the two off-by-one traps in this problem, and together with the "do not advance mid" rule they account for nearly every incorrect implementation.
+
+|Bug|Symptom|
+|---|---|
+|Advancing `mid` after a 2-swap|Unsorted output on `[2,0,1]`|
+|`mid < high` instead of `<=`|Last element unsorted|
+|Advancing `low` without `mid`|Infinite loop|
+|Swapping with `low` on a 2|Corrupts the 0s region|
+
+## Where it comes from: quick sort
+
+The Dutch national flag partition is the three-way partition used in <strong>quick sort with duplicate handling</strong>.
+
+Standard two-way partitioning splits into "less than pivot" and "greater than pivot", and elements <em>equal</em> to the pivot end up scattered on one side. On an array with many duplicates, that means each partition removes only one element and quick sort degrades to O(n²).
+
+Three-way partitioning places all elements equal to the pivot in the middle and recurses only on the outer two regions. An array of identical elements becomes the <em>best</em> case &mdash; one partition, O(n) total &mdash; instead of the worst.
+
+That is the practical reason to know this pattern: arrays with few distinct values are common in real data (status flags, categories, boolean columns), and three-way partitioning is what handles them.
+
+## The variants
+
+<strong>Two colours</strong> &mdash; move all zeros to the front. Two pointers, no middle region:
+
+```python
+def move_zeros_front(nums):
+    write = 0
+    for i, x in enumerate(nums):
+        if x == 0:
+            nums[write], nums[i] = nums[i], nums[write]
+            write += 1
+```
+
+<strong>k colours</strong> &mdash; counting sort is the right answer once there are more than three values. Count, then overwrite. Two passes, O(n + k).
+
+<strong>Partition around an arbitrary pivot</strong> &mdash; the same three regions with `< pivot`, `== pivot`, `> pivot`.
+
+<strong>Sort by a predicate</strong> &mdash; move everything satisfying a condition to the front, which is the two-way case with a general test.
+
+<strong>Wiggle sort</strong> and other rearrangement problems use related multi-pointer partitioning.
+
+## What it is testing
+
+<strong>Do you find the one-pass solution?</strong> Counting is the obvious answer and it uses two passes; the constraint exists to push past it.
+
+<strong>Do you state the invariant?</strong> Four regions with clear boundaries is what makes the code verifiable, and interviewers listen for it.
+
+<strong>Do you handle the mid-pointer correctly?</strong> Not advancing after a 2-swap is the single most important detail.
+
+<strong>Do you get the loop condition right?</strong> `<=`, not `<`.
+
+<strong>Do you connect it to quick sort?</strong> Recognising it as three-way partitioning, and knowing why that matters for duplicates, is the answer that distinguishes understanding from memorisation.
+
+## Recap in one screen
+
+- Three pointers maintain four regions: 0s, 1s, unknown, 2s &mdash; and the invariant is the algorithm.
+- On a 0, swap forward and advance both `low` and `mid`; on a 1, advance `mid`; on a 2, swap back and retreat `high` only.
+- Do not advance `mid` after a 2-swap &mdash; the incoming element has not been examined.
+- The loop runs while `mid <= high`, inclusive.
+- It is quick sort's three-way partition, which turns arrays of duplicates from the worst case into the best.

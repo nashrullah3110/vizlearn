@@ -1,6 +1,58 @@
 title: First non-repeating character
 intro: Find the first character in a string that does not repeat.
 
+## The problem
+
+Return the index of the first character that appears exactly once. If there is none, return &minus;1.
+
+|Input|Answer|
+|---|---|
+|`"leetcode"`|0 &mdash; `l`|
+|`"loveleetcode"`|2 &mdash; `v`|
+|`"aabb"`|&minus;1|
+|`""`|&minus;1|
+|`"z"`|0|
+
+The naive approach checks each character against the whole string: O(n²). The expected solution is two passes and O(n).
+
+## Two passes
+
+```python
+from collections import Counter
+
+def first_uniq_char(s):
+    counts = Counter(s)
+    for i, ch in enumerate(s):
+        if counts[ch] == 1:
+            return i
+    return -1
+```
+
+<strong>Pass one</strong> counts every character. <strong>Pass two</strong> walks the string in order and returns the first index whose count is 1.
+
+O(n) time, O(k) space where k is the alphabet size &mdash; bounded by 26 for lowercase ASCII, so effectively O(1) for that case.
+
+Why two passes are necessary: the answer depends on the total count of a character, which is not known until the whole string has been read. A single pass cannot decide whether the first character is unique before seeing the end.
+
+Note the second loop iterates the <strong>string</strong>, not the counter. Iterating the counter would give the first character in insertion order that happens to have count 1, which is the same thing in CPython 3.7+ because dictionaries preserve insertion order &mdash; and relying on that is less clear than walking the string.
+
+## The single-pass variant
+
+If asked for one pass over the input, the answer stores indices and resolves at the end:
+
+```python
+def first_uniq_char_indices(s):
+    seen = {}                              # char -> index, or None if repeated
+    for i, ch in enumerate(s):
+        seen[ch] = None if ch in seen else i
+    candidates = [i for i in seen.values() if i is not None]
+    return min(candidates) if candidates else -1
+```
+
+Still O(n) overall, and the final scan is over the alphabet rather than the string &mdash; so for a long string with a small alphabet it touches less data.
+
+Whether this counts as "one pass" is arguable, and the useful observation to make is that <strong>the information required is not available until the input ends</strong>, so some second look is unavoidable. Saying that is better than claiming a single-pass solution that does not exist.
+
 ## Why one pass is impossible
 
 Reading left to right, the first character might be unique or might repeat at the very end. Nothing can be returned until the whole string has been read, so a single pass that emits an answer as it goes is wrong by construction.
@@ -16,3 +68,85 @@ Since Python 3.7 dictionaries preserve insertion order, so walking <code>counts.
 ## The stream variant
 
 The real follow-up: "characters arrive one at a time and you must answer at any moment." Keep a counter <em>and</em> a queue of candidates. On each arrival, push it to the queue, then pop from the front while the front has a count above one. The head of the queue is always the current answer, in O(1) amortised.
+
+## The array optimisation
+
+For a known small alphabet, an array replaces the dictionary:
+
+```python
+def first_uniq_char_array(s):
+    counts = [0] * 26
+    for ch in s:
+        counts[ord(ch) - 97] += 1
+    for i, ch in enumerate(s):
+        if counts[ord(ch) - 97] == 1:
+            return i
+    return -1
+```
+
+Faster in practice &mdash; array indexing beats hashing &mdash; and it breaks on anything outside lowercase ASCII.
+
+Worth offering as the optimised version <em>with the assumption stated</em>. Presenting it without noting that it assumes lowercase ASCII is the mistake; interviewers frequently follow up with "what about Unicode?"
+
+|&nbsp;|Counter|Array|
+|---|---|---|
+|Time|O(n)|O(n)|
+|Space|O(k)|O(26)|
+|Alphabet|Any|Lowercase ASCII only|
+|Constant factor|Higher|Lower|
+
+## Edge cases
+
+|Case|Result|Why|
+|---|---|---|
+|Empty string|&minus;1|The loop does not run|
+|All characters repeat|&minus;1|No count equals 1|
+|Single character|0|Count is 1|
+|All unique|0|The first character qualifies|
+|Mixed case|`"Aa"` gives 0 &mdash; different characters|Ask whether case matters|
+|Spaces and punctuation|Counted as characters|Ask whether they should be|
+|Non-ASCII|Works with `Counter`, breaks with the array|Mention the assumption|
+
+The mixed-case row is a legitimate clarifying question: is `"Aa"` two unique characters or one repeated one?
+
+## The variants
+
+<strong>First repeating character.</strong> Simpler and genuinely one pass: keep a set of seen characters and return the first one already present.
+
+```python
+def first_repeating(s):
+    seen = set()
+    for i, ch in enumerate(s):
+        if ch in seen:
+            return i
+        seen.add(ch)
+    return -1
+```
+
+That asymmetry is worth noticing: "first repeating" can be answered as soon as the repeat appears, so one pass suffices. "First non-repeating" cannot, because uniqueness is only knowable at the end.
+
+<strong>First unique in a stream.</strong> A queue of candidates plus a count map: push each new character, and pop from the front while the front's count exceeds 1. The front is always the current answer, in O(1) per query.
+
+<strong>Last non-repeating character.</strong> Same counts, iterate the string backwards.
+
+<strong>First non-repeating word</strong> in a document. Identical structure over tokens rather than characters.
+
+## What it is testing
+
+<strong>Do you use two passes rather than a nested loop?</strong> The O(n²) version is the baseline to improve on.
+
+<strong>Do you iterate the string in the second pass?</strong> Order matters, and the counter's order is an implementation detail to avoid depending on.
+
+<strong>Do you know the alphabet-size bound?</strong> Stating the space as O(1) for a fixed alphabet, rather than O(n), is the precise answer.
+
+<strong>Do you ask about case and non-letter characters?</strong>
+
+<strong>Do you notice the asymmetry with "first repeating"?</strong> Recognising that one is answerable in a single pass and the other is not shows you understand why the two passes are needed.
+
+## Recap in one screen
+
+- Count every character, then walk the string in order and return the first index with count 1.
+- O(n) time, O(k) space bounded by the alphabet &mdash; effectively O(1) for fixed alphabets.
+- Two passes are unavoidable: uniqueness is not knowable until the input ends.
+- Iterate the string, not the counter, in the second pass.
+- "First <em>repeating</em>" is the one-pass sibling, answerable the moment the repeat appears.
