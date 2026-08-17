@@ -17,6 +17,41 @@ The output for that word is the weighted blend of all the values. So after one s
 
 <p>"The animal didn't cross the street because it was too tired." What does "it" refer to?</p><p>Change one word &mdash; "because it was too <em>wide</em>" &mdash; and the answer flips from the animal to the street. Nothing about the grammar changed. The only way to resolve it is to notice which noun makes sense with the adjective, which means "it" has to be able to look at both nouns <em>and</em> at the adjective, all at once.</p><p>An RNN reading left to right has to carry that decision in its hidden state across six words. Self-attention just looks &mdash; but not, it turns out, in one go.</p><strong>One layer cannot do it.</strong> In layer 1 each word's query is a fixed function of that word alone, so the query "it" sends out is identical in both sentences. It scores the same against "animal" and against "street" whichever adjective the sentence ends on, and the panel confirms this: at layer 1 the answer is "animal" both times, to three decimal places.<p>Layer 2 is where it resolves. By then "it" has absorbed a little of everything it attended to in layer 1, including the adjective, so the query it sends the second time is no longer generic &mdash; and that is enough to separate the two nouns. Switch to layer 2 and the reference follows the adjective: "tired" keeps it on the animal, "wide" moves it to the street.</p><p>This is the real reason transformers are deep. A single attention layer mixes information; it takes another to <em>use</em> what was mixed.</p>
 
+## A sequence relating itself
+
+Self-attention is attention where the queries, keys and values all come from the same sequence. Every token asks every token &mdash; including itself &mdash; how relevant it is, and builds a new representation from the answer.
+
+That is what turns a bag of independent word vectors into contextual ones. Before self-attention, "bank" has one vector. After a layer of self-attention, the vector for "bank" in "river bank" has absorbed information from "river", and differs from the same word in "savings bank".
+
+The mechanics for one token:
+
+1. Project its input into a <strong>query</strong>.
+2. Project every token, including itself, into <strong>keys</strong> and <strong>values</strong>.
+3. Dot the query with each key, scale by `√dₖ`, softmax to get weights.
+4. Output the weighted sum of the values.
+
+Every token does this simultaneously, which is one matrix multiplication rather than a loop.
+
+## Why it needs positional information
+
+Self-attention has no notion of order. Shuffle the input tokens and the set of outputs is the same set, just permuted &mdash; the mechanism sees a bag, not a sequence.
+
+For language that is fatal: "the dog bit the man" and "the man bit the dog" would be indistinguishable.
+
+<strong>Positional encodings</strong> supply the missing information by adding (or otherwise injecting) a position-dependent signal into the token representations before attention. The original transformer used fixed sinusoidal patterns; modern models mostly use rotary embeddings (RoPE), which rotate the query and key vectors by an angle proportional to position and generalise better to lengths not seen in training.
+
+This is worth remembering as a design fact rather than a detail: attention supplies the relationships, positional encoding supplies the order, and neither works alone.
+
+## Multiple heads
+
+One set of attention weights can only express one kind of relationship at a time. Multi-head attention runs several attention computations in parallel, each with its own learned projections, and concatenates the results.
+
+With 8 heads and a model dimension of 512, each head works in 64 dimensions &mdash; the total cost is roughly unchanged, and the model gains several independent views of the sequence.
+
+What the heads specialise in, when inspected, is genuinely varied: some track syntactic dependencies such as subject to verb, some attend to the previous token, some to matching brackets or quotation marks, some appear to do little at all. Studies that prune heads find many can be removed with little loss, which suggests a good deal of redundancy.
+
+The practical reading: heads give the layer capacity to represent several relationships at once, and the specialisations that emerge are a side effect rather than something designed.
+
 ## Guided tour
 
 1. <strong>Watch one layer fail.</strong> Set the <strong>Layer</strong> slider to 1 and the <strong>Focus Row</strong> to it. Note what it attends to, then switch the <strong>Example</strong> to the "wide" sentence. The number does not move at all &mdash; a single layer's query for "it" cannot depend on a word elsewhere in the sentence.
@@ -45,3 +80,51 @@ The last two rows are the bill. The quadratic cost is why context windows were s
 ## Where that leaves you
 
 Self-attention is attention with queries, keys and values all drawn from the same sequence, so every word is rewritten as a blend of the words it finds relevant &mdash; which is how a pronoun can resolve to a noun six words away in a single step. Because every position is computed independently, training parallelises completely and the path between any two words is length 1 regardless of distance, and those two properties are what displaced recurrence. One layer only mixes information, though &mdash; resolving a pronoun against a distant adjective takes a second layer to use what the first collected, which is why the architecture is stacked. The costs are real and specific: the number of scores grows with the square of the sequence length, and the mechanism is entirely blind to word order until positional information is added.
+
+## Where it sits in a transformer block
+
+Self-attention is one of two sublayers, and the surrounding structure matters as much as the mechanism.
+
+<p class="mono-font">x &rarr; LayerNorm &rarr; Self-attention &rarr; (+x) &rarr; LayerNorm &rarr; Feed-forward &rarr; (+x)</p>
+
+<strong>The residual connections</strong> give gradients a clean path back through dozens of layers. Without them, deep transformers do not train.
+
+<strong>LayerNorm</strong> keeps activations in a stable range, and placing it before each sublayer (pre-norm) rather than after is what makes very deep stacks trainable.
+
+<strong>The feed-forward network</strong> is where most of the parameters live &mdash; typically expanding to four times the model dimension and back. Attention moves information between positions; the feed-forward layer processes each position independently. Both are needed, and it is a common misconception that attention is doing all the work.
+
+Stack that block 12, 32 or 80 times and you have a transformer.
+
+## Complexity, and reading an attention map
+
+Every token attends to every token, so the score matrix is n&times;n for a sequence of length n. That quadratic cost is the defining constraint of the architecture, and the reason context windows were limited for years.
+
+Attention maps &mdash; the n&times;n weights, visualised as a heatmap &mdash; are the most common interpretability tool for transformers, and the most commonly over-read. Three cautions:
+
+- They show what was <em>connected</em>, not what was <em>used</em>. The value vectors and the subsequent layers determine the effect.
+- Later layers attend to representations that already mix many positions, so a weight against token 5 does not mean information from token 5 specifically.
+- Work on attention as explanation has shown weights can often be substantially altered without changing the prediction.
+
+Useful for intuition and for spotting gross problems; not evidence about reasoning.
+
+## Questions people ask
+
+<strong>What is the difference between attention and self-attention?</strong> Self-attention is the case where queries, keys and values come from the same sequence. Cross-attention draws them from two.
+
+<strong>Why does each token attend to itself?</strong> Because its own content is usually the most relevant thing available, and excluding it would force the representation to be built entirely from other positions.
+
+<strong>How many heads should I use?</strong> 8&ndash;16 for typical model sizes, with the head dimension usually 64. It is rarely the parameter worth tuning.
+
+<strong>Does self-attention replace the feed-forward layer?</strong> No &mdash; they do different jobs, and most of a transformer's parameters are in the feed-forward layers.
+
+<strong>Is self-attention permutation-invariant?</strong> Yes, which is precisely why positional encodings exist.
+
+<strong>Why is it quadratic?</strong> Every position is compared with every other, giving n&sup2; pairs.
+
+## Recap in one screen
+
+- Self-attention lets each token build a new representation from a content-weighted mix of all tokens.
+- That is what makes representations contextual: "bank" differs by sentence.
+- It is order-blind on its own; positional encodings supply the sequence.
+- Multiple heads give several relationship types at once, at roughly constant cost.
+- It lives inside a block with residual connections, LayerNorm and a feed-forward network &mdash; all four matter.

@@ -23,6 +23,41 @@ Subtracting <em>man</em> from <em>king</em> isolates a direction that roughly me
 
 Worth being precise: the result is not exactly <em>queen</em>, it is a point whose nearest neighbour is <em>queen</em>, and the effect is weaker on rare words. But it demonstrates the real claim &mdash; that these dimensions carry semantic structure learned entirely from co-occurrence, with no one ever labelling a “gender axis”.
 
+## Numbers that carry meaning
+
+A one-hot vector says only "this is word 4,712". Every word is equally distant from every other, so the representation contains no information about which words are related.
+
+An embedding replaces that with a dense vector of a few hundred numbers, learned from data, positioned so that <strong>similar words end up near each other</strong>.
+
+|Representation|"king"|Similar to "queen"?|
+|---|---|---|
+|One-hot|[0, 0, …, 1, …, 0] &mdash; 50,000 long|No &mdash; equidistant from everything|
+|Embedding|[0.21, &minus;0.44, 0.83, …] &mdash; 300 long|Yes &mdash; nearby in the space|
+
+The famous demonstration is vector arithmetic: `king − man + woman` lands close to `queen`. It works because the training objective forces words that appear in similar contexts into similar positions, and the difference between "king" and "man" ends up encoding something like royalty as a direction in the space.
+
+The demonstration is often overstated &mdash; it works cleanly for a small number of well-chosen analogies &mdash; but the underlying property is real and it is what makes embeddings useful.
+
+## Where they come from
+
+<strong>Word2Vec and GloVe</strong> learn one fixed vector per word from co-occurrence statistics. Cheap, useful, and limited: "bank" gets a single vector averaging the river and the financial senses.
+
+<strong>Contextual embeddings</strong> from BERT-style models give a different vector for each occurrence, computed from the surrounding words. "River bank" and "savings bank" now differ, which resolves the ambiguity that fixed embeddings cannot.
+
+<strong>Sentence embeddings</strong> (Sentence-BERT, E5, OpenAI's embedding models) represent whole passages as one vector, tuned so that similar <em>meanings</em> land near each other. These are what retrieval systems use.
+
+<strong>Learned task embeddings</strong> are the everyday case in applied deep learning: an embedding layer trained jointly with your model, replacing a high-cardinality categorical column with a compact dense vector.
+
+## Comparing them: cosine similarity
+
+The standard measure is the angle between two vectors, ignoring their lengths:
+
+<p class="mono-font">similarity = (a &middot; b) / (&#8214;a&#8214; &#8214;b&#8214;)</p>
+
+Length in an embedding often reflects word frequency or confidence rather than meaning, so ignoring it is the point. On vectors normalised to length 1, cosine similarity and the dot product are the same number &mdash; which is why libraries normalise on the way in and then use fast dot products.
+
+Calibrate the threshold rather than assuming. Many sentence-embedding models score unrelated text at 0.2&ndash;0.4, so a threshold of 0.5 admits a great deal of noise. Score a few hundred pairs you know to be related and a few hundred you know are not, and put the threshold where the two distributions separate.
+
 ## Try it yourself
 
 1. <strong>Run the analogy.</strong> Press <strong>Run the Famous Analogy</strong> and follow the vector arithmetic. The result is a point in space, and the answer is whichever word happens to lie nearest to it.
@@ -45,3 +80,53 @@ BERT and every modern language model produce <strong>contextual</strong> embeddi
 ## The short version
 
 An embedding replaces a sparse, meaningless one-hot vector with a short dense one whose position encodes meaning, so similar words end up nearby and knowledge transfers between them. Relationships appear as consistent directions, which is what makes vector analogies work. Static embeddings give each word one vector and cannot handle ambiguity; contextual embeddings compute the vector from the surrounding sentence, and that is what modern models use.
+
+## What they are used for
+
+- <strong>Semantic search and RAG.</strong> Embed the question and every stored passage; retrieve the passages with the highest cosine similarity. Every vector database is a machine for doing this quickly.
+- <strong>Recommendations.</strong> Embed users and items in the same space and recommend the nearest items.
+- <strong>Classification with little data.</strong> Embed the text and train a simple classifier on the vectors. Often beats fine-tuning when you have a few hundred labels.
+- <strong>Clustering and topic discovery.</strong> Embed, then run k-means or HDBSCAN in the embedding space.
+- <strong>Deduplication.</strong> Support tickets or product listings above about 0.9 similarity are usually the same thing said twice.
+- <strong>High-cardinality categorical features.</strong> An embedding layer instead of 10,000 one-hot columns.
+
+```python
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer("all-MiniLM-L6-v2")
+vecs = model.encode(["a cat on a mat", "a feline on a rug"],
+                    normalize_embeddings=True)
+float(vecs[0] @ vecs[1])       # ~0.7 - close in meaning, no words shared
+```
+
+## What they get wrong
+
+<strong>They inherit the training data's biases.</strong> Word2Vec's `doctor − man + woman` famously lands near `nurse`. The vectors encode statistical regularities of the corpus, including its prejudices, and using them in hiring or lending pipelines propagates that.
+
+<strong>Similarity is not truth.</strong> "The drug is effective" and "The drug is not effective" are close in most embedding spaces, because they share nearly every word. Negation, numbers and named entities are all weak spots. Retrieval systems built on embeddings alone will confidently return the opposite of what was asked, which is why hybrid retrieval &mdash; embeddings plus keyword search &mdash; is standard in production.
+
+<strong>Domain mismatch.</strong> A model trained on web text has thin coverage of medical or legal vocabulary. Fine-tuning on domain text, or choosing a domain-specific model, matters more than the general benchmark ranking.
+
+<strong>They are model-specific.</strong> Vectors from two different models are not comparable, so changing model means re-embedding your whole corpus.
+
+## Questions people ask
+
+<strong>What dimension should I use?</strong> 384 to 1,536 for text. Larger costs more memory and search time for diminishing gains; for categorical features, a rough starting point is the fourth root of the cardinality.
+
+<strong>Word or sentence embeddings?</strong> Sentence embeddings for search, similarity and classification. Word embeddings for token-level tasks or as a cheap baseline.
+
+<strong>Do I need a vector database?</strong> Below about 100,000 vectors, a NumPy matrix and a dot product is fine. Above that, an approximate index (FAISS, HNSW) pays for itself.
+
+<strong>Can I fine-tune embeddings?</strong> Yes &mdash; contrastive training on your own pairs of related and unrelated text, which typically beats a general-purpose model on a specific domain.
+
+<strong>Why do all my similarities look high?</strong> Some models pack everything into a narrow cone of the space. Relative ranking still works; absolute thresholds need calibrating.
+
+<strong>Are embeddings interpretable?</strong> Individual dimensions, no. Directions in the space often are &mdash; and probing classifiers can find them.
+
+## Recap in one screen
+
+- An embedding is a dense learned vector positioned so that similar items sit near each other.
+- Fixed embeddings give one vector per word; contextual ones give a different vector per occurrence.
+- Compare with cosine similarity, and calibrate the threshold against known pairs.
+- They power search, RAG, recommendations, clustering and high-cardinality features.
+- They inherit corpus bias, handle negation and numbers poorly, and are not comparable across models.

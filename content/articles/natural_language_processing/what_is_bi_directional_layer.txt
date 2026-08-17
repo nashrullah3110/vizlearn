@@ -17,6 +17,65 @@ Two consequences follow immediately. The output at each position is <strong>twic
 
 Note the passes are independent: the backward cell does not see the forward cell’s states. They are computed separately and only joined at the end, which also means they can run in parallel.
 
+## Reading the sequence twice
+
+A forward LSTM at word 5 knows words 1 to 5. A bidirectional layer runs a second, independent LSTM backwards &mdash; from the end to the beginning &mdash; and concatenates the two hidden states at each position.
+
+<p class="mono-font">h&#7511; = [h&#7511;<sup>&rarr;</sup> ; h&#7511;<sup>&larr;</sup>]</p>
+
+So the representation at word 5 now contains what came before it <em>and</em> what came after. The output width doubles: 256 hidden units in each direction gives 512-dimensional outputs.
+
+Why it helps is easiest to see with an ambiguous word:
+
+"The <strong>bank</strong> was steep and muddy."
+
+At "bank", a forward-only model has seen "the" and nothing else &mdash; it cannot yet know which sense is meant. The backward pass has seen "steep and muddy" and resolves it immediately. Neither direction alone is sufficient; together they are.
+
+The same argument applies to named entities ("Washington" as a person or a place depends on what follows), part-of-speech tagging, and coreference.
+
+## The hard constraint
+
+Bidirectional layers require the <strong>entire sequence to be available before processing starts</strong>. That rules them out for two important cases:
+
+<strong>Generation.</strong> Predicting the next word cannot use the next word. A bidirectional language model would have access to the answer, which makes training trivial and inference impossible.
+
+<strong>Streaming.</strong> Live transcription, real-time translation and any incremental system cannot wait for the end of the input.
+
+So the rule is clear: <strong>bidirectional for understanding a complete input, unidirectional for generating or streaming</strong>.
+
+|Task|Bidirectional?|
+|---|---|
+|Sentiment classification|Yes|
+|Named entity recognition|Yes|
+|Part-of-speech tagging|Yes|
+|Text generation|No|
+|Live transcription|No|
+|Machine translation encoder|Yes|
+|Machine translation decoder|No|
+
+That last pair is worth noting: an encoder-decoder model is frequently bidirectional in the encoder and causal in the decoder, because the source sentence is complete and the target is being produced.
+
+## Using one
+
+```python
+lstm = nn.LSTM(300, 256, batch_first=True, bidirectional=True)
+out, (h, c) = lstm(x)
+
+out.shape          # (batch, seq, 512)  -- 256 forward + 256 backward
+h.shape            # (2, batch, 256)    -- one final state per direction
+```
+
+Two details cause most of the confusion.
+
+<strong>The output is twice as wide.</strong> Any layer after it must expect `2 × hidden_size`. Forgetting this is the most common bidirectional bug, and it produces an immediate shape error.
+
+<strong>The final states are not simply the last row of `out`.</strong> The forward direction's final state corresponds to the <em>last</em> token; the backward direction's corresponds to the <em>first</em>. For classification, concatenate the two final states, or pool over `out` &mdash; do not take `out[:, -1, :]`, which mixes the forward state at the end with the backward state at the end (which has seen only the last token).
+
+```python
+h_fwd, h_bwd = h[0], h[1]
+summary = torch.cat([h_fwd, h_bwd], dim=-1)     # correct for classification
+```
+
 ## Guided experiments
 
 1. <strong>Watch both passes.</strong> Press <strong>Simulate Dual Passes</strong> and follow the two chains. One advances left to right, the other right to left, and they meet only where the outputs concatenate.
@@ -44,3 +103,53 @@ Where the full sequence <em>is</em> available &mdash; classification, tagging, n
 ## The short version
 
 A bidirectional layer runs independent forward and backward recurrent passes and concatenates them, so every position is represented with context from both sides &mdash; at twice the parameters and twice the output width. It is the right default for classification and tagging, where the whole sequence is available, and impossible for generation or streaming, where the backward pass would be reading the future it is meant to predict.
+
+## The cost
+
+<strong>Twice the computation and twice the parameters.</strong> Two independent LSTMs, each with its own four weight matrices. For 300-dimensional input and 256 hidden units, about 1.15 million parameters instead of 574,000.
+
+<strong>Twice the memory during training,</strong> since both passes' activations must be stored.
+
+<strong>No latency benefit from parallelism.</strong> The two directions are independent of each other and can run concurrently, but each is still strictly sequential internally.
+
+<strong>Full input required,</strong> which is the real cost rather than the arithmetic.
+
+Whether the accuracy gain justifies it depends on the task. For tagging and span extraction, where the right context is genuinely necessary, the gain is usually substantial. For document-level topic classification, where the signal is distributed and redundant, it is often marginal.
+
+## The transformer equivalent
+
+Bidirectionality in transformers is not a separate layer &mdash; it is the default, and unidirectionality is what has to be added.
+
+An encoder's self-attention lets every position attend to every other, in both directions, with no extra machinery. That is exactly what BERT is: a bidirectional encoder, and its masked-language-model training objective exists precisely because bidirectional attention makes next-token prediction trivial.
+
+A decoder adds a <strong>causal mask</strong> that sets attention scores for future positions to negative infinity, so their weights become zero. Generation becomes possible because the model genuinely cannot see ahead.
+
+|&nbsp;|Recurrent|Transformer|
+|---|---|---|
+|Bidirectional|Two passes, concatenated|Default &mdash; unmasked attention|
+|Unidirectional|One forward pass|Causal mask applied|
+|Cost of bidirectionality|2&times; parameters and compute|None|
+
+So "bidirectional layer" is largely a recurrent-era concept. The idea survives; the implementation is a mask rather than a second network.
+
+## Questions people ask
+
+<strong>Can I use a bidirectional layer for language modelling?</strong> No &mdash; it would see the token it is meant to predict.
+
+<strong>Does the backward LSTM share weights with the forward one?</strong> No, they are entirely separate parameter sets.
+
+<strong>Should I concatenate or sum the two directions?</strong> Concatenate, which is the standard and keeps both intact. Summing halves the width and loses information.
+
+<strong>Is BERT a bidirectional LSTM?</strong> No &mdash; it is a bidirectional transformer encoder. The word "bidirectional" in its name refers to unmasked attention.
+
+<strong>Does bidirectionality help every task?</strong> No. It helps most where right context disambiguates &mdash; tagging, entity recognition, span extraction &mdash; and least on tasks with redundant global signal.
+
+<strong>Can I stack bidirectional layers?</strong> Yes, and each layer's doubled output feeds the next. Two is usually the practical limit.
+
+## Recap in one screen
+
+- A bidirectional layer runs a second recurrent pass backwards and concatenates the states.
+- Each position then has both left and right context, which resolves ambiguity that neither direction can alone.
+- It requires the complete input, so it is unusable for generation and streaming.
+- Output width doubles, and the two final states correspond to opposite ends of the sequence.
+- In transformers, bidirectionality is the default and a causal mask is what creates the unidirectional case.

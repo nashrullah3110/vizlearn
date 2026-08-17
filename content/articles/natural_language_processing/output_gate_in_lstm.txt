@@ -32,6 +32,50 @@ There is a side effect worth seeing in the lab: once $|C_t|$ is large, $\tanh$ f
 
 $H_t$ is not just the cell's answer &mdash; it is also half of the input to the <em>next</em> time step, where it will help compute all four layers again. So the Output Gate does double duty: it decides what the outside world sees, and it decides what the cell tells its own future self. A closed output gate leaves the next step reasoning almost entirely from the incoming token.
 
+## Deciding what to expose
+
+The cell state holds everything the LSTM is carrying. The output gate decides how much of it to reveal as this step's output.
+
+<p class="mono-font">o&#7511; = &sigma;(W&#8338; &middot; [h&#7511;&#8331;&#8321;, x&#7511;] + b&#8338;)</p>
+<p class="mono-font">h&#7511; = o&#7511; &#8857; tanh(c&#7511;)</p>
+
+Two things happen on that second line. The cell state is squashed through tanh into the range &minus;1 to 1, and then multiplied elementwise by the gate.
+
+The squashing matters: the cell state is unbounded and can grow large through accumulation, so exposing it raw would produce enormous hidden states that destabilise the next layer. The tanh bounds it.
+
+The gate then filters. The cell may be tracking six things and only two of them are relevant to the current output, so the gate opens for those dimensions and closes for the rest.
+
+## Why memory and output are separated
+
+This is the design decision worth understanding, and it is what distinguishes an LSTM from a GRU.
+
+The cell state is <strong>long-term storage</strong>. It should keep information for as long as it is needed, whether or not it is relevant at this exact step.
+
+The hidden state is the <strong>working output</strong>. It feeds the next layer, the prediction head, and the gate computations of the following step.
+
+Those are different requirements. Reading "The keys to the cabinet ___", a language model must remember that the subject is plural (keys, not cabinet) in order to choose "are". While reading the intervening words, that information should stay in memory and should not dominate the output &mdash; the output at "cabinet" is about cabinets.
+
+Separating them lets the cell hold information quietly and surface it when needed. A GRU, which has only a hidden state, cannot make that distinction: whatever it remembers is also what it outputs.
+
+|&nbsp;|Cell state `c`|Hidden state `h`|
+|---|---|---|
+|Role|Long-term memory|Working output|
+|Range|Unbounded|&minus;1 to 1, gated|
+|Updated by|Forget and input gates, additively|Output gate, from `c`|
+|Passed to|The next time step only|The next layer, the head, and the next step's gates|
+
+## What the gate feeds
+
+`hₜ` goes to three places, which is why the output gate matters more than "just the output" suggests:
+
+1. <strong>The prediction head</strong>, if this is the final layer &mdash; so it determines the model's answer.
+2. <strong>The next layer</strong>, in a stacked LSTM.
+3. <strong>All four gate computations at step t+1</strong>, since they take `[hₜ, xₜ₊₁]` as input.
+
+That third path is the subtle one. The output gate does not only control what leaves the cell &mdash; it controls what the cell's own future gate decisions are based on. Close it entirely and the next step's forget, input and output gates see nothing but the new input, effectively cutting the recurrence.
+
+That is a real mechanism rather than a curiosity: a trained cell can use it to isolate a segment of the sequence from what came before.
+
 ## Things to try
 
 1. <strong>Run the simulation.</strong> The highlighted route runs from the glowing $o_t$ box to the final $\times$, where it meets the cell state coming down through the $\tanh$ block &mdash; and only then splits out as $H_t$, both upward and to the right.
@@ -42,3 +86,62 @@ $H_t$ is not just the cell's answer &mdash; it is also half of the input to the 
 ## The short of it
 
 The Output Gate separates <em>having</em> information from <em>using</em> it. Together with the Forget Gate (what to erase), the Input Gate (what to write), and the Candidate (what the content is), it completes the four-layer machine that makes an LSTM cell work &mdash; and explains why it costs four times a simple RNN's parameters.
+
+## The gradient path through the output
+
+The output gate sits on the path from the loss back into the cell state, and the tanh in that path is where gradient trouble can appear.
+
+Differentiating `hₜ = oₜ ⊙ tanh(cₜ)` with respect to `cₜ` gives `oₜ ⊙ (1 − tanh²(cₜ))`. Two ways that becomes small:
+
+<strong>The gate is closed.</strong> If `oₜ` is near 0, little gradient flows back into the cell state from this step's loss.
+
+<strong>The cell state is large.</strong> If `|cₜ|` is big, `tanh(cₜ)` saturates and `1 − tanh²` approaches 0.
+
+The second is the one to watch. A cell whose state has accumulated to values in the tens or hundreds &mdash; forget gate near 1 and input gate near 1 for many steps &mdash; has a saturated output path and receives almost no gradient through it.
+
+Note this does <em>not</em> affect the main long-range path. The cell-to-cell gradient `∂cₜ/∂cₜ₋₁ = fₜ` bypasses the tanh entirely, which is precisely why the LSTM's memory survives distance. The output path is a separate, shorter route.
+
+The practical remedies are the usual ones: layer normalisation inside the cell, gradient clipping, and keeping inputs scaled so the state does not run away.
+
+## Inspecting it
+
+```python
+# manual cell exposing all gates
+gates = self.W(torch.cat([h, x], dim=-1))
+f, i, g, o = gates.chunk(4, dim=-1)
+f, i, o = f.sigmoid(), i.sigmoid(), o.sigmoid()
+c = f * c + i * g.tanh()
+h = o * c.tanh()
+```
+
+What healthy output gates look like: a mean somewhere in the middle of the range, real variation across dimensions, and variation across time steps.
+
+Two failure signatures:
+
+<strong>Always open (near 1).</strong> The hidden state is just `tanh(c)`, so the gate is doing nothing and the model has lost the memory/output distinction &mdash; effectively a GRU with extra parameters.
+
+<strong>Always closed (near 0).</strong> The hidden state is near zero, the recurrence is broken, and the model is operating on the current input alone. Usually a learning rate or initialisation problem.
+
+Also worth checking the cell state's magnitude directly. If `|c|` routinely exceeds about 5, the tanh is saturated and the output path is barely differentiable.
+
+## Questions people ask
+
+<strong>Why squash the cell state with tanh before gating?</strong> The cell state is unbounded, and passing large values to the next layer destabilises it. Tanh bounds the output to &minus;1 to 1.
+
+<strong>Why is the hidden state, not the cell state, passed to the next layer?</strong> Because the cell state is private long-term memory; the hidden state is the filtered, bounded view intended for consumption.
+
+<strong>Does the output gate affect long-range memory?</strong> Not the main path &mdash; `∂cₜ/∂cₜ₋₁` is the forget gate and bypasses the output entirely. It affects how much gradient reaches the cell from this step's loss.
+
+<strong>What if the output gate is always 1?</strong> The gate stops doing anything, and the model loses the separation between what it remembers and what it reports.
+
+<strong>Do GRUs have an output gate?</strong> No &mdash; that is the other simplification, alongside merging forget and input. Their hidden state is exposed directly.
+
+<strong>Should its bias be initialised specially?</strong> Zero is standard. Only the forget gate benefits from a bias of 1.
+
+## Recap in one screen
+
+- The output gate filters `tanh(cₜ)` to produce the hidden state, one coefficient per dimension.
+- The tanh bounds an otherwise unbounded cell state before it leaves the cell.
+- Separating memory from output lets a cell hold information without reporting it &mdash; a GRU cannot.
+- The hidden state feeds the next layer, the prediction head, and the next step's gate computations.
+- Watch for a saturated cell state, which flattens the tanh and starves the output path of gradient.

@@ -16,6 +16,67 @@ The standard ASCII table contains 128 unique codes, numbered from 0 to 127. Each
 
 When you type "Hello", the computer sees the sequence of numbers: 72, 101, 108, 108, 111.
 
+## Characters as numbers
+
+Computers store numbers. ASCII was the agreement, from 1963, about which number means which character &mdash; 128 codes covering the English alphabet, digits, punctuation and control characters.
+
+|Character|Decimal|Hex|
+|---|---|---|
+|`NUL`|0|00|
+|`\n` (newline)|10|0A|
+|space|32|20|
+|`0`|48|30|
+|`A`|65|41|
+|`Z`|90|5A|
+|`a`|97|61|
+|`z`|122|7A|
+
+Three of those ranges are worth memorising because they make arithmetic tricks possible.
+
+Digits start at 48, so `ord('7') - ord('0')` gives 7 &mdash; converting a character to its numeric value without a lookup table.
+
+Uppercase starts at 65 and lowercase at 97, exactly 32 apart. So `chr(ord('A') + 32)` is 'a', and since 32 is a single bit (2⁵), case conversion is a bit flip &mdash; which is why it was historically so cheap.
+
+Letters are contiguous, so `'a' <= c <= 'z'` tests for a lowercase letter, and sorting strings by code point sorts alphabetically within a case.
+
+```python
+ord('A')            # 65
+chr(97)             # 'a'
+ord('a') - ord('A') # 32
+'A' < 'a'           # True - uppercase sorts first
+```
+
+That last line is a real source of surprise: sorting a list of names puts every capitalised entry before every lowercase one, because 'Z' (90) is less than 'a' (97).
+
+## Why 128 was not enough
+
+ASCII covers English. It has no é, no ñ, no ö, no Cyrillic, no Greek, no Arabic, no Chinese, no emoji.
+
+The first response was a proliferation of 8-bit extensions &mdash; Latin-1 for Western European, Windows-1252, KOI8-R for Russian, and dozens more &mdash; each redefining codes 128&ndash;255 differently. A file was only readable if you knew which encoding it used, and the classic symptom of guessing wrong is text like "Ã©" where "é" should be.
+
+<strong>Unicode</strong> is the modern answer: one code point per character, covering every script, currently over 149,000 assigned. `é` is U+00E9, `中` is U+4E2D, and 🎉 is U+1F389.
+
+Unicode assigns numbers; it does not say how to store them. That is what an <em>encoding</em> does, and <strong>UTF-8</strong> is the one that won:
+
+|Character|Code point|UTF-8 bytes|
+|---|---|---|
+|`A`|U+0041|1 byte: 41|
+|`é`|U+00E9|2 bytes: C3 A9|
+|`中`|U+4E2D|3 bytes: E4 B8 AD|
+|🎉|U+1F389|4 bytes: F0 9F 8E 89|
+
+UTF-8's decisive property is that the first 128 code points encode as single bytes identical to ASCII. Every ASCII file is already valid UTF-8, which is why adoption was possible at all.
+
+## Where this matters in NLP
+
+<strong>Characters are not bytes.</strong> `len("café")` is 4 characters and 5 UTF-8 bytes. Truncating a string at a byte boundary can split a character in half and produce invalid data &mdash; a real bug when enforcing length limits on user input.
+
+<strong>The same text can have two encodings.</strong> "é" may be one code point (U+00E9) or two (e + combining accent U+0301). They look identical and compare as different strings, which is the most common cause of "these records should match and do not". `unicodedata.normalize("NFKC", text)` resolves it, and should be the first step of any text pipeline.
+
+<strong>Tokenisers work on bytes or characters.</strong> Byte-level BPE, used by GPT models, operates on UTF-8 bytes, so it can represent any text at all &mdash; at the cost of more tokens for non-Latin scripts, since each character consumes several bytes.
+
+<strong>Encoding errors are silent or fatal.</strong> Reading a UTF-8 file as Latin-1 succeeds and produces mojibake; reading a Latin-1 file as UTF-8 raises `UnicodeDecodeError`. Always specify the encoding explicitly.
+
 ## Try it yourself
 
 Use the "ASCII Code Explorer" above to see this process in action:
@@ -37,3 +98,57 @@ ASCII is a foundational concept in Natural Language Processing (NLP). While mode
 ## In one line
 
 ASCII is the essential bridge between human language and computer processing. It standardizes the representation of text as numbers, a fundamental step for all digital communication and computation. By interacting with the explorer, you can build a solid intuition for this cornerstone of computer science and NLP.
+
+## Practical handling
+
+```python
+# always specify the encoding
+with open("data.txt", encoding="utf-8") as f:
+    text = f.read()
+
+# be explicit about failures
+text = raw_bytes.decode("utf-8", errors="replace")   # bad bytes become U+FFFD
+text = raw_bytes.decode("utf-8", errors="ignore")    # bad bytes dropped
+
+# normalise before comparing
+import unicodedata
+a = unicodedata.normalize("NFKC", a)
+b = unicodedata.normalize("NFKC", b)
+a == b
+```
+
+Python 3 keeps this straight by separating the two types: `str` is a sequence of Unicode code points, `bytes` is a sequence of 8-bit values. You cannot concatenate them, which prevents a whole class of bug that Python 2 permitted.
+
+The four normalisation forms: <strong>NFC</strong> composes characters where possible, <strong>NFD</strong> decomposes them, and <strong>NFKC</strong>/<strong>NFKD</strong> additionally fold compatibility variants (full-width characters, ligatures, superscripts). NFKC is the usual choice for text processing, because it collapses the largest number of visually-equivalent forms.
+
+## Other things worth knowing
+
+<strong>Control characters</strong> occupy codes 0&ndash;31 and 127. Most are historical &mdash; bell, form feed, device control &mdash; and their presence in scraped text usually indicates a problem. Strip them.
+
+<strong>Line endings differ.</strong> Unix uses `\n` (10), Windows uses `\r\n` (13, 10). Reading in text mode normalises them; reading in binary mode does not, and stray `\r` characters at line ends are a common annoyance.
+
+<strong>Zero-width and invisible characters</strong> exist and cause trouble: zero-width space (U+200B), zero-width joiner, byte-order mark (U+FEFF). A BOM at the start of a file appears as an invisible character in the first field, which breaks header parsing in CSV files &mdash; `encoding="utf-8-sig"` strips it.
+
+<strong>Emoji are often several code points.</strong> A single visible emoji may combine a base character, a skin-tone modifier and a zero-width joiner, so `len()` on an emoji string rarely matches what the user sees.
+
+## Questions people ask
+
+<strong>Is ASCII still relevant?</strong> As a subset of UTF-8, yes &mdash; and never as a complete encoding for real-world text.
+
+<strong>Why is `'A' < 'a'`?</strong> Because 65 &lt; 97. Sorting by code point puts all uppercase before all lowercase.
+
+<strong>What is mojibake?</strong> Text decoded with the wrong encoding &mdash; "café" appearing as "cafÃ©". The fix is to identify the true encoding, not to patch the symptoms.
+
+<strong>Should I always use UTF-8?</strong> Yes, for output. For input, detect or be told; `chardet` guesses when nothing else is available.
+
+<strong>Why does my string length look wrong?</strong> Characters, bytes and user-perceived characters are three different counts. Emoji and combining accents make them diverge.
+
+<strong>What is a byte-order mark?</strong> An invisible marker at the start of a file indicating the encoding. Harmless in principle, and it corrupts the first field of a CSV; use `utf-8-sig` to strip it.
+
+## Recap in one screen
+
+- ASCII maps 128 characters to numbers; digits at 48, uppercase at 65, lowercase at 97.
+- The 32-place gap between cases makes case conversion a single bit flip.
+- Unicode assigns code points for every script; UTF-8 stores them, with ASCII as a compatible subset.
+- Characters, code points and bytes are three different counts &mdash; truncate on the right one.
+- Normalise with NFKC before comparing anything, and always state the encoding when reading files.

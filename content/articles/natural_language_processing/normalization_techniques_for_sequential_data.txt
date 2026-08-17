@@ -9,6 +9,58 @@ intro: Batch normalisation works beautifully on images and badly on sequences. L
 
 <strong>Variable length.</strong> Sequences in a batch have different lengths, so timestep 50 might have 32 real values in one batch and 3 in another, with the rest padding. Statistics computed over that are unstable, and computed over padding they are simply wrong.<strong>Per-timestep statistics.</strong> A recurrent network applies the same cell at every step, but batch norm would need separate running statistics for each timestep &mdash; and at inference on a sequence longer than anything seen in training, there are no statistics for those positions at all.<strong>Batch dependence.</strong> A sample’s normalised representation depends on the other samples it happens to be batched with. For generation, where inference often runs one sequence at a time, the batch statistics are meaningless.<p>Layer norm sidesteps all three. It uses only the sample’s own features, so it is independent of batch size, identical at training and inference, and unaffected by how many other sequences are present or how long they are.</p>
 
+## Two different meanings of "normalisation"
+
+The word covers two unrelated operations in sequence work, and conflating them causes confusion.
+
+<strong>Data normalisation</strong> scales the input values &mdash; putting a temperature series and a price series on comparable footing before the model sees them.
+
+<strong>Layer normalisation</strong> is an architectural component that standardises activations <em>inside</em> the network at every step.
+
+Both matter for sequences, and for different reasons. This covers both.
+
+## Scaling sequence inputs
+
+The requirement is the same as for tabular data: a feature ranging over thousands will dominate the first layer's weighted sum, and gradients for the other features become negligible.
+
+The rule that is specific to sequences is <strong>fit the scaler on the training period only</strong>:
+
+```python
+from sklearn.preprocessing import StandardScaler
+
+split = int(len(series) * 0.7)
+scaler = StandardScaler().fit(series[:split].reshape(-1, 1))   # past only
+scaled = scaler.transform(series.reshape(-1, 1))
+```
+
+Computing the mean and standard deviation over the whole series uses future values to scale past ones, which is a leak. It inflates results and cannot be reproduced in production, where the future is unavailable by definition.
+
+|Method|Suits|
+|---|---|
+|Standardisation|The default for most sequences|
+|Min-max|Bounded signals such as audio or normalised sensors|
+|Robust (median / IQR)|Series with spikes and outliers|
+|Log transform|Multiplicative series &mdash; prices, counts, traffic|
+|Differencing|Series with a trend, especially for tree models|
+
+Differencing deserves a note: tree-based models cannot extrapolate beyond their training range, so on a trending series they will never predict a new high. Modelling the <em>change</em> rather than the level fixes it, and this is one of the most valuable transformations in applied forecasting.
+
+## Non-stationarity, the sequence-specific problem
+
+A series whose statistics change over time is <strong>non-stationary</strong>, and a single scaler fitted once is wrong for the later part of it.
+
+A stock price in 2015 and in 2025 differ in level and volatility; a website's traffic in its first month and its fifth year are different distributions. Scaling both with one mean and standard deviation puts the recent data far from zero.
+
+Three responses:
+
+<strong>Difference the series</strong> so the model works on changes, which are usually far more stationary than levels.
+
+<strong>Use rolling normalisation</strong> &mdash; scale each window by its own statistics, so each example is locally normalised. This is standard in financial modelling, and it discards absolute level, which is sometimes exactly what you want and sometimes the signal.
+
+<strong>Refit periodically,</strong> as part of a retraining schedule, and monitor for drift.
+
+Note that a log transform handles a specific and common case: when a series grows multiplicatively, differencing the logarithm gives percentage changes, which are usually stationary where absolute changes are not.
+
 ## Interactive Exploration Guide
 
 1. <strong>Look at the unnormalised distribution.</strong> With the outlier toggle off, note the spread of the raw values &mdash; features on different scales pull the layer’s activations around.
@@ -35,3 +87,58 @@ The placement matters too. Original transformers put layer norm after the residu
 ## The short version
 
 All normalisation layers subtract a mean and divide by a deviation; they differ only in which values are pooled. Batch norm pools across the batch, which makes it unusable for sequences of varying length and inference on single examples. Layer norm pools across each sample’s own features, so it is independent of batch size and identical at training and inference &mdash; which is why every transformer uses it.
+
+## Layer normalisation inside the network
+
+For recurrent and transformer models, the internal normalisation choice is not the same as for convolutional networks, and the reason is structural.
+
+<strong>Batch normalisation does not suit sequences.</strong> It computes statistics across the batch for each feature, which means mixing position 3 of one sentence with position 3 of another &mdash; and with padding, mixing real tokens with filler. It also needs a reasonable batch size, and it behaves differently at inference, which matters when serving one request at a time.
+
+<strong>Layer normalisation</strong> standardises each example across its own features:
+
+<p class="mono-font">x&#770; = (x &minus; &mu;<sub>example</sub>) / &radic;(&sigma;&sup2;<sub>example</sub> + &epsilon;)&nbsp;&nbsp;&nbsp;out = &gamma;x&#770; + &beta;</p>
+
+It is completely independent of the batch, works at batch size 1, handles variable lengths, and behaves identically in training and inference. That is why every transformer uses it.
+
+|Normalisation|Statistics over|Sequence-safe?|
+|---|---|---|
+|BatchNorm|The batch, per feature|No|
+|LayerNorm|Features of one example|Yes|
+|RMSNorm|Scale only, one example|Yes|
+|GroupNorm|Channel groups, one example|For vision|
+
+<strong>RMSNorm</strong> is the simplification now common in large language models: divide by the root mean square and skip the mean subtraction. One fewer statistic, measurably faster at scale, no quality cost in practice.
+
+## Placement matters
+
+In transformers, where the normalisation sits relative to the residual connection is a real architectural decision.
+
+<strong>Post-norm</strong> &mdash; `LayerNorm(x + sublayer(x))` &mdash; was the original arrangement. It works, and beyond roughly 12 layers it requires careful warm-up to train at all.
+
+<strong>Pre-norm</strong> &mdash; `x + sublayer(LayerNorm(x))` &mdash; puts the normalisation inside the residual branch, leaving the identity path completely clean. Gradients flow back through it unchanged, and very deep stacks become trainable.
+
+Every large model uses pre-norm. It is one of the small details that made scaling to 80 or more layers practical.
+
+For recurrent cells, layer normalisation applied to the gate pre-activations stabilises training and helps with the exploding cell states that otherwise saturate the output tanh.
+
+## Questions people ask
+
+<strong>Why not batch normalisation for sequences?</strong> It mixes statistics across positions and padding, needs a decent batch size, and differs between training and inference.
+
+<strong>Do I still need to scale the inputs if I use LayerNorm?</strong> Yes. The first layer receives the raw input, and normalisation only affects activations after it.
+
+<strong>Should I difference my series?</strong> If it trends, and especially if the model is tree-based, yes. Check stationarity rather than assuming.
+
+<strong>What is rolling normalisation?</strong> Scaling each window by its own statistics, so every example is locally normalised. Standard in finance, and it discards absolute level.
+
+<strong>Can I scale on the whole series if I am careful?</strong> No &mdash; that is the leak. Training-period statistics only.
+
+<strong>Pre-norm or post-norm?</strong> Pre-norm for anything deep. It is what all current large models use.
+
+## Recap in one screen
+
+- Two meanings: scaling the input data, and normalising activations inside the network.
+- Fit input scalers on the training period only &mdash; using the whole series leaks the future.
+- Non-stationary series need differencing, log transforms, rolling normalisation or periodic refitting.
+- Batch normalisation is wrong for sequences; LayerNorm and RMSNorm are batch-independent and correct.
+- Place normalisation before each sublayer (pre-norm) so the residual path stays clean.

@@ -9,13 +9,19 @@ The query&ndash;key&ndash;value framing answers that, and it is worth learning p
 
 ## A soft dictionary lookup
 
-Think of a Python dictionary. You supply a key, it matches one stored key exactly, and you get back its value. Attention is the same operation with the hard edges removed:
+Attention is easiest to read as a lookup that returns a blend rather than one entry.
 
-- the <strong>query</strong> is what you are looking up;
-- every entry has a <strong>key</strong>, which decides how well it matches;
-- every entry has a <strong>value</strong>, which is what you get back.
+In an ordinary dictionary you present a key and get back exactly one value. In attention you present a <strong>query</strong>, compare it against <em>every</em> key, and get back a weighted mixture of all the values &mdash; weighted by how well each key matched.
 
-The difference is that instead of one key matching and the rest failing, <em>every</em> key matches to some degree, and you get back a weighted blend of all the values. A dictionary lookup is attention with one weight set to 1 and the rest to 0.
+- <strong>Query</strong> &mdash; what this position is looking for.
+- <strong>Key</strong> &mdash; the label each position advertises.
+- <strong>Value</strong> &mdash; what each position actually contributes when selected.
+
+All three are linear projections of the same input, with separate learned matrices:
+
+<p class="mono-font">Q = XW<sub>Q</sub>&nbsp;&nbsp;&nbsp;K = XW<sub>K</sub>&nbsp;&nbsp;&nbsp;V = XW<sub>V</sub></p>
+
+That is where every parameter in the mechanism lives. Attention itself has no weights &mdash; it is a fixed formula applied to these three projections.
 
 ## Where they come from
 
@@ -34,6 +40,33 @@ Attention(Q, K, V) = softmax( QK<sup>T</sup> / &radic;d<sub>k</sub> ) V
 It is reasonable to ask why we need both &mdash; why not match against the values directly and save a matrix?
 
 Because how easily something is <em>found</em> is a different question from what it <em>contains</em>. A word might be highly relevant to a query while the information it should pass on is quite unrelated to why it matched. Splitting the two lets the model learn addressing and content independently, and in practice that separation is what allows different heads to specialise.
+
+## Why three separate projections
+
+The obvious question: if all three come from the same input, why not use the input directly for all of them?
+
+Because the three roles want different information. What a token is <em>looking for</em> is not the same as how it wants to <em>be found</em>, and neither is the same as what it should <em>contribute</em>.
+
+Take "it" in "The cat sat on the mat because it was warm". As a query, "it" needs to search for a nearby noun that could be warm. As a key, "mat" needs to advertise itself as a warmable surface. As a value, "mat" contributes its full semantic content. Separate matrices let the model learn those three functions independently.
+
+The clearest demonstration is that Q and K are used only to compute compatibility, and V only to produce output. A token can be highly attended to for one reason and contribute something quite different &mdash; which a single shared projection could not express.
+
+## The computation, step by step
+
+<p class="mono-font">Attention(Q, K, V) = softmax(QK&#7488; / &radic;d<sub>k</sub>) V</p>
+
+For a sequence of 4 tokens with head dimension 64:
+
+|Step|Operation|Shape|
+|---|---|---|
+|1|`QKᵀ` &mdash; every query against every key|4&times;4|
+|2|Divide by `√64` = 8|4&times;4|
+|3|Softmax over each row|4&times;4, rows sum to 1|
+|4|Multiply by V|4&times;64|
+
+Row i of the 4&times;4 matrix holds token i's attention weights over all four tokens. Multiplying by V replaces token i's representation with the weighted mixture.
+
+The `√dₖ` division is not cosmetic. Dot products of d-dimensional vectors grow with d, so without scaling the scores reach the tens or hundreds, the softmax becomes nearly one-hot, and the gradient through it approaches zero. Dividing by `√dₖ` keeps the variance of the scores near 1 regardless of dimension.
 
 ## Things to try
 
@@ -67,3 +100,58 @@ Cross-attention is the classic encoder&ndash;decoder attention of the previous m
 ## Summing up
 
 Attention is a soft dictionary lookup: the query says what a position is looking for, each key says how well that position matches, and each value says what it contributes once matched, with all three being separate learned projections of the same input. Every key matches to some degree, so the output is a weighted blend rather than a single retrieved entry, and the whole mechanism is softmax(QKᵀ/&radic;d_k)V. Keys and values are kept apart because findability and content are different things, and the &radic;d_k division exists because dot products grow with dimension and would otherwise saturate the softmax into a hard, ungradient-able argmax.
+
+## Multiple heads, and where they come from
+
+Multi-head attention runs several of these computations in parallel with different learned projections, then concatenates the outputs and applies one more projection.
+
+```python
+import torch, torch.nn.functional as F
+
+def attention(x, Wq, Wk, Wv, mask=None):
+    Q, K, V = x @ Wq, x @ Wk, x @ Wv
+    scores = Q @ K.transpose(-2, -1) / (K.size(-1) ** 0.5)
+    if mask is not None:
+        scores = scores.masked_fill(mask == 0, float("-inf"))
+    return F.softmax(scores, dim=-1) @ V
+```
+
+With a model dimension of 512 and 8 heads, each head projects to 64 dimensions, so the total work is roughly the same as one 512-dimensional head &mdash; and the model gets 8 independent views instead of 1.
+
+The masking line is how causal generation and padding are both handled: setting a score to negative infinity makes its softmax weight exactly zero.
+
+## Cross-attention, and the caching trick
+
+In <strong>self-attention</strong> Q, K and V all come from the same sequence. In <strong>cross-attention</strong> the queries come from one sequence and the keys and values from another &mdash; a decoder querying an encoder's output, or a text query attending to image patches.
+
+That asymmetry has a practical consequence during generation, and it is the basis of the most important inference optimisation in language models.
+
+When generating token by token, the keys and values for all previous tokens do not change &mdash; only the new token's query is new. So they can be computed once and cached:
+
+<strong>Without a KV cache,</strong> generating the 1,000th token requires recomputing keys and values for all 999 previous tokens. Generation is quadratic in output length.
+
+<strong>With a KV cache,</strong> each new token computes its own K and V, appends them, and attends against the stored ones. Generation becomes linear.
+
+The cost is memory: the cache holds two tensors per layer per token, which for a large model and a long context runs to many gigabytes. That is exactly what <strong>multi-query</strong> and <strong>grouped-query attention</strong> address, by sharing key and value projections across heads and shrinking the cache several-fold.
+
+## Questions people ask
+
+<strong>Why is it called query, key, value?</strong> By analogy with a database lookup. The analogy is genuinely useful and the mechanism is soft rather than exact.
+
+<strong>Are Q, K and V the same size?</strong> Q and K must match, since they are dotted together. V can differ in principle and is usually the same size in practice.
+
+<strong>Do they have separate weight matrices?</strong> Yes &mdash; three per head, plus one output projection per layer.
+
+<strong>What is `dₖ`?</strong> The dimension of a single head's key vectors, typically 64. It is what the scaling factor is derived from.
+
+<strong>Why not use cosine similarity instead of a dot product?</strong> The dot product is cheaper, and the scaling plus LayerNorm already keeps magnitudes controlled. Some architectures do normalise the queries and keys.
+
+<strong>Can K and V come from a different source than Q?</strong> That is precisely cross-attention, and it is how decoders read encoders and how multimodal models connect modalities.
+
+## Recap in one screen
+
+- Query is what a position seeks, key is how a position advertises itself, value is what it contributes.
+- All three are learned linear projections of the input; attention itself has no parameters.
+- Score with `QKᵀ`, scale by `√dₖ`, softmax, then weight the values.
+- The scaling prevents softmax saturation and vanishing gradients in high dimensions.
+- Keys and values do not change during generation, which is what makes KV caching &mdash; and linear-time decoding &mdash; possible.

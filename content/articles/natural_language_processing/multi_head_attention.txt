@@ -23,6 +23,60 @@ So going from 1 head to 8 does not multiply the cost by eight. The projection ma
 
 This is close to a free lunch, and it is why every transformer uses many heads. The cost is that each head is individually less expressive, which is why very high head counts eventually stop helping &mdash; at some point d<sub>k</sub> gets too small to represent anything useful.
 
+## Several attention computations at once
+
+One attention computation produces one set of weights per position &mdash; one view of how the tokens relate. Language needs several at a time: which word is the grammatical subject, which pronoun refers to which noun, which bracket closes which.
+
+Multi-head attention runs h independent attention computations in parallel, each with its own learned Q, K and V projections, then concatenates the results and applies one output projection.
+
+<p class="mono-font">MultiHead(X) = Concat(head&#8321;, &hellip;, head&#8341;) W<sub>O</sub></p>
+
+The cost is arranged to be roughly free. With a model dimension of 512 and 8 heads, each head works in 512/8 = 64 dimensions. Eight 64-dimensional attentions cost about the same as one 512-dimensional attention &mdash; and give eight independent views instead of one.
+
+|Model|Model dim|Heads|Dim per head|
+|---|---|---|---|
+|BERT-base|768|12|64|
+|GPT-2 medium|1024|16|64|
+|Llama-2 7B|4096|32|128|
+
+Note that the per-head dimension stays around 64&ndash;128 across model sizes. Width is added by adding heads, not by making each head wider.
+
+## What the heads actually learn
+
+Inspecting trained models finds genuine specialisation, and it is more varied than one might guess:
+
+- <strong>Positional heads</strong> that mostly attend to the previous or next token.
+- <strong>Syntactic heads</strong> that link verbs to their subjects or objects, corresponding closely to dependency-parse edges.
+- <strong>Coreference heads</strong> that connect pronouns to their referents.
+- <strong>Delimiter heads</strong> that match brackets, quotes and sentence boundaries.
+- <strong>Rare-token heads</strong> that attend to unusual words carrying most of the information.
+- <strong>Heads that appear to do very little.</strong>
+
+That last category is well documented: pruning studies find a substantial fraction of heads can be removed with minimal loss, and in some layers a single head does most of the work. So multi-head attention provides <em>capacity</em> for several relationship types, and the specialisation that emerges is a side effect rather than a design.
+
+Two induction-related heads deserve mention. In language models, "induction heads" that complete a pattern seen earlier in the context appear to underpin much of in-context learning, and their emergence during training coincides with a visible jump in that ability.
+
+## The shape gymnastics
+
+In code, all heads are computed in one batched operation rather than in a loop:
+
+```python
+B, T, D = x.shape                       # batch, tokens, model dim
+H = 8; d = D // H                       # heads, dim per head
+
+q = (x @ Wq).view(B, T, H, d).transpose(1, 2)     # (B, H, T, d)
+k = (x @ Wk).view(B, T, H, d).transpose(1, 2)
+v = (x @ Wv).view(B, T, H, d).transpose(1, 2)
+
+scores = q @ k.transpose(-2, -1) / d ** 0.5        # (B, H, T, T)
+out = (scores.softmax(-1) @ v)                     # (B, H, T, d)
+out = out.transpose(1, 2).reshape(B, T, D) @ Wo    # back to (B, T, D)
+```
+
+The `view` and `transpose` pair is the whole trick: project once at full width, then reshape so the head dimension becomes a batch dimension. Every head is then computed by the same matrix multiplication.
+
+`F.scaled_dot_product_attention` does all of this with a FlashAttention kernel underneath, and should be preferred in real code.
+
 ## Try it yourself
 
 1. <strong>Collapse to one head.</strong> Set the <strong>Number of Heads</strong> slider to 1 and pick "drank" as the <strong>Focus Word</strong>. A single distribution has to cover subject, object and everything else at once, and Coverage drops.
@@ -49,3 +103,51 @@ So treat clean per-head interpretations with care. The tidy examples in papers a
 ## In one line
 
 Multi-head attention runs several attention operations in parallel, each with its own projections, so a layer can represent several relationships at once instead of compromising between them in a single distribution that must sum to 1. Crucially the model dimension is split across heads rather than multiplied by them, so more heads cost no extra parameters &mdash; they buy diversity at the price of making each head narrower, which is why the count cannot be raised indefinitely. The concatenated outputs are mixed by a final projection, and in trained models many heads turn out to be redundant or parked on punctuation, so individual head patterns should be read with caution.
+
+## Variants that shrink the KV cache
+
+During generation, the keys and values of previous tokens are cached so each new token costs one step rather than a full recomputation. With many heads that cache becomes the dominant memory cost &mdash; often larger than the model weights for long contexts.
+
+Two variants address it directly:
+
+<strong>Multi-query attention (MQA)</strong> keeps separate query projections per head but shares a <em>single</em> key and value projection across all of them. The cache shrinks by a factor equal to the head count. Quality drops slightly.
+
+<strong>Grouped-query attention (GQA)</strong> is the compromise now standard in large models: heads are divided into groups, and each group shares one key/value pair. With 32 query heads and 8 key/value groups the cache is a quarter the size, with quality close to full multi-head.
+
+|&nbsp;|Q heads|KV heads|Cache size|
+|---|---|---|---|
+|Multi-head|32|32|Full|
+|Grouped-query|32|8|1/4|
+|Multi-query|32|1|1/32|
+
+This is a good example of an architectural choice driven entirely by inference economics rather than by modelling quality.
+
+## Cost and practical notes
+
+Attention's score matrix is (batch, heads, tokens, tokens), so memory grows with the head count <em>and</em> the square of the sequence length. FlashAttention avoids materialising it at all, which is why it is now the default implementation everywhere.
+
+Choosing the head count in a model you are designing: keep the per-head dimension at 64 or 128 and derive the count from the model width. Very small per-head dimensions (16 or fewer) reduce each head's expressiveness; very large ones lose the benefit of having several views.
+
+For fine-tuning and use, this is not a parameter you choose &mdash; it is fixed by the pretrained checkpoint.
+
+## Questions people ask
+
+<strong>Why not one big attention head?</strong> It can only express one weighting pattern per position. Several heads represent several relationships simultaneously.
+
+<strong>How many heads is best?</strong> 8&ndash;32 for typical sizes, with per-head dimension 64&ndash;128. Rarely worth tuning.
+
+<strong>Do all heads matter?</strong> No &mdash; pruning studies show many can be removed with little loss. The redundancy appears to help training rather than inference.
+
+<strong>What is the output projection for?</strong> It mixes the concatenated head outputs back into the model dimension, letting the layer combine what the heads found.
+
+<strong>Is multi-head attention more expensive?</strong> Not meaningfully &mdash; the dimensions are split, so total work is comparable to single-head at full width.
+
+<strong>Why does GQA exist?</strong> To shrink the KV cache during generation, which is the binding memory constraint for long-context inference.
+
+## Recap in one screen
+
+- Several attention computations in parallel, each with its own projections, concatenated and projected out.
+- The model dimension is split across heads, so the cost is roughly that of one full-width head.
+- Heads specialise &mdash; syntax, coreference, delimiters &mdash; and many turn out to be redundant.
+- All heads are computed as one batched matrix multiplication via reshaping.
+- Grouped-query attention shares keys and values across heads to shrink the generation cache.

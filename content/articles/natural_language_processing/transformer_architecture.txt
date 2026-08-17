@@ -26,6 +26,51 @@ That is the entire thing. Two sublayers, and each is wrapped identically: run th
 
 The division of labour between the first two is worth holding on to: attention mixes across tokens, the FFN thinks about each token. A transformer alternates between the two, over and over.
 
+## The block, repeated
+
+A transformer is one block stacked many times. The block has two sublayers, each wrapped in a residual connection and a normalisation:
+
+<p class="mono-font">x &rarr; LayerNorm &rarr; Multi-head attention &rarr; (+x)</p>
+<p class="mono-font">x &rarr; LayerNorm &rarr; Feed-forward &rarr; (+x)</p>
+
+<strong>Attention moves information between positions.</strong> Each token gathers a content-weighted mix of the others.
+
+<strong>The feed-forward network processes each position independently.</strong> It expands to four times the model dimension, applies a non-linearity, and projects back. This is where most of the parameters live &mdash; roughly two thirds of them in a typical model &mdash; and it is a common misconception that attention does all the work.
+
+<strong>Residual connections</strong> give gradients a path back through dozens of blocks. <strong>LayerNorm</strong> keeps activations stable, and placing it <em>before</em> each sublayer rather than after is what makes 80-layer stacks trainable.
+
+Everything else about a transformer is the arrangement of these blocks and what goes in and out.
+
+## Three arrangements, three jobs
+
+|Family|Blocks used|Attention|Good at|
+|---|---|---|---|
+|Encoder-only (BERT)|Encoder stack|Bidirectional|Classification, retrieval, tagging|
+|Decoder-only (GPT)|Decoder stack|Causal|Generation, chat, anything open-ended|
+|Encoder-decoder (T5, original)|Both, with cross-attention|Both|Translation, summarisation|
+
+<strong>Encoder-only</strong> models see the whole input at once, so every token's representation is informed by both directions. That makes them excellent at understanding and useless at generating &mdash; there is no notion of "next".
+
+<strong>Decoder-only</strong> models mask future positions, so each token depends only on what precedes it. That constraint is what makes generation possible, and it turned out to scale so well that most current large models are decoder-only.
+
+<strong>Encoder-decoder</strong> models encode the source, then decode while attending to it through cross-attention. Natural for translation, where input and output are distinct sequences.
+
+## The full input path
+
+Following a sentence through a decoder-only model:
+
+1. <strong>Tokenise</strong> &mdash; text becomes integer ids.
+2. <strong>Embed</strong> &mdash; each id looks up a vector from the embedding table.
+3. <strong>Add positional information</strong> &mdash; sinusoidal, learned, or rotary applied inside attention.
+4. <strong>N transformer blocks</strong> &mdash; each refining the representation.
+5. <strong>Final LayerNorm.</strong>
+6. <strong>Output projection</strong> to vocabulary size, giving one logit per possible next token.
+7. <strong>Softmax</strong> (inside the loss during training; explicitly at generation time).
+
+Step 6 is often <em>tied</em> to the embedding table &mdash; the same matrix used in reverse. That saves a large number of parameters and usually improves quality slightly.
+
+The shape of the tensors flowing through: (batch, sequence, model_dim) from step 2 onwards, unchanged by every block. That constancy is what makes the stack composable.
+
 ## Try it yourself
 
 1. <strong>Take the residuals away.</strong> Untick <strong>Residual Connections</strong> and set the <strong>Number of Layers</strong> slider to 24. Watch the gradient curve decay toward zero and Trainable flip to no. Each sublayer shrinks what passes through it, and twenty-four of those in a row leave nothing to learn from.
@@ -57,3 +102,54 @@ The reason is practical: with post-norm the residual path itself gets normalised
 ## In one line
 
 A transformer block is two sublayers, each wrapped in the same add-and-normalise pattern: attention moves information between positions, and a position-wise feed-forward network processes each token on its own. The residual connection is what makes depth possible, giving the gradient a path that skips each sublayer &mdash; remove it and a deep stack stops training entirely &mdash; while layer normalisation holds the activation scale steady as layers accumulate. About two thirds of the parameters live in the feed-forward network rather than in attention, and parameters grow with the square of the model dimension but only linearly with depth.
+
+## Why it replaced recurrent networks
+
+Two properties, both structural.
+
+<strong>Parallelism.</strong> An RNN must compute position t before t+1. A transformer computes all positions simultaneously as one matrix multiplication, which is what a GPU is built for. That alone made training on far more data feasible.
+
+<strong>Constant path length.</strong> Any two positions are one attention step apart. In an RNN the path grows with the distance, and gradients decay along it &mdash; which is why long-range dependencies were the central difficulty.
+
+The cost of those wins is quadratic attention: doubling the sequence length quadruples the work. That is the trade the architecture makes, and it is why long context required years of engineering (FlashAttention, sparse patterns, KV caching) rather than being free.
+
+Note that recurrent architectures have not disappeared &mdash; state-space models such as Mamba revisit the idea with linear scaling, and are competitive on long sequences.
+
+## Scaling, and what changes with size
+
+The same block, repeated more times and made wider:
+
+|Model|Layers|Model dim|Parameters|
+|---|---|---|---|
+|BERT-base|12|768|110M|
+|GPT-2|48|1600|1.5B|
+|Llama-2 7B|32|4096|7B|
+|Large frontier models|80+|8192+|100B+|
+
+Nothing about the block changes. What changes is depth, width, vocabulary, context length and the amount of data.
+
+The scaling laws that emerged from studying this &mdash; performance improving predictably with compute, parameters and data together &mdash; are why the field spent several years mostly making the same architecture bigger. The Chinchilla result refined it: for a given compute budget, most early large models were under-trained on too little data relative to their size.
+
+Practical consequences of size: Adam's optimiser state is twice the model, so large-scale training needs sharding (ZeRO, FSDP); inference needs KV caching and quantisation; and fine-tuning uses parameter-efficient methods such as LoRA rather than updating every weight.
+
+## Questions people ask
+
+<strong>Why is the feed-forward layer four times wider?</strong> Convention from the original paper, and it works. Some modern models use different ratios, and gated variants (SwiGLU) with a smaller expansion.
+
+<strong>What is the difference between BERT and GPT?</strong> Bidirectional encoder trained on masked tokens, versus causal decoder trained on next-token prediction. Understanding versus generation.
+
+<strong>Do transformers understand language?</strong> They model statistical structure in text extremely well. Whether that constitutes understanding is a genuine open question, not a settled one in either direction.
+
+<strong>Why pre-norm rather than post-norm?</strong> It leaves the residual path clean, so gradients flow back unimpeded. Post-norm needs careful warm-up beyond about 12 layers.
+
+<strong>How long can the context be?</strong> Architecturally unlimited; practically bounded by quadratic cost and by how far the positional scheme generalises. Current models reach hundreds of thousands of tokens.
+
+<strong>Are transformers only for text?</strong> No &mdash; vision transformers treat image patches as tokens, and the architecture is used for audio, protein structure, video and time series.
+
+## Recap in one screen
+
+- One block: attention to move information between positions, a feed-forward network to process each position, both wrapped in residual connections and LayerNorm.
+- Most parameters are in the feed-forward layers, not in attention.
+- Encoder-only for understanding, decoder-only for generation, encoder-decoder for sequence-to-sequence.
+- Parallelism and constant path length are why it replaced RNNs; quadratic attention is what it costs.
+- Scaling changes depth, width and data &mdash; not the block.

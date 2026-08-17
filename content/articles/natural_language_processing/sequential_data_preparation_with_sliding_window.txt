@@ -21,6 +21,61 @@ The same trick works for text: given the words "the cat sat on", predict "mat". 
 - <strong>Too large:</strong> fewer training samples (N &minus; w shrinks), more parameters, and irrelevant ancient history dilutes the signal.
 - <strong>Fixed forever:</strong> whatever w you pick, the network's view of the past is frozen at that width — a limitation that recurrent networks were invented to remove.
 
+## Turning a stream into training examples
+
+A model needs rows: a fixed number of inputs and a target. A sequence is one long stream. The sliding window is the conversion.
+
+Pick a window length, slide it along, and each position becomes one example: the window is the input, whatever follows is the target.
+
+With the token sequence [the, cat, sat, on, the, mat] and a window of 3:
+
+|Input|Target|
+|---|---|
+|the, cat, sat|on|
+|cat, sat, on|the|
+|sat, on, the|mat|
+
+Six tokens have become three training examples. From here any model that takes fixed-size input will work &mdash; a feed-forward network, gradient boosting, or a transformer with a fixed context.
+
+Two consequences fall out immediately. The first `window` tokens produce no example, because there is no complete history for them. And consecutive examples overlap heavily, so they are <em>not</em> independent &mdash; which is exactly why the usual random train/test split is invalid.
+
+## The three settings
+
+<strong>Window size (lookback)</strong> &mdash; how much history each example sees. Too short and the pattern is invisible: a window of 3 cannot represent a weekly cycle in daily data. Too long and you have many features, fewer examples, and ancient history diluting recent signal.
+
+Start from the domain. Daily data with weekly seasonality wants at least 7. Hourly data with a daily cycle wants at least 24. Then confirm with an autocorrelation plot, which shows directly how far back the useful dependence reaches.
+
+<strong>Horizon</strong> &mdash; how far ahead the target sits. One step is easiest. For several steps there are three strategies: <em>recursive</em> (predict one, feed it back, repeat &mdash; errors compound), <em>direct</em> (a separate model per horizon &mdash; more models, no compounding), and <em>multi-output</em> (one model predicting the whole vector at once).
+
+<strong>Stride</strong> &mdash; how far the window moves each time. A stride of 1 extracts every possible window and maximises training examples; larger strides reduce overlap and training time at the cost of fewer examples.
+
+```python
+def windows(seq, size, horizon=1, stride=1):
+    X, y = [], []
+    for i in range(0, len(seq) - size - horizon + 1, stride):
+        X.append(seq[i:i + size])
+        y.append(seq[i + size:i + size + horizon])
+    return X, y
+```
+
+## Splitting without cheating
+
+This is where most sliding-window projects go wrong, and the failure produces excellent metrics and a useless model.
+
+Window 1 contains positions 1&ndash;3; window 2 contains 2&ndash;4. Put one in training and the other in test, and the test example shares two thirds of its input with a training example. Worse, a shuffled split lets the model train on later data and be evaluated on earlier data &mdash; a capability it will never have in production.
+
+The correct approach is <strong>chronological</strong>: train on the earliest portion, validate on the middle, test on the most recent. For cross-validation, use an expanding window:
+
+|Fold|Train on|Test on|
+|---|---|---|
+|1|Months 1&ndash;6|Month 7|
+|2|Months 1&ndash;7|Month 8|
+|3|Months 1&ndash;8|Month 9|
+
+Scikit-learn's `TimeSeriesSplit` implements exactly this. Add a <strong>gap</strong> of at least `window` steps between train and test so no test window overlaps a training window.
+
+The same rule applies to scaling: fit the scaler on the training period only. Computing a mean over the whole series leaks the future into the past.
+
 ## Experiments to try
 
 1. <strong>Click "Slide One Step" a few times.</strong> Watch the green window and amber target move together along the series, and each step append one row to the training table.
@@ -30,3 +85,59 @@ The same trick works for text: given the words "the cat sat on", predict "mat". 
 ## In one line
 
 The sliding window is the simplest bridge between sequential data and supervised learning: it manufactures labeled examples from an unlabeled stream. Its fixed width is both its strength (simplicity) and its weakness — the model can never look further back than w steps, which is exactly the limitation that motivates recurrent architectures.
+
+## For text specifically
+
+Language model training is exactly this pattern, at scale.
+
+A corpus is tokenised into one long stream, chunked into windows of the context length, and each window's target is the same window shifted by one position. Predicting token t from tokens 1…t&minus;1 is the sliding window with a horizon of 1 and the causal mask doing the work.
+
+Two practical details:
+
+<strong>Chunking versus true sliding.</strong> Extracting every possible window with stride 1 gives the most examples and enormous redundancy. Language model training typically uses non-overlapping chunks (stride = window), which is far cheaper and loses little, since each token still appears in a training example.
+
+<strong>Document boundaries.</strong> Concatenating documents into one stream means some windows straddle two unrelated documents. Most implementations accept this; careful ones insert a separator token or mask attention across the boundary.
+
+For classification rather than generation, windowing is used differently: a long document is split into overlapping chunks, each is classified or embedded, and the results are pooled or the highest-scoring chunk is used.
+
+## Features beyond the raw window
+
+The lagged values are a starting point, not the finished feature set. For numeric series, three additions usually earn their place:
+
+<strong>Rolling statistics</strong> &mdash; mean, standard deviation, min and max over the window. A rolling mean is often a stronger feature than the individual lags.
+
+<strong>Calendar features</strong> &mdash; day of week, month, hour, holiday flags. Most human-generated series have strong calendar structure. Encode cyclical values as sine and cosine pairs so hour 23 sits next to hour 0.
+
+<strong>Differences</strong> &mdash; the change from the previous value, or the ratio to the same time last week. This matters especially for tree models, which cannot extrapolate: a forest trained on values between 100 and 200 will never predict 250, but it can predict "a 5% increase" from a differenced target.
+
+```python
+import pandas as pd
+df = pd.DataFrame({"y": series})
+for lag in range(1, 8):
+    df[f"lag_{lag}"] = df["y"].shift(lag)
+df["roll_mean_7"] = df["y"].shift(1).rolling(7).mean()
+```
+
+The `.shift(1)` before `.rolling()` is essential. Without it the rolling mean at time t includes the value at time t &mdash; the thing being predicted. That is a leak, it is easy to write by accident, and it produces suspiciously excellent results.
+
+## Questions people ask
+
+<strong>How do I choose the window size?</strong> From known seasonality, confirmed by an autocorrelation plot, then tuned with time-series cross-validation.
+
+<strong>Should windows overlap?</strong> For small datasets, yes &mdash; stride 1 maximises examples. For large corpora, non-overlapping chunks are cheaper and adequate.
+
+<strong>Why can I not shuffle?</strong> Overlapping windows leak across the split, and a shuffled split lets the model see the future.
+
+<strong>What about missing timestamps?</strong> Resample to a regular frequency first and decide explicitly how to fill gaps. Windows that silently span a gap are meaningless.
+
+<strong>How much data do I need?</strong> Enough to cover several full seasonal cycles &mdash; two years of daily data to learn annual seasonality.
+
+<strong>Can one model serve many series?</strong> Often better than one model each: train across all series with an identifier feature, so series with little history borrow strength from the others.
+
+## Recap in one screen
+
+- A sliding window turns a stream into fixed-size (input, target) rows that any model can consume.
+- Window size sets how far back, horizon sets how far ahead, stride sets the overlap.
+- Consecutive windows overlap, so a random split leaks &mdash; split chronologically with a gap.
+- Fit scalers on the training period only, and shift before rolling or you leak the target.
+- Language model training is this pattern with a horizon of one and non-overlapping chunks.

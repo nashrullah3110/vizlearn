@@ -17,6 +17,44 @@ z&#8348; = &sigma;(W&#8386;x&#8348; + U&#8386;h&#8348;&#8331;&#8321;) &nbsp;&mid
 
 <table class="w-full text-left text-xs md:text-sm border rounded-lg" style="border-color: var(--border-subtle)"> <thead><tr class="text-[10px] uppercase font-bold tracking-widest opacity-60 border-b" style="border-color: var(--border-subtle)"><th class="p-3"></th><th class="p-3">LSTM</th><th class="p-3">GRU</th></tr></thead> <tbody class="mono-font"> <tr class="border-b" style="border-color: var(--border-subtle)"><td class="p-3 opacity-60">Gates</td><td class="p-3">3 (forget, input, output)</td><td class="p-3">2 (update, reset)</td></tr> <tr class="border-b" style="border-color: var(--border-subtle)"><td class="p-3 opacity-60">Memory tracks</td><td class="p-3">2 (cell state + hidden)</td><td class="p-3">1 (hidden only)</td></tr> <tr class="border-b" style="border-color: var(--border-subtle)"><td class="p-3 opacity-60">Weight matrices</td><td class="p-3">4 sets</td><td class="p-3">3 sets (~25% fewer params)</td></tr> <tr><td class="p-3 opacity-60">When to prefer</td><td class="p-3">very long dependencies, large data</td><td class="p-3">smaller data, faster training</td></tr> </tbody> </table> In practice the two trade blows: no consistent winner across tasks. GRUs train faster and overfit less on small datasets; LSTMs sometimes edge ahead when sequences are very long.
 
+## Two gates instead of three
+
+A GRU is an LSTM with the design simplified. It merges the forget and input gates into a single <strong>update gate</strong>, and it drops the separate cell state &mdash; there is only the hidden state.
+
+<p class="mono-font">z&#7511; = &sigma;(W&#7595;&middot;[h&#7511;&#8331;&#8321;, x&#7511;])&nbsp;&nbsp;&nbsp;&nbsp;update gate</p>
+<p class="mono-font">r&#7511; = &sigma;(W&#7523;&middot;[h&#7511;&#8331;&#8321;, x&#7511;])&nbsp;&nbsp;&nbsp;&nbsp;reset gate</p>
+<p class="mono-font">h&#771;&#7511; = tanh(W&middot;[r&#7511; &#8857; h&#7511;&#8331;&#8321;, x&#7511;])&nbsp;&nbsp;candidate state</p>
+<p class="mono-font">h&#7511; = (1 &minus; z&#7511;) &#8857; h&#7511;&#8331;&#8321; + z&#7511; &#8857; h&#771;&#7511;&nbsp;&nbsp;blend</p>
+
+The last line is the whole idea: the new state is an <strong>interpolation</strong> between the old state and a candidate, with the update gate choosing the mix. When `z` is near 0 the state is carried forward unchanged; when near 1 it is replaced.
+
+The <strong>reset gate</strong> does something subtler: it controls how much of the previous state the candidate is allowed to see. Near 0, the candidate is computed almost from the current input alone &mdash; which is how the cell starts fresh at a sentence boundary or a topic change.
+
+Because the two coefficients are `z` and `1 − z`, the GRU cannot both keep the old state and add new information at full strength. An LSTM's separate forget and input gates can. That is the expressiveness the simplification gives up.
+
+## GRU or LSTM?
+
+|&nbsp;|LSTM|GRU|
+|---|---|---|
+|Gates|3 (forget, input, output)|2 (update, reset)|
+|States|Cell and hidden|Hidden only|
+|Parameters|4 weight matrices|3 &mdash; about 25% fewer|
+|Speed|Slower|Faster|
+|Long sequences|Slight edge|Slightly behind|
+|Small data|Comparable|Sometimes better &mdash; fewer parameters|
+
+The honest summary from the literature: <strong>they perform comparably on most tasks</strong>, with no consistent winner. Comparisons find each ahead on some datasets and behind on others, usually by small margins.
+
+Practical guidance: try the GRU first &mdash; fewer parameters, faster, less to overfit &mdash; and switch to an LSTM if long-range dependencies are central and you can afford the extra cost. Do not spend a week on the comparison; spend it on the data.
+
+## The additive path, again
+
+The GRU keeps the property that made LSTMs work. Because `hₜ` includes `(1 − zₜ) ⊙ hₜ₋₁`, the derivative of `hₜ` with respect to `hₜ₋₁` includes the term `(1 − zₜ)`. When the update gate is near 0 &mdash; the network has learned to preserve this information &mdash; that coefficient is near 1 and the gradient passes back nearly unchanged.
+
+That is the same structural trick as the LSTM's cell state and as a residual connection: an additive path with a derivative near 1, protecting the gradient from multiplicative decay through many steps.
+
+It reduces vanishing gradients rather than eliminating them, and exploding gradients remain possible &mdash; so gradient clipping is standard here too.
+
 ## Exploration guide
 
 1. <strong>Auto-run with learned gates</strong> and watch z&#772; hover in the middle &mdash; the cell constantly negotiates between keeping and rewriting.
@@ -27,3 +65,56 @@ z&#8348; = &sigma;(W&#8386;x&#8348; + U&#8386;h&#8348;&#8331;&#8321;) &nbsp;&mid
 ## Summing up
 
 The GRU keeps the essential insight of gating &mdash; <em>memory updates as learned, per-dimension decisions</em> &mdash; while cutting a gate, a state track, and a quarter of the parameters. Both LSTM and GRU still read strictly left-to-right, though. What if the meaning of a word depends on what comes <em>after</em> it? That is the next module: bidirectional processing.
+
+## Using one
+
+```python
+import torch.nn as nn
+
+gru = nn.GRU(input_size=300, hidden_size=256, num_layers=2,
+             batch_first=True, bidirectional=True, dropout=0.2)
+
+out, h = gru(x)          # note: one state returned, not two
+# out: (batch, seq, 512) with bidirectional=True
+# h:   (layers*2, batch, 256)
+```
+
+The interface differs from `nn.LSTM` in one visible way: a GRU returns a single hidden state rather than a `(h, c)` tuple, because there is no cell state. Code written for one needs that adjustment.
+
+Everything else transfers: pack variable-length sequences so the final state reflects the last real token rather than padding, clip gradients, and keep the layer count to one or two.
+
+Parameter count is `3 × ((input + hidden) × hidden + hidden)` per direction per layer &mdash; for 300-dimensional input and 256 hidden units, about 428,000, against roughly 570,000 for the equivalent LSTM.
+
+## Where recurrent cells still make sense
+
+Transformers displaced both for large-scale language work, and there are situations where a GRU remains the better engineering choice:
+
+- <strong>Streaming with bounded memory.</strong> A GRU carries one fixed-size state regardless of how much has been processed. A transformer's KV cache grows with every token.
+- <strong>On-device inference.</strong> Small, fast, low memory, and no attention kernels needed.
+- <strong>Small datasets.</strong> With a few thousand examples, a GRU's inductive bias and small parameter count often beat a transformer trained from scratch.
+- <strong>Classical time series.</strong> Sensor data, demand forecasting and control problems, where sequences are numeric and moderate in length.
+- <strong>As a component.</strong> GRUs appear inside larger systems as encoders or state trackers.
+
+Note also that the recurrent idea is not finished: state-space models such as Mamba revisit it with linear scaling in sequence length and competitive quality on long sequences.
+
+## Questions people ask
+
+<strong>Is a GRU always faster than an LSTM?</strong> Usually by roughly 20&ndash;30% per step, from having one fewer gate and one fewer state.
+
+<strong>Which should I choose?</strong> GRU first. Switch to LSTM if long-range memory is central and the extra cost is affordable.
+
+<strong>Does a GRU have a cell state?</strong> No &mdash; that is the main structural simplification.
+
+<strong>What does the reset gate do that the update gate does not?</strong> It controls how much history the <em>candidate</em> sees, which lets the cell effectively restart at a boundary.
+
+<strong>Are GRUs obsolete?</strong> For large language models, yes. For streaming, embedded and small-data work, no.
+
+<strong>Can I stack GRUs deeply?</strong> Two layers is the practical limit; deeper recurrent stacks are difficult to train and rarely help.
+
+## Recap in one screen
+
+- Two gates: update decides how much of the state to replace, reset decides how much history the candidate sees.
+- One state, not two &mdash; the LSTM's cell state is gone.
+- The new state is an interpolation between old and candidate, which gives the same gradient-preserving additive path.
+- About 25% fewer parameters than an LSTM and comparable accuracy; try it first.
+- Still the right choice for streaming, on-device and small-data sequence work.

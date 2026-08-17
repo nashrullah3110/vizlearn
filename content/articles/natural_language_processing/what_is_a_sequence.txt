@@ -14,6 +14,51 @@ In a classic spreadsheet-style dataset, each row is independent: shuffling the r
 
 Because of this, sequence models need a way to <em>remember</em> or <em>look at</em> what came before — the motivation behind sliding windows, recurrent networks, and attention.
 
+## Order is part of the data
+
+A sequence is data where the <em>order</em> carries meaning. Shuffle it and you have destroyed information, not merely rearranged it.
+
+"The dog bit the man" and "The man bit the dog" contain identical words and describe different events. A stock price series read backwards describes a different market. A DNA sequence read out of order codes for nothing.
+
+Compare that with a table of customers: shuffle the rows and nothing is lost, because each row is independent of the others. That independence is what most standard machine learning assumes, and sequences violate it.
+
+|Data|Sequential?|Why|
+|---|---|---|
+|Text|Yes|Word order is grammar|
+|Audio waveform|Yes|Time ordering is the signal|
+|Video|Yes|Frame order is motion|
+|Sensor readings|Yes|Time ordering carries trend|
+|Customer records|No|Rows are independent|
+|Images|Spatially, not temporally|2-D structure, no time axis|
+
+## What makes sequences hard
+
+Four properties, each requiring a specific architectural response.
+
+<strong>Variable length.</strong> One sentence is 5 words, another 500. Fixed-size inputs cannot accommodate both, so models must either pad and mask, or process step by step.
+
+<strong>Order matters.</strong> Any model treating the input as an unordered set is unusable, which is why attention needs positional encodings bolted on.
+
+<strong>Long-range dependencies.</strong> A pronoun may refer to a noun fifty words earlier; a stock's behaviour may depend on last quarter. Architectures that decay information over distance cannot capture this.
+
+<strong>Elements are not independent.</strong> Standard train/test splitting assumes independence. Shuffling a time series before splitting lets the model see the future, producing excellent scores and worthless models.
+
+That last point is the one that catches people in practice. Sequence data needs chronological splits, and windows that overlap the boundary must be excluded.
+
+## The architectures, in order of history
+
+|Model|How it handles order|Limitation|
+|---|---|---|
+|Bag of words|It does not|Order lost entirely|
+|n-grams|Local windows of n|Cannot reach beyond n|
+|RNN|A carried hidden state|Gradients decay; no parallelism|
+|LSTM / GRU|Gated state with an additive path|Long ranges still hard|
+|1-D CNN|Local filters over time|Fixed receptive field|
+|Transformer|Attention plus positional encoding|Quadratic in length|
+|State-space (Mamba)|Recurrence with linear scaling|Newer, less tooling|
+
+Each row fixes the previous row's main problem. The transformer's dominance comes from two structural wins &mdash; constant path length between any two positions, and full parallelism across the sequence &mdash; at the cost of quadratic attention.
+
 ## Experiments to try
 
 1. <strong>Shuffle the default sentence.</strong> Watch the top panel: the words get amber borders and the read-out sentence becomes gibberish, while the "bag" panel below is completely unchanged. The bag never noticed.
@@ -23,3 +68,61 @@ Because of this, sequence models need a way to <em>remember</em> or <em>look at<
 ## The short of it
 
 A sequence is not just a set of values — it is values <strong>plus their order</strong>. Any model that throws the order away (like a bag of words) throws information away with it. Everything else in this NLP track — sliding windows, encodings, embeddings, recurrent cells — exists to let neural networks use that ordering information instead of losing it.
+
+## Preparing sequence data
+
+Whatever the model, the same practical decisions arise.
+
+<strong>Fix the length.</strong> Pad short sequences and truncate long ones, and supply an attention mask so the model ignores padding. Which end you truncate matters: for classification the beginning is often most informative; for time series the most recent values are.
+
+<strong>Window it.</strong> For forecasting, slide a window along the series so each position becomes one training example: the previous k values as features, the next value as the target. This converts a sequence into an ordinary supervised table.
+
+<strong>Split chronologically.</strong> Train on the past, validate on the middle, test on the most recent. Never shuffle. Leave a gap when windows would otherwise straddle the boundary.
+
+<strong>Scale using training-period statistics only.</strong> Computing a mean over the whole series leaks the future into the past.
+
+```python
+# windowing a series into (features, target) pairs
+X, y = [], []
+for i in range(len(series) - window):
+    X.append(series[i:i + window])
+    y.append(series[i + window])
+```
+
+## Sequence-to-what?
+
+The shape of the task determines the architecture's output arrangement:
+
+|Shape|Example|
+|---|---|
+|Sequence &rarr; one label|Sentiment, intent classification|
+|Sequence &rarr; label per element|Named entities, part-of-speech tagging|
+|Sequence &rarr; different-length sequence|Translation, summarisation|
+|Sequence &rarr; next element|Forecasting, language modelling|
+|One input &rarr; sequence|Image captioning, text-to-speech|
+
+For the first, pool over all positions rather than taking only the last &mdash; the final state is biased towards the end of the input.
+
+For the third, an encoder-decoder or a decoder-only model with the input as a prefix. This is where the attention mechanism was originally invented, to remove the bottleneck of compressing a whole source sentence into one vector.
+
+## Questions people ask
+
+<strong>Are images sequences?</strong> They have spatial structure but no time axis, so convolutions suit them better. Vision transformers do treat patches as a sequence, with 2-D positional encodings.
+
+<strong>Can I use a standard neural network on sequences?</strong> Only by flattening a fixed-length window, which discards the notion of order and cannot generalise across positions. It is a baseline, not a solution.
+
+<strong>How long can a sequence be?</strong> LSTMs handle hundreds of steps reliably; transformers reach hundreds of thousands of tokens with engineering effort and quadratic cost.
+
+<strong>Why can I not shuffle time series before splitting?</strong> Because the model would train on the future and be tested on the past, which is not a capability it will have in production.
+
+<strong>What about irregular timestamps?</strong> Resample to a regular frequency, or use a model that takes the time delta as an explicit input.
+
+<strong>Is a transformer always better than an LSTM?</strong> Not always. For streaming with bounded memory, small datasets and on-device inference, recurrent models remain the practical choice.
+
+## Recap in one screen
+
+- A sequence is data where order carries meaning, so elements are not independent.
+- Variable length, order sensitivity, long-range dependence and non-independence are the four difficulties.
+- Padding with masks, or step-by-step processing, handles variable length.
+- Split chronologically and scale on training-period statistics &mdash; shuffling leaks the future.
+- Transformers win on path length and parallelism; recurrent models still win on streaming and small data.

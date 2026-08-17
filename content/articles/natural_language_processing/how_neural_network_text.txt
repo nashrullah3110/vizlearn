@@ -17,6 +17,49 @@ The numerical embeddings are fed into the <strong>hidden layers</strong> of the 
 
 Finally, the highly processed information from the last hidden layer reaches the <strong>output layer</strong>. This layer condenses all the learned features into a final prediction. For a task like sentiment analysis, the output layer might have two neurons: one for "positive" and one for "negative". The neuron with the highest activation value determines the model's final answer.
 
+## The full path from string to prediction
+
+Text does not enter a network as text. Five stages convert it, and each one is a decision that affects what the model can learn.
+
+1. <strong>Normalise</strong> &mdash; Unicode form, whitespace, markup. Not case or punctuation, for a modern model.
+2. <strong>Tokenise</strong> &mdash; split into subword units and map each to an integer id.
+3. <strong>Embed</strong> &mdash; each id indexes a learned matrix, giving a vector.
+4. <strong>Encode</strong> &mdash; layers (recurrent, convolutional or attention) build contextual representations.
+5. <strong>Predict</strong> &mdash; a head maps the representation to whatever the task needs.
+
+<p class="mono-font">"the cat sat" &rarr; [2, 4756, 3231] &rarr; 3 &times; 768 matrix &rarr; contextual vectors &rarr; output</p>
+
+Stage 3 is where the shapes become concrete. A 3-token input with a 768-dimensional embedding is a 3&times;768 tensor, and that shape &mdash; (sequence, features) &mdash; is what flows through every subsequent layer.
+
+## Batching, padding and masks
+
+Models process batches, and sentences differ in length. So short sequences are padded to the batch's longest, and an <strong>attention mask</strong> marks which positions are real.
+
+|&nbsp;|Tokens|Mask|
+|---|---|---|
+|"the cat sat"|[2, 4756, 3231, 0, 0]|[1, 1, 1, 0, 0]|
+|"a very long sentence here"|[7, 1893, 992, 4410, 651]|[1, 1, 1, 1, 1]|
+
+The mask is not optional. Without it, the model attends to padding as though it were content, and a recurrent model's final hidden state describes the padding rather than the last real word. Results degrade for no visible reason.
+
+<strong>Dynamic padding</strong> &mdash; padding each batch to its own longest sequence rather than to a global maximum &mdash; is meaningfully faster when lengths vary. Grouping similar lengths into the same batch ("bucketing") reduces the waste further.
+
+## The three families of encoder
+
+|Encoder|How it builds context|Strength|
+|---|---|---|
+|1-D CNN|Filters slide along the sequence|Fast; local phrases|
+|RNN / LSTM|A carried state, step by step|Bounded memory; streaming|
+|Transformer|Attention across all positions|Long range; parallel|
+
+A <strong>CNN</strong> over text is underrated for classification: a filter of width 3 detects three-word phrases anywhere in the input, it is fast, and it parallelises. Its limit is the receptive field.
+
+An <strong>LSTM</strong> carries one fixed-size state, which makes it the right choice for streaming and for small datasets.
+
+A <strong>transformer</strong> makes every position one step from every other and computes them all at once, which is why it dominates at scale.
+
+For most applied work today the practical answer is a pretrained transformer, fine-tuned &mdash; or, with few labels, a frozen encoder plus a small classifier on its embeddings.
+
 ## Guided experiments
 
 Use the network builder above to solidify your understanding:
@@ -30,3 +73,60 @@ Use the network builder above to solidify your understanding:
 ## What to remember
 
 Neural networks process text by first converting words into meaningful numerical vectors (embeddings). These numbers are then passed through a series of hidden layers that extract increasingly complex features. Finally, an output layer makes a prediction based on these learned features. The entire architecture, from the input dimensions to the number of hidden layers and neurons, determines the model's capacity to learn and understand language.
+
+## The head, and what it depends on
+
+The encoder produces one vector per token. What you do with them is determined by the task shape:
+
+|Task|Head|
+|---|---|
+|Classification|Pool over tokens, then a linear layer to class count|
+|Token labelling (NER, POS)|A linear layer applied at every position|
+|Span extraction (QA)|Two heads predicting start and end positions|
+|Sentence similarity|Pool, normalise, compare with cosine|
+|Generation|Linear layer to vocabulary size, sampled repeatedly|
+
+For classification, how you pool matters more than people expect. Mean pooling over the (masked) tokens is a strong default. BERT's `[CLS]` token works because it was trained for that purpose. Taking the last hidden state of an LSTM over-weights the end of the input.
+
+```python
+# masked mean pooling - the reliable default
+mask = attention_mask.unsqueeze(-1)              # (batch, seq, 1)
+summed = (hidden_states * mask).sum(dim=1)
+pooled = summed / mask.sum(dim=1).clamp(min=1)   # ignore padding
+```
+
+The `clamp` guards against an all-padding row, which would otherwise divide by zero.
+
+## The practical routes, in order of cost
+
+<strong>Frozen embeddings plus a simple classifier.</strong> Embed with a sentence encoder, train logistic regression on the vectors. Minutes of work, no GPU, and with a few hundred labels it frequently beats fine-tuning because there is far less to overfit.
+
+<strong>Fine-tuning a small encoder.</strong> A DistilBERT or MiniLM fine-tuned on a few thousand labelled examples. Cheap to run afterwards &mdash; milliseconds on a CPU &mdash; and usually the best accuracy-per-cost for a fixed task.
+
+<strong>Prompting a large model.</strong> No training and no labels needed, and much higher inference cost. Right for open-ended tasks or when labels do not exist.
+
+<strong>Training from scratch.</strong> Almost never the right choice for text. Pretrained representations carry knowledge that a small dataset cannot supply.
+
+And the baseline that should always be measured first: <strong>TF-IDF plus logistic regression</strong>. On topic classification with adequate labels it is frequently competitive with a fine-tuned transformer, trains in seconds, and is fully interpretable.
+
+## Questions people ask
+
+<strong>Do I need to remove stop words and punctuation?</strong> Not for a transformer &mdash; they carry syntax and sentiment the model was trained on. Yes, often, for TF-IDF.
+
+<strong>How long can the input be?</strong> BERT-style models cap at 512 tokens; modern decoders reach far more. Longer documents are chunked, and the chunk results pooled or retrieved.
+
+<strong>Should I use the `[CLS]` token or mean pooling?</strong> `[CLS]` for models trained with it; masked mean pooling otherwise, and it is the safer default.
+
+<strong>Why is my model ignoring part of the input?</strong> Check truncation &mdash; the text may be silently cut at the token limit.
+
+<strong>Can I use the same pipeline for several languages?</strong> With a multilingual model, yes. Token counts per word will be higher for languages far from the training distribution.
+
+<strong>Do I have to fine-tune?</strong> No. Frozen embeddings plus a light classifier is often the better trade with limited labels.
+
+## Recap in one screen
+
+- Normalise, tokenise, embed, encode, predict &mdash; five stages, each a decision.
+- Pad batches and always supply the attention mask, or the model treats filler as content.
+- CNNs catch local phrases, LSTMs carry bounded state, transformers relate everything to everything.
+- Pool with a masked mean for classification; label every position for tagging.
+- Measure TF-IDF plus logistic regression first &mdash; it is often closer than expected.

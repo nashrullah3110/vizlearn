@@ -15,6 +15,57 @@ BPTT multiplies the gradient by &part;h&#8348;/&part;h&#8348;&#8331;&#8321; once
 
 <strong>LSTM</strong> and <strong>GRU</strong> cells attack the product itself: they add a cell state with <em>additive</em> updates and learned gates, creating a path where the effective factor stays near 1 for as long as the gates choose. Gradients ride this "constant error carousel" across hundreds of steps — which is why LSTMs dominated sequence learning for two decades, until attention offered an even more direct shortcut.
 
+## Multiplication through time
+
+Training a recurrent network means unrolling it. A 50-step sequence becomes a 50-layer network sharing one weight matrix, and backpropagation multiplies one Jacobian factor per step.
+
+The gradient reaching step 1 from a loss at step 50 is a product of 49 factors. If they average below 1, the product collapses:
+
+|Steps back|Factor 0.5|Factor 0.9|Factor 1.1|
+|---|---|---|---|
+|10|0.001|0.35|2.6|
+|25|3e-8|0.07|10.8|
+|50|9e-16|0.005|117|
+
+At 50 steps with a factor of 0.5 the gradient is one part in a quadrillion &mdash; indistinguishable from zero in floating point. The network cannot learn that step 1 mattered, so it cannot learn long-range dependencies at all.
+
+Two things make factors below 1 the default. Tanh's derivative is at most 1 and usually well below it. And the recurrent weight matrix's largest singular value must be near 1 for the product to be stable, which nothing enforces.
+
+## What it looks like in practice
+
+The symptoms are specific enough to diagnose:
+
+- <strong>The model learns local patterns and ignores distant ones.</strong> It predicts the next word well from the previous two and fails on agreement across a clause.
+- <strong>Early-layer or early-timestep gradients are orders of magnitude smaller</strong> than late ones.
+- <strong>Loss falls and then plateaus</strong> at a level that local context alone can explain.
+- <strong>Increasing the sequence length does not improve results</strong>, because the extra context is unreachable.
+
+The diagnostic is to log gradient norms by time step or by layer:
+
+```python
+loss.backward()
+for name, p in model.named_parameters():
+    if p.grad is not None:
+        print(f"{name:<30} {p.grad.norm().item():.3e}")
+```
+
+A steady decay from output to input is the signature. Similar magnitudes throughout is healthy.
+
+## The mirror problem
+
+The same multiplication explodes when the factors exceed 1. A factor of 1.1 over 50 steps gives 117; a factor of 2 gives 10&#185;&#8309;.
+
+The result is one enormous weight update that pushes the model far outside any sensible region, the next forward pass produces `inf`, the loss becomes `NaN`, and the run is over &mdash; nothing recovers from `NaN` weights.
+
+Exploding gradients are, in one sense, the easier problem: they are loud and immediately visible, and gradient clipping fixes them completely. Vanishing gradients are silent &mdash; the model trains, converges, and simply fails to learn what you wanted.
+
+|&nbsp;|Vanishing|Exploding|
+|---|---|---|
+|Symptom|Slow or no learning of long range|`NaN` loss|
+|Visibility|Silent|Immediate|
+|Fix|Gating, architecture|Gradient clipping|
+|Onset|From the start|Often within a few steps|
+
 ## Guided experiments
 
 1. <strong>Start at w = 0.70, T = 20.</strong> The bars die out about a third of the way back — most of the sentence is unreachable by the learning signal.
@@ -24,3 +75,63 @@ BPTT multiplies the gradient by &part;h&#8348;/&part;h&#8348;&#8331;&#8321; once
 ## What to remember
 
 The vanishing gradient problem is not a bug or a tuning issue — it is the inescapable arithmetic of multiplying T numbers that aren't exactly 1. It caps how far back a vanilla RNN can learn, and it is the direct reason LSTMs, GRUs, and ultimately attention-based Transformers exist.
+
+## How gating fixes it
+
+The LSTM's answer is an additive path. Its cell state updates as:
+
+<p class="mono-font">c&#7511; = f&#7511; &#8857; c&#7511;&#8331;&#8321; + i&#7511; &#8857; g&#7511;</p>
+
+Differentiating with respect to `cₜ₋₁` gives the forget gate `fₜ`. If the network has learned to keep this information, `fₜ` is near 1, and the gradient passes back through that step essentially unchanged.
+
+Contrast with a plain RNN, where the factor is the derivative of a tanh times a weight matrix &mdash; a quantity nothing keeps near 1.
+
+The GRU achieves the same with its update gate: `hₜ` includes `(1 − zₜ) ⊙ hₜ₋₁`, so the derivative includes `(1 − zₜ)`, near 1 when the state is being preserved.
+
+This is structurally the same trick as a <strong>residual connection</strong>: an additive path whose derivative is 1, giving gradients a route that multiplication cannot crush. The transformer's `x + sublayer(x)`, the LSTM's cell state and the GRU's interpolation are three expressions of one idea.
+
+Gating reduces the problem rather than solving it. LSTMs handle hundreds of steps reliably and thousands unreliably, which is part of why attention &mdash; where any two positions are one step apart regardless of distance &mdash; eventually displaced them.
+
+## The full set of countermeasures
+
+<strong>For vanishing:</strong>
+
+- <strong>Use an LSTM or GRU</strong> rather than a plain RNN. This is the main fix, and it is free.
+- <strong>Orthogonal initialisation</strong> of the recurrent matrix keeps its singular values at 1, so the product neither grows nor shrinks initially.
+- <strong>Shorter sequences,</strong> or truncated backpropagation through time, which bounds how far gradients must travel.
+- <strong>Skip connections across time steps</strong> in deeper recurrent stacks.
+- <strong>Attention,</strong> which removes the distance dependence entirely.
+
+<strong>For exploding:</strong>
+
+- <strong>Gradient clipping by norm.</strong> Essentially mandatory for recurrent models; `max_norm=1.0` to `5.0` is typical.
+- <strong>A lower learning rate.</strong>
+- <strong>Layer normalisation</strong> inside the recurrent cell.
+
+```python
+loss.backward()
+torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+optimizer.step()
+```
+
+## Questions people ask
+
+<strong>Why does tanh cause vanishing gradients?</strong> Its derivative is at most 1 and approaches 0 when saturated, so the per-step factor is usually below 1.
+
+<strong>Would ReLU fix it in an RNN?</strong> It removes the saturation problem and makes explosion far more likely, since the derivative is exactly 1 on the positive side and the same matrix is applied repeatedly. Gating is the better answer.
+
+<strong>Do LSTMs eliminate the problem?</strong> They greatly reduce it. Very long dependencies remain hard, and clipping is still needed for the exploding direction.
+
+<strong>How do transformers avoid it?</strong> Any two positions are one attention step apart, so there is no long product of factors to decay.
+
+<strong>What is truncated BPTT?</strong> Backpropagating only k steps back rather than to the beginning. It bounds memory and compute, and prevents learning dependencies longer than k.
+
+<strong>Is this the same problem as in deep feed-forward networks?</strong> Structurally identical &mdash; a product of many factors &mdash; and the fixes rhyme: ReLU and residual connections there, gating and clipping here.
+
+## Recap in one screen
+
+- Backpropagation through time multiplies one factor per step, so anything not near 1 compounds.
+- Factors below 1 vanish the gradient and make long-range learning impossible &mdash; silently.
+- Factors above 1 explode it into `NaN` &mdash; loudly, and clipping fixes it completely.
+- Gating creates an additive path whose derivative is the gate, near 1 when information is preserved.
+- That is the same idea as a residual connection, and attention removes the distance dependence altogether.

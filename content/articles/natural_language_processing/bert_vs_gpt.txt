@@ -16,6 +16,49 @@ A model that can see the future cannot be trained to predict it. If position 4 c
 
 The consequence is the interesting part. Masked language modelling produces excellent representations and no way to generate: there is no "next" for a model where every position already saw everything. Next-token prediction produces a generator whose representations are weaker per parameter, because each token was built without the right-hand context.
 
+## Two ways to train on the same architecture
+
+BERT and GPT are both transformers. What separates them is which direction they can look and what they are trained to predict &mdash; and everything else follows from that one choice.
+
+|&nbsp;|BERT|GPT|
+|---|---|---|
+|Blocks|Encoder|Decoder|
+|Attention|Bidirectional|Causal &mdash; past only|
+|Training task|Predict masked tokens|Predict the next token|
+|Sees the future|Yes|No|
+|Natural at|Understanding|Generating|
+|Output used|Token representations|Next-token distribution|
+
+<strong>BERT</strong> masks about 15% of the tokens and asks the model to fill them in, with the whole rest of the sentence visible in both directions. "The cat sat on the [MASK]" is answered using "cat" and "sat" from the left and any following words from the right.
+
+<strong>GPT</strong> predicts each token from those before it, with future positions masked out. That constraint is what makes generation possible: at inference the model has only the past, exactly as in training.
+
+## Why one generates and the other does not
+
+BERT cannot generate because it has no notion of "next". Its training task assumes the surrounding context exists, so there is nothing to iterate. You can coax text out of it by repeatedly filling masks, and the result is poor.
+
+GPT cannot use future context because it was never allowed to see any. For a classification task where the whole input is available, that is a genuine handicap &mdash; the representation of an early token knows nothing about the end of the sentence.
+
+That asymmetry made the split look permanent for several years: encoders for understanding, decoders for generation.
+
+What changed is scale. A sufficiently large decoder, prompted appropriately, does classification, extraction and question answering well enough that the encoder's bidirectional advantage stopped mattering for most applications &mdash; and it does them without task-specific fine-tuning. That is why most current large models are decoder-only.
+
+## Where each is still the right choice
+
+<strong>Use a BERT-style encoder when:</strong>
+
+- You need <strong>embeddings</strong> for search, clustering or similarity. Sentence-BERT and its successors dominate here.
+- You are doing <strong>token classification</strong> &mdash; named entities, part-of-speech tagging &mdash; where bidirectional context helps and the whole input is available.
+- You want a <strong>small, fast, cheap</strong> classifier. A fine-tuned DistilBERT runs on a CPU in milliseconds; a large decoder does not.
+- You have a <strong>fixed task with labelled data</strong>. Fine-tuning a 110M-parameter encoder often matches or beats prompting a much larger model, at a fraction of the cost.
+
+<strong>Use a GPT-style decoder when:</strong>
+
+- The output is <strong>text</strong> &mdash; writing, summarising, translating, answering.
+- The task is <strong>open-ended</strong> or not known in advance.
+- You have <strong>few or no labels</strong> and want to work by prompting.
+- You need <strong>several tasks from one model</strong> without training a head per task.
+
 ## Experiments to try
 
 1. <strong>Look around from the middle.</strong> With bidirectional attention selected and position 5, the whole sentence lights up: 8 tokens visible, 2 of them to the right.
@@ -36,3 +79,49 @@ The industry has drifted decisively towards decoder-only for general systems, be
 ## The short of it
 
 Encoder-only and decoder-only transformers differ by one thing: whether the attention mask deletes the upper triangle. Bidirectional attention lets every token see the whole sequence, which rules out next-token prediction and demands a masked objective instead, and yields strong representations with no ability to generate. Causal attention lets each token see only what precedes it, which makes next-token prediction both possible and enormously efficient, and yields a generator. Pick by the task rather than by fashion: text out means a decoder, and understanding text you already have is still cheaper and often better with an encoder.
+
+## The third family: encoder-decoder
+
+T5, BART and the original transformer use both stacks: an encoder that reads the input bidirectionally, and a decoder that generates while attending to the encoder's output through cross-attention.
+
+That structure suits tasks with a clear input and a distinct output &mdash; translation, summarisation, grammatical correction. T5's framing was to treat every task as text-to-text, with a prefix saying which task it is.
+
+|Family|Example models|
+|---|---|
+|Encoder-only|BERT, RoBERTa, DeBERTa, DistilBERT, E5|
+|Decoder-only|GPT, Llama, Mistral, Claude, Gemini|
+|Encoder-decoder|T5, BART, mT5, Flan-T5|
+
+Encoder-decoder models are less prominent now, largely because decoder-only models scaled better and can do the same tasks by prompting. They remain strong when the task is genuinely a fixed transformation and you can fine-tune.
+
+## The training details that mattered
+
+<strong>BERT's masked language modelling</strong> replaces 15% of tokens: 80% with `[MASK]`, 10% with a random token, 10% left unchanged. The randomisation exists because `[MASK]` never appears at fine-tuning time, and a model trained only on it would be mismatched.
+
+<strong>Next sentence prediction</strong> was BERT's second objective &mdash; predicting whether two sentences were adjacent. RoBERTa showed it was unhelpful and removed it, along with training longer on more data, which improved results substantially. It is a useful reminder that the original recipe was not optimal.
+
+<strong>GPT's next-token prediction</strong> needs no labelling at all: any text is training data. That simplicity is a large part of why decoder-only models scaled &mdash; the training set is the internet rather than an annotated corpus.
+
+<strong>Instruction tuning and RLHF</strong> are what turn a raw next-token predictor into something that follows instructions. A base GPT-style model completes text; it does not answer questions until it has been fine-tuned to.
+
+## Questions people ask
+
+<strong>Which is better?</strong> Neither &mdash; they are shaped for different jobs. For embeddings and cheap fixed-task classification, an encoder. For anything generative or open-ended, a decoder.
+
+<strong>Can I use GPT-style models for embeddings?</strong> Yes, by pooling hidden states, and purpose-trained embedding models generally do better because they are trained with a similarity objective.
+
+<strong>Why does BERT have `[CLS]`?</strong> It is a position whose final representation is used as a summary of the whole sequence for classification.
+
+<strong>Is fine-tuning BERT still worth doing?</strong> Very much so, when you have labelled data and a fixed task. It is far cheaper to run than prompting a large model, and often as accurate.
+
+<strong>What makes RoBERTa different?</strong> Same architecture, better training: more data, longer, larger batches, dynamic masking, and no next-sentence prediction.
+
+<strong>Do decoders really understand as well as encoders?</strong> At sufficient scale, they perform comparably on most understanding benchmarks despite the one-directional constraint. Bidirectional attention is an advantage that scale largely compensates for.
+
+## Recap in one screen
+
+- Same architecture; the difference is bidirectional masked prediction versus causal next-token prediction.
+- BERT sees both directions and cannot generate; GPT sees only the past and therefore can.
+- Encoders are the right tool for embeddings and cheap fixed-task classification.
+- Decoders are the right tool for generation and for open-ended tasks with few labels.
+- Encoder-decoder models suit fixed input-to-output transformations, and lost prominence as decoders scaled.

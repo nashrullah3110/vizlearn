@@ -19,6 +19,59 @@ Let's break down the common steps you'll find in a text normalization pipeline, 
 - <strong>Removing Stopwords:</strong> Stopwords are common words that appear frequently in a language but carry very little semantic weight (e.g., "the", "a", "is", "in"). These words can clutter the data and obscure more meaningful terms. By removing them, we allow the model to focus on the words that truly define the content.
 - <strong>Trimming Whitespace:</strong> This final clean-up step removes any extra spaces, tabs, or newlines that might have been created during the previous processing stages. It ensures that the text is compact and that words are separated by a single, consistent space.
 
+## Making text consistent before anything else
+
+Raw text is inconsistent in ways that matter. "Hello", "hello", "HELLO" and " hello " are four different strings to a computer and one word to a person. Normalisation is the set of steps that collapses irrelevant variation before a model sees the text.
+
+The usual sequence, and each step is a decision rather than a default:
+
+|Step|Example|Keep it?|
+|---|---|---|
+|Unicode normalisation|"café" (two forms) &rarr; one form|Always|
+|Lowercasing|"Apple" &rarr; "apple"|Depends on the task|
+|Strip whitespace|" hi \n" &rarr; "hi"|Always|
+|Remove HTML|`<p>text</p>` &rarr; "text"|If scraped|
+|Expand contractions|"don't" &rarr; "do not"|Sometimes|
+|Remove punctuation|"hi!" &rarr; "hi"|Rarely for modern models|
+|Remove stop words|"the cat" &rarr; "cat"|Rarely for modern models|
+|Stemming / lemmatisation|"running" &rarr; "run"|Only for classical models|
+
+The important thing about that table is the right-hand column. A pipeline copied from a 2015 tutorial will lowercase, strip punctuation and remove stop words &mdash; and for a transformer that destroys information the model was trained to use.
+
+## The Unicode step nobody remembers
+
+"café" can be encoded two ways: as `é` (one code point) or as `e` followed by a combining accent (two code points). They look identical and compare as different strings.
+
+That is the single most common cause of "these two records look the same but do not match". `unicodedata.normalize("NFKC", text)` resolves it, along with full-width characters, ligatures and several other invisible variations.
+
+```python
+import unicodedata, re
+
+def normalise(text):
+    text = unicodedata.normalize("NFKC", text)         # canonical form
+    text = text.replace("’", "'")                 # curly to straight quote
+    text = re.sub(r"\s+", " ", text)                   # collapse whitespace
+    return text.strip()
+```
+
+The quote replacement matters more than it looks: word processors and phones produce curly apostrophes, so "don't" and "don't" are different strings and any dictionary lookup or exact match fails on one of them.
+
+Do this step always, before anything else, for any text that came from the outside world.
+
+## What to keep for a transformer
+
+Modern subword tokenisers were trained on text that had punctuation, casing and stop words. Removing them creates a mismatch between your input and the model's training distribution, and it removes real signal:
+
+<strong>Case</strong> distinguishes "Apple" from "apple", "US" from "us", and marks emphasis and proper nouns. Use a cased model and leave case alone.
+
+<strong>Punctuation</strong> carries syntax and sentiment. "Great." and "Great!" and "Great?" are three different messages, and question marks are a strong feature for intent classification.
+
+<strong>Stop words</strong> carry grammar. "The cat sat on the mat" and "cat sat mat" differ in what a model can infer about structure. Removing them was a bag-of-words optimisation for vocabulary size, and transformers do not need it.
+
+<strong>Word forms</strong> are handled by subword tokenisation. Stemming "running" to "run" throws away tense that the model can use.
+
+So for a transformer the pipeline shrinks to: Unicode normalise, remove markup, fix quotes and whitespace, and stop.
+
 ## 3. Experiment with the Visualization
 
 Now that you understand the components, it's time to see them in action. Use the interactive pipeline above to see how each step transforms the input text.
@@ -30,3 +83,63 @@ Now that you understand the components, it's time to see them in action. Use the
 ## Beyond the Basics
 
 This pipeline covers the fundamentals, but text normalization can also include more advanced techniques like <strong>Stemming</strong> and <strong>Lemmatization</strong>, which reduce words to their root forms (e.g., "running" -> "run"). These methods further help in consolidating the vocabulary and improving model performance.
+
+## What to normalise for classical models
+
+For TF-IDF plus a linear model or Naive Bayes, aggressive normalisation genuinely helps, because the model has no way to relate "run", "runs" and "running" unless you collapse them.
+
+There, the fuller pipeline earns its place: lowercase, strip punctuation, remove stop words, and lemmatise. It cuts the vocabulary substantially, which means more data per feature and a smaller, better-conditioned matrix.
+
+<strong>Stemming</strong> chops suffixes with rules &mdash; fast, crude, and it produces non-words ("studies" → "studi"). <strong>Lemmatisation</strong> uses a dictionary and part-of-speech information to find the real base form ("studies" → "study", "better" → "good"). Slower, and correct.
+
+|&nbsp;|Stemming|Lemmatisation|
+|---|---|---|
+|Method|Suffix rules|Dictionary plus grammar|
+|Output|Sometimes not a word|Always a real word|
+|Speed|Very fast|Slower|
+|Use|Search indexing, quick baselines|When output must be readable|
+
+## Domain-specific steps
+
+The generic pipeline is rarely enough, and the additions depend on where the text came from:
+
+<strong>Social media.</strong> Handle @mentions, #hashtags, URLs and emoji deliberately. Replacing URLs with a placeholder token is usually better than deleting them, since their presence is informative. Emoji carry sentiment and should be kept or mapped to text, not stripped.
+
+<strong>Scraped web pages.</strong> Strip markup, decode entities (`&amp;` → `&`), remove boilerplate navigation, and detect the language before assuming it.
+
+<strong>Documents from OCR.</strong> Expect character confusions (`rn` for `m`, `0` for `O`), broken hyphenation across line ends, and stray line breaks mid-sentence.
+
+<strong>User-entered forms.</strong> Normalise phone numbers, postcodes and dates to a canonical format before comparison. This is where most duplicate-record problems originate.
+
+<strong>Anything privacy-sensitive.</strong> Redact or hash personal identifiers as part of the pipeline rather than afterwards, so raw values never reach the model or the logs.
+
+## Common mistakes
+
+- <strong>Normalising the test set differently from the training set.</strong> Put the pipeline in a function, apply it in one place, and test it.
+- <strong>Skipping Unicode normalisation,</strong> then debugging strings that look identical and are not.
+- <strong>Lowercasing for a cased model.</strong> A mismatch with the pretraining distribution, for no benefit.
+- <strong>Removing stop words before a transformer.</strong> Destroys syntax the model uses.
+- <strong>Stripping numbers</strong> when they carry meaning &mdash; prices, dates, quantities.
+- <strong>Applying an English pipeline to other languages.</strong> Stop-word lists, stemmers and even whitespace tokenisation are language-specific.
+
+## Questions people ask
+
+<strong>Should I lowercase?</strong> For classical bag-of-words models, yes. For cased transformers, no.
+
+<strong>Do I need to remove stop words?</strong> Only for classical models where vocabulary size matters. Never for transformers.
+
+<strong>Stemming or lemmatisation?</strong> Lemmatisation when quality matters, stemming when speed does, neither for transformers.
+
+<strong>What about emoji?</strong> Keep them, or map them to descriptive text. They are strong sentiment features.
+
+<strong>How do I handle several languages?</strong> Detect the language first, then apply language-appropriate steps &mdash; or use a multilingual model and minimal normalisation.
+
+<strong>Does normalisation help transformers at all?</strong> Yes, but only the structural parts: Unicode, markup, whitespace and encoding fixes. Not the linguistic parts.
+
+## Recap in one screen
+
+- Normalisation removes variation that does not matter, and every step is a decision.
+- Always do Unicode normalisation, markup removal and whitespace collapsing.
+- For transformers, stop there &mdash; case, punctuation and stop words all carry signal they were trained on.
+- For TF-IDF and other classical models, the full pipeline including lemmatisation genuinely helps.
+- Apply exactly the same pipeline to training, validation and production input.

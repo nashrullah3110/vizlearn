@@ -21,6 +21,51 @@ With d = 100 and h = 128 that is 12,800 + 16,384 + 128 = <strong>29,312</strong>
 
 <p>Training unrolls the network, runs a normal forward pass, then backpropagates from the loss all the way back to timestep 1. Because the same weights appear at every step, the gradient for <span class="mono-font">W<sub>h</sub></span> is the <em>sum</em> of its gradient contributions from all timesteps.</p><p>This is called backpropagation through time, and it has two practical consequences. Memory grows linearly with sequence length, since every intermediate hidden state must be kept for the backward pass. And the gradient reaching early timesteps is a long product, so it vanishes or explodes exactly as depth causes it to in a feedforward network.</p><strong>Truncated BPTT</strong> is the standard mitigation: backpropagate only k steps back, typically 20 to 50, and treat anything earlier as constant. It bounds memory and gradient depth at the cost of never learning dependencies longer than k.
 
+## The shapes a recurrent network can take
+
+The cell is the same in every case. What changes is where inputs enter and where outputs are taken, and that determines what the network can do.
+
+|Shape|Input &rarr; output|Example|
+|---|---|---|
+|One-to-many|One vector &rarr; sequence|Image captioning|
+|Many-to-one|Sequence &rarr; one value|Sentiment classification|
+|Many-to-many, aligned|Sequence &rarr; same-length sequence|Part-of-speech tagging|
+|Many-to-many, unaligned|Sequence &rarr; different-length sequence|Translation|
+
+<strong>Many-to-one</strong> takes an output only at the end. Use pooled hidden states rather than only the final one, since the final state over-weights the end of the input.
+
+<strong>Many-to-many aligned</strong> takes an output at every step, and a bidirectional layer usually helps because right context disambiguates.
+
+<strong>Many-to-many unaligned</strong> needs two networks: an encoder that reads the input and a decoder that produces the output. This is where attention was invented.
+
+## The encoder-decoder, and the bottleneck that motivated attention
+
+For translation, an encoder reads the source sentence and its final hidden state is passed to a decoder, which generates the target one token at a time.
+
+That final state is a fixed-size vector &mdash; 512 numbers, say &mdash; and it must contain everything about the source sentence. For five words that is comfortable. For fifty it is a severe compression, and translation quality was observed to fall sharply with sentence length.
+
+<strong>Attention</strong> removed the bottleneck: instead of passing only the final state, keep <em>all</em> the encoder's hidden states, and let the decoder compute a weighted combination at each output step, choosing what to look at.
+
+That change &mdash; introduced for exactly this problem &mdash; improved translation immediately, and within a few years the attention mechanism had displaced the recurrence it was invented to assist. "Attention is all you need" is a literal description of what happened next.
+
+## Depth, and how to add it
+
+Stacking recurrent layers means feeding one layer's output sequence into the next:
+
+```python
+lstm = nn.LSTM(300, 256, num_layers=2, batch_first=True, dropout=0.2)
+```
+
+The `dropout` argument applies <em>between</em> layers, not within the recurrence &mdash; applying dropout to the recurrent connection with a different mask each step damages the memory, which is why variational dropout (the same mask at every step) exists.
+
+Two layers is the practical limit for most tasks. Deep recurrent stacks are hard to train: the gradient must travel back through both depth and time, and the two decays compound. Residual connections between layers help and are less standard here than in transformers.
+
+Two other structural choices:
+
+<strong>Bidirectional</strong> layers run a second pass backwards and concatenate, doubling the output width. Excellent for tagging and classification, unusable for generation or streaming.
+
+<strong>Where the output head goes.</strong> On the final layer, always &mdash; but note that in a stacked bidirectional model, extracting the right final states requires care, since each direction's final state corresponds to a different end of the sequence.
+
 ## Things to try
 
 1. <strong>See where the parameters live.</strong> Press <strong>Parameters</strong> and read the breakdown. The recurrent matrix is the largest block, because it is h &times; h while the input matrix is only d &times; h.
@@ -45,3 +90,65 @@ With d = 100 and h = 128 that is 12,800 + 16,384 + 128 = <strong>29,312</strong>
 ## In one line
 
 An RNN is one cell unrolled across time, sharing weights at every step, so its parameter count is fixed at dh + h&sup2; + h regardless of sequence length. Training backpropagates through the whole unrolled graph, which makes the effective depth equal to the sequence length &mdash; hence vanishing gradients, mandatory gradient clipping, and truncated BPTT. The sequential dependency is also what stops it parallelising, which is what eventually made attention the better architecture.
+
+## Building one end to end
+
+```python
+class TextClassifier(nn.Module):
+    def __init__(self, vocab, emb=300, hidden=256, classes=2):
+        super().__init__()
+        self.embed = nn.Embedding(vocab, emb, padding_idx=0)
+        self.lstm = nn.LSTM(emb, hidden, num_layers=2, batch_first=True,
+                            bidirectional=True, dropout=0.3)
+        self.drop = nn.Dropout(0.3)
+        self.head = nn.Linear(hidden * 2, classes)     # *2 for bidirectional
+
+    def forward(self, ids, lengths):
+        x = self.embed(ids)
+        packed = pack_padded_sequence(x, lengths, batch_first=True,
+                                      enforce_sorted=False)
+        out, _ = self.lstm(packed)
+        out, _ = pad_packed_sequence(out, batch_first=True)
+
+        mask = (ids != 0).unsqueeze(-1)
+        pooled = (out * mask).sum(1) / mask.sum(1).clamp(min=1)
+        return self.head(self.drop(pooled))
+```
+
+Four details in that code are the ones that matter in practice: `padding_idx=0` keeps the pad embedding at zero, packing stops the LSTM processing padding, `hidden * 2` accounts for bidirectionality, and the masked mean pooling ignores padding when summarising.
+
+Getting any of the four wrong produces a model that trains and underperforms without an error message.
+
+## Training notes
+
+<strong>Clip gradients.</strong> `clip_grad_norm_(params, 5.0)`. Recurrent models are the classic case, and omitting it eventually produces `NaN`.
+
+<strong>Sort or bucket by length</strong> when batching, so batches contain similar lengths and less computation is wasted on padding.
+
+<strong>Watch memory against sequence length.</strong> Activation memory grows linearly with the number of steps, so a model that fits at 200 tokens may fail at 500.
+
+<strong>Use pretrained embeddings</strong> where available, and consider freezing them with small datasets &mdash; there is far less to overfit.
+
+<strong>Truncate backpropagation</strong> for very long sequences, detaching the state every k steps.
+
+## Questions people ask
+
+<strong>How many layers should I use?</strong> One or two. Deeper recurrent stacks rarely repay the training difficulty.
+
+<strong>Should I use the last hidden state or pool?</strong> Pool, for classification.
+
+<strong>Where does dropout go?</strong> Between layers via the `dropout` argument, and after pooling before the head. Not on the recurrent connection with a per-step mask.
+
+<strong>Bidirectional or not?</strong> Bidirectional for classification and tagging; unidirectional for generation and streaming.
+
+<strong>Is an encoder-decoder RNN still used?</strong> Rarely for translation. The structure survives in transformers, with attention doing the work the recurrence used to.
+
+<strong>Why did attention replace this?</strong> It removed the fixed-size bottleneck between encoder and decoder, and then proved sufficient without the recurrence at all.
+
+## Recap in one screen
+
+- One cell, four arrangements: one-to-many, many-to-one, aligned and unaligned many-to-many.
+- Unaligned tasks need an encoder and a decoder, and the fixed-size state between them was the bottleneck attention was invented to remove.
+- Stack at most two layers; put dropout between them, not inside the recurrence.
+- Bidirectional doubles the output width and requires the complete input.
+- Pack padded batches, clip gradients, and pool over states rather than taking the last one.

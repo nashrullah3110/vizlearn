@@ -23,6 +23,46 @@ Because they sum to 1 and are all positive, the weights read as a distribution o
 
 That interpretability is genuinely useful, but treat it carefully &mdash; attention weights show where information was drawn from, which is not quite the same as showing why the model decided what it decided.
 
+## Looking at everything at once
+
+A recurrent network reads a sentence one word at a time, carrying a fixed-size hidden state. By word fifty, everything about word one has been compressed into that state, competing with forty-nine other words for room. Long-range dependencies are lost by construction.
+
+Attention removes the bottleneck. Every position looks directly at every other position and decides, per position, how much each one matters.
+
+Concretely, for each word the mechanism computes a weight against every other word, then produces a weighted average of their representations. "It" in "The cat sat on the mat because it was warm" can attend strongly to "mat" &mdash; a direct connection, not a signal relayed through five intermediate states.
+
+Two consequences follow immediately, and they are why transformers replaced recurrent networks:
+
+<strong>Path length is constant.</strong> Any two positions are one step apart, regardless of distance. In an RNN the path is proportional to the gap, and gradients decay along it.
+
+<strong>It parallelises.</strong> Every position's attention can be computed simultaneously, as one matrix multiplication. An RNN must process position t before t+1, so it cannot use a GPU's parallelism across the sequence.
+
+## Queries, keys and values
+
+The mechanism is best read as a soft dictionary lookup.
+
+- The <strong>query</strong> is what this position is looking for.
+- The <strong>key</strong> is what each position offers as a label.
+- The <strong>value</strong> is what each position actually contributes if selected.
+
+Compare the query against every key to get a score, turn the scores into weights, and take the weighted sum of the values:
+
+<p class="mono-font">Attention(Q, K, V) = softmax(QK&#7488; / &radic;d<sub>k</sub>) V</p>
+
+Reading it left to right: `QKᵀ` is every query dotted with every key, giving a score matrix. Dividing by `√dₖ` keeps those scores in a range where softmax is not saturated &mdash; without it, large dimensions produce huge dot products, the softmax becomes nearly one-hot, and gradients vanish. The softmax turns scores into weights summing to 1. Multiplying by V produces the output.
+
+All three &mdash; Q, K and V &mdash; are linear projections of the input, with learned weight matrices. That is the only place parameters enter the mechanism.
+
+## A worked example, small enough to follow
+
+Three tokens, and suppose token 2's query produces these dot products against the three keys: 4.0, 1.0, 2.0. Divide by `√dₖ` = 2: 2.0, 0.5, 1.0.
+
+Softmax: e² = 7.39, e⁰·⁵ = 1.65, e¹ = 2.72; total 11.76. Weights: <strong>0.63, 0.14, 0.23</strong>.
+
+The output for token 2 is 0.63 × value₁ + 0.14 × value₂ + 0.23 × value₃ &mdash; mostly the first token's contribution, with some of the third.
+
+Those weights are what get visualised as attention heatmaps. They are genuinely informative about what the model connected to what, and they are not an explanation of <em>why</em> &mdash; a caution worth keeping, since attention maps are frequently over-interpreted.
+
 ## Things to try
 
 1. <strong>Walk the output.</strong> Set the <strong>Output Step</strong> slider to 1, then step it up one at a time. The bright connection moves across the source sentence as each output word is produced &mdash; the decoder is looking somewhere different every time.
@@ -55,3 +95,55 @@ The next module generalises the three steps above into the <a href="query_key_va
 ## Summing up
 
 Attention replaces the single fixed context vector with a fresh weighted average of every encoder state, recomputed at each output step: score the decoder state against each input position, softmax the scores into weights that sum to 1, and blend. Because nothing is compressed, long sentences stop degrading, and because the weights are a proper distribution they can be read as an alignment. Dot-product scoring made it fast enough to be worth doing everywhere, and once the decoder could reach any position directly, recurrence turned out to be optional.
+
+## Self-attention, cross-attention, and masking
+
+<strong>Self-attention</strong> has queries, keys and values all derived from the same sequence &mdash; a sentence relating its own words to each other. This is what encoder layers do.
+
+<strong>Cross-attention</strong> takes queries from one sequence and keys and values from another. In translation, the decoder's queries attend to the encoder's representation of the source sentence. In multimodal models, text queries attend to image patches.
+
+<strong>Causal (masked) attention</strong> prevents a position from seeing anything after it, by setting those scores to negative infinity before the softmax so their weights become zero. This is what makes a decoder able to generate: predicting token t must not depend on token t+1, or the task would be trivial at training time and impossible at inference.
+
+|Type|Queries from|Keys/values from|Can see ahead?|
+|---|---|---|---|
+|Encoder self-attention|The sequence|The same sequence|Yes|
+|Decoder self-attention|The sequence|The same sequence|No &mdash; masked|
+|Cross-attention|The decoder|The encoder|Yes|
+
+<strong>Padding masks</strong> serve a different purpose: they zero out the attention paid to padding tokens added for batching. Forgetting them means the model attends to filler as if it were content, which quietly degrades results.
+
+## The cost, and what is being done about it
+
+Attention compares every position with every other, so cost grows with the <strong>square</strong> of the sequence length. Doubling the context quadruples the compute and the memory for the score matrix.
+
+At 512 tokens that is 262,144 pairs &mdash; trivial. At 100,000 tokens it is ten billion, which is why long context was the central engineering problem of the last few years.
+
+The main responses:
+
+- <strong>FlashAttention</strong> computes exact attention without ever materialising the full score matrix, tiling the computation to fit in fast on-chip memory. Same result, several times faster, far less memory &mdash; now standard.
+- <strong>Sparse and local attention</strong> restrict each position to a window plus a few global positions (Longformer, BigBird).
+- <strong>Linear attention</strong> approximates the softmax to achieve linear scaling, at some quality cost.
+- <strong>Multi-query and grouped-query attention</strong> share key and value projections across heads, which mainly reduces the memory needed to cache them during generation.
+- <strong>KV caching</strong> stores the keys and values of previous tokens during generation so each new token costs one step rather than a full re-computation.
+
+## Questions people ask
+
+<strong>Why divide by `√dₖ`?</strong> Dot products grow with dimension, and large values saturate the softmax into a near-one-hot distribution with tiny gradients. The scaling keeps them in a workable range.
+
+<strong>Is attention the same as a weighted average?</strong> The output is one &mdash; but the weights are computed from the content itself, which is what makes it adaptive rather than fixed.
+
+<strong>Does attention explain the model?</strong> It shows which positions were connected. That is not the same as why the prediction was made, and papers have shown attention weights can be altered substantially without changing the output.
+
+<strong>How does attention know word order?</strong> It does not &mdash; the mechanism is permutation-invariant. Positional encodings are added to supply that information.
+
+<strong>Why replace RNNs entirely?</strong> Constant path length between any two positions, and full parallelism across the sequence. Together those made much larger models trainable.
+
+<strong>Can attention be used outside text?</strong> Yes &mdash; vision transformers attend across image patches, and it is used in graphs, audio and protein models.
+
+## Recap in one screen
+
+- Attention lets every position draw directly from every other, with weights computed from content.
+- Query, key, value: compare the query with all keys, softmax the scores, take the weighted sum of values.
+- Divide by `√dₖ` or the softmax saturates and gradients vanish.
+- Masking makes generation possible (causal) and batching correct (padding).
+- Cost is quadratic in sequence length, which is what FlashAttention, sparse attention and KV caching address.

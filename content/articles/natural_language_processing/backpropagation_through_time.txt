@@ -11,6 +11,56 @@ Backpropagation works on feed-forward graphs — signals flow one way, gradients
 - <strong>Backward pass:</strong> the gradient &part;L/&part;h starts at the loss and travels right to left. Crossing each cell multiplies it by the local derivative &part;h&#8348;/&part;h&#8348;&#8331;&#8321; — the chain rule, applied once per timestep.
 - <strong>Weight update:</strong> because every unrolled copy shares the same W and U, their gradient contributions from all timesteps are <em>summed</em> before the single weight update.
 
+## Unrolling the loop
+
+A recurrent network is a loop, and gradients cannot flow through a loop directly. So training unrolls it: a 50-step sequence becomes a 50-layer feed-forward network in which every layer shares the same weight matrix.
+
+Ordinary backpropagation then applies to that unrolled graph. The only special feature is what happens to the shared weights.
+
+<strong>Each weight's gradient is the sum of its gradients from every time step</strong>, because it was used at all of them:
+
+<p class="mono-font">&part;L/&part;W = &Sigma;&#7511; &part;L&#7511;/&part;W</p>
+
+That summation is the entire difference between BPTT and standard backpropagation. Everything else &mdash; the chain rule, the storage of activations, the update &mdash; is the same.
+
+Two consequences follow directly. Memory grows with sequence length, because every step's activations must be kept for the backward pass. And the gradient for early steps is a long product of factors, which is where vanishing and exploding gradients come from.
+
+## Truncated BPTT
+
+Backpropagating through a 10,000-step sequence is impossible: the memory required is proportional to the length.
+
+Truncated BPTT bounds it by propagating only k steps back, then detaching the hidden state and continuing forward:
+
+```python
+hidden = None
+for chunk in chunks_of(sequence, size=50):        # k = 50
+    out, hidden = model(chunk, hidden)
+    loss = criterion(out, targets_for(chunk))
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    hidden = tuple(h.detach() for h in hidden)     # cut the gradient path
+```
+
+The `detach()` is the whole mechanism. The hidden state continues forward, carrying information indefinitely, while the <em>gradient</em> stops at the chunk boundary.
+
+The trade is explicit: the model can use context from arbitrarily far back in the forward direction, and it cannot <em>learn</em> dependencies longer than k, because no gradient connects them. Typical k is 20&ndash;100 &mdash; long enough for useful structure, short enough to be affordable.
+
+Forgetting to detach is a real bug: the graph grows without bound, memory climbs every step, and eventually the process is killed.
+
+## Cost, and where it binds
+
+|Aspect|Scaling|
+|---|---|
+|Forward compute|Linear in sequence length|
+|Backward compute|Linear in sequence length|
+|Activation memory|Linear in sequence length|
+|Parallelism across steps|None &mdash; strictly sequential|
+
+The last row is the one that mattered historically. Because step t needs `hₜ₋₁`, the steps cannot be computed simultaneously, so a GPU's thousands of cores sit mostly idle and training time scales with length.
+
+That is a hardware-utilisation limitation rather than a quality one, and gating cannot fix it. It is the main reason transformers &mdash; where every position is computed in parallel &mdash; displaced recurrent networks for large-scale work, independent of any argument about long-range dependencies.
+
 ## Exploration guide
 
 1. <strong>Run the forward pass.</strong> Cells light up green in sequence, ending at the loss node — this is the network "reading" the sentence.
@@ -20,3 +70,49 @@ Backpropagation works on feed-forward graphs — signals flow one way, gradients
 ## Worth remembering
 
 BPTT = unroll the loop, backpropagate through the chain, sum the shared-weight gradients. It makes RNNs trainable — but it also chains together T multiplications, and a long product of numbers below 1 races toward zero. That arithmetic inevitability is the vanishing gradient problem.
+
+## Practical notes
+
+<strong>Clip gradients.</strong> The summation over time steps plus the product of factors makes large gradients common. `clip_grad_norm_` with a threshold of 1&ndash;5 is standard, and omitting it eventually produces a `NaN` run.
+
+<strong>Pack variable-length sequences.</strong> `pack_padded_sequence` stops the recurrence at each sequence's real end. Without it, gradients flow through padding steps and the final hidden state summarises the padding rather than the sentence.
+
+<strong>Watch memory with sequence length.</strong> Doubling the sequence doubles the stored activations. If training fits at 200 steps and fails at 400, this is why &mdash; truncate, or reduce the batch size.
+
+<strong>Detach the carried state</strong> between chunks in stateful training, or the graph never gets freed.
+
+<strong>Consider gradient checkpointing</strong> for long sequences: store activations only every few steps and recompute the rest during the backward pass, trading about 30% more compute for a large memory saving.
+
+## How it differs from feed-forward backpropagation
+
+|&nbsp;|Feed-forward|Through time|
+|---|---|---|
+|Weights|Distinct per layer|Shared across steps|
+|Gradient for a weight|From one place|Summed over all steps|
+|Depth|Fixed by architecture|Set by sequence length|
+|Memory|Fixed|Grows with sequence length|
+|Parallelism|Across the batch|Across the batch only|
+
+The shared weights are what create both the summation and the long product. A network with distinct weights per step would have neither problem &mdash; and would need a separate parameter set for every possible sequence length, which is exactly what parameter sharing exists to avoid.
+
+## Questions people ask
+
+<strong>Why is it called "through time"?</strong> Because the unrolled layers correspond to time steps rather than to distinct network layers.
+
+<strong>What value of k should I use?</strong> 20&ndash;100 typically. Long enough to cover the dependencies you care about, short enough to fit in memory.
+
+<strong>Does truncation hurt?</strong> It prevents learning dependencies longer than k. The forward state still carries information further, so it is a limit on learning rather than on use.
+
+<strong>Do transformers need BPTT?</strong> No &mdash; there is no recurrence, so ordinary backpropagation applies and all positions are computed in parallel.
+
+<strong>Why does my memory grow every batch?</strong> A carried hidden state that was never detached, so the graph accumulates.
+
+<strong>Is gradient clipping always needed?</strong> For recurrent models, effectively yes.
+
+## Recap in one screen
+
+- BPTT unrolls the recurrence into a deep network sharing one weight matrix, then backpropagates normally.
+- A shared weight's gradient is the sum of its contributions from every time step.
+- Memory and compute grow linearly with sequence length, and the steps cannot be parallelised.
+- Truncated BPTT bounds cost by detaching the state every k steps &mdash; and caps what can be learned at k.
+- Clip gradients, pack variable-length batches, and always detach carried state.

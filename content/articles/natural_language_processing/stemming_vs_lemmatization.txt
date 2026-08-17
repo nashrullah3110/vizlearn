@@ -13,6 +13,62 @@ In Natural Language Processing (NLP), we often need to treat different forms of 
 
 <strong>Lemmatization</strong> is a more sophisticated process that aims to find the true root form of a word, known as the <strong>lemma</strong>. It uses a dictionary and morphological analysis to consider the context of the word and its part of speech.<ul><li><strong>Method:</strong> Dictionary-based, considers the word's meaning and part of speech.</li><li><strong>Speed:</strong> Slower than stemming because it involves dictionary lookups.</li><li><strong>Result:</strong> Always returns a valid dictionary word. For example, "better" is correctly identified as having the lemma "good", and "are" becomes "be".</li><li><strong>Use Case:</strong> Best for applications requiring high accuracy, such as chatbots, question-answering systems, and machine translation, where understanding the correct meaning of words is essential.</li></ul>
 
+## Two ways to collapse word forms
+
+"Run", "runs", "running" and "ran" are four strings and one concept. To a bag-of-words model they are four unrelated features, each with a quarter of the evidence. Reducing them to a common form pools that evidence.
+
+There are two methods, and they differ in how much they know.
+
+<strong>Stemming</strong> chops suffixes according to rules. Fast, crude, and it produces strings that are not always words.
+
+<strong>Lemmatisation</strong> looks the word up, using its part of speech, and returns the real dictionary form.
+
+|Word|Porter stemmer|Lemmatiser|
+|---|---|---|
+|running|run|run|
+|runs|run|run|
+|ran|ran|run|
+|studies|studi|study|
+|better|better|good|
+|was|wa|be|
+|caring|care|care|
+
+Two rows show the difference clearly. "Ran" and "better" need knowledge, not rules &mdash; a stemmer has no way to know that "ran" relates to "run" or that "better" is a form of "good". And "studi" and "wa" show what rule-based chopping produces: fragments that work as index keys and read as errors.
+
+## When each is right
+
+<strong>Stemming</strong> is appropriate when the output is a lookup key nobody reads. Search indexing is the canonical case: if "studi" is the key for both "study" and "studies", a query for either matches, and the user never sees the stem.
+
+<strong>Lemmatisation</strong> is appropriate when the output is shown to someone, or when correctness matters &mdash; topic modelling where you display the top terms, linguistic analysis, anything with an audit trail.
+
+|&nbsp;|Stemming|Lemmatisation|
+|---|---|---|
+|Method|Suffix rules|Dictionary plus part of speech|
+|Output|Sometimes not a word|Always a real word|
+|Speed|Very fast|Slower &mdash; needs POS tagging|
+|Handles irregulars|No|Yes|
+|Needs language resources|No|Yes, per language|
+
+```python
+from nltk.stem import PorterStemmer, WordNetLemmatizer
+
+PorterStemmer().stem("studies")                        # 'studi'
+WordNetLemmatizer().lemmatize("studies")               # 'study'
+WordNetLemmatizer().lemmatize("better", pos="a")       # 'good'
+```
+
+That last line matters: without the part of speech, a lemmatiser assumes noun and gets adjectives and verbs wrong. `lemmatize("running")` returns "running" unless you tell it the word is a verb. In practice, run a POS tagger first &mdash; spaCy does this automatically.
+
+## Why neither belongs in a transformer pipeline
+
+Both techniques exist to solve a problem transformers do not have.
+
+A subword tokeniser already splits "running" into "run" + "ning", so the shared stem is represented and the suffix is available as separate information. The model sees both the root and the inflection, and it can use the inflection &mdash; tense, number and aspect all carry meaning.
+
+Stemming before a transformer therefore does two harmful things: it destroys grammatical information the model was trained to use, and it creates strings ("studi", "wa") that are not in the vocabulary and tokenise into odd fragments.
+
+The rule is simple. <strong>Stem or lemmatise for classical bag-of-words models. Never for transformers.</strong>
+
 ## Things to try
 
 Use the interactive tool above to see the difference firsthand:
@@ -24,3 +80,65 @@ Use the interactive tool above to see the difference firsthand:
 ## Key Takeaway: Speed vs. Accuracy
 
 The choice between stemming and lemmatization is a trade-off. <strong>Stemming</strong> is fast and good enough for many applications, but it can be inaccurate. <strong>Lemmatization</strong> is more accurate and provides meaningful root words, but it comes at a higher computational cost. Choose the tool that best fits the needs of your specific NLP task.
+
+## The stemmers you will meet
+
+<strong>Porter</strong> (1980) is the classic for English &mdash; five phases of suffix rules, well understood, moderately aggressive. Still the default in many pipelines.
+
+<strong>Snowball</strong> (Porter2) is Porter's own improvement, and it covers many languages. The better default when you have a choice.
+
+<strong>Lancaster</strong> is more aggressive and produces shorter stems, sometimes conflating words that should stay distinct.
+
+For lemmatisation, <strong>WordNet</strong> (via NLTK) is the traditional English option, and <strong>spaCy</strong> is the practical one &mdash; it tags parts of speech and lemmatises in one pass, across many languages, and is considerably faster.
+
+```python
+import spacy
+nlp = spacy.load("en_core_web_sm")
+
+doc = nlp("The studies were better than we ran previously")
+[t.lemma_ for t in doc]
+# ['the', 'study', 'be', 'well', 'than', 'we', 'run', 'previously']
+```
+
+Note "be" from "were" and "run" from "ran" &mdash; the irregulars a stemmer cannot reach.
+
+## What it buys, measured
+
+The benefit is vocabulary reduction, and it is substantial for classical models.
+
+On a typical English corpus, stemming reduces the distinct term count by roughly 30&ndash;50%. That means more occurrences per feature, a smaller and better-conditioned matrix, and less overfitting on rare forms.
+
+Whether it improves <em>accuracy</em> is less certain and task-dependent. For topic classification and search recall it usually helps. For sentiment it can hurt, because it flattens distinctions ("caring" and "cared" carry different implications). For anything where tense or number is the signal, it clearly hurts.
+
+The honest guidance: treat it as a hyperparameter and test it, rather than applying it because a tutorial did.
+
+## Common mistakes
+
+- <strong>Lemmatising without a part of speech,</strong> so verbs and adjectives are treated as nouns and left unchanged.
+- <strong>Using an English stemmer on other languages.</strong> Suffix rules are language-specific, and applying English ones to German or Turkish produces nonsense.
+- <strong>Stemming before a transformer.</strong> Destroys information and creates out-of-vocabulary fragments.
+- <strong>Stemming the query but not the index</strong> (or vice versa) in a search system, so nothing matches.
+- <strong>Assuming lemmatisation is always better.</strong> It is more correct and slower, and for a search index the stem is fine.
+- <strong>Applying it to named entities,</strong> where "Rogers" becoming "Roger" changes the referent.
+
+## Questions people ask
+
+<strong>Which should I use?</strong> Lemmatisation when output quality matters or is shown to users; stemming for search indexes and quick baselines; neither for transformers.
+
+<strong>Is lemmatisation much slower?</strong> Meaningfully so, because it needs POS tagging and dictionary lookups &mdash; roughly an order of magnitude in NLTK, less with spaCy's pipeline.
+
+<strong>Do I need stop-word removal too?</strong> For classical bag-of-words models, often yes. For transformers, no.
+
+<strong>What about other languages?</strong> Snowball covers many for stemming; spaCy has lemmatisers for a wide range. Morphologically rich languages benefit more from lemmatisation than English does.
+
+<strong>Does it help search?</strong> Yes, for recall &mdash; matching "running" to a query for "run". Modern search engines do this, alongside embedding-based retrieval.
+
+<strong>Why does the Porter stemmer produce non-words?</strong> Because it applies suffix rules without any dictionary. The stems are index keys, not words.
+
+## Recap in one screen
+
+- Both reduce inflected forms to a common form so evidence pools across them.
+- Stemming chops with rules &mdash; fast, and it produces non-words and misses irregulars.
+- Lemmatisation uses a dictionary and part of speech &mdash; correct, slower, and it needs the POS to be right.
+- Use stemming for index keys, lemmatisation for anything readable, neither before a transformer.
+- Vocabulary shrinks by 30&ndash;50%; accuracy gains are task-dependent, so test rather than assume.

@@ -13,6 +13,69 @@ Run a word cloud on raw English text and you get <em>the</em>, <em>of</em>, <em>
 
 Removing them is what makes the visualisation informative, and it is a genuine editorial choice rather than a technical detail. Standard stopword lists are a reasonable default; domain-specific ones usually matter more. In a corpus of medical papers, <em>patient</em> and <em>study</em> may be so ubiquitous that they crowd out everything that distinguishes one paper from another.
 
+## A frequency chart that happens to look like art
+
+A word cloud draws each word at a size proportional to how often it appears. That is the whole visualisation: size encodes frequency, and everything else &mdash; colour, rotation, position &mdash; is decoration.
+
+Which is worth stating plainly, because it sets both the use and the limits. It answers "what words dominate this text?" quickly and legibly, and it answers nothing else.
+
+The pipeline behind one:
+
+1. <strong>Tokenise</strong> the text into words.
+2. <strong>Normalise</strong> &mdash; lowercase, strip punctuation.
+3. <strong>Remove stop words</strong>, or "the" and "and" will dominate every cloud ever made.
+4. <strong>Count</strong> the remaining words.
+5. <strong>Lay out</strong> the top n by size, fitting them into the available space.
+
+Step 3 is what makes the difference between a useful cloud and a picture of English function words.
+
+```python
+from wordcloud import WordCloud
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+
+wc = WordCloud(width=1200, height=600, background_color="white",
+               stopwords=set(ENGLISH_STOP_WORDS),
+               max_words=100, collocations=False).generate(text)
+wc.to_file("cloud.png")
+```
+
+`collocations=False` is worth knowing: by default the library includes two-word phrases, which is sometimes desirable and often produces duplicated content ("machine", "learning" and "machine learning" all present).
+
+## Why counts alone mislead
+
+Raw frequency has a systematic bias: it favours words that are common in the <em>language</em>, not words that are distinctive to <em>this text</em>.
+
+Remove stop words and the next tier takes over &mdash; "said", "one", "time", "people". A cloud of a thousand product reviews will prominently feature "product", which tells you nothing you did not already know.
+
+<strong>TF-IDF weighting</strong> fixes this by dividing by how many documents contain each word, so terms appearing everywhere are suppressed and terms distinctive to this document are amplified:
+
+```python
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+vec = TfidfVectorizer(stop_words="english", max_features=200)
+scores = vec.fit_transform([text]).toarray()[0]
+freqs = dict(zip(vec.get_feature_names_out(), scores))
+WordCloud().generate_from_frequencies(freqs)
+```
+
+`generate_from_frequencies` is the function to know: it takes any dictionary of word-to-weight, so the sizes can encode TF-IDF, log-odds against a comparison corpus, or a sentiment score &mdash; anything more informative than a raw count.
+
+## The honest limitations
+
+Word clouds are widely criticised in data visualisation, and the criticisms are correct:
+
+<strong>Area is hard to compare.</strong> People judge length well and area poorly, so a word twice as frequent does not look twice as prominent. A bar chart of the top 20 terms conveys the same information far more precisely.
+
+<strong>Long words look more important.</strong> "Implementation" occupies more space than "cost" at the same font size, so word length confounds the encoding.
+
+<strong>Position is meaningless</strong> but reads as meaningful. Words near the centre appear more important, and the layout algorithm placed them there for packing reasons.
+
+<strong>No context or relationships.</strong> "Not good" appears as "good". Negation, phrases and sentiment are all invisible.
+
+<strong>Rotation hurts legibility</strong> for no informational gain.
+
+So the fair summary: a word cloud is a reasonable <em>first look</em> at an unfamiliar corpus and a poor <em>analytical</em> tool. Use it to orient yourself, then use a bar chart, a keyness comparison or a topic model to say anything specific.
+
 ## Interactive Exploration Guide
 
 1. <strong>Turn the filter off.</strong> Disable <strong>Stopwords Filter</strong> and press <strong>Generate</strong>. The cloud fills with function words and says nothing about the content &mdash; raw frequency is dominated by grammar, not meaning.
@@ -40,3 +103,61 @@ The other limitation is that area is a poor visual encoding. People judge length
 ## Key takeaway
 
 A word cloud encodes frequency as font size and nothing else &mdash; position, colour and rotation are layout, not data. It needs stopword removal to say anything at all, and TF-IDF rather than raw frequency to show what is distinctive rather than merely common. Treat it as a fast exploratory glance at a corpus, and reach for a bar chart whenever the question is how much bigger one term is than another.
+
+## Better alternatives, by question
+
+|Question|Better tool|
+|---|---|
+|Which terms are most frequent?|A horizontal bar chart of the top 20|
+|Which terms distinguish A from B?|Keyness or log-odds ratio, plotted|
+|What topics are present?|LDA or BERTopic, with top terms per topic|
+|How does usage change over time?|A line chart of term frequency by period|
+|Which terms co-occur?|A co-occurrence network graph|
+|What is the sentiment?|A sentiment model, not word counts|
+
+The second row deserves emphasis because it is the question people usually mean. Comparing two corpora &mdash; positive versus negative reviews, this year versus last &mdash; and plotting the terms with the largest difference in relative frequency is far more informative than two word clouds side by side, and it is a standard technique in corpus linguistics.
+
+<strong>BERTopic</strong> is worth knowing as the modern option: embed the documents, cluster the embeddings, and extract distinguishing terms per cluster. It finds themes rather than words, and it handles the "not good" problem because embeddings are contextual.
+
+## When a word cloud is the right choice
+
+Not never &mdash; there are cases where it genuinely fits:
+
+<strong>Exploratory orientation.</strong> First contact with an unfamiliar corpus, to see what register and subject matter you are dealing with.
+
+<strong>Presentation to a non-technical audience</strong>, where an immediately legible impression matters more than precision. It communicates "here is what this text is about" in one glance.
+
+<strong>A visual element</strong> in a report or dashboard where the analytical content is carried by other charts.
+
+What to do to make it as good as it can be: remove stop words aggressively, weight by TF-IDF rather than count, disable rotation, cap at 50&ndash;100 words, use a single colour or a colour that encodes something real, and put a bar chart of the top terms next to it.
+
+## Practical gotchas
+
+- <strong>Stop words are language-specific.</strong> An English list applied to French text leaves "le", "de" and "et" dominating.
+- <strong>Domain stop words matter too.</strong> In product reviews, "product", "item" and the brand name are noise; add them to the list.
+- <strong>Lemmatise or accept duplicates.</strong> "Run", "runs" and "running" appear as three words otherwise.
+- <strong>Watch for a dominating single term</strong> that compresses everything else to illegibility. A log scale on the weights helps.
+- <strong>Numbers and URLs</strong> usually want removing.
+- <strong>Font support.</strong> Non-Latin scripts need a font that contains them, or the cloud renders as boxes.
+
+## Questions people ask
+
+<strong>Are word clouds bad?</strong> They are imprecise, which is a real limitation for analysis and not disqualifying for orientation and presentation.
+
+<strong>Should I remove stop words?</strong> Always, or the cloud shows the structure of the language rather than the content of the text.
+
+<strong>Can I use TF-IDF instead of counts?</strong> Yes, via `generate_from_frequencies`, and it usually produces a much more informative cloud.
+
+<strong>Does colour mean anything?</strong> By default no. You can map it to something real &mdash; sentiment, topic, part of speech &mdash; and then it does.
+
+<strong>How many words should I show?</strong> 50&ndash;100. Beyond that the small words are unreadable and add nothing.
+
+<strong>What about phrases?</strong> Bigrams can be included, and watch for the duplication that produces ("machine", "learning", "machine learning").
+
+## Recap in one screen
+
+- A word cloud encodes frequency as font size; everything else is decoration.
+- Remove stop words, or every cloud shows the same function words.
+- Weight by TF-IDF rather than raw count to surface what is distinctive rather than what is common.
+- Area comparison is imprecise and word length confounds it &mdash; a bar chart says the same thing more accurately.
+- Good for orientation and presentation; use keyness comparison or topic modelling for analysis.

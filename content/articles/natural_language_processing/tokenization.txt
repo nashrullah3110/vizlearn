@@ -18,6 +18,51 @@ There's no single "best" way to tokenize text; the right method depends on the t
 - <strong>Sentence Tokenization:</strong> Instead of words, this method splits the text into individual sentences. It identifies sentence boundaries using delimiters like periods (.), question marks (?), and exclamation marks (!). This is a crucial preprocessing step for tasks that need to understand the context of a full sentence, such as document summarization.
 - <strong>Character Tokenization:</strong> This method breaks the text down to its most granular level: individual characters. The sentence "Hello" becomes <code>["H", "e", "l", "l", "o"]</code>. This approach is useful for languages without clear word boundaries or for tasks like spell-checking and text generation, as it creates a very small, manageable vocabulary.
 
+## Cutting text into pieces a model can count
+
+A model cannot consume a string. It consumes integers, each pointing at a row of an embedding table. Tokenisation is the step that decides what those integers stand for, and the choice shapes everything downstream.
+
+Three levels are possible:
+
+|Level|"unhappiness" becomes|Vocabulary size|
+|---|---|---|
+|Character|u, n, h, a, p, ...|~100|
+|Word|unhappiness|100,000+|
+|Subword|un, happi, ness|30,000&ndash;100,000|
+
+<strong>Character-level</strong> needs a tiny vocabulary and never meets an unknown symbol, but sequences become very long and the model has to learn spelling before it can learn meaning.
+
+<strong>Word-level</strong> gives short sequences and readable tokens, and it breaks on anything unseen. A vocabulary built from training text will not contain "unhappiness" if only "happiness" appeared, so the word becomes `<UNK>` and its meaning is lost entirely. Morphologically rich languages make this far worse.
+
+<strong>Subword</strong> is the compromise everything modern uses. Common words stay whole; rare words split into meaningful fragments. Nothing is ever unknown, because the vocabulary includes the individual characters as a fallback.
+
+## How byte-pair encoding builds a vocabulary
+
+BPE is the algorithm behind GPT's tokeniser, and it is simpler than its reputation.
+
+1. Start with every character as a token.
+2. Count all adjacent pairs in the training corpus.
+3. Merge the most frequent pair into a new token.
+4. Repeat until the vocabulary reaches the target size.
+
+Run it on English text and the early merges are `t`+`h` → `th`, then `th`+`e` → `the`. Frequent sequences become single tokens; rare ones stay as fragments. The result is a vocabulary that spends its budget where the text actually is.
+
+The consequence worth knowing: <strong>token count is not word count</strong>. English averages roughly 1.3 tokens per word. Code, unusual names, other scripts and emoji use far more &mdash; a Japanese sentence may cost three or four times as many tokens as its English translation, which is a real cost and latency difference when calling an API.
+
+WordPiece (BERT) and SentencePiece (T5, Llama) are variants of the same idea. SentencePiece is notable for treating the input as a raw byte stream with no pre-tokenisation step, which means it needs no language-specific whitespace rules.
+
+## What tokenisation decides for you
+
+Several model behaviours trace directly back to this step.
+
+<strong>Why models are bad at spelling and character counting.</strong> "strawberry" may be three tokens, none of which is a letter. Asking how many r's it contains is asking the model to reason about something it cannot see.
+
+<strong>Why numbers are handled inconsistently.</strong> "1234" might be one token or four, depending on the tokeniser, so arithmetic is learned over an inconsistent representation.
+
+<strong>Why context limits are in tokens.</strong> A 128,000-token window is roughly 96,000 English words &mdash; and considerably fewer if the text is code or non-Latin script.
+
+<strong>Why the tokeniser must ship with the model.</strong> Token id 1,547 means one thing to one tokeniser and something else to another. A mismatch produces fluent nonsense, not an error.
+
 ## 3. Experiment with the Visualization
 
 The best way to grasp these concepts is to see them in action. Use the interactive tokenizer to build your intuition:
@@ -29,3 +74,68 @@ The best way to grasp these concepts is to see them in action. Use the interacti
 ## Advanced Tokenization: Sub-word Methods
 
 Modern NLP models like BERT and GPT use more advanced techniques called <strong>sub-word tokenization</strong> (e.g., Byte-Pair Encoding or WordPiece). These methods break down rare words into smaller, known sub-word units. For example, "tokenization" might become <code>["token", "##ization"]</code>. This allows the model to handle any word it encounters, even if it wasn't in the training data, preventing the "unknown token" problem and maintaining a manageable vocabulary size.
+
+## In code
+
+```python
+from transformers import AutoTokenizer
+
+tok = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+tok.tokenize("Tokenisation isn't trivial.")
+# ['token', '##isation', 'isn', "'", 't', 'trivial', '.']
+
+ids = tok("Tokenisation isn't trivial.", return_tensors="pt")
+ids["input_ids"]          # includes [CLS] and [SEP] automatically
+tok.decode(ids["input_ids"][0])
+```
+
+The `##` prefix marks a continuation of the previous word, which is how WordPiece distinguishes "token" at the start of a word from the same letters inside one.
+
+Special tokens matter and are easy to forget: `[CLS]` and `[SEP]` for BERT, `<s>` and `</s>` for others, plus `[PAD]` for batching and `[MASK]` for masked-language training. Using the tokeniser's `__call__` adds them correctly; calling `tokenize()` alone does not.
+
+For classical NLP the simpler tools still apply:
+
+```python
+import re
+re.findall(r"\b\w+\b", text.lower())     # crude word tokens
+```
+
+Splitting on whitespace looks adequate and is not: "don't", "state-of-the-art", "U.S.A." and "€19.99" all need decisions. NLTK's and spaCy's tokenisers encode those decisions; a regular expression encodes your assumptions.
+
+## Padding, truncation and attention masks
+
+Models take fixed-size batches, so sequences of different lengths must be equalised.
+
+<strong>Padding</strong> appends a filler token to short sequences. The <strong>attention mask</strong> is what tells the model to ignore those positions &mdash; without it, the model attends to padding as if it were content, and the results degrade for no visible reason.
+
+<strong>Truncation</strong> cuts sequences that exceed the limit. Which end you cut matters: for classification the start of a document is often most informative, for question answering the relevant passage may be anywhere, and blind truncation silently discards the answer.
+
+```python
+batch = tok(texts, padding=True, truncation=True, max_length=512, return_tensors="pt")
+model(**batch)          # attention_mask is included in batch
+```
+
+Padding to the longest sequence in the batch rather than to a fixed maximum &mdash; dynamic padding &mdash; is meaningfully faster when lengths vary.
+
+## Questions people ask
+
+<strong>How many tokens is a word?</strong> About 1.3 for English prose, more for code, names and non-Latin scripts. Count with the actual tokeniser rather than estimating.
+
+<strong>Should I lowercase before tokenising?</strong> Only if the tokeniser is uncased. Modern subword tokenisers usually handle case themselves, and lowercasing first destroys information they were trained to use.
+
+<strong>Can I use a different tokeniser than the model was trained with?</strong> No. The ids would mean the wrong things.
+
+<strong>Why does my model see `<UNK>` everywhere?</strong> A word-level vocabulary built from too little text. Use subword tokenisation.
+
+<strong>Do I still need stemming and stop-word removal?</strong> For classical bag-of-words models, sometimes. For transformers, no &mdash; they use the full form and the function words carry syntax.
+
+<strong>What is the vocabulary size trade-off?</strong> Larger means shorter sequences and a bigger embedding table; smaller means longer sequences and more fragmenting. 30,000&ndash;100,000 is the usual range.
+
+## Recap in one screen
+
+- Tokenisation turns text into integer ids; the choice of unit shapes everything after it.
+- Character level is robust and long; word level is short and breaks on unseen words; subword is the standard compromise.
+- BPE repeatedly merges the most frequent adjacent pair, so common words stay whole and rare ones fragment.
+- Token count is not word count, and it varies by language and content type.
+- Pad with an attention mask, truncate deliberately, and always ship the tokeniser with the model.

@@ -17,6 +17,44 @@ The standard fixed-size representation for text — bag of words — counts word
 
 Each forward pass is an island. When an ANN processes word 5, it retains nothing about words 1–4 unless they were crammed into the same fixed input. There is no persistent state that flows from one step to the next — which is precisely the thing a <strong>recurrent cell</strong> adds, carrying a hidden state h&#8348; forward through time.
 
+## What a plain network cannot do with a sequence
+
+A standard feed-forward network takes a fixed-size vector and produces an output. Text is not a fixed-size vector, and forcing it to be one costs three specific things.
+
+<strong>It cannot handle variable length.</strong> A network with 100 input units takes exactly 100 numbers. A 5-word sentence and a 500-word document cannot both be fed to it without padding to a fixed maximum &mdash; wasting most of the input on short texts and truncating long ones.
+
+<strong>It has no notion of order.</strong> Flatten "the dog bit the man" into 5 embedding vectors concatenated, and the network sees position 1, position 2 and so on as unrelated input slots. It can learn that slot 2 tends to hold a noun, and it learns nothing transferable about nouns at other positions.
+
+<strong>It shares nothing across positions.</strong> A pattern learned at position 3 has to be learned again, separately, at position 40. Every position needs its own examples, so the data requirement multiplies by the sequence length.
+
+That third point is the deepest. It is the same argument as for convolution in images: without parameter sharing along the relevant axis, the model wastes capacity relearning the same thing.
+
+## The concrete failure
+
+Take sentiment classification on a fixed 100-word window with 300-dimensional embeddings. Flattened, that is 30,000 input values.
+
+- A first hidden layer of 512 units needs 30,000 × 512 = <strong>15.4 million weights</strong>, for one layer, on a task a recurrent model handles with a few hundred thousand.
+- "Not good" appearing at words 3&ndash;4 and at words 60&ndash;61 are, to the network, two unrelated patterns in unrelated input slots.
+- A 12-word review pads to 100, so 88% of the input is filler, and the network must learn to ignore it.
+- A 200-word review is truncated, and the second half is simply unavailable.
+
+Every one of those is a structural consequence of treating an ordered variable-length sequence as a fixed-size vector.
+
+## What each successor fixes
+
+|Architecture|Fixes|By|
+|---|---|---|
+|1-D CNN|Position sharing, some order|Sliding filters along the sequence|
+|RNN|Variable length, order, sharing|One state carried step by step|
+|LSTM / GRU|Long-range decay|Gated additive memory|
+|Transformer|Range and parallelism|Attention plus positional encoding|
+
+A <strong>1-D convolution</strong> is the smallest change that helps: a filter slides along the sequence, so a pattern learned anywhere applies everywhere, and the parameter count drops enormously. Its limit is the receptive field &mdash; a filter of width 5 sees five words, and reaching further needs depth.
+
+An <strong>RNN</strong> processes one element at a time, carrying a state, so the same weights apply at every position and any length is accepted. Its limit is gradient decay over distance, and no parallelism.
+
+A <strong>transformer</strong> makes every position one step from every other and computes them all simultaneously. Its limit is quadratic cost in length.
+
 ## Experiments to try
 
 1. <strong>Load the long sentence.</strong> The 9-word input overflows the 6 slots — the red strip shows words the network will simply never see.
@@ -26,3 +64,51 @@ Each forward pass is an island. When an ANN processes word 5, it retains nothing
 ## The short of it
 
 ANNs don't fail on sequences because they are weak — they fail because their architecture makes three promises (fixed size, unordered input, stateless processing) that sequential data breaks. Recurrent networks are the structural fix: variable-length input consumed one step at a time, with a hidden state that remembers.
+
+## Where a plain network is still fine
+
+The limitations are real and they are not universal. A feed-forward network on a fixed window is perfectly reasonable when:
+
+- <strong>The sequence has a genuinely fixed length</strong> &mdash; a sensor reading at 24 fixed hourly points, a form with a known number of fields.
+- <strong>The features are engineered summaries</strong> rather than raw sequence. Mean, standard deviation, trend, min and max over a window turn a sequence into a small fixed vector, and a plain network or a gradient-boosted model on those features is often excellent.
+- <strong>Order does not carry the signal</strong> &mdash; some classification tasks are genuinely bag-of-words problems.
+- <strong>You want a baseline.</strong> TF-IDF plus logistic regression is a feed-forward model on a fixed vector, and it is a strong baseline for text classification.
+
+That second row is worth emphasising because it is the pragmatic answer in time-series work: windowing plus engineered features plus gradient boosting frequently beats a sequence model on business data with limited history, and it is far cheaper to build.
+
+## The parameter-sharing principle
+
+Stepping back, the same idea appears wherever a structure repeats:
+
+|Domain|Repeats along|Shared by|
+|---|---|---|
+|Images|Space|Convolution filters|
+|Sequences|Time|Recurrent weights|
+|Sequences|Position|Transformer layers|
+|Graphs|Nodes|Message functions|
+
+In each case the model encodes an assumption: that a pattern is equally meaningful wherever it occurs. That assumption is what reduces the parameter count and the data requirement, and it is exactly what a plain feed-forward network lacks along the sequence axis.
+
+When the assumption is false &mdash; when absolute position genuinely matters &mdash; sharing hurts, which is why transformers need explicit positional encodings and why some vision tasks use locally-connected layers without sharing.
+
+## Questions people ask
+
+<strong>Can I just pad everything to a fixed length?</strong> You can, and you inherit wasted capacity on short inputs, truncation on long ones, and no sharing across positions.
+
+<strong>Is a 1-D CNN good enough for text?</strong> Often, for classification. It is fast and captures local phrases well. It cannot reach across a document the way attention can.
+
+<strong>Why do transformers need positional encodings if they handle sequences?</strong> Attention itself is order-blind &mdash; it computes a weighted mixture over a set. Position has to be injected separately.
+
+<strong>Do I always need a sequence model for time series?</strong> No. Windowing plus engineered features plus gradient boosting is a strong and often superior baseline.
+
+<strong>What about very long documents?</strong> Chunk them, embed each chunk, and pool or retrieve &mdash; or use a long-context model. Feeding 50,000 tokens to a standard transformer is expensive.
+
+<strong>Is order always important?</strong> No. For topic classification, bag-of-words often suffices. For anything involving negation, syntax or reasoning, it is essential.
+
+## Recap in one screen
+
+- A plain network needs fixed-size input, so sequences must be padded or truncated.
+- It treats each position as an unrelated input slot, so patterns are not shared across positions.
+- The parameter count explodes: a flattened 100-word window into 512 units is 15 million weights.
+- Convolutions share along position; RNNs carry a state; transformers attend across all positions.
+- Fixed-length or well-summarised sequences are still legitimate feed-forward problems.

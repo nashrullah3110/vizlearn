@@ -17,6 +17,46 @@ Three things are worth noticing. The hidden state is the <strong>memory</strong>
 
 That weight sharing is what makes the parameter count independent of sequence length &mdash; and it is exactly the same trick a convolution uses across space.
 
+## The unit that carries state
+
+A recurrent cell is the piece of a recurrent network that runs once per time step. It takes two things &mdash; the current input and its own state from the previous step &mdash; and produces a new state.
+
+<p class="mono-font">h&#7511; = cell(x&#7511;, h&#7511;&#8331;&#8321;)</p>
+
+For the simplest cell:
+
+<p class="mono-font">h&#7511; = tanh(W&#8341;&#8341; h&#7511;&#8331;&#8321; + W&#8339;&#8341; x&#7511; + b)</p>
+
+The state `hₜ` is a fixed-size vector that summarises everything seen so far. Its size is a hyperparameter &mdash; 128, 256, 512 &mdash; and it does not grow with the sequence, which is both the cell's defining strength and its defining limit.
+
+The <strong>same weights are used at every step</strong>. That is parameter sharing along time, and it is what lets one cell handle a sequence of any length with a fixed parameter count. A network with distinct weights per position would need a separate set for every possible length.
+
+## Three cells, in order of sophistication
+
+|Cell|State|Gates|Parameters per layer|
+|---|---|---|---|
+|Simple RNN|h|None|1 matrix|
+|GRU|h|2 (update, reset)|3 matrices|
+|LSTM|h and c|3 (forget, input, output)|4 matrices|
+
+<strong>The simple cell</strong> overwrites its state at every step. Whatever it knew is repeatedly transformed, and after fifty steps almost nothing survives. Gradients decay along the same path, so it cannot learn long-range dependencies. It is a teaching device rather than a practical choice.
+
+<strong>The GRU</strong> adds an update gate that interpolates between keeping the old state and replacing it, plus a reset gate controlling how much history the candidate sees. One state, two gates.
+
+<strong>The LSTM</strong> adds a separate cell state updated additively, with three gates deciding what to drop, what to store and what to expose. Two states, three gates.
+
+The pattern across the three is the same insight applied more thoroughly: <strong>give the state an additive path so information and gradients can survive many steps.</strong>
+
+## Why gating changes everything
+
+For the simple cell, the gradient across one step involves the derivative of tanh times the recurrent weight matrix &mdash; a quantity nothing keeps near 1, and usually below it. Over 50 steps the product collapses.
+
+For an LSTM, `∂cₜ/∂cₜ₋₁` is exactly the forget gate. When the network has learned to preserve something, that value is near 1 and the gradient passes back essentially undamped.
+
+That single derivative is the difference between failing at 20 steps and succeeding at 200. And it is structurally the same trick as a residual connection in a deep feed-forward network: an additive path with a derivative of 1.
+
+The practical guidance follows directly: <strong>use an LSTM or GRU, never `nn.RNN`.</strong> The extra cost is small and the difference in what can be learned is large.
+
 ## Things to try
 
 1. <strong>Feed one token at a time.</strong> Press <strong>Feed Next Token</strong> and watch the hidden state change. Each press mixes new input into the existing memory rather than replacing it.
@@ -42,3 +82,69 @@ The fix is to give the cell an explicit, <em>additive</em> memory channel with l
 ## In one line
 
 A recurrent cell applies one small network at every timestep, combining the current token with a hidden state that summarises everything before it, using the same weights throughout. That gives a fixed-size model the ability to read arbitrary-length sequences and to be sensitive to order. Its weakness is that memory is overwritten multiplicatively at each step, so information decays after roughly ten timesteps &mdash; the limitation that gated cells were invented to remove.
+
+## The cell versus the layer
+
+Frameworks distinguish two levels, and knowing which you want saves confusion.
+
+<strong>The cell</strong> processes one time step. `nn.LSTMCell` takes `(x, (h, c))` and returns the new states. You write the loop.
+
+<strong>The layer</strong> processes a whole sequence. `nn.LSTM` takes a `(batch, seq, features)` tensor and runs the loop internally, in optimised C or cuDNN.
+
+```python
+# the layer - what you almost always want
+lstm = nn.LSTM(300, 256, batch_first=True)
+out, (h, c) = lstm(x)                        # x: (batch, seq, 300)
+
+# the cell - when you need per-step control
+cell = nn.LSTMCell(300, 256)
+h, c = torch.zeros(b, 256), torch.zeros(b, 256)
+for t in range(seq_len):
+    h, c = cell(x[:, t], (h, c))
+```
+
+The layer is dramatically faster &mdash; often ten times or more &mdash; because it fuses the four gate matrices into one multiplication and uses hardware-optimised kernels. Write the loop only when you need something the layer cannot express: inspecting gates, applying custom logic between steps, scheduled sampling during training.
+
+## Two states, two purposes
+
+For an LSTM specifically, the distinction between the states is worth restating because it is the design's whole point.
+
+The <strong>cell state</strong> is private long-term memory. It is unbounded, updated additively, and passed only to the next time step.
+
+The <strong>hidden state</strong> is the working output. It is bounded by tanh, filtered by the output gate, and passed to three places: the next layer, the prediction head, and the next step's gate computations.
+
+That separation lets a cell hold information quietly without reporting it. A GRU, having only a hidden state, cannot make the distinction &mdash; whatever it remembers is what it outputs.
+
+## Where recurrent cells still fit
+
+Transformers displaced them for large-scale language work. The cases where a recurrent cell remains the better engineering choice are specific and real:
+
+- <strong>Streaming with bounded memory.</strong> One fixed-size state regardless of how much has been processed, where a transformer's KV cache grows with every token.
+- <strong>On-device inference.</strong> Small, fast, no attention kernels required.
+- <strong>Small datasets.</strong> The inductive bias helps where a transformer trained from scratch overfits.
+- <strong>Classical time series.</strong> Numeric sequences of moderate length, where windowing plus a GRU is a strong baseline.
+- <strong>Inside larger systems</strong>, as state trackers or encoders.
+
+State-space models such as Mamba are worth noting: they revisit recurrence with linear scaling in sequence length and are competitive with transformers on long sequences, which suggests the idea is not finished.
+
+## Questions people ask
+
+<strong>What is the difference between a cell and a layer?</strong> The cell handles one step; the layer runs the loop over a whole sequence and is much faster.
+
+<strong>Should I ever use `nn.RNN`?</strong> Only to demonstrate the problem it has. Use LSTM or GRU.
+
+<strong>How big should the hidden state be?</strong> 128&ndash;512 typically. Larger means more memory capacity and more parameters.
+
+<strong>Can I stack cells?</strong> Yes &mdash; each layer's outputs are the next layer's inputs. Two layers is the practical limit.
+
+<strong>Does the cell see the whole sequence?</strong> Not at once. It sees one element at a time, carrying a summary of the rest.
+
+<strong>Why can it not be parallelised?</strong> Step t needs `hₜ₋₁`, so the steps are strictly ordered. This is the structural reason transformers won at scale.
+
+## Recap in one screen
+
+- A recurrent cell maps the current input and the previous state to a new state, using the same weights every step.
+- The state is a fixed-size summary that does not grow with the sequence.
+- A simple cell overwrites its state and cannot learn long range; gating adds an additive path that preserves both information and gradients.
+- Use the layer (`nn.LSTM`) rather than the cell unless you need per-step control.
+- Still the right tool for streaming, on-device and small-data sequence work.

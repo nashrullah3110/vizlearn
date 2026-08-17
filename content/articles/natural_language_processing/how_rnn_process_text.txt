@@ -17,6 +17,47 @@ The visualization above "unrolls" the RNN loop, showing it as a sequence of iden
 
 A crucial concept in RNNs is <strong>shared weights</strong>. The same set of calculations (the same "brain") is used at every single time step. This is incredibly efficient. Instead of learning a new set of rules for the first word, second word, etc., the RNN learns a single set of rules for how to update its memory based on a new word and its previous memory. The "Parameters" calculation in the visualization shows the size of these shared weights.
 
+## One word at a time, carrying a state
+
+A recurrent network processes a sequence step by step. At each step it combines the current input with what it remembers from before:
+
+<p class="mono-font">h&#7511; = tanh(W&#8341;&#8341; h&#7511;&#8331;&#8321; + W&#8339;&#8341; x&#7511; + b)</p>
+
+`hₜ` is the hidden state &mdash; a fixed-size vector summarising everything seen so far. `xₜ` is the current word's embedding. The same weight matrices are used at every step, which is parameter sharing along the time axis.
+
+Walking through "the cat sat":
+
+|Step|Input|State contains|
+|---|---|---|
+|1|"the"|A determiner has appeared|
+|2|"cat"|A noun phrase, subject-like|
+|3|"sat"|A subject and its verb|
+
+Each state is a function of the current word and the previous state, so information propagates forward by being repeatedly transformed.
+
+That single design choice &mdash; one weight matrix reused at every step &mdash; is what lets an RNN handle sequences of any length with a fixed number of parameters.
+
+## The architectures it supports
+
+|Shape|Input &rarr; output|Example|
+|---|---|---|
+|Many-to-one|Sequence &rarr; one label|Sentiment classification|
+|Many-to-many, aligned|Sequence &rarr; sequence of the same length|Part-of-speech tagging|
+|Many-to-many, unaligned|Sequence &rarr; different-length sequence|Translation (encoder-decoder)|
+|One-to-many|One input &rarr; sequence|Image captioning|
+
+For classification, use the final hidden state &mdash; or better, pool over all states, since the final one is biased towards the end of the sequence.
+
+For an encoder-decoder, the encoder's final state is the "thought vector" passed to the decoder. That design is exactly where attention was invented: compressing a whole sentence into one fixed vector is a bottleneck, and letting the decoder look back at every encoder state instead removed it.
+
+## Two structural limitations
+
+<strong>Vanishing gradients.</strong> Backpropagation through 50 steps multiplies 50 Jacobian factors. If they average below 1, the gradient reaching step 1 is effectively zero, so the network cannot learn that step 1 mattered. Tanh's derivative is at most 1 and usually well below it, so decay is the default.
+
+<strong>No parallelism.</strong> Step t needs `hₜ₋₁`, so the steps must run in order. A GPU's thousands of cores sit mostly idle, and training time scales with sequence length. This is a hardware-utilisation problem, and it is the reason transformers displaced RNNs at scale rather than any single quality issue.
+
+The first was addressed by gating (LSTM, GRU). The second was not addressable within the recurrent framework at all &mdash; which is why the field moved to attention.
+
 ## Experiments to try
 
 Use the simulation to see how an RNN performs sentiment analysis (classifying a sentence as positive or negative):
@@ -30,3 +71,58 @@ Use the simulation to see how an RNN performs sentiment analysis (classifying a 
 ## Where that leaves you
 
 RNNs are designed for sequential data like text. Their core feature is the <strong>hidden state</strong>, a memory that is passed through time, allowing the network to remember previous inputs and understand context. By using shared weights, they can efficiently process sequences of any length, making them a cornerstone of modern Natural Language Processing.
+
+## Backpropagation through time
+
+Training an RNN means unrolling it. A 50-word sentence becomes a 50-layer feed-forward network that happens to share weights, and ordinary backpropagation is applied to that unrolled graph.
+
+The gradient for a shared weight is the <strong>sum</strong> of its gradients from every time step, since it was used at all of them.
+
+Two practical consequences:
+
+<strong>Memory grows with sequence length,</strong> because every step's activations must be stored for the backward pass. Long sequences exhaust memory quickly.
+
+<strong>Truncated BPTT</strong> is the standard remedy: backpropagate only k steps back (typically 20&ndash;50) rather than to the beginning. It bounds memory and compute, at the cost of not learning dependencies longer than k.
+
+Gradient clipping is essentially mandatory here. The same multiplication that vanishes gradients can explode them, and a single large gradient destroys the weights in one step.
+
+## Practical notes
+
+```python
+import torch.nn as nn
+
+rnn = nn.LSTM(300, 256, batch_first=True)      # prefer LSTM/GRU over nn.RNN
+out, (h, c) = rnn(packed_input)
+```
+
+`nn.RNN` &mdash; the plain version &mdash; is almost never the right choice; use an LSTM or GRU, which cost little more and train far better.
+
+Three details that matter with real text:
+
+<strong>Pack variable-length sequences.</strong> `pack_padded_sequence` tells the RNN to stop at each sequence's real end. Without it, the final hidden state summarises the padding rather than the sentence.
+
+<strong>Sort or bucket by length</strong> when batching, so batches contain similar lengths and less padding is wasted.
+
+<strong>Consider bidirectionality</strong> for classification and tagging &mdash; running one RNN forward and another backward and concatenating gives each position both left and right context. Not available for generation or streaming.
+
+## Questions people ask
+
+<strong>Are RNNs still used?</strong> Yes, in streaming inference with bounded memory, on-device models, small datasets and classical time-series work. Not for large-scale language modelling.
+
+<strong>Why does the same weight matrix apply at every step?</strong> Parameter sharing along time &mdash; the same reason a convolution shares filters across space. It lets one model handle any length.
+
+<strong>How long a sequence can an LSTM handle?</strong> Hundreds of steps in practice; thousands is unreliable. Transformers handle far longer, at quadratic cost.
+
+<strong>What is the hidden state size?</strong> A hyperparameter, typically 128&ndash;512. Larger means more memory capacity and more parameters.
+
+<strong>Can I stack RNN layers?</strong> Yes, and two is usually the practical limit &mdash; deeper stacks are hard to train.
+
+<strong>Why did transformers replace them?</strong> Parallelism across the sequence and constant path length between positions. Both are structural advantages that gating cannot provide.
+
+## Recap in one screen
+
+- An RNN carries a fixed-size hidden state, updated at each step from the input and the previous state.
+- The same weights are reused at every step, so one model handles any sequence length.
+- Training unrolls the sequence and sums each weight's gradient across all steps.
+- Vanishing gradients limit range (fixed by gating); the sequential dependency prevents parallelism (not fixable).
+- Pack variable-length batches, clip gradients, and prefer LSTM or GRU over the plain cell.

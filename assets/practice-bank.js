@@ -7498,7 +7498,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Forward, Then Backward”?",
-    "ans": "BPTT = unroll the loop, backpropagate through the chain, sum the shared-weight gradients. It makes RNNs trainable — but it also chains together T multiplications, and a long product of numbers below 1 races toward zero. That arithmetic inevitability is the vanishing gradient problem."
+    "ans": "A recurrent network is a loop, and gradients cannot flow through a loop directly. So training unrolls it: a 50-step sequence becomes a 50-layer feed-forward network in which every layer shares the same weight matrix."
    }
   ]
  },
@@ -7535,8 +7535,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A model that can see the future cannot be trained to predict it. If position 4 can attend to position 5, then \"predict the token at position 5\" is answered by copying it, and nothing is learned. So the two masks admit different training tasks."
    },
    {
-    "t": "What does this module say about “Which one to reach for”?",
-    "ans": "The industry has drifted decisively towards decoder-only for general systems, because one model that can be prompted to do anything beats a family of specialists — but for a high-volume classifier or a retrieval encoder, the small bidirectional model is still usually the right engineering answer."
+    "t": "What does this module say about “Two ways to train on the same architecture”?",
+    "ans": "BERT and GPT are both transformers. What separates them is which direction they can look and what they are trained to predict — and everything else follows from that one choice."
    }
   ]
  },
@@ -7641,16 +7641,12 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Embeddings are learned by training a deliberately simple model on a proxy task — predict a word from its context, or the context from the word — and keeping the embedding matrix while discarding everything else. Semantic structure emerges because words in similar contexts need similar vectors to make the prediction work."
+    "t": "What is meant by “Masked language modelling” here?",
+    "ans": "(BERT) hides 15% of tokens and predicts them from both directions."
    },
    {
-    "t": "What does this module say about “The distributional hypothesis”?",
-    "ans": "The whole field rests on one claim: a word is characterised by the company it keeps. Words appearing in similar contexts tend to mean similar things."
-   },
-   {
-    "t": "What does this module say about “Negative sampling”?",
-    "ans": "The naive setup predicts a probability distribution over the whole vocabulary, which means a softmax over 50,000 words for every training example. That is prohibitively expensive."
+    "t": "What is meant by “Next-token prediction” here?",
+    "ans": "(GPT) predicts each token from those before it."
    }
   ]
  },
@@ -7736,16 +7732,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "An n-gram model estimates the next word by counting how often each continuation followed the previous n−1 words, which makes it fast, interpretable, and trainable in a single pass. It is defeated by sparsity: the number of possible n-grams grows exponentially with n, so most sequences are never observed and smoothing is mandatory."
+    "t": "What is meant by “Features for classical classifiers” here?",
+    "ans": "TF-IDF over unigrams and bigrams, plus logistic regression, remains a strong baseline for text classification — and it trains in seconds."
    },
    {
-    "t": "What does this module say about “Counting, not learning”?",
-    "ans": "An n-gram model estimates the probability of a word from the n−1 words before it, using nothing but counts from a corpus:"
+    "t": "What is meant by “Character n-grams” here?",
+    "ans": "for language identification, authorship attribution and handling misspellings. Character 3-grams are remarkably effective at identifying a language from a short string."
    },
    {
-    "t": "What does this module say about “Choosing n”?",
-    "ans": "This is a bias–variance trade in a very concrete form. Small n generalises but ignores context; large n captures context but has seen almost nothing."
+    "t": "What is meant by “Autocomplete and query suggestion,” here?",
+    "ans": "where a count-based model over query logs is fast and adequate."
+   },
+   {
+    "t": "What is meant by “Spelling correction” here?",
+    "ans": "and fuzzy matching, using character n-gram overlap."
    }
   ]
  },
@@ -7782,8 +7782,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Layer norm sidesteps all three. It uses only the sample’s own features, so it is independent of batch size, identical at training and inference, and unaffected by how many other sequences are present or how long they are."
    },
    {
-    "t": "What does this module say about “The variants worth knowing”?",
-    "ans": "The placement matters too. Original transformers put layer norm after the residual addition (post-norm); modern ones put it before the sublayer (pre-norm), which makes deep stacks far easier to train and often removes the need for a learning-rate warmup."
+    "t": "What does this module say about “Two different meanings of \"normalisation\"”?",
+    "ans": "The word covers two unrelated operations in sequence work, and conflating them causes confusion."
    }
   ]
  },
@@ -7801,8 +7801,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "$H_t$ is not just the cell's answer — it is also half of the input to the next time step, where it will help compute all four layers again. So the Output Gate does double duty: it decides what the outside world sees, and it decides what the cell tells its own future self. A closed output gate leaves the next step reasoning almost entirely from the incoming token."
    },
    {
-    "t": "What does this module say about “Things to try”?",
-    "ans": "The Output Gate separates having information from using it. Together with the Forget Gate (what to erase), the Input Gate (what to write), and the Candidate (what the content is), it completes the four-layer machine that makes an LSTM cell work — and explains why it costs four times a simple RNN's parameters."
+    "t": "What does this module say about “Deciding what to expose”?",
+    "ans": "The cell state holds everything the LSTM is carrying. The output gate decides how much of it to reveal as this step's output."
    }
   ]
  },
@@ -7836,7 +7836,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “A soft dictionary lookup”?",
-    "ans": "Think of a Python dictionary. You supply a key, it matches one stored key exactly, and you get back its value. Attention is the same operation with the hard edges removed:"
+    "ans": "Attention is easiest to read as a lookup that returns a blend rather than one entry."
    },
    {
     "t": "What does this module say about “Why keys and values are separate”?",
@@ -7907,16 +7907,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "The choice between stemming and lemmatization is a trade-off. Stemming is fast and good enough for many applications, but it can be inaccurate. Lemmatization is more accurate and provides meaningful root words, but it comes at a higher computational cost. Choose the tool that best fits the needs of your specific NLP task."
+    "t": "What is meant by “Lemmatising without a part of speech,” here?",
+    "ans": "so verbs and adjectives are treated as nouns and left unchanged."
    },
    {
-    "t": "What does this module say about “The Goal: Text Normalization”?",
-    "ans": "In Natural Language Processing (NLP), we often need to treat different forms of a word as the same. For example, \"run\", \"running\", and \"ran\" all refer to the same basic concept. The process of reducing these variations down to a common base form is called text normalization . Stemming and lemmatization are two popular techniques for achieving this."
+    "t": "What is meant by “Using an English stemmer on other languages” here?",
+    "ans": "Suffix rules are language-specific, and applying English ones to German or Turkish produces nonsense."
    },
    {
-    "t": "What does this module say about “Key Takeaway: Speed vs. Accuracy”?",
-    "ans": "The choice between stemming and lemmatization is a trade-off. Stemming is fast and good enough for many applications, but it can be inaccurate. Lemmatization is more accurate and provides meaningful root words, but it comes at a higher computational cost. Choose the tool that best fits the needs of your specific NLP task."
+    "t": "What is meant by “Stemming before a transformer” here?",
+    "ans": "Destroys information and creates out-of-vocabulary fragments."
+   },
+   {
+    "t": "What is meant by “Stemming the query but not the index” here?",
+    "ans": "(or vice versa) in a search system, so nothing matches."
    }
   ]
  },
@@ -7934,8 +7938,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Once you accept that text must become numbers, the question is which numbers. The four classic answers form a ladder — each rung keeps more information or removes more distortion than the one below it."
    },
    {
-    "t": "What does this module say about “Experiments to try”?",
-    "ans": "Sparse encodings are a progression of fixes: one-hot removes label encoding's fake ordering, bag-of-words adds document structure, TF-IDF suppresses noise words. What none of them can do is say that \"cat\" and \"kitten\" are related — for that you need embeddings , the subject of the next module."
+    "t": "What does this module say about “From words to numbers, four ways”?",
+    "ans": "Every model needs numbers. The methods form a clear progression, each fixing a limitation of the last."
    }
   ]
  },
@@ -7945,16 +7949,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "What does this module say about “What is Text Normalization”?",
-    "ans": "Text normalization is the process of transforming raw, unstructured text into a clean, standardized format that can be easily understood and analyzed by machines. Think of it as a \"clean-up\" phase for your text data. Computers are literal and see \"Run\", \"run\", and \"running\" as three completely different words."
+    "t": "What is meant by “Observe the Order” here?",
+    "ans": "Try changing the order of operations (though the visualizer has a fixed order, imagine swapping them). What happens if you remove stopwords *before* converting to lowercase? The word \"The\" would not be removed because it doesn't match the lowercase \"the\" in the stopword list. This highlights why the pipeline's sequence is important."
    },
    {
-    "t": "What does this module say about “Why is a Pipeline Necessary”?",
-    "ans": "Real-world text is messy. It's filled with inconsistencies like capitalization, punctuation, numbers, and special characters that add little to no semantic value for many NLP tasks. A text normalization pipeline is a series of sequential steps designed to methodically remove this \"noise.\" By applying these steps in a specific order, we can ensure that the final text is clean and ready for more advanced processing, su..."
+    "t": "What is meant by “Toggle Steps On and Off” here?",
+    "ans": "Run the pipeline with only \"Lowercase\" and \"Remove Punctuation\" enabled. Then, progressively add more steps. Notice how the character count and the text itself change with each addition. This demonstrates the impact of each normalization technique."
    },
    {
-    "t": "What does this module say about “Exploring the Pipeline Steps”?",
-    "ans": "Let's break down the common steps you'll find in a text normalization pipeline, all of which you can toggle in the interactive tool."
+    "t": "What is meant by “Use Different Inputs” here?",
+    "ans": "Try pasting in different kinds of text. Use a formal sentence, a casual tweet with hashtags and mentions, and a line of code. See how the pipeline handles each one. This will build your intuition for where and why text normalization is so crucial in the world of NLP."
    }
   ]
  },
@@ -8002,16 +8006,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "The vanishing gradient problem is not a bug or a tuning issue — it is the inescapable arithmetic of multiplying T numbers that aren't exactly 1. It caps how far back a vanilla RNN can learn, and it is the direct reason LSTMs, GRUs, and ultimately attention-based Transformers exist."
+    "t": "What is meant by “Use an LSTM or GRU” here?",
+    "ans": "rather than a plain RNN. This is the main fix, and it is free."
    },
    {
-    "t": "What does this module say about “The Arithmetic of Forgetting”?",
-    "ans": "BPTT multiplies the gradient by ∂hₜ/∂hₜ₋₁ once per timestep. Call that factor's typical size w . After travelling back T steps the gradient is scaled by w T — a geometric series. At w = 0.7 and T = 30, that's 0.7³⁰ ≈ 0.00002: the beginning of the sentence receives two hundred-thousandths of the learning signal."
+    "t": "What is meant by “Orthogonal initialisation” here?",
+    "ans": "of the recurrent matrix keeps its singular values at 1, so the product neither grows nor shrinks initially."
    },
    {
-    "t": "What does this module say about “The Way Out: Gates”?",
-    "ans": "The vanishing gradient problem is not a bug or a tuning issue — it is the inescapable arithmetic of multiplying T numbers that aren't exactly 1. It caps how far back a vanilla RNN can learn, and it is the direct reason LSTMs, GRUs, and ultimately attention-based Transformers exist."
+    "t": "What is meant by “Shorter sequences,” here?",
+    "ans": "or truncated backpropagation through time, which bounds how far gradients must travel."
+   },
+   {
+    "t": "What is meant by “Attention,” here?",
+    "ans": "which removes the distance dependence entirely."
    }
   ]
  },
@@ -8088,8 +8096,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A bidirectional layer runs two entirely separate recurrent cells with their own weights. The forward cell reads left to right; the backward cell reads the same sequence right to left. At each position their hidden states are concatenated:"
    },
    {
-    "t": "What does this module say about “When you cannot use it”?",
-    "ans": "A bidirectional layer requires the entire sequence before it can produce any output, because the backward pass starts at the end. That rules it out whenever the future genuinely is not available:"
+    "t": "What does this module say about “Reading the sequence twice”?",
+    "ans": "A forward LSTM at word 5 knows words 1 to 5. A bidirectional layer runs a second, independent LSTM backwards — from the end to the beginning — and concatenates the two hidden states at each position."
    }
   ]
  },
@@ -8107,8 +8115,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "zₜ = σ(W⃂xₜ + U⃂hₜ₋₁) · rₜ = σ(Wᵣxₜ + Uᵣhₜ₋₁) h̃ₜ = tanh(W·xₜ + U·(rₜ⊙hₜ₋₁)) hₜ = zₜ⊙hₜ₋₁ + (1 − zₜ)⊙h̃ₜ"
    },
    {
-    "t": "What does this module say about “Summing up”?",
-    "ans": "The GRU keeps the essential insight of gating — memory updates as learned, per-dimension decisions — while cutting a gate, a state track, and a quarter of the parameters. Both LSTM and GRU still read strictly left-to-right, though. What if the meaning of a word depends on what comes after it? That is the next module: bidirectional processing."
+    "t": "What does this module say about “LSTM vs GRU at a Glance”?",
+    "ans": "A GRU is an LSTM with the design simplified. It merges the forget and input gates into a single update gate , and it drops the separate cell state — there is only the hidden state."
    }
   ]
  },
@@ -8118,16 +8126,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A recurrent cell applies one small network at every timestep, combining the current token with a hidden state that summarises everything before it, using the same weights throughout. That gives a fixed-size model the ability to read arbitrary-length sequences and to be sensitive to order."
+    "t": "What is meant by “Streaming with bounded memory” here?",
+    "ans": "One fixed-size state regardless of how much has been processed, where a transformer's KV cache grows with every token."
    },
    {
-    "t": "What does this module say about “The problem with feeding a sentence to a normal network”?",
-    "ans": "A feedforward network has a fixed number of inputs. A sentence does not have a fixed number of words. You can pad everything to a maximum length, but then the model has no notion that word 3 comes before word 4 — each position gets its own independent weights, so “dog bites man” and “man bites dog” are unrelated inputs as far as it is concerned."
+    "t": "What is meant by “On-device inference” here?",
+    "ans": "Small, fast, no attention kernels required."
    },
    {
-    "t": "What does this module say about “The recurrence, written out”?",
-    "ans": "At each timestep t the cell takes the current input x t and the previous hidden state h t−1 , and produces a new hidden state:"
+    "t": "What is meant by “Small datasets” here?",
+    "ans": "The inductive bias helps where a transformer trained from scratch overfits."
+   },
+   {
+    "t": "What is meant by “Classical time series” here?",
+    "ans": "Numeric sequences of moderate length, where windowing plus a GRU is a strong baseline."
    }
   ]
  },
@@ -8145,8 +8157,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "In a classic spreadsheet-style dataset, each row is independent: shuffling the rows of a housing-price table changes nothing about what a model can learn. Sequential data breaks this assumption in two ways:"
    },
    {
-    "t": "What does this module say about “Experiments to try”?",
-    "ans": "A sequence is not just a set of values — it is values plus their order . Any model that throws the order away (like a bag of words) throws information away with it. Everything else in this NLP track — sliding windows, encodings, embeddings, recurrent cells — exists to let neural networks use that ordering information instead of losing it."
+    "t": "What does this module say about “Order is part of the data”?",
+    "ans": "A sequence is data where the order carries meaning. Shuffle it and you have destroyed information, not merely rearranged it."
    }
   ]
  },
@@ -8156,16 +8168,12 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Text encoding isn't a preprocessing nicety — it is the bridge without which no NLP is possible. A neural network can no more process the raw word \"cat\" than a calculator can. First we turn language into numbers; everything else in NLP is about turning it into good numbers."
+    "t": "What is meant by “Normalise” here?",
+    "ans": "— Unicode form, whitespace, markup. Not case or punctuation."
    },
    {
-    "t": "What does this module say about “The One-Sentence Argument”?",
-    "ans": "Every neuron in every network — from a 1958 perceptron to GPT — computes some flavour of w · x + b . Multiplication is only defined for numbers. Therefore, before any text can enter any network, it must be converted into numbers. That conversion is text encoding , and it isn't an optimization — it's a precondition."
-   },
-   {
-    "t": "What does this module say about “What \"Feeding Raw Text\" Actually Does”?",
-    "ans": "Try to compute 0.5 × \"cat\" + 0.1 in any language and you get an error or NaN — the arithmetic is simply undefined. In practice a framework like PyTorch refuses at the door: tensors hold floats, not strings. The demo above makes this failure visible instead of hiding it in a stack trace."
+    "t": "What is meant by “Tokenise” here?",
+    "ans": "into subwords with the model's own tokeniser."
    }
   ]
  },
@@ -8175,16 +8183,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A word cloud encodes frequency as font size and nothing else — position, colour and rotation are layout, not data. It needs stopword removal to say anything at all, and TF-IDF rather than raw frequency to show what is distinctive rather than merely common. Treat it as a fast exploratory glance at a corpus, and reach for a bar chart whenever the question is how much bigger one term is than another."
+    "t": "What is meant by “Stop words are language-specific” here?",
+    "ans": "An English list applied to French text leaves \"le\", \"de\" and \"et\" dominating."
    },
    {
-    "t": "What does this module say about “What the picture encodes”?",
-    "ans": "Font size maps to frequency: the most common word is largest, and everything else is scaled relative to it. Position, colour and rotation almost always carry no information — they are chosen by a layout algorithm packing shapes into a space without overlap."
+    "t": "What is meant by “Domain stop words matter too” here?",
+    "ans": "In product reviews, \"product\", \"item\" and the brand name are noise; add them to the list."
    },
    {
-    "t": "What does this module say about “Why stopwords have to go”?",
-    "ans": "Run a word cloud on raw English text and you get the , of , and , to , a in enormous type. These are the most frequent words in almost any corpus and they tell you nothing about the subject."
+    "t": "What is meant by “Lemmatise or accept duplicates” here?",
+    "ans": "\"Run\", \"runs\" and \"running\" appear as three words otherwise."
+   },
+   {
+    "t": "What is meant by “Watch for a dominating single term” here?",
+    "ans": "that compresses everything else to illegibility. A log scale on the weights helps."
    }
   ]
  },

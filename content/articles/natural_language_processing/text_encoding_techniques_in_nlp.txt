@@ -13,6 +13,48 @@ Once you accept that text must become numbers, the question is <em>which</em> nu
 
 <strong>Bag of words</strong> moves from single words to whole documents: each document becomes a vector of word counts. Suddenly documents can be compared — but frequent filler words like "the" dominate the counts while carrying no meaning. <strong>TF-IDF</strong> fixes that with a reweighting: term frequency (how often a word appears in <em>this</em> document) multiplied by inverse document frequency (how rare it is <em>across</em> documents). Words that appear everywhere score near zero; words distinctive to one document light up.<p>tf-idf(w, d) = tf(w, d) &times; log(N / df(w))</p>
 
+## From words to numbers, four ways
+
+Every model needs numbers. The methods form a clear progression, each fixing a limitation of the last.
+
+|Technique|Represents|Captures order?|Captures meaning?|
+|---|---|---|---|
+|One-hot|One position per word|No|No|
+|Bag of words|Word counts per document|No|No|
+|TF-IDF|Weighted counts|No|Weakly &mdash; via rarity|
+|Word embeddings|Learned dense vectors|No|Yes|
+|Contextual embeddings|Vectors computed in context|Yes|Yes|
+
+<strong>One-hot</strong> gives each word a vector of zeros with a single 1. With a 50,000-word vocabulary that is a 50,000-dimensional vector per word, and every pair of words is equally distant &mdash; "cat" is no closer to "dog" than to "bureaucracy".
+
+<strong>Bag of words</strong> counts occurrences per document, producing one vector per document rather than per word. Simple, surprisingly effective for classification, and it discards order entirely: "the dog bit the man" and "the man bit the dog" are identical.
+
+## TF-IDF, and why rarity matters
+
+Raw counts overweight common words. "The" appears in every document and tells you nothing about which document you are looking at.
+
+TF-IDF multiplies two terms:
+
+<p class="mono-font">TF-IDF = (count in this document) &times; log(total documents / documents containing the word)</p>
+
+The second factor is the <strong>inverse document frequency</strong>. A word appearing in every document has an IDF near zero and is effectively discarded. A word appearing in a handful gets a large weight, because its presence is informative.
+
+Worked through: with 1,000 documents, a word in all 1,000 has IDF = log(1) = 0. A word in 10 has IDF = log(100) = 4.6. So the rare word's contribution is amplified and the ubiquitous one's is erased &mdash; automatic stop-word removal, without a list.
+
+That is why TF-IDF plus logistic regression remains a strong, fast baseline for text classification and should be the first thing you try before reaching for a transformer.
+
+## What embeddings add
+
+The gap between TF-IDF and embeddings is generalisation across words.
+
+To TF-IDF, "excellent" and "superb" are two unrelated columns. A model trained on documents containing "excellent" learns nothing about documents containing "superb". Embeddings place them near each other, so evidence transfers.
+
+<strong>Static embeddings</strong> (Word2Vec, GloVe, FastText) give one vector per word. Good, and blind to context &mdash; "bank" has one vector.
+
+<strong>Contextual embeddings</strong> (BERT, GPT and successors) compute a vector per occurrence from the surrounding words, resolving ambiguity and capturing order.
+
+To represent a whole document with static embeddings, the usual approach is to average the word vectors &mdash; which works better than it should and still loses order. Sentence encoders trained with a similarity objective do the job properly.
+
 ## Experiments to try
 
 1. <strong>Walk the tabs left to right</strong> with the default corpus. Watch the representation grow from a simple ID list to a weighted document-term matrix.
@@ -22,3 +64,59 @@ Once you accept that text must become numbers, the question is <em>which</em> nu
 ## What to remember
 
 Sparse encodings are a progression of fixes: one-hot removes label encoding's fake ordering, bag-of-words adds document structure, TF-IDF suppresses noise words. What none of them can do is say that "cat" and "kitten" are related — for that you need <strong>embeddings</strong>, the subject of the next module.
+
+## Choosing for the job
+
+|Situation|Reach for|
+|---|---|
+|Fast baseline, any classification task|TF-IDF + logistic regression|
+|Small labelled dataset, need accuracy|Sentence embeddings + a simple classifier|
+|Semantic search, RAG, deduplication|Sentence embeddings|
+|Token-level tasks (NER, tagging)|Contextual embeddings from a transformer|
+|Interpretability required|TF-IDF &mdash; coefficients map to words|
+|Noisy text, misspellings, many languages|Character n-grams, or FastText|
+|Generation of any kind|A decoder-only language model|
+
+Two observations from practice. TF-IDF is not a toy &mdash; on topic classification with plenty of labels it frequently matches a fine-tuned transformer at a thousandth of the cost. And embedding a document and training a small classifier on the vectors often beats fine-tuning when labels are scarce, because there is far less to overfit.
+
+```python
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+
+model = make_pipeline(
+    TfidfVectorizer(ngram_range=(1, 2), min_df=3, sublinear_tf=True),
+    LogisticRegression(max_iter=1000),
+)
+model.fit(train_texts, train_labels)     # a strong baseline in three lines
+```
+
+## Sparse versus dense, in practice
+
+<strong>Sparse</strong> representations (one-hot, bag of words, TF-IDF) are wide and mostly zero. Keep them in sparse matrices &mdash; never call `.toarray()` on a large one &mdash; and use models that handle sparsity natively: linear models, Naive Bayes, LightGBM.
+
+<strong>Dense</strong> representations (embeddings) are compact and every dimension is used. They need less memory per document, support fast similarity search, and are not interpretable dimension by dimension.
+
+A useful hybrid exists and is standard in production retrieval: combine a sparse keyword score (BM25, a refined TF-IDF) with a dense embedding score. Keyword search catches exact terms, names and numbers that embeddings blur; embeddings catch paraphrase that keywords miss. Together they beat either alone, which is why "hybrid search" is the default recommendation for RAG systems.
+
+## Questions people ask
+
+<strong>Is TF-IDF outdated?</strong> No. It is fast, interpretable, needs no GPU, and remains competitive on topic classification with adequate labels.
+
+<strong>What is BM25?</strong> A refinement of TF-IDF with term-frequency saturation and document-length normalisation. The standard keyword retrieval function, and better than plain TF-IDF for search.
+
+<strong>Should I average word embeddings for a sentence?</strong> It works as a baseline and loses word order. A sentence encoder is materially better.
+
+<strong>How do I pick the vocabulary size?</strong> Via `min_df` &mdash; drop terms appearing in fewer than three to five documents. That usually removes most of the vocabulary and almost none of the signal.
+
+<strong>Do I still need stop-word removal with TF-IDF?</strong> Rarely &mdash; IDF already suppresses ubiquitous words.
+
+<strong>Which encoding for a language model?</strong> Subword tokenisation into learned embeddings, contextualised by the model itself. The earlier techniques do not apply.
+
+## Recap in one screen
+
+- One-hot has no notion of similarity; bag of words counts and discards order.
+- TF-IDF weights by rarity, which erases ubiquitous words automatically and makes a strong fast baseline.
+- Embeddings add generalisation across similar words; contextual ones add order and disambiguation.
+- Keep sparse representations sparse, and use sparse-aware models.
+- Hybrid retrieval &mdash; keyword plus embedding &mdash; beats either alone, which is why production search uses both.

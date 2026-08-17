@@ -13,12 +13,16 @@ The underlying simplification is the <strong>Markov assumption</strong>: that on
 
 ## Choosing n
 
-- <strong>n = 1 (unigram)</strong> &mdash; no context at all, just word frequency. Generates word salad.
-- <strong>n = 2 (bigram)</strong> &mdash; one word of context. Locally plausible, globally incoherent.
-- <strong>n = 3 (trigram)</strong> &mdash; the traditional sweet spot, and the workhorse of speech recognition for decades.
-- <strong>n = 5+</strong> &mdash; better context in principle, and almost every 5-gram you meet at test time was never seen in training.
+|n|Behaviour|
+|---|---|
+|1|No word order at all; smallest feature set|
+|2|Captures negation and common phrases; usually worth it|
+|3|Some benefit, considerably sparser|
+|4+|Rarely justified for features; used in language models with heavy smoothing|
 
-This is a bias&ndash;variance trade in a very concrete form. Small n generalises but ignores context; large n captures context but has seen almost nothing.
+For classification features, `(1, 2)` is the standard choice and the marginal gain from trigrams is usually small relative to the extra columns.
+
+For a count-based language model, trigrams to 5-grams with Kneser-Ney smoothing was the state of the art for years, and it needed large corpora to estimate.
 
 ## The sparsity wall
 
@@ -27,6 +31,48 @@ The counts grow catastrophically. With a 50,000-word vocabulary there are 2.5 bi
 So most n-grams have a count of zero, and a zero count means a probability of zero &mdash; the model declares a perfectly ordinary sentence impossible because it happens not to have seen one four-word span before. Worse, one zero anywhere makes the probability of the whole sentence zero.
 
 The fixes are all forms of <strong>smoothing</strong>. Add-one (Laplace) smoothing adds a pseudocount to everything, which is simple and crude. <strong>Backoff</strong> falls back to a shorter n-gram when the longer one is unseen. <strong>Kneser-Ney</strong>, the best of the classical methods, discounts observed counts and redistributes the mass according to how many distinct contexts a word appears in &mdash; capturing that <em>Francisco</em> is common but only ever after <em>San</em>.
+
+## Counting sequences of words
+
+An n-gram is a contiguous run of n items. For "the cat sat on the mat":
+
+|n|Name|Grams|
+|---|---|---|
+|1|Unigram|the, cat, sat, on, the, mat|
+|2|Bigram|the cat, cat sat, sat on, on the, the mat|
+|3|Trigram|the cat sat, cat sat on, sat on the, on the mat|
+
+Why bother beyond unigrams? Because word order carries meaning that a bag of individual words discards. "Not good" and "good not" have identical unigrams; as bigrams they are distinguishable. Sentiment classification improves measurably from bigrams for exactly this reason.
+
+The cost is the vocabulary. With 10,000 distinct words there are up to 100 million possible bigrams and a trillion trigrams. Almost all are absent from any real corpus, so the feature matrix becomes enormous and extremely sparse.
+
+That trade &mdash; more context against exponentially more features &mdash; is the whole subject.
+
+## As a language model
+
+Before neural networks, next-word prediction was done by counting. An n-gram language model estimates:
+
+<p class="mono-font">P(w&#7511; | w&#8321; &hellip; w&#7511;&#8331;&#8321;) &asymp; P(w&#7511; | w&#7511;&#8331;&#8345;&#8330;&#8321; &hellip; w&#7511;&#8331;&#8321;)</p>
+
+The approximation is the <strong>Markov assumption</strong>: only the previous n&minus;1 words matter. For a trigram model, the probability of the next word depends on the two before it and nothing further back.
+
+Estimation is division: count how often "sat on the" was followed by "mat", divide by how often "sat on the" appeared at all.
+
+Two problems arise immediately, and the fixes are classic:
+
+<strong>Unseen sequences get probability zero</strong>, which zeroes the probability of the whole sentence. <strong>Smoothing</strong> fixes it &mdash; add-one (Laplace) is the simplest, and Kneser-Ney is the one that actually works well, because it accounts for how many different contexts a word appears in.
+
+<strong>Longer n means better context and sparser counts.</strong> <strong>Backoff</strong> and interpolation handle it by falling back to shorter n-grams when the longer one has no data.
+
+## Why neural models replaced them
+
+Two limitations are structural, not fixable by better smoothing.
+
+<strong>No generalisation across similar words.</strong> A trigram model that has seen "the black cat" learns nothing about "the dark cat" &mdash; the two contexts are entirely separate counts. An embedding-based model places "black" and "dark" near each other, so evidence transfers.
+
+<strong>No long-range dependency.</strong> A 5-gram model cannot connect a pronoun to a noun seven words earlier. Increasing n makes the counts too sparse to estimate long before the range becomes useful.
+
+Neural language models solved both &mdash; distributed representations generalise across words, and recurrence or attention reaches arbitrary distances. That is the whole reason the field moved.
 
 ## Interactive Exploration Guide
 
@@ -45,3 +91,50 @@ The fixes are all forms of <strong>smoothing</strong>. Add-one (Laplace) smoothi
 ## In one line
 
 An n-gram model estimates the next word by counting how often each continuation followed the previous n&minus;1 words, which makes it fast, interpretable, and trainable in a single pass. It is defeated by sparsity: the number of possible n-grams grows exponentially with n, so most sequences are never observed and smoothing is mandatory. Neural language models replaced it precisely because embeddings let them generalise across similar contexts rather than requiring each one to have been seen.
+
+## Where n-grams are still used
+
+They have not disappeared, because counting is cheap, interpretable and needs no training:
+
+- <strong>Features for classical classifiers.</strong> TF-IDF over unigrams and bigrams, plus logistic regression, remains a strong baseline for text classification &mdash; and it trains in seconds.
+- <strong>Character n-grams</strong> for language identification, authorship attribution and handling misspellings. Character 3-grams are remarkably effective at identifying a language from a short string.
+- <strong>Autocomplete and query suggestion,</strong> where a count-based model over query logs is fast and adequate.
+- <strong>Spelling correction</strong> and fuzzy matching, using character n-gram overlap.
+- <strong>Evaluation metrics.</strong> BLEU and ROUGE, still standard for translation and summarisation, are n-gram overlap measures.
+- <strong>Plagiarism and duplicate detection,</strong> via shared n-gram fingerprints.
+
+```python
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+vec = TfidfVectorizer(ngram_range=(1, 2),     # unigrams and bigrams
+                      min_df=3,               # drop very rare grams
+                      max_features=50_000,
+                      sublinear_tf=True)
+X = vec.fit_transform(docs)
+```
+
+`min_df` and `max_features` are what keep this tractable &mdash; without them, bigrams alone can produce millions of columns, almost all appearing once.
+
+For character n-grams, `analyzer="char_wb", ngram_range=(3, 5)` is a strong setting for noisy or multilingual text.
+
+## Questions people ask
+
+<strong>Are n-grams obsolete?</strong> As language models, largely. As features, as evaluation metrics and for character-level tasks, no.
+
+<strong>Why does adding bigrams help sentiment analysis?</strong> Because "not good" is the signal, and unigrams cannot represent it.
+
+<strong>What is the Markov assumption?</strong> That only the last n&minus;1 items matter. It is false and useful.
+
+<strong>How do I handle unseen n-grams?</strong> Smoothing and backoff for a language model; `min_df` and a fixed vocabulary for features.
+
+<strong>Should I use word or character n-grams?</strong> Words for clean text in a known language; characters for noisy text, misspellings, multiple languages and short strings.
+
+<strong>Is BLEU an n-gram metric?</strong> Yes &mdash; it measures overlap of n-grams up to 4 between a candidate and reference, with a brevity penalty.
+
+## Recap in one screen
+
+- An n-gram is a run of n consecutive items; going beyond unigrams reintroduces word order.
+- Feature count grows explosively with n, so `min_df` and a capped vocabulary are essential.
+- As a language model, n-grams assume only the last n&minus;1 words matter, and need smoothing for unseen sequences.
+- They cannot generalise across similar words or reach long distances &mdash; which is why neural models replaced them.
+- Still used for classical features, character-level tasks, autocomplete, and BLEU/ROUGE evaluation.
