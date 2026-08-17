@@ -1,11 +1,65 @@
 title: Why does `is` sometimes work on strings?
 intro: Why does &#x27;a&#x27; is &#x27;a&#x27; return True, and why should you never rely on it?
 
+## The two operators
+
+`==` compares <strong>values</strong>. `is` compares <strong>identity</strong> &mdash; whether two names refer to the same object in memory.
+
+```python
+a = "hello"
+b = "hello"
+a == b          # True  -- same characters
+a is b          # True  -- and, here, the same object
+
+x = "hello world!"
+y = "hello world!"
+x == y          # True
+x is y          # True or False, depending on how they were created
+```
+
+That last pair is the whole problem: `is` on strings gives answers that depend on interpreter internals, so code relying on it works in testing and fails somewhere else.
+
+<strong>The rule is short: use `==` for values, and `is` only for `None`, `True`, `False`, and genuine identity checks.</strong>
+
 ## What interning is
 
-CPython keeps a table of strings and reuses the entry rather than allocating a second identical object. Identifiers, and literals in compiled code that look like identifiers, go in it automatically. The payoff is real: comparing interned strings can short-circuit on a pointer comparison, and attribute lookup does this constantly.
+CPython keeps a table of strings so that identical text can share one object, saving memory and making comparison fast &mdash; two interned strings can be compared by pointer.
 
-Immutability is what makes it legal. Sharing one object between unrelated pieces of code would be a disaster if either could modify it.
+Which strings get interned is an implementation detail, and roughly:
+
+|String|Interned?|
+|---|---|
+|String literals in source code|Usually|
+|Identifier-like text (`"abc"`, `"x_1"`)|Usually|
+|Containing spaces or punctuation|<strong>Often not</strong>|
+|Built at runtime by concatenation|<strong>No</strong>|
+|Read from a file or network|No|
+|Short: `""`, single characters|Yes|
+
+```python
+a = "hello"
+b = "hello"
+a is b                       # True -- literal, identifier-like
+
+c = "".join(["hel", "lo"])
+a is c                       # False -- built at runtime
+a == c                       # True  -- and equal, which is what matters
+
+sys.intern(c) is a           # True -- forced into the table
+```
+
+The dangerous part is not that `is` returns False. It is that it returns <strong>True often enough to look correct</strong>. A test with short literals passes, and production data read from a socket fails the same check.
+
+The identical trap exists for small integers: CPython preallocates &minus;5 to 256, so `256 is 256` is True and `257 is 257` may be False. Same lesson, different type.
+
+```python
+a, b = 256, 256
+a is b          # True  -- cached
+a, b = 257, 257
+a is b          # False in many contexts
+```
+
+Python emits a `SyntaxWarning` for `is` against a literal precisely because this is such a reliable source of bugs.
 
 ## Why it is a trap
 
@@ -18,3 +72,73 @@ Code that uses <code>is</code> on strings therefore works in testing, works in t
 Use <code>==</code> for strings, always. Use <code>is</code> only for singletons &mdash; <code>None</code>, <code>True</code>, <code>False</code> &mdash; where identity <em>is</em> the intended test.
 
 There is one legitimate use of interning: <code>sys.intern(s)</code>, called deliberately on a large set of repeated strings such as parsed field names, cuts memory and speeds up dictionary lookups. That is opting in, which is different from relying on a coincidence.
+
+## When `is` is the right operator
+
+Three legitimate uses, and they are the only ones worth defending in review:
+
+<strong>Singleton comparison.</strong> `None`, `True` and `False` are unique objects, so identity is exactly right &mdash; and `x is None` also cannot be fooled by a class that overrides `__eq__`:
+
+```python
+if x is None: ...
+if flag is True: ...          # when you mean the object, not truthiness
+```
+
+<strong>Sentinel values,</strong> where "not supplied" must be distinguishable from any legal value including `None`:
+
+```python
+_MISSING = object()
+
+def get(key, default=_MISSING):
+    if default is _MISSING:       # only identity can test this
+        raise KeyError(key)
+    return default
+```
+
+<strong>Genuine identity questions</strong> &mdash; is this the same object, in caching, cycle detection, or checking whether a mutation aliased something:
+
+```python
+if new_list is old_list:
+    print("same object; a mutation would affect both")
+```
+
+Note that `is` is also the faster operator, since it compares pointers rather than contents. That is never a good enough reason to use it on values &mdash; the correctness risk dwarfs the nanoseconds.
+
+## `==` has its own subtleties
+
+|Comparison|Result|Why|
+|---|---|---|
+|`1 == 1.0`|True|Numeric types compare across types|
+|`1 == True`|True|`bool` subclasses `int`|
+|`float("nan") == float("nan")`|<strong>False</strong>|IEEE 754 requires it|
+|`[] == ()`|False|Different types, no cross-comparison|
+|`"café" == "café"`|False|Different Unicode normalisation|
+|`Decimal("0.1") == 0.1`|False|Binary float is not exactly 0.1|
+
+<strong>NaN is the pathological case:</strong> it is not equal to itself, so `x == x` can be False. Yet `x is x` is always True, which means a NaN inside a list is found by `in` &mdash; `in` checks identity before equality as an optimisation. Use `math.isnan(x)` to test for it.
+
+Classes may override `__eq__` to define whatever equality means for them, and if they do they should also define `__hash__` consistently, or instances behave incorrectly in sets and dicts.
+
+## Questions people ask
+
+<strong>Why does `is` sometimes work on strings?</strong> Interning makes identical literals share one object. It is an optimisation, not a guarantee.
+
+<strong>Should I ever use `is` on strings?</strong> Only after `sys.intern`, and only in performance-critical code where you control every string involved.
+
+<strong>Why the `SyntaxWarning`?</strong> Because `x is "text"` is almost always a bug, and the interpreter can tell.
+
+<strong>Is `x is None` faster than `x == None`?</strong> Yes, and use it because it is correct: `==` can be redefined by a class, identity cannot.
+
+<strong>Do other implementations intern the same strings?</strong> No. PyPy and Jython differ, which is another reason not to depend on it.
+
+<strong>How do I compare identity in a set?</strong> Store `id(obj)` &mdash; and keep a reference to the object, since ids are reused after garbage collection.
+
+<strong>What about `is not`?</strong> The negation, and `x is not None` is the idiomatic form. Not to be confused with `not x is None`, which parses the same but reads worse.
+
+## Recap in one screen
+
+- `==` compares values; `is` compares object identity.
+- CPython interns some strings and caches small integers, so `is` on values gives inconsistent, version-dependent answers.
+- The failure mode is that `is` often returns True in testing and False on runtime-built data.
+- Use `is` only for `None`, `True`, `False`, sentinels, and real identity questions.
+- `float("nan") == float("nan")` is False by design, and NaN is still found by `in` because containment checks identity first.

@@ -1,6 +1,74 @@
 title: list vs tuple vs deque vs array — which and why?
 intro: When would you use a tuple instead of a list? What about deque or array?
 
+## The three, in one table
+
+|&nbsp;|`list`|`tuple`|`deque`|
+|---|---|---|---|
+|Mutable|Yes|<strong>No</strong>|Yes|
+|Hashable|No|Yes, if contents are|No|
+|Append right|O(1) amortised|&mdash;|O(1)|
+|Append left|<strong>O(n)</strong>|&mdash;|<strong>O(1)</strong>|
+|Pop left|<strong>O(n)</strong>|&mdash;|<strong>O(1)</strong>|
+|Index `x[i]`|O(1)|O(1)|<strong>O(n)</strong>|
+|Slicing|Yes|Yes|<strong>No</strong>|
+|Memory per element|Higher|Lower|Similar to list|
+|Import needed|No|No|`collections`|
+
+Two rows decide almost every real choice: <strong>`deque` is O(1) at both ends but O(n) to index</strong>, and <strong>`tuple` is hashable so it can be a dict key or a set member</strong>.
+
+## When to use each
+
+<strong>`list`</strong> is the default. Random access, sorting, slicing, appending at the end &mdash; all good. Only reject it when you need something it cannot do.
+
+<strong>`tuple`</strong> when the sequence is a fixed record rather than a collection, or when it must be hashable:
+
+```python
+point = (3, 4)                          # a record, not a collection
+cache[(user_id, date)] = result         # composite dict key
+seen.add((row, col))                    # set of coordinates
+x, y = point                            # unpacking reads naturally
+```
+
+The hashability is the hard requirement &mdash; a list simply cannot be a dict key. The immutability is also a signal to the reader that the contents are not going to change, which is why returning a tuple from a function that produces a fixed set of values is idiomatic.
+
+<strong>`deque`</strong> when you add or remove at the front:
+
+```python
+from collections import deque
+
+queue = deque()
+queue.append(task)          # enqueue at the right
+queue.popleft()             # dequeue from the left -- O(1)
+
+window = deque(maxlen=100)  # a bounded buffer: old items fall off
+window.append(reading)      # never grows beyond 100
+```
+
+<strong>`maxlen` is the underrated feature.</strong> A bounded deque discards from the opposite end automatically, which gives you a rolling window or a fixed-size log buffer with no bookkeeping at all.
+
+## The performance trap that matters
+
+`list.pop(0)` and `list.insert(0, x)` are <strong>O(n)</strong>, because every remaining element shifts one position. Inside a loop, that makes the whole operation quadratic:
+
+```python
+queue = list(range(100_000))
+while queue:
+    item = queue.pop(0)      # O(n) each time -> O(n^2) total
+```
+
+Roughly five billion element moves. Swapping in a deque makes it linear:
+
+```python
+queue = deque(range(100_000))
+while queue:
+    item = queue.popleft()   # O(1) each time -> O(n) total
+```
+
+<strong>Any breadth-first search, task queue, or producer-consumer loop should use a `deque`.</strong> This is the single most common reason a straightforward-looking Python loop is slow, and it is invisible in small tests &mdash; a thousand elements finishes fine, and a hundred thousand does not.
+
+The mirror-image mistake also exists: reaching for a deque and then indexing it in a loop. `dq[i]` walks the internal block list, so a positional loop over a deque is O(n²). Use a list when you index, a deque when you push and pop at the ends.
+
 ## tuple versus list
 
 The textbook answer is "tuples are immutable", which is true and not the point. The consequence is that a tuple is <strong>hashable</strong> (if its contents are), so it can be a dictionary key or a set member &mdash; which is why coordinates, database rows and cache keys are tuples.
@@ -18,3 +86,91 @@ The trade is random access: <code>d[5000]</code> walks the blocks, so it is O(n)
 A list holds <em>references</em>, so a list of a million integers is a million pointers plus a million integer objects. <code>array.array</code> packs the values inline in one typed block, which is several times smaller and much friendlier to the cache.
 
 For real numeric work the answer is <code>numpy</code>, which adds vectorised operations on top of the same packed layout. Mentioning that a list of numbers is a list of pointers is usually the specific thing an interviewer is listening for.
+
+## Why tuples are smaller and faster
+
+```python
+import sys
+sys.getsizeof([1, 2, 3])     # 88 bytes
+sys.getsizeof((1, 2, 3))     # 64 bytes
+```
+
+A list over-allocates so that `append` is amortised O(1), and it stores a capacity alongside its length. A tuple is fixed at creation, so it needs neither &mdash; less memory, one less indirection, and marginally faster iteration.
+
+CPython also <strong>caches small tuples</strong> for reuse, and constant tuples are built at compile time:
+
+```python
+import dis
+dis.dis("x = (1, 2, 3)")     # LOAD_CONST (1, 2, 3)  -- one instruction
+dis.dis("x = [1, 2, 3]")     # BUILD_LIST -- constructed at runtime
+```
+
+So `for x in (1, 2, 3)` is very slightly faster than the list version. This is a real but tiny effect, and <strong>not a reason to choose a tuple</strong> &mdash; choose based on mutability and hashability, and take the memory win as a side benefit.
+
+## Immutability is shallow
+
+A tuple's immutability applies to its own slots, not to what they point at:
+
+```python
+t = ([1, 2], "fixed")
+t[0].append(3)              # allowed -- the LIST is mutable
+t                            # ([1, 2, 3], 'fixed')
+t[0] = []                    # TypeError -- the SLOT is not
+
+hash(([1], 2))              # TypeError: unhashable type: 'list'
+```
+
+The tuple guarantees its references will not change, and says nothing about the objects behind them. That is also why a tuple containing a list is unhashable: hashing recurses into the contents, so one mutable element makes the whole thing unhashable.
+
+The practical rule: <strong>a tuple is only usable as a dict key if everything inside it is hashable too.</strong> Convert nested lists to tuples, and sets to `frozenset`.
+
+## The rest of the family
+
+|Need|Use|
+|---|---|
+|Fixed record with named fields|`NamedTuple` or `dataclass(frozen=True)`|
+|Queue between threads|`queue.Queue` &mdash; deque plus locking|
+|Priority queue|`heapq` on a list|
+|Array of numbers, compact|`array.array` or NumPy|
+|Sorted insertion|`bisect.insort` on a list|
+|Immutable set|`frozenset`|
+|Ring buffer|`deque(maxlen=n)`|
+
+<strong>`NamedTuple`</strong> is the natural upgrade once a tuple's positions acquire meaning. `point.x` beats `point[0]`, it stays a tuple, and it costs no extra memory:
+
+```python
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x: int
+    y: int
+
+p = Point(3, 4)
+p.x, p[0]           # both work; still hashable and unpackable
+```
+
+<strong>`deque` is thread-safe for `append` and `popleft`</strong> individually, because those are atomic at the C level. That does <em>not</em> make a check-then-pop sequence safe &mdash; use `queue.Queue` when several threads coordinate through it.
+
+## Questions people ask
+
+<strong>Why is `list.pop(0)` slow?</strong> Every subsequent element shifts down one slot. Use `deque.popleft`.
+
+<strong>Can I index a deque?</strong> Yes, and at O(n). Indexing in a loop is quadratic.
+
+<strong>Why can a tuple not be a dict key sometimes?</strong> If it contains a mutable object, it is unhashable.
+
+<strong>Is a tuple actually faster?</strong> Marginally, from less allocation and compile-time constants. Not a deciding factor.
+
+<strong>What about slicing a deque?</strong> Unsupported. Use `itertools.islice`, or a list if slicing is central.
+
+<strong>`deque` or `queue.Queue` for threads?</strong> `Queue` when threads coordinate; `deque` when a single owner mutates it.
+
+<strong>Does `tuple` copying help?</strong> `tuple(lst)` snapshots the references &mdash; a shallow copy, so shared mutable elements are still shared.
+
+## Recap in one screen
+
+- `list` is the default; `tuple` when the sequence is a fixed record or must be hashable; `deque` when you touch both ends.
+- `list.pop(0)` and `insert(0, x)` are O(n) and turn ordinary loops quadratic &mdash; use `deque` for queues and BFS.
+- Indexing a `deque` is O(n), so do not loop over it positionally.
+- Tuple immutability is shallow: the slots are fixed, the objects inside may not be, and one mutable element makes it unhashable.
+- `deque(maxlen=n)` gives a rolling window for free; `NamedTuple` gives a tuple with named fields.

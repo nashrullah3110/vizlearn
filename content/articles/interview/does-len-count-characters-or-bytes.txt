@@ -1,6 +1,86 @@
 title: Does len() count characters or bytes?
 intro: Is len(s) the number of characters or the number of bytes?
 
+## The answer
+
+For a `str`, `len` counts <strong>Unicode code points</strong>. For `bytes`, it counts <strong>bytes</strong>. Neither necessarily matches what a person would call a character.
+
+```python
+len("hello")      # 5
+len("café")       # 4  -- code points
+len("café".encode("utf-8"))   # 5  -- bytes; é takes two
+
+len("👍")          # 1  -- one code point
+len("👍".encode("utf-8"))      # 4  -- four bytes
+
+len("é")           # 1 or 2, depending on how it was written
+```
+
+That last line is the interesting one, and the reason this question gets asked at all.
+
+## The same text, two lengths
+
+`"é"` has two valid Unicode representations:
+
+|Form|Code points|`len`|
+|---|---|---|
+|Precomposed (NFC)|U+00E9|1|
+|Decomposed (NFD)|U+0065 U+0301 &mdash; `e` + combining accent|<strong>2</strong>|
+
+Both display identically. Both are "correct". They are not equal:
+
+```python
+a = "café"              # typed with a precomposed é
+b = "café"        # e followed by a combining accent
+
+a == b                  # False
+len(a), len(b)          # (4, 5)
+```
+
+This is a real bug source, not a curiosity. macOS filesystems historically store filenames in NFD while Linux stores what it is given, so the same filename read from two systems compares unequal.
+
+The fix is <strong>normalisation</strong> before comparing:
+
+```python
+import unicodedata
+
+unicodedata.normalize("NFC", a) == unicodedata.normalize("NFC", b)   # True
+```
+
+|Form|Does what|Use for|
+|---|---|---|
+|NFC|Compose &mdash; shortest form|<strong>Storage and comparison</strong>|
+|NFD|Decompose &mdash; base plus marks|Stripping accents|
+|NFKC|Compose plus compatibility folding|Search keys, identifiers|
+|NFKD|Decompose plus compatibility|Aggressive normalisation|
+
+The K forms also fold compatibility characters: `"ﬁ"` becomes `"fi"`, `"①"` becomes `"1"`, and full-width Latin becomes ASCII. Useful for search and dangerous for round-tripping, since the transformation is lossy.
+
+<strong>NFC is the default choice.</strong> Normalise on input, store normalised, and comparisons stop being surprising.
+
+## Three different notions of "length"
+
+|Concept|Example: `"👨‍👩‍👧"` (family emoji)|Count|
+|---|---|---|
+|Bytes (UTF-8)|Raw octets|18|
+|Code points|`len()` in Python|5|
+|<strong>Grapheme clusters</strong>|What a person sees|<strong>1</strong>|
+
+That family emoji is three people joined by zero-width joiners &mdash; five code points that render as one glyph. `len()` reports 5, and no user would agree.
+
+Python's standard library has no grapheme support. The `regex` module does, via `\X`:
+
+```python
+import regex
+len(regex.findall(r"\X", "👨‍👩‍👧"))    # 1
+```
+
+Which of the three you want depends entirely on the question being asked, and picking the right one is the actual skill:
+
+<strong>Bytes</strong> for storage limits, network payloads, `Content-Length`, and database column sizes.
+<strong>Code points</strong> for most programming &mdash; slicing, iteration, regular expressions.
+<strong>Graphemes</strong> for anything a person perceives: cursor movement, truncating a display string, counting characters in a tweet.
+
 ## Three different counts
 
 There are three things you could mean by "length", and they coincide only for ASCII:
@@ -22,3 +102,70 @@ Emoji are the other reliable surprise. A family emoji or a skin-tone modifier is
 ## The practical rule
 
 Use <code>len(s)</code> for indexing and slicing your own text. Use <code>len(s.encode('utf-8'))</code> whenever a limit is a storage or transport limit. Normalise on input. And if you are truncating text for display &mdash; a preview, a tweet counter &mdash; know that code points are an approximation you may have to replace.
+
+## Why truncation goes wrong
+
+Cutting text at a byte boundary can split a multi-byte character in half:
+
+```python
+s = "héllo wörld"
+b = s.encode("utf-8")
+b[:6].decode("utf-8")
+# UnicodeDecodeError: unexpected end of data
+```
+
+The slice ends mid-character. Three ways out, in increasing correctness:
+
+```python
+b[:6].decode("utf-8", errors="ignore")     # drops the partial char
+```
+
+<strong>Truncate in `str` space, then encode</strong> &mdash; correct for code points:
+
+```python
+s[:6].encode("utf-8")
+```
+
+<strong>Truncate by grapheme</strong> &mdash; correct for what the user sees, and the only version that will not cut an emoji family apart or orphan a combining accent.
+
+The database version of this bug is common: a `VARCHAR(10)` counts characters in PostgreSQL and bytes in some MySQL configurations, so ten emoji may or may not fit. Knowing which unit a storage layer counts in is part of the schema.
+
+## Length in other languages
+
+|Language|`length` counts|
+|---|---|
+|Python 3|Code points|
+|JavaScript|<strong>UTF-16 code units</strong> &mdash; emoji count as 2|
+|Java|UTF-16 code units|
+|Go|<strong>Bytes</strong> &mdash; `len(s)` on a string|
+|Rust|Bytes &mdash; `chars().count()` for code points|
+|Swift|<strong>Grapheme clusters</strong> &mdash; the only mainstream language that gets this right by default|
+|C|Bytes, up to the NUL terminator|
+
+JavaScript's behaviour explains a familiar class of bug: `"👍".length` is 2, so a naive character limit counts one emoji as two, and slicing at an odd offset produces a lone surrogate that renders as a replacement glyph.
+
+Go's byte-based `len` is a deliberate choice &mdash; strings are byte slices, and `for i, r := range s` iterates runes. Swift's grapheme-cluster default is the most user-friendly and makes indexing O(n), which is the trade it accepts.
+
+Being able to name these differences is what turns this question from trivia into a demonstration that you have handled text across systems.
+
+## Questions people ask
+
+<strong>Is `len` O(1) in Python?</strong> Yes. The count is stored on the object, not computed.
+
+<strong>Why does the same visible text have different lengths?</strong> Precomposed versus decomposed Unicode. Normalise with NFC before comparing.
+
+<strong>How do I count what the user sees?</strong> Grapheme clusters, via the `regex` module's `\X`. The standard library cannot do it.
+
+<strong>How do I get a byte count?</strong> `len(s.encode("utf-8"))`, and the answer depends on the encoding.
+
+<strong>Why is my emoji length 2 in JavaScript and 1 in Python?</strong> JavaScript counts UTF-16 code units; characters above U+FFFF need a surrogate pair.
+
+<strong>Should I normalise everything on input?</strong> For anything compared, stored as a key, or deduplicated &mdash; yes, to NFC. It is cheap and it prevents an entire class of bug.
+
+## Recap in one screen
+
+- `len(str)` counts code points; `len(bytes)` counts bytes; neither counts what a person calls a character.
+- Precomposed and decomposed forms look identical and compare unequal &mdash; normalise to NFC first.
+- Grapheme clusters are the user-facing unit, and Python needs the `regex` module's `\X` to count them.
+- Never truncate encoded bytes at an arbitrary offset; truncate the `str` and then encode.
+- JavaScript and Java count UTF-16 units, Go and Rust count bytes, Swift counts graphemes.

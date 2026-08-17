@@ -1,6 +1,79 @@
 title: What is the difference between str and bytes?
 intro: What is the difference between str and bytes, and when do you need encode and decode?
 
+## Two different things
+
+`str` is a sequence of <strong>Unicode code points</strong> &mdash; abstract characters. `bytes` is a sequence of <strong>integers from 0 to 255</strong> &mdash; raw octets. Python 3 keeps them strictly separate, and the separation is the feature.
+
+```python
+s = "café"                 # str: 4 characters
+b = s.encode("utf-8")      # bytes: b'caf\xc3\xa9'  -- 5 bytes
+
+len(s)     # 4    characters
+len(b)     # 5    bytes -- é needs two in UTF-8
+
+s[0]       # 'c'  a one-character str
+b[0]       # 99   an INTEGER, not b'c'
+```
+
+Two details catch people out immediately. Indexing `bytes` yields an `int`, not a one-byte `bytes` object &mdash; slicing does give `bytes`, so `b[0:1]` is `b'c'` while `b[0]` is `99`. And `len` differs between the two representations of the same text, which is the source of most truncation bugs.
+
+|&nbsp;|`str`|`bytes`|
+|---|---|---|
+|Element|Unicode code point|Integer 0&ndash;255|
+|`x[0]` gives|`str` of length 1|`int`|
+|Literal|`"text"`|`b"text"`|
+|Convert|`.encode()`|`.decode()`|
+|Use for|Text you manipulate|I/O, network, files, crypto|
+|Mutable version|None|`bytearray`|
+
+## Encode and decode, in the right direction
+
+This is the single most confused pair in Python, and there is a reliable way to remember it: <strong>encode goes to bytes; decode comes back to text.</strong>
+
+```python
+"café".encode("utf-8")            # b'caf\xc3\xa9'   str -> bytes
+b'caf\xc3\xa9'.decode("utf-8")    # 'café'           bytes -> str
+```
+
+The mental model: <em>encoding</em> is what you do to send text somewhere, because wires and disks carry bytes. <em>Decoding</em> is what you do on receipt, to recover meaning.
+
+UTF-8 is the default for both, and it is nearly always the right choice. It is ASCII-compatible, so English text costs one byte per character, and it represents every Unicode character.
+
+<strong>Mixing the two types raises rather than coercing:</strong>
+
+```python
+"abc" + b"def"          # TypeError: can only concatenate str
+b"abc" == "abc"         # False -- no error, just never equal
+"a" in b"abc"           # TypeError
+```
+
+The `==` case is the dangerous one, because it fails silently. A dictionary keyed on `str` will never match a `bytes` lookup, and the result is a mysteriously empty response rather than an exception. This is the most common bug when reading a file in binary mode and comparing against string literals.
+
+## The errors that appear in production
+
+```python
+b'\xff\xfe'.decode("utf-8")
+# UnicodeDecodeError: invalid start byte
+
+"café".encode("ascii")
+# UnicodeEncodeError: ordinal not in range(128)
+```
+
+Both mean the same thing: the data does not fit the codec. The `errors` parameter decides what happens next.
+
+|Value|Behaviour|Use when|
+|---|---|---|
+|`"strict"`|Raise &mdash; the default|Correctness matters|
+|`"ignore"`|Drop the offending characters|<strong>Rarely; silently loses data</strong>|
+|`"replace"`|Substitute `?` or U+FFFD|Display-only output|
+|`"surrogateescape"`|Round-trip undecodable bytes|Filenames, lossless pass-through|
+|`"backslashreplace"`|Escape as `\xNN`|Debugging and logs|
+
+<strong>`surrogateescape` is the one worth knowing about.</strong> It maps undecodable bytes into a reserved surrogate range so that decoding then re-encoding reproduces the original bytes exactly. That is how Python handles filenames on systems where the name is not valid UTF-8 &mdash; it can still be opened, even though it cannot be meaningfully displayed.
+
+Reaching for `errors="ignore"` to make an exception go away is almost always the wrong fix; it converts a loud failure into corrupted data.
+
 ## Two different things that both print nicely
 
 <p><code>"hi"</code> and <code>b"hi"</code> look almost identical and are not comparable: <code>"hi" == b"hi"</code> is <code>False</code>, and in Python 3 that is deliberate. A str has no encoding &mdash; asking for the bytes of a str is meaningless until you say <em>which</em> bytes, which is why <code>encode</code> takes an argument.</p>
@@ -18,3 +91,69 @@ Violating it produces the two classic errors. <code>UnicodeDecodeError</code> me
 Reading a file with <code>open(path)</code> gives str and applies your platform's default encoding, which differs between machines and is the source of "works on my laptop" bugs. Pass <code>encoding="utf-8"</code> explicitly, always. <code>open(path, "rb")</code> gives bytes and does not guess.
 
 Sockets, subprocess output, hashlib and most binary formats are bytes. <code>hashlib.sha256(s)</code> is a <code>TypeError</code> until you encode &mdash; a hash is defined over bytes, so the encoding is part of the answer.
+
+## Where the boundary sits in real code
+
+The practical rule: <strong>decode at the edges, work in `str` in the middle, encode on the way out.</strong> Text processing should never happen on `bytes`.
+
+```python
+# Files: text mode decodes for you
+with open("f.txt", encoding="utf-8") as fh:      # ALWAYS pass encoding
+    text = fh.read()                              # str
+
+with open("f.bin", "rb") as fh:
+    data = fh.read()                              # bytes
+
+# Network: sockets are always bytes
+sock.send("hello".encode())
+reply = sock.recv(1024).decode()
+
+# Subprocess: text=True decodes for you
+out = subprocess.run(["ls"], capture_output=True, text=True).stdout   # str
+```
+
+<strong>Always pass `encoding=` explicitly when opening text files.</strong> Without it, Python uses the platform default, which is UTF-8 on Linux and macOS and historically a legacy code page on Windows &mdash; so the same code reads different characters on different machines. Python 3.15 makes UTF-8 the default everywhere, and being explicit remains the habit that survives version differences.
+
+Three things must stay in `bytes`:
+
+<strong>Hashing and cryptography.</strong> `hashlib.sha256("text")` raises; it needs `b"text"`. Digests are defined over bytes, so the encoding is part of the hash.
+<strong>Binary formats.</strong> Images, protocol buffers, compressed data &mdash; there is no text to recover.
+<strong>Anything length- or offset-sensitive at the wire level,</strong> such as a Content-Length header, which counts bytes rather than characters.
+
+## `bytearray` and `memoryview`
+
+```python
+ba = bytearray(b"hello")
+ba[0] = 72                    # mutable, unlike bytes
+ba.extend(b" world")
+bytes(ba)                     # b'Hello world'
+
+mv = memoryview(ba)
+chunk = mv[0:5]               # zero-copy view
+```
+
+`bytearray` is the mutable counterpart, useful for building a buffer incrementally without repeated concatenation. `memoryview` slices without copying, which is what makes parsing large binary payloads efficient &mdash; and it has no `str` equivalent, because a character offset in a variable-width representation is not a fixed byte offset.
+
+## Questions people ask
+
+<strong>Which way does `encode` go?</strong> `str.encode()` produces `bytes`. Text encodes to bytes for transport.
+
+<strong>Why does `b[0]` give a number?</strong> `bytes` is a sequence of integers. Use `b[0:1]` for a one-byte `bytes` object.
+
+<strong>Why is `b"abc" == "abc"` False rather than an error?</strong> Equality across unrelated types returns False by design; only ordering and concatenation raise. This is why the comparison bug is so easy to miss.
+
+<strong>What is the default encoding?</strong> UTF-8 for `encode`/`decode`. File `open` used the locale default before Python 3.15, so pass it explicitly.
+
+<strong>How do I get the byte length of text?</strong> `len(s.encode("utf-8"))`. `len(s)` counts characters.
+
+<strong>Can I put `bytes` and `str` keys in one dict?</strong> Yes, and they never collide &mdash; which is a footgun, not a feature.
+
+<strong>What about UTF-16 or Latin-1?</strong> Latin-1 is the identity mapping for bytes 0&ndash;255, so it never raises on decode &mdash; which makes it a tempting and usually wrong way to silence errors.
+
+## Recap in one screen
+
+- `str` holds Unicode code points; `bytes` holds integers 0&ndash;255. They never mix implicitly.
+- `encode` goes `str` &rarr; `bytes`; `decode` goes back. UTF-8 unless told otherwise.
+- `b[0]` is an `int`; `b[0:1]` is `bytes`. And `len` differs between the two forms of the same text.
+- `b"abc" == "abc"` is silently False, which is the bug that hides in dictionary lookups.
+- Decode at the input edge, work in `str`, encode on output &mdash; and always pass `encoding=` to `open`.
