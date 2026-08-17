@@ -19,6 +19,55 @@ So the cost splits three ways. Best case is 1 comparison, when the target is fir
 
 Roughly half the array. All three cases are O(n) except the best, and it is the worst case that gets quoted, so linear search is an O(n) algorithm with O(1) extra space.
 
+## Check every element until you find it
+
+Linear search examines each element in turn until it finds the target or reaches the end.
+
+```python
+def linear_search(arr, target):
+    for i, x in enumerate(arr):
+        if x == target:
+            return i
+    return -1
+```
+
+O(n) in the worst case, O(1) in the best, and n/2 comparisons on average for a successful search.
+
+It sounds like the algorithm you would only teach and never use, and that is wrong. Linear search is the right choice more often than binary search, for a specific set of reasons.
+
+## When it beats binary search
+
+|Situation|Why linear wins|
+|---|---|
+|Unsorted data|Binary search requires sorting first &mdash; O(n log n)|
+|Small arrays|Below roughly 50&ndash;100 elements, the constant factor decides|
+|Searching once|Sorting to search once costs more than scanning|
+|Linked lists|No random access, so binary search cannot reach the middle cheaply|
+|Streaming data|You cannot index into a stream|
+|Finding all matches|Binary search finds one; a scan finds every one|
+|Complex predicates|"First element satisfying this arbitrary condition"|
+
+The small-array row matters more than the table suggests. Linear search reads memory <strong>sequentially</strong>, which CPU prefetchers handle extremely well, while binary search jumps around and defeats them. For arrays that fit in cache, a scan of 100 elements can be faster than 7 binary-search comparisons.
+
+That is why real sorting and searching implementations switch to linear methods below a threshold, and why `list.index()` in Python &mdash; a C-level linear scan &mdash; is fast enough that reaching for `bisect` on a short list is usually not worth the complexity.
+
+## The one-sorting-question
+
+The decision is not "linear or binary" but "how many searches will there be?"
+
+<p class="mono-font">sort once + k binary searches:&nbsp;&nbsp;O(n log n + k log n)</p>
+<p class="mono-font">k linear searches:&nbsp;&nbsp;O(k &times; n)</p>
+
+Sorting pays off when `k log n` plus the sort beats `k n` &mdash; which, roughly, means when k is more than about log n.
+
+|Searches|n = 1,000|Better|
+|---|---|---|
+|1|Scan: 1,000 ops. Sort+search: ~10,000|Linear|
+|10|10,000 vs ~10,100|About equal|
+|1,000|1,000,000 vs ~20,000|Binary|
+
+And if you are performing many lookups, the real answer is usually neither: <strong>build a set or dictionary</strong>, which gives O(1) per lookup after O(n) construction. That beats both for repeated membership testing, and it is what most production code should do.
+
 ## Things to try
 
 1. <strong>Watch the worst case.</strong> Set <strong>Array Size</strong> to 25, then set <strong>Search Target</strong> to a value that is not in the array and press <strong>Auto-Run</strong>. Every single cell lights up before the algorithm gives up. That full sweep is what O(n) means.
@@ -45,3 +94,83 @@ It gets dismissed as the naive option, which is unfair. Reach for it when:
 ## In one line
 
 Linear search trades speed for having no requirements at all. It is O(n) because it may have to look at everything, and it cannot do better because it has no information to exploit &mdash; but for unsorted data, a single lookup, or a small array, that is not a weakness. Every faster search on this track buys its speed with a precondition, and linear search is what you use when you cannot pay it.
+
+## Variants worth knowing
+
+<strong>Early exit on sorted data.</strong> If the array happens to be sorted, a scan can stop as soon as it passes the target &mdash; still O(n), and it halves the average work on unsuccessful searches.
+
+<strong>Sentinel search.</strong> Append the target to the end of the array so the loop needs no bounds check &mdash; the search always terminates on a match. It removes one comparison per iteration, which mattered in low-level code and is irrelevant in Python.
+
+<strong>Finding all matches</strong> is where linear search has no competition:
+
+```python
+indices = [i for i, x in enumerate(arr) if x == target]
+```
+
+<strong>Predicate search</strong> &mdash; the first element satisfying an arbitrary condition:
+
+```python
+first = next((x for x in items if x.status == "pending"), None)
+```
+
+That `next` with a default is the idiomatic Python for "find the first matching item, or None". It short-circuits, so it stops at the first match rather than building a list.
+
+## In Python specifically
+
+The built-in operations are C-level linear scans and are faster than a hand-written loop:
+
+```python
+x in items                    # membership
+items.index(x)                # first index, raises ValueError if absent
+items.count(x)                # occurrences
+min(items), max(items)        # extremes - O(n)
+any(p(x) for x in items)      # short-circuits on the first True
+all(p(x) for x in items)      # short-circuits on the first False
+```
+
+`any` and `all` with generator expressions are the most useful of these, because they short-circuit: `any(x > 100 for x in huge_list)` stops at the first qualifying element rather than examining everything.
+
+Two notes on `index`: it raises rather than returning &minus;1, so wrap it in `try` or check membership first, and it only finds the first occurrence.
+
+For NumPy arrays the vectorised equivalents operate in C over the whole array:
+
+```python
+import numpy as np
+np.where(arr == target)[0]        # all matching indices
+(arr == target).any()             # membership
+```
+
+These are still O(n) and considerably faster per element, and they do not short-circuit &mdash; the whole array is compared.
+
+## Where linear search is the only option
+
+- <strong>Unsorted collections</strong> that change constantly, where maintaining order would cost more than scanning.
+- <strong>Streams and generators,</strong> where there is no index and data arrives once.
+- <strong>Linked lists,</strong> where reaching the middle is itself O(n).
+- <strong>Finding every match,</strong> or counting occurrences.
+- <strong>Arbitrary predicates</strong> that have no ordering to exploit &mdash; "the first log line containing an error".
+- <strong>Very small collections,</strong> where any cleverness costs more than it saves.
+
+That last point deserves emphasis as the practical conclusion: <strong>for a handful of items, scan</strong>. Introducing a sorted structure or a hash map for a ten-element list adds complexity and usually loses on speed too.
+
+## Questions people ask
+
+<strong>Is linear search ever better than binary search?</strong> Yes &mdash; on unsorted data, on small arrays, for a single search, on linked lists and streams, and when finding all matches.
+
+<strong>What is the average number of comparisons?</strong> About n/2 for a successful search, n for an unsuccessful one.
+
+<strong>Should I sort first to use binary search?</strong> Only if you will search many times. For one search, sorting costs more than scanning.
+
+<strong>What about a set?</strong> For repeated membership tests, a set is better than both &mdash; O(1) per lookup after O(n) construction.
+
+<strong>Why is `in` fast in Python?</strong> It is a C-level loop, so the per-element cost is far below an interpreted loop.
+
+<strong>How do I find the first match without scanning everything?</strong> `next((x for x in items if pred(x)), None)` &mdash; it short-circuits.
+
+## Recap in one screen
+
+- Examine elements in order until found: O(n) worst case, n/2 comparisons on average.
+- It beats binary search on unsorted data, small arrays, single searches, linked lists and streams.
+- Sequential memory access makes it cache-friendly, which is why small-array scans are genuinely fast.
+- Sorting to enable binary search pays off only after roughly log n searches; for many lookups, use a set.
+- In Python, use `in`, `index`, `any` and `next` &mdash; C-level scans that short-circuit where possible.

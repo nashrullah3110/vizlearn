@@ -25,6 +25,78 @@ The last one catches people out. <span class="mono-font">d.keys()</span> does no
 
 The important contrast is with values. <span class="mono-font">k in d</span> checks keys and is O(1); <span class="mono-font">v in d.values()</span> scans and is O(n). They look symmetric and are not.
 
+## A hash table with guaranteed order
+
+A Python dictionary maps keys to values with roughly constant-time lookup. Since Python 3.7 it also <strong>preserves insertion order</strong>, which is a language guarantee rather than an implementation detail.
+
+|Operation|Complexity|
+|---|---|
+|`d[key]`|O(1) average|
+|`d[key] = value`|O(1) average|
+|`del d[key]`|O(1) average|
+|`key in d`|O(1) average|
+|`len(d)`|O(1)|
+|Iteration|O(n), in insertion order|
+
+"Average" is doing work in those rows: the worst case is O(n) when every key collides, which requires a pathological hash function or adversarially chosen keys. Python randomises string hashes per process specifically to prevent the latter as a denial-of-service vector.
+
+## Accessing keys that might not exist
+
+Four ways, each right in a different situation:
+
+```python
+d = {"a": 1}
+
+d["b"]                       # KeyError
+d.get("b")                   # None
+d.get("b", 0)                # 0 - a default of your choosing
+d.setdefault("b", 0)         # returns 0 AND inserts b: 0
+
+if "b" in d: ...             # explicit check
+```
+
+`setdefault` is the one people forget, and it is useful precisely because it inserts &mdash; which is also its trap, since reading a key with it modifies the dictionary.
+
+For counting and grouping, the `collections` module removes the boilerplate entirely:
+
+```python
+from collections import Counter, defaultdict
+
+Counter(words).most_common(5)           # the five most frequent words
+
+groups = defaultdict(list)
+for user in users:
+    groups[user.country].append(user)   # no "if key not in dict" needed
+```
+
+`defaultdict(list)` creates an empty list on first access to a key, turning a four-line grouping pattern into one line. Note that it also creates the key on a mere <em>read</em>, so use `.get()` when only inspecting.
+
+## What can be a key
+
+A key must be <strong>hashable</strong>: it must have a hash that never changes, and support equality comparison.
+
+```python
+d[(1, 2)] = "ok"         # tuple - immutable, hashable
+d[[1, 2]] = "error"      # TypeError: unhashable type: 'list'
+d[frozenset({1,2})] = "ok"
+```
+
+If a list could be a key, mutating it after insertion would change its hash and the entry would become unreachable &mdash; stored in a slot the new hash does not point to.
+
+For a custom class, `__eq__` and `__hash__` must agree:
+
+```python
+class Point:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+    def __eq__(self, other):
+        return isinstance(other, Point) and (self.x, self.y) == (other.x, other.y)
+    def __hash__(self):
+        return hash((self.x, self.y))      # hash the same fields as __eq__
+```
+
+Defining `__eq__` without `__hash__` makes the class unhashable in Python 3 &mdash; a deliberate safeguard, because equal objects with different hashes would land in different slots and both exist in the dictionary.
+
 ## Try it yourself
 
 1. <strong>Compare get with direct indexing.</strong> Choose <strong>Method</strong> for a lookup on a missing key and press <strong>Execute</strong>. Direct indexing raises KeyError; <span class="mono-font">get</span> returns None instead. That difference decides which one belongs in your code.
@@ -50,3 +122,86 @@ A tuple is hashable only if everything inside it is, so <span class="mono-font">
 ## What to remember
 
 A Python dict is a hash table giving O(1) average insert, lookup, and delete, with keys required to be hashable so their storage slot cannot move. Since 3.7 it also preserves insertion order. The traps are the asymmetries: keys are O(1) but values are O(n), views are live rather than snapshots, and mutating during iteration is an error rather than undefined behaviour.
+
+## The dictionary as an index: the key optimisation
+
+The single most valuable use of dictionaries in practical code is replacing a repeated scan.
+
+```python
+# O(n*m) - for each order, scan every customer
+for order in orders:
+    for c in customers:
+        if c.id == order.customer_id:
+            ...
+
+# O(n+m) - build the index once, then constant-time lookups
+by_id = {c.id: c for c in customers}
+for order in orders:
+    c = by_id[order.customer_id]
+```
+
+With 10,000 orders and 10,000 customers that is 100 million comparisons against 20,000 operations &mdash; and the second version is shorter.
+
+The pattern generalises: whenever a loop contains a search, a dictionary built beforehand usually eliminates it. Recognising it is worth more than most algorithmic knowledge in everyday work.
+
+## Comprehensions, merging and views
+
+```python
+lengths = {word: len(word) for word in words}
+inverted = {v: k for k, v in original.items()}
+filtered = {k: v for k, v in prices.items() if v > 1.00}
+
+merged = defaults | overrides          # Python 3.9+, right side wins
+defaults |= overrides                  # in place
+```
+
+Iteration returns <strong>views</strong>, not copies:
+
+```python
+for key in d: ...                      # keys
+for key, value in d.items(): ...       # the usual choice
+for value in d.values(): ...
+```
+
+Views are live, which is why modifying a dictionary while iterating it raises `RuntimeError: dictionary changed size during iteration`. To delete while looping, iterate over a snapshot: `for k in list(d):`.
+
+Sorting a dictionary produces a new one, since dictionaries have no sort method:
+
+```python
+by_value = dict(sorted(prices.items(), key=lambda kv: kv[1]))
+```
+
+## When a dictionary is not the answer
+
+|Need|Better structure|
+|---|---|
+|Membership only, no values|`set`|
+|Sorted iteration or range queries|A sorted list plus `bisect`, or `sortedcontainers`|
+|Fixed known fields|A `dataclass` or `NamedTuple`|
+|Counting|`Counter`|
+|Bidirectional lookup|Two dictionaries, or a `bidict`|
+|Memory-critical, many similar objects|`__slots__` on a class|
+
+The `dataclass` row is worth emphasising. A dictionary with fixed keys &mdash; `{"name": ..., "email": ..., "age": ...}` &mdash; is better as a dataclass: attribute access, type hints, autocompletion, and a typo becomes an error rather than a silent `KeyError` at runtime.
+
+## Questions people ask
+
+<strong>Are dictionaries ordered?</strong> Yes, by insertion, guaranteed since Python 3.7. That is not sorted order.
+
+<strong>Why can a list not be a key?</strong> Mutating it would change its hash and orphan the entry. Use a tuple.
+
+<strong>How much memory does a dictionary use?</strong> More than a list of the same values &mdash; it stores hashes and spare capacity. Lookup speed is what you are buying.
+
+<strong>Is `dict.get()` slower than `d[key]`?</strong> Marginally, because it is a method call. Both are O(1).
+
+<strong>How do I merge dictionaries?</strong> `a | b` in Python 3.9+, or `{**a, **b}` in earlier versions.
+
+<strong>Why do my string hashes change between runs?</strong> Deliberate per-process randomisation, to prevent collision-based denial-of-service attacks. Set `PYTHONHASHSEED` to fix it.
+
+## Recap in one screen
+
+- A hash table with O(1) average lookup, and insertion order preserved as a language guarantee.
+- `.get()` for a safe read, `defaultdict` and `Counter` for grouping and counting.
+- Keys must be immutable, and `__eq__` and `__hash__` must agree for custom classes.
+- Building a dictionary to replace a repeated scan is the highest-value optimisation in ordinary Python.
+- Iteration yields live views, so modify a snapshot rather than the dictionary you are looping over.

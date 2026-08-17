@@ -42,6 +42,79 @@ If edge weights are all distinct the MST is unique, so both produce identical tr
 
 Laying cable, pipe or road networks at minimum cost; clustering (remove the k&minus;1 most expensive MST edges to get k clusters); approximation algorithms for the travelling salesman problem; and network design generally.
 
+## The cheapest way to connect everything
+
+Given a weighted undirected graph, a <strong>spanning tree</strong> connects all vertices using exactly V&minus;1 edges and no cycles. A <strong>minimum</strong> spanning tree is the one with the lowest total weight.
+
+The practical question it answers: what is the cheapest set of connections that leaves nothing isolated? Laying cable, building a road network, connecting offices &mdash; wherever connectivity is required and redundancy is not.
+
+Two properties are worth stating, because they are what the algorithms rely on:
+
+<strong>Exactly V&minus;1 edges.</strong> Fewer leaves the graph disconnected; more creates a cycle, and the heaviest edge in a cycle can always be removed.
+
+<strong>The cut property.</strong> For any way of splitting the vertices into two groups, the lightest edge crossing the split is in some MST. That single fact is what makes greedy algorithms correct here.
+
+The MST is not necessarily unique &mdash; equal edge weights allow several &mdash; but the total weight is.
+
+## Kruskal's algorithm
+
+Sort every edge by weight and add each one unless it would create a cycle.
+
+```python
+def kruskal(n, edges):
+    uf = UnionFind(n)
+    mst, total = [], 0
+    for weight, u, v in sorted(edges):
+        if uf.union(u, v):            # False if u and v are already connected
+            mst.append((u, v, weight))
+            total += weight
+            if len(mst) == n - 1:
+                break                  # done
+    return mst, total
+```
+
+The cycle check <em>is</em> the Union-Find `union` returning False. If both endpoints already share a component, adding the edge would close a cycle.
+
+O(E log E) for the sort, plus effectively O(E) for the union operations &mdash; so sorting dominates. The algorithm builds a forest that gradually merges into one tree, which is why it does not care whether the graph is connected until the end.
+
+## Prim's algorithm
+
+Grow a single tree from an arbitrary starting vertex, repeatedly adding the cheapest edge that reaches a new vertex.
+
+```python
+import heapq
+
+def prim(graph, start):
+    visited = {start}
+    pq = [(w, start, v) for v, w in graph[start]]
+    heapq.heapify(pq)
+    mst, total = [], 0
+
+    while pq and len(visited) < len(graph):
+        w, u, v = heapq.heappop(pq)
+        if v in visited:
+            continue                   # stale entry
+        visited.add(v)
+        mst.append((u, v, w))
+        total += w
+        for nxt, weight in graph[v]:
+            if nxt not in visited:
+                heapq.heappush(pq, (weight, v, nxt))
+    return mst, total
+```
+
+Structurally this is Dijkstra's algorithm with one change: the priority is the edge weight rather than the accumulated distance from the source. Dijkstra asks "how far from the start?"; Prim asks "how cheap to attach?"
+
+|&nbsp;|Kruskal|Prim|
+|---|---|---|
+|Grows|A forest, merging|One tree|
+|Needs|Sorted edges, Union-Find|A priority queue|
+|Complexity|O(E log E)|O(E log V) with a heap|
+|Better on|Sparse graphs|Dense graphs|
+|Disconnected graphs|Produces a forest naturally|Needs restarting per component|
+
+For dense graphs, Prim with an adjacency matrix and a linear scan is O(V²), which beats the heap version when E approaches V².
+
 ## Things to try
 
 1. <strong>Run Kruskal.</strong> Watch it consider edges in weight order and reject any that would close a cycle.
@@ -53,3 +126,62 @@ Laying cable, pipe or road networks at minimum cost; clustering (remove the k&mi
 ## Worth remembering
 
 An MST connects everything with V−1 edges at minimum cost. Kruskal sorts all edges and uses union-find to reject cycles; Prim grows one tree using a priority queue. The cut property proves both greedy strategies optimal, so neither ever needs to reconsider.
+
+## Where MSTs are used
+
+- <strong>Network design.</strong> Laying fibre, power lines or pipes to connect sites at minimum cost &mdash; the original motivating problem.
+- <strong>Clustering.</strong> Build the MST, then remove the k&minus;1 heaviest edges to get k clusters. This is single-linkage hierarchical clustering, and the MST is exactly what it computes.
+- <strong>Image segmentation.</strong> Pixels as vertices, colour difference as weight; the MST's structure reveals regions.
+- <strong>Approximation algorithms.</strong> A traveling-salesman tour built by walking the MST is within a factor of 2 of optimal, and Christofides' refinement gets to 1.5.
+- <strong>Circuit and layout design</strong> for minimum wire length.
+- <strong>Maze generation.</strong> A random spanning tree of a grid is a maze with exactly one path between any two cells.
+
+The clustering use is the one most likely to be encountered outside a networking context, and the connection is worth remembering: <strong>MST plus cutting the heaviest edges is single-linkage clustering</strong>.
+
+## MST against shortest paths
+
+A common confusion, and the distinction is sharp.
+
+<strong>An MST minimises the total weight of the whole tree.</strong> It says nothing about the distance between any particular pair.
+
+<strong>A shortest-path tree minimises the distance from one source to every vertex.</strong> Its total weight is generally larger than the MST's.
+
+Concretely, in a triangle with edges A&mdash;B = 1, B&mdash;C = 1, A&mdash;C = 3: the MST is {A&mdash;B, B&mdash;C} with total 2. The shortest path from A to C in that tree is 2, which happens to match the true shortest path &mdash; but in general the path between two vertices <em>within</em> the MST can be much longer than their shortest path in the graph.
+
+So: use an MST when you need cheap global connectivity; use Dijkstra when you need distances.
+
+## Variants and related problems
+
+<strong>Maximum spanning tree.</strong> Negate the weights and run the same algorithm. Used in some clustering and network-reliability problems.
+
+<strong>Bottleneck spanning tree.</strong> Minimise the <em>heaviest</em> edge rather than the total. The MST already achieves this &mdash; every MST is a minimum bottleneck spanning tree.
+
+<strong>Steiner tree.</strong> Connect a <em>subset</em> of vertices, allowed to use others as intermediate points. NP-hard, unlike MST, and MST-based heuristics are the standard approach.
+
+<strong>Minimum spanning forest.</strong> On a disconnected graph, Kruskal's produces one tree per component naturally.
+
+<strong>Second-best MST.</strong> Found by trying, for each MST edge, the best replacement &mdash; useful for redundancy planning.
+
+<strong>Borůvka's algorithm.</strong> The third classical MST algorithm, which adds the cheapest edge leaving every component simultaneously. It is the one that parallelises well, and it is the basis of modern distributed MST algorithms.
+
+## Questions people ask
+
+<strong>Kruskal or Prim?</strong> Kruskal for sparse graphs and when the edges are already sorted or arriving as a list. Prim for dense graphs, especially with an adjacency matrix.
+
+<strong>Is the MST unique?</strong> Not when edge weights tie. The total weight is unique; the edge set may not be.
+
+<strong>Does it work with negative weights?</strong> Yes &mdash; unlike shortest-path algorithms, MST algorithms are unaffected by negative weights, because there is no notion of accumulating a path.
+
+<strong>Does it give shortest paths?</strong> No. That is a different tree, computed by Dijkstra.
+
+<strong>What if the graph is disconnected?</strong> Kruskal's produces a spanning forest. Prim's must be restarted from each unvisited vertex.
+
+<strong>Why does greedy work here?</strong> The cut property: the lightest edge crossing any partition belongs to some MST, so taking it can never be a mistake.
+
+## Recap in one screen
+
+- The cheapest V&minus;1 edges that connect every vertex without a cycle.
+- Kruskal sorts all edges and adds those that do not close a cycle, using Union-Find for the check.
+- Prim grows one tree with a priority queue &mdash; Dijkstra with edge weight instead of path distance.
+- Greedy is provably correct here because of the cut property.
+- MST minimises the total; it does not give shortest paths &mdash; and cutting its heaviest edges gives single-linkage clusters.

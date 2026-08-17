@@ -32,6 +32,78 @@ Radix sort escapes because it never compares. Its cost is <strong>O(d &middot; n
 
 Its sweet spot is large volumes of fixed-width keys, which is why it appears in database index construction and older card-sorting machinery &mdash; literally where the algorithm came from.
 
+## Sorting digit by digit
+
+Radix sort avoids comparisons entirely. It sorts numbers by processing one digit at a time, using a stable counting sort for each pass.
+
+Sorting [170, 45, 75, 90, 802, 24, 2, 66] by units, then tens, then hundreds:
+
+|Pass|Result|
+|---|---|
+|By units|[17<strong>0</strong>, 9<strong>0</strong>, 80<strong>2</strong>, <strong>2</strong>, 2<strong>4</strong>, 4<strong>5</strong>, 7<strong>5</strong>, 6<strong>6</strong>]|
+|By tens|[80<strong>2</strong>, <strong>2</strong>, 2<strong>4</strong>, 4<strong>5</strong>, 6<strong>6</strong>, 1<strong>7</strong>0, 7<strong>5</strong>, <strong>9</strong>0]|
+|By hundreds|[2, 24, 45, 66, 75, 90, <strong>1</strong>70, <strong>8</strong>02]|
+
+Three passes, and the array is sorted. No two elements were ever compared with each other.
+
+```python
+def radix_sort(arr):
+    if not arr:
+        return arr
+    max_val = max(arr)
+    exp = 1
+    while max_val // exp > 0:
+        arr = counting_sort_by_digit(arr, exp)
+        exp *= 10
+    return arr
+
+def counting_sort_by_digit(arr, exp):
+    counts = [0] * 10
+    for x in arr:
+        counts[(x // exp) % 10] += 1
+    for i in range(1, 10):
+        counts[i] += counts[i - 1]              # cumulative positions
+    out = [0] * len(arr)
+    for x in reversed(arr):                     # backwards: preserves stability
+        d = (x // exp) % 10
+        counts[d] -= 1
+        out[counts[d]] = x
+    return out
+```
+
+## Stability is not optional
+
+The `reversed(arr)` on the second-to-last line is what makes the whole algorithm work.
+
+Each pass must preserve the relative order established by the previous passes. If sorting by tens reordered two numbers that were already correctly ordered by units, the units pass would be wasted.
+
+So <strong>radix sort requires a stable inner sort</strong>, and that is why counting sort's cumulative-position form &mdash; iterating the input backwards &mdash; is the version used. Using an unstable inner sort produces a wrong answer that looks nearly sorted, which is a confusing failure.
+
+This is the clearest practical demonstration of why stability is a property worth caring about rather than a technicality.
+
+## Complexity, and the choice of base
+
+<p class="mono-font">O(d &times; (n + k))&nbsp;&nbsp;where d = digits, k = base</p>
+
+The base is a tuning parameter, and the trade is direct: a larger base means fewer passes and a bigger count array.
+
+|Base|Passes for 32-bit integers|Count array|
+|---|---|---|
+|10|10|10|
+|16|8|16|
+|256|4|256|
+|65,536|2|65,536|
+
+Base 256 &mdash; one byte per pass &mdash; is the usual choice for integers. Four passes, a 256-entry array, and the digit extraction is a bit shift and mask rather than division, which is considerably faster.
+
+The complexity is <strong>linear in n</strong> for fixed-width keys, which beats the O(n log n) comparison lower bound. That is not a contradiction: the bound applies only to comparison-based sorts, and radix sort never compares.
+
+|Sort|Complexity|Requires|
+|---|---|---|
+|Radix|O(d(n+k))|Fixed-width integer-like keys|
+|Counting|O(n+k)|Small integer range|
+|Comparison sorts|&Omega;(n log n)|Only a comparison function|
+
 ## Guided experiments
 
 1. <strong>Step through pass 1 (units).</strong> Values scatter into buckets by their last digit and are collected back in bucket order.
@@ -43,3 +115,62 @@ Its sweet spot is large volumes of fixed-width keys, which is why it appears in 
 ## The short of it
 
 Radix sort distributes by digit rather than comparing, achieving O(d·n) — linear when digit count is fixed. It depends entirely on stable bucketing, since each pass must preserve the ordering established by the last. Only usable on digit-decomposable keys, and it costs extra memory.
+
+## LSD and MSD
+
+<strong>Least significant digit first</strong> is the version above: start with the rightmost digit and work left. It requires a stable inner sort and processes every digit of every element, and it is the standard choice for fixed-width numeric keys.
+
+<strong>Most significant digit first</strong> starts from the left, partitions into buckets by the leading digit, and recurses into each bucket. It can stop early &mdash; once a bucket holds one element, that element's position is settled &mdash; which makes it better for <strong>variable-length keys</strong> such as strings.
+
+MSD radix sort on strings is genuinely fast and is used for sorting large string collections. It is essentially a trie traversal, which is the connection worth noticing: MSD radix sort and tries organise data the same way.
+
+|&nbsp;|LSD|MSD|
+|---|---|---|
+|Direction|Right to left|Left to right|
+|Needs stability|Yes|No|
+|Early termination|No|Yes|
+|Suits|Fixed-width numbers|Variable-length strings|
+|Recursion|None|Per bucket|
+
+## Handling the awkward cases
+
+<strong>Negative numbers.</strong> The straightforward version breaks, because digit extraction treats sign as absent. Two fixes: offset every value by the minimum so all are non-negative, or partition into negatives and non-negatives, sort each, and reverse the negative part.
+
+<strong>Floating-point numbers.</strong> IEEE 754 floats can be radix-sorted by reinterpreting their bits as integers, with a transformation to handle the sign bit and negative ordering. Correct, fiddly, and used in high-performance libraries.
+
+<strong>Strings of unequal length.</strong> Pad conceptually with a character that sorts before everything, or use MSD radix sort, which handles it naturally.
+
+<strong>Very large keys.</strong> The number of passes grows with key width, so a 512-bit key means many passes. Comparison sorts become competitive.
+
+## Where it is used
+
+- <strong>GPU sorting libraries.</strong> Radix sort is the dominant GPU sorting algorithm, because its work is regular and highly parallel &mdash; no branching on comparisons.
+- <strong>Database sorting</strong> of integer keys at scale.
+- <strong>Suffix array construction,</strong> which uses radix sort internally and underlies compressed text indexes.
+- <strong>Histogram-based image processing,</strong> where the count array is the histogram.
+- <strong>Sorting fixed-width identifiers</strong> &mdash; timestamps, IDs, IP addresses.
+- <strong>Bioinformatics,</strong> for sorting DNA k-mers over a four-letter alphabet.
+
+The GPU case is the most consequential today: when sorting billions of keys on a GPU, radix sort's predictable memory access and absence of branching matter far more than its theoretical complexity.
+
+## Questions people ask
+
+<strong>How does it beat O(n log n)?</strong> That bound applies to comparison-based sorts. Radix sort never compares two elements, so the bound does not apply.
+
+<strong>Is it always faster than quick sort?</strong> No. It wins for fixed-width integer keys at large n; comparison sorts win for arbitrary objects, small n, or very wide keys.
+
+<strong>Does the inner sort have to be counting sort?</strong> It has to be stable. Counting sort is the natural choice because it is O(n+k) and stable.
+
+<strong>Can it sort strings?</strong> Yes &mdash; MSD radix sort handles variable-length strings well and is effectively a trie traversal.
+
+<strong>What base should I use?</strong> 256 for integers: four passes for 32-bit keys, and digit extraction is a shift and mask.
+
+<strong>Is it stable?</strong> LSD radix sort is, provided the inner sort is. That is a requirement, not a bonus.
+
+## Recap in one screen
+
+- Sort by one digit at a time with a stable counting sort; after all digits, the array is sorted.
+- Stability is mandatory &mdash; each pass must preserve the previous passes' ordering.
+- O(d(n+k)), linear for fixed-width keys, which is possible because nothing is ever compared.
+- Base 256 is the practical choice: four passes for 32-bit integers, with shift-and-mask digit extraction.
+- LSD suits fixed-width numbers; MSD suits variable-length strings and is essentially a trie traversal.

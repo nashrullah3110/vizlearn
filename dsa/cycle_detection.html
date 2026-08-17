@@ -493,12 +493,86 @@
                     <ul><li><strong>Linked list integrity</strong> &mdash; a corrupted list with a loop makes traversal hang forever.</li><li><strong>Detecting infinite loops</strong> in state machines and iterative processes.</li><li><strong>Finding duplicates</strong> &mdash; the classic "find the duplicate in an array of n+1 values from 1..n" problem becomes cycle detection when you treat values as next-pointers.</li><li><strong>Cryptography</strong> &mdash; Pollard's rho algorithm for integer factorisation uses exactly this to find collisions.</li></ul><p>Note that cycle detection in a <em>graph</em> is a different problem, usually solved with DFS and a recursion-stack check, or by topological sort.</p>
                 </div>
                 <div>
+                    <h3>Two different problems with the same name</h3>
+                    <p>Cycle detection means something different depending on the structure, and the algorithms are unrelated.</p><strong>In a linked list</strong> &mdash; does the chain of `next` pointers loop back on itself? Solved by Floyd's tortoise and hare in O(1) space.<strong>In a graph</strong> &mdash; is there a path from some vertex back to itself? Solved by DFS, and the method differs between directed and undirected graphs.<p>Both matter, and confusing them wastes time. The graph case is the one with the subtlety.</p>
+                </div>
+                <div>
+                    <h3>Floyd's algorithm for linked lists</h3>
+                    <p>Move one pointer one step at a time and another two steps. If a cycle exists the fast pointer laps the slow one and they meet; if not, the fast one reaches the end.</p><pre><code class="language-python">def has_cycle(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow, fast = slow.next, fast.next.next
+        if slow is fast:
+            return True
+    return False</code></pre><p>Why they must meet: once both are inside the cycle, the gap between them decreases by exactly one position per step, so it reaches zero. It cannot be stepped over.</p><p>Finding the cycle's <strong>entry point</strong> uses a second phase that looks like a trick and follows from the distances:</p><pre><code class="language-python">def cycle_start(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow, fast = slow.next, fast.next.next
+        if slow is fast:                       # they met inside the cycle
+            slow = head
+            while slow is not fast:            # advance both one step
+                slow, fast = slow.next, fast.next
+            return slow                         # the entry point
+    return None</code></pre><p>O(n) time, O(1) space. The alternative &mdash; storing every visited node in a set &mdash; is also O(n) time and uses O(n) space, so Floyd's algorithm is the one to know when memory matters.</p>
+                </div>
+                <div>
+                    <h3>Directed graphs need three states</h3>
+                    <p>The subtlety that catches people. In a directed graph, a two-state visited set is insufficient:</p><pre><code class="language-python">WHITE, GREY, BLACK = 0, 1, 2      # unvisited, on the current path, finished
+
+def has_cycle_directed(graph):
+    colour = {n: WHITE for n in graph}
+
+    def visit(u):
+        colour[u] = GREY
+        for v in graph.get(u, []):
+            if colour[v] == GREY:      # back edge to the current path
+                return True
+            if colour[v] == WHITE and visit(v):
+                return True
+        colour[u] = BLACK
+        return False
+
+    return any(visit(n) for n in graph if colour[n] == WHITE)</code></pre><p>The distinction is between meeting a <strong>grey</strong> vertex and a <strong>black</strong> one.</p><strong>Grey</strong> means the vertex is on the path currently being explored &mdash; an edge to it closes a loop. That is a cycle.<strong>Black</strong> means the vertex and everything below it is finished. An edge to it is a cross edge or forward edge, reachable by two different routes, which is <em>not</em> a cycle.<p>Using one visited set treats both as cycles, and reports cycles in perfectly acyclic graphs &mdash; a diamond shape A&rarr;B, A&rarr;C, B&rarr;D, C&rarr;D would be falsely flagged.</p>
+                </div>
+                <div>
                     <h3>Things to try</h3>
                     <ol><li><strong>Run the cyclic list.</strong> Watch fast lap the loop and close in on slow one position per step.</li><li><strong>Note where they meet</strong> &mdash; usually <em>not</em> at the cycle's entry. That is why a second phase is needed.<button class="vz-run" type="button" data-vz-run="0" aria-label="Run this experiment in the visualisation: Note where they meet"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Keep stepping.</strong> Phase two resets one pointer to the head and both walk at speed one, meeting exactly at the entry node.</li><li><strong>Switch to the acyclic list.</strong> Fast runs off the end and the algorithm correctly reports no cycle.<button class="vz-run" type="button" data-vz-run="1" aria-label="Run this experiment in the visualisation: Switch to the acyclic list"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Watch the memory readout: O(1) throughout.</strong> No matter how long the list, only two pointers are ever stored.</li></ol>
                 </div>
                 <div>
                     <h3>What to remember</h3>
                     <p>Floyd's algorithm detects a loop in O(n) time and O(1) space, because inside a cycle the gap between a one-step and a two-step pointer shrinks by exactly one each iteration and must hit zero. A second phase from the head then locates where the cycle begins.</p>
+                </div>
+                <div>
+                    <h3>Undirected graphs are different again</h3>
+                    <p>In an undirected graph, every edge appears in both directions, so DFS immediately sees an edge back to the vertex it came from. That is not a cycle &mdash; it is the same edge.</p><p>So the check is: a cycle exists if DFS reaches an already-visited vertex that is <strong>not the immediate parent</strong>.</p><pre><code class="language-python">def has_cycle_undirected(graph):
+    visited = set()
+
+    def visit(u, parent):
+        visited.add(u)
+        for v in graph[u]:
+            if v == parent:
+                continue                # the edge we arrived on
+            if v in visited or visit(v, u):
+                return True
+        return False
+
+    return any(visit(n, None) for n in graph if n not in visited)</code></pre><strong>Union-Find is the cleaner alternative</strong> for undirected graphs: process each edge and attempt a union. If both endpoints are already in the same set, the edge closes a cycle. That is exactly the check inside Kruskal's algorithm.<div class="vz-table-wrap"><table><thead><tr><th>Structure</th><th>Method</th><th>Space</th></tr></thead><tbody><tr><td>Linked list</td><td>Floyd's fast/slow pointers</td><td>O(1)</td></tr><tr><td>Directed graph</td><td>DFS with three colours</td><td>O(V)</td></tr><tr><td>Undirected graph</td><td>DFS ignoring the parent, or Union-Find</td><td>O(V)</td></tr><tr><td>Undirected, edges arriving one at a time</td><td>Union-Find</td><td>O(V)</td></tr></tbody></table></div><p>Note also that a parallel edge (u&mdash;v twice) or a self-loop is a cycle in an undirected graph, and the parent check above will miss the parallel-edge case unless edge identities are tracked.</p>
+                </div>
+                <div>
+                    <h3>Where cycle detection matters</h3>
+                    <ul><li><strong>Deadlock detection.</strong> A cycle in the wait-for graph &mdash; A waits for a lock held by B, which waits for one held by A &mdash; is a deadlock. Databases detect exactly this and abort one transaction.</li><li><strong>Dependency validation.</strong> Build systems, package managers and module loaders reject circular dependencies, and the error message comes from this algorithm.</li><li><strong>Spreadsheet circular references.</strong> The <code>#REF!</code> circular error is a detected cycle in the cell dependency graph.</li><li><strong>Topological sorting.</strong> A cycle means no valid ordering exists, and detecting it is part of the sort.</li><li><strong>Garbage collection.</strong> Reference cycles are why reference counting alone leaks, and Python's cycle collector exists to find them.</li><li><strong>Infinite loop prevention</strong> in graph traversal, state machines and crawlers.</li><li><strong>Fraud detection.</strong> Circular transaction flows between accounts.</li></ul><p>The deadlock case is the clearest example of it running constantly in production: every relational database periodically checks its wait-for graph for cycles.</p>
+                </div>
+                <div>
+                    <h3>Complexity and practical notes</h3>
+                    <p>Both graph methods are O(V + E) &mdash; every vertex and edge examined once.</p><p>Three implementation notes:</p><strong>Recursion depth.</strong> DFS-based detection on a long chain exceeds Python's limit around 1,000 frames. Convert to an iterative version with an explicit stack, tracking which vertices are on the current path.<strong>Disconnected graphs.</strong> Start from every unvisited vertex, or cycles in later components are missed.<strong>Self-loops.</strong> An edge from a vertex to itself is a cycle, and some implementations skip it by accident when comparing against the parent.<p>For very large graphs where recursion is impractical, Kahn's topological sort is often the better cycle detector: if the output contains fewer vertices than the graph, a cycle exists. It is iterative, O(V+E), and needs no colour bookkeeping.</p>
+                </div>
+                <div>
+                    <h3>Questions people ask</h3>
+                    <strong>Why three colours for directed graphs?</strong> To distinguish an edge back to the current path (a cycle) from an edge into an already-finished subtree (not a cycle).<strong>Why does the undirected case need a parent check?</strong> Because every undirected edge is stored twice, so DFS immediately sees the edge it arrived on.<strong>Can I use Union-Find for directed graphs?</strong> No &mdash; it models symmetric connectivity and has no notion of direction.<strong>Is Floyd's algorithm only for linked lists?</strong> It works for any functional graph where each node has exactly one successor &mdash; including iterated functions, which is how it is used in Pollard's rho factorisation.<strong>What is the simplest way to detect a cycle in a DAG candidate?</strong> Run Kahn's topological sort; a short output means a cycle.<strong>How do I find the cycle itself, not just detect it?</strong> Keep the current path on a stack; when a grey vertex is met, the cycle is the portion of the stack from that vertex onwards.
+                </div>
+                <div>
+                    <h3>Recap in one screen</h3>
+                    <ul><li>Linked lists: Floyd's fast and slow pointers, O(1) space, with a second phase finding the entry point.</li><li>Directed graphs: DFS with three colours &mdash; a grey vertex means a cycle, a black one does not.</li><li>Undirected graphs: DFS ignoring the parent edge, or Union-Find where a failed union means a cycle.</li><li>Both graph methods are O(V+E), and Kahn's topological sort is a convenient iterative alternative.</li><li>It runs in production constantly: deadlock detection, dependency validation and circular references.</li></ul>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

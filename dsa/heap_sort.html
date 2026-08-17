@@ -488,12 +488,66 @@
                     <p>Heap sort has better worst-case guarantees than quick sort (which can degrade to O(n&sup2;)) and uses less memory than merge sort (which needs O(n)). Yet quick sort is usually faster in the real world.</p><p>The reason is <strong>cache locality</strong>. Sifting jumps between indices i, 2i+1 and 2i+2 &mdash; wildly scattered addresses that defeat the CPU cache. Quick sort scans contiguously and stays cache-friendly. Heap sort also does more swaps and is <strong>not stable</strong>.</p><p>Its real niche is guaranteed worst-case behaviour with constant memory &mdash; embedded and real-time systems. It also appears inside <em>introsort</em> (used by C++'s <span class="mono-font">std::sort</span>), which starts with quick sort and switches to heap sort if recursion gets too deep, capping the worst case.</p>
                 </div>
                 <div>
+                    <h3>Selection sort with a better data structure</h3>
+                    <p>Heap sort has a clean derivation: selection sort repeatedly finds the largest remaining element, and finding it by scanning is O(n). A heap finds it in O(log n).</p><p>Same algorithm, better structure, and the complexity drops from O(n²) to O(n log n).</p><p>Two phases:</p><strong>Build a max-heap</strong> from the array, in place, in O(n).
+<strong>Repeatedly</strong> swap the root (the maximum) with the last unsorted element, shrink the heap by one, and sift the new root down.<pre><code class="language-python">def heap_sort(arr):
+    n = len(arr)
+
+    for i in range(n // 2 - 1, -1, -1):        # build the heap: O(n)
+        sift_down(arr, i, n)
+
+    for end in range(n - 1, 0, -1):            # extract: n times O(log n)
+        arr[0], arr[end] = arr[end], arr[0]    # max to its final position
+        sift_down(arr, 0, end)                 # restore the heap, excluding the tail
+    return arr
+
+def sift_down(arr, i, size):
+    while True:
+        largest, left, right = i, 2*i + 1, 2*i + 2
+        if left &lt; size and arr[left] &gt; arr[largest]:
+            largest = left
+        if right &lt; size and arr[right] &gt; arr[largest]:
+            largest = right
+        if largest == i:
+            return
+        arr[i], arr[largest] = arr[largest], arr[i]
+        i = largest</code></pre><p>Note that everything happens in the original array: the heap occupies the front, the sorted region grows from the back, and no auxiliary storage is needed.</p>
+                </div>
+                <div>
+                    <h3>Building the heap is O(n), not O(n log n)</h3>
+                    <p>A detail that surprises people and is worth understanding.</p><p>Sifting down from the middle backwards looks like n/2 operations each costing O(log n), suggesting O(n log n). The actual bound is O(n), because <strong>most nodes are near the bottom and have almost no distance to sift</strong>.</p><p>Half the nodes are leaves and need no work. A quarter are one level up and sift at most once. An eighth sift at most twice. Summing that series gives O(n).</p><p>Building by repeated insertion instead <em>is</em> O(n log n) &mdash; each insertion sifts up from a leaf, and the last insertions travel the full height. So the direction matters: sift down from the middle, not up from insertions.</p>
+                </div>
+                <div>
+                    <h3>Its position among the O(n log n) sorts</h3>
+                    <div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>Heap sort</th><th>Quick sort</th><th>Merge sort</th></tr></thead><tbody><tr><td>Worst case</td><td>O(n log n)</td><td>O(n&sup2;)</td><td>O(n log n)</td></tr><tr><td>Extra space</td><td>O(1)</td><td>O(log n) stack</td><td>O(n)</td></tr><tr><td>Stable</td><td>No</td><td>No</td><td>Yes</td></tr><tr><td>Cache behaviour</td><td>Poor</td><td>Excellent</td><td>Good</td></tr><tr><td>Typical speed</td><td>Slowest of the three</td><td>Fastest</td><td>Middle</td></tr></tbody></table></div><p>Heap sort is the only one with <strong>both</strong> a guaranteed O(n log n) and O(1) extra space. That combination is unique among the classical sorts, and it is why the algorithm survives.</p><p>It is also the slowest of the three in practice, and the reason is cache behaviour: sifting jumps between indices i, 2i+1 and 2i+2, which on a large array means touching memory pages far apart. Quick sort's partitioning scans sequentially, which modern CPUs handle far better.</p><p>So heap sort is rarely chosen on its own &mdash; and it is chosen as a <em>fallback</em>, which is a genuinely important role.</p>
+                </div>
+                <div>
                     <h3>Exploration guide</h3>
                     <ol><li><strong>Watch phase 1.</strong> Sifting starts from the middle of the array, never the leaves &mdash; that is why heapify is O(n).</li><li><strong>Note when the heap is valid.</strong> Every parent now beats its children, but the array is far from sorted &mdash; a heap is only partially ordered.</li><li><strong>Watch phase 2.</strong> Each swap sends the current maximum to its final position and the green sorted region grows leftward.</li><li><strong>Compare the tree and the array.</strong> They are the same data &mdash; the tree is drawn from array indices, with no pointers anywhere.</li><li><strong>Shuffle and re-run.</strong> The operation counts barely move; heap sort has no bad inputs, unlike quick sort.</li></ol>
                 </div>
                 <div>
                     <h3>Where that leaves you</h3>
                     <p>Heap sort is O(n log n) in every case with O(1) extra memory — the only common sort offering both. It loses on speed to quick sort because scattered sift-down accesses wreck cache locality, and it is not stable. Use it when worst-case guarantees matter more than raw throughput.</p>
+                </div>
+                <div>
+                    <h3>Introsort: where heap sort actually runs</h3>
+                    <p>C++'s <code>std::sort</code> is <strong>introsort</strong>, and heap sort is its safety net.</p><p>The algorithm starts with quick sort. It tracks recursion depth, and if the depth exceeds roughly 2 log n &mdash; evidence that pivots are being chosen badly and the O(n²) case is developing &mdash; it switches to heap sort for that subarray. Below a small threshold it finishes with insertion sort.</p><p>The result combines all three strengths:</p><div class="vz-table-wrap"><table><thead><tr><th>Component</th><th>Provides</th></tr></thead><tbody><tr><td>Quick sort</td><td>Speed in the common case</td></tr><tr><td>Heap sort</td><td>The O(n log n) worst-case guarantee</td></tr><tr><td>Insertion sort</td><td>Low overhead on small subarrays</td></tr></tbody></table></div><p>That is heap sort's real production role: it is never the fastest choice, and it is the one that makes quick sort's worst case impossible. Without it, <code>std::sort</code> would have no guarantee.</p><p>Python takes a different route &mdash; Timsort, which is a stable merge sort &mdash; because Python guarantees stability and heap sort is not stable.</p>
+                </div>
+                <div>
+                    <h3>Why it is not stable</h3>
+                    <p>Sifting swaps elements that are far apart in the array, so equal elements can be reordered relative to their original positions.</p><p>Sorting [3a, 3b, 1] as a max-heap: 3a becomes the root, is swapped with the last element, and 3b ends up before it. The two equal values have exchanged order.</p><p>Making it stable requires attaching original indices as a tiebreaker, which needs O(n) extra space &mdash; and that removes the in-place advantage that was the reason to choose heap sort.</p><p>So heap sort's guarantee is worst-case time and constant space, never stability. When stability matters, merge sort or Timsort is the answer.</p>
+                </div>
+                <div>
+                    <h3>Related uses of the same structure</h3>
+                    <p>The heap itself is far more widely used than heap sort:</p><strong>Priority queues</strong> in Dijkstra's algorithm, A*, and any scheduler.<strong>Top-k selection.</strong> A min-heap of size k gives the k largest of n items in O(n log k) time and O(k) space &mdash; better than sorting everything when k is small. This is what `heapq.nlargest` does.<strong>Partial sorting.</strong> Stopping heap sort after k extractions gives the k largest elements in sorted order, in O(n + k log n).<strong>k-way merging.</strong> A heap of the front elements of k sorted streams merges them efficiently, which is how external sorting combines runs.<strong>Running medians.</strong> Two heaps &mdash; a max-heap of the lower half and a min-heap of the upper &mdash; give the median of a stream in O(log n) per element.
+                </div>
+                <div>
+                    <h3>Questions people ask</h3>
+                    <strong>Why is heap sort slower than quick sort if both are O(n log n)?</strong> Cache behaviour. Sifting jumps between distant indices; quick sort scans sequentially.<strong>Is it stable?</strong> No, and making it stable requires extra space, which defeats its purpose.<strong>Why is building the heap O(n)?</strong> Most nodes are near the leaves and sift a short distance; the series sums to O(n).<strong>Where is it used in practice?</strong> As introsort's fallback, providing the worst-case guarantee behind quick sort's speed.<strong>Max-heap or min-heap for ascending order?</strong> Max-heap &mdash; the largest goes to the end of the array first.<strong>Can it sort in place?</strong> Yes, and that is its distinguishing feature: O(1) extra space with a guaranteed O(n log n).
+                </div>
+                <div>
+                    <h3>Recap in one screen</h3>
+                    <ul><li>Build a max-heap in O(n), then repeatedly swap the root to the end and sift down.</li><li>Building by sifting down from the middle is O(n); building by repeated insertion is O(n log n).</li><li>Uniquely among classical sorts: guaranteed O(n log n) <em>and</em> O(1) extra space.</li><li>Slower than quick sort in practice because sifting has poor cache locality, and not stable.</li><li>Its production role is introsort's fallback, which is what gives <code>std::sort</code> its worst-case guarantee.</li></ul>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

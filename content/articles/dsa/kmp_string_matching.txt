@@ -33,6 +33,74 @@ KMP is the classic, but not always the fastest in practice. <strong>Boyer&ndash;
 
 KMP's distinguishing strength is its worst-case guarantee and its ability to work on streaming input without buffering.
 
+## Never re-examining a character
+
+The naive way to find a pattern in a text compares the pattern at every position, and on a mismatch slides forward by one and starts over. That re-reads characters it has already seen, and in the worst case &mdash; a text of "aaaaaaab" searched for "aaab" &mdash; it is O(n&times;m).
+
+KMP eliminates the re-reading. When a mismatch occurs after matching k characters, those k characters are already known, so the algorithm can compute how far to slide without looking back at the text.
+
+The result is <strong>O(n + m)</strong>, with the text pointer never moving backwards. That property matters beyond the complexity: it means KMP can search a stream.
+
+## The failure function
+
+The precomputation is the whole algorithm. For each prefix of the pattern, record the length of the longest proper prefix that is also a suffix of it.
+
+For the pattern "ABABC":
+
+|Prefix|Longest prefix that is also a suffix|Value|
+|---|---|---|
+|A|&mdash;|0|
+|AB|&mdash;|0|
+|ABA|A|1|
+|ABAB|AB|2|
+|ABABC|&mdash;|0|
+
+So the table is [0, 0, 1, 2, 0].
+
+What it means operationally: if a mismatch happens after matching "ABAB", the table says 2 &mdash; the first two characters "AB" of the pattern already match the text at the right place, so the pattern can be slid forward by 2 rather than 1, and comparison resumes at pattern index 2.
+
+```python
+def build_table(pattern):
+    table = [0] * len(pattern)
+    k = 0
+    for i in range(1, len(pattern)):
+        while k and pattern[i] != pattern[k]:
+            k = table[k - 1]                    # fall back
+        if pattern[i] == pattern[k]:
+            k += 1
+        table[i] = k
+    return table
+```
+
+That function is itself a self-match of the pattern against itself, which is why it looks like the search loop.
+
+## The search
+
+```python
+def kmp_search(text, pattern):
+    if not pattern:
+        return 0
+    table = build_table(pattern)
+    k = 0                                        # characters matched so far
+    for i, ch in enumerate(text):
+        while k and ch != pattern[k]:
+            k = table[k - 1]                     # slide, without moving i
+        if ch == pattern[k]:
+            k += 1
+            if k == len(pattern):
+                return i - k + 1                 # match start index
+    return -1
+```
+
+The crucial observation is that `i` only ever increases. The inner `while` reduces `k`, never `i` &mdash; so each text character is examined a bounded number of times overall, giving O(n).
+
+|Algorithm|Preprocessing|Search|Worst case|
+|---|---|---|---|
+|Naive|None|O(n&times;m)|O(n&times;m)|
+|KMP|O(m)|O(n)|O(n+m)|
+|Boyer-Moore|O(m + alphabet)|O(n/m) best|O(n&times;m) worst, O(n) with refinements|
+|Rabin-Karp|O(m)|O(n) expected|O(n&times;m) with bad hashing|
+
 ## Things to try
 
 1. <strong>Look at the LPS table first.</strong> Non-zero entries mark places where a prefix reappears as a suffix &mdash; the only places a shortcut is possible.
@@ -44,3 +112,70 @@ KMP's distinguishing strength is its worst-case guarantee and its ability to wor
 ## What to remember
 
 KMP precomputes an LPS table describing the pattern's self-overlap, then uses it to shift intelligently after a mismatch. Because the text pointer never moves backwards, matching is O(n+m) with a worst-case guarantee — and it works on streams that can never be rewound.
+
+## Boyer-Moore, and why it is usually faster in practice
+
+KMP guarantees O(n+m) and examines every text character at least once. Boyer-Moore can <strong>skip</strong> characters entirely, and in practice it is faster on natural text.
+
+It compares the pattern from right to left, and on a mismatch uses two heuristics:
+
+<strong>Bad character rule.</strong> If the mismatched text character does not appear in the pattern at all, the whole pattern can be slid past it &mdash; a jump of m positions.
+
+<strong>Good suffix rule.</strong> If a suffix of the pattern matched, slide to align the next occurrence of that suffix.
+
+For long patterns and large alphabets, the average behaviour is <strong>sublinear</strong> &mdash; roughly O(n/m) &mdash; because most positions are skipped without examination. That is why `grep`, text editors and most standard library `find` implementations use Boyer-Moore or a hybrid.
+
+The trade: Boyer-Moore needs random access to the text, so it cannot search a stream. KMP can. And KMP's guarantee is unconditional, where Boyer-Moore's worst case needs the Galil rule to be bounded.
+
+|&nbsp;|KMP|Boyer-Moore|
+|---|---|---|
+|Direction|Left to right|Right to left|
+|Skips characters|No|Yes|
+|Practical speed on text|Good|Better|
+|Streaming|Yes|No|
+|Guarantee|O(n+m) always|Needs refinement for worst case|
+
+## Rabin-Karp, and multi-pattern search
+
+<strong>Rabin-Karp</strong> hashes the pattern and each window of the text, comparing hashes rather than characters. A <strong>rolling hash</strong> updates in O(1) as the window slides &mdash; remove the leaving character's contribution, add the entering one.
+
+Its distinctive strength is <strong>searching for many patterns at once</strong>: hash all of them into a set and check each window's hash against it. That is O(n) regardless of how many patterns there are, which neither KMP nor Boyer-Moore can match.
+
+It is also the basis of plagiarism detection and duplicate-file finding, where the hashes of many document fragments are compared.
+
+The caveat is hash collisions: a matching hash must be verified by an actual comparison, and adversarial input can force collisions on every window, degrading to O(n&times;m).
+
+<strong>Aho-Corasick</strong> is the other multi-pattern algorithm: a trie of all patterns with failure links generalising KMP's table. It finds every occurrence of every pattern in one linear pass, and it is what `grep -F` with many patterns and most intrusion-detection systems use.
+
+## Where these appear
+
+- <strong>Text editors and `grep`</strong> &mdash; substring search, usually Boyer-Moore or a hybrid.
+- <strong>Streaming search</strong> &mdash; log monitoring and network inspection, where KMP's forward-only property is required.
+- <strong>Bioinformatics</strong> &mdash; DNA sequence matching, where alphabets are small and patterns long.
+- <strong>Intrusion detection</strong> &mdash; Aho-Corasick matching thousands of signatures against a packet stream.
+- <strong>Plagiarism and duplicate detection</strong> &mdash; Rabin-Karp fingerprinting.
+- <strong>`str.find` and `in`</strong> in Python, which uses a hybrid of Boyer-Moore-Horspool and other techniques.
+
+The practical point for everyday work: <strong>use the standard library</strong>. Python's `in` and `str.find` are implemented in C with a well-tuned hybrid, and they will beat a hand-written KMP by a wide margin. These algorithms matter for understanding why string search is fast, and for the cases the library does not cover &mdash; streaming, multi-pattern, or approximate matching.
+
+## Questions people ask
+
+<strong>Why is it called the failure function?</strong> Because it says where to resume when a comparison fails.
+
+<strong>Does KMP ever move backwards in the text?</strong> No &mdash; that is its defining property, and it is what makes streaming search possible.
+
+<strong>Is KMP the fastest string search?</strong> No. Boyer-Moore is usually faster on natural text because it skips characters. KMP's advantage is the unconditional guarantee and streaming.
+
+<strong>What does Python use for `in`?</strong> A hybrid based on Boyer-Moore-Horspool with additional heuristics, implemented in C.
+
+<strong>How do I search for many patterns?</strong> Aho-Corasick, or Rabin-Karp with a hash set. Running KMP once per pattern is O(k(n+m)).
+
+<strong>What about approximate matching?</strong> Different problem &mdash; edit distance dynamic programming, or specialised algorithms such as bitap.
+
+## Recap in one screen
+
+- Precompute, for each prefix, the longest proper prefix that is also a suffix &mdash; the failure table.
+- On a mismatch, that table says how far to slide without re-reading any text character.
+- The text pointer never moves backwards, giving O(n+m) and the ability to search a stream.
+- Boyer-Moore skips characters and is usually faster on real text, at the cost of needing random access.
+- Rabin-Karp and Aho-Corasick handle many patterns at once, which single-pattern algorithms cannot.

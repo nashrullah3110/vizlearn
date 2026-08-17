@@ -27,6 +27,78 @@ Extract a substring (a "slice") using the syntax <code>[start:stop:step]</code>.
 
 Strings come with a rich library of methods to perform common text operations, such as changing case (<code>.lower()</code>), finding substrings (<code>.find()</code>), or replacing parts of a string (<code>.replace()</code>).
 
+## Immutable, and why that shapes everything
+
+A Python string cannot be changed. Every operation that looks like a modification creates a new string.
+
+```python
+s = "hello"
+s.upper()        # 'HELLO'
+print(s)         # 'hello' - unchanged
+s = s.upper()    # to keep the result, rebind the name
+```
+
+That immutability buys real things: strings can be dictionary keys, they can be shared between parts of a program without defensive copying, and the interpreter can cache and intern them.
+
+It also has one significant performance consequence:
+
+```python
+# O(n^2) - each += copies the entire string built so far
+result = ""
+for word in words:
+    result += word
+
+# O(n) - collect the pieces, join once
+result = "".join(words)
+```
+
+At 10,000 words the first version does about 50 million character copies; the second does 10,000 appends and one allocation. <strong>`"".join()` is the idiomatic way to build a string</strong>, and the separator is the string you call it on.
+
+## Slicing, and the one rule
+
+Strings slice exactly like lists, and the stop index is always excluded.
+
+```python
+s = "Hello, World"
+
+s[0]          # 'H'
+s[-1]         # 'd'
+s[0:5]        # 'Hello'
+s[7:]         # 'World'
+s[:5]         # 'Hello'
+s[::2]        # 'Hlo ol'  - every second character
+s[::-1]       # 'dlroW ,olleH'  - reversed
+len(s)        # 12
+```
+
+Out-of-range slices return what exists rather than raising, so `s[5:100]` is safe while `s[100]` is an `IndexError`.
+
+Slicing copies, so `s[:]` produces an equal string and slicing a very long string repeatedly in a loop allocates repeatedly. For scanning without copying, iterate or use indices.
+
+## The methods that matter
+
+```python
+text = "  Hello, World  "
+
+text.strip()                  # 'Hello, World' - also lstrip, rstrip
+text.lower() / .upper()       # case conversion
+text.replace("World", "Ada")  # a new string
+text.split(",")               # ['  Hello', ' World  ']
+text.strip().startswith("H")  # True - also endswith
+"World" in text               # True - substring test
+text.find("World")            # index, or -1 if absent
+text.count("l")               # 3
+", ".join(["a", "b"])         # 'a, b'
+```
+
+Two habits prevent a large share of real string bugs.
+
+<strong>Always strip input.</strong> Data from files, forms and APIs carries trailing whitespace and newlines, and `"yes\n" == "yes"` is False. This is the most common cause of "but they look identical".
+
+<strong>Normalise case before comparing.</strong> `a.lower() == b.lower()`, or `a.casefold() == b.casefold()` for correct handling of non-English text &mdash; casefold is more aggressive and handles cases like the German &szlig;.
+
+Note also `split()` with no argument: it splits on any run of whitespace and discards empty results, which is almost always what you want for parsing text. `split(" ")` splits on each single space and can produce empty strings.
+
 ## Experiments to try
 
 Try these experiments to solidify your understanding of string manipulation.
@@ -41,3 +113,82 @@ Try these experiments to solidify your understanding of string manipulation.
 - <strong>Slicing is Non-Destructive:</strong> Slicing is a safe way to get parts of a string. It always produces a new string and never modifies the original.
 - <strong>Rich Method Library:</strong> Python's string methods are powerful and efficient. Before writing your own function to manipulate a string, always check if a built-in method already does what you need.
 - <strong>Strings are Iterable:</strong> You can loop over a string directly, e.g., <code>for char in my_string: print(char)</code>, which is useful for character-by-character processing.
+
+## f-strings
+
+f-strings take expressions, not just names, and their formatting mini-language covers most output needs:
+
+```python
+name, total, ratio = "Ada", 1234.5678, 0.847
+
+f"Hello, {name}"                  # 'Hello, Ada'
+f"Total: {total:.2f}"             # 'Total: 1234.57'
+f"Total: {total:,.2f}"            # 'Total: 1,234.57'
+f"{ratio:.1%}"                    # '84.7%'
+f"{name:>10}"                     # '       Ada'  right-aligned
+f"{name:*^11}"                    # '****Ada****' centred with fill
+f"{255:08b}"                      # '11111111'  binary, zero-padded
+f"{name=}"                        # "name='Ada'"  - for debugging
+```
+
+The `=` suffix prints both the expression and its value, which removes most of the reason to write `print("name:", name)`.
+
+Multi-line strings use triple quotes and preserve line breaks, which suits SQL, templates and docstrings. `textwrap.dedent` removes the common leading whitespace when the string is indented in source.
+
+## Unicode, and the trap that catches everyone
+
+Python 3 strings are sequences of Unicode code points. Files and networks carry <strong>bytes</strong>, so text is encoded on the way out and decoded on the way in:
+
+```python
+data = "café".encode("utf-8")     # b'caf\xc3\xa9' - 5 bytes
+text = data.decode("utf-8")       # 'café' - 4 characters
+```
+
+Three consequences worth knowing:
+
+<strong>Characters and bytes differ.</strong> `len("café")` is 4; its UTF-8 encoding is 5 bytes. Truncating at a byte boundary can split a character.
+
+<strong>Always specify the encoding</strong> when opening a text file. The default depends on the operating system, which is why a script that works on one machine raises `UnicodeDecodeError` on another.
+
+<strong>The same text can have two encodings.</strong> "é" may be one code point or an "e" plus a combining accent. They look identical and compare as different strings:
+
+```python
+import unicodedata
+a = unicodedata.normalize("NFKC", a)
+b = unicodedata.normalize("NFKC", b)
+a == b                            # now comparable
+```
+
+That normalisation should be the first step of any pipeline handling text from the outside world. Skipping it produces the classic "these two records should match and do not" bug.
+
+## Performance notes
+
+<strong>Interning.</strong> Short string literals are cached, so `"a" is "a"` may be True. Never rely on it &mdash; use `==` for equality, always.
+
+<strong>`in` is fast.</strong> Python's substring search is a tuned C implementation (a Boyer-Moore-Horspool hybrid), so `"needle" in haystack` will beat a hand-written search comfortably.
+
+<strong>Regular expressions are slower than string methods.</strong> `startswith`, `in` and `split` are faster than the equivalent regex, so reach for regex only when the pattern genuinely needs it. Compile the pattern once with `re.compile` if it is used repeatedly.
+
+<strong>`str.translate`</strong> is the fastest way to remove or map many characters at once, faster than chained `replace` calls.
+
+## Questions people ask
+
+<strong>How do I reverse a string?</strong> `text[::-1]`.
+
+<strong>Why is `+=` in a loop slow?</strong> Strings are immutable, so each concatenation copies everything so far. Use `"".join(parts)`.
+
+<strong>What is the difference between `str` and `bytes`?</strong> `str` is Unicode text; `bytes` is raw 8-bit data. Encode to go from one to the other, and Python 3 will not mix them implicitly.
+
+<strong>Is `str.format()` obsolete?</strong> Not obsolete &mdash; f-strings are clearer for almost every case, and `format` is still right when the template comes from a config file or a translation catalogue.
+
+<strong>How do I pad a number?</strong> `f"{n:03d}"` gives '007'.
+
+<strong>Why does my comparison fail on identical-looking strings?</strong> Unicode normalisation, a curly versus straight apostrophe, or trailing whitespace. Check with `repr()`.
+
+## Recap in one screen
+
+- Strings are immutable; every "modifying" method returns a new one.
+- Build strings with `"".join(parts)`, never with `+=` in a loop.
+- Slicing excludes the stop index and never raises on out-of-range bounds.
+- Strip and case-normalise anything from a human or a file before comparing it.
+- Text is Unicode and files are bytes &mdash; state the encoding, and normalise with NFKC before comparing.

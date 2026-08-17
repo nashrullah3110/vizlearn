@@ -488,12 +488,38 @@
                     <p>Bellman-Ford makes no greedy commitment. It simply relaxes <em>every</em> edge, repeatedly:</p><p>Why V&minus;1 passes? A shortest path can contain at most V&minus;1 edges (any more would revisit a vertex, forming a cycle). Each pass guarantees correctness for paths one edge longer, so V&minus;1 passes settle every possible path.</p><p>This brute-force honesty costs <strong>O(V&middot;E)</strong> &mdash; considerably slower than Dijkstra's O(E log V).</p>
                 </div>
                 <div>
-                    <h3>Detecting Negative Cycles</h3>
-                    <p>If a cycle's edges sum to a negative number, you can loop it forever and drive the distance to negative infinity &mdash; no shortest path exists.</p><p>Bellman-Ford detects this elegantly. After V&minus;1 passes everything should be final, so it runs <strong>one extra pass</strong>. If any distance still improves, a negative cycle must exist. Load the third graph and watch that final pass fire.</p><p>This is not a curiosity: it is used to detect arbitrage in currency exchange, where taking the log of exchange rates turns a profitable loop into a negative cycle.</p>
+                    <h3>Detecting negative cycles</h3>
+                    <p>This is Bellman-Ford's distinctive capability, and the reason it is still used despite being slower.</p><p>If a cycle's total weight is negative, going round it again always reduces the distance. There is no shortest path &mdash; the answer is negative infinity.</p><p>The detection is elegant: after V&minus;1 rounds every genuine shortest path has been found, so <strong>if one more round still improves something, a negative cycle must be reachable</strong>. That is the final loop in the code above.</p><p>To find the cycle itself rather than merely detect it: record a predecessor for each vertex, and when the extra round relaxes an edge, walk the predecessor chain backwards V times to land inside the cycle, then trace round it.</p><p>Note the phrase "reachable from source". A negative cycle in a disconnected part of the graph does not affect the answer and will not be detected from that source.</p><p>Why Dijkstra cannot do this: it finalises each vertex once, on the assumption that no later path can be shorter. A negative edge breaks that assumption silently, so Dijkstra returns a wrong answer rather than an error &mdash; which is worse than failing.</p>
                 </div>
                 <div>
                     <h3>When Negative Weights Are Real</h3>
                     <p>They sound artificial until you meet them: financial transactions with gains and losses, chemical reactions with energy release, game scoring with penalties and bonuses, or any cost model where some moves refund you.</p><p>Related algorithms worth knowing: <strong>Floyd-Warshall</strong> computes all-pairs shortest paths in O(V&sup3;) and also tolerates negative edges; <strong>Johnson's algorithm</strong> reweights a graph with Bellman-Ford so Dijkstra can then run on it safely.</p>
+                </div>
+                <div>
+                    <h3>Shortest paths when weights can be negative</h3>
+                    <p>Dijkstra's algorithm is faster and it assumes every edge weight is non-negative. Bellman-Ford drops that assumption, and it can additionally detect when no shortest path exists at all.</p><p>The mechanism is <strong>relaxation</strong>, repeated:</p><p class="mono-font">if dist[u] + weight(u,v) &lt; dist[v]: dist[v] = dist[u] + weight(u,v)</p><p>Apply that to <em>every</em> edge, V&minus;1 times.</p><pre><code class="language-python">def bellman_ford(n, edges, source):
+    INF = float(&quot;inf&quot;)
+    dist = [INF] * n
+    dist[source] = 0
+
+    for _ in range(n - 1):                    # V-1 rounds
+        changed = False
+        for u, v, w in edges:
+            if dist[u] != INF and dist[u] + w &lt; dist[v]:
+                dist[v] = dist[u] + w
+                changed = True
+        if not changed:
+            break                              # converged early
+
+    for u, v, w in edges:                     # one extra round
+        if dist[u] != INF and dist[u] + w &lt; dist[v]:
+            raise ValueError(&quot;negative cycle reachable from source&quot;)
+
+    return dist</code></pre>
+                </div>
+                <div>
+                    <h3>Why V&minus;1 rounds</h3>
+                    <p>A shortest path in a graph with V vertices contains at most V&minus;1 edges &mdash; any more would repeat a vertex, and repeating a vertex means a cycle, which cannot help unless it is negative.</p><p>Each round of relaxation guarantees that all shortest paths using one more edge than before are correct. So after round 1 all one-edge shortest paths are settled, after round 2 all two-edge paths, and after V&minus;1 rounds every possible shortest path is found.</p><p>That gives O(V &times; E), which is considerably worse than Dijkstra's O((V+E) log V). The <code>changed</code> flag helps in practice &mdash; most graphs converge well before V&minus;1 rounds &mdash; and the worst case stands.</p><div class="vz-table-wrap"><table><thead><tr><th>Algorithm</th><th>Weights</th><th>Complexity</th><th>Detects negative cycles</th></tr></thead><tbody><tr><td>BFS</td><td>Unweighted</td><td>O(V+E)</td><td>N/A</td></tr><tr><td>Dijkstra</td><td>Non-negative</td><td>O((V+E) log V)</td><td>No</td></tr><tr><td>Bellman-Ford</td><td>Any</td><td>O(VE)</td><td>Yes</td></tr><tr><td>Floyd-Warshall</td><td>Any, all pairs</td><td>O(V&sup3;)</td><td>Yes</td></tr><tr><td>Johnson</td><td>Any, all pairs, sparse</td><td>O(V&sup2; log V + VE)</td><td>Yes</td></tr></tbody></table></div>
                 </div>
                 <div>
                     <h3>Things to try</h3>
@@ -502,6 +528,46 @@
                 <div>
                     <h3>In one line</h3>
                     <p>Bellman-Ford relaxes every edge V−1 times instead of committing greedily, so it survives negative weights at O(V·E). One extra pass turns it into a negative-cycle detector. Use Dijkstra when all weights are non-negative; reach for this when they are not.</p>
+                </div>
+                <div>
+                    <h3>Where negative weights actually occur</h3>
+                    <p>Negative weights sound artificial, and they arise naturally in several domains.</p><strong>Currency arbitrage.</strong> Take the negative logarithm of each exchange rate as the edge weight. A negative cycle then means a sequence of trades returning more currency than it started with &mdash; a risk-free profit. Detecting it is exactly Bellman-Ford's negative-cycle check, and this is a real application in financial systems.<strong>Net cost with rebates.</strong> A route that earns a subsidy, a process step that recovers energy, a transaction with a refund &mdash; all give edges with negative net cost.<strong>Difference constraints.</strong> Systems of inequalities of the form x&#7522; &minus; x&#7514; &le; c are solved by building a graph with edge weights c and running Bellman-Ford. Infeasibility appears as a negative cycle. This is used in scheduling and in compiler optimisation.<strong>Reduced costs</strong> in linear programming and network flow algorithms, where potentials produce negative-weight residual edges.<p>So the algorithm's role is: <strong>the one to reach for when weights might be negative, and the one that tells you when the question has no answer.</strong></p>
+                </div>
+                <div>
+                    <h3>SPFA, the practical optimisation</h3>
+                    <p>The Shortest Path Faster Algorithm is Bellman-Ford with a queue: only relax edges leaving vertices whose distance actually changed, rather than sweeping every edge every round.</p><pre><code class="language-python">from collections import deque
+
+def spfa(n, graph, source):
+    INF = float(&quot;inf&quot;)
+    dist = [INF] * n
+    dist[source] = 0
+    in_queue = [False] * n
+    count = [0] * n                            # relaxations per vertex
+    q = deque([source]); in_queue[source] = True
+
+    while q:
+        u = q.popleft(); in_queue[u] = False
+        for v, w in graph[u]:
+            if dist[u] + w &lt; dist[v]:
+                dist[v] = dist[u] + w
+                if not in_queue[v]:
+                    q.append(v); in_queue[v] = True
+                    count[v] += 1
+                    if count[v] &gt;= n:
+                        raise ValueError(&quot;negative cycle&quot;)
+    return dist</code></pre><p>On typical graphs this is dramatically faster than the naive sweep &mdash; often close to O(E). Its worst case remains O(VE), and adversarial inputs exist that trigger it, so it is a practical optimisation rather than a complexity improvement.</p><p>The counter provides negative-cycle detection: a vertex entering the queue V or more times means it is being improved indefinitely.</p>
+                </div>
+                <div>
+                    <h3>Distributed routing, and the count-to-infinity problem</h3>
+                    <p>Bellman-Ford is naturally distributed: each node needs only its neighbours' distance estimates, not global knowledge. That is why it underlies <strong>distance-vector routing protocols</strong> such as RIP, where routers exchange distance tables with neighbours.</p><p>It also has a famous failure mode there. When a link goes down, routers can slowly increment each other's estimates &mdash; A thinks it can reach the destination via B, B thinks via A &mdash; converging towards infinity one step at a time. That is the <strong>count-to-infinity</strong> problem, and the mitigations (split horizon, poison reverse, a maximum hop count of 16 in RIP) are all workarounds for it.</p><p>Link-state protocols such as OSPF avoid it by having every router build a complete map and run Dijkstra locally. That is the practical trade: Bellman-Ford needs no global view and converges slowly; Dijkstra needs the whole topology and converges immediately.</p>
+                </div>
+                <div>
+                    <h3>Questions people ask</h3>
+                    <strong>When should I use Bellman-Ford over Dijkstra?</strong> Only when weights can be negative, or when you need negative-cycle detection. Otherwise Dijkstra is much faster.<strong>What happens if I use Dijkstra with negative weights?</strong> It returns a wrong answer without any error, because it finalises vertices too early.<strong>Why exactly V&minus;1 rounds?</strong> A shortest path uses at most V&minus;1 edges, and each round settles paths one edge longer.<strong>How do I find the negative cycle, not just detect it?</strong> Track predecessors; from a vertex relaxed in the extra round, walk back V times to land in the cycle, then trace it.<strong>Is SPFA always faster?</strong> Usually, and not in the worst case &mdash; adversarial graphs still force O(VE).<strong>What about all-pairs shortest paths with negative edges?</strong> Floyd-Warshall for dense graphs, or Johnson's algorithm (Bellman-Ford once, then Dijkstra from each vertex) for sparse ones.
+                </div>
+                <div>
+                    <h3>Recap in one screen</h3>
+                    <ul><li>Relax every edge V&minus;1 times; each round settles shortest paths one edge longer.</li><li>It handles negative weights, which Dijkstra cannot &mdash; and Dijkstra fails silently rather than erroring.</li><li>One extra round that still improves something proves a reachable negative cycle exists.</li><li>O(VE), which is slow; SPFA's queue makes it fast in practice without improving the worst case.</li><li>It is the basis of distance-vector routing, along with the count-to-infinity problem that follows.</li></ul>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

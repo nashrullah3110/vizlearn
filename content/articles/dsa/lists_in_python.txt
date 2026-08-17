@@ -3,9 +3,23 @@ intro: A Python list is a dynamic array, not a linked list. That single fact exp
 
 ## A dynamic array, not a linked list
 
-Despite the name, a Python list is a contiguous array of pointers. Elements sit next to each other in memory, so indexing is a single address calculation: <span class="mono-font">lst[i]</span> is O(1) regardless of the list’s length or the value of i.
+A Python list is a contiguous block of pointers to objects, with spare capacity at the end. That single implementation fact explains every performance characteristic it has.
 
-Everything else follows from that layout. Inserting in the middle means shifting every later element up one slot. Deleting means shifting them down. Only the end of the list can be modified without moving anything &mdash; which is why <span class="mono-font">append</span> and <span class="mono-font">pop()</span> are the fast operations and their front-of-list counterparts are not.
+|Operation|Complexity|Why|
+|---|---|---|
+|`lst[i]`|O(1)|Direct offset into the block|
+|`lst.append(x)`|O(1) amortised|Writes into spare capacity|
+|`lst.pop()`|O(1)|Removes from the end|
+|`lst.insert(0, x)`|O(n)|Shifts every element right|
+|`lst.pop(0)`|O(n)|Shifts every element left|
+|`x in lst`|O(n)|Linear scan|
+|`lst.remove(x)`|O(n)|Scan, then shift|
+|`len(lst)`|O(1)|Stored, not counted|
+|Slicing `lst[a:b]`|O(b&minus;a)|Copies|
+
+The two O(n) operations at the front are the ones that cause real performance problems, because the code looks innocent. A loop doing `lst.pop(0)` n times is O(n²) and works fine on 100 items and unusably on 100,000.
+
+<strong>Use `collections.deque` when you need to add or remove at the front.</strong> It gives O(1) at both ends.
 
 ## Indexing and slicing
 
@@ -27,6 +41,62 @@ The exclusive stop is deliberate: it makes <span class="mono-font">lst[:k] + lst
 
 <p>lst[i]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(1)&nbsp;&nbsp; direct address</p><p>lst.append(x)&nbsp;&nbsp;&nbsp;# O(1) amortised</p><p>lst.pop()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(1)&nbsp;&nbsp; from the end</p><p>lst.insert(0, x)&nbsp;# O(n)&nbsp;&nbsp; shifts everything</p><p>lst.pop(0)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(n)&nbsp;&nbsp; shifts everything</p><p>x in lst&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(n)&nbsp;&nbsp; linear scan</p><p>lst[a:b]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(b&minus;a) copies</p><strong>Amortised</strong> O(1) for append means individual appends are occasionally expensive. When the underlying array fills, Python allocates a larger one and copies everything across &mdash; O(n) for that one call. Because the array grows by a proportion rather than a fixed amount, those resizes become rarer as the list grows, and the average over many appends is constant.
 
+## Why append is amortised O(1)
+
+The list holds more capacity than its length. When it fills, Python allocates a larger block &mdash; growing by roughly an eighth of the current size &mdash; and copies everything across.
+
+That resize is O(n). Spread across the many appends that fit in the new capacity, the average cost per append is constant. That is what <strong>amortised</strong> means: individual operations can be expensive, the sequence is cheap.
+
+The practical consequence is that appending in a loop is fine, and it is worth knowing that a list comprehension is faster still because the append happens in C rather than through the interpreter:
+
+```python
+squares = [x * x for x in range(1000)]        # fastest
+squares = list(map(lambda x: x*x, range(1000)))
+squares = []
+for x in range(1000):
+    squares.append(x * x)                      # slowest of the three
+```
+
+If you know the final size and need a fixed-length list, `[None] * n` allocates once.
+
+## Copying, and the aliasing trap
+
+A list holds references, so copying has two levels.
+
+```python
+a = [1, 2, 3]
+b = a               # NOT a copy - another name for the same list
+b.append(4)
+print(a)            # [1, 2, 3, 4]
+
+c = a.copy()        # shallow copy - a new list, same objects inside
+c = a[:]            # same thing
+c = list(a)         # same thing
+```
+
+<strong>Shallow</strong> means the new list is separate, and the objects it points to are shared:
+
+```python
+grid = [[0, 0], [0, 0]]
+flat = grid.copy()
+flat[0].append(9)
+print(grid)         # [[0, 0, 9], [0, 0]] - the inner lists are shared
+```
+
+Use `copy.deepcopy()` when the nested objects must be independent.
+
+The same aliasing produces the most notorious Python gotcha:
+
+```python
+board = [[0] * 3] * 3        # three references to ONE row
+board[0][0] = 1
+print(board)                 # [[1,0,0], [1,0,0], [1,0,0]]
+
+board = [[0] * 3 for _ in range(3)]     # three separate rows - correct
+```
+
+`[x] * n` repeats the <em>reference</em> n times. For immutable values that is harmless; for mutable ones it is a bug.
+
 ## Exploration guide
 
 1. <strong>Watch the exclusive stop.</strong> Set <strong>Start</strong> to 1 and <strong>Stop</strong> to 4, then press <strong>Run Expression</strong>. Three elements come back, not four &mdash; index 4 is the boundary, not a member.
@@ -45,3 +115,93 @@ The exclusive stop is deliberate: it makes <span class="mono-font">lst[:k] + lst
 ## What to remember
 
 A Python list is a contiguous dynamic array, so indexing is O(1), appending is amortised O(1), and anything touching the front is O(n) because every later element must shift. Slices are always copies, negative indices count from the end, and the stop bound is exclusive. Most list performance bugs are one of two things: treating the front like the back, or slicing inside a loop.
+
+## Sorting, and the in-place trap
+
+```python
+items = [3, 1, 2]
+
+items.sort()                  # sorts IN PLACE, returns None
+new = sorted(items)           # returns a NEW sorted list
+
+items = items.sort()          # BUG - items is now None
+```
+
+That last line is the classic mistake, and it follows a Python convention: <strong>methods that mutate return `None`</strong>, precisely so this error fails loudly rather than silently.
+
+The `key` parameter is where the useful power is:
+
+```python
+words.sort(key=len)                              # by length
+people.sort(key=lambda p: (p.surname, p.first))  # by surname, then first name
+items.sort(key=lambda x: -x.score)               # descending by score
+```
+
+Sorting by a tuple gives multi-key sorting in one pass. And because Timsort is <strong>stable</strong>, sorting by one key and then another also works &mdash; the second sort preserves the first's order within ties, which is how "sort by department, then by name within department" is done as two sorts.
+
+## Choosing the right structure
+
+|Need|Use|
+|---|---|
+|Indexed access, ordered items|`list`|
+|Add/remove at both ends|`collections.deque`|
+|Membership testing|`set` &mdash; O(1) instead of O(n)|
+|Key-value lookup|`dict`|
+|Fixed record, hashable|`tuple`|
+|Counting|`collections.Counter`|
+|Grouping|`collections.defaultdict(list)`|
+|Numeric arrays, maths|`numpy.ndarray`|
+|Sorted order maintained|`bisect.insort`, or `sortedcontainers`|
+
+The membership row is the one that most often matters:
+
+```python
+# O(n^2) - 'in' scans the list for every item
+for x in items:
+    if x in other_list: ...
+
+# O(n) - build a set once
+other = set(other_list)
+for x in items:
+    if x in other: ...
+```
+
+That transformation is the most common real-world optimisation in Python, and it usually shortens the code as well.
+
+## Memory
+
+A Python list of a million integers uses considerably more memory than a million integers' worth of data: the list holds a million pointers (8 bytes each), and each small integer is itself an object with a header.
+
+Two alternatives when that matters:
+
+<strong>`numpy.ndarray`</strong> stores raw values contiguously &mdash; a million 64-bit integers is 8MB, against roughly 40MB for a list. It also enables vectorised operations that run in C.
+
+<strong>Generators</strong> avoid materialising the list at all:
+
+```python
+total = sum(x * x for x in range(10_000_000))    # no list built
+```
+
+For a large intermediate that is consumed once, a generator expression is both faster and dramatically lighter.
+
+## Questions people ask
+
+<strong>Is a Python list a linked list?</strong> No &mdash; it is a dynamic array of pointers, contiguous, with O(1) indexing.
+
+<strong>Why is `insert(0, x)` slow?</strong> Every existing element shifts one position right. Use `deque.appendleft`.
+
+<strong>Why does `list.sort()` return `None`?</strong> By convention, mutating methods return `None`, so `x = x.sort()` fails visibly.
+
+<strong>What is the difference between `list` and `tuple`?</strong> Tuples are immutable and can be dictionary keys; lists are mutable and cannot.
+
+<strong>How do I remove duplicates?</strong> `list(set(items))` loses order; `list(dict.fromkeys(items))` preserves it.
+
+<strong>When should I use NumPy instead?</strong> For numeric data of uniform type, especially with arithmetic across the whole array &mdash; far less memory and far faster.
+
+## Recap in one screen
+
+- A list is a contiguous array of pointers with spare capacity, which is why indexing and appending are O(1).
+- Operations at the front are O(n) because everything shifts &mdash; use `deque` there.
+- Assignment shares the list; `copy()` is shallow; `[x]*n` repeats a reference.
+- `sort()` mutates and returns `None`; `sorted()` returns a new list; both are stable.
+- Replacing `in list` with `in set` is the most common Python speed-up available.
