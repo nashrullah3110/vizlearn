@@ -14,6 +14,41 @@ A feature vector is <strong>sparse</strong> when most of its entries are zero. T
 
 <p>Sparsity causes three separate problems, and they are worth keeping apart:</p><strong>Memory.</strong> Storing a 100,000&times;50,000 matrix densely at 4 bytes per float is 20 GB, nearly all of it zeros. Sparse formats such as CSR store only the non-zeros plus their indices, typically cutting this by two or three orders of magnitude.<strong>Wasted computation.</strong> A dense matrix multiply performs a multiply-add for every element, and multiplying by zero contributes nothing. Most of the arithmetic produces no information.<strong>Uneven gradients.</strong> This is the subtle one. A weight connected to a feature that is non-zero in 0.1% of samples receives a gradient in only 0.1% of steps. Rare features therefore learn roughly a thousand times more slowly than common ones under a single global learning rate &mdash; which is precisely the problem <strong>Adagrad</strong> and <strong>Adam</strong> solve, by giving each parameter its own effective rate based on how often it has received a gradient. That is why adaptive optimisers are the standard choice on sparse data.
 
+## Two different problems with the same name
+
+"Sparse" describes two situations that need entirely different responses, and conflating them causes a lot of confusion.
+
+<strong>Sparse features</strong> &mdash; most values in the input are zero. One-hot encoded categories, bag-of-words text, user-item interaction matrices. A vocabulary of 50,000 words means a document vector where 49,900 entries are zero.
+
+<strong>Sparse labels</strong> &mdash; you have plenty of data and very few annotations. This is a labelling problem, addressed by semi-supervised learning, active learning or transfer learning.
+
+Both are common; only the first is about representation, and the rest of this is mostly about that one.
+
+## Why sparse features are awkward
+
+<strong>Memory.</strong> A million users by 50,000 items stored densely is 200GB of floats. Stored sparsely &mdash; only the non-zero positions and values &mdash; it may be a few hundred megabytes. Sparse formats are not an optimisation here; they are the difference between possible and impossible.
+
+<strong>Thin statistics.</strong> A feature that is non-zero in 20 of a million rows gives the model almost nothing to learn from, so its weight is mostly noise.
+
+<strong>Distances stop working.</strong> Two documents that share no words have identical Euclidean distance regardless of what else they contain. Cosine similarity, which compares direction, is the standard alternative for exactly this reason.
+
+<strong>Gradients are sparse too.</strong> A weight connected to a feature that is zero in this batch receives no gradient, so it updates only in the batches where its feature appears. Rare features therefore learn very slowly &mdash; which is precisely the problem adaptive optimisers were designed for. Adam and AdaGrad give parameters with infrequent gradients larger effective steps.
+
+## Embeddings: the standard fix
+
+Instead of a 50,000-dimensional sparse vector, learn a dense vector of 64 to 256 numbers per category, trained jointly with the rest of the model.
+
+|&nbsp;|One-hot|Embedding|
+|---|---|---|
+|Width|One column per category|A chosen width, e.g. 64|
+|Similar categories|Equidistant &mdash; no notion of similarity|Nearby in the space|
+|Rare categories|Almost no data per column|Share structure with others|
+|Memory|Sparse, wide|Dense, compact|
+
+The second row is the important one. One-hot encoding makes every category exactly as different from every other; an embedding can place "London" near "Manchester" and far from "banana" because the training signal pushes them there. That is why embeddings are the default for high-cardinality categorical features in deep models, and why they underpin every recommendation system.
+
+A common width heuristic is `min(50, (cardinality + 1) // 2)`, or the fourth root of the cardinality &mdash; both are starting points to be tuned rather than rules.
+
 ## Guided experiments
 
 1. <strong>Start dense.</strong> Set <strong>Input Sparsity Level</strong> to 0 and press <strong>Stream Data</strong>. Every input carries signal and every weight receives a gradient on every sample.
@@ -38,3 +73,76 @@ Mathematically this is identical to multiplying the one-hot vector by a weight m
 ## What to remember
 
 Sparse data is the norm for one-hot categories, text and recommenders, and it costs memory, wasted arithmetic, and &mdash; least obviously &mdash; badly uneven learning rates, because a weight only updates when its input is non-zero. Keep sparse matrices in sparse formats, replace one-hot encodings of high-cardinality fields with learned embeddings, and use an adaptive optimiser so rare features are not left thousands of steps behind common ones.
+
+## Handling it in code
+
+For classical models, keep the matrix sparse end to end:
+
+```python
+from scipy import sparse
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+
+X = TfidfVectorizer(min_df=5).fit_transform(docs)     # sparse matrix
+print(X.shape, X.nnz / (X.shape[0] * X.shape[1]))     # density, often < 1%
+
+LogisticRegression().fit(X, y)                        # accepts sparse input
+```
+
+Never call `.toarray()` on a large sparse matrix &mdash; that is the line that exhausts memory. `min_df=5` is also doing real work: dropping terms that appear in fewer than five documents removes most of the vocabulary and almost none of the signal.
+
+For neural networks, use an embedding layer and pass integer indices rather than one-hot vectors:
+
+```python
+emb = nn.Embedding(num_embeddings=50_000, embedding_dim=64)
+out = emb(token_ids)          # (batch, seq) -> (batch, seq, 64)
+```
+
+`nn.Embedding` is a lookup, not a matrix multiplication, so it never materialises the one-hot vector at all. `nn.EmbeddingBag` sums or averages several embeddings in one call, which is the efficient way to represent a bag of features.
+
+## Which models cope well
+
+|Model|With sparse features|
+|---|---|
+|Linear / logistic regression|Excellent &mdash; sparse-aware and fast|
+|Naive Bayes|Excellent &mdash; designed for high-dimensional counts|
+|Gradient boosting (LightGBM, XGBoost)|Good &mdash; handles sparsity natively|
+|Neural networks with embeddings|Excellent, and the standard for high cardinality|
+|KNN, k-means|Poor without cosine distance and dimension reduction|
+|Dense neural networks on one-hot input|Poor &mdash; wasteful and slow to learn|
+
+Two further options worth knowing. <strong>Feature hashing</strong> maps categories into a fixed number of buckets, accepting collisions in exchange for bounded memory and no vocabulary to maintain &mdash; useful when new categories appear constantly. And <strong>truncated SVD</strong> reduces a sparse matrix to a few hundred dense components, which is what makes clustering and nearest-neighbour search on text feasible.
+
+## Sparse labels, briefly
+
+The other meaning deserves its own short answer, since the techniques are different:
+
+- <strong>Transfer learning</strong> &mdash; start from a pretrained model, so a few hundred labels suffice.
+- <strong>Self-supervised pretraining</strong> on your unlabelled data, then fine-tune on the labelled subset.
+- <strong>Active learning</strong> &mdash; let the model choose which examples to send for labelling, prioritising the ones it is least sure about.
+- <strong>Pseudo-labelling</strong> &mdash; label the confident predictions on unlabelled data and train on them, carefully, since errors compound.
+- <strong>Weak supervision</strong> &mdash; combine noisy rules and heuristics into probabilistic labels.
+
+The first two are where the leverage is: pretraining plus a small labelled set now beats a large labelled set trained from scratch on most tasks.
+
+## Questions people ask
+
+<strong>When is data "sparse"?</strong> Informally, when a large majority of entries are zero. Below about 10% density, sparse storage and sparse-aware models start to matter.
+
+<strong>Should I use one-hot or an embedding?</strong> One-hot below about 10 categories; embeddings above roughly 50, especially in a network.
+
+<strong>Does PCA work on sparse data?</strong> Not directly &mdash; centring destroys sparsity. Use `TruncatedSVD`, which does not centre.
+
+<strong>Which distance for sparse vectors?</strong> Cosine, almost always. Euclidean distance is dominated by the shared zeros.
+
+<strong>Do trees handle sparsity?</strong> LightGBM and XGBoost handle it natively and efficiently, including treating missing and zero appropriately.
+
+<strong>Why do rare features learn slowly?</strong> They appear in few batches, so their weights receive few gradients. Adaptive optimisers partly compensate by giving them larger effective steps.
+
+## Recap in one screen
+
+- "Sparse" means either mostly-zero features or mostly-missing labels &mdash; different problems, different fixes.
+- Sparse features cost memory, give thin per-feature statistics, break Euclidean distance and slow learning for rare values.
+- Keep sparse matrices sparse; never densify a large one.
+- Embeddings replace wide one-hot encodings with compact dense vectors that can express similarity.
+- For sparse labels, transfer learning and self-supervised pretraining give the most leverage.

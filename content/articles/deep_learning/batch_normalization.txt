@@ -22,6 +22,69 @@ Normalizing inputs at the front door helps the first layer, but <strong>internal
 - <strong>Enables deeper networks</strong> — gradients stay in a healthy range across 50, 100, or even 1000+ layers.
 - <strong>Interview staple</strong> — expect questions on BatchNorm in almost every ML/DL interview.
 
+## Normalising the activations inside the network
+
+Feature scaling puts the <em>inputs</em> on a common footing. Batch normalisation does the same thing to the activations <em>between</em> layers, and does it continuously during training.
+
+For each channel, over the current mini-batch:
+
+<p class="mono-font">x&#770; = (x &minus; &mu;<sub>batch</sub>) / &radic;(&sigma;&sup2;<sub>batch</sub> + &epsilon;)&nbsp;&nbsp;&nbsp;&nbsp;out = &gamma;x&#770; + &beta;</p>
+
+The first step standardises to mean 0 and variance 1. The second step is what makes it a layer rather than a fixed transform: `γ` and `β` are <em>learned</em>, so the network can rescale and shift the normalised values &mdash; and can undo the normalisation entirely if that turns out to be better.
+
+Two parameters per channel, which is why batch normalisation is almost free in parameter count while being one of the most impactful layers available.
+
+## What it buys
+
+<strong>Higher learning rates.</strong> The main practical benefit. Normalised activations keep gradients in a sensible range, so you can train at rates that would diverge without it &mdash; often 10&times; higher.
+
+<strong>Faster convergence.</strong> Fewer epochs to the same loss, consistently.
+
+<strong>Depth becomes trainable.</strong> Networks beyond about 20 layers were unreliable before batch normalisation and residual connections; together they made 100+ layers routine.
+
+<strong>Mild regularisation.</strong> Each example's normalisation depends on which other examples happened to share its batch, which injects noise. That is why models with batch normalisation often need less dropout.
+
+<strong>Less sensitivity to initialisation.</strong> A layer that normalises its inputs cares much less about the scale it was initialised with.
+
+The original explanation was "reducing internal covariate shift". Later work argued that the real mechanism is smoothing the loss landscape. The debate is unresolved and does not change how you use it.
+
+## Train and inference behave differently
+
+This is where the bugs are. During <strong>training</strong>, statistics come from the current batch. During <strong>inference</strong>, there may be no batch &mdash; a single image must give a deterministic answer &mdash; so the layer uses running averages accumulated during training.
+
+That means the layer has two modes, and forgetting to switch is a genuine and common error:
+
+```python
+model.train()      # batch statistics, running averages updated
+# ... training loop ...
+
+model.eval()       # running averages used, not updated
+with torch.no_grad():
+    predictions = model(x)
+```
+
+Symptoms of getting it wrong: predictions that change depending on what else is in the batch, validation accuracy far below training accuracy for no other reason, or a model that behaves differently on a batch of one.
+
+The `momentum` parameter controls how fast the running averages update (0.1 in PyTorch means each batch contributes 10%). If your data distribution shifts during training, the running statistics lag behind.
+
+## Where it fails
+
+<strong>Small batches.</strong> With a batch of 2 or 4, the batch statistics are noise. This is a real constraint in detection and segmentation, where large images force small batches &mdash; and the reason GroupNorm exists.
+
+<strong>Sequence models.</strong> Sequences vary in length and normalising across the batch mixes positions that are not comparable. LayerNorm replaced it entirely in transformers.
+
+<strong>Batch size 1.</strong> The variance is zero and the layer cannot function.
+
+<strong>Distribution shift between train and inference.</strong> The running averages describe the training data; if production data differs, the normalisation is wrong.
+
+|Alternative|Normalises over|Use when|
+|---|---|---|
+|BatchNorm|Batch, per channel|CNNs with reasonable batch sizes|
+|LayerNorm|All features of one example|Transformers, RNNs|
+|GroupNorm|Groups of channels, one example|Small batches in vision|
+|InstanceNorm|Each channel of one example|Style transfer, generative models|
+|RMSNorm|Scale only, no centring|Modern large language models|
+
 ## 4) Guided Experiments with This Interactive
 
 1. <strong>Baseline</strong> — Set Age ≈ 35, Salary ≈ 80k. Leave both toggles OFF. Click <em>Train Network</em>. Watch W1 (first layer) turn <span style="color:var(--accent-danger)">red</span> and W3 (deep layer) turn <span style="color:var(--accent-blue)">blue</span>. The status should say "Unstable".
@@ -56,3 +119,46 @@ In practice both work well; consistency within your architecture matters more th
 - It fights internal covariate shift, enabling higher learning rates and deeper architectures.
 - The learnable parameters γ and β let the network undo the normalization if needed.
 - Always switch to eval mode at inference and be mindful of batch size.
+
+## Placement, and the redundant bias
+
+The conventional order is `Conv → BatchNorm → ReLU`. Normalising before the activation keeps the pre-activations centred, so roughly half the ReLU units are active &mdash; which is what the initialisation assumed.
+
+Two details that appear in real code:
+
+<strong>The convolution's bias is redundant.</strong> Batch normalisation subtracts the mean, which cancels any constant the convolution added. That is why ResNet-style implementations use `bias=False` on convolutions followed by normalisation &mdash; it saves parameters and changes nothing.
+
+<strong>Pre-activation ordering trains deeper.</strong> In residual blocks, `BN → ReLU → Conv` leaves the identity path completely clean, which was shown to train deeper networks more reliably than the original post-activation arrangement.
+
+At inference, batch normalisation can be <strong>folded</strong> into the preceding convolution: since both are linear at that point, their weights can be combined into a single convolution. Every deployment toolkit does this, and it removes the layer's runtime cost entirely.
+
+## Practical guidance
+
+- <strong>Use it in convolutional networks</strong> unless batches are small.
+- <strong>Use LayerNorm in transformers and RNNs.</strong> Batch normalisation is not the right tool there.
+- <strong>Use GroupNorm when batch size is under about 8.</strong> It is independent of batch size and nearly as effective.
+- <strong>Keep it in eval mode when a pretrained backbone is frozen,</strong> or its running statistics will drift on your small dataset and quietly degrade the features.
+- <strong>Exclude `γ` and `β` from weight decay.</strong> Decaying them towards zero fights what the layer is for.
+- <strong>Shuffle your training data.</strong> Batches sorted by class give meaningless statistics.
+
+## Questions people ask
+
+<strong>Does batch normalisation replace input scaling?</strong> No. Scale the inputs as well; the first layer benefits from the same treatment as the rest.
+
+<strong>Why does my model perform worse in eval mode?</strong> Usually the running statistics are poor &mdash; too few training steps, unshuffled data, or a distribution that shifted during training.
+
+<strong>Can I use it with dropout?</strong> Yes, though the combination is often unnecessary. If you use both, dropout goes after the normalisation.
+
+<strong>How many parameters does it add?</strong> Two per channel, plus two non-trained running statistics per channel.
+
+<strong>Is it needed with residual connections?</strong> They solve different problems and are normally used together. Removing normalisation from a deep ResNet usually breaks training unless the initialisation is adjusted to compensate.
+
+<strong>What is the &epsilon; for?</strong> To avoid dividing by zero when a channel's variance is tiny. The default of 1e-5 is fine.
+
+## Recap in one screen
+
+- Standardise each channel over the batch, then rescale with two learned parameters.
+- The main gain is that much higher learning rates become stable, so training is faster and depth is feasible.
+- It behaves differently in training and inference &mdash; call `model.eval()`, or predictions depend on the batch.
+- Small batches break it; use GroupNorm there, and LayerNorm for sequences and transformers.
+- Drop the preceding layer's bias, exclude the parameters from weight decay, and fold the layer away at deployment.

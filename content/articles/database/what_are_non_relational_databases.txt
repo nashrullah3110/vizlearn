@@ -12,17 +12,48 @@ A <strong>non-relational</strong> database stores data in a shape other than fix
 - <strong>Wide column</strong> (Cassandra, HBase) &mdash; rows keyed for distribution, where each row can hold different columns. Built for enormous write volume across many machines.
 - <strong>Graph</strong> (Neo4j) &mdash; nodes and edges as first-class citizens. Relationships are traversed directly instead of being recomputed by joins.
 
-## Schema Flexibility Cuts Both Ways
+## Schema flexibility cuts both ways
 
-Press "Add field to one record" in each model. In a document store, one document simply gains a field &mdash; no migration, no downtime. In the relational model the same change is an <span class="mono-font">ALTER TABLE</span> affecting every row.
+The headline benefit of a document store is that you can add a field to one document without altering anything else. For rapidly changing data, or genuinely heterogeneous records, that removes real friction: no migration, no downtime, no coordination.
 
-The catch: the database no longer guarantees that every record has the same shape, so <em>your application</em> must handle documents that lack the field. Schema enforcement did not disappear &mdash; responsibility for it moved into your code.
+The cost arrives later. There is still a schema &mdash; it has just moved from the database into every piece of code that reads the data. Six months in, a collection contains documents from four generations of the application, and something must handle all of them. The database will not tell you which documents lack the field you are about to read; it will return `undefined` and let you find out in production.
+
+The mature answer is schema validation at the application boundary or in the database's own validation rules, plus a version field on every document. That gets you flexibility with a way to reason about what exists &mdash; which is most of what a relational schema was giving you.
 
 ## Denormalisation Is the Point — and the Cost
 
 Document stores deliberately duplicate data so a page can be served with a single read. That is genuinely faster. But you have re-created the update anomaly from the relational lab: change a customer's name and you must now find every document that copied it.
 
 The rule of thumb: <strong>relational optimises for correct writes, non-relational optimises for fast reads.</strong> Choose based on which one your workload does more of, and how much inconsistency you can tolerate.
+
+## What "NoSQL" actually covers
+
+"NoSQL" is a label for four quite different families of database that share only the fact that they are not relational. Comparing them as one thing is where most confusion starts.
+
+<strong>Document stores</strong> (MongoDB, Couchbase, Firestore) hold JSON-like documents. A whole order &mdash; customer details, line items, shipping address &mdash; lives in one document and is read in one operation. The schema can vary between documents in the same collection.
+
+<strong>Key-value stores</strong> (Redis, DynamoDB, Memcached) are a giant hash map: give a key, get a value. Extremely fast, very simple, and the value is opaque to the store. Sessions, caches, feature flags, rate limiters.
+
+<strong>Wide-column stores</strong> (Cassandra, HBase, ScyllaDB) look table-ish but each row can have different columns, and the data is partitioned across many machines by key. Built for enormous write volumes and linear horizontal scaling.
+
+<strong>Graph databases</strong> (Neo4j, Neptune) store nodes and the edges between them, and traverse relationships in constant time per hop. Social networks, fraud rings, recommendation paths, dependency graphs.
+
+|Family|Read pattern it optimises|Typical use|
+|---|---|---|
+|Document|Fetch one nested object by id|Product catalogues, user profiles, CMS|
+|Key-value|Fetch one value by exact key|Caching, sessions, counters|
+|Wide-column|Fetch a partition, write heavily|Event logs, time series, IoT|
+|Graph|Traverse relationships many hops deep|Social, fraud, recommendations|
+
+## Denormalisation is the point, and the cost
+
+Relational design says store each fact once and join. Document design says store the data the way you read it, even if that means duplicating.
+
+Embedding an order's line items in the order document means one read instead of a join &mdash; genuinely faster, and it scales horizontally because everything needed sits in one partition. Embedding the product name too means the order renders without touching the product collection at all.
+
+Then the product is renamed, and 40,000 order documents contain the old name. You now own that consistency problem. Sometimes that is correct &mdash; the name at the time of the order is a historical fact worth preserving. Sometimes it is a bug you find out about from a customer.
+
+The design question for every embedded copy: <em>is this a snapshot or a reference?</em> Snapshots should be embedded. References should be looked up, even when that costs a second query.
 
 ## Try it yourself
 
@@ -34,3 +65,49 @@ The rule of thumb: <strong>relational optimises for correct writes, non-relation
 ## Worth remembering
 
 There is no "better" model, only different bargains. Relational gives you enforced consistency and flexible ad-hoc queries; non-relational gives you speed, scale and schema freedom in exchange for moving integrity into your application. Most real systems today use both.
+
+## Consistency, CAP and what "eventual" means
+
+Distributed stores face a constraint that a single-node database does not. The CAP theorem says that when the network between nodes fails, a system must choose between staying <strong>consistent</strong> (refuse to answer rather than return stale data) and staying <strong>available</strong> (answer with whatever this node knows).
+
+Many NoSQL systems chose availability, which produces <strong>eventual consistency</strong>: a write is acknowledged immediately, replicas catch up shortly afterwards, and for a brief window different clients can read different values. For a like counter or a viewed-products list, that is entirely fine. For an account balance or a seat booking, it is not.
+
+Most modern systems make this tunable per operation rather than fixing it for the whole database &mdash; write to a quorum for the operations that matter, write to one node for the ones that do not. DynamoDB, Cassandra and MongoDB all expose some version of this, and choosing it deliberately is part of using them well.
+
+The related trade is transactions. Single-document atomicity is universal; multi-document transactions are now available in several document stores but cost more than their relational equivalents and are not the default idiom.
+
+## Choosing between them
+
+Reach for a non-relational store when:
+
+- The access pattern is known, narrow and dominated by one key &mdash; "get everything for this user id".
+- Write throughput exceeds what one node can serve, and the data partitions cleanly.
+- The records are genuinely heterogeneous, such as event payloads from many sources.
+- The workload is relationship traversal many hops deep, where a graph database is orders of magnitude faster than recursive joins.
+- You need a cache, a queue or a session store &mdash; which is a key-value job, not a database design question.
+
+Stay relational when queries will be ad hoc, when several records must change atomically, when the data has clear structure and referential rules, or when reporting matters &mdash; SQL is still the best query language anyone has built for questions you did not anticipate.
+
+<strong>Polyglot persistence</strong> &mdash; PostgreSQL for the core data, Redis for the cache, Elasticsearch for search &mdash; is common and sensible. The cost is operational: several systems to run, back up and keep consistent with each other.
+
+## Questions people ask
+
+<strong>Is NoSQL faster?</strong> For its designed access pattern, often yes. For an unanticipated query, usually much slower &mdash; there may be no index and no join to fall back on.
+
+<strong>Can I do joins?</strong> Document stores offer limited lookups (MongoDB's `$lookup`), and they are not the idiom. If you find yourself joining constantly, the data model or the database choice is wrong.
+
+<strong>Does NoSQL mean no schema?</strong> No &mdash; it means the schema is not enforced by the database. It still exists, in your code.
+
+<strong>Should I start with NoSQL for a new project?</strong> Rarely. Early projects change their query patterns constantly, which is exactly the situation relational databases handle best. Adopt a specialised store when a specific need appears.
+
+<strong>What is NewSQL?</strong> Distributed systems (CockroachDB, Spanner, TiDB) that keep SQL and ACID guarantees while scaling horizontally &mdash; an attempt to stop the choice being necessary.
+
+<strong>Can PostgreSQL just do this?</strong> Often, yes. `JSONB` covers many document use cases with indexing and constraints available, and it means one system to operate rather than two.
+
+## Recap in one screen
+
+- "NoSQL" covers four different families: document, key-value, wide-column and graph.
+- Each optimises one access pattern &mdash; and is poor at the ones it was not designed for.
+- Flexible schemas move the schema into your code; they do not remove it.
+- Denormalisation buys single-read speed and hands you the consistency problem.
+- Many systems trade immediate consistency for availability; make that choice per operation, deliberately.

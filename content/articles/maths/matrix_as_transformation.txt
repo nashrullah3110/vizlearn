@@ -27,6 +27,58 @@ M(x, y) = x·(a, c) + y·(b, d) = (ax + by, cx + dy)
 
 That is the rule you were taught, derived rather than memorised. And matrix multiplication is just doing this twice &mdash; applying one transformation and then another &mdash; which is also why order matters: rotating then shearing is genuinely not the same as shearing then rotating.
 
+## A matrix is a function on space
+
+The most useful way to read a matrix is not as a grid of numbers but as an instruction: <em>take every point in space and move it, in a consistent way</em>.
+
+Multiply a matrix by a vector and you get a new vector. Do that to every point in a square grid and the grid becomes stretched, rotated, sheared or flipped &mdash; but it stays a grid. Lines stay lines, parallel lines stay parallel, and the origin stays put. Those three properties define a <em>linear</em> transformation, and matrices are exactly the transformations with them.
+
+The quickest way to read a matrix is to look at what it does to the basis vectors:
+
+<p class="mono-font">A = [[a, b], [c, d]]</p>
+
+The first column is where [1, 0] lands; the second column is where [0, 1] lands. That is all. Everything else follows, because any vector is a combination of those two and the transformation preserves combinations.
+
+## The transformations worth recognising
+
+|Matrix|Effect|
+|---|---|
+|[[1,0],[0,1]]|Identity &mdash; nothing moves|
+|[[2,0],[0,2]]|Uniform scale by 2|
+|[[2,0],[0,1]]|Stretch along x only|
+|[[0,&minus;1],[1,0]]|Rotate 90&deg; anticlockwise|
+|[[1,1],[0,1]]|Shear &mdash; the top slides right|
+|[[&minus;1,0],[0,1]]|Reflect across the vertical axis|
+|[[1,2],[2,4]]|Collapse everything onto a line|
+
+That last one is worth dwelling on. Its two columns are multiples of each other, so both basis vectors land on the same line, and the whole plane is flattened onto it. The transformation destroys information and cannot be undone &mdash; the matrix is <strong>singular</strong>, its determinant is zero, and it has no inverse.
+
+## Composition, and why order matters
+
+Applying one transformation after another is a matrix product, and the order matters because the operations do not commute.
+
+Rotate 90&deg; then stretch horizontally, versus stretch then rotate: the results differ, and you can verify it by tracking where [1, 0] ends up in each case.
+
+The convention with column vectors is that the rightmost matrix acts first:
+
+<p class="mono-font">(A B) v = A (B v)&nbsp;&nbsp;&mdash;&nbsp;B first, then A</p>
+
+That reversal catches everyone once. It is why a graphics pipeline written as `M = translate · rotate · scale` applies scaling first.
+
+Because matrix multiplication is associative, a chain of transformations can be multiplied into a single matrix once, and then applied to millions of points cheaply. That is the basis of every rendering pipeline and of fused operations in neural network inference.
+
+## Reading the numbers back out
+
+Three summaries tell you what a matrix does without applying it to anything:
+
+<strong>The determinant</strong> is the factor by which areas (or volumes) are scaled. A determinant of 3 triples areas; 0.5 halves them; 0 collapses them; and a negative determinant means the space has been flipped over.
+
+<strong>The eigenvectors</strong> are the directions that do not rotate &mdash; the axes of the transformation. The eigenvalues say how much each is stretched.
+
+<strong>The rank</strong> is the number of dimensions that survive. A 3&times;3 matrix of rank 2 flattens three-dimensional space onto a plane.
+
+Those three between them describe almost everything a linear transformation can do, which is why they appear in every linear algebra course before anything else.
+
 ## Things to try
 
 1. <strong>Start with nothing.</strong> Set the <strong>Preset</strong> to Identity. The grid does not move, the determinant is 1, and the columns are (1,0) and (0,1) &mdash; the basis vectors, unmoved.
@@ -64,3 +116,46 @@ The formula <span class="mono-font">ad &minus; bc</span> is not a magic incantat
 ## The short of it
 
 A matrix is a record of where the basis vectors land, stored as its columns, and because linear transformations keep grid lines straight and evenly spaced that record determines where every other vector goes. This makes the multiplication rule a derivation rather than a convention: transforming (x, y) means taking x copies of the first column plus y copies of the second. The determinant is the area of the transformed unit square, signed by whether space was flipped, so a determinant of zero means space collapsed onto a line and no inverse can exist.
+
+## Where this reading pays off in machine learning
+
+<strong>A neural network layer</strong> is `Wx + b`: a linear transformation followed by a shift. The weight matrix rotates, scales and projects the input space; the bias moves it. The activation function then bends it &mdash; and that bending is the only non-linear step, which is why activations are what give depth its power. Without them, a hundred stacked layers collapse into a single matrix.
+
+<strong>PCA</strong> is a rotation: the eigenvectors of the covariance matrix form a matrix that rotates the data onto new axes aligned with its own spread. Dropping components afterwards is a projection onto a lower-dimensional subspace.
+
+<strong>Embeddings</strong> are learned linear maps from a sparse one-hot space into a dense one where distances mean something.
+
+<strong>Attention</strong> in transformers applies three learned matrices to each token &mdash; queries, keys and values &mdash; each one a transformation into a space where the comparison it needs is easy.
+
+<strong>Data augmentation</strong> for images applies rotation, scaling and shear matrices to pixel coordinates &mdash; literally the transformations in the table above.
+
+## Non-square matrices change the dimension
+
+A square matrix maps a space to itself. A non-square one moves between spaces:
+
+- A 2&times;3 matrix takes 3-D vectors and returns 2-D ones &mdash; a projection, losing a dimension.
+- A 3&times;2 matrix takes 2-D vectors into 3-D space, but the output can only ever lie on a plane through the origin.
+
+This is exactly what network layers do when they change width. A layer mapping 512 features to 128 is a projection into a smaller space, and information is necessarily discarded. A layer mapping 128 to 512 cannot create information &mdash; the outputs lie in a 128-dimensional subspace of the larger space, which is why bottleneck architectures and autoencoders work the way they do.
+
+## Questions people ask
+
+<strong>Why must the origin stay fixed?</strong> Because a linear transformation satisfies `T(0) = 0`. Translation is not linear, which is why the bias term is added separately, and why graphics uses homogeneous coordinates to fold translation into a bigger matrix.
+
+<strong>What does a negative determinant mean?</strong> The transformation flipped orientation &mdash; a reflection is involved.
+
+<strong>How do I picture a 512-dimensional transformation?</strong> You do not. Work with the summaries: rank, determinant, eigenvalues, and what the shapes are before and after.
+
+<strong>Is every matrix invertible?</strong> No. If the determinant is zero, the transformation collapsed a dimension, and the lost information cannot be recovered.
+
+<strong>Why do the columns tell you where the basis vectors go?</strong> Because multiplying by [1, 0] picks out the first column by construction &mdash; the arithmetic is the explanation.
+
+<strong>Does this help with debugging models?</strong> Yes &mdash; a great deal of framework shape errors, and every question about which layer discards information, is easier to reason about in terms of what maps into what.
+
+## Recap in one screen
+
+- A matrix is a linear transformation: lines stay lines, parallels stay parallel, the origin stays fixed.
+- The columns are where the basis vectors land, which is the fastest way to read what a matrix does.
+- Products compose transformations, and the rightmost acts first on a column vector.
+- Determinant is the area scale factor, eigenvectors are the unrotated directions, rank is the surviving dimensions.
+- Network layers, PCA, embeddings and attention are all this idea with learned matrices.

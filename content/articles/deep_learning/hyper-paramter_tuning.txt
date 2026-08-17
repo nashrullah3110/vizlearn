@@ -11,6 +11,63 @@ The distinction matters because you cannot use gradient descent to find hyperpar
 
 <strong>Grid search</strong> tries every combination on a predefined grid. With 5 learning rates and 5 layer widths that is 25 runs, and adding a third hyperparameter with 5 values makes it 125. The cost is exponential in the number of hyperparameters.<strong>Random search</strong> samples combinations at random from ranges you specify. Counterintuitively it usually finds better settings for the same budget, and the reason is sharp: not all hyperparameters matter equally. If learning rate dominates and layer width barely matters, a 5&times;5 grid tests only <strong>5 distinct learning rates</strong> across 25 runs. Random search with 25 samples tests <strong>25 distinct learning rates</strong>. You get five times the resolution on the axis that counts, at no extra cost.<strong>Bayesian optimisation</strong> goes further, building a model of which regions look promising and sampling there. It is more efficient per trial and worth the complexity when each run takes hours.
 
+## The settings you choose rather than learn
+
+Parameters are learned by gradient descent. <strong>Hyperparameters</strong> are the settings you choose before training starts, and they decide how well that learning goes.
+
+Not all of them matter equally, and the difference is large enough that tuning them in the wrong order wastes most of the effort:
+
+|Hyperparameter|Impact|Typical range|
+|---|---|---|
+|Learning rate|Enormous|1e-5 to 1e-1, log scale|
+|Batch size|Moderate|32&ndash;256|
+|Number of epochs|Moderate|Decided by early stopping|
+|Weight decay|Moderate|1e-5 to 1e-1, log scale|
+|Architecture depth / width|Moderate|Problem-dependent|
+|Dropout rate|Small to moderate|0.0&ndash;0.5|
+|Optimiser choice|Small|AdamW by default|
+|Adam's &beta; values|Negligible|Leave at defaults|
+
+The learning rate deserves its position. It affects results more than the number of layers, the width, or which optimiser you pick &mdash; and it is the cheapest to find, via a short exponential sweep.
+
+## Random search beats grid search
+
+This is the most useful practical result in the topic, and it is counterintuitive.
+
+A grid search over 3 learning rates and 3 dropout rates tries 9 combinations &mdash; but only 3 distinct learning rates. If the learning rate is what matters and dropout barely does, you spent 9 runs to sample 3 values of the important parameter.
+
+<strong>Random search</strong> with 9 trials samples 9 distinct learning rates. For the same budget it explores the important dimension three times as thoroughly, and the result generalises: when only a few hyperparameters matter, random search finds better configurations than grid search at equal cost.
+
+<strong>Bayesian optimisation</strong> goes further by modelling the relationship between settings and score, and choosing each next trial where the expected improvement is highest. Optuna and similar libraries implement this, and they add another useful feature &mdash; <strong>pruning</strong>, which abandons a trial early once it is clearly losing.
+
+```python
+import optuna
+
+def objective(trial):
+    lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+    wd = trial.suggest_float("weight_decay", 1e-6, 1e-1, log=True)
+    dropout = trial.suggest_float("dropout", 0.0, 0.5)
+    return train_and_validate(lr=lr, weight_decay=wd, dropout=dropout)
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=50)
+print(study.best_params)
+```
+
+Note `log=True` on the learning rate and weight decay. Both span orders of magnitude, and sampling them uniformly wastes almost every trial in the top decade.
+
+## An order that does not waste effort
+
+1. <strong>Get a working baseline first.</strong> One run, sensible defaults, no tuning. Everything is measured against this.
+2. <strong>Find the learning rate</strong> with an exponential sweep. Biggest gain, smallest cost.
+3. <strong>Fix the schedule</strong> &mdash; warm-up plus cosine decay.
+4. <strong>Set the batch size</strong> to what fits, scaling the rate accordingly.
+5. <strong>Tune regularisation</strong> &mdash; weight decay, then dropout &mdash; guided by the train/validation gap.
+6. <strong>Adjust architecture</strong> if the model is clearly under- or over-capacity.
+7. <strong>Random or Bayesian search</strong> over whatever remains, if the budget allows.
+
+Two habits that matter more than the search algorithm: change <strong>one thing at a time</strong> so you can attribute the effect, and <strong>fix the random seed</strong> so a 1% difference is a real difference rather than run-to-run variation.
+
 ## Things to try
 
 1. <strong>Run a small search.</strong> Set <strong>N Trials</strong> to 5 and press <strong>Run Trial</strong> repeatedly. Results scatter widely &mdash; five samples is not enough to distinguish a good region from luck.
@@ -34,3 +91,43 @@ Sample the exponent instead: draw uniformly from &minus;4 to &minus;1 and use <s
 ## Key takeaway
 
 Hyperparameters sit outside gradient descent, so the only way to evaluate them is to train and measure &mdash; which makes the search strategy itself worth thinking about. Random search beats grid search at equal budget because it spends its samples on more distinct values of whichever hyperparameter actually matters, and anything spanning orders of magnitude should be sampled on a log scale. Whatever the strategy, select on validation data and keep the test set untouched.
+
+## Not tuning on the test set
+
+Every hyperparameter decision made by looking at a score consumes some of that set's independence. Search fifty configurations against a validation set and keep the best, and its score is optimistic &mdash; you selected the luckiest of fifty.
+
+The disciplined arrangement is three splits: train fits the parameters, validation chooses the hyperparameters, and test is looked at once, at the end, to produce the number you report.
+
+For a rigorous estimate, <strong>nested cross-validation</strong> puts the hyperparameter search inside an outer loop whose test folds never participate in tuning. It costs k times more compute, and it is what you want when the number will inform a real decision.
+
+The pragmatic middle ground &mdash; cross-validation for tuning, plus one genuinely untouched hold-out set for the final number &mdash; is what most projects should do.
+
+## Budget, and knowing when to stop
+
+Hyperparameter search has diminishing returns, and it is worth knowing roughly where they set in.
+
+The first few trials usually find most of the available gain, because they fix the learning rate. Trials ten to fifty refine it. Beyond a hundred, improvements on a fixed dataset are typically fractions of a percent &mdash; at which point better data, better features or a different architecture is a far better use of the compute.
+
+Two shortcuts worth knowing. <strong>Tune on a subset</strong> &mdash; 10&ndash;20% of the data &mdash; to find a promising region cheaply, then verify the best few configurations on the full dataset. And <strong>use early pruning</strong>, so a configuration that is clearly losing after two epochs does not consume twenty.
+
+## Questions people ask
+
+<strong>What should I tune first?</strong> The learning rate, always. It dominates.
+
+<strong>How many trials do I need?</strong> Twenty to fifty random or Bayesian trials cover most of the available gain for a handful of hyperparameters.
+
+<strong>Grid or random search?</strong> Random, or Bayesian. Grid search wastes its budget on dimensions that do not matter.
+
+<strong>Should I tune the architecture?</strong> Only after the training recipe is right, and prefer a proven architecture over designing one.
+
+<strong>Do I need to tune Adam's betas?</strong> Almost never. The defaults are robust.
+
+<strong>Why do my results change between runs with the same settings?</strong> Random initialisation, shuffling and non-deterministic GPU kernels. Fix the seeds, and treat differences smaller than the run-to-run variation as noise.
+
+## Recap in one screen
+
+- Hyperparameters are chosen, not learned, and they are not equally important.
+- The learning rate matters most and is the cheapest to find &mdash; sweep it first.
+- Random and Bayesian search beat grid search at equal budget, because only a few dimensions matter.
+- Sample learning rate and weight decay on a log scale.
+- Tune on validation, report on a test set you touched once, and fix the seed before comparing anything.

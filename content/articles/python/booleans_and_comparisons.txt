@@ -17,13 +17,105 @@ This is not two separate comparisons glued together &mdash; Python evaluates <sp
 
 ## == compares value, is compares identity
 
-This is the single most common source of confusion. <span class="mono-font">==</span> asks whether two objects have the same <em>value</em>; <span class="mono-font">is</span> asks whether they are the <em>same object</em> in memory.
+`==` asks "are these equal?" `is` asks "are these the same object?"
 
-a = [1, 2, 3]<br>b = [1, 2, 3]<br>a == b&nbsp;&nbsp;&rarr; True&nbsp;&nbsp;&nbsp;same contents<br>a is b&nbsp;&nbsp;&rarr; False&nbsp;&nbsp;different objects
+```python
+a = [1, 2, 3]
+b = [1, 2, 3]
+c = a
 
-Almost always you want <span class="mono-font">==</span>. The exception is comparing against the singletons <span class="mono-font">None</span>, <span class="mono-font">True</span> and <span class="mono-font">False</span>, where <span class="mono-font">x is None</span> is the correct idiom because there is exactly one None object.
+a == b      # True  - same contents
+a is b      # False - two separate lists
+a is c      # True  - one list, two names
+```
 
-Small integers and short strings sometimes appear to work with <span class="mono-font">is</span> because Python caches them &mdash; which makes the bug intermittent and therefore worse.
+Use `is` only for `None`, `True` and `False`, which are singletons &mdash; there is exactly one `None` object in a running program.
+
+```python
+if result is None:      # correct
+if name == "Ada":       # correct
+if count is 100:        # wrong, and modern Python warns about it
+```
+
+The trap is that small integers and short strings are cached and reused by the interpreter, so `x is 100` sometimes appears to work &mdash; and then fails silently for `1000`, in production, months later.
+
+## True, False, and everything that behaves like them
+
+A boolean has two values, `True` and `False`, capitalised. They are what every comparison produces and what every `if` consumes.
+
+```python
+5 > 3           # True
+5 == 3          # False
+type(True)      # <class 'bool'>
+True + True     # 2  -- booleans are integers underneath
+sum([True, False, True])   # 2  -- which makes counting matches easy
+```
+
+That last line is a genuinely useful idiom: `sum(x > 100 for x in values)` counts how many values exceed 100, because each comparison contributes 1 or 0.
+
+The comparison operators:
+
+```python
+a == b     # equal in value
+a != b     # not equal
+a < b      # less than          (also <=, >, >=)
+a is b     # the same object in memory
+a in items # membership
+```
+
+Comparisons chain, exactly as in mathematics, and each operand is evaluated once:
+
+```python
+if 0 <= score <= 100:        # clearer than score >= 0 and score <= 100
+```
+
+## and, or, not, and short-circuiting
+
+```python
+True and False    # False - both must be true
+True or False     # True  - either will do
+not True          # False
+```
+
+The important behaviour is <strong>short-circuiting</strong>: `and` stops at the first false operand, `or` at the first true one, and the rest is never evaluated. That is not an optimisation detail; it is how you write safe checks.
+
+```python
+if user is not None and user.is_admin:     # user.is_admin never runs
+    ...                                     # when user is None
+```
+
+Reverse the order and it raises `AttributeError` on exactly the case the check was protecting against.
+
+Short-circuiting also means `and` and `or` return one of their <em>operands</em>, not a boolean:
+
+```python
+name = given_name or "Anonymous"      # falls back when given_name is empty
+port = config.get("port") or 8080     # careful: 0 is falsy, so 0 becomes 8080
+```
+
+That second line shows the one caveat &mdash; when `0` or `""` are legitimate values, use an explicit `is None` test instead.
+
+## Truthiness
+
+Every object can be used as a condition. These are false:
+
+<p class="mono-font">False&nbsp;&nbsp;None&nbsp;&nbsp;0&nbsp;&nbsp;0.0&nbsp;&nbsp;""&nbsp;&nbsp;[]&nbsp;&nbsp;{}&nbsp;&nbsp;()&nbsp;&nbsp;set()</p>
+
+Everything else is true, including `"False"`, `[0]` and `-1`.
+
+```python
+if items:            # idiomatic "is this non-empty"
+if not items:        # "is this empty"
+```
+
+Two useful builtins that fold a whole sequence into one boolean:
+
+```python
+any(x > 100 for x in values)     # True if at least one qualifies
+all(x > 0 for x in values)       # True if every one does
+```
+
+Both short-circuit, so `any()` stops at the first match &mdash; which makes them efficient as well as readable.
 
 ## Guided experiments
 
@@ -42,3 +134,53 @@ Small integers and short strings sometimes appear to work with <span class="mono
 ## Key takeaway
 
 Comparisons return booleans and can be chained the way they are written in mathematics. <span class="mono-font">and</span> and <span class="mono-font">or</span> short-circuit, which is what lets a guard on the left protect an expression on the right &mdash; so operand order matters. Use <span class="mono-font">==</span> for value and reserve <span class="mono-font">is</span> for None, True and False, and never compare floats for exact equality.
+
+## Comparing different types
+
+```python
+1 == 1.0        # True  - numeric types compare across the boundary
+1 == True       # True  - because True IS 1
+"1" == 1        # False - text is never equal to a number
+[1, 2] == (1, 2) # False - a list is never equal to a tuple
+
+"apple" < "banana"     # True  - alphabetical by character code
+"Apple" < "apple"      # True  - uppercase sorts first in ASCII
+[1, 2] < [1, 3]        # True  - element by element
+```
+
+Strings compare by character code, which is why `"Zebra" < "apple"` is true &mdash; all uppercase letters come before all lowercase ones. For human-friendly comparison, normalise the case first with `.casefold()`.
+
+Ordering comparisons between unrelated types raise `TypeError` in Python 3: `1 < "a"` fails rather than producing an arbitrary answer. That is deliberate, and it catches a class of bug that Python 2 silently allowed.
+
+Floats bring their own caveat: `0.1 + 0.2 == 0.3` is `False`. Compare with `math.isclose(a, b)` instead.
+
+## Writing conditions that read well
+
+- <strong>Do not compare to `True`.</strong> `if is_ready:` beats `if is_ready == True:`, and both beat `if is_ready is True:`.
+- <strong>Name complicated conditions.</strong> `is_eligible = age >= 18 and has_id and not banned` then `if is_eligible:` &mdash; the name is documentation and the condition becomes testable.
+- <strong>Prefer `in` over chains of `or`.</strong> `if status in ("open", "pending", "review"):`.
+- <strong>Use `not in`</strong> rather than `not x in y`, which parses correctly but reads badly.
+- <strong>Apply De Morgan's law</strong> when a negation gets tangled: `not (a and b)` is `not a or not b`, and one of the two is usually clearer for the case at hand.
+
+## Questions people ask
+
+<strong>Why is `True == 1`?</strong> Because `bool` is a subclass of `int`, with `True` equal to 1 and `False` to 0. It is what makes `sum(conditions)` count matches.
+
+<strong>When should I use `is`?</strong> For `None`, `True` and `False`, and when you genuinely mean "the same object". Everywhere else, `==`.
+
+<strong>Why does `0.1 + 0.2 == 0.3` return False?</strong> Binary floating point cannot represent 0.1 exactly. Use `math.isclose`.
+
+<strong>What does `bool(x)` do?</strong> Applies the truthiness rules and returns `True` or `False` &mdash; occasionally useful to normalise a value before storing it.
+
+<strong>Can I use `&&` and `||`?</strong> No. Python uses the words `and` and `or`; `&` and `|` are bitwise operators and behave differently.
+
+<strong>Is `if x != None` wrong?</strong> It usually works but `is not None` is the correct and conventional form, and it cannot be fooled by a class that overrides `__eq__`.
+
+## Recap in one screen
+
+- Comparisons produce booleans, and booleans are integers &mdash; `sum(...)` over conditions counts them.
+- `==` compares value; `is` compares identity, and is only for `None`, `True` and `False`.
+- `and` and `or` short-circuit, which is what makes `if x and x.field` safe.
+- Falsy values: `False`, `None`, `0`, `0.0`, `""`, `[]`, `{}`, `()`, `set()`.
+- `any()` and `all()` collapse a sequence of conditions into one answer, and stop early.
+- Compare floats with `math.isclose`, never with `==`.

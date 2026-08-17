@@ -11,6 +11,65 @@ Imagine walking across a flat, grey field that suddenly drops off into a black c
 
 The Sobel operator achieves this by using two small matrices (called <strong>kernels</strong>), one to detect horizontal changes and one for vertical changes. By sliding these kernels over every pixel, it calculates the "gradient" or rate of change in brightness. A high gradient value means a strong edge is likely present.
 
+## Edges are where the numbers change fast
+
+An edge is a place where brightness changes sharply &mdash; the boundary between an object and its background, or between two surfaces. Since an image is a grid of numbers, "changes sharply" means a large difference between neighbouring pixels, which is a derivative.
+
+The simplest detector is the difference between a pixel's neighbours:
+
+<p class="mono-font">gradient at x = pixel(x+1) &minus; pixel(x&minus;1)</p>
+
+A flat region gives zero. A step from dark (50) to light (200) gives 150. The size of the number is the strength of the edge; the sign is its direction.
+
+Doing this in two dimensions gives two gradients &mdash; horizontal and vertical &mdash; which combine into a magnitude and an angle:
+
+<p class="mono-font">magnitude = &radic;(G&#8339;&sup2; + G&#8342;&sup2;)&nbsp;&nbsp;&nbsp;&nbsp;direction = arctan(G&#8342; / G&#8339;)</p>
+
+## The classic kernels
+
+<strong>Sobel</strong> is the standard, combining differencing in one direction with smoothing in the other:
+
+```
+Gx = [-1  0  +1]        Gy = [-1 -2 -1]
+     [-2  0  +2]             [ 0  0  0]
+     [-1  0  +1]             [+1 +2 +1]
+```
+
+`Gx` responds to vertical edges (where brightness changes horizontally) and `Gy` to horizontal ones. The 2s in the middle row weight the central pixels more, which suppresses noise slightly compared with a plain difference.
+
+<strong>Prewitt</strong> is the same idea with uniform weights &mdash; simpler, marginally noisier. <strong>Scharr</strong> uses weights chosen for better rotational symmetry, and is the better choice when edge <em>angles</em> matter.
+
+<strong>Laplacian</strong> takes the second derivative in both directions at once with a single kernel:
+
+```
+[ 0 -1  0]
+[-1  4 -1]
+[ 0 -1  0]
+```
+
+It finds edges as zero-crossings rather than peaks, needs no direction combining, and is considerably more sensitive to noise &mdash; which is why it is almost always applied after a Gaussian blur (the Laplacian of Gaussian).
+
+## Why blurring first is not optional
+
+Differencing amplifies noise. A single speckled pixel produces a large difference with both its neighbours, so an edge detector run on a raw noisy photograph returns a field of false edges.
+
+Smoothing with a Gaussian blur first removes the high-frequency noise while leaving genuine edges, which are lower-frequency, largely intact. The blur radius sets the scale: a small sigma keeps fine texture and some noise, a large sigma keeps only major boundaries.
+
+The <strong>Canny detector</strong> packages the whole sensible pipeline into one algorithm, and it is still the standard classical method:
+
+1. <strong>Blur</strong> with a Gaussian.
+2. <strong>Compute gradients</strong>, usually with Sobel.
+3. <strong>Non-maximum suppression</strong> &mdash; thin each ridge to a one-pixel line by keeping only local maxima along the gradient direction.
+4. <strong>Double thresholding</strong> &mdash; strong edges are kept, weak ones are candidates, the rest are discarded.
+5. <strong>Hysteresis</strong> &mdash; keep a weak edge only if it connects to a strong one, which links broken contours without admitting isolated noise.
+
+```python
+import cv2
+edges = cv2.Canny(gray, threshold1=100, threshold2=200)
+```
+
+The two thresholds are the parameters that matter; a common heuristic is a ratio between 2:1 and 3:1.
+
 ## Guided Experiments with This Interactive
 
 1. <strong>Baseline Observation:</strong> <p class="font-light opacity-80 mt-1">Start with the default image and threshold. Notice how the major outlines of the subject are captured. The output is a binary image: pixels are either black (not an edge) or white (an edge).</p>
@@ -33,3 +92,55 @@ The Sobel operator achieves this by using two small matrices (called <strong>ker
 - Edge detection is a foundational step for higher-level computer vision tasks like object recognition and image segmentation.
 
 Edge detection is the first step in helping a computer make sense of the visual world, turning a sea of pixels into structured information.
+
+## The connection to convolutional networks
+
+Every one of those kernels is a 3&times;3 convolution filter. The only difference between classical edge detection and the first layer of a CNN is where the numbers come from.
+
+Sobel's weights were designed by a person. A CNN's first-layer filters are <em>learned</em> from data by gradient descent &mdash; and when you visualise them after training, they look strikingly like Sobel kernels, Gabor filters and colour-opponent detectors. The network rediscovers edge detection because edges are genuinely the most useful low-level feature in natural images.
+
+That is the honest relationship between the two topics. Classical methods hand-code one layer of filters; deep networks learn hundreds of layers of them, and the first layer ends up doing roughly what the hand-coded one did.
+
+The practical consequences:
+
+- <strong>Do not add Sobel as a preprocessing step</strong> before a CNN. It duplicates what the first layer will learn, and it discards information that later layers might have used.
+- <strong>Classical detectors are still useful</strong> when you have no training data, need a deterministic result, must run on a microcontroller, or want something explainable.
+- <strong>Modern learned boundary detectors</strong> (HED and its successors) outperform Canny substantially on natural images, because they use semantic context rather than local contrast alone.
+
+## Where edge detection is still used
+
+- <strong>Industrial inspection</strong> &mdash; measuring parts, checking alignment, finding cracks, where lighting is controlled and rules must be auditable.
+- <strong>Document processing</strong> &mdash; locating page boundaries, table lines and text regions before OCR.
+- <strong>Medical imaging</strong> &mdash; delineating structures, often as a component in a larger pipeline.
+- <strong>Feature extraction for classical vision</strong> &mdash; HOG descriptors, which underpinned pedestrian detection before deep learning, are histograms of exactly these gradient orientations.
+- <strong>Preprocessing for geometry</strong> &mdash; the Hough transform finds lines and circles from edge maps, which is how lane detection and coin counting are done classically.
+
+## Common mistakes
+
+- <strong>Skipping the blur,</strong> producing an edge map dominated by noise.
+- <strong>Running edge detection on a colour image channel by channel</strong> without deciding how to combine the results. Convert to greyscale, or compute the gradient properly across channels.
+- <strong>Using fixed thresholds across varying lighting.</strong> Otsu's method or an adaptive threshold based on image statistics generalises far better.
+- <strong>Expecting closed contours.</strong> Edge detectors produce fragments; connecting them into shapes is a separate step.
+- <strong>Adding it in front of a CNN,</strong> which throws away information the network could have used.
+
+## Questions people ask
+
+<strong>Which detector should I use?</strong> Canny for a general-purpose edge map, Sobel when you need the raw gradients, Scharr when angles matter, Laplacian of Gaussian for blob-like structures.
+
+<strong>How do I choose Canny's thresholds?</strong> Start from the image's median: low = 0.66&times;median, high = 1.33&times;median is a widely used heuristic that adapts to brightness.
+
+<strong>Why are my edges thick?</strong> Because non-maximum suppression has not been applied. Sobel produces ridges; Canny thins them.
+
+<strong>Can edge detection work on colour?</strong> Yes &mdash; compute gradients per channel and combine, which catches boundaries between colours of equal brightness that greyscale conversion would miss entirely.
+
+<strong>Is edge detection obsolete?</strong> For recognition, largely. For measurement, inspection and constrained environments, no &mdash; it is fast, deterministic and needs no training data.
+
+<strong>Do CNNs really learn Sobel-like filters?</strong> The first layer of trained image networks consistently contains oriented edge and colour-transition detectors. It is one of the most reproducible findings in the field.
+
+## Recap in one screen
+
+- An edge is a large change in brightness, which makes edge detection a derivative computation.
+- Sobel and Prewitt give directional gradients; magnitude and angle come from combining them.
+- Blur first, always &mdash; differencing amplifies noise.
+- Canny adds thinning, dual thresholds and hysteresis, and remains the classical standard.
+- These kernels are convolutions, and a CNN's first layer learns very similar ones from data.

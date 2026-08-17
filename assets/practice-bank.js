@@ -1668,16 +1668,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Computer Vision",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A convolutional layer holds (k × k × C in × F) + F parameters, with filters spanning every input channel and the image dimensions appearing nowhere. Weight sharing is what buys the enormous reduction against a fully connected layer, along with translation equivariance."
+    "t": "What is meant by “Flatten-then-dense is where parameters explode” here?",
+    "ans": "Global average pooling is the standard fix."
    },
    {
-    "t": "What does this module say about “The formula”?",
-    "ans": "For a convolutional layer with kernel size k×k, C in input channels and F filters:"
+    "t": "What is meant by “Doubling the channels roughly quadruples that layer's parameters,” here?",
+    "ans": "because both C_in and C_out appear in the formula."
    },
    {
-    "t": "What does this module say about “The General Formula”?",
-    "ans": "A convolutional layer's parameter count depends on the filter size, the input channels and the number of filters - and not at all on the size of the image. That independence is the whole reason CNNs are practical."
+    "t": "What is meant by “Early layers cost compute; late layers cost parameters” here?",
+    "ans": "Optimise the right one for your constraint."
+   },
+   {
+    "t": "What is meant by “More parameters is not more capacity in any useful sense” here?",
+    "ans": "if they sit in a badly placed dense layer."
    }
   ]
  },
@@ -1754,8 +1758,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "It is called a Fully Connected (or Dense) layer because every single node in the input vector is connected to every single node in the output vector. If you have 4 inputs and 3 outputs, there are $4 \\times 3 = 12$ distinct connections (weights), plus 3 biases."
    },
    {
-    "t": "What does this module say about “The Dense Formula”?",
-    "ans": "For an output node $j$, the raw Logit ($Z_j$) is the dot product of the inputs ($X$) and weights ($W$), plus bias ($b$):"
+    "t": "What does this module say about “Where the convolutions stop and the decision starts”?",
+    "ans": "Convolutional layers produce feature maps: a stack of grids saying where each learned pattern was found. That is not yet an answer to \"which of these ten classes is it?\""
    }
   ]
  },
@@ -1843,6 +1847,10 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “IoU as loss, IoU as grade”?",
     "ans": "A natural localization loss is simply 1 − IoU between the predicted box and the ground truth box: 0 when they coincide exactly, approaching 1 as they stop overlapping at all. At evaluation time, the same IoU number gets a different job — a detection is usually scored as a true positive only if its IoU with the matching ground truth box clears a threshold, conventionally 0.5 under the PASCAL VOC convention."
+   },
+   {
+    "t": "What does this module say about “Classification says what; detection says what and where”?",
+    "ans": "A classifier answers one question about a whole image. A detector answers two questions about every object in it: what is it , and where is it — expressed as a rectangle."
    }
   ]
  },
@@ -1860,8 +1868,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "To fix this, we artificially expand the original image by adding a border of zeros around it before applying the convolution. This is called Padding ."
    },
    {
-    "t": "What does this module say about “Summing up”?",
-    "ans": "By manipulating padding, machine learning engineers control the spatial dimensions flowing through a neural network's architecture."
+    "t": "What does this module say about “The edges lose out”?",
+    "ans": "Slide a 3×3 filter over a 5×5 image and it only fits in 3×3 positions. The output is smaller than the input, and the reason is at the borders: a pixel in the corner has no neighbours on two sides, so the filter cannot be centred there."
    }
   ]
  },
@@ -1871,16 +1879,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Computer Vision",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Visualize why Convolutional Neural Networks are so efficient. See how a single set of shared weights is reused across the entire image, drastically reducing the number of parameters compared to a Dense layer."
-   },
-   {
     "t": "What does this module say about “What is Parameter Sharing”?",
     "ans": "In a traditional Fully Connected (Dense) neural network layer, every output node is connected to every input node with a unique weight (parameter). If you process an image, a specific pixel in the top-left corner has a completely different weight than a pixel in the bottom-right corner."
    },
    {
     "t": "What does this module say about “The Massive Efficiency Gain”?",
     "ans": "Let's look at the math for the simple interactive above. We have a 4x4 input grid (16 pixels) and we are generating a 3x3 output grid (9 pixels)."
+   },
+   {
+    "t": "What does this module say about “One filter, used everywhere”?",
+    "ans": "A dense layer gives every input pixel its own weight to every output unit. A convolutional layer does something quite different: it learns one small filter and applies that same filter at every position in the image."
    }
   ]
  },
@@ -1890,16 +1898,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Computer Vision",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Pooling summarises each neighbourhood into one value, most often taking the maximum of a 2×2 window at stride 2, which quarters the feature map for free — it has no parameters. Its real value is enlarging the receptive field so small filters can eventually see large structures, with computational saving second and a modest, purely local translation tolerance third."
+    "t": "What is meant by “Downsampling too aggressively on small images” here?",
+    "ans": "A 32×32 CIFAR image cannot survive five stride-2 stages; it would be down to 1×1 before the network has done anything."
    },
    {
-    "t": "What does this module say about “What pooling does”?",
-    "ans": "A pooling layer slides a window over the feature map and replaces the values inside it with a single summary. With a 2×2 window and stride 2 — by far the most common setting — the windows do not overlap, and the output is half the height and half the width, so a quarter of the values ."
+    "t": "What is meant by “Expecting pooling to give real invariance” here?",
+    "ans": "It tolerates shifts of a pixel or two, not rotation, scale, or a shifted object. Augmentation is what handles those."
    },
    {
-    "t": "What does this module say about “Why some architectures drop it”?",
-    "ans": "Pooling is a fixed rule, and a strided convolution achieves the same downsampling while learning how to summarise. Many modern architectures use stride-2 convolutions instead, and all-convolutional networks remove pooling entirely."
+    "t": "What is meant by “Using max pooling right at the end” here?",
+    "ans": "Global average pooling is almost always the better final layer."
+   },
+   {
+    "t": "What is meant by “Flattening a large feature map into a dense layer” here?",
+    "ans": "That is where the parameter explosion lives; global average pooling removes it."
    }
   ]
  },
@@ -1917,8 +1929,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Think of a color image not as a single flat picture, but as three separate grayscale images stacked on top of each other. Each of these \"layers\" is a channel , representing the intensity of Red, Green, or Blue light for every pixel."
    },
    {
-    "t": "What does this module say about “Thinking in Pseudocode”?",
-    "ans": "When a computer applies a filter, it iterates through every pixel and applies a mathematical rule. For a brightness adjustment, it looks like this:"
+    "t": "What does this module say about “Three numbers per pixel”?",
+    "ans": "A colour image stores three values per pixel — red, green and blue — each usually 0 to 255. Mixing them additively produces every colour the display can show."
    }
   ]
  },
@@ -1929,7 +1941,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Visualize the Rectified Linear Unit (ReLU). See how it introduces non-linearity by passing positive signals and turning off (clipping) negative signals."
+    "ans": "For convolutional networks, plain ReLU remains the sensible default. Leaky ReLU is the first thing to try if you observe many dead units. GELU and SiLU dominate in transformers and in recent efficient vision architectures, where their smoothness appears to help slightly — at a small computational cost."
    },
    {
     "t": "What does this module say about “What is an Activation Function”?",
@@ -1966,16 +1978,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Computer Vision",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A plain stack of layers with a contractive weight matrix shrinks its forward signal geometrically with depth — the same kind of multiplicative decay that causes vanishing gradients on the way back. An identity shortcut adds a nonnegative quantity back onto the running signal at every block, which makes shrinkage below the starting point mathematically impossible."
+    "t": "What is meant by “ResNet-50 pretrained on ImageNet is the sensible default backbone” here?",
+    "ans": "for a new vision project. It is well-supported everywhere, and fine-tunes reliably."
    },
    {
-    "t": "What does this module say about “The idea in brief”?",
-    "ans": "ResNet's headline idea is the identity shortcut: instead of a block computing x_{i+1} = f(x_i) , it computes x_{i+1} = x_i + f(x_i) , adding the block's own input back onto its output. The usual explanation is about gradients flowing backward through very deep networks."
+    "t": "What is meant by “The shortcut must match shapes” here?",
+    "ans": "When channels or stride change, use the 1×1 projection; frameworks do this automatically, but hand-written blocks frequently get it wrong."
    },
    {
-    "t": "What does this module say about “Depth”?",
-    "ans": "same fixed weight matrix W applied at every block, ReLU after each one — a stand-in for a stack of identical conv blocks"
+    "t": "What is meant by “Do not put a ReLU on the identity path” here?",
+    "ans": "The whole point is that the path is clean."
+   },
+   {
+    "t": "What is meant by “Batch normalisation and residuals work together” here?",
+    "ans": "Removing BN from a deep ResNet usually breaks training unless the initialisation is adjusted to compensate."
    }
   ]
  },
@@ -1985,16 +2001,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Computer Vision",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Downsampling for context and needing pixel-precise output are in direct tension — the same pooling that builds semantic understanding destroys the spatial detail a segmentation mask needs back. Skip connections resolve that tension not by improving the upsampling step, but by making it partly unnecessary: the fine detail rides across the encoder-decoder bridge instead of being reconstructed from a coarse map that no..."
+    "t": "What is meant by “It is fully convolutional” here?",
+    "ans": ", with no dense layers, so it accepts any input size and has relatively few parameters."
    },
    {
-    "t": "What does this module say about “The idea in brief”?",
-    "ans": "Semantic segmentation labels every pixel with a class, not just the image as a whole. A CNN classifier's usual move — pool down repeatedly to build up wide receptive fields and semantic context — is exactly what a segmentation decoder then has to undo, pixel by pixel, to produce a full-resolution output mask."
+    "t": "What is meant by “Heavy augmentation” here?",
+    "ans": "— particularly elastic deformation, which is realistic for tissue — multiplies the effective dataset."
    },
    {
-    "t": "What does this module say about “Downsample Depth”?",
-    "ans": "a 16×16 mask, majority-vote 2×2 pooling per level, nearest-neighbour upsampling back"
+    "t": "What is meant by “Every pixel is a training example” here?",
+    "ans": "A single 512×512 image provides 262,144 labelled pixels, which is why so few images can be enough."
+   },
+   {
+    "t": "What is meant by “Patch-based training” here?",
+    "ans": "lets large images be processed in tiles, with overlap to avoid edge artefacts."
    }
   ]
  },
@@ -2012,8 +2032,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "If you process a massive high-resolution image pixel-by-pixel, the resulting feature map will also be massive. This requires enormous amounts of memory and computational power."
    },
    {
-    "t": "What does this module say about “Where that leaves you”?",
-    "ans": "By manipulating strides, we force neural networks to transition from looking at individual pixels to recognizing high-level abstract shapes."
+    "t": "What does this module say about “How far the filter jumps”?",
+    "ans": "Stride is the step size the filter takes as it slides. Stride 1 moves one pixel at a time and looks at every possible position. Stride 2 skips every other position, halving the output in both dimensions."
    }
   ]
  },
@@ -2046,8 +2066,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A plain view stores no data. Every time you query it, the underlying SELECT runs again against the current table — which is the whole point of the raise experiment below. This is different from a materialized view , which does store a snapshot and has to be refreshed explicitly to catch up with changes underneath it."
    },
    {
-    "t": "What does this module say about “Where that leaves you”?",
-    "ans": "CASE is a per-row branch inside SELECT that returns the first matching value or NULL if nothing matches and there is no ELSE. A view is a saved query, not saved data — it re-runs against live tables on every read, which is what makes it stay correct as the underlying data changes and is exactly the property a materialized view trades away for speed."
+    "t": "What does this module say about “CASE: if/else inside a query”?",
+    "ans": "CASE is SQL's conditional expression. It returns a value, so it can appear anywhere a value can — in SELECT , in ORDER BY , inside an aggregate, even in WHERE ."
+   },
+   {
+    "t": "What does this module say about “Conditional aggregation: the pattern worth learning”?",
+    "ans": "Putting CASE inside an aggregate turns rows into columns, which is how summary reports are built without a pivot feature."
    }
   ]
  },
@@ -2076,16 +2100,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "DDL defines the contract your data must obey. Time spent choosing sensible types and constraints up front is repaid every day afterwards — and because these statements are usually irreversible, they deserve more care than any query you will write."
+    "t": "What is meant by “Adding a column with a default” here?",
+    "ans": "historically rewrote every row. PostgreSQL 11+ and MySQL 8+ handle constant defaults without a rewrite; older versions do not."
    },
    {
-    "t": "What does this module say about “Context first”?",
-    "ans": "In most engines (MySQL and Oracle in particular) DDL statements perform an implicit commit : the moment you run one, any open transaction is committed and the change is permanent. A ROLLBACK afterwards will not save you. PostgreSQL is the notable exception — it supports transactional DDL."
+    "t": "What is meant by “Changing a column type” here?",
+    "ans": "generally rewrites the table and holds a strong lock."
    },
    {
-    "t": "What does this module say about “The Four Commands”?",
-    "ans": "In most engines (MySQL and Oracle in particular) DDL statements perform an implicit commit : the moment you run one, any open transaction is committed and the change is permanent. A ROLLBACK afterwards will not save you. PostgreSQL is the notable exception — it supports transactional DDL."
+    "t": "What is meant by “Adding an index” here?",
+    "ans": "locks writes unless you use CREATE INDEX CONCURRENTLY (PostgreSQL) or an online index build."
+   },
+   {
+    "t": "What is meant by “Adding a NOT NULL constraint” here?",
+    "ans": "requires scanning the table to verify. Adding it as NOT VALID and validating later avoids the long lock in PostgreSQL."
    }
   ]
  },
@@ -2100,11 +2128,11 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “The idea in brief”?",
-    "ans": "Set the filter to \"all rows\" in this lab and watch the affected-row counter jump to the full table size. The professional habit is to run the equivalent SELECT first, confirm the row count is what you expected, and only then convert it to an UPDATE or DELETE ."
+    "ans": "Both are valid SQL, both run without complaint, and both are the reason database people flinch at typing UPDATE into a production console."
    },
    {
     "t": "What does this module say about “The Four Statements”?",
-    "ans": "Set the filter to \"all rows\" in this lab and watch the affected-row counter jump to the full table size. The professional habit is to run the equivalent SELECT first, confirm the row count is what you expected, and only then convert it to an UPDATE or DELETE ."
+    "ans": "Both are valid SQL, both run without complaint, and both are the reason database people flinch at typing UPDATE into a production console."
    }
   ]
  },
@@ -2122,8 +2150,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A datatype declares what a column may contain. The database uses it to reject invalid data, to decide how many bytes each value occupies, and to choose how comparisons and arithmetic behave. Get it wrong and you pay in storage, in speed, or — worst — in silently incorrect numbers."
    },
    {
-    "t": "What does this module say about “Integers: Pick the Smallest That Fits”?",
-    "ans": "Integer types differ only in width, and width sets the range. TINYINT holds −128 to 127 in one byte; INT covers roughly ±2.1 billion in four; BIGINT uses eight."
+    "t": "What does this module say about “Integers: pick the smallest that fits”?",
+    "ans": "SMALLINT holds ±32,767 in 2 bytes. INT holds about ±2.1 billion in 4. BIGINT holds roughly ±9.2 quintillion in 8."
    }
   ]
  },
@@ -2141,8 +2169,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A grouped query runs in stages. Rows are read, WHERE discards the ones that fail a per-row test, what is left is collected into groups, each group is boiled down to its aggregates, and only then does HAVING get a look — at the groups, not the rows."
    },
    {
-    "t": "What does this module say about “In one line”?",
-    "ans": "WHERE filters rows before grouping and HAVING filters groups after, which is why WHERE cannot mention an aggregate and why HAVING is the only place a condition on SUM or COUNT can live. The consequence people miss is that WHERE does not merely remove rows from the output — it changes what every aggregate downstream is computed from, so moving one condition between the two clauses changes the numbers, not just the row..."
+    "t": "What does this module say about “Two things people are surprised by”?",
+    "ans": "WHERE and HAVING both remove rows. The difference is when they run, and everything else follows from that."
    }
   ]
  },
@@ -2175,16 +2203,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "LIMIT and OFFSET slice a result set, but only after ORDER BY has made that set deterministic. Offset pagination is fine for the first few pages and quietly quadratic beyond them — reach for keyset pagination when the data gets big."
+    "t": "What is meant by “Do not show an exact total” here?",
+    "ans": "\"Showing 21–40\" with a next button is usually enough, and it is what most large sites do."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Syntax varies: PostgreSQL, MySQL and SQLite use LIMIT ... OFFSET ... ; SQL Server uses OFFSET ... FETCH NEXT ... ROWS ONLY ; older Oracle used ROWNUM . The idea is identical."
+    "t": "What is meant by “Use an approximate count” here?",
+    "ans": "PostgreSQL's reltuples in pg_class , or EXPLAIN 's row estimate, is instant and close enough for \"about 1,200 results\"."
    },
    {
-    "t": "What does this module say about “Trap 1: LIMIT Without ORDER BY Is Meaningless”?",
-    "ans": "SQL tables are unordered sets . Without an explicit ORDER BY , the database may return rows in any order it finds convenient — and that order can change between runs, after an update, or when the query plan changes."
+    "t": "What is meant by “Cache it” here?",
+    "ans": "Store the count and refresh it periodically, or maintain it with a trigger if it must be exact."
    }
   ]
  },
@@ -2241,7 +2269,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Ties, and why a second key is not optional”?",
-    "ans": "Sort the sample table by salary and four pairs of rows tie. Those eight rows appear in some order, but nothing in your query asked for it, so nothing guarantees it will be the same order tomorrow. That is what the \"order is decided\" readout is telling you: a sort is only deterministic once the keys you supplied separate every pair of rows."
+    "ans": "Sorting by a column with duplicate values leaves the tied rows in an undefined order relative to each other. Combined with LIMIT , this produces one of the most confusing bugs in SQL:"
    }
   ]
  },
@@ -2251,16 +2279,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "SQL executes FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY, LIMIT — not the order it is written in. That single fact explains why SELECT aliases work in ORDER BY but not WHERE, why aggregates belong in HAVING rather than WHERE, and why filtering early is faster. When a query does something surprising, walking it through the execution order usually answers it in one step."
+    "t": "What is meant by “DISTINCT” here?",
+    "ans": "runs after SELECT and before ORDER BY . That is why SELECT DISTINCT x FROM t ORDER BY y fails in strict engines — y was removed before the sort could use it."
    },
    {
-    "t": "What does this module say about “WHERE and HAVING are not interchangeable”?",
-    "ans": "Both filter, at different stages, and the distinction matters for correctness as well as speed:"
+    "t": "What is meant by “Window functions” here?",
+    "ans": "are computed after HAVING and before DISTINCT . They can see the grouped rows, and WHERE / HAVING cannot see them. Filtering on a window function always needs an outer query."
    },
    {
-    "t": "What does this module say about “What usually goes wrong”?",
-    "ans": "SQL executes FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY, LIMIT — not the order it is written in. That single fact explains why SELECT aliases work in ORDER BY but not WHERE, why aggregates belong in HAVING rather than WHERE, and why filtering early is faster. When a query does something surprising, walking it through the execution order usually answers it in one step."
+    "t": "What is meant by “CTEs ( WITH )” here?",
+    "ans": "are conceptually evaluated first, as named inputs to the main query, though modern planners inline them and optimise across the boundary."
+   },
+   {
+    "t": "What is meant by “OFFSET” here?",
+    "ans": "runs with LIMIT , at the very end, after everything has been produced and sorted — which is exactly why deep offsets are slow."
    }
   ]
  },
@@ -2270,16 +2302,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Reach for regex when the shape of the text matters and LIKE cannot describe it — validation, extraction, messy-data cleanup. Reach for LIKE when a prefix will do, because it can use an index and regex usually cannot. This lab runs your pattern through a real regex engine, so what matches here is what will match in your database."
+    "t": "What is meant by “Anchor them” here?",
+    "ans": "Without ^ and $ , a pattern matches anywhere in the string, which is usually not what a validation rule means."
    },
    {
-    "t": "What does this module say about “The idea in brief”?",
-    "ans": "A regular expression describes a shape that text may take, rather than the text itself. SQL's LIKE offers exactly two wildcards; regex offers character classes, quantifiers, anchors, alternation and grouping — enough to validate, extract and clean data directly in the database."
+    "t": "What is meant by “Escape properly” here?",
+    "ans": "A literal dot is \\. ; unescaped it matches any character, so '^[0-9]+.[0-9]+$' accepts \"12x34\"."
    },
    {
-    "t": "What does this module say about “Every Engine Spells It Differently”?",
-    "ans": "The dialect differences are mostly in the operator name; the pattern syntax itself is broadly POSIX or PCRE and transfers well."
+    "t": "What is meant by “Watch case sensitivity” here?",
+    "ans": "PostgreSQL's ~ is case-sensitive, ~* is not; MySQL's REGEXP follows the column collation."
+   },
+   {
+    "t": "What is meant by “Prefer explicit classes” here?",
+    "ans": "[0-9] is unambiguous across engines; \\d is not always available and may include non-ASCII digits under Unicode rules."
    }
   ]
  },
@@ -2409,16 +2445,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "UNION, INTERSECT and EXCEPT combine result sets vertically, requiring the same column count and compatible types matched by position rather than name. All three deduplicate by default, which costs a full sort or hash — so prefer UNION ALL unless you specifically need duplicates removed. EXCEPT is the only one where operand order changes the answer, and none of them is a substitute for a JOIN."
+    "t": "What is meant by “Combining partitioned or archived tables” here?",
+    "ans": "into one result, which is the classic UNION ALL case."
    },
    {
-    "t": "What does this module say about “Stacking, not joining”?",
-    "ans": "A JOIN combines tables horizontally : matching rows are linked and the result has the columns of both. A set operator combines result sets vertically : rows from the second query are stacked under rows from the first, and the column count does not change."
+    "t": "What is meant by “Comparing two datasets during a migration” here?",
+    "ans": "Run A EXCEPT B and B EXCEPT A ; if both return nothing, the datasets are identical. This is the fastest reconciliation check there is."
    },
    {
-    "t": "What does this module say about “The rules every set operator enforces”?",
-    "ans": "Note that matching is positional , not by name. If the first query selects (id, name) and the second selects (name, id), and both are text-compatible, the query runs and silently returns nonsense."
+    "t": "What is meant by “Adding a total row” here?",
+    "ans": "to a report by unioning the detail with an aggregate."
+   },
+   {
+    "t": "What is meant by “Merging results from different sources” here?",
+    "ans": "that happen to share a shape — internal customers and external ones, current staff and alumni."
    }
   ]
  },
@@ -2437,7 +2477,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “The Four Families”?",
-    "ans": "Press \"Add field to one record\" in each model. In a document store, one document simply gains a field — no migration, no downtime. In the relational model the same change is an ALTER TABLE affecting every row."
+    "ans": "The headline benefit of a document store is that you can add a field to one document without altering anything else. For rapidly changing data, or genuinely heterogeneous records, that removes real friction: no migration, no downtime, no coordination."
    }
   ]
  },
@@ -2451,8 +2491,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A relational database stores data in tables of rows and columns, where every table describes one kind of thing — customers, orders, products — and tables are connected by shared key values rather than by nesting data inside each other."
    },
    {
-    "t": "What does this module say about “Keys Are the Whole Trick”?",
-    "ans": "That enforcement is called referential integrity , and it is a guarantee the database makes on your behalf — not something your application code has to remember."
+    "t": "What does this module say about “Keys are the whole trick”?",
+    "ans": "The foreign key is what turns a pile of tables into a database. Declared properly, it makes an order pointing at a non-existent customer impossible — not unlikely, not caught by a validation function somewhere, but rejected by the engine for every client that ever connects."
    },
    {
     "t": "What does this module say about “Why Split the Data at All”?",
@@ -2529,16 +2569,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Deep Learning",
   "q": [
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "It is not a learning rule and not an optimiser. It computes derivatives, and nothing else. What to do with them is the optimiser's business."
+    "t": "What is meant by “Start from the loss” here?",
+    "ans": "The page opens with the forward pass already done: values left to right, ending on a single number. Press Reset and Step if you want to watch that part happen too — but it holds no surprises, it is just the network making a prediction."
    },
    {
-    "t": "What does this module say about “Everything is a graph”?",
-    "ans": "A network is a long expression, and any expression can be drawn as a graph of small operations: multiply, add, apply a function. The graph above is a single neuron with two inputs, which is already enough to show every mechanic that matters."
+    "t": "What is meant by “Keep stepping” here?",
+    "ans": "The gradient starts at the loss as 1, then flows right to left. Each node prints the multiplication it performed, so you can read the chain rule rather than take it on faith."
    },
    {
-    "t": "What does this module say about “Each operation knows one thing”?",
-    "ans": "Every node needs only its local derivative: how its output responds to its own inputs. It has no idea what the rest of the network looks like, and does not need to."
+    "t": "What is meant by “Compare the two weight gradients” here?",
+    "ans": "They differ only by their input: ∂L/∂w₁ carries x₁ and ∂L/∂w₂ carries x₂. Set Input x1 to 0 and its weight's gradient goes to exactly zero — that weight cannot learn from this example at all."
+   },
+   {
+    "t": "What is meant by “Check the answer” here?",
+    "ans": "The gradient-check panel recomputes ∂L/∂w₁ numerically, by nudging w₁ and dividing the change in loss by the change in weight. It agrees with the chain rule to several decimal places, which is the test to reach for whenever a hand-written backward pass looks suspicious."
    }
   ]
  },
@@ -2549,7 +2593,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Batch Normalization (BatchNorm) was introduced by Ioffe & Szegedy in 2015 and is now a standard building block in virtually every deep network. It normalizes the inputs to each layer so that training is faster and more stable. This page lets you see what happens with and without it."
+    "ans": "The conventional order is Conv → BatchNorm → ReLU . Normalising before the activation keeps the pre-activations centred, so roughly half the ReLU units are active — which is what the initialisation assumed."
    },
    {
     "t": "What does this module say about “Quick Context”?",
@@ -2567,16 +2611,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Deep Learning",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Batching turns many small vector-matrix products into one large matrix-matrix product, which is what makes parallel hardware pay off, without changing the model at all. Batch size sets both the number of updates per epoch and the noise in each gradient, so it trades throughput against a regularising effect that favours flat minima."
+    "t": "What is meant by “Mixed precision” here?",
+    "ans": "stores activations in 16-bit, roughly halving the requirement and speeding up the arithmetic."
    },
    {
-    "t": "What does this module say about “A batch is a matrix, not a loop”?",
-    "ans": "Feeding one sample through a layer is a vector-matrix product. Feeding 32 samples is a matrix -matrix product — stack the 32 input vectors into a 32×n in matrix and multiply once by the same n in ×n out weights."
+    "t": "What is meant by “Gradient checkpointing” here?",
+    "ans": "keeps only some activations and recomputes the rest, trading about 30% more compute for a large memory saving."
    },
    {
-    "t": "What does this module say about “Things to try”?",
-    "ans": "Larger batches give a lower-variance estimate of the true gradient, so the path to the minimum is smoother. That sounds strictly good and is not."
+    "t": "What is meant by “Gradient accumulation” here?",
+    "ans": ", above, which keeps the memory small and the effective batch large."
    }
   ]
  },
@@ -2586,16 +2630,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Deep Learning",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Sparse data is the norm for one-hot categories, text and recommenders, and it costs memory, wasted arithmetic, and — least obviously — badly uneven learning rates, because a weight only updates when its input is non-zero."
+    "t": "What is meant by “Transfer learning” here?",
+    "ans": "— start from a pretrained model, so a few hundred labels suffice."
    },
    {
-    "t": "What does this module say about “What sparsity means, and where it comes from”?",
-    "ans": "A feature vector is sparse when most of its entries are zero. This is not an edge case — it is the default in several of the most common data types:"
+    "t": "What is meant by “Self-supervised pretraining” here?",
+    "ans": "on your unlabelled data, then fine-tune on the labelled subset."
    },
    {
-    "t": "What does this module say about “Embeddings, the standard fix”?",
-    "ans": "For high-cardinality categorical data the usual answer is not to keep the one-hot vector at all. An embedding layer maps each category to a short dense vector — say 50 dimensions instead of 195 columns — learned during training."
+    "t": "What is meant by “Active learning” here?",
+    "ans": "— let the model choose which examples to send for labelling, prioritising the ones it is least sure about."
+   },
+   {
+    "t": "What is meant by “Pseudo-labelling” here?",
+    "ans": "— label the confident predictions on unlabelled data and train on them, carefully, since errors compound."
    }
   ]
  },
@@ -2763,16 +2811,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Deep Learning",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Batch size trades gradient noise against how many times per epoch you get to move."
+    "t": "What is meant by “Batch normalisation” here?",
+    "ans": "needs at least about 8 examples per batch for usable statistics. Below that, use GroupNorm."
    },
    {
-    "t": "What does this module say about “Why mini-batch won”?",
-    "ans": "Batch gradient descent computes an exact gradient and needs a full pass over the data for a single update. On a million samples that is a million forward passes to move the weights once — accurate and unusable."
+    "t": "What is meant by “Very large inputs” here?",
+    "ans": "— high-resolution images, long sequences — may force a batch of 1 or 2. Gradient accumulation recovers the effective batch size."
    },
    {
-    "t": "What does this module say about “Batch size and learning rate move together”?",
-    "ans": "These two cannot be tuned independently. The gradient of a batch is an average , so a larger batch gives a lower-variance estimate — and a more reliable estimate can support a larger step."
+    "t": "What is meant by “Small datasets” here?",
+    "ans": "give few updates per epoch at a large batch size, so a smaller batch and more updates often trains better."
    }
   ]
  },
@@ -2830,8 +2878,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A parameter is learned: weights and biases move during training because gradient descent moves them. A hyperparameter is fixed before training and never updated by the optimiser — learning rate, number of layers, neurons per layer, batch size, dropout rate, regularisation strength."
    },
    {
-    "t": "What does this module say about “Things to try”?",
-    "ans": "Learning rate should be sampled logarithmically, not uniformly. Sampling uniformly from 0.0001 to 0.1 puts 90% of the samples above 0.01, leaving the small-rate region — where the answer usually is — almost untested."
+    "t": "What does this module say about “Grid search, random search, and why random usually wins”?",
+    "ans": "Parameters are learned by gradient descent. Hyperparameters are the settings you choose before training starts, and they decide how well that learning goes."
    }
   ]
  },
@@ -2845,8 +2893,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "LayerNorm normalizes each sample against itself — the mean and standard deviation are computed across that one row's own features, so no other sample's presence or absence changes the answer."
    },
    {
-    "t": "What does this module say about “Summing up”?",
-    "ans": "BatchNorm and LayerNorm are the same normalization idea applied to different axes: BatchNorm down a column, across the batch; LayerNorm across a row, within one sample. That single difference in axis is why LayerNorm works identically at any batch size, including one, while BatchNorm's statistics depend on the batch it happens to see — which is why transformers and RNNs, which often run with small or variable batches..."
+    "t": "What does this module say about “Normalising across features, not across the batch”?",
+    "ans": "Batch normalisation standardises each feature using statistics computed across the examples in a batch. Layer normalisation does the opposite: it standardises each example using statistics computed across its own features."
+   },
+   {
+    "t": "What does this module say about “Pre-norm versus post-norm”?",
+    "ans": "Where the normalisation sits relative to the residual connection turns out to matter a great deal."
    }
   ]
  },
@@ -2864,8 +2916,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Early in training you are far from any good solution and want large steps. Late in training you are close, and large steps make you bounce around the minimum without ever landing in it. A fixed rate forces a compromise that is wrong at both ends."
    },
    {
-    "t": "What does this module say about “What usually goes wrong”?",
-    "ans": "Big steps to travel, small steps to arrive — and get the starting size right before tuning the decay."
+    "t": "What does this module say about “One rate does not fit the whole run”?",
+    "ans": "Early in training the weights are far from anything useful, and large steps make rapid progress. Late in training the model is close to a good solution, and large steps overshoot it repeatedly — the loss plateaus and bounces rather than settling."
    }
   ]
  },
@@ -3012,16 +3064,12 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Deep Learning",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Classifier body, linear head, distance-based loss — and scale your targets."
+    "t": "What is meant by “Check the input range at prediction time” here?",
+    "ans": "and flag or refuse inputs outside it. This is a production concern that is easy to overlook."
    },
    {
-    "t": "What does this module say about “The two differences that matter”?",
-    "ans": "Everything else — hidden layers, ReLU, backpropagation, the optimiser — is unchanged from a classifier."
-   },
-   {
-    "t": "What does this module say about “A concrete architecture”?",
-    "ans": "Predicting house price from three features: 3 inputs → 16 hidden with ReLU → 1 linear output. That is (3×16 + 16) + (16×1 + 1) = 81 parameters."
+    "t": "What is meant by “Model the right quantity” here?",
+    "ans": "Predicting price-per-square-metre, or a change rather than a level, often extrapolates far better than predicting the raw level."
    }
   ]
  },
@@ -3050,16 +3098,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Deep Learning",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "The shape of the surface, not the cleverness of the algorithm, decides which optimiser looks good."
+    "t": "What is meant by “Small batches generalise slightly better” here?",
+    "ans": "because their gradient noise makes it hard to settle into a narrow crevice."
    },
    {
-    "t": "What does this module say about “What the terrain is made of”?",
-    "ans": "The folk explanation of training failure is \"it got stuck in a local minimum\". In high dimensions that is mostly wrong. For a point to be a local minimum, the surface must curve upward in every direction at once — and with millions of parameters that is vanishingly unlikely. Saddle points, where it curves up in some directions and down in others, are enormously more common."
+    "t": "What is meant by “Very large batches sometimes generalise worse” here?",
+    "ans": ", and techniques like LARS and longer warm-up exist to counter it."
    },
    {
-    "t": "What does this module say about “Saddles matter more than local minima”?",
-    "ans": "The folk explanation of training failure is \"it got stuck in a local minimum\". In high dimensions that is mostly wrong. For a point to be a local minimum, the surface must curve upward in every direction at once — and with millions of parameters that is vanishingly unlikely. Saddle points, where it curves up in some directions and down in others, are enormously more common."
+    "t": "What is meant by “Weight averaging” here?",
+    "ans": "(SWA) averages weights from several late-training points, landing nearer the centre of a basin than any individual point."
+   },
+   {
+    "t": "What is meant by “Sharpness-aware minimisation” here?",
+    "ans": "(SAM) explicitly penalises sharpness by taking a step towards the worst nearby point before updating."
    }
   ]
  },
@@ -3176,8 +3228,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "An overfitting model has found a way to fit noise, and doing that almost always requires large weights — sharp, wiggly functions need big coefficients. Regularisation exploits that by adding the size of the weights to the loss:"
    },
    {
-    "t": "What does this module say about “Weight decay is not quite L2”?",
-    "ans": "The two are used interchangeably and are only equivalent for plain SGD. Weight decay multiplies the weights by a factor slightly below 1 at each step; L2 adds a term to the loss, so its contribution passes through the optimiser’s gradient machinery."
+    "t": "What does this module say about “Constraining the model on purpose”?",
+    "ans": "A network with millions of parameters can fit almost any training set exactly, including its noise. Regularisation is any deliberate constraint that makes that harder, trading a little training accuracy for better generalisation."
    }
   ]
  },
@@ -3195,8 +3247,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "every layer squashes its input by the same factor (local derivative 0.55) — realistic for a deep sigmoid/tanh stack"
    },
    {
-    "t": "What does this module say about “Where that leaves you”?",
-    "ans": "A residual connection adds the block's input back onto its output, which adds a constant 1 to that layer's local derivative during backpropagation. A chain of derivatives all below 1 shrinks geometrically and vanishes; a chain that includes a guaranteed +1 at every step cannot collapse toward zero regardless of how small the learned part's derivative is."
+    "t": "What does this module say about “The two reasons it works”?",
+    "ans": "That matters because deep plain networks were failing on training data, not just test data. A 56-layer network scored worse than a 20-layer one at fitting the training set, despite being able in principle to copy the shallower network and make the extra layers do nothing. It could not find that solution. Residual connections make it the default starting point."
    }
   ]
  },
@@ -3210,12 +3262,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A network's final layer produces one raw number per class. These are called logits , and they can be anything: 8.2, −3.1, 0.0. They are not probabilities — they do not sit between 0 and 1 and they do not add up to anything in particular."
    },
    {
-    "t": "What does this module say about “Why they are paired”?",
-    "ans": "Take the derivative of cross-entropy with respect to the raw logits and almost everything cancels:"
+    "t": "What does this module say about “From scores to probabilities”?",
+    "ans": "A classifier's final layer outputs one unbounded number per class — a logit. Softmax turns those into probabilities:"
    },
    {
-    "t": "What does this module say about “Where you meet it next”?",
-    "ans": "Softmax is not only an output layer. It is the normalising step inside attention : attention scores are logits, and softmax turns them into weights that sum to 1 so they can average the values. Every property above — monotonic, shift-invariant, temperature-controllable — applies there unchanged."
+    "t": "What does this module say about “The loss that goes with it”?",
+    "ans": "Cross-entropy measures how far the predicted distribution is from the truth. With a one-hot target the sum collapses to a single term:"
    }
   ]
  },
@@ -6838,8 +6890,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "P(A | B) is read \"the probability of A given B\". The bar does not mean division and it does not mean \"and\". It means: assume B happened, throw away every outcome where it did not, and ask about A within what remains."
    },
    {
-    "t": "What does this module say about “Try it yourself”?",
-    "ans": "This is worth stating in its own section because it causes more real-world damage than any other confusion in probability."
+    "t": "What does this module say about “Probability, once you know something”?",
+    "ans": "Conditional probability is the probability of one event given that another has happened."
    }
   ]
  },
@@ -6857,8 +6909,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Covariance has a fatal flaw for reporting: it carries the units of both variables multiplied together. Measure height in metres and weight in kilograms and you get one number; switch height to centimetres and the same data gives a number a hundred times larger. Nothing about the relationship changed."
    },
    {
-    "t": "What does this module say about “Traps worth knowing”?",
-    "ans": "Covariance averages the product of each variable's deviation from its own mean, so it is positive when two variables move together and negative when they move oppositely — but it carries the units of both, which makes its magnitude meaningless on its own. Correlation divides by both standard deviations to strip the units out, giving a number always between −1 and 1 that is unchanged by rescaling."
+    "t": "What does this module say about “Correlation matrices, and multicollinearity”?",
+    "ans": "With several features, the correlation matrix shows every pair at once, and it is one of the first things worth plotting on a new dataset."
    }
   ]
  },
@@ -6872,11 +6924,11 @@ window.VIZLEARN_PRACTICE = [
     "ans": "The answer is always at least H(p), and the excess is the KL divergence. Every classifier trained with \"cross-entropy loss\" is being pushed to make that excess smaller."
    },
    {
-    "t": "What does this module say about “Things to try”?",
-    "ans": "For a single labelled example, p is one-hot: probability 1 on the true class and 0 elsewhere. Every term of the cross-entropy sum vanishes except one, leaving"
+    "t": "What does this module say about “Entropy, cross-entropy and KL, in one relationship”?",
+    "ans": "Three quantities that are constantly confused, and one equation that separates them:"
    },
    {
-    "t": "What does this module say about “Why classifiers use it”?",
+    "t": "What does this module say about “Things to try”?",
     "ans": "For a single labelled example, p is one-hot: probability 1 on the true class and 0 elsewhere. Every term of the cross-entropy sum vanishes except one, leaving"
    }
   ]
@@ -6954,8 +7006,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A surprising number of algorithms do nothing but compare distances. KNN finds the nearest points, k-means assigns each point to the nearest centre, hierarchical clustering merges the closest pair, and a vector database retrieves the closest embeddings."
    },
    {
-    "t": "What does this module say about “When cosine is the right answer”?",
-    "ans": "Cosine dominates text and embedding work, and the reason is specific. In a bag-of-words representation, a long document has larger counts everywhere than a short one on the same subject. Euclidean distance reads that as \"far apart\"; cosine reads the direction of the vector — the mix of words rather than the volume — and correctly calls them similar."
+    "t": "What does this module say about “Several ways to measure \"far apart\"”?",
+    "ans": "Distance is the foundation of clustering, nearest-neighbour methods, anomaly detection and most retrieval systems — and there is more than one sensible definition."
    }
   ]
  },
@@ -6965,16 +7017,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "An eigenvector is a direction a transformation does not rotate, and its eigenvalue is the factor it is stretched by, so along an eigenvector the whole matrix collapses into a single multiplication. For a 2×2 matrix they follow from the trace and determinant alone, and always satisfy λ₁+λ₂ = trace and λ₁λ₂ = det; a negative discriminant means no real eigenvectors exist, which is exactly the case for a rotation."
+    "t": "What is meant by “Scale before decomposing” here?",
+    "ans": "Eigenvalues of a covariance matrix depend on units, so an unscaled column with a large range dominates the first component."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A matrix moves space . Almost every vector it touches gets both stretched and rotated — it comes out pointing somewhere new."
+    "t": "What is meant by “Signs are arbitrary” here?",
+    "ans": "An eigenvector and its negation describe the same direction; do not read meaning into which one a library returns."
    },
    {
-    "t": "What does this module say about “Finding them”?",
-    "ans": "For a 2×2 matrix the eigenvalues come straight out of two numbers you can read off by eye:"
+    "t": "What is meant by “Order is not guaranteed” here?",
+    "ans": "by np.linalg.eig . Sort explicitly, or use eigh for symmetric matrices."
+   },
+   {
+    "t": "What is meant by “Repeated eigenvalues” here?",
+    "ans": "mean the corresponding eigenvectors are not unique — any rotation within that subspace works, so individual component directions become meaningless."
    }
   ]
  },
@@ -7070,8 +7126,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A matrix is a transformation . Once you can do something to space, three questions follow immediately: what does nothing, what puts it back, and what happens if you read the matrix sideways."
    },
    {
-    "t": "What does this module say about “Worth remembering”?",
-    "ans": "The identity is the matrix that changes nothing, and the inverse is the one that undoes A — defined by A A⁻¹ = I and computed by dividing through by the determinant, which is precisely why a zero determinant means no inverse exists: the transformation destroyed information and no matrix can recover it."
+    "t": "What does this module say about “Not every matrix has an inverse”?",
+    "ans": "A matrix is invertible only if its determinant is non-zero. Zero determinant means the transformation collapsed a dimension — flattened a plane onto a line — and no operation can recover what was lost, because many different inputs now map to the same output."
    }
   ]
  },
@@ -7085,12 +7141,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A decision tree does nothing cleverer than this. At every node it tries every feature and every threshold, computes the gain for each, and keeps the winner. Then it repeats on both children until some stopping rule fires."
    },
    {
-    "t": "What does this module say about “Gini, and why the choice barely matters”?",
-    "ans": "Many implementations measure impurity with the Gini index, 1 − Σ pᵢ² , rather than entropy. Both are zero for a pure node and maximal for an even mix; Gini avoids a logarithm and is marginally cheaper. In practice the two pick the same split the overwhelming majority of the time, and scikit-learn's default of Gini is a performance decision, not a statistical one."
+    "t": "What does this module say about “How much did that question help”?",
+    "ans": "Information gain measures how much a split reduces uncertainty. It is the difference between the entropy before a question is asked and the average entropy afterwards."
    },
    {
-    "t": "What does this module say about “Where raw gain misleads”?",
-    "ans": "Information gain is the drop in entropy a split buys: the parent's entropy minus the size-weighted average of its children's. The weighting is what stops a tiny lucky child from looking impressive, and the gain is zero exactly when the split leaves the label mix unchanged."
+    "t": "What does this module say about “How a tree uses it”?",
+    "ans": "At every node the algorithm loops over every feature and, for numeric features, every candidate threshold. For each candidate it computes the information gain, and it keeps the best. Then it repeats on each child."
    }
   ]
  },
@@ -7138,16 +7194,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Maximum likelihood picks the distribution that makes the observed data least surprising, by holding the data fixed and varying the parameters — the reverse of a probability question. The likelihood is the product of each point's density, and because that product underflows to zero on any real sample, it is always computed as a sum of logarithms instead, which is safe because the logarithm is monotonic."
+    "t": "What is meant by “Consistent” here?",
+    "ans": "With enough data, the estimate converges to the true parameter value."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "You have some data and a family of distributions that might have produced it. Which member of the family should you pick?"
+    "t": "What is meant by “Asymptotically efficient” here?",
+    "ans": "No other consistent estimator has smaller variance in the large-sample limit."
    },
    {
-    "t": "What does this module say about “Likelihood is not probability”?",
-    "ans": "The two words get used interchangeably in conversation and they are not the same thing."
+    "t": "What is meant by “Invariant” here?",
+    "ans": "If θ-hat is the MLE of θ, then g(θ-hat) is the MLE of g(θ) — so you can estimate on whichever scale is convenient."
    }
   ]
  },
@@ -7279,12 +7335,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Projection answers one question: of all the points on the line through a, which is closest to b? The answer is b's shadow, and the line from b down to that shadow is perpendicular. Those two facts — closest point, perpendicular error — are the same fact, and almost every fitting method in machine learning is built on it."
    },
    {
-    "t": "What does this module say about “Things to try”?",
-    "ans": "Fitting a line to data means solving Xw = y when there is no exact solution: y almost never lies in the space that the columns of X can reach. The best you can do is find the point in that space closest to y — which is the projection of y onto the column space of X."
+    "t": "What does this module say about “Casting a shadow onto a direction”?",
+    "ans": "A projection answers: how much of vector a lies along the direction of vector b ? Picture the sun directly overhead of b and a casting a shadow onto it."
    },
    {
-    "t": "What does this module say about “Why this is the root of least squares”?",
-    "ans": "Fitting a line to data means solving Xw = y when there is no exact solution: y almost never lies in the space that the columns of X can reach. The best you can do is find the point in that space closest to y — which is the projection of y onto the column space of X."
+    "t": "What does this module say about “Least squares is a projection”?",
+    "ans": "Linear regression fits a line by minimising squared residuals. Geometrically it is projecting."
    }
   ]
  },
@@ -7294,16 +7350,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Rank counts the independent directions a matrix's columns actually provide, which is the dimension of everything they can reach. Full rank means the span is as large as it could be and the matrix is invertible; a drop in rank means one column was a combination of the others, the determinant is zero, and both the inverse and the unique solution to Ax = b disappear together."
+    "t": "What is meant by “Image compression” here?",
+    "ans": "A 1000×1000 image kept at rank 50 stores 5% of the numbers and often looks nearly identical, because natural images are dominated by a few strong directions."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Two columns are linearly independent when neither one can be built out of the other. When they are, the combinations s·c₁ + t·c₂ sweep out the whole plane. When one is a multiple of the other, everything you can build lies on a single line, no matter how hard you pull on s and t."
+    "t": "What is meant by “Recommender systems” here?",
+    "ans": "A user-item ratings matrix is assumed to be approximately low rank — a few latent taste factors explain most preferences — and the missing entries are filled by reconstructing from those factors."
    },
    {
-    "t": "What does this module say about “Worth remembering”?",
-    "ans": "Rank counts the independent directions a matrix's columns actually provide, which is the dimension of everything they can reach. Full rank means the span is as large as it could be and the matrix is invertible; a drop in rank means one column was a combination of the others, the determinant is zero, and both the inverse and the unique solution to Ax = b disappear together."
+    "t": "What is meant by “Noise reduction” here?",
+    "ans": "Signal usually lives in the strong directions and noise is spread across the weak ones, so truncating the small singular values cleans the data."
+   },
+   {
+    "t": "What is meant by “LoRA fine-tuning” here?",
+    "ans": "Large language models are adapted by learning a low-rank update to the weight matrices, training a tiny fraction of the parameters. The whole method is named after this property."
    }
   ]
  },

@@ -41,6 +41,39 @@ The cost is memory: two extra values per parameter, so optimiser state is three 
 
 A practical note: the optimiser is not a substitute for the learning rate. Adam’s default of 0.001 is a reasonable starting point rather than a universal answer, and a badly chosen rate will defeat any optimiser on this list.
 
+## From one global step size to per-parameter steps
+
+Plain gradient descent applies one learning rate to every parameter. That is a poor fit for a real network, where some parameters sit on steep slopes and others on nearly flat ones.
+
+Optimisers are the successive fixes for that, and they build on each other:
+
+|Optimiser|Idea added|
+|---|---|
+|SGD|Step against the gradient|
+|SGD + momentum|Accumulate a velocity across steps|
+|Nesterov|Look ahead before stepping|
+|AdaGrad|Divide by accumulated squared gradients &mdash; per-parameter rates|
+|RMSProp|Same, but with a decaying average so it does not stall|
+|Adam|RMSProp plus momentum, with bias correction|
+|AdamW|Adam with weight decay applied correctly|
+
+<strong>Momentum</strong> is the first and biggest win. Averaging recent gradients builds speed in consistent directions and cancels oscillation across a narrow valley.
+
+<strong>AdaGrad</strong> introduced per-parameter scaling, but its accumulator only grows, so the effective learning rate decays to zero and training stalls. <strong>RMSProp</strong> replaced the running sum with an exponential moving average, which fixed it.
+
+<strong>Adam</strong> combines the two: a moving average of gradients (momentum) and of squared gradients (scaling), each bias-corrected for the first few steps when the averages start at zero.
+
+## What Adam actually computes
+
+<p class="mono-font">m &larr; &beta;&#8321;m + (1&minus;&beta;&#8321;)g&nbsp;&nbsp;&nbsp;&nbsp;v &larr; &beta;&#8322;v + (1&minus;&beta;&#8322;)g&sup2;</p>
+<p class="mono-font">w &larr; w &minus; &eta; &middot; m&#770; / (&radic;v&#770; + &epsilon;)</p>
+
+`m` is the smoothed gradient, `v` the smoothed squared gradient. Dividing by `√v` means a parameter with consistently large gradients takes smaller steps and one with tiny gradients takes larger ones &mdash; the per-parameter adaptation.
+
+The defaults are unusually robust: β₁ = 0.9, β₂ = 0.999, ε = 1e-8. Those are almost never worth changing. β₂ = 0.999 corresponds to a memory of roughly a thousand steps, which is why Adam is stable but slow to react to a genuine change in the loss landscape.
+
+<strong>AdamW</strong> is the version to use. Plain Adam applies weight decay by adding it to the gradient, which then gets divided by `√v` &mdash; so parameters with small gradients are penalised more, which was never the intent. AdamW applies the decay directly to the weights, decoupled from the adaptive scaling. The difference is measurable, and it is why every transformer recipe specifies AdamW.
+
 ## Try this above
 
 1. Select <strong>All (Compare)</strong> and run. Watch SGD (red) oscillate while Adam (green) takes a far more direct route.
@@ -55,3 +88,65 @@ A practical note: the optimiser is not a substitute for the learning rate. Adam�
 ## In one line
 
 Same downhill direction, different memory &mdash; and memory is what stops you bouncing off the walls.
+
+## Choosing one, and the schedule that goes with it
+
+|Situation|Optimiser|Starting learning rate|
+|---|---|---|
+|Transformers, language models|AdamW|1e-4 to 3e-4, with warm-up|
+|Vision, from scratch|SGD + momentum 0.9, or AdamW|0.1 (SGD) / 1e-3 (AdamW)|
+|Fine-tuning a pretrained model|AdamW|1e-5 to 1e-4|
+|Tabular data, small networks|AdamW|1e-3|
+|Sparse features, embeddings|Adam or Adagrad|1e-3|
+
+The honest summary of a long-running debate: <strong>AdamW converges faster and needs less tuning; well-tuned SGD with momentum sometimes generalises slightly better on vision tasks.</strong> If you have limited time, use AdamW.
+
+The schedule matters as much as the optimiser. Two components are standard:
+
+<strong>Warm-up</strong> &mdash; ramp the learning rate from near zero over the first few hundred or few thousand steps. Adam's variance estimate is unreliable early on, and a large first step can damage the initialisation. Essential for transformers.
+
+<strong>Cosine decay</strong> &mdash; smoothly reduce the rate to near zero over training. Reliably beats a constant rate, and beats step decay in most comparisons.
+
+```python
+import torch
+
+opt = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=0.01)
+sched = torch.optim.lr_scheduler.OneCycleLR(
+    opt, max_lr=3e-4, total_steps=epochs * len(loader), pct_start=0.1)
+
+for batch in loader:
+    loss = criterion(model(batch.x), batch.y)
+    opt.zero_grad()
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+    opt.step()
+    sched.step()          # per batch for OneCycle, not per epoch
+```
+
+## Memory, and the newer options
+
+Adam stores two extra values per parameter, so its optimiser state is twice the model size. For a 7-billion-parameter model in 32-bit that is 56GB of optimiser state alone, which is why large-model training uses 8-bit optimisers, sharding across devices (ZeRO), or memory-efficient variants such as Adafactor and Lion.
+
+<strong>Lion</strong> keeps only momentum and uses the sign of the update, halving the state. <strong>Sophia</strong> and other second-order-flavoured methods use curvature estimates. These matter at scale; for ordinary work AdamW remains the right default.
+
+## Questions people ask
+
+<strong>Should I ever use plain SGD?</strong> With momentum, yes &mdash; it is still competitive on vision with a good schedule. Without momentum, essentially never.
+
+<strong>Do I need to tune β₁ and β₂?</strong> Almost never. β₂ = 0.95 is sometimes used for very large models where the default is too slow to adapt.
+
+<strong>Why does my loss spike after a while with Adam?</strong> Often the learning rate is too high for the later, sharper part of the landscape. A decaying schedule fixes it.
+
+<strong>What weight decay should I use?</strong> 0.01 to 0.1 with AdamW is typical. Note that it applies to weights, and biases and normalisation parameters are usually excluded.
+
+<strong>Is Adam bad for generalisation?</strong> The old claim is overstated. AdamW closed most of the gap, and with a proper schedule the difference is small.
+
+<strong>Can I change optimiser mid-training?</strong> You can, and the state is lost, so expect a temporary disruption. Sometimes done deliberately: Adam early, SGD late.
+
+## Recap in one screen
+
+- Momentum accumulates a velocity; adaptive methods give each parameter its own effective step size.
+- Adam combines both with bias correction; AdamW fixes how weight decay interacts with the scaling.
+- Defaults (β₁ = 0.9, β₂ = 0.999) are robust and rarely need changing.
+- Warm-up plus cosine decay is the modern schedule, and matters as much as the optimiser choice.
+- Adam's state doubles memory use, which is why large-scale training uses sharded or 8-bit variants.

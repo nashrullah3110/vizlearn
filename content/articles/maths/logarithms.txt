@@ -33,6 +33,56 @@ Logs are only defined for <strong>x &gt; 0</strong>. As x approaches 0 the curve
 
 This causes real bugs. Cross-entropy computes <span class="mono-font">&minus;log(p)</span>, so a model that confidently predicts probability 0 for the correct answer produces infinite loss and NaNs everywhere. Every framework quietly clamps p away from zero for exactly this reason. Slide x below about 0.1 and watch the value plunge.
 
+## The inverse of exponentiation
+
+A logarithm answers one question: <strong>what power do I need?</strong>
+
+<p class="mono-font">log&#8322;(8) = 3&nbsp;&nbsp;because&nbsp;&nbsp;2&sup3; = 8</p>
+
+The base (2 here) is the number being raised; the logarithm is the exponent. Three bases account for nearly everything you will meet:
+
+|Base|Written|Used for|
+|---|---|---|
+|2|log&#8322;|Information, bits, algorithm complexity|
+|e &asymp; 2.718|ln|Calculus, statistics, machine learning|
+|10|log&#8321;&#8320;|Decibels, pH, orders of magnitude|
+
+The natural log is the default in machine learning because its derivative is the tidiest possible: d/dx ln(x) = 1/x. Every log in a loss function is a natural log unless it says otherwise.
+
+## The property that does all the work
+
+<p class="mono-font">log(a &times; b) = log(a) + log(b)</p>
+
+Logarithms turn multiplication into addition. That one identity is why they were invented, and why they are still everywhere in machine learning.
+
+The related rules:
+
+- log(a / b) = log(a) &minus; log(b)
+- log(a&#8319;) = n &times; log(a)
+- log(1) = 0, for any base
+- log(0) is undefined and tends to &minus;&infin;
+
+The practical consequence appears immediately in probability. A model computing the joint probability of 1,000 independent events multiplies 1,000 numbers below 1 &mdash; and the result underflows to exactly zero in floating point, destroying the calculation.
+
+```python
+0.1 ** 400        # 0.0  -- underflow: the information is gone
+
+import math
+sum(math.log(0.1) for _ in range(400))    # -921.03  -- fine
+```
+
+Taking logs converts that product into a sum of 1,000 manageable numbers. This is why every implementation works in log-probabilities: Naive Bayes, hidden Markov models, language models, and the log-likelihood that underlies most of statistics.
+
+## Compressing scale
+
+Logarithms squash large ranges into small ones. Data spanning 1 to 1,000,000 spans 0 to 6 after a log&#8321;&#8320;.
+
+That makes them the standard fix for skewed features. Income, city population, website visits and word frequencies all have long right tails, where a few enormous values dominate every distance calculation and every squared error. A log transform pulls the tail in and often turns a curved relationship into a straight one, which is exactly what a linear model wants.
+
+Two practical notes. `log(0)` is undefined, so use `log1p(x)` (which computes log(1 + x)) when zeros are present. And remember to invert the transform before reporting numbers &mdash; a mean of logged values back-transforms to a geometric mean, not the ordinary one.
+
+Log scales on charts do the same job visually: exponential growth becomes a straight line, and small values stop being invisible next to large ones.
+
 ## Guided tour
 
 1. <strong>Set base 2 and x = 8.</strong> The answer is exactly 3 &mdash; three doublings from 1 reaches 8.
@@ -44,3 +94,50 @@ This causes real bugs. Cross-entropy computes <span class="mono-font">&minus;log
 ## In one line
 
 A log is an exponent in disguise. It converts products into sums, compresses vast ranges into readable ones, and is undefined at zero &mdash; three facts that between them explain log-likelihood, cross-entropy loss, entropy in bits, and most NaN bugs in training code.
+
+## Logs inside loss functions
+
+Cross-entropy, the standard classification loss, is built from logarithms:
+
+<p class="mono-font">loss = &minus;[ y log(p) + (1 &minus; y) log(1 &minus; p) ]</p>
+
+Read what it does for a true label of 1. If the model predicts 0.9, the loss is &minus;log(0.9) = 0.105 &mdash; small. If it predicts 0.1, the loss is &minus;log(0.1) = 2.303 &mdash; over twenty times larger. And as the prediction approaches 0, the loss grows without bound.
+
+That unbounded growth is the design. A model that is <em>confidently</em> wrong is punished far more than one that is uncertainly wrong, which is precisely the behaviour you want from a probability estimator. Squared error, by contrast, caps the penalty at 1 and gives confidently wrong predictions a gentle nudge.
+
+The other reason logs appear here is calculus: log turns the product of many probabilities into a sum, and derivatives of sums are trivial. Maximising a likelihood becomes maximising a log-likelihood, and the optimum is in the same place because log is monotonic.
+
+## Logs in complexity
+
+Algorithm analysis uses log&#8322;, and the intuition is halving. Binary search halves the search space each step, so a list of 1,000,000 takes about 20 comparisons, because 2&sup2;&#8304; &asymp; 1,000,000.
+
+|n|log&#8322;(n)|
+|---|---|
+|8|3|
+|1,000|~10|
+|1,000,000|~20|
+|1,000,000,000|~30|
+
+That table is worth internalising, because it explains why O(log n) algorithms feel instantaneous at any realistic scale, and why O(n log n) sorting is close enough to linear that nobody worries about it.
+
+## Questions people ask
+
+<strong>What is the difference between `log` and `ln`?</strong> `ln` is base e. Plain `log` means base 10 in mathematics and base e in most programming languages &mdash; check the library rather than assuming.
+
+<strong>Why is log(0) undefined?</strong> No power of any base gives zero; the values tend to &minus;infinity. In code, add a small epsilon or use `log1p`.
+
+<strong>Can I take the log of a negative number?</strong> Not with real numbers. Shift the data first if you need to.
+
+<strong>When should I log-transform a feature?</strong> When it is strongly right-skewed, spans several orders of magnitude, or has a multiplicative relationship with the target.
+
+<strong>Does the base matter?</strong> For the mathematics, no &mdash; changing base multiplies by a constant. For interpretation it does: bits are base 2, nats are base e.
+
+<strong>Why do models use log-probabilities?</strong> To avoid underflow and to turn products into sums, which are numerically stable and easy to differentiate.
+
+## Recap in one screen
+
+- A logarithm is the exponent: log&#8322;(8) = 3 because 2&sup3; = 8.
+- log(a&times;b) = log(a) + log(b) &mdash; multiplication becomes addition, which prevents underflow.
+- Logs compress skewed data, straighten multiplicative relationships and make charts readable.
+- Cross-entropy uses log so that confident mistakes are punished without limit.
+- log&#8322;(n) is "how many halvings", which is why binary search on a million items takes 20 steps.

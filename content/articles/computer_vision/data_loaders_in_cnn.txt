@@ -15,6 +15,59 @@ A DataLoader solves this by taking a <strong>Batch Size</strong> parameter. If B
 
 DataLoaders don't just load data; they are also responsible for <strong>preprocessing</strong> and <strong>augmentation</strong>. By applying random transformations (like flipping, rotating, or color shifting) to each image <em>as it is loaded</em>, you artificially expand your dataset size. A single image of a cat can be seen by the CNN as dozens of slightly different cats across multiple epochs, making the model highly robust and preventing overfitting. The original image on disk is never permanently altered.
 
+## Feeding the model without starving it
+
+A GPU can process thousands of images a second. Reading a JPEG from disk, decoding it, resizing it and augmenting it takes milliseconds on a CPU core. Without care, an expensive GPU spends most of its time waiting.
+
+A data loader is the machinery that closes that gap. Its job is to have the next batch ready in memory before the model finishes the current one.
+
+Four responsibilities:
+
+1. <strong>Read and decode</strong> images from disk.
+2. <strong>Transform</strong> them &mdash; resize, augment, normalise, convert to tensors.
+3. <strong>Batch</strong> them into a single tensor of shape (batch, channels, height, width).
+4. <strong>Shuffle</strong> the order each epoch, so batches are not correlated.
+
+```python
+from torch.utils.data import DataLoader
+
+loader = DataLoader(
+    dataset,
+    batch_size=32,
+    shuffle=True,          # training only
+    num_workers=8,         # parallel CPU processes doing the loading
+    pin_memory=True,       # faster host-to-GPU copies
+    prefetch_factor=2,     # batches queued per worker
+    persistent_workers=True,
+    drop_last=True,        # keeps every batch the same size
+)
+```
+
+## The settings that matter
+
+<strong>`num_workers`</strong> is the one that usually decides throughput. Zero means loading happens in the main process, in lockstep with training &mdash; the GPU idles for every batch. A reasonable starting point is the number of physical CPU cores, or four per GPU. Too many causes memory pressure and contention.
+
+<strong>`batch_size`</strong> trades memory against stability. Larger batches use the GPU more efficiently and give smoother gradients; smaller ones add useful noise and need less memory. It also interacts with the learning rate &mdash; the common rule is to scale the learning rate linearly with batch size.
+
+<strong>`pin_memory=True`</strong> allocates page-locked memory so transfers to the GPU can be asynchronous. It is close to free and usually worth it.
+
+<strong>`shuffle=True` for training, `False` for validation.</strong> Unshuffled training data, especially if sorted by class, produces batches containing one class at a time and destroys batch normalisation's statistics.
+
+<strong>`drop_last=True`</strong> discards the final partial batch. This matters more than it sounds with batch normalisation, where a final batch of one or two samples produces wild statistics.
+
+## Diagnosing a starved GPU
+
+Watch GPU utilisation with `nvidia-smi` during training. If it oscillates between 100% and near zero, the loader is the bottleneck, not the model.
+
+In order of effectiveness:
+
+1. <strong>Raise `num_workers`.</strong> The single biggest lever, and often the whole fix.
+2. <strong>Pre-resize the images on disk.</strong> Decoding 4000&times;3000 JPEGs to produce 224&times;224 tensors wastes enormous CPU time. Resize the dataset once, offline.
+3. <strong>Use a faster format.</strong> WebDataset, LMDB or TFRecord read sequentially and avoid millions of small-file operations, which matters especially on network storage.
+4. <strong>Move augmentation to the GPU</strong> (Kornia, DALI) when the CPU cannot keep up.
+5. <strong>Cache in memory</strong> if the dataset fits.
+6. <strong>Use mixed precision</strong> &mdash; which speeds up the GPU side and so makes the loader relatively more of a bottleneck, but is worth doing anyway.
+
 ## Guided Experiments with This Interactive
 
 1. <strong>Observe the Transforms:</strong> <p class="font-light opacity-80 mt-1">Look at the Raw Dataset storage—the icons are pristine and perfectly upright. Now toggle the <strong>Random Rotation</strong> and <strong>Random Horizontal Flip</strong> checkboxes. The DataLoader Output instantly shows batches where the icons are flipped and rotated uniquely. Every epoch will generate new random variations of the original data.</p>
@@ -34,3 +87,82 @@ DataLoaders don't just load data; they are also responsible for <strong>preproce
 - DataLoaders prevent Out-of-Memory crashes.
 - DataLoaders apply random augmentations on-the-fly to boost robustness.
 - Always shuffle your training data!
+
+## Writing a dataset
+
+A custom dataset needs two methods: how many items there are, and how to produce item `i`.
+
+```python
+from torch.utils.data import Dataset
+from PIL import Image
+
+class ImageFolderDataset(Dataset):
+    def __init__(self, paths, labels, transform=None):
+        self.paths, self.labels, self.transform = paths, labels, transform
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, i):
+        img = Image.open(self.paths[i]).convert("RGB")   # convert: some are grey
+        if self.transform:
+            img = self.transform(img)
+        return img, self.labels[i]
+```
+
+Three details worth building in from the start. `convert("RGB")` handles the greyscale and RGBA files that appear in almost every real dataset. Loading lazily in `__getitem__` rather than in `__init__` keeps memory flat. And returning a tuple of tensors lets the default collate function batch them without a custom collator.
+
+For imbalanced data, `WeightedRandomSampler` draws examples in proportion to weights you supply, which oversamples rare classes at the batch level rather than duplicating files on disk.
+
+## Splits, leaks and reproducibility
+
+The data loader is where several evaluation mistakes originate.
+
+<strong>Split before augmenting</strong>, and apply training augmentation only to the training split. A validation loader should resize, centre-crop and normalise, and do nothing random.
+
+<strong>Split by group where groups exist.</strong> Multiple photographs of the same patient, product or scene must not straddle the split, or the model recognises the subject rather than the class.
+
+<strong>Deduplicate.</strong> Near-identical images on both sides of a split inflate the score. Perceptual hashing finds them cheaply.
+
+<strong>Seed everything</strong> for reproducibility &mdash; and note that with multiple workers each needs its own seeding via `worker_init_fn`, or several workers generate identical augmentation sequences.
+
+```python
+import torch, numpy as np, random
+
+def seed_worker(worker_id):
+    seed = torch.initial_seed() % 2**32
+    np.random.seed(seed); random.seed(seed)
+
+loader = DataLoader(dataset, worker_init_fn=seed_worker, generator=torch.Generator().manual_seed(0))
+```
+
+## Common mistakes
+
+- <strong>`num_workers=0`</strong>, which serialises loading with training and leaves the GPU idle.
+- <strong>Augmenting the validation set,</strong> making metrics noisy and irreproducible.
+- <strong>Shuffling the validation loader</strong> &mdash; harmless for metrics, but it makes per-sample debugging much harder.
+- <strong>Loading full-resolution originals</strong> when the model wants 224&times;224.
+- <strong>Forgetting `.convert("RGB")`</strong>, so an occasional greyscale file produces a single-channel tensor and a shape error thousands of steps into training.
+- <strong>Normalising before augmenting,</strong> so colour transforms operate on standardised values and behave unpredictably.
+
+## Questions people ask
+
+<strong>What batch size should I use?</strong> The largest that fits in memory, up to about 256 for most vision work. Then tune the learning rate accordingly.
+
+<strong>Why is my first epoch much slower?</strong> The operating system's file cache is cold. Subsequent epochs read from cache and speed up.
+
+<strong>Should I shuffle validation data?</strong> No need. Deterministic order makes debugging and comparison easier.
+
+<strong>How do I handle images of different sizes?</strong> Resize them in the transform. Batching requires identical shapes; variable-size batches need a custom collate function and padding.
+
+<strong>Does the loader run on the GPU?</strong> By default no &mdash; it is CPU work in separate processes. DALI and Kornia move parts of it to the GPU when the CPU is the bottleneck.
+
+<strong>What is `persistent_workers` for?</strong> It keeps worker processes alive between epochs, avoiding the start-up cost each time. Worth enabling when epochs are short.
+
+## Recap in one screen
+
+- The loader's job is to keep the GPU fed: read, transform, batch and shuffle, ahead of time.
+- `num_workers` is the main throughput lever; oscillating GPU utilisation means the loader is the bottleneck.
+- Pre-resize images offline &mdash; decoding huge JPEGs to make small tensors is wasted work.
+- Shuffle and augment training data only; keep validation deterministic.
+- Split by group, deduplicate, and seed the workers individually for reproducibility.

@@ -23,6 +23,55 @@ Shrinking the world to B leaves A's share of it unchanged. Equivalently, and mor
 
 Multiplying probabilities when the events are <em>not</em> independent is one of the most common errors in applied statistics, and it always understates joint risk when the events tend to occur together.
 
+## Probability, once you know something
+
+Conditional probability is the probability of one event <em>given</em> that another has happened.
+
+<p class="mono-font">P(A|B) = P(A and B) / P(B)</p>
+
+Read it as: restrict attention to the cases where B happened, and ask what fraction of those also have A. The denominator is the new, smaller universe.
+
+A worked example on 100 people:
+
+|&nbsp;|Owns a car|No car|Total|
+|---|---|---|---|
+|<strong>Lives in a city</strong>|20|40|60|
+|<strong>Lives rurally</strong>|35|5|40|
+|<strong>Total</strong>|55|45|100|
+
+- P(owns a car) = 55/100 = <strong>0.55</strong>
+- P(owns a car | lives rurally) = 35/40 = <strong>0.875</strong>
+- P(owns a car | lives in a city) = 20/60 = <strong>0.33</strong>
+
+Knowing where someone lives changes the answer dramatically, which is the entire point: <strong>conditioning is what turns a population statistic into a prediction about an individual</strong>. Every supervised model is an estimate of P(target | features).
+
+## Independence, stated properly
+
+Two events are independent when conditioning changes nothing:
+
+<p class="mono-font">P(A|B) = P(A)&nbsp;&nbsp;&nbsp;equivalently&nbsp;&nbsp;&nbsp;P(A and B) = P(A) &times; P(B)</p>
+
+In the table above, car ownership and location are clearly <em>not</em> independent: 0.875 against 0.55. Two coin flips are independent; two words in the same sentence are not.
+
+The distinction matters because independence is what lets probabilities multiply. Assume it wrongly and you double-count evidence, producing models that are far too confident &mdash; which is precisely the known behaviour of Naive Bayes on correlated features.
+
+<strong>Mutually exclusive is not the same as independent.</strong> If two events cannot both happen, then knowing one occurred tells you the other definitely did not &mdash; which is maximal dependence, not independence.
+
+## Chaining conditions
+
+The definition rearranges into the multiplication rule, which extends to any number of events:
+
+<p class="mono-font">P(A and B) = P(B) &times; P(A|B)</p>
+<p class="mono-font">P(A, B, C) = P(A) &times; P(B|A) &times; P(C|A, B)</p>
+
+This chain rule is the backbone of sequence modelling. A language model assigns a probability to a sentence by multiplying the probability of each word given everything before it:
+
+<p class="mono-font">P(w&#8321;, w&#8322;, &hellip;, w&#8345;) = &prod; P(w&#7522; | w&#8321; &hellip; w&#7522;&#8331;&#8321;)</p>
+
+That is exactly what "predict the next token" means, and it is why a model trained only to guess the next word can assign a probability to an entire document.
+
+Because these products underflow, implementations sum log-probabilities instead &mdash; which is where perplexity, the exponentiated average negative log-probability, comes from.
+
 ## Try it yourself
 
 1. <strong>Watch the world shrink.</strong> Tick <strong>Condition on B</strong>. The dots outside B fade out and P(A given B) is the fraction of the survivors that are blue. Untick it and the denominator goes back to all 400.
@@ -57,3 +106,35 @@ The Rare A preset above shows the same asymmetry with nothing but dots. Converti
 ## Worth remembering
 
 Conditioning on B does not change the outcomes, it discards the ones where B did not happen, so P(A | B) is simply the count of outcomes in both events divided by the count in B. Independence is the special case where that shrinking leaves A's share unchanged, which is exactly when P(A and B) = P(A)P(B) is valid and not before. The two conditionals P(A|B) and P(B|A) are different numbers and can differ enormously when one event is rare &mdash; converting between them is what Bayes' theorem is for.
+
+## Confounding, and why conditioning matters for causation
+
+Conditional probabilities are also how you check whether an association is real or an artefact.
+
+The classic illustration: ice cream sales and drowning incidents rise together. P(drowning | high ice cream sales) is genuinely higher than P(drowning). But condition on temperature as well, and within any given temperature band the association disappears. Temperature was driving both.
+
+That structure &mdash; a third variable causing both &mdash; is a <strong>confounder</strong>, and it is why "controlling for" variables is the central move in observational statistics.
+
+<strong>Simpson's paradox</strong> is the extreme case: a trend that holds in every subgroup can reverse when the groups are pooled. A treatment can be better for mild cases and better for severe cases, and appear worse overall, simply because it was given more often to severe cases. The lesson is not that statistics lie; it is that the conditional and unconditional questions are genuinely different, and you must decide which one you are asking.
+
+## Questions people ask
+
+<strong>Does P(A|B) equal P(B|A)?</strong> Almost never. P(rain | clouds) is high; P(clouds | rain) is essentially 1. Confusing the two is the most common probability error there is.
+
+<strong>What if P(B) is zero?</strong> The conditional probability is undefined &mdash; you cannot condition on something impossible.
+
+<strong>How is this related to Bayes' theorem?</strong> Bayes' theorem is a rearrangement of this definition, and it is what lets you convert P(B|A) into P(A|B).
+
+<strong>Is machine learning just conditional probability?</strong> Supervised learning largely is: estimate P(target | features) from examples. Classifiers estimate it directly; regressors estimate the conditional mean.
+
+<strong>What does "conditionally independent" mean?</strong> Independent once you know a third variable. Two symptoms may be correlated overall but independent given the disease &mdash; which is exactly the assumption Naive Bayes makes.
+
+<strong>Why do dependent features hurt Naive Bayes?</strong> Because it multiplies their probabilities as if each were fresh evidence, so correlated features count the same signal several times and the output becomes overconfident.
+
+## Recap in one screen
+
+- P(A|B) restricts attention to the cases where B happened: P(A and B) / P(B).
+- Conditioning is what turns a population rate into an individual prediction &mdash; supervised learning is P(target | features).
+- Independence means conditioning changes nothing, and it is what allows probabilities to multiply.
+- The chain rule factorises a joint probability into conditionals, which is how language models score sentences.
+- Confounders and Simpson's paradox show that conditional and unconditional answers can differ, and even reverse.

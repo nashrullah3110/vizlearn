@@ -470,12 +470,46 @@
                     <ul><li><span class="mono-font kw">INSERT INTO ... VALUES</span> &mdash; adds new rows. Every constraint declared in DDL is checked here; a duplicate primary key is rejected outright.</li><li><span class="mono-font kw">UPDATE ... SET ... WHERE</span> &mdash; changes values in existing rows. The <span class="mono-font">WHERE</span> decides which.</li><li><span class="mono-font kw">DELETE FROM ... WHERE</span> &mdash; removes rows. The structure stays.</li><li><span class="mono-font kw">SELECT</span> &mdash; reads without changing anything. The only one of the four that is always safe.</li></ul>
                 </div>
                 <div>
-                    <h3>The Missing WHERE Clause</h3>
-                    <span class="mono-font">UPDATE employees SET salary = 0;</span> is perfectly valid SQL. Without a <span class="mono-font">WHERE</span>, it applies to <strong>every row in the table</strong>. The same is true of <span class="mono-font">DELETE FROM employees;</span>.<p>Set the filter to "all rows" in this lab and watch the affected-row counter jump to the full table size. The professional habit is to run the equivalent <span class="mono-font">SELECT</span> first, confirm the row count is what you expected, and only then convert it to an <span class="mono-font">UPDATE</span> or <span class="mono-font">DELETE</span>.</p>
+                    <h3>The missing WHERE clause</h3>
+                    <pre><code class="language-sql">UPDATE employees SET salary = 50000;    -- every employee. All of them.
+DELETE FROM orders;                     -- every order.</code></pre><p>Both are valid SQL, both run without complaint, and both are the reason database people flinch at typing <code>UPDATE</code> into a production console.</p><p>Three defences, in order of reliability:</p><ol><li><strong>Write the <code>SELECT</code> first.</strong> Run <code>SELECT * FROM employees WHERE dept_id = 3</code> and look at what comes back. Then change the word <code>SELECT *</code> to <code>UPDATE ... SET</code>, keeping the same <code>WHERE</code>.</li><li><strong>Wrap it in a transaction.</strong> <code>BEGIN</code>, run the statement, check the reported row count, then <code>COMMIT</code> or <code>ROLLBACK</code>. If it says "4,912 rows affected" and you expected 12, roll back.</li><li><strong>Turn off autocommit in your client,</strong> or enable safe-update mode &mdash; MySQL's <code>sql_safe_updates</code> refuses an <code>UPDATE</code> or <code>DELETE</code> without a key-based <code>WHERE</code>.</li></ol><p>The row count is the signal that catches this. Get into the habit of predicting it before running and comparing afterwards.</p>
                 </div>
                 <div>
                     <h3>Transactions Are the Safety Net</h3>
                     <p>Unlike DDL, DML <em>is</em> transactional. Wrap your changes in a transaction and nothing is permanent until you say so:</p><p>BEGIN; UPDATE employees SET salary = salary * 1.1 WHERE dept = 'Engineering'; -- check the result ROLLBACK; -- or COMMIT;</p><p>Press BEGIN in this lab, delete some rows, then press ROLLBACK &mdash; they all come back. This is the single most valuable habit when running a statement you are not completely sure about.</p><p>Transactions also provide <strong>atomicity</strong>: if you debit one account and credit another, either both happen or neither does. A crash between the two statements cannot leave money missing.</p>
+                </div>
+                <div>
+                    <h3>The four statements that move data</h3>
+                    <p>DDL defines the containers; DML fills, changes and empties them.</p><pre><code class="language-sql">-- INSERT: add rows
+INSERT INTO employees (name, email, salary)
+VALUES (&#x27;Alice&#x27;, &#x27;alice@example.com&#x27;, 75000),
+       (&#x27;Bob&#x27;,   &#x27;bob@example.com&#x27;,   62000);
+
+-- UPDATE: change existing rows
+UPDATE employees SET salary = salary * 1.05 WHERE dept_id = 3;
+
+-- DELETE: remove rows
+DELETE FROM employees WHERE hired_on &lt; &#x27;2015-01-01&#x27;;
+
+-- SELECT: read rows (the one you run a thousand times a day)
+SELECT name, salary FROM employees WHERE salary &gt; 70000;</code></pre><p>Two habits worth adopting immediately. Always list the columns in an <code>INSERT</code> &mdash; <code>INSERT INTO employees VALUES (...)</code> breaks the moment someone adds a column. And insert many rows in one statement rather than one statement per row; the difference on a few thousand rows is often a hundredfold, because each statement carries its own round trip and transaction overhead.</p>
+                </div>
+                <div>
+                    <h3>Upserts: insert or update in one statement</h3>
+                    <p>"Insert this row, or update it if it already exists" is such a common need that every engine has a form of it, and doing it with a <code>SELECT</code> followed by an <code>INSERT</code> is a race condition waiting to happen.</p><pre><code class="language-sql">-- PostgreSQL and SQLite
+INSERT INTO inventory (sku, quantity)
+VALUES (&#x27;ABC-1&#x27;, 10)
+ON CONFLICT (sku) DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity;
+
+-- MySQL
+INSERT INTO inventory (sku, quantity) VALUES (&#x27;ABC-1&#x27;, 10)
+ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity);
+
+-- Standard SQL / SQL Server / Oracle
+MERGE INTO inventory AS t
+USING (SELECT &#x27;ABC-1&#x27; AS sku, 10 AS qty) AS s ON t.sku = s.sku
+WHEN MATCHED THEN UPDATE SET quantity = t.quantity + s.qty
+WHEN NOT MATCHED THEN INSERT (sku, quantity) VALUES (s.sku, s.qty);</code></pre><p>The conflict target must be backed by a unique constraint or index &mdash; the engine needs a defined way to detect the collision.</p><p><code>RETURNING</code> (PostgreSQL, and now several others) is the natural companion: it hands back the affected rows, so you can get the generated id without a second query.</p><pre><code class="language-sql">INSERT INTO employees (name) VALUES (&#x27;Carol&#x27;) RETURNING id, hired_on;</code></pre>
                 </div>
                 <div>
                     <h3>Guided tour</h3>
@@ -485,6 +519,37 @@
                     <h3>Worth remembering</h3>
                     <p>DML is where data actually changes, and the WHERE clause is what stands between a targeted fix and a table-wide accident. Preview with SELECT, wrap risky work in a transaction, and let the constraints you declared in DDL catch what you miss.</p>
                 </div>
+                <div>
+                    <h3>Updating from another table</h3>
+                    <p>Changing rows based on data elsewhere is routine, and the syntax is one of the least portable corners of SQL.</p><pre><code class="language-sql">-- PostgreSQL
+UPDATE employees e
+SET    dept_name = d.name
+FROM   departments d
+WHERE  d.id = e.dept_id;
+
+-- MySQL
+UPDATE employees e
+JOIN   departments d ON d.id = e.dept_id
+SET    e.dept_name = d.name;
+
+-- Portable, if slower
+UPDATE employees e
+SET    dept_name = (SELECT name FROM departments d WHERE d.id = e.dept_id);</code></pre><p>The portable version has a trap: rows with no matching department get <code>NULL</code> rather than being left alone. Add <code>WHERE EXISTS (...)</code> if that is not what you want.</p>
+                </div>
+                <div>
+                    <h3>Deleting and updating at scale</h3>
+                    <p>A <code>DELETE</code> touching millions of rows holds locks, generates enormous undo or WAL volume, and can block everything else for minutes. Batch it instead:</p><pre><code class="language-sql">-- repeat until zero rows are affected
+DELETE FROM events
+WHERE  id IN (SELECT id FROM events WHERE created_at &lt; &#x27;2025-01-01&#x27; LIMIT 10000);</code></pre><p>Each batch is a short transaction, other queries get a chance to run between them, and an interruption leaves the job resumable rather than rolled back.</p><p>For deleting most of a very large table, an even better pattern is to copy the rows you are keeping into a new table, then swap the names. And for data with a natural time boundary, partitioning turns "delete last year" into "drop a partition", which is instant.</p>
+                </div>
+                <div>
+                    <h3>Questions people ask</h3>
+                    <strong>Does `UPDATE` rewrite the whole row?</strong> In PostgreSQL, yes &mdash; an update writes a new row version and marks the old one dead, which is why heavily updated tables need vacuuming. In MySQL's InnoDB, only the changed columns and the undo record.<strong>Why did my `INSERT` succeed but the data is gone?</strong> Autocommit was off and the transaction was never committed, or a rollback happened later in the session.<strong>Can I `INSERT` from a `SELECT`?</strong> Yes &mdash; `INSERT INTO archive SELECT * FROM orders WHERE completed` is the standard way to copy rows between tables.<strong>How do I get the id of a row I just inserted?</strong> `RETURNING id` where supported, otherwise the driver's last-insert-id function. Never re-query by the values you inserted; that is racy.<strong>Is `TRUNCATE` a DML statement?</strong> It is usually classified as DDL, which is why it auto-commits in some engines and does not fire triggers. Treat it as a structural operation.<strong>What happens if an `INSERT` violates a constraint?</strong> The statement fails and, inside a transaction, the whole transaction is typically marked as aborted &mdash; in PostgreSQL you must roll back or use a savepoint before continuing.
+                </div>
+                <div>
+                    <h3>Recap in one screen</h3>
+                    <ul><li><code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code> and <code>SELECT</code> are the statements that move data.</li><li>Always name your columns in <code>INSERT</code>, and insert in batches rather than row by row.</li><li>A missing <code>WHERE</code> is the classic disaster &mdash; write the <code>SELECT</code> first, and use a transaction.</li><li>Upserts belong in one statement (<code>ON CONFLICT</code> / <code>ON DUPLICATE KEY</code> / <code>MERGE</code>), never in read-then-write application code.</li><li>Delete and update large volumes in batches, and prefer partition drops where the data allows.</li></ul>
+                </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->
         </div>
@@ -492,7 +557,7 @@
     <!-- End auto-article-vizlearn -->
 
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
-<div class="vz-lab"><section class="vz-predict" data-vz-preset="0" aria-labelledby="vz-predict-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg><h2 id="vz-predict-h">Predict, then reveal</h2><span class="vz-rule"></span></div><p class="vz-predict-q">About to run: <strong>Now do it inside a transaction</strong>. Before it does &mdash; what happens to <strong class="vz-predict-readout">the readout</strong>?</p><div class="vz-predict-opts"><button type="button" class="vz-predict-opt" data-vz-guess="up">It goes up</button><button type="button" class="vz-predict-opt" data-vz-guess="down">It goes down</button><button type="button" class="vz-predict-opt" data-vz-guess="same">It stays the same</button></div><div class="vz-predict-result" hidden></div><p class="vz-predict-hint">Committing to an answer first is the point &mdash; the reveal runs the experiment on the visualisation above and reads the real value back, so nothing here is scripted.</p></section><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Recall check</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Say the answer out loud before you reveal it &mdash; recalling it is what makes it stick, and rereading it is not.</p><ol class="vz-check-list"><li class="vz-q vz-q-card"><p class="vz-q-text">Without scrolling back — what is the one-line takeaway from this module?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>DML is where data actually changes, and the WHERE clause is what stands between a targeted fix and a table-wide accident. Preview with SELECT, wrap risky work in a transaction, and let the constraints you declared in DDL catch what you miss.</p></li><li class="vz-q vz-q-card"><p class="vz-q-text">What does this module say about “The idea in brief”?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>Set the filter to &quot;all rows&quot; in this lab and watch the affected-row counter jump to the full table size. The professional habit is to run the equivalent SELECT first, confirm the row count is what you expected, and only then convert it to an UPDATE or DELETE .</p></li><li class="vz-q vz-q-card"><p class="vz-q-text">What does this module say about “The Four Statements”?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>Set the filter to &quot;all rows&quot; in this lab and watch the affected-row counter jump to the full table size. The professional habit is to run the equivalent SELECT first, confirm the row count is what you expected, and only then convert it to an UPDATE or DELETE .</p></li></ol></section></div>
+<div class="vz-lab"><section class="vz-predict" data-vz-preset="0" aria-labelledby="vz-predict-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg><h2 id="vz-predict-h">Predict, then reveal</h2><span class="vz-rule"></span></div><p class="vz-predict-q">About to run: <strong>Now do it inside a transaction</strong>. Before it does &mdash; what happens to <strong class="vz-predict-readout">the readout</strong>?</p><div class="vz-predict-opts"><button type="button" class="vz-predict-opt" data-vz-guess="up">It goes up</button><button type="button" class="vz-predict-opt" data-vz-guess="down">It goes down</button><button type="button" class="vz-predict-opt" data-vz-guess="same">It stays the same</button></div><div class="vz-predict-result" hidden></div><p class="vz-predict-hint">Committing to an answer first is the point &mdash; the reveal runs the experiment on the visualisation above and reads the real value back, so nothing here is scripted.</p></section><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Recall check</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Say the answer out loud before you reveal it &mdash; recalling it is what makes it stick, and rereading it is not.</p><ol class="vz-check-list"><li class="vz-q vz-q-card"><p class="vz-q-text">Without scrolling back — what is the one-line takeaway from this module?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>DML is where data actually changes, and the WHERE clause is what stands between a targeted fix and a table-wide accident. Preview with SELECT, wrap risky work in a transaction, and let the constraints you declared in DDL catch what you miss.</p></li><li class="vz-q vz-q-card"><p class="vz-q-text">What does this module say about “The idea in brief”?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>Both are valid SQL, both run without complaint, and both are the reason database people flinch at typing UPDATE into a production console.</p></li><li class="vz-q vz-q-card"><p class="vz-q-text">What does this module say about “The Four Statements”?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>Both are valid SQL, both run without complaint, and both are the reason database people flinch at typing UPDATE into a production console.</p></li></ol></section></div>
 <script type="application/json" id="vz-lab-data">{"presets": [{"set": [], "click": ["rollbackBtn"]}], "readouts": [{"id": "pctVal", "label": "Raise salary by"}, {"id": "opForm", "label": "1. Operation"}, {"id": "stAff", "label": "Rows affected"}, {"id": "logOut", "label": "Session Log"}, {"id": "stTotal", "label": "Table rows"}, {"id": "txnState", "label": "txn state"}, {"id": "sqlOut", "label": "Statement"}], "viz": "", "keys": {"primary": {"id": "fPct", "label": "Raise salary by", "min": 1.0, "max": 50.0, "step": 1.0}, "secondary": {"id": "fFilter", "label": "F filter", "kind": "select", "count": 4}, "actions": [{"label": "INSERT", "sel": ".op-btn", "i": 0}, {"label": "UPDATE", "sel": ".op-btn", "i": 1}, {"label": "DELETE", "sel": ".op-btn", "i": 2}, {"label": "SELECT", "sel": ".op-btn", "i": 3}, {"label": "Run statement", "sel": "#runBtn", "i": 0}, {"label": "BEGIN", "sel": "#beginBtn", "i": 0}, {"label": "COMMIT", "sel": "#commitBtn", "i": 0}, {"label": "ROLLBACK", "sel": "#rollbackBtn", "i": 0}]}}</script>
 <!-- VIZLEARN:LAB:END -->
 <!-- VIZLEARN:MODULE:BEGIN (generated by tools/build_module_ui.py) -->

@@ -25,6 +25,51 @@ Every other class drops out, because the true distribution is 1 for the right an
 
 Look at the curve. At p = 1 the loss is 0. At p = 0.5 it is 0.69. At p = 0.1 it is 2.3. As p approaches 0 it goes to infinity. That asymptote is the point: a model that is confidently wrong is punished without limit, while one that hedges is only mildly penalised.
 
+## From scores to probabilities
+
+A classifier's final layer outputs one unbounded number per class &mdash; a logit. Softmax turns those into probabilities:
+
+<p class="mono-font">p&#7522; = e<sup>z&#7522;</sup> / &Sigma;<sub>j</sub> e<sup>z&#7502;</sup></p>
+
+Worked through on logits [2.0, 1.0, 0.1]:
+
+- Exponentiate: e² = 7.39, e¹ = 2.72, e⁰·¹ = 1.11. Sum = 11.22.
+- Divide: <strong>0.659, 0.242, 0.099</strong>. They sum to 1.
+
+Two properties do the work. Exponentiating makes everything positive, which probabilities must be. And dividing by the total makes them sum to 1.
+
+The exponential also <em>exaggerates</em> differences. A logit gap of 1.0 became a probability ratio of 2.7 to 1. A gap of 5 becomes 148 to 1. That sharpening is why a small change in the final layer can flip a prediction decisively, and why temperature scaling &mdash; dividing the logits by a constant before the softmax &mdash; is such an effective way to soften or sharpen a model's confidence.
+
+## The loss that goes with it
+
+Cross-entropy measures how far the predicted distribution is from the truth. With a one-hot target the sum collapses to a single term:
+
+<p class="mono-font">loss = &minus;log(probability assigned to the correct class)</p>
+
+|Probability given to the true class|Loss|
+|---|---|
+|0.99|0.01|
+|0.66|0.42|
+|0.50|0.69|
+|0.10|2.30|
+|0.01|4.61|
+
+The penalty grows without bound as the prediction approaches zero, so a confidently wrong model is punished far harder than an uncertain one. Squared error caps the penalty at 1 and gives confident mistakes only a gentle nudge, which is exactly why classification uses cross-entropy.
+
+A useful sanity check at initialisation: with C balanced classes, the expected starting loss is ln(C). For 10 classes that is 2.30. Seeing that number in the first few steps means the model is initialised sensibly; seeing something wildly different suggests a bug in the labels or the loss.
+
+## Why the two are always paired
+
+Softmax and cross-entropy are combined for a mathematical reason that matters in practice. The derivative of the pair, with respect to the logits, is startlingly simple:
+
+<p class="mono-font">&part;L/&part;z&#7522; = p&#7522; &minus; y&#7522;</p>
+
+Predicted probability minus the true label. Nothing else. No sigmoid derivative to shrink the gradient, no saturation term.
+
+Compare with sigmoid plus squared error, where the gradient includes `a(1 − a)` &mdash; a factor that goes to zero exactly when the model is confidently wrong. That model learns slowest in the cases it most needs to fix. The softmax and cross-entropy pairing has no such term, and that is why it became the standard.
+
+It also explains why frameworks fuse them. `nn.CrossEntropyLoss` applies log-softmax and the negative log-likelihood in one numerically stable step, and computes that clean gradient directly.
+
 ## Guided tour
 
 1. <strong>Watch the gap do the work.</strong> Set the <strong>Score for cat</strong> slider to 6. Its probability shoots up and every other class is squeezed toward zero. Softmax cares about the <em>differences</em> between logits, not their absolute size.
@@ -58,3 +103,64 @@ Softmax is not only an output layer. It is the normalising step inside <a href="
 ## Summing up
 
 Softmax exponentiates the raw scores and divides by their total, turning any set of logits into a probability distribution &mdash; monotonic, so the winner never changes, and shift-invariant, which is what makes it numerically safe. Cross-entropy then reduces to minus the log of the probability given to the true class, so a confident mistake is punished without limit while a hedge is not. Paired, their gradient with respect to the logits collapses to predicted minus actual, which is why frameworks fuse them into one operation and why you should never apply softmax before a loss that expects logits.
+
+## Numerical stability, and the bug everyone hits
+
+`e^1000` is infinity in floating point, and once an infinity appears the result is `NaN`. Since logits are unbounded, this is a real risk.
+
+The fix is to subtract the maximum logit before exponentiating. Because the constant cancels between numerator and denominator, the result is unchanged, but the largest exponent becomes `e⁰ = 1`:
+
+```python
+import numpy as np
+
+def softmax(z):
+    z = z - np.max(z)         # shift: mathematically identical, numerically safe
+    e = np.exp(z)
+    return e / e.sum()
+```
+
+Every framework does this internally, which leads to the practical rule: <strong>pass logits to the loss function, never probabilities</strong>.
+
+```python
+import torch.nn as nn
+
+criterion = nn.CrossEntropyLoss()      # expects raw logits
+logits = model(x)                      # no softmax in the model
+loss = criterion(logits, targets)      # integer class indices, not one-hot
+```
+
+Applying softmax in the model and then using `CrossEntropyLoss` applies it twice. The model still trains &mdash; badly, slowly, with no error message. It is one of the most common bugs in deep learning code.
+
+For binary problems, `BCEWithLogitsLoss` is the equivalent fused pair.
+
+## Variants worth knowing
+
+<strong>Sigmoid instead of softmax</strong> for multi-label problems, where several classes can be true at once. Softmax forces the outputs to compete for a fixed total, which is wrong there.
+
+<strong>Label smoothing</strong> replaces the one-hot target with, say, 0.9 on the true class and the remaining 0.1 spread across the others. The model is no longer pushed towards infinite confidence, which improves calibration and usually test accuracy.
+
+<strong>Temperature scaling</strong> divides logits by T before the softmax. T &gt; 1 softens the distribution; T &lt; 1 sharpens it. Fitting a single T on held-out data is the standard, cheap way to calibrate a network's confidence, and it changes no predictions' ranking.
+
+<strong>Focal loss</strong> down-weights examples the model already gets right, focusing training on the hard ones. Designed for object detection, where background vastly outnumbers objects.
+
+## Questions people ask
+
+<strong>Why exponentiate rather than just normalise the logits?</strong> Because logits can be negative, and dividing negatives by a sum does not give probabilities. Exponentiating guarantees positivity and gives a smooth, differentiable function.
+
+<strong>Should my model end with softmax?</strong> No &mdash; return logits and let the loss apply it. Apply softmax explicitly only at inference, when you want to display probabilities.
+
+<strong>Are softmax outputs real probabilities?</strong> They are a distribution, and typically an overconfident one. Check with a reliability diagram and apply temperature scaling if the numbers matter.
+
+<strong>What loss for two classes?</strong> Either a single sigmoid output with binary cross-entropy, or two logits with softmax. Both work; the sigmoid version has one fewer parameter.
+
+<strong>Why is my loss exactly ln(number of classes) and not falling?</strong> The model is predicting uniformly and learning nothing &mdash; check the learning rate, the label alignment and whether gradients are reaching the parameters.
+
+<strong>Does softmax have parameters?</strong> No. It is a fixed function applied to the final layer's outputs.
+
+## Recap in one screen
+
+- Softmax exponentiates the logits and normalises, turning scores into a distribution that sums to 1.
+- The exponential exaggerates differences, which is why temperature scaling is an effective confidence dial.
+- Cross-entropy is `−log(probability of the correct class)`, punishing confident mistakes without limit.
+- Together their gradient is simply `predicted − actual`, with no saturating term.
+- Subtract the maximum logit for stability, and always hand logits to the fused loss rather than probabilities.

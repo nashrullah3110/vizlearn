@@ -37,6 +37,51 @@ There is no formula, but there are reliable starting points. Begin with one or t
 
 Then let the training curves decide. If the model cannot drive training loss down it lacks capacity, so widen or deepen it. If training loss is near zero while validation loss climbs, it has too much capacity for the data available, and the answer is regularisation or more data rather than a smaller network. Increase capacity until the model can overfit, then regularise back &mdash; that order is far more reliable than guessing an architecture up front.
 
+## Layers of weighted sums, with a bend between them
+
+A neural network is a chain of very simple operations. Each layer takes a vector of numbers, multiplies it by a matrix of weights, adds a bias, and pushes the result through a non-linear function.
+
+<p class="mono-font">a<sup>(1)</sup> = f(W<sup>(1)</sup>x + b<sup>(1)</sup>)&nbsp;&nbsp;&rarr;&nbsp;&nbsp;a<sup>(2)</sup> = f(W<sup>(2)</sup>a<sup>(1)</sup> + b<sup>(2)</sup>)&nbsp;&nbsp;&rarr;&nbsp;&nbsp;&hellip;</p>
+
+That is the whole forward pass. A network with 175 billion parameters is doing exactly this, many times.
+
+The three parts of the architecture:
+
+- <strong>Input layer</strong> &mdash; one unit per feature. Not really a layer; it holds the data.
+- <strong>Hidden layers</strong> &mdash; where the representation is built. "Deep" simply means more than one or two.
+- <strong>Output layer</strong> &mdash; one unit per class for classification, one for a single regression target.
+
+## Why the non-linearity is the whole point
+
+Remove the activation function and stack two layers: `W₂(W₁x) = (W₂W₁)x`. That is a single matrix. A hundred stacked linear layers can express exactly what one can &mdash; a straight boundary.
+
+Insert a non-linear bend between them, and the layers stop collapsing. Each one can reshape the space the next one sees, so the network can represent curves, corners and disjoint regions.
+
+This is the answer to "why not just use one very wide layer?" The universal approximation theorem says one hidden layer, made wide enough, can approximate any continuous function. In practice depth is dramatically more efficient: a function that needs an exponentially wide shallow network can often be represented by a narrow deep one, because layers <em>compose</em> features rather than enumerating them.
+
+## What each layer learns
+
+The layers build a hierarchy, and it is visible when you inspect trained networks.
+
+|Depth|On images|On text|
+|---|---|---|
+|Layer 1|Edges, colour blobs|Character and word shapes|
+|Middle|Textures, parts|Phrases, syntax|
+|Deep|Objects|Meaning, topic, intent|
+
+This is why you cannot usefully read a single weight in a deep network: a feature's influence is spread across many paths, and the meaningful units are combinations rather than individual neurons.
+
+It is also why <strong>transfer learning</strong> works. Early layers learn primitives that apply to almost any task in the domain, so they can be reused; only the last layers are specific to the original labels.
+
+## Training, in four steps
+
+1. <strong>Forward pass.</strong> Push a batch through the network and get predictions.
+2. <strong>Loss.</strong> Compare predictions with the truth, producing one number.
+3. <strong>Backward pass.</strong> Compute how much each weight contributed to that number &mdash; the chain rule, applied backwards.
+4. <strong>Update.</strong> Nudge every weight against its gradient, scaled by the learning rate.
+
+Repeat for every batch, for many epochs. Nothing else happens. Everything else in deep learning &mdash; optimisers, normalisation, schedules, regularisation &mdash; is a refinement of one of those four steps.
+
 ## Try this above
 
 1. Set <strong>Input Features</strong> to 4, one <strong>Hidden Layer</strong> of 8, and <strong>Output Classes</strong> to 3, then count the connections against the arithmetic above.
@@ -50,3 +95,58 @@ Then let the training curves decide. If the model cannot drive training loss dow
 ## In one line
 
 Multiply, add a bias, bend &mdash; repeated, with the bend being the part that matters.
+
+## The choices you actually make
+
+|Decision|Typical answer|
+|---|---|
+|Hidden layers|Start with 2&ndash;3 for tabular data; use a proven architecture for images or text|
+|Units per layer|64&ndash;512, often narrowing towards the output|
+|Hidden activation|ReLU, or GELU in transformers|
+|Output activation|None for regression, softmax for multi-class, sigmoid for multi-label|
+|Loss|MSE for regression, cross-entropy for classification|
+|Optimiser|AdamW|
+|Learning rate|1e-3 for Adam, then tune &mdash; the most important hyperparameter|
+|Batch size|32&ndash;256, as large as memory allows|
+|Regularisation|Weight decay, dropout, early stopping|
+
+Two notes on that table. The output layer usually has <em>no</em> activation in modern frameworks, because the loss function applies softmax or sigmoid internally in a numerically stable way &mdash; applying it twice is a real and quiet bug. And the learning rate deserves its label: it affects results more than the number of layers, the width, or the choice of optimiser.
+
+## When a neural network is the wrong tool
+
+Deep learning is not the default answer to a modelling problem. It wins decisively on <strong>unstructured</strong> data &mdash; images, audio, text, video &mdash; where the raw input has spatial or sequential structure a network can exploit.
+
+On <strong>tabular</strong> data, gradient-boosted trees usually match or beat a neural network while needing less tuning, less data and no GPU. This has been tested repeatedly and the result is consistent.
+
+Three other reasons to look elsewhere: you have a few hundred rows, you need to explain each decision to a regulator, or you need the model to extrapolate outside the range it was trained on.
+
+## Common mistakes
+
+- <strong>Forgetting to scale the inputs.</strong> Networks assume roughly unit-scale features; unscaled columns make the first layer's activations enormous and training unstable.
+- <strong>Applying softmax in the model and again in the loss.</strong> Trains slowly, silently.
+- <strong>A learning rate that is wrong by an order of magnitude.</strong> Too high diverges to `NaN`; too low crawls. Find it with a short learning-rate sweep.
+- <strong>No validation set,</strong> so overfitting is invisible until deployment.
+- <strong>Too big a model for the data.</strong> With a few thousand rows, a smaller network plus regularisation beats a larger one.
+- <strong>Not shuffling the training data,</strong> so batches contain one class at a time and batch normalisation's statistics become meaningless.
+
+## Questions people ask
+
+<strong>How many layers should I use?</strong> For tabular data, two or three. For images and text, start from a proven architecture rather than designing one.
+
+<strong>What is an epoch?</strong> One full pass through the training data. Batches are the chunks within it, and one update happens per batch.
+
+<strong>Why does my loss go to `NaN`?</strong> Learning rate too high, a `log(0)` in the loss, or unscaled inputs. Check in that order.
+
+<strong>Do I need a GPU?</strong> For images and text, effectively yes. For small tabular models, a CPU is fine.
+
+<strong>How much data do I need?</strong> Thousands of examples per class as a rough floor, and far fewer if you fine-tune a pretrained model.
+
+<strong>Why is it called a "neuron"?</strong> Historical analogy to biology. The resemblance is loose; a unit is a weighted sum with a threshold, not a cell.
+
+## Recap in one screen
+
+- Each layer is a matrix multiply, a bias, and a non-linear function.
+- Without the non-linearity, any number of layers collapses into one.
+- Layers build a hierarchy of features, which is why depth and transfer learning both work.
+- Training is forward pass, loss, backward pass, update &mdash; repeated.
+- Excellent on images, audio and text; usually beaten by boosted trees on tabular data.

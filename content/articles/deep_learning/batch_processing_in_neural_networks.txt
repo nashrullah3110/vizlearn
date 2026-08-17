@@ -17,6 +17,46 @@ These three get muddled constantly:
 
 With 10,000 samples and a batch size of 100, one epoch is 100 iterations, so 10 epochs means 1,000 weight updates. Halving the batch size to 50 doubles the updates per epoch to 200 &mdash; which is why batch size and learning rate cannot be tuned independently.
 
+## Why examples are processed in groups
+
+Training could update the weights after every single example, or after seeing the entire dataset. Both are worse than the middle option, and for different reasons.
+
+<strong>One example at a time</strong> gives an extremely noisy gradient estimate and, more importantly, wastes the hardware. A GPU has thousands of cores designed to do the same operation on many values simultaneously; feeding it one 784-element vector uses a fraction of a percent of that capacity.
+
+<strong>The entire dataset</strong> gives an accurate gradient at enormous cost per update. On a million rows, a single step requires a million forward and backward passes, and the model gets one weight update for all that work.
+
+<strong>A mini-batch of 32 to 256</strong> is what everyone uses. The gradient is a reasonable estimate, the matrix multiplications are large enough to saturate the hardware, and the remaining noise is useful &mdash; it helps the optimiser escape saddle points.
+
+The arithmetic is a matrix multiply either way: a batch of 64 examples with 784 features is a 64&times;784 matrix multiplied by the layer's weights, which is one operation rather than 64.
+
+## Epochs, steps and the numbers that confuse people
+
+|Term|Meaning|
+|---|---|
+|Batch size|Examples per update|
+|Step / iteration|One forward pass, one backward pass, one update|
+|Epoch|One full pass through the training data|
+|Steps per epoch|dataset size / batch size|
+
+With 50,000 training examples and a batch size of 64, one epoch is 782 steps &mdash; 782 weight updates, not one. Ten epochs is 7,820 updates.
+
+That relationship has a consequence people trip over: <strong>doubling the batch size halves the number of updates per epoch</strong>. So a run with batch size 256 and the same number of epochs performs a quarter of the updates of one with batch size 64, and will usually be behind unless the learning rate is scaled up to compensate.
+
+## Batch size, learning rate and generalisation
+
+Larger batches give less noisy gradients, so larger steps are safe. The standard rule is to <strong>scale the learning rate linearly with batch size</strong> &mdash; double the batch, double the rate &mdash; with a warm-up period, because the first few large steps are the risky ones.
+
+That rule holds well up to a point. Beyond a few thousand examples per batch, the gradient noise becomes so small that the implicit regularisation it provided disappears, and very large-batch training tends to generalise slightly worse. Techniques such as LARS and LAMB exist specifically to push that ceiling higher.
+
+|Batch size|Character|
+|---|---|
+|1&ndash;8|Very noisy; slow on GPUs; sometimes necessary for huge inputs|
+|32&ndash;256|The normal range; good hardware use, useful noise|
+|512&ndash;2048|Faster wall-clock; needs a scaled learning rate and warm-up|
+|8192+|Requires specialised optimisers; used in large-scale pretraining|
+
+Note that batch normalisation adds a constraint of its own: with batches below about 8, its statistics become unreliable and GroupNorm or LayerNorm is the better choice.
+
 ## Things to try
 
 1. <strong>Watch a single sample flow.</strong> Set <strong>Batch Size</strong> to 1 and press <strong>Simulate Flow</strong>. One activation pattern moves through the network and one update follows &mdash; maximally noisy and maximally frequent.
@@ -43,3 +83,64 @@ The standard mitigation is the <strong>linear scaling rule</strong>: when you mu
 ## Key takeaway
 
 Batching turns many small vector-matrix products into one large matrix-matrix product, which is what makes parallel hardware pay off, without changing the model at all. Batch size sets both the number of updates per epoch and the noise in each gradient, so it trades throughput against a regularising effect that favours flat minima. Change it and change the learning rate with it &mdash; roughly linearly &mdash; or the comparison is not fair.
+
+## Gradient accumulation: a big batch on a small GPU
+
+When the batch you want does not fit in memory, you can simulate it by accumulating gradients over several small batches before updating:
+
+```python
+accum = 4                                   # effective batch = 4 x batch_size
+opt.zero_grad()
+for i, batch in enumerate(loader):
+    loss = criterion(model(batch.x), batch.y) / accum    # scale to keep the mean right
+    loss.backward()                                       # gradients accumulate
+    if (i + 1) % accum == 0:
+        opt.step()
+        opt.zero_grad()
+```
+
+Two details matter. The loss must be divided by the accumulation count, or the effective gradient is `accum` times too large. And PyTorch accumulates into `.grad` by default, which is exactly why this works &mdash; the same behaviour that makes forgetting `zero_grad()` a bug is the mechanism here.
+
+The trade is wall-clock time: four small batches cost about as much as one large one would have, so you get the large-batch <em>statistics</em> without the large-batch <em>speed</em>.
+
+## What limits batch size
+
+Almost always <strong>activation memory</strong>, not the weights.
+
+Every intermediate activation from the forward pass must be kept for the backward pass. A ResNet-50 at batch size 64 on 224&times;224 images stores several gigabytes of activations, against about 100MB of weights. That is why a model that "fits" can still fail with an out-of-memory error the moment you raise the batch size.
+
+Three ways to buy memory back:
+
+- <strong>Mixed precision</strong> stores activations in 16-bit, roughly halving the requirement and speeding up the arithmetic.
+- <strong>Gradient checkpointing</strong> keeps only some activations and recomputes the rest, trading about 30% more compute for a large memory saving.
+- <strong>Gradient accumulation</strong>, above, which keeps the memory small and the effective batch large.
+
+## Batching at inference
+
+The same idea applies when serving a model, with a different objective. Batching several requests together uses the hardware far more efficiently &mdash; often five to ten times the throughput of processing them one at a time.
+
+The cost is latency: a request must wait for the batch to fill. Production systems use <strong>dynamic batching</strong>, collecting requests for a few milliseconds and then processing whatever has arrived, which captures most of the throughput gain with a bounded delay.
+
+One correctness note: batch normalisation must be in eval mode at inference, or the prediction for one input depends on which other inputs happen to share its batch. That is a genuinely confusing bug &mdash; the same input gives different answers &mdash; and `model.eval()` is the fix.
+
+## Questions people ask
+
+<strong>What batch size should I use?</strong> The largest that fits comfortably, up to about 256 for most work, then scale the learning rate accordingly.
+
+<strong>Is a power of two required?</strong> Not required, and it aligns well with hardware, so 32/64/128/256 are conventional and marginally faster.
+
+<strong>Why did my accuracy drop when I increased the batch size?</strong> Fewer updates per epoch and an unscaled learning rate. Scale the rate up and add warm-up.
+
+<strong>Does batch size affect the final result?</strong> Somewhat. Very large batches tend to generalise slightly worse without specialised optimisers, and very small batches are slow and noisy.
+
+<strong>Should the last partial batch be dropped?</strong> With batch normalisation, yes &mdash; a final batch of one or two gives wild statistics. `drop_last=True` handles it.
+
+<strong>Is the loss averaged or summed over a batch?</strong> Averaged, by default. Summing makes the effective learning rate depend on batch size.
+
+## Recap in one screen
+
+- Mini-batches balance gradient quality, hardware efficiency and useful noise; 32&ndash;256 is the normal range.
+- An epoch contains `dataset / batch_size` updates, so a larger batch means fewer updates.
+- Scale the learning rate with the batch size, and add warm-up.
+- Activation memory, not the weights, is what limits batch size &mdash; mixed precision and checkpointing buy it back.
+- Gradient accumulation gives a large effective batch on small hardware, at the cost of wall-clock time.

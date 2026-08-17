@@ -20,6 +20,71 @@ random.seed(42)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Python&rsquo;s own ge
 
 The catch is that these are separate generators. Seeding NumPy does nothing for PyTorch’s dropout, and seeding PyTorch does nothing for a shuffle done with Python’s <span class="mono-font">random</span>. Every library that draws a random number needs its own seed, and missing one is the usual reason a “seeded” run is still not reproducible.
 
+## Why the same code gives different numbers
+
+Run the same training script twice and the results differ. Five sources of randomness are involved, and each has to be pinned separately.
+
+|Source|What varies|
+|---|---|
+|Weight initialisation|The starting point|
+|Data shuffling|The order and composition of batches|
+|Dropout|Which units are zeroed each step|
+|Augmentation|The random transformations applied|
+|GPU kernels|Floating-point summation order|
+
+The first four are ordinary pseudo-random number generators and can be seeded. The fifth is different in kind: many GPU operations sum values in a non-deterministic order, and floating-point addition is not associative, so `(a + b) + c` and `a + (b + c)` can differ in the last bits. Those differences amplify over thousands of steps.
+
+Seeding gets you most of the way; full determinism costs a little speed.
+
+## Pinning it down
+
+```python
+import os, random, numpy as np, torch
+
+def set_seed(seed=42):
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+set_seed(42)
+
+# for full determinism, at some cost in speed
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+torch.use_deterministic_algorithms(True)
+```
+
+Two additional details that are easy to miss.
+
+<strong>Data loader workers need their own seeding.</strong> Each worker process inherits a different base seed, and without `worker_init_fn` several workers can generate identical augmentation sequences &mdash; or different ones between runs.
+
+```python
+def seed_worker(worker_id):
+    s = torch.initial_seed() % 2**32
+    np.random.seed(s); random.seed(s)
+
+loader = DataLoader(ds, worker_init_fn=seed_worker,
+                    generator=torch.Generator().manual_seed(42))
+```
+
+<strong>`cudnn.benchmark = True` is non-deterministic by design.</strong> It profiles several convolution algorithms and picks the fastest, which can differ between runs. Leaving it on is often worth 10&ndash;20% speed; turning it off is required for bit-exact reproducibility.
+
+## Reproducibility is more than the seed
+
+A fixed seed makes one script repeatable on one machine. Reproducing a result months later, or on someone else's machine, needs more.
+
+<strong>Pin the environment.</strong> Library versions change numerical behaviour and occasionally defaults. Record exact versions &mdash; `requirements.txt` with pinned versions, a lock file, or a container image.
+
+<strong>Version the data.</strong> "The dataset" is a moving target if it is a folder someone adds files to. Record a hash, a snapshot, or use a data-versioning tool.
+
+<strong>Log the configuration.</strong> Every hyperparameter, the seed, the git commit, and the command line. A result you cannot map back to its settings is not a result.
+
+<strong>Save checkpoints with their config.</strong> A weights file alone does not tell you what preprocessing it expects.
+
+Tools such as MLflow, Weights & Biases and DVC exist to automate this, and a disciplined text log plus git tags covers most of it.
+
 ## Interactive Exploration Guide
 
 1. <strong>Fix the seed and repeat.</strong> Enter a seed value and press <strong>Apply Seed &amp; Init</strong>, note the initial weights, then press it again with the same seed. Identical values &mdash; the initialisation is fully determined by that number.
@@ -43,3 +108,47 @@ Those differences are around 10<sup>&minus;7</sup>, but training amplifies them:
 ## Key takeaway
 
 Training draws randomness from initialisation, shuffling, dropout and augmentation, each from its own generator, so reproducibility means seeding all of them rather than one. Even then GPU reductions are non-deterministic at the level of floating-point rounding, and training amplifies those differences over thousands of steps. Seed to make a run repeatable for debugging &mdash; and report results over several seeds, because a single run tells you as much about the seed as about the method.
+
+## Seed variance is a measurement, not a nuisance
+
+Here is the more useful framing: instead of trying to eliminate run-to-run variation, <em>measure</em> it.
+
+Train the same configuration with five different seeds and record the spread. On many tasks that spread is one or two percent &mdash; which means any improvement smaller than that is indistinguishable from luck.
+
+That has a direct consequence for how results are reported. A single run showing 91.2% against a baseline's 90.8% demonstrates nothing if the seed variance is &plusmn;0.8%. Reporting the mean and standard deviation over several seeds is the honest alternative, and it is what prevents a project from chasing noise for weeks.
+
+It also changes how you choose: a configuration that is slightly worse on average but far more stable across seeds is often the better one to ship.
+
+## Determinism at inference
+
+Serving has its own reproducibility requirements, and they are usually easier.
+
+<strong>Call `model.eval()`.</strong> This disables dropout and switches batch normalisation to its running statistics. Without it, predictions vary between calls and depend on what else is in the batch &mdash; the same input genuinely gives different answers.
+
+<strong>Fix the preprocessing.</strong> Ship the fitted scaler, the tokeniser and the exact resizing and normalisation constants alongside the weights. A mismatch here is the most common cause of a model that scored well in training and behaves oddly in production.
+
+<strong>Beware batch effects.</strong> Even in eval mode, some operations produce marginally different results depending on batch composition due to floating-point summation order. For most applications the difference is irrelevant; for anything audited, it is worth knowing about.
+
+<strong>Pin the runtime.</strong> A model exported to ONNX or TorchScript and run on a different runtime version can differ in the last decimal places.
+
+## Questions people ask
+
+<strong>Why is 42 the conventional seed?</strong> Cultural, from <em>The Hitchhiker's Guide to the Galaxy</em>. Any fixed value works; the point is that it is fixed.
+
+<strong>Does setting a seed guarantee identical results?</strong> On the same machine with the same library versions and deterministic algorithms enabled, yes. Across different hardware, not necessarily.
+
+<strong>How much does deterministic mode cost?</strong> Typically 10&ndash;20% throughput, mostly from disabling `cudnn.benchmark`. Some operations have no deterministic implementation and will raise an error instead.
+
+<strong>Should I always train deterministically?</strong> No &mdash; use it when debugging or when a result must be exactly reproducible. For ordinary training, seed everything and accept small variation.
+
+<strong>How many seeds should I run?</strong> Three to five for a paper or an important decision. One is fine for iteration, as long as you do not over-interpret small differences.
+
+<strong>Why do my results differ between my laptop and the server?</strong> Different hardware, different library versions, different numbers of data loader workers. All three change the arithmetic or the batch composition.
+
+## Recap in one screen
+
+- Five sources of randomness: initialisation, shuffling, dropout, augmentation and GPU kernel order.
+- Seed Python, NumPy and Torch, and seed the data loader workers individually.
+- Full determinism needs `cudnn.deterministic` and no benchmarking, at 10&ndash;20% of throughput.
+- Reproducibility also requires pinned library versions, versioned data and logged configuration.
+- Measure the seed variance, and treat any improvement smaller than it as noise.

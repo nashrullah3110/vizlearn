@@ -33,6 +33,64 @@ Draw every vector whose norm equals exactly 1 and you get that norm's <strong>un
 
 Those corners on the L1 diamond are not decoration. They are the entire reason Lasso produces exact zeros and Ridge does not.
 
+## Several ways to measure length
+
+A norm measures the size of a vector, and the choice of norm changes what "size" means.
+
+|Norm|Formula|Common name|
+|---|---|---|
+|L1|&Sigma;\|x&#7522;\||Manhattan, taxicab|
+|L2|&radic;&Sigma;x&#7522;&sup2;|Euclidean|
+|L&infin;|max\|x&#7522;\||Maximum, Chebyshev|
+|L0 (not a true norm)|Count of non-zero entries|Sparsity|
+
+For x = [3, &minus;4]:
+
+- L1 = 3 + 4 = <strong>7</strong>
+- L2 = &radic;(9 + 16) = <strong>5</strong>
+- L&infin; = max(3, 4) = <strong>4</strong>
+- L0 = <strong>2</strong> non-zero entries
+
+L2 is the everyday default &mdash; it is the straight-line length and the one that corresponds to ordinary geometry. L1 sums the magnitudes and is more forgiving of a single large component. L&infin; only looks at the worst one.
+
+## The unit circles explain everything
+
+Draw the set of vectors with norm exactly 1 under each measure and you get three different shapes:
+
+- <strong>L2</strong>: a circle.
+- <strong>L1</strong>: a diamond, with corners on the axes.
+- <strong>L&infin;</strong>: a square.
+
+Those corners are not a curiosity &mdash; they are the entire reason lasso produces sparse models.
+
+Optimisation under a norm constraint means finding where the loss function's contours first touch the constraint shape. On a smooth circle, the touching point is almost never on an axis, so no coefficient becomes exactly zero: that is ridge, which shrinks everything without eliminating anything.
+
+On a diamond, the corners stick out and lie exactly on the axes. Contours are far more likely to touch a corner &mdash; and touching a corner means one coefficient is exactly zero. That is lasso, and it is why L1 regularisation selects features while L2 does not.
+
+## Norms as regularisation
+
+<p class="mono-font">loss = prediction error + &lambda; &times; (norm of the weights)</p>
+
+|Penalty|Name|Effect|
+|---|---|---|
+|L2|Ridge, weight decay|Shrinks all weights smoothly; handles collinearity|
+|L1|Lasso|Drives weak weights to exactly zero; selects features|
+|L1 + L2|Elastic net|Sparsity with stability on correlated groups|
+
+The same choice appears in deep learning under a different name: weight decay is L2 regularisation applied to the network's parameters, and it remains one of the few regularisers used in essentially every serious training recipe.
+
+The scaling requirement follows directly. The penalty is applied to raw coefficient sizes, so a feature measured in thousands naturally has a tiny coefficient and is barely penalised, while one measured in units is penalised heavily. Standardise before regularising, always.
+
+## Norms elsewhere in training
+
+<strong>Gradient clipping.</strong> Compute the L2 norm of the whole gradient, and if it exceeds a threshold, rescale it down. This is standard in recurrent networks and transformers, where occasional enormous gradients would otherwise destroy the weights in a single step.
+
+<strong>Monitoring.</strong> Logging the gradient norm per layer is the fastest diagnosis of vanishing or exploding gradients, and it costs nothing.
+
+<strong>Normalisation.</strong> Dividing a vector by its L2 norm gives a unit vector, which is what makes dot products equal cosine similarity &mdash; the standard preprocessing step in every embedding pipeline.
+
+<strong>Loss functions.</strong> Mean squared error is a squared L2 norm of the residual vector; mean absolute error is an L1 norm. That is precisely why MSE is dominated by outliers and MAE is not.
+
 ## Guided tour
 
 1. <strong>Confirm the ordering.</strong> Set <strong>Component X</strong> to 3 and <strong>Component Y</strong> to 4. L2 reads exactly 5 &mdash; the 3-4-5 triangle &mdash; while L1 reads 7 and L&infin; reads 4. The rule L&infin; &le; L2 &le; L1 holds for every vector you can drag to.
@@ -68,3 +126,49 @@ The same fact shows up in the calculus. The derivative of x&sup2; is 2x, which f
 ## What to remember
 
 A norm answers "how big is this vector", and L1, L2 and L&infin; give three different answers &mdash; the sum of absolute values, the straight-line length, and the largest component &mdash; always ordered L&infin; &le; L2 &le; L1, agreeing only on the axes. What separates them in practice is the shape of their unit ball: L2's circle is smooth and touches a solution set at a generic point, while L1's diamond is mostly corner and its corners sit on the axes, where a coordinate is exactly zero. That single geometric fact is why Lasso deletes features and Ridge only shrinks them.
+
+## Matrix norms
+
+Norms extend from vectors to matrices, and two appear regularly.
+
+The <strong>Frobenius norm</strong> treats the matrix as one long vector and takes the L2 norm of all its entries. It is what weight decay penalises in a neural network layer, and what `np.linalg.norm(W)` returns by default.
+
+The <strong>spectral norm</strong> is the largest singular value &mdash; the greatest factor by which the matrix can stretch any vector. It bounds how much a layer can amplify its input, which makes it the natural measure for stability. Spectral normalisation, used in GAN training, constrains exactly this quantity to keep the discriminator well-behaved.
+
+```python
+import numpy as np
+
+np.linalg.norm(v)               # L2 of a vector
+np.linalg.norm(v, 1)            # L1
+np.linalg.norm(v, np.inf)       # L-infinity
+np.linalg.norm(W)               # Frobenius, for a matrix
+np.linalg.norm(W, 2)            # spectral (largest singular value)
+```
+
+## What makes something a norm
+
+Three conditions: it is zero only for the zero vector, scaling the vector scales the norm by the same factor, and the triangle inequality holds &mdash; `‖a + b‖ ≤ ‖a‖ + ‖b‖`, the formal statement that a detour is never shorter.
+
+The "L0 norm" fails the second condition (doubling a vector does not double the count of non-zero entries), which is why it is not really a norm. It is also non-differentiable and combinatorially hard to optimise, and L1 is used as its practical, convex stand-in &mdash; the reason lasso exists in the form it does.
+
+## Questions people ask
+
+<strong>Which norm should I use for regularisation?</strong> L2 by default. L1 when you want feature selection or a genuinely sparse model. Elastic net when features are correlated and you want both.
+
+<strong>Why does L1 produce zeros and L2 does not?</strong> Because the L1 constraint region has corners on the axes, and optimisation is disproportionately likely to land on one.
+
+<strong>Is weight decay the same as L2 regularisation?</strong> They coincide for plain SGD. For Adam they differ, which is why AdamW &mdash; which decouples the decay from the adaptive scaling &mdash; became the standard optimiser for transformers.
+
+<strong>What does normalising a vector mean?</strong> Dividing by its norm so the length becomes 1, keeping only the direction.
+
+<strong>Which norm for distance between embeddings?</strong> Cosine, or equivalently L2 on normalised vectors &mdash; the ranking is the same.
+
+<strong>Does the norm choice affect KNN?</strong> Yes. L1 is often more stable in high dimensions, and switching metric can change which neighbours are selected.
+
+## Recap in one screen
+
+- A norm measures a vector's size; L1 sums magnitudes, L2 is straight-line length, L&infin; takes the largest component.
+- The shape of the unit ball explains regularisation: a diamond's corners give lasso its sparsity, a circle's smoothness gives ridge its shrinkage.
+- Standardise features before applying any norm-based penalty.
+- Gradient clipping, embedding normalisation, MSE and MAE are all norms in disguise.
+- Frobenius and spectral norms extend the idea to matrices, and bound how much a layer can amplify.

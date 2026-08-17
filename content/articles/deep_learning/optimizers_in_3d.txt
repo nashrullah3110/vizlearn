@@ -13,6 +13,43 @@ The folk explanation of training failure is "it got stuck in a local minimum". I
 
 This is a practical difference. A local minimum is a trap. A saddle is not &mdash; there is a way down, and an optimiser with momentum carries enough velocity from earlier steps to keep moving across the flat region until it finds one.
 
+## The loss surface as a landscape
+
+Picture two weights on the horizontal axes and the loss on the vertical one. Training is a ball rolling downhill on that surface, and the optimiser decides how the ball moves.
+
+Real networks have millions of weights, so the surface is millions of dimensions rather than two. The picture is still useful, because the features that make optimisation hard are visible in three dimensions:
+
+- <strong>Ravines</strong> &mdash; steep in one direction, nearly flat in another. Plain gradient descent zigzags across the steep direction and crawls along the flat one.
+- <strong>Saddle points</strong> &mdash; downhill in some directions, uphill in others, with a gradient of zero at the centre. In high dimensions these vastly outnumber local minima, because it is improbable for millions of curvature signs to agree.
+- <strong>Plateaus</strong> &mdash; large flat regions where gradients are tiny and progress stalls.
+- <strong>Sharp versus flat minima</strong> &mdash; both fit the training data; flat ones tend to generalise better, because a small shift in the weights (or in the data) changes the loss less.
+
+## How each optimiser behaves on that landscape
+
+<strong>Plain SGD</strong> takes a step directly downhill, scaled by the learning rate. In a ravine that means oscillating across the narrow direction while barely advancing along the valley floor.
+
+<strong>Momentum</strong> accumulates velocity, so the oscillations partly cancel and the consistent downhill direction builds speed. It is the difference between a ball on a rough surface and one with mass.
+
+<strong>Adam</strong> gives every weight its own effective step size, dividing by the square root of its recent squared gradients. Weights on flat directions get larger steps and weights on steep ones get smaller, which reshapes the ravine into something closer to a bowl.
+
+|Optimiser|In a ravine|On a plateau|Near a saddle|
+|---|---|---|---|
+|SGD|Zigzags slowly|Stalls|Can stall|
+|SGD + momentum|Advances along the valley|Coasts through|Coasts through|
+|Adam|Advances directly|Amplifies small gradients|Escapes readily|
+
+That plateau row explains a real advantage of adaptive methods: dividing by a small accumulated gradient magnitude <em>increases</em> the step, so Adam keeps moving where SGD would sit still.
+
+## Saddle points, not local minima
+
+The old fear was that gradient descent would get stuck in bad local minima. High-dimensional geometry says otherwise.
+
+For a stationary point to be a local minimum, the curvature must be positive in <em>every</em> direction. With ten million parameters, that requires ten million signs to agree, which is vanishingly unlikely. Almost every point where the gradient vanishes is a saddle &mdash; downhill in at least one direction.
+
+That is good news, because saddles are escapable. The stochastic noise from mini-batches is usually enough to push the model off the ridge and onto a descending path, which is one reason mini-batch training generalises better than full-batch.
+
+It also reframes what training is doing: not searching for a unique global minimum, but descending through a landscape of many near-equivalent good solutions, most of which are fine.
+
 ## Try this above
 
 1. Run <strong>SGD (Red)</strong> alone and watch it stall when it reaches a flat region &mdash; near-zero gradient means near-zero step.
@@ -27,3 +64,50 @@ This is a practical difference. A local minimum is a trap. A saddle is not &mdas
 ## In one line
 
 The shape of the surface, not the cleverness of the algorithm, decides which optimiser looks good.
+
+## Sharp and flat minima
+
+Two solutions can fit the training data equally well and behave very differently on new data.
+
+A <strong>sharp</strong> minimum is a narrow crevice: move the weights slightly and the loss rises steeply. Since the test distribution differs slightly from the training one, that sensitivity translates into worse test performance.
+
+A <strong>flat</strong> minimum is a broad basin: nearby weights are almost as good, so a small mismatch between train and test costs little.
+
+Several observed behaviours follow from this:
+
+- <strong>Small batches generalise slightly better</strong> because their gradient noise makes it hard to settle into a narrow crevice.
+- <strong>Very large batches sometimes generalise worse</strong>, and techniques like LARS and longer warm-up exist to counter it.
+- <strong>Weight averaging</strong> (SWA) averages weights from several late-training points, landing nearer the centre of a basin than any individual point.
+- <strong>Sharpness-aware minimisation</strong> (SAM) explicitly penalises sharpness by taking a step towards the worst nearby point before updating.
+
+## Visualising a real loss surface
+
+You can plot the landscape of an actual network, and the pictures are informative.
+
+Take a trained model's weights, pick two random directions in weight space, and evaluate the loss on a grid of small perturbations along them. Plotting that grid gives a two-dimensional slice through a million-dimensional surface.
+
+What such plots reliably show: networks <em>without</em> skip connections have chaotic, spiky surfaces; networks <em>with</em> them are dramatically smoother. That is a fairly direct visual explanation of why residual connections make deep networks trainable, and it is one of the more satisfying results in the area.
+
+The caveat is that a two-dimensional slice of a million-dimensional surface can be misleading. Treat these plots as intuition, not proof.
+
+## Questions people ask
+
+<strong>Does the optimiser find the global minimum?</strong> No, and it does not need to. High-dimensional landscapes have vast numbers of near-equivalent good solutions.
+
+<strong>Why does momentum help?</strong> It averages recent gradients, so consistent directions accumulate and oscillations cancel &mdash; exactly what a ravine needs.
+
+<strong>Are local minima a problem?</strong> Rarely. Saddle points and plateaus are the real obstacles in high dimensions.
+
+<strong>Should I use a large batch to get a cleaner gradient?</strong> A cleaner gradient is not automatically better &mdash; the noise helps escape saddles and avoid sharp minima. Scale the learning rate if you do increase the batch.
+
+<strong>What is the difference between the learning rate and momentum?</strong> The learning rate is how far to step; momentum is how much of the previous direction to keep.
+
+<strong>Can I see whether my minimum is flat?</strong> Approximately &mdash; perturb the weights slightly and measure how much the loss rises. Large increases mean a sharp minimum.
+
+## Recap in one screen
+
+- Loss landscapes have ravines, plateaus and saddles; the optimiser's job is to navigate them.
+- Momentum damps oscillation across a ravine; adaptive methods rescale each direction.
+- In high dimensions almost every zero-gradient point is a saddle, not a local minimum &mdash; and noise escapes them.
+- Flat minima generalise better than sharp ones, which is why small batches and weight averaging help.
+- Skip connections visibly smooth the surface, which is a direct explanation of why they work.

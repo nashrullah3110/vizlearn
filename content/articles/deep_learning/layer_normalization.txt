@@ -11,6 +11,47 @@ LayerNorm: y<sub>i</sub> = (x<sub>i</sub> &minus; &mu;<sub>row</sub>) / &sigma;<
 
 &mu;<sub>row</sub> and &sigma;<sub>row</sub> are the mean and standard deviation of that one sample's own feature vector. Compare to BatchNorm's &mu;<sub>col</sub>, &sigma;<sub>col</sub> — computed down a column, across samples. Same shape of formula, different axis.
 
+## Normalising across features, not across the batch
+
+Batch normalisation standardises each feature using statistics computed across the examples in a batch. Layer normalisation does the opposite: it standardises each <em>example</em> using statistics computed across its own features.
+
+<p class="mono-font">x&#770; = (x &minus; &mu;<sub>example</sub>) / &radic;(&sigma;&sup2;<sub>example</sub> + &epsilon;)&nbsp;&nbsp;&nbsp;&nbsp;out = &gamma;x&#770; + &beta;</p>
+
+That change of axis has one enormous practical consequence: <strong>the computation does not depend on the batch at all</strong>. Each example is normalised in isolation.
+
+|&nbsp;|BatchNorm|LayerNorm|
+|---|---|---|
+|Statistics over|The batch, per feature|The features, per example|
+|Depends on batch size|Yes|No|
+|Train and inference differ|Yes &mdash; running averages|No &mdash; identical|
+|Works with batch size 1|No|Yes|
+|Handles variable-length sequences|Poorly|Yes|
+|Standard in|CNNs|Transformers, RNNs|
+
+## Why transformers use it
+
+Three reasons, all following from batch independence.
+
+<strong>Sequences vary in length.</strong> Batch normalisation would compute statistics across positions in a batch, mixing a sentence's third token with another's third token &mdash; and with padding, mixing real tokens with padding tokens. Layer normalisation normalises each token's own feature vector, which is a meaningful operation.
+
+<strong>Inference is often batch size 1.</strong> Generating text one request at a time gives no batch to compute statistics from. Layer normalisation needs none.
+
+<strong>Training and inference behave identically.</strong> There are no running averages to accumulate, no `train()`/`eval()` distinction for this layer, and no risk of a train/serve mismatch.
+
+Together those made layer normalisation the obvious choice for sequence models, and it has been standard since the original transformer.
+
+## Pre-norm versus post-norm
+
+Where the normalisation sits relative to the residual connection turns out to matter a great deal.
+
+<strong>Post-norm</strong> &mdash; the original transformer &mdash; is `x + sublayer(x)` followed by normalisation. It works, and beyond about 12 layers it needs careful warm-up to train at all.
+
+<strong>Pre-norm</strong> is `x + sublayer(norm(x))`. The normalisation is inside the residual branch, so the identity path from input to output is completely clean &mdash; no normalisation touches it. Gradients flow back through that path unchanged, and very deep transformers become trainable.
+
+Every large language model uses pre-norm, and it is one of the small architectural details that made scaling to 100 layers practical.
+
+<strong>RMSNorm</strong> is the further simplification now common in large models: it divides by the root mean square of the features and skips the mean subtraction entirely. One fewer statistic to compute, no accuracy cost in practice, and measurably faster at scale.
+
 ## Guided experiments
 
 1. <strong>Start at None.</strong> Four samples with deliberately different overall magnitudes — Sample B in particular is roughly 500x the scale of Sample C. Per-column stats are dominated by whichever sample happens to be largest.
@@ -21,3 +62,55 @@ LayerNorm: y<sub>i</sub> = (x<sub>i</sub> &minus; &mu;<sub>row</sub>) / &sigma;<
 ## Summing up
 
 BatchNorm and LayerNorm are the same normalization idea applied to different axes: BatchNorm down a column, across the batch; LayerNorm across a row, within one sample. That single difference in axis is why LayerNorm works identically at any batch size, including one, while BatchNorm's statistics depend on the batch it happens to see — which is why transformers and RNNs, which often run with small or variable batches, use LayerNorm almost universally.
+
+## The other members of the family
+
+|Normalisation|Statistics computed over|Typical use|
+|---|---|---|
+|BatchNorm|Batch, per channel|CNNs, batch size 16+|
+|LayerNorm|All features of one example|Transformers, RNNs|
+|GroupNorm|Groups of channels, one example|Vision with small batches|
+|InstanceNorm|One channel of one example|Style transfer, generative models|
+|RMSNorm|Scale only, one example|Large language models|
+
+<strong>GroupNorm</strong> is the one to know for computer vision. It splits channels into groups (32 is the usual default) and normalises within each group, per example. Being batch-independent, it works at batch size 2 &mdash; which is exactly the situation in detection and segmentation, where large images force small batches. It is the standard replacement for batch normalisation there.
+
+Note that GroupNorm with one group is LayerNorm, and with one channel per group is InstanceNorm. They are points on the same axis.
+
+## In code, and the shape that trips people up
+
+```python
+import torch.nn as nn
+
+norm = nn.LayerNorm(512)              # normalise the last dimension, size 512
+x = torch.randn(8, 100, 512)          # (batch, sequence, features)
+out = norm(x)                         # each of the 800 tokens normalised separately
+```
+
+`nn.LayerNorm(512)` normalises over the last dimension only, which for a transformer is the feature dimension &mdash; correct. You can pass a tuple to normalise over several trailing dimensions, which is what image applications sometimes need.
+
+The mistake to avoid is normalising over the wrong axis. `nn.LayerNorm([100, 512])` on the tensor above would normalise across sequence positions as well as features, mixing tokens together &mdash; not what a transformer wants, and it produces a model that trains poorly for no obvious reason.
+
+Parameter count is 2 per normalised feature: 1,024 for a 512-dimensional layer. Negligible, and like batch normalisation's parameters they should be excluded from weight decay.
+
+## Questions people ask
+
+<strong>Which should I use?</strong> LayerNorm for anything sequential or transformer-shaped; BatchNorm for CNNs with reasonable batch sizes; GroupNorm for CNNs with small batches.
+
+<strong>Does LayerNorm need a `model.eval()` switch?</strong> Not for its own behaviour &mdash; it computes the same thing in both modes. You still need `eval()` for dropout and any batch normalisation elsewhere.
+
+<strong>Why does it help at all?</strong> It keeps activations in a stable range through depth, which keeps gradients in a usable range and allows higher learning rates. The precise theoretical account is still debated, exactly as with batch normalisation.
+
+<strong>Is pre-norm always better?</strong> For deep networks, yes in practice. Post-norm sometimes reaches slightly better final quality on shallow models with careful tuning.
+
+<strong>What is RMSNorm's advantage?</strong> One fewer statistic, so slightly faster, with no measurable loss in quality. Standard in recent large language models.
+
+<strong>Can I use both BatchNorm and LayerNorm?</strong> In one model, technically yes, and it is unusual. Pick the one that matches the data's structure.
+
+## Recap in one screen
+
+- LayerNorm standardises each example across its own features, so it is completely independent of the batch.
+- That makes it correct for variable-length sequences and for batch size 1, and identical in training and inference.
+- Transformers use it, in the pre-norm arrangement, which keeps the residual path clean and makes deep stacks trainable.
+- GroupNorm is the batch-independent choice for vision with small batches.
+- RMSNorm drops the mean subtraction and is now common in large language models.

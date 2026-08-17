@@ -19,7 +19,87 @@ The exclusive stop makes <span class="mono-font">s[:k] + s[k:]</span> reconstruc
 
 ## The methods worth knowing
 
-<p>.strip()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;remove surrounding whitespace<br>.split(",")&nbsp;&nbsp;&nbsp;split into a list on a separator<br>",".join(xs)&nbsp;&nbsp;join a list into one string<br>.replace(a, b)&nbsp;substitute every occurrence<br>.startswith(x)&nbsp;prefix test<br>.find(x)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;index or &minus;1 if absent</p><span class="mono-font">split</span> and <span class="mono-font">join</span> are inverses and do most of the real work in text processing. Note that <span class="mono-font">join</span> is called on the <em>separator</em>, not on the list &mdash; <span class="mono-font">", ".join(items)</span> &mdash; which surprises nearly everyone once.<p>For building strings from values, f-strings are the modern form: <span class="mono-font">f"{name} is {age}"</span>, with expressions and formatting allowed inside the braces.</p>
+```python
+text = "  Hello, World  "
+
+text.strip()                 # 'Hello, World'  - also lstrip, rstrip
+text.lower() / .upper()      # case conversion
+text.replace("World", "Ada") # a new string with the substitution
+text.split(",")              # ['  Hello', ' World  ']
+text.strip().startswith("H") # True   - also endswith
+"World" in text              # True   - substring test
+text.find("World")           # index, or -1 if absent
+text.count("l")              # 3
+"a,b,c".split(",")           # ['a', 'b', 'c']
+", ".join(["a", "b"])        # 'a, b'
+```
+
+Two habits that prevent real bugs. Always `.strip()` user input and data read from files &mdash; trailing whitespace and newlines are the single most common cause of "but they look identical" comparison failures. And normalise case before comparing: `a.lower() == b.lower()`, or `a.casefold() == b.casefold()` for correct handling of non-English text.
+
+## Text, and why it cannot be changed
+
+A string is a sequence of characters, and in Python it is <strong>immutable</strong> &mdash; every operation that looks like a change actually produces a new string.
+
+```python
+name = "python"
+name.upper()        # 'PYTHON'
+print(name)         # 'python'  -- unchanged
+name = name.upper() # to keep the result, assign it
+```
+
+That trips people up constantly, and it is worth knowing why the language works this way. Immutable strings can be used as dictionary keys, shared safely between parts of a program without defensive copying, and cached by the interpreter.
+
+The practical consequence is a performance one:
+
+```python
+# slow: each += copies the whole string so far
+result = ""
+for word in words:
+    result += word          # quadratic on long inputs
+
+# fast: collect, then join once
+result = "".join(words)
+```
+
+`join` is the idiomatic way to build text from pieces, and the separator is the string you call it on: `", ".join(names)`.
+
+## Slicing text
+
+Strings slice exactly like lists, with the same "stop is excluded" rule:
+
+```python
+s = "Hello, World"
+
+s[0]        # 'H'
+s[-1]       # 'd'
+s[0:5]      # 'Hello'
+s[7:]       # 'World'
+s[:5]       # 'Hello'
+s[::2]      # 'Hlo ol'
+s[::-1]     # 'dlroW ,olleH'  -- reversed
+len(s)      # 12
+```
+
+Out-of-range slices return what exists rather than raising, so `s[5:100]` is fine while `s[100]` is an `IndexError`.
+
+## f-strings, and formatting numbers
+
+f-strings are the modern way to build text, and they take expressions, not just names:
+
+```python
+name, total = "Ada", 1234.5678
+
+f"Hello, {name}"                  # 'Hello, Ada'
+f"Total: {total:.2f}"             # 'Total: 1234.57'
+f"Total: {total:,.2f}"            # 'Total: 1,234.57'
+f"{0.847:.1%}"                    # '84.7%'
+f"{42:>8}"                        # '      42'   right-aligned in 8 columns
+f"{name=}"                        # "name='Ada'"  -- excellent for debugging
+```
+
+That last one, the `=` suffix, prints both the expression and its value, and it removes most of the reason to write `print("name:", name)`.
+
+Multi-line strings use triple quotes and keep their line breaks, which makes them right for SQL, templates and docstrings.
 
 ## Exploration guide
 
@@ -39,3 +119,60 @@ The exclusive stop makes <span class="mono-font">s[:k] + s[k:]</span> reconstruc
 ## The short version
 
 Strings are immutable sequences, so every transforming method returns a new string and the original never changes &mdash; assign the result, and never build strings by concatenation in a loop. Slicing uses an exclusive stop, accepts negative indices, and returns an empty string rather than raising when the range is out of bounds. <span class="mono-font">split</span> and <span class="mono-font">join</span> are the two methods most text processing is actually made of.
+
+## Escapes, raw strings and encodings
+
+Some characters need escaping inside a string:
+
+```python
+"line one\nline two"      # \n is a newline
+"tab\there"               # \t is a tab
+"she said \"hi\""         # escaped quotes
+'she said "hi"'           # or just use the other quote character
+r"C:\Users\new"           # raw string: backslashes are literal
+```
+
+Raw strings matter most for Windows paths and regular expressions, where `\n` in the pattern should mean backslash-n rather than a newline.
+
+Underneath, Python 3 strings are Unicode, so they hold any character from any writing system. Files and networks carry <strong>bytes</strong>, so text has to be encoded on the way out and decoded on the way in:
+
+```python
+data = "café".encode("utf-8")     # b'caf\xc3\xa9'  -- bytes
+text = data.decode("utf-8")       # 'café'          -- back to str
+```
+
+Always specify `encoding="utf-8"` when opening a text file. The default depends on the operating system, which is why a script that works on one machine produces `UnicodeDecodeError` on another.
+
+One more subtlety: `len("café")` is 4 characters, but the UTF-8 encoding is 5 bytes. Characters and bytes are different units, and mixing them up is the source of most truncated-text bugs.
+
+## Common mistakes
+
+- <strong>Expecting a method to modify the string.</strong> `text.upper()` returns a new one; assign it.
+- <strong>Building strings with `+=` in a loop.</strong> Use `"".join(parts)`.
+- <strong>Comparing unstripped input.</strong> `"yes\n" == "yes"` is False.
+- <strong>Using `+` to join a number to text.</strong> `"Total: " + 5` raises `TypeError`; use an f-string.
+- <strong>Forgetting `find` returns -1 rather than raising,</strong> so `if text.find(x):` is true for a match at index 0 and false for a match at index... no, it is false only at index 0. Use `in` instead.
+- <strong>Ignoring encodings</strong> until a file with an accented character arrives.
+
+## Questions people ask
+
+<strong>How do I reverse a string?</strong> `text[::-1]`.
+
+<strong>How do I check if a string contains something?</strong> `"abc" in text`.
+
+<strong>What is the difference between `split()` and `split(" ")`?</strong> Bare `split()` splits on any run of whitespace and drops empties; `split(" ")` splits on each single space and can produce empty strings.
+
+<strong>Is `str.format()` obsolete?</strong> Not obsolete, but f-strings are clearer for almost every case. `format` is still useful when the template comes from elsewhere, such as a config file.
+
+<strong>How do I pad a number with zeros?</strong> `f"{n:03d}"` gives '007'.
+
+<strong>Why does `"1" + 1` fail?</strong> Because Python is strongly typed and refuses to guess whether you meant "11" or 2. Convert explicitly.
+
+## Recap in one screen
+
+- Strings are immutable; every "modifying" method returns a new string.
+- Slicing works exactly as with lists, and the stop index is excluded.
+- Build text with `"".join(parts)`, not repeated `+=`.
+- Strip and case-normalise before comparing anything that came from a human or a file.
+- f-strings handle formatting, alignment and percentages, and `f"{x=}"` is a debugging shortcut.
+- Text is Unicode; files are bytes. Say `encoding="utf-8"` explicitly.

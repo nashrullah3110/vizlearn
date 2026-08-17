@@ -9,6 +9,87 @@ When you write <code class="mono-font">age = 36</code>, Python creates the value
 
 The type of a value decides what the operators mean. <code class="mono-font">+</code> on two <code class="mono-font">int</code>s adds them; <code class="mono-font">+</code> on two <code class="mono-font">str</code>s concatenates them. Neither is "wrong" — the behaviour follows the type. When a program does something surprising, nine times out of ten a value is a different type than you assumed, and <code class="mono-font">type()</code> settles it in one line.
 
+## A variable is a label, not a box
+
+Most explanations say a variable is a box that holds a value. Python does not work that way, and the difference explains several things that otherwise look like bugs.
+
+In Python a variable is a <strong>name attached to an object</strong>. Assignment does not copy anything into a container; it points a label at something that already exists.
+
+```python
+x = 10       # the label x now points at the integer object 10
+y = x        # y points at the same object
+x = 20       # x now points at a different object; y still points at 10
+print(y)     # 10
+```
+
+For numbers and strings this behaves exactly like the box picture, so nobody notices. For lists it does not:
+
+```python
+a = [1, 2, 3]
+b = a            # b is another label for the SAME list
+b.append(4)
+print(a)         # [1, 2, 3, 4]  -- a changed too
+```
+
+There is only one list, with two names. If you wanted a separate copy, you have to ask for one: `b = a.copy()` or `b = a[:]`.
+
+## The types you will use every day
+
+```python
+count    = 42                  # int    - whole numbers, unlimited size
+price    = 19.99               # float  - decimals, with rounding error
+name     = "Ada"               # str    - text, immutable
+is_ready = True                # bool   - True or False
+nothing  = None                # NoneType - the absence of a value
+items    = [1, 2, 3]           # list   - ordered, changeable
+point    = (10, 20)            # tuple  - ordered, unchangeable
+unique   = {1, 2, 3}           # set    - unordered, no duplicates
+person   = {"name": "Ada"}     # dict   - key to value
+```
+
+`type(x)` tells you what something is; `isinstance(x, int)` asks whether it is a particular type and is the one to use in real code, because it also accepts subclasses.
+
+Two properties matter more than the names:
+
+- <strong>Mutable or immutable.</strong> Lists, dicts and sets can be changed in place. Numbers, strings and tuples cannot &mdash; "changing" them creates a new object.
+- <strong>Ordered or not.</strong> Lists, tuples and (since Python 3.7) dicts keep their order. Sets do not.
+
+## Dynamic typing, and what it does not mean
+
+Python is <strong>dynamically typed</strong>: a name can point at an integer now and a string later, and nothing complains.
+
+```python
+value = 42
+value = "forty-two"     # perfectly legal
+```
+
+It is also <strong>strongly typed</strong>, which is a different thing and often confused with the first. Python will not silently mix types that do not belong together:
+
+```python
+"5" + 3        # TypeError: can only concatenate str (not "int") to str
+5 + 3          # 8
+"5" * 3        # '555'  -- legal, and probably not what you meant
+int("5") + 3   # 8      -- convert explicitly
+```
+
+That `TypeError` is a feature. A language that guessed here would turn a typo into a wrong answer instead of an error message.
+
+The most common place beginners meet it is user input: `input()` always returns a string, so `input("Age: ") + 1` fails and `int(input("Age: ")) + 1` works.
+
+## Type hints: saying what you meant
+
+Python 3 lets you annotate types. They are not enforced at runtime &mdash; the interpreter ignores them &mdash; but editors and tools such as mypy use them to catch mistakes before the code runs.
+
+```python
+def total_price(quantity: int, unit_price: float) -> float:
+    return quantity * unit_price
+
+names: list[str] = []
+lookup: dict[str, int] = {}
+```
+
+They are optional, and they pay off as soon as a file is read by someone other than the person who wrote it &mdash; including you, later. Start with function signatures; that is where most of the value is.
+
 ## Guided tour
 
 1. <strong>Read the outputs.</strong> In the first editor, check the order: the two values print, then their two types. The last line runs only after the first three have finished.
@@ -19,3 +100,86 @@ The type of a value decides what the operators mean. <code class="mono-font">+</
 ## The short of it
 
 A variable is a label, not a container. The type of the value it labels is chosen by Python, and it dictates behaviour — especially what <code class="mono-font">+</code> means. Whenever behaviour looks wrong, ask <code class="mono-font">type()</code> first; it is the single most useful question you can ask a running program.
+
+## Naming, and the rules that are not rules
+
+Python enforces very little about names: they must start with a letter or underscore, may contain letters, digits and underscores, and cannot be a keyword such as `class` or `for`.
+
+Convention does the rest, and following it makes your code readable to every other Python programmer:
+
+|Kind|Convention|Example|
+|---|---|---|
+|Variables and functions|lower_snake_case|`user_count`, `send_email`|
+|Constants|UPPER_SNAKE_CASE|`MAX_RETRIES`|
+|Classes|CapWords|`ShoppingCart`|
+|"Internal" names|Leading underscore|`_cache`|
+|Throwaway values|A single underscore|`for _ in range(3):`|
+
+Two habits worth forming early. Name things after what they mean, not what type they are &mdash; `user_count` beats `int_value`, and `customers` beats `list1`. And never shadow a builtin: assigning to `list`, `dict`, `str`, `id`, `type` or `sum` makes the original unavailable for the rest of the scope, and the resulting error appears far from the cause.
+
+## Converting between types
+
+```python
+int("42")        # 42
+int(3.99)        # 3      - truncates towards zero, does not round
+round(3.99)      # 4      - use this when you want rounding
+float("3.14")    # 3.14
+str(42)          # '42'
+bool(0)          # False
+list("abc")      # ['a', 'b', 'c']
+int("abc")       # ValueError - not a valid integer
+```
+
+`int()` truncating rather than rounding surprises people regularly: `int(9.99)` is 9, and if that is a price in pounds you have just lost almost a pound.
+
+`bool()` has rules worth memorising, because they drive every `if` statement: `0`, `0.0`, `""`, `[]`, `{}`, `()` and `None` are falsy; everything else is truthy. That is why `if items:` is the idiomatic way to ask "is this list non-empty".
+
+## Questions people ask
+
+<strong>Do I have to declare types?</strong> No. Type hints are optional and ignored at runtime; they exist for tools and readers.
+
+<strong>What is `None`?</strong> A single object meaning "no value". It is what a function returns when it has no `return` statement. Test for it with `is None`, not `== None`.
+
+<strong>Why does `0.1 + 0.2` give `0.30000000000000004`?</strong> Because floats are binary approximations and 0.1 has no exact binary form. Use the `decimal` module for money, or compare with `math.isclose` rather than `==`.
+
+<strong>When should I use a tuple instead of a list?</strong> When the contents should not change &mdash; coordinates, database rows, a function returning several values. Tuples can also be dictionary keys; lists cannot.
+
+<strong>Is there a limit on integer size?</strong> No. Python integers grow to whatever memory allows, which is why `2 ** 1000` just works.
+
+<strong>What does `id(x)` show?</strong> The object's identity &mdash; effectively its address. It is how you can prove two names point at the same object.
+
+## Recap in one screen
+
+- A variable is a name pointing at an object, not a box containing a value.
+- Assigning a mutable object to a second name gives you two names for one object.
+- Python is dynamically typed (names can change type) and strongly typed (it will not silently mix them).
+- `int()` truncates; `round()` rounds; `input()` always returns a string.
+- Falsy values: `0`, `""`, `[]`, `{}`, `()`, `None`. Everything else is truthy.
+- Type hints are optional documentation that tools can check.
+
+## Three habits that prevent most beginner bugs
+
+<strong>Convert input immediately.</strong> `input()` returns a string, always. Convert at the point of reading, not three functions later where the `TypeError` will be confusing:
+
+```python
+age = int(input("Age: "))          # fails immediately on bad input
+```
+
+Better still, handle the failure where it happens:
+
+```python
+try:
+    age = int(input("Age: "))
+except ValueError:
+    print("Please enter a whole number.")
+```
+
+<strong>Use `is` only for `None`, `True` and `False`.</strong> `is` asks whether two names point at the same object; `==` asks whether the values are equal. For small integers and short strings, Python reuses objects, so `a is b` sometimes appears to work for equality &mdash; and then stops working on larger values, which is a genuinely horrible bug to track down.
+
+```python
+if result is None:      # correct
+if name == "Ada":       # correct
+if count is 100:        # wrong, and a SyntaxWarning in modern Python
+```
+
+<strong>Print the type when confused.</strong> `print(type(x), repr(x))` answers more debugging questions than any amount of staring. `repr()` shows the quotes, so you can immediately see whether `5` is the number or the string.

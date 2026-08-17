@@ -11,6 +11,61 @@ That turning point is where the model stops learning generalisable structure and
 
 <p>Validation loss is noisy. Mini-batch sampling, dropout and a finite validation set mean it rises and falls between epochs even while the underlying trend is still improving. Stopping at the first increase would stop almost immediately and almost always too early.</p><strong>Patience</strong> is the number of epochs to keep training without improvement before giving up. With patience 10, the run continues 10 epochs past the best score and stops only if nothing beats it in that window.<p>The other half is restoring weights. Because training continued past the best point, the <em>final</em> weights are not the best weights &mdash; the best checkpoint must be saved when it occurs and reloaded at the end. Skipping that gives you a model that is deliberately <span class="mono-font">patience</span> epochs overfit.</p>
 
+## Stopping at the right moment
+
+Train a network long enough and training loss keeps falling while validation loss stops improving and then rises. That turning point is where the model stops learning the pattern and starts memorising the noise.
+
+Early stopping watches validation performance and halts when it stops improving. It is the cheapest regulariser available &mdash; free in compute, since it <em>saves</em> time &mdash; and it requires no tuning beyond one number.
+
+The mechanism has three parts:
+
+1. <strong>Monitor</strong> a validation metric after each epoch.
+2. <strong>Track the best</strong> value seen, and save a checkpoint whenever it improves.
+3. <strong>Stop</strong> when it has not improved for `patience` epochs, and restore the best checkpoint.
+
+That third detail is the one people miss. Stopping without restoring leaves you with the weights from `patience` epochs <em>past</em> the best point &mdash; the worst of both worlds.
+
+## Patience, and why it is not zero
+
+Validation loss is noisy. It dips and recovers, sometimes for several epochs, particularly with small validation sets or aggressive augmentation. Stopping at the first non-improvement would end most runs prematurely.
+
+|Patience|Behaviour|
+|---|---|
+|0&ndash;1|Stops on noise; almost always too early|
+|5&ndash;10|The usual range|
+|20+|For noisy metrics, or long schedules|
+
+Patience also interacts with the learning-rate schedule. With a cosine decay, the final low-rate epochs often produce a distinct improvement &mdash; so patience must be long enough to survive the plateau before it, or you will stop just short of the best result the schedule was building towards.
+
+```python
+best, wait = float("inf"), 0
+for epoch in range(max_epochs):
+    train_one_epoch()
+    val = validate()
+
+    if val < best - 1e-4:                 # min_delta: ignore trivial changes
+        best, wait = val, 0
+        torch.save(model.state_dict(), "best.pt")
+    else:
+        wait += 1
+        if wait >= patience:
+            break
+
+model.load_state_dict(torch.load("best.pt"))    # restore the best, not the last
+```
+
+## What to monitor
+
+Validation loss is the default, and it is not always the right choice.
+
+<strong>Loss</strong> is smooth and sensitive, which makes it a good early-stopping signal. But it can rise while accuracy holds steady &mdash; a model becoming overconfident on examples it already classifies correctly. Stopping there discards a model that was still improving on the thing you care about.
+
+<strong>The task metric</strong> &mdash; accuracy, F1, IoU, AUC &mdash; is what you will report, so stopping on it aligns the decision with the goal. It is noisier, so it needs more patience.
+
+The practical answer: monitor the metric that matters for the decision, with enough patience to ride out its noise, and log both.
+
+Note that the validation set is now part of the training procedure. Every early-stopping decision uses it, so its score is no longer an unbiased estimate of generalisation. Keep a separate test set for the number you report.
+
 ## Interactive Exploration Guide
 
 1. <strong>Watch the curves diverge.</strong> Press <strong>Start Training</strong> and follow both lines. They fall together, then separate &mdash; training keeps dropping while validation flattens and turns up. That gap is overfitting, drawn directly.
@@ -35,3 +90,55 @@ For linear models with gradient descent this can be made precise: early stopping
 ## Key takeaway
 
 Early stopping monitors validation loss, waits <span class="mono-font">patience</span> epochs after the best score, then halts and restores the best checkpoint. It regularises by limiting how far weights travel from initialisation &mdash; provably equivalent to L2 for linear models &mdash; and it costs nothing beyond the validation split you already have. The two things that make it fail are monitoring the wrong curve and forgetting to restore the best weights.
+
+## Why it works as a regulariser
+
+Early stopping is not merely a convenience. For linear models it is provably equivalent to L2 regularisation of a particular strength: limiting the number of gradient steps limits how far the weights can travel from their small initial values, which is exactly what a weight penalty does.
+
+The same intuition carries to networks. Weights grow during training, and larger weights mean sharper, more confident functions that fit finer detail &mdash; including noise. Stopping early keeps them smaller.
+
+That also explains why early stopping and weight decay partly overlap, and why adding both usually gives less than the sum of their individual effects.
+
+## Where it fits with the other regularisers
+
+|Method|Cost|Tuning|
+|---|---|---|
+|Early stopping|Negative &mdash; saves compute|One patience value|
+|Weight decay|Free|One coefficient|
+|Dropout|Slows convergence|One rate per layer group|
+|Augmentation|CPU time|Task-specific choices|
+
+Early stopping should essentially always be on. It costs nothing, it protects against the most common failure mode, and the checkpoint it keeps is the model you would have wanted anyway.
+
+The one situation where it is set aside is very large-scale pretraining, where a fixed step budget and a fixed schedule are decided in advance and the model is not trained to convergence at all &mdash; there is no overfitting to stop, because the data is effectively unlimited.
+
+## Common mistakes
+
+- <strong>Not restoring the best checkpoint,</strong> which discards the whole benefit.
+- <strong>Patience of one,</strong> stopping on noise.
+- <strong>Monitoring training loss,</strong> which never rises and so never triggers.
+- <strong>Using the test set to decide when to stop,</strong> which makes the test score optimistic.
+- <strong>A validation set too small</strong> to give a stable signal &mdash; a few hundred examples produce metrics that swing by several percent.
+- <strong>Stopping before a scheduled learning-rate drop</strong> has had a chance to help.
+
+## Questions people ask
+
+<strong>What patience should I use?</strong> 5&ndash;10 epochs for most work; more if the metric is noisy or the schedule is long.
+
+<strong>Should I monitor loss or accuracy?</strong> Whichever you will report, with patience matched to its noise. Log both.
+
+<strong>Does early stopping replace other regularisation?</strong> No. It complements weight decay and augmentation, and overlaps partly with weight decay.
+
+<strong>Can I combine it with a learning-rate schedule?</strong> Yes, and reduce-on-plateau plus early stopping is a common pairing &mdash; cut the rate on the first plateau, stop on the second.
+
+<strong>Should I retrain on train plus validation afterwards?</strong> Some do, for the extra data, using the epoch count found by early stopping. It gives up the ability to detect that the retrained model is worse, so it is a judgement call.
+
+<strong>What is `min_delta` for?</strong> To ignore improvements too small to be meaningful, so a metric creeping by 1e-6 does not reset the patience counter for ever.
+
+## Recap in one screen
+
+- Watch validation performance, keep the best checkpoint, and stop when it stops improving.
+- Restore the best weights &mdash; stopping without restoring is the common mistake.
+- Patience of 5&ndash;10 epochs rides out normal noise; patience of 1 stops on it.
+- Monitor the metric you will report, since loss and accuracy can diverge.
+- It is provably related to L2 regularisation, costs nothing, and should almost always be enabled.

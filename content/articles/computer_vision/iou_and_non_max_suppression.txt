@@ -9,6 +9,58 @@ A detector's region proposal stage doesn't stop at one box per object — it sco
 
 NMS turns that overlap score into a cleanup rule. Sort every proposal by confidence, descending. Take the top one, keep it, and discard every remaining box whose IoU with it exceeds a threshold — those are treated as duplicate detections of the same object. Move to the next surviving box by confidence and repeat, until nothing is left to process. The threshold is the only knob: too low and boxes on genuinely different but nearby objects get merged into one; too high and duplicate boxes on the same object all survive.
 
+## Measuring overlap with one number
+
+IoU compares two boxes by dividing the area they share by the area they cover together:
+
+<p class="mono-font">IoU = intersection / union</p>
+
+Worked through. Box A spans (0, 0) to (100, 100); box B spans (50, 50) to (150, 150).
+
+- Intersection: from (50, 50) to (100, 100) &mdash; 50 &times; 50 = <strong>2,500</strong>.
+- Union: 10,000 + 10,000 &minus; 2,500 = <strong>17,500</strong>.
+- IoU = 2,500 / 17,500 = <strong>0.14</strong>.
+
+Reading the scale:
+
+|IoU|Interpretation|
+|---|---|
+|&gt; 0.9|Near-perfect box|
+|0.7&ndash;0.9|Good localisation|
+|0.5&ndash;0.7|Acceptable by the traditional threshold|
+|&lt; 0.5|Usually counted as a miss|
+|0|No overlap at all|
+
+Two properties make it the standard measure. It is scale-invariant &mdash; a 20-pixel error on a small object scores the same as a proportionally similar error on a large one &mdash; and it is bounded, so it can be thresholded and averaged.
+
+```python
+def iou(a, b):
+    x1, y1 = max(a[0], b[0]), max(a[1], b[1])
+    x2, y2 = min(a[2], b[2]), min(a[3], b[3])
+    inter = max(0, x2 - x1) * max(0, y2 - y1)
+    area_a = (a[2] - a[0]) * (a[3] - a[1])
+    area_b = (b[2] - b[0]) * (b[3] - b[1])
+    return inter / (area_a + area_b - inter)
+```
+
+The two `max(0, ...)` calls are what handle boxes that do not overlap; without them a negative width times a negative height produces a positive area and a nonsensical result.
+
+## Non-maximum suppression, step by step
+
+A detector fires at many nearby positions, so one object produces a cluster of boxes. NMS reduces each cluster to one.
+
+1. Discard every box below a confidence threshold.
+2. Sort the rest by confidence, highest first.
+3. Take the top box and keep it.
+4. Remove every remaining box whose IoU with it exceeds the NMS threshold.
+5. Repeat from step 3 with what is left.
+
+Two thresholds control the outcome, and they do different jobs. The <strong>confidence threshold</strong> decides how sure the model must be before a box is considered at all &mdash; raise it for fewer false positives, lower it for better recall. The <strong>NMS IoU threshold</strong> decides how much overlap counts as a duplicate; 0.45&ndash;0.5 is typical.
+
+The failure mode is genuinely overlapping objects: two people standing close together produce boxes with high IoU, and standard NMS deletes one of them. <strong>Soft-NMS</strong> addresses this by reducing the confidence of overlapping boxes rather than deleting them outright, so a strong second detection can still survive.
+
+Note also that NMS is applied <em>per class</em> in most implementations &mdash; a dog box and a person box overlapping heavily are not duplicates of each other.
+
 ## Try it yourself
 
 1. <strong>Read the stage at the default threshold.</strong> Box A (confidence 0.95) is kept. Box D, a separate object with no real overlap with A, is also kept. Boxes B and C overlap A too heavily and are suppressed as duplicates.
@@ -19,3 +71,53 @@ NMS turns that overlap score into a cleanup rule. Sort every proposal by confide
 ## The short of it
 
 IoU is a pure geometry calculation — it knows nothing about confidence or class. NMS is the policy layer that uses it: keep the most confident box, discard anything that overlaps it past a threshold, repeat. Set the threshold too low and it merges distinct nearby objects into one detection; set it too high and duplicate boxes on the same object all survive. Every object detector that outputs boxes runs some form of this after its raw proposals come out.
+
+## IoU as a loss function
+
+Since IoU is what evaluation measures, training directly on it is appealing &mdash; and it took several iterations to make it work.
+
+Plain IoU has a fatal gradient problem: when two boxes do not overlap at all, IoU is 0 for every possible position, so there is no gradient telling the box which way to move. Three refinements fix it:
+
+- <strong>GIoU</strong> adds a penalty based on the smallest box enclosing both, so non-overlapping boxes still receive a useful gradient.
+- <strong>DIoU</strong> adds a term for the distance between the box centres, which converges faster.
+- <strong>CIoU</strong> adds an aspect-ratio term as well, and is the default regression loss in several modern detectors.
+
+The alternative, still widely used, is smooth L1 on the coordinates &mdash; simple and stable, but it optimises a proxy rather than the metric, and it treats a 10-pixel error the same on a small object as on a large one.
+
+## Where IoU appears beyond detection
+
+- <strong>Assigning anchors during training.</strong> An anchor box is treated as a positive example if its IoU with a ground-truth box exceeds a threshold, and as background below a lower one. Anchors in between are ignored.
+- <strong>Segmentation.</strong> The same ratio computed over pixel masks rather than boxes is the Jaccard index, and mean IoU is the standard segmentation metric.
+- <strong>Tracking.</strong> Frame-to-frame association is usually IoU-based &mdash; a detection is matched to the track whose last box it overlaps most.
+- <strong>Evaluation at several thresholds.</strong> COCO's primary metric averages mAP over IoU thresholds from 0.5 to 0.95, which is what makes it reward tight boxes rather than approximate ones.
+
+## Common mistakes
+
+- <strong>Forgetting to clamp negative overlaps</strong>, giving a positive intersection for disjoint boxes.
+- <strong>Mixing box formats.</strong> Applying corner-format code to centre-format boxes produces plausible-looking nonsense.
+- <strong>Running NMS across classes</strong> when it should be per class, deleting legitimate detections of different objects.
+- <strong>An NMS threshold that is too low</strong>, which removes genuine nearby objects; or too high, which leaves duplicates.
+- <strong>Tuning the confidence threshold on the test set</strong> rather than on validation data.
+- <strong>Assuming NMS is cheap.</strong> With tens of thousands of candidate boxes it can dominate inference time; batched GPU implementations exist for this reason.
+
+## Questions people ask
+
+<strong>What IoU threshold means "correct"?</strong> 0.5 by the Pascal VOC convention. COCO averages from 0.5 to 0.95 in steps of 0.05, which is stricter and now more standard.
+
+<strong>Can IoU exceed 1?</strong> No &mdash; the intersection can never exceed the union.
+
+<strong>Is NMS still needed?</strong> For most detectors, yes. DETR-style set-prediction models avoid it by design, which is one of their main attractions.
+
+<strong>How do I handle heavily overlapping objects?</strong> Soft-NMS, a higher NMS threshold, or an architecture that predicts a set directly.
+
+<strong>Should I train with an IoU-based loss?</strong> CIoU or DIoU generally beats smooth L1 on localisation quality, and both are readily available in modern detection libraries.
+
+<strong>Why is my mAP low despite good-looking boxes?</strong> Often the strict IoU thresholds: boxes that look right to a human may score 0.6, which passes at 0.5 and fails at 0.75.
+
+## Recap in one screen
+
+- IoU is overlap divided by union &mdash; scale-invariant, bounded between 0 and 1.
+- Clamp negative overlaps to zero, or disjoint boxes report a false positive area.
+- NMS keeps the highest-confidence box and removes overlapping duplicates, per class.
+- Two thresholds matter: confidence (how sure) and NMS IoU (how much overlap is a duplicate).
+- GIoU, DIoU and CIoU make IoU usable as a training loss by supplying gradients when boxes do not overlap.

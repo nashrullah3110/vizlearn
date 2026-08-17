@@ -13,6 +13,50 @@ Because the bottleneck cannot carry everything, the network is forced to decide 
 
 If those 8 features are genuinely independent, the reconstruction will be poor &mdash; there is nothing to compress. If several are correlated, as real features usually are, the network finds those relationships and reconstruction gets surprisingly close. The loss is simply <span class="mono-font">MSE(input, reconstruction)</span>.
 
+## Learning without labels
+
+Supervised learning needs a target for every example. Most data has none &mdash; and labelling it is the expensive part of every project.
+
+Unsupervised methods learn structure from the data itself. For neural networks the dominant trick is to <strong>invent a target from the input</strong>, so that ordinary supervised machinery can be used on unlabelled data. That reframing is called self-supervision, and it is what made modern language and vision pretraining possible.
+
+The main families:
+
+|Approach|Invented target|Used for|
+|---|---|---|
+|Autoencoder|Reconstruct the input|Compression, denoising, anomaly detection|
+|Masked prediction|Predict hidden parts|BERT, MAE &mdash; pretraining|
+|Next-token prediction|Predict what follows|Language models|
+|Contrastive|Are these two views the same item?|SimCLR, CLIP &mdash; representation learning|
+|Generative (VAE, GAN, diffusion)|Produce plausible samples|Image and audio generation|
+
+## Autoencoders, and why the bottleneck matters
+
+An autoencoder is two networks back to back. The <strong>encoder</strong> compresses the input into a small vector; the <strong>decoder</strong> reconstructs the input from it. The loss is reconstruction error &mdash; how different the output is from the input.
+
+<p class="mono-font">x &rarr; encoder &rarr; z (small) &rarr; decoder &rarr; x&#770;&nbsp;&nbsp;&nbsp;&nbsp;loss = &#8214;x&#770; &minus; x&#8214;&sup2;</p>
+
+The bottleneck is the whole design. Force 784 pixels through a 32-dimensional vector and the network cannot memorise; it must find the structure that lets it rebuild the input from 32 numbers. Those 32 numbers are a learned compression of the data.
+
+Remove the bottleneck &mdash; make `z` as large as the input &mdash; and the network learns the identity function, which teaches it nothing. Constraint is what creates the representation.
+
+Three practical uses:
+
+<strong>Anomaly detection.</strong> Train on normal data only. Anything that reconstructs badly is unlike what the model has seen, and reconstruction error becomes an anomaly score. This is one of the most widely deployed unsupervised techniques in industry.
+
+<strong>Denoising.</strong> Feed a corrupted input and ask for the clean original. The network cannot copy its input, so it must learn what the data should look like.
+
+<strong>Dimensionality reduction.</strong> A non-linear alternative to PCA. With linear activations and squared error, an autoencoder recovers the PCA subspace exactly &mdash; so it is a strict generalisation.
+
+## Contrastive learning, and why it dominates
+
+The idea: take two augmented views of the same image, and train the network to produce similar embeddings for them and dissimilar embeddings for views of <em>different</em> images.
+
+No labels are needed &mdash; the supervision comes entirely from knowing which pairs came from the same source. What the network learns is what is invariant under the augmentations you chose: crop it, recolour it, flip it, and it is still the same object.
+
+That last point is the crux. <strong>The augmentations define what the representation considers important.</strong> Include colour jitter and the model learns colour-invariant features, which is right for object recognition and wrong for distinguishing ripe from unripe fruit.
+
+Contrastive pretraining on unlabelled data followed by fine-tuning on a small labelled set routinely beats training from scratch on the labelled set alone, and in specialised domains it beats ImageNet initialisation too. CLIP extends the idea across modalities, matching images with their captions, which is what gives it zero-shot classification.
+
 ## Try this above
 
 1. Set <strong>Input Features</strong> to 8 and squeeze the hidden layer to 2. A hard compression &mdash; only the strongest structure survives.
@@ -26,3 +70,45 @@ If those 8 features are genuinely independent, the reconstruction will be poor &
 ## In one line
 
 No labels needed &mdash; make the input the target and let a narrow layer decide what was worth keeping.
+
+## Variational autoencoders and generative models
+
+A plain autoencoder's latent space has gaps: pick a random point in it and the decoder produces nonsense, because nothing constrained the space to be continuous.
+
+A <strong>variational autoencoder</strong> fixes that by having the encoder output a distribution rather than a point, and adding a KL divergence term that pulls those distributions towards a standard normal. The latent space becomes smooth and samplable, so you can generate new examples by drawing a random point and decoding it.
+
+The trade is sharpness: VAE samples tend to be blurry, because the reconstruction loss rewards the average of plausible outputs.
+
+<strong>GANs</strong> take a different route &mdash; a generator and a discriminator trained against each other &mdash; producing sharper samples at the cost of unstable training and mode collapse. <strong>Diffusion models</strong> learn to reverse a gradual noising process, and now dominate image generation on quality and stability alike.
+
+All three are unsupervised in the same sense: the training signal comes from the data, not from labels.
+
+## Clustering, and where networks fit
+
+Classical clustering &mdash; k-means, DBSCAN, hierarchical &mdash; operates on the raw features and struggles on high-dimensional unstructured data, because distances there are not meaningful.
+
+The standard modern pipeline is two stages: <strong>learn a representation</strong> with a self-supervised network, then <strong>cluster in that embedding space</strong> with an ordinary algorithm. Images that look alike land near each other in the embedding, so k-means on embeddings finds groups that k-means on pixels never could.
+
+Deep clustering methods (DEC and successors) train the representation and the clustering jointly, which can work better and is considerably more fiddly.
+
+## Questions people ask
+
+<strong>Is self-supervised learning the same as unsupervised?</strong> Self-supervision is a subset: it invents labels from the data. The training loop is then fully supervised.
+
+<strong>How small should an autoencoder's bottleneck be?</strong> Small enough to force compression. Treat it as a hyperparameter, and watch reconstruction quality against the downstream task.
+
+<strong>Are autoencoders good for anomaly detection?</strong> Yes, and with a caveat: train on normal data only, and be aware that a sufficiently flexible autoencoder can learn to reconstruct anomalies too.
+
+<strong>Should I use PCA or an autoencoder?</strong> PCA first &mdash; it is faster, deterministic and interpretable. An autoencoder wins when the structure is genuinely non-linear and there is enough data.
+
+<strong>Do I still need labels?</strong> For the final task, usually a few. The point of pretraining is that a small labelled set becomes sufficient.
+
+<strong>Which self-supervised method should I use?</strong> For images, a contrastive or masked-image approach; for text, masked or next-token prediction. Or start from a published pretrained model rather than doing it yourself.
+
+## Recap in one screen
+
+- Unsupervised networks invent a target from the input, so supervised machinery can learn from unlabelled data.
+- Autoencoders reconstruct their input through a bottleneck; the constraint is what forces a useful representation.
+- Reconstruction error is a practical anomaly score, and denoising autoencoders learn what clean data looks like.
+- Contrastive learning trains views of the same item to embed together &mdash; and your augmentations decide what the representation ignores.
+- VAEs, GANs and diffusion models generate; pretrain then fine-tune is the standard way to exploit unlabelled data.

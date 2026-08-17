@@ -34,6 +34,69 @@ So the dot product is really asking: <em>how far along a does b reach?</em> That
 - <strong>Cosine similarity</strong> is the dot product of two unit-length vectors &mdash; the angle alone, with magnitude divided out.
 - <strong>Matrix multiplication</strong> is nothing but a grid of dot products, which is the next module.
 
+## A vector is a list of numbers with a direction
+
+In machine learning a vector is simply an ordered list of numbers &mdash; and each number is a measurement of something.
+
+<p class="mono-font">house = [120, 3, 2, 1995]&nbsp;&nbsp;&nbsp;(sq m, bedrooms, bathrooms, year)</p>
+
+Geometrically, that list is an arrow from the origin to a point in four-dimensional space. Nobody can picture four dimensions, and it does not matter: every operation is defined arithmetically and behaves the same way in 2 dimensions as in 768.
+
+Two operations are all you need to start:
+
+```python
+import numpy as np
+a = np.array([3, 4])
+b = np.array([1, 2])
+
+a + b        # [4, 6]     - add corresponding entries
+3 * a        # [9, 12]    - scale every entry
+np.linalg.norm(a)   # 5.0 - the length, sqrt(3^2 + 4^2)
+```
+
+The length (or norm) is Pythagoras extended to any number of dimensions: square every entry, add them, take the square root.
+
+## The dot product, and the two ways to read it
+
+<p class="mono-font">a &middot; b = a&#8321;b&#8321; + a&#8322;b&#8322; + &hellip; + a&#8345;b&#8345;</p>
+
+For [3, 4] and [1, 2]: 3&times;1 + 4&times;2 = 3 + 8 = <strong>11</strong>. Multiply matching entries, add them all up, get a single number.
+
+The second reading is geometric, and it is where the meaning lives:
+
+<p class="mono-font">a &middot; b = |a| |b| cos&theta;</p>
+
+The dot product is the product of the two lengths times the cosine of the angle between them. That gives an immediate interpretation of its sign:
+
+|Dot product|Angle|Meaning|
+|---|---|---|
+|Large positive|Near 0&deg;|Pointing the same way|
+|Zero|Exactly 90&deg;|Perpendicular &mdash; no shared direction|
+|Large negative|Near 180&deg;|Pointing opposite ways|
+
+The zero case is the most useful fact in the whole topic: <strong>a dot product of zero means the vectors are at right angles</strong>. That single test underpins orthogonality, projections, PCA components and the independence of basis directions.
+
+## Where it appears in machine learning
+
+- <strong>A neuron.</strong> `z = w · x + b` is a dot product between the weights and the inputs. Everything a network computes is built from this.
+- <strong>Similarity.</strong> Cosine similarity is the dot product with the lengths divided out, which is how search, recommendation and retrieval systems compare embeddings.
+- <strong>Projection.</strong> How much of one vector lies along another is a dot product.
+- <strong>Matrix multiplication.</strong> Every entry of a matrix product is a dot product between a row and a column.
+
+The scale of it is worth noticing: a single forward pass of a large language model is billions of dot products, and nothing more exotic.
+
+## Normalising, and why it matters
+
+Dividing a vector by its length gives a <strong>unit vector</strong> &mdash; same direction, length exactly 1.
+
+```python
+unit = a / np.linalg.norm(a)      # [0.6, 0.8], length 1
+```
+
+This matters because raw dot products mix two things: how aligned the vectors are, and how long they are. A long vector scores highly against everything. Normalise first and the dot product measures only alignment &mdash; which is exactly cosine similarity.
+
+That is why embedding libraries normalise vectors on the way in and then use plain dot products: on unit vectors the two are the same number, and a dot product is faster.
+
 ## Experiments to try
 
 1. <strong>Drag b in a circle around a</strong> at constant length. The dot product traces a cosine wave: maximum when aligned, zero at right angles, most negative when opposed.
@@ -44,3 +107,46 @@ So the dot product is really asking: <em>how far along a does b reach?</em> That
 ## Worth remembering
 
 Multiply matching components and add. The result is positive when two vectors agree, zero when they are unrelated, and negative when they oppose &mdash; a single number capturing alignment, and the atom from which matrix multiplication, attention and similarity search are all built.
+
+## Vectors in two, three and seven hundred dimensions
+
+Everything above is defined by arithmetic, not by pictures, which is why it survives the jump to high dimensions unchanged. A sentence embedding with 768 entries has a length, an angle to every other embedding, and a dot product with each of them, computed by exactly the formulas above.
+
+What does change is intuition, and two effects are worth knowing.
+
+<strong>Distances concentrate.</strong> In very high dimensions, the distance between the nearest pair of random points and the furthest pair becomes proportionally similar. "Nearest neighbour" gets less meaningful, which is why KNN degrades and why dimensionality reduction before distance-based methods is standard practice.
+
+<strong>Random vectors are nearly orthogonal.</strong> Pick two random directions in 1000 dimensions and their dot product is almost certainly close to zero. There is simply an enormous amount of room, which is part of why high-dimensional embeddings can store so many distinguishable concepts.
+
+## Other products, and what they are for
+
+|Operation|Input|Output|Use|
+|---|---|---|---|
+|Dot product|Two vectors|One number|Similarity, projection, neurons|
+|Elementwise product|Two vectors|A vector|Masking, gating in LSTMs|
+|Cross product|Two 3D vectors|A vector at right angles to both|Geometry, graphics, physics|
+|Outer product|Two vectors|A matrix|Building rank-1 updates, attention maths|
+
+The cross product only exists in three dimensions (and seven, for exotic reasons), which is why it appears in graphics and almost never in machine learning.
+
+## Questions people ask
+
+<strong>Is a vector the same as an array?</strong> In code, effectively yes &mdash; a 1-D NumPy array. Mathematically a vector also carries the idea of direction and magnitude.
+
+<strong>Row vector or column vector?</strong> Maths convention is columns; NumPy's 1-D arrays are neither, and broadcast sensibly in both roles. It matters as soon as you write matrix products by hand.
+
+<strong>What does a negative dot product mean?</strong> The vectors point in broadly opposite directions &mdash; more than 90&deg; apart.
+
+<strong>Why normalise before comparing?</strong> Otherwise long vectors score highly against everything, and you are measuring magnitude rather than similarity.
+
+<strong>Is the dot product the same as cosine similarity?</strong> Only for unit vectors. In general, cosine similarity is the dot product divided by both lengths.
+
+<strong>How is this related to matrix multiplication?</strong> Every entry in a matrix product is a dot product between a row of the first matrix and a column of the second.
+
+## Recap in one screen
+
+- A vector is an ordered list of numbers, and geometrically an arrow with length and direction.
+- The dot product multiplies matching entries and sums them &mdash; one number out.
+- Geometrically it is `|a||b|cos&theta;`: positive means aligned, zero means perpendicular, negative means opposed.
+- Normalising to length 1 turns the dot product into pure similarity, which is cosine similarity.
+- A neuron, a similarity search and every entry of a matrix product are all dot products.

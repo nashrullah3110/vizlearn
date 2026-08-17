@@ -17,6 +17,59 @@ Read them as costs. Entropy is the unavoidable cost of the randomness in p. Cros
 
 Because H(p) does not depend on q at all, minimising cross-entropy over your model and minimising KL are the same optimisation. That is the reason the loss is written as cross-entropy even though the quantity anyone cares about is the divergence.
 
+## Measuring how wrong a predicted distribution is
+
+Cross-entropy compares two probability distributions: the true one, `p`, and the model's, `q`.
+
+<p class="mono-font">H(p, q) = &minus;&Sigma; p(x) log q(x)</p>
+
+For classification the true distribution is one-hot &mdash; all the probability on the correct class &mdash; so the sum collapses to a single term:
+
+<p class="mono-font">loss = &minus;log(probability the model gave the correct class)</p>
+
+That is the whole loss function, and its behaviour is easy to read off:
+
+|Predicted probability for the true class|Loss|
+|---|---|
+|0.99|0.01|
+|0.90|0.11|
+|0.50|0.69|
+|0.10|2.30|
+|0.01|4.61|
+|0.001|6.91|
+
+The penalty grows without bound as the prediction approaches zero. A model that is <em>confidently wrong</em> is punished far harder than one that is merely uncertain, which is exactly the incentive you want when the output is meant to be a probability.
+
+Compare with squared error, where being wrong by 1.0 caps the penalty at 1.0. That is why cross-entropy trains classifiers faster: its gradient stays large where the model is badly wrong, while squared error's gradient shrinks precisely there.
+
+## Entropy, cross-entropy and KL, in one relationship
+
+Three quantities that are constantly confused, and one equation that separates them:
+
+<p class="mono-font">H(p, q) = H(p) + D<sub>KL</sub>(p &#8214; q)</p>
+
+- <strong>H(p)</strong>, entropy: the irreducible uncertainty in the true distribution. You cannot do better than this.
+- <strong>D<sub>KL</sub>(p‖q)</strong>, KL divergence: the <em>extra</em> cost of using q when the truth is p. Zero when they match, positive otherwise.
+- <strong>H(p, q)</strong>, cross-entropy: the total cost, which is the sum of the two.
+
+Since H(p) does not depend on the model, minimising cross-entropy is exactly minimising KL divergence. Frameworks optimise the first because it is simpler to compute; the second is what it means.
+
+The coding interpretation makes it concrete. Entropy is the average number of bits needed to encode outcomes using an optimal code for p. Cross-entropy is the average when you use a code designed for q instead. KL divergence is the waste.
+
+## KL divergence is not a distance
+
+<p class="mono-font">D<sub>KL</sub>(p &#8214; q) &ne; D<sub>KL</sub>(q &#8214; p)</p>
+
+The asymmetry is not a technicality &mdash; it changes the behaviour of models built on it.
+
+<strong>Forward KL, D(p‖q)</strong>, is heavily penalised wherever p has mass and q has almost none. Minimising it makes q spread out to cover everything the truth does &mdash; <em>mode-covering</em>, at the cost of putting probability in places nothing happens.
+
+<strong>Reverse KL, D(q‖p)</strong>, punishes q for putting mass where p has none. Minimising it makes q concentrate on one region and ignore the others &mdash; <em>mode-seeking</em>.
+
+Variational autoencoders minimise reverse KL, which is part of why their samples can be blurry and why they sometimes ignore modes. Maximum likelihood training is forward KL, which is why language models trained this way assign small but non-zero probability to almost everything.
+
+When a symmetric measure is genuinely needed, Jensen-Shannon divergence &mdash; the average of both directions against their mixture &mdash; is the standard choice, and its square root is a true metric.
+
 ## Things to try
 
 1. <strong>Read the default.</strong> p is 60/20/15/5 with an entropy of 1.533 bits. q is 40/30/20/10, so the cross-entropy is 1.655 and 0.122 bits per symbol are being wasted.
@@ -52,3 +105,52 @@ KL(q ‖ p) &mdash; the "reverse" direction, which shows up in variational infer
 ## Where that leaves you
 
 Cross-entropy H(p, q) is what your beliefs cost when reality is p, entropy H(p) is the part of that cost no model could avoid, and the KL divergence is the difference &mdash; the waste that is genuinely your model's fault. KL is never negative and is zero only when q matches p exactly, so minimising cross-entropy and minimising divergence are the same job. With a one-hot label it collapses to &minus;log of the probability given to the right class, which is why classification loss, negative log likelihood and maximum likelihood are three names for one thing. It is not symmetric, and a single zero in q where p is non-zero sends it to infinity.
+
+## Using it correctly in code
+
+Two implementation details cause most of the problems in practice.
+
+<strong>Pass logits, not probabilities.</strong> Computing a softmax yourself and then taking a log is numerically fragile: large logits overflow the exponential, small probabilities underflow before the log sees them. Frameworks provide fused, stable versions:
+
+```python
+import torch.nn as nn
+
+loss = nn.CrossEntropyLoss()        # expects raw logits, applies log-softmax
+loss = nn.BCEWithLogitsLoss()       # binary version, also expects logits
+```
+
+`nn.CrossEntropyLoss` combines `log_softmax` and negative log-likelihood in one numerically stable step. Using `nn.NLLLoss` after a manual softmax is the classic double-softmax bug: the model trains slowly and never quite works, with no error message.
+
+<strong>Guard the log.</strong> If you must write it yourself, add a small epsilon: `-log(p + 1e-12)`. Without it, a single prediction of exactly zero produces infinity and then `NaN` for the whole batch.
+
+Two variants worth knowing: <strong>binary cross-entropy</strong> for two-class and multi-label problems (one sigmoid per label, not a softmax), and <strong>categorical cross-entropy</strong> for mutually exclusive classes. Choosing softmax for a multi-label problem is a common modelling error &mdash; softmax forces the outputs to sum to 1, which is wrong when several labels can be true at once.
+
+## Where KL divergence turns up
+
+- <strong>Variational autoencoders</strong> add a KL term pulling the learned latent distribution towards a standard normal, which is what makes the latent space smooth enough to sample from.
+- <strong>Knowledge distillation</strong> minimises the KL between a large teacher's output distribution and a small student's, which transfers far more information per example than hard labels.
+- <strong>Reinforcement learning from human feedback</strong> uses a KL penalty to keep a fine-tuned policy close to the original model, preventing it from drifting into degenerate text that games the reward.
+- <strong>Drift detection</strong> compares the distribution of production inputs against the training distribution; a rising KL or PSI is the alarm.
+- <strong>Bayesian inference</strong> approximates an intractable posterior by minimising KL to a tractable family &mdash; the "variational" in variational inference.
+
+## Questions people ask
+
+<strong>Why not use accuracy as the loss?</strong> Accuracy is a step function of the predictions, so its gradient is zero almost everywhere. There is nothing for gradient descent to follow. Train on cross-entropy, evaluate on accuracy.
+
+<strong>Can cross-entropy be zero?</strong> Only if the model puts probability 1 on the correct class. In practice it approaches but never reaches zero.
+
+<strong>What if my loss is `NaN`?</strong> Almost always a `log(0)`, an overflow in the exponential, or a learning rate high enough to send weights to infinity. Use the fused loss functions and check the learning rate.
+
+<strong>Why is my loss around 2.3 at the start?</strong> Because ln(10) = 2.30 &mdash; a model predicting uniformly across 10 classes. Seeing exactly that at initialisation is a healthy sign; not seeing it suggests a bug.
+
+<strong>Is KL divergence ever negative?</strong> No, never &mdash; it is zero only when the distributions are identical.
+
+<strong>What is label smoothing doing to this?</strong> It replaces the one-hot target with a slightly softened distribution, so the model is no longer pushed towards infinite confidence. It usually improves calibration at a small cost in training accuracy.
+
+## Recap in one screen
+
+- Cross-entropy is `-log(probability given to the correct class)`, and it punishes confident mistakes without limit.
+- Cross-entropy = entropy + KL divergence, so minimising one minimises the other.
+- KL is asymmetric: forward KL covers all the modes, reverse KL concentrates on one.
+- Always pass logits to the framework's fused loss; never hand-roll softmax followed by log.
+- KL powers VAEs, distillation, RLHF penalties, drift detection and variational inference.

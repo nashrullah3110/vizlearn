@@ -14,6 +14,53 @@ Let's look at the math for the simple interactive above. We have a 4x4 input gri
 
 For a real-world 1080p image, a Dense layer would require trillions of parameters. A CNN might only require a few hundred. Parameter sharing makes image processing computationally possible.
 
+## One filter, used everywhere
+
+A dense layer gives every input pixel its own weight to every output unit. A convolutional layer does something quite different: it learns one small filter and applies that <em>same</em> filter at every position in the image.
+
+The arithmetic is where the argument lives. For a 224&times;224&times;3 input into 1,000 units:
+
+|Layer type|Parameters|
+|---|---|
+|Dense|150,528 &times; 1,000 = <strong>150,528,000</strong>|
+|Conv, 64 filters of 3&times;3&times;3|64 &times; (27 + 1) = <strong>1,792</strong>|
+
+Four orders of magnitude, and the convolutional version performs better. That is not a trade-off; it is a strictly better design for images, and the reason is that it encodes a true fact about them.
+
+## The assumption behind it
+
+Parameter sharing works because of <strong>translation invariance of statistics</strong>: a vertical edge in the top-left corner of a photograph looks exactly like a vertical edge in the bottom-right. The pattern is the same wherever it appears.
+
+If that is true, learning a separate edge detector for every position is not just wasteful &mdash; it is actively harmful, because each position's detector sees only the examples that happened to fall there. Sharing means every position's examples train the same filter, so the filter sees the whole dataset rather than a slice of it.
+
+Three consequences follow directly:
+
+<strong>Fewer parameters.</strong> Less memory, less computation, and far less overfitting for a given amount of data.
+
+<strong>Translation equivariance.</strong> Shift the input and the feature map shifts identically. A network does not need to see cats in every position to detect them everywhere.
+
+<strong>Better data efficiency.</strong> Every occurrence of a pattern anywhere in any image contributes to learning that one filter.
+
+## Where the assumption fails
+
+It is worth knowing the cases, because they explain several real architectures.
+
+<strong>Position genuinely matters in some domains.</strong> In a face-alignment task where images are cropped and centred, eyes are always near the top and mouths near the bottom. <em>Locally connected layers</em> &mdash; local receptive fields without sharing &mdash; were used in early face recognition work for exactly this reason, and they need far more data.
+
+<strong>Vision transformers need position told to them.</strong> Attention has no built-in notion of location at all, so transformers add explicit positional embeddings. They trade the convolutional prior for flexibility, which is why they need substantially more data to reach the same accuracy without pretraining.
+
+<strong>Coordinate information is sometimes required.</strong> Tasks that must reason about absolute position benefit from appending coordinate channels to the input &mdash; the CoordConv trick &mdash; because pure convolution deliberately discards that information.
+
+## Sharing in other architectures
+
+The same principle, applied along a different axis, appears throughout deep learning:
+
+- <strong>Recurrent networks</strong> share weights across time steps. One set of weights processes every position in a sequence, which is why an RNN handles variable-length input.
+- <strong>Transformers</strong> share the same feed-forward and attention weights across all token positions within a layer.
+- <strong>Graph neural networks</strong> share weights across nodes, so one learned message function applies to every vertex.
+
+The unifying idea: wherever the same kind of structure repeats, share the parameters that process it. It is one of the most reliable ways to build a useful inductive bias into a model.
+
 ## Guided Experiments with This Interactive
 
 1. <strong>Watch the Colors:</strong> <p class="font-light opacity-80 mt-1">Click the <strong>Slide Filter</strong> button. Watch the formula in the center column. The 4 weights are color-coded (Red, Blue, Yellow, Purple). Notice that as the green highlight box slides across different areas of the Input Image, the <em>exact same colored weights</em> are used over and over again to do the multiplication.</p>
@@ -32,3 +79,57 @@ A single Convolutional layer usually has many filters (e.g., 32 filters). Filter
 - It drastically reduces memory and computation requirements.
 - It forces the network to learn global patterns (Translation Invariance).
 - It prevents severe overfitting by heavily restricting the number of variables the model can memorize.
+
+## Counting parameters properly
+
+The formula for a convolutional layer:
+
+<p class="mono-font">params = (kernel_h &times; kernel_w &times; in_channels + 1) &times; out_channels</p>
+
+The `+1` is the bias, one per filter. The crucial detail people miss is that each filter spans <em>all</em> input channels &mdash; a 3&times;3 filter on a 64-channel input has 3&times;3&times;64 = 576 weights, not 9.
+
+Worked through for a small network on 32&times;32&times;3 input:
+
+|Layer|Shape|Parameters|
+|---|---|---|
+|Conv 3&times;3, 32 filters|32&times;32&times;32|(3&times;3&times;3 + 1) &times; 32 = 896|
+|Conv 3&times;3, 64 filters|16&times;16&times;64|(3&times;3&times;32 + 1) &times; 64 = 18,496|
+|Conv 3&times;3, 128 filters|8&times;8&times;128|(3&times;3&times;64 + 1) &times; 128 = 73,856|
+|Global average pool|128|0|
+|Dense to 10 classes|10|1,290|
+
+Total: about 94,000 parameters for a working CIFAR-scale classifier. The equivalent dense network on the same input would run into the tens of millions.
+
+Notice where the parameters concentrate: in the deeper convolutions, because the channel count grows. And notice that global average pooling contributes nothing &mdash; which is exactly why it replaced the flatten-and-dense head that once held most of a network's weights.
+
+## Sharing does not mean shared computation
+
+A common misunderstanding: parameter sharing reduces the number of <em>weights</em>, not the number of <em>operations</em>.
+
+A 3&times;3 convolution with 64 filters on a 224&times;224 map performs 224 &times; 224 &times; 64 &times; 9 &times; in_channels multiply-adds. The filter is small; it is applied 50,000 times.
+
+That is why convolutional networks are memory-light and compute-heavy, and why GPUs suit them: the same small set of weights is reused across thousands of parallel positions, which is exactly the access pattern GPU memory hierarchies are built for.
+
+It also explains <strong>depthwise separable convolutions</strong>, used in MobileNet and EfficientNet. Splitting a convolution into a per-channel spatial filter followed by a 1&times;1 channel mixer cuts both parameters and operations by roughly a factor of the kernel area &mdash; around 8&ndash;9&times; for 3&times;3 &mdash; with a small accuracy cost. On phones, that trade is usually worth making.
+
+## Questions people ask
+
+<strong>Do all positions really need the same filter?</strong> For natural images, yes &mdash; and the empirical evidence is overwhelming. For centred, aligned images where position is meaningful, less so.
+
+<strong>Does sharing hurt accuracy?</strong> It constrains the model, and that constraint is what prevents overfitting. On image data the constraint matches reality, so it helps.
+
+<strong>How does backpropagation work with shared weights?</strong> The gradients from every position where the filter was applied are summed into one update. That is why a filter effectively learns from the whole image at once.
+
+<strong>Why do deeper layers have more filters?</strong> Because spatial size shrinks and the number of distinct patterns worth detecting grows. Doubling channels as size halves keeps the computation per layer roughly constant.
+
+<strong>Is a 1&times;1 convolution still parameter sharing?</strong> Yes &mdash; the same channel-mixing weights are applied at every spatial position.
+
+<strong>Do transformers share parameters?</strong> Across positions within a layer, yes. Across layers, usually not, though some efficient variants tie layer weights deliberately.
+
+## Recap in one screen
+
+- One filter is applied at every position, so a convolutional layer has thousands of weights where a dense layer would have millions.
+- The justification is that image statistics are the same everywhere &mdash; an edge is an edge wherever it appears.
+- Sharing gives translation equivariance and much better data efficiency.
+- It reduces parameters, not operations: convolutions are compute-heavy and memory-light.
+- The same idea drives recurrent networks, transformers and graph networks along their own axes.

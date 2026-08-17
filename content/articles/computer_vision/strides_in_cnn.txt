@@ -13,6 +13,48 @@ If you process a massive high-resolution image pixel-by-pixel, the resulting fea
 
 By increasing the stride, the kernel skips over sections of the image. This dramatically shrinks the width and height of the resulting feature map. We call this <strong>downsampling</strong>. Downsampling forces the network to summarize local features (like corners or edges) into higher-level, broader concepts, making the network faster and more robust to slight shifts in the image.
 
+## How far the filter jumps
+
+Stride is the step size the filter takes as it slides. Stride 1 moves one pixel at a time and looks at every possible position. Stride 2 skips every other position, halving the output in both dimensions.
+
+<p class="mono-font">out = floor( (in + 2&times;pad &minus; kernel) / stride ) + 1</p>
+
+A 32&times;32 input with a 3&times;3 kernel and padding 1:
+
+|Stride|Output|Positions computed|
+|---|---|---|
+|1|32&times;32|1,024|
+|2|16&times;16|256|
+|3|11&times;11|121|
+|4|8&times;8|64|
+
+Stride 2 cuts the output area to a quarter, and therefore cuts the computation of every subsequent layer to a quarter as well. That compounding is why striding matters so much for cost.
+
+## What you gain and what you lose
+
+<strong>Gained: computation and memory.</strong> Halving both spatial dimensions quarters the work. In a deep network the early layers are the expensive ones, because the maps are largest, so downsampling early is where the savings are.
+
+<strong>Gained: receptive field.</strong> After a stride-2 layer, each subsequent filter covers twice as much of the original image per step. Striding is one of the two ways a network gets a wide enough view to see whole objects (depth is the other).
+
+<strong>Lost: spatial precision.</strong> Positions are skipped, so fine detail is discarded and cannot be recovered. For classification that is usually acceptable &mdash; you want to know what, not exactly where. For segmentation and detection it is a real cost, and architectures work hard to recover the lost resolution.
+
+<strong>Lost: shift stability.</strong> Striding makes the network's output depend slightly on where the object sits relative to the sampling grid. Shift an image by one pixel and a strided network can produce a noticeably different prediction, an effect that has been measured and named &mdash; aliasing from downsampling without a low-pass filter.
+
+## Strided convolution versus pooling
+
+Both reduce spatial size, and modern practice has moved from one to the other.
+
+|&nbsp;|Max pooling|Strided convolution|
+|---|---|---|
+|Parameters|None|Learned|
+|What it keeps|The strongest response in each window|Whatever the filter learns to keep|
+|Cost|Very cheap|A convolution, so more|
+|Used in|VGG, older architectures|ResNet and most modern designs|
+
+The argument for strided convolutions is that downsampling is a decision, and a learned decision is usually better than a fixed rule. The argument for pooling is simplicity and a small amount of built-in shift tolerance. In practice both work, and the difference is smaller than the architecture around them.
+
+Global average pooling is a special case worth knowing: it collapses each feature map to a single number at the end of the network, replacing the flatten-and-dense head. It removes millions of parameters and makes the network accept any input size.
+
 ## Guided Experiments with This Interactive
 
 1. <strong>Observe the Default (S = 1):</strong> <p class="font-light opacity-80 mt-1">Leave Stride at <strong>S = 1</strong>. Click <strong>Slide Window</strong>. Watch the red box (kernel) move smoothly, pixel by pixel, across the input. The output feature map is 7x7. It's a dense, highly detailed representation of the input.</p>
@@ -39,3 +81,41 @@ Assuming Padding (P) is 0, the output dimension ($O$) is calculated as:
 - Often used as an alternative to "Pooling" layers to reduce image size.
 
 By manipulating strides, we force neural networks to transition from looking at individual pixels to recognizing high-level abstract shapes.
+
+## Going the other way: transposed convolution
+
+Segmentation, super-resolution and generative models need to <em>increase</em> spatial size, and a stride of less than 1 is the idea &mdash; implemented as transposed convolution, sometimes misleadingly called deconvolution.
+
+Conceptually it inserts zeros between the input pixels and then convolves, so a stride-2 transposed convolution doubles the resolution. The weights are learned, so the upsampling is adaptive rather than a fixed interpolation.
+
+Its known weakness is <strong>checkerboard artefacts</strong>: when the kernel size is not divisible by the stride, some output positions receive contributions from more input positions than others, producing a visible grid pattern. Two fixes are standard &mdash; make the kernel size a multiple of the stride (4&times;4 with stride 2), or use nearest-neighbour upsampling followed by an ordinary convolution, which avoids the problem entirely and is now the more common choice.
+
+## Dilated convolution: reach without cost
+
+There is a third way to widen the receptive field, distinct from both stride and depth. <strong>Dilated</strong> (or atrous) convolution spreads the filter's taps apart, so a 3&times;3 kernel with dilation 2 covers a 5&times;5 area while still using only nine weights.
+
+The output size is unchanged, so nothing is downsampled and no resolution is lost. Stacking layers with dilations of 1, 2, 4 and 8 grows the receptive field exponentially while keeping full resolution throughout.
+
+This is why dilated convolutions are standard in semantic segmentation (DeepLab) and in audio models such as WaveNet, where the network needs a very wide view of a long signal without throwing away detail.
+
+## Questions people ask
+
+<strong>What stride should I use?</strong> 1 for the convolutions that extract features, 2 where you deliberately want to halve the resolution. Strides above 2 are rare outside the very first layer of some networks.
+
+<strong>Why do some networks use stride 2 in the first layer?</strong> Because the input is large and the early layers are the most expensive. ResNet's first layer is a 7&times;7 convolution with stride 2, immediately followed by a stride-2 pool, cutting 224&times;224 to 56&times;56 before the real work begins.
+
+<strong>Does stride affect the number of parameters?</strong> No. The filter is the same size; only how often it is applied changes.
+
+<strong>Can stride be different per dimension?</strong> Yes &mdash; (2, 1) halves the height and preserves the width, which is used in spectrogram models where the two axes mean different things.
+
+<strong>How do I recover resolution after striding?</strong> Transposed convolution or upsampling, usually combined with skip connections from earlier, higher-resolution layers &mdash; which is exactly what U-Net does.
+
+<strong>Is striding the same as pooling?</strong> Both downsample. Pooling applies a fixed rule with no parameters; strided convolution learns what to keep.
+
+## Recap in one screen
+
+- Stride is how far the filter moves; stride 2 halves each spatial dimension and quarters the work.
+- Downsampling widens the receptive field and cuts cost, at the price of spatial precision.
+- Strided convolutions have largely replaced pooling because the reduction is learned.
+- Transposed convolution upsamples; watch for checkerboard artefacts, or upsample then convolve.
+- Dilated convolution widens the view without downsampling at all &mdash; the tool for segmentation and audio.

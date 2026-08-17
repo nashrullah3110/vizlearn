@@ -37,6 +37,50 @@ The mean is always pulled <em>toward the tail</em>, because it is the only one o
 
 In practice this is a data-cleaning decision: filling missing values with the mean is standard for symmetric numeric columns, with the median for skewed ones, and with the mode for categories.
 
+## Three answers to "what is typical"
+
+|Measure|How it is found|Best when|
+|---|---|---|
+|Mean|Add everything, divide by the count|Symmetric data, no extreme values|
+|Median|Sort, take the middle value|Skewed data, or outliers present|
+|Mode|The most frequently occurring value|Categories, or finding a peak|
+
+Take seven salaries: 22, 25, 27, 30, 32, 35, and 250 (thousand).
+
+- <strong>Mean</strong> = 421 / 7 = <strong>60.1</strong>
+- <strong>Median</strong> = the fourth value = <strong>30</strong>
+- <strong>Mode</strong> = none, since every value appears once
+
+Six of the seven people earn less than the mean. That single observation is the whole argument for the median: one extreme value pulled the average up by 30, while the middle value did not move at all.
+
+This is why house prices, incomes and response times are reported as medians. Anyone quoting a mean for a skewed distribution is either being careless or making a case.
+
+## Robustness, in one idea
+
+The median is <strong>robust</strong>: changing the largest value to a billion does not move it. The mean is not: every value has a vote weighted by its size, so one outlier can dominate.
+
+Formally, the median has a breakdown point of 50% &mdash; you can corrupt almost half the data before it becomes meaningless. The mean has a breakdown point of 0%: one bad value is enough.
+
+The trade-off is that the mean uses all the information and the median throws most of it away. On clean, symmetric data the mean is the more efficient estimator, which is why it remains the default when the data justifies it.
+
+The relationship between them is also diagnostic:
+
+- <strong>Mean &asymp; median</strong> &rarr; roughly symmetric.
+- <strong>Mean &gt; median</strong> &rarr; right-skewed, with a tail of large values (incomes, sales).
+- <strong>Mean &lt; median</strong> &rarr; left-skewed, with a tail of small values (exam scores near a ceiling).
+
+Comparing the two costs one line of code and tells you immediately whether averages are safe to quote.
+
+## Where each is used in machine learning
+
+<strong>Mean.</strong> `StandardScaler` subtracts it; mean squared error is built from it; the loss reported during training is a mean. Because it is a sum, it is differentiable, which is why optimisers like it.
+
+<strong>Median.</strong> The default for imputing skewed numeric features, the basis of mean absolute error's optimum, and the centre used by `RobustScaler`, which scales by the interquartile range instead of the standard deviation.
+
+<strong>Mode.</strong> The natural imputation for categorical features, the prediction of a classification tree's leaf, and the aggregation used when a random forest votes.
+
+One clean way to remember which loss goes with which: minimising squared error gives you the mean, minimising absolute error gives you the median. So a model trained on MAE predicts the median outcome and is naturally robust to outlying targets.
+
 ## Guided experiments
 
 1. <strong>Start symmetric.</strong> All three markers sit almost on top of each other &mdash; on nice data the distinction genuinely does not matter.
@@ -48,3 +92,37 @@ In practice this is a data-cleaning decision: filling missing values with the me
 ## Worth remembering
 
 The mean is the balance point and uses every value &mdash; which makes it precise but fragile. The median is the middle and shrugs off outliers. The mode is the most common and is the only option for categories. Skewed data pulls them apart, and "average" without qualification is an ambiguous word.
+
+## Beyond the centre
+
+A single number never describes a distribution. Three companions turn "typical" into a picture:
+
+<strong>Spread.</strong> The standard deviation goes with the mean; the interquartile range (the middle 50%) goes with the median. Reporting a centre without a spread is close to reporting nothing &mdash; "average delivery 3 days" is a different promise at &plusmn;0.5 days than at &plusmn;6.
+
+<strong>Quartiles and percentiles.</strong> The median is the 50th percentile. The 25th and 75th bracket the middle half, and the 95th or 99th are what service-level agreements are written against, because the average response time hides exactly the slow requests users complain about.
+
+<strong>Shape.</strong> Skew says which way the tail leans; a histogram says whether there are two peaks. A bimodal distribution &mdash; two groups mixed together &mdash; has a mean and a median that both sit in the empty valley between them, describing nobody.
+
+That last case is worth taking seriously. Any summary statistic assumes the data is one population. If it is two, the right move is to split it and describe each.
+
+## Questions people ask
+
+<strong>Which should I report?</strong> The median for skewed data, the mean for symmetric data, and both when you can &mdash; the gap between them is itself informative.
+
+<strong>Can there be more than one mode?</strong> Yes. Two peaks is bimodal, and usually means two populations are mixed together.
+
+<strong>How do I compute a median for an even count?</strong> Average the two middle values after sorting.
+
+<strong>Why do models use the mean if it is fragile?</strong> Because it is differentiable and uses every data point. Squared error's smooth gradient is what makes optimisation practical.
+
+<strong>Should I remove outliers before averaging?</strong> Only if they are genuinely errors. Removing real but inconvenient values makes the number look better and the description worse &mdash; use the median instead.
+
+<strong>What is a trimmed mean?</strong> The mean after discarding a fixed percentage from each end &mdash; a compromise between the two, common in scoring competitions.
+
+## Recap in one screen
+
+- Mean is the balance point, median is the middle value, mode is the most common one.
+- The mean is dragged by outliers; the median is not, which is why skewed data is reported as a median.
+- Mean above median means a right tail; mean below means a left tail; equal means roughly symmetric.
+- Squared-error loss predicts the mean, absolute-error loss predicts the median.
+- Always pair a centre with a spread, and check for two peaks before summarising at all.

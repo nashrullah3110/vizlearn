@@ -23,6 +23,48 @@ Every node needs only its <em>local</em> derivative: how its output responds to 
 
 The chain rule then says: the gradient arriving at a node, times the node's local derivative, is the gradient leaving it. Backpropagation is that single sentence applied repeatedly, in reverse topological order.
 
+## Assigning blame to every weight
+
+Training needs one number per weight: if I nudge this weight slightly, how much does the loss change? With ten million weights, computing that separately ten million times is impossible.
+
+Backpropagation gets all of them in a single backward pass, at roughly the cost of one forward pass. That efficiency is the reason deep learning is practical at all.
+
+The mechanism is the chain rule. A network is nested functions, so the effect of an early weight on the loss is a product of factors, one per layer in between:
+
+<p class="mono-font">&part;L/&part;w<sup>(1)</sup> = &part;L/&part;a<sup>(3)</sup> &times; &part;a<sup>(3)</sup>/&part;a<sup>(2)</sup> &times; &part;a<sup>(2)</sup>/&part;a<sup>(1)</sup> &times; &part;a<sup>(1)</sup>/&part;w<sup>(1)</sup></p>
+
+Computed naively, weights in the same layer would each redo most of that product. Backpropagation works from the loss backwards, carrying the accumulated product with it, and hands each layer exactly the factor it needs. Nothing is recomputed.
+
+## One neuron, worked through with numbers
+
+A single neuron: `z = wx + b`, `a = sigmoid(z)`, loss `L = (a − y)²`.
+
+Take x = 2, w = 0.5, b = 0, y = 1.
+
+<strong>Forward:</strong> z = 1.0, a = sigmoid(1.0) = 0.731, L = (0.731 − 1)² = 0.072.
+
+<strong>Backward,</strong> three factors:
+
+- &part;L/&part;a = 2(a − y) = 2(−0.269) = −0.538
+- &part;a/&part;z = a(1 − a) = 0.731 × 0.269 = 0.197
+- &part;z/&part;w = x = 2
+
+<strong>Multiply:</strong> &part;L/&part;w = −0.538 × 0.197 × 2 = <strong>−0.212</strong>
+
+Negative, so increasing w lowers the loss. With a learning rate of 0.1 the update is w ← 0.5 + 0.0212 = 0.521 &mdash; a small step in the right direction, which is exactly what gradient descent is.
+
+Notice `a(1 − a)`: it peaks at 0.25 and approaches zero when the neuron saturates near 0 or 1. A confidently wrong sigmoid neuron therefore learns very slowly, which is precisely the argument for cross-entropy loss, whose derivative cancels that term.
+
+## Why the forward pass must be remembered
+
+The backward pass needs the activations computed on the way forward &mdash; `a(1 − a)` needs `a`. So every intermediate result is stored during the forward pass and kept until the backward pass consumes it.
+
+That storage is <strong>activation memory</strong>, and it is what usually limits batch size, not the weights. A ResNet-50's weights are about 100MB; its activations for a batch of 64 images run to several gigabytes.
+
+Two standard responses. <strong>Gradient checkpointing</strong> stores only some activations and recomputes the rest during the backward pass &mdash; trading roughly 30% more compute for a large memory saving. And <strong>mixed precision</strong> stores activations in 16-bit, halving the memory and speeding up the arithmetic.
+
+This also explains why `torch.no_grad()` matters at inference: without gradients, nothing needs to be stored, and memory use drops sharply.
+
 ## Exploration guide
 
 1. <strong>Start from the loss.</strong> The page opens with the forward pass already done: values left to right, ending on a single number. Press Reset and Step if you want to watch that part happen too &mdash; but it holds no surprises, it is just the network making a prediction.
@@ -49,3 +91,53 @@ Backpropagation gets all of them in one backward pass, because the gradient arri
 ## Where that leaves you
 
 Backpropagation is the chain rule applied to a computational graph in reverse order: each operation contributes only its own local derivative, and the gradient arriving from downstream is multiplied by it on the way past. An add passes the gradient through untouched, a multiply scales it by the other input, and a saturating activation shrinks it &mdash; which is where vanishing gradients come from. Because every node reuses the gradient already computed for the nodes it feeds, one backward pass yields every weight's gradient at roughly the cost of one forward pass, and that efficiency is the reason training deep networks is possible at all. The forward values have to be kept in memory for it to work, and a numeric gradient check is the fastest way to prove your backward pass is right.
+
+## What goes wrong, and why
+
+Because the chain rule multiplies one factor per layer, deep networks multiply many numbers together &mdash; and that is numerically unstable in both directions.
+
+<strong>Vanishing gradients.</strong> Sigmoid's derivative peaks at 0.25. Ten layers gives 0.25¹⁰ ≈ 0.000001, so early layers barely move. The fixes all target the size of those factors: ReLU (derivative exactly 1 when active), residual connections (an identity path whose derivative is 1), and normalisation layers (which keep activations where the factors stay near 1).
+
+<strong>Exploding gradients.</strong> If the factors average above 1, the product grows without bound and weights become `NaN`. Gradient clipping caps the gradient's norm directly and is standard in recurrent models and transformers.
+
+<strong>Dead ReLUs.</strong> A unit stuck on the negative side has a derivative of exactly 0, receives no gradient, and never recovers. Leaky ReLU, careful initialisation and a lower learning rate all reduce it.
+
+Diagnosing all three is the same action: log the gradient norm per layer. A healthy network shows similar magnitudes throughout; a vanishing one shows orders of magnitude of decay from output to input.
+
+## Automatic differentiation in practice
+
+You will never implement backpropagation by hand. Frameworks record every operation into a graph as the forward pass runs, then walk it backwards applying each operation's known derivative rule.
+
+```python
+loss = criterion(model(x), y)
+
+optimizer.zero_grad()    # clear the previous step's gradients
+loss.backward()          # backpropagation: fills .grad on every parameter
+optimizer.step()         # apply the update
+```
+
+The `zero_grad()` line is not optional. PyTorch <em>accumulates</em> gradients into `.grad` rather than replacing them, so forgetting it means each step uses the sum of all previous gradients &mdash; training appears to work and converges to nonsense. (The accumulation behaviour is deliberate: it is how you simulate a large batch on a small GPU, by calling `backward()` several times before `step()`.)
+
+To verify a hand-written gradient, compare it with a numerical one: `(f(x+h) − f(x−h)) / 2h` with h around 1e-5. If they disagree, the analytic version is wrong.
+
+## Questions people ask
+
+<strong>Is backpropagation the same as gradient descent?</strong> No. Backpropagation computes the gradients; gradient descent uses them to update the weights. Two separate steps.
+
+<strong>Why do I need to call `zero_grad()`?</strong> Because gradients accumulate by default. Omitting it is one of the most common PyTorch bugs.
+
+<strong>Does it work through any operation?</strong> Any differentiable one. Non-differentiable steps (argmax, sampling, hard thresholds) block the gradient and need workarounds such as straight-through estimators or the reparameterisation trick.
+
+<strong>How does it handle branching architectures?</strong> Where a value feeds several paths, the gradients from all of them are summed. That is the multivariable chain rule.
+
+<strong>Why is training about three times a forward pass?</strong> Roughly: one forward, one backward of similar cost, plus the weight update.
+
+<strong>Is it biologically plausible?</strong> Not really &mdash; real neurons have no known mechanism for sending precise error signals backwards. It is an engineering algorithm, not a model of the brain.
+
+## Recap in one screen
+
+- Backpropagation computes every weight's gradient in one backward pass using the chain rule.
+- It reuses shared factors, which is why training costs about the same as a few forward passes rather than one pass per parameter.
+- Activations from the forward pass must be stored, and that memory usually limits batch size.
+- Multiplying many factors causes vanishing and exploding gradients; ReLU, residuals, normalisation and clipping are the responses.
+- Frameworks do it automatically &mdash; but call `zero_grad()`, because gradients accumulate.

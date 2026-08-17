@@ -27,6 +27,71 @@ Training a model means minimising a loss. The derivative answers the only questi
 
 A large derivative means a steep slope and a big correction; a derivative near zero means you have arrived somewhere flat. Every optimiser on this site &mdash; SGD, Adam, the lot &mdash; is a refinement of that one line.
 
+## The slope of a curve at a single point
+
+A straight line has one slope everywhere: rise over run, and any two points give the same answer. A curve does not &mdash; it is steep in places and flat in others.
+
+The derivative is the answer to "how steep is this curve <em>right here</em>". You get it by taking two points on the curve, computing the slope between them, and sliding them closer and closer together:
+
+<p class="mono-font">f&prime;(x) = lim<sub>h&rarr;0</sub> [ f(x + h) &minus; f(x) ] / h</p>
+
+Concretely, for f(x) = x&sup2; at x = 3, with h shrinking:
+
+|h|Slope between x and x+h|
+|---|---|
+|1|(16 &minus; 9) / 1 = 7|
+|0.1|(9.61 &minus; 9) / 0.1 = 6.1|
+|0.01|(9.0601 &minus; 9) / 0.01 = 6.01|
+|0.001|&hellip; = 6.001|
+
+The numbers are converging on <strong>6</strong>, and the rule f&prime;(x) = 2x confirms it: 2&times;3 = 6. The limit is not a trick; it is the value the slope approaches as the two points merge.
+
+## Reading the sign and the size
+
+The derivative carries two pieces of information, and both are used constantly in machine learning:
+
+- <strong>The sign</strong> says which way the function is heading. Positive means increasing as x grows; negative means decreasing; zero means momentarily flat.
+- <strong>The magnitude</strong> says how fast. A derivative of 100 is a cliff; a derivative of 0.01 is nearly level.
+
+A derivative of zero marks a <strong>stationary point</strong> &mdash; a minimum, a maximum, or a saddle. That is why optimisation is the search for points where the derivative vanishes, and why "the gradient is zero" means training has stopped moving.
+
+The second derivative distinguishes the cases: positive means a valley (minimum), negative means a peak (maximum), zero is inconclusive.
+
+## The rules you actually need
+
+|Function|Derivative|
+|---|---|
+|c (a constant)|0|
+|x|1|
+|x&#8319;|n&thinsp;x&#8319;&#8315;&sup1;|
+|e&#7530;|e&#7530;|
+|ln x|1/x|
+|sin x|cos x|
+|c&thinsp;f(x)|c&thinsp;f&prime;(x)|
+|f(x) + g(x)|f&prime;(x) + g&prime;(x)|
+
+Two more that do the heavy lifting in neural networks:
+
+- <strong>Product rule</strong>: (fg)&prime; = f&prime;g + fg&prime;
+- <strong>Chain rule</strong>: (f(g(x)))&prime; = f&prime;(g(x)) &middot; g&prime;(x)
+
+The chain rule is the one that matters most: backpropagation is the chain rule applied layer by layer, from the loss backwards to every weight.
+
+Worked example: f(x) = 3x&#8308; + 2x &minus; 7. Differentiate term by term: 12x&sup3; + 2 + 0 = <strong>12x&sup3; + 2</strong>. At x = 1 the slope is 14.
+
+## Why any of this is in a machine learning course
+
+Training a model means minimising a loss function, and the derivative is what tells you which way to step.
+
+<p class="mono-font">new weight = old weight &minus; learning rate &times; derivative of loss w.r.t. that weight</p>
+
+The minus sign is the whole idea: the derivative points uphill, so you move the opposite way. The learning rate decides how big the step is.
+
+The derivatives of the activation functions explain some famous training problems directly:
+
+- <strong>Sigmoid</strong> has a maximum derivative of 0.25, and it approaches zero at both ends. Multiply several of those together through a deep network and the gradient vanishes.
+- <strong>ReLU</strong> has a derivative of exactly 1 for positive inputs and exactly 0 for negative ones. The 1 is why it trains well; the 0 is why neurons can die.
+
 ## Guided tour
 
 1. <strong>Start on f(x) = x&sup2; at x = 2</strong> with h large. The secant is visibly wrong; shrink h and the error falls to almost nothing.
@@ -38,3 +103,55 @@ A large derivative means a steep slope and a big correction; a derivative near z
 ## In one line
 
 A derivative is the slope of the tangent, obtained by taking the slope between two points and letting the gap shrink to nothing. Positive means rising, negative means falling, zero means flat &mdash; and that sign is the compass every learning algorithm follows.
+
+## Where derivatives fail to exist
+
+Not every function has a derivative everywhere, and the exceptions are not academic.
+
+<strong>Corners.</strong> `f(x) = |x|` has slope &minus;1 on the left and +1 on the right, and no single answer at zero. ReLU has exactly this corner at the origin. Frameworks resolve it by convention, defining the derivative at zero to be 0 (or sometimes 1), and it causes no practical trouble because landing exactly on zero is vanishingly unlikely.
+
+<strong>Jumps.</strong> A step function has no derivative at the jump, and a derivative of zero everywhere else. That is precisely why step activations were abandoned: gradient descent has nothing to follow.
+
+<strong>Vertical tangents.</strong> The slope becomes infinite, as with the cube root at zero.
+
+This is the reason loss functions are chosen to be smooth. Mean squared error is differentiable everywhere; accuracy is a step function of the predictions and cannot be optimised directly, which is why models train on cross-entropy and are evaluated on accuracy.
+
+## Numerical derivatives, and automatic differentiation
+
+You can approximate a derivative without any calculus by using a small h:
+
+```python
+def numerical_derivative(f, x, h=1e-5):
+    return (f(x + h) - f(x - h)) / (2 * h)     # central difference
+
+numerical_derivative(lambda x: x**2, 3)        # 6.000000000039306
+```
+
+The central difference (using x&minus;h and x+h) is noticeably more accurate than the one-sided version for the same h. Too large an h and the approximation is poor; too small and floating-point rounding destroys it &mdash; around 10&#8315;&#8309; to 10&#8315;&#8311; is the usual sweet spot for doubles.
+
+Deep learning frameworks do not use this. They use <strong>automatic differentiation</strong>: every operation records how to compute its own derivative, and the chain rule is applied backwards through the recorded graph. The result is exact to floating-point precision and costs about the same as the forward computation &mdash; which is what makes training networks with billions of parameters feasible.
+
+Numerical derivatives still have a job: checking that a hand-written gradient is correct. If your analytic gradient and the numerical one disagree, the analytic one is wrong.
+
+## Questions people ask
+
+<strong>What is the difference between a derivative and a gradient?</strong> A derivative is for a function of one variable; a gradient is the vector of partial derivatives for a function of many. Loss functions have millions of inputs, so gradients are what you meet.
+
+<strong>Does a zero derivative always mean a minimum?</strong> No &mdash; it could be a maximum or a saddle point. In high dimensions saddle points are far more common than local minima.
+
+<strong>Why does the learning rate matter so much?</strong> The derivative gives a direction, not a distance. Too large a step overshoots and diverges; too small and training crawls.
+
+<strong>Is the derivative of a constant really zero?</strong> Yes &mdash; a constant does not change, so its rate of change is zero. This is why the bias term differentiates cleanly.
+
+<strong>What does the second derivative tell me?</strong> How the slope itself is changing &mdash; the curvature. Second-order optimisers use it to choose better step sizes, at a much higher cost per step.
+
+<strong>Do I need to compute derivatives by hand?</strong> Not in practice; frameworks do it. Knowing the rules is what lets you understand vanishing gradients, dead neurons and why some losses are chosen over others.
+
+## Recap in one screen
+
+- The derivative is the slope of a curve at a point, defined as a limit of slopes between two points that merge.
+- The sign says which way the function goes; the magnitude says how fast.
+- Zero derivative means a stationary point &mdash; minimum, maximum or saddle.
+- Gradient descent steps against the derivative, scaled by the learning rate.
+- Corners and jumps have no derivative, which is why losses are chosen to be smooth.
+- Frameworks use automatic differentiation, not finite differences &mdash; exact and cheap.

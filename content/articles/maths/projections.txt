@@ -15,6 +15,53 @@ Two things worth noticing. The length of a cancels out &mdash; only its directio
 
 The <strong>scalar</strong> projection is <span class="mono-font">(a &middot; b) / ‖a‖</span>, the signed length of the shadow. The <strong>vector</strong> projection is that length pointed along a. Mixing the two up is the most common slip here.
 
+## Casting a shadow onto a direction
+
+A projection answers: how much of vector `a` lies along the direction of vector `b`? Picture the sun directly overhead of `b` and `a` casting a shadow onto it.
+
+<p class="mono-font">proj<sub>b</sub>(a) = ( (a &middot; b) / (b &middot; b) ) b</p>
+
+The fraction is a number saying how far along b to go; multiplying by b turns it back into a vector.
+
+For a = [3, 4] and b = [1, 0] (the x-axis):
+
+- a &middot; b = 3, b &middot; b = 1, so the projection is 3 &times; [1, 0] = <strong>[3, 0]</strong>.
+
+Which is exactly what you would expect: the shadow of [3, 4] on the x-axis is [3, 0], and the part left over, [0, 4], is perpendicular to b.
+
+That decomposition is the point of the whole topic. Any vector splits uniquely into a part along a direction and a part at right angles to it:
+
+<p class="mono-font">a = proj<sub>b</sub>(a) + (a &minus; proj<sub>b</sub>(a))</p>
+
+The second term is the <strong>residual</strong>, and it is perpendicular to b by construction.
+
+## Least squares is a projection
+
+Linear regression fits a line by minimising squared residuals. Geometrically it is projecting.
+
+The target vector `y` lives in n-dimensional space (one dimension per data point). The predictions the model can produce &mdash; every possible combination of the feature columns &mdash; form a subspace, usually of far lower dimension. Almost certainly, `y` is not in that subspace, which is why a perfect fit is impossible.
+
+The best approximation is the point in the subspace <em>closest</em> to y, and that is exactly the projection of y onto it. The residual is what is left over, and the defining property is that it is perpendicular to every feature column:
+
+<p class="mono-font">X&#7488;(y &minus; X&beta;) = 0&nbsp;&nbsp;&rarr;&nbsp;&nbsp;&beta; = (X&#7488;X)&#8315;&sup1;X&#7488;y</p>
+
+That is the normal equation, derived without calculus. "Normal" here means perpendicular &mdash; the equation is stating that the residual is orthogonal to the columns of X.
+
+This also explains a fact that puzzles people: the residuals of a fitted least-squares model sum to zero (when an intercept is included), because the constant column is one of the directions the residual must be perpendicular to.
+
+## Orthogonality, and why it makes things easy
+
+Two vectors are orthogonal when their dot product is zero &mdash; no shared direction at all.
+
+An <strong>orthonormal basis</strong> is a set of mutually orthogonal unit vectors, and it makes projection trivial: the component along each basis vector is just the dot product, with no division needed. Decomposing a vector becomes a list of dot products.
+
+This is why so much of applied linear algebra is spent constructing orthogonal bases:
+
+- <strong>PCA</strong> produces orthogonal components, so each carries information the others do not.
+- <strong>QR decomposition</strong> factors a matrix into an orthogonal part and a triangular part, and is the numerically stable way to solve least squares &mdash; better than forming `XᵀX` and inverting it.
+- <strong>Fourier and wavelet transforms</strong> project a signal onto an orthogonal basis of frequencies.
+- <strong>Gram-Schmidt</strong> is the classic procedure for turning any independent set into an orthonormal one, by repeatedly subtracting projections.
+
 ## Things to try
 
 1. <strong>Read the default.</strong> a = (3, 1), b = (2, 3). The dot product is 9, ‖a‖&sup2; is 10, so t = 0.900 and the shadow lands at (2.70, 0.90) &mdash; short of b, and on the line.
@@ -42,3 +89,49 @@ It is also why the residuals of a fitted linear model are uncorrelated with its 
 ## The short of it
 
 The projection of b onto a is <span class="mono-font">((a&middot;b)/‖a‖&sup2;)a</span>: the point on the line through a that is closest to b, and the only one whose residual is perpendicular to a. Only a's direction matters, so scaling a changes nothing; the scale factor goes negative when the shadow falls behind the origin, zero when the vectors are perpendicular, and equals b exactly when they are parallel. Least squares is this picture with a subspace in place of a line &mdash; the fitted values are a projection of y, the residual is orthogonal to every predictor, and the normal equations are just that orthogonality written down.
+
+## Projections in machine learning
+
+<strong>Dimensionality reduction.</strong> PCA projects data onto the subspace spanned by the top principal components. Everything perpendicular to that subspace is discarded, and the explained variance ratio measures how much of the data survived the projection.
+
+<strong>Attention.</strong> Each token is projected into query, key and value spaces by learned matrices &mdash; three different views of the same vector, chosen so the comparison the model needs becomes a simple dot product.
+
+<strong>Embeddings.</strong> Projecting high-dimensional embeddings down to two or three dimensions is how they are visualised; the projection is lossy by construction, which is why t-SNE and UMAP plots should be read for structure, not for exact distances.
+
+<strong>Regularised regression.</strong> Ridge regression shrinks the projection along low-variance directions more than along high-variance ones, which is exactly why it stabilises collinear problems.
+
+<strong>Gradient projection.</strong> Constrained optimisation keeps parameters on a permitted surface by projecting each step back onto it after taking it.
+
+## The projection matrix
+
+Projecting onto a subspace can be written as a single matrix, applied to any vector:
+
+<p class="mono-font">P = X (X&#7488;X)&#8315;&sup1; X&#7488;</p>
+
+In statistics this is called the <strong>hat matrix</strong>, because it puts the hat on y: `ŷ = Py`.
+
+It has two properties that identify any projection matrix. It is idempotent &mdash; `P² = P`, because projecting something that is already in the subspace changes nothing. And it is symmetric.
+
+Its diagonal entries are the <strong>leverage</strong> values, measuring how much each observation influences its own fitted value. A point with high leverage sits far from the centre of the feature space and can pull the whole fit towards itself, which is why leverage is one of the standard regression diagnostics alongside residuals.
+
+## Questions people ask
+
+<strong>What is the difference between projection and rotation?</strong> A rotation preserves lengths and is reversible; a projection discards a component and is not.
+
+<strong>Can I project onto more than one direction?</strong> Yes &mdash; onto any subspace. Project onto each vector of an orthonormal basis and add the pieces.
+
+<strong>Why is the residual perpendicular?</strong> Because if it had any component along the subspace, you could move within the subspace and get closer &mdash; so the closest point is precisely the one where nothing is left pointing that way.
+
+<strong>Is projection the same as dropping a column?</strong> Only in the special case of projecting onto an axis. General projections combine features rather than discarding them.
+
+<strong>How does this relate to cosine similarity?</strong> The scalar projection of a onto b is `|a| cos θ`. Divide by |a| and you have the cosine itself.
+
+<strong>Why use QR instead of the normal equation?</strong> Numerical stability. Forming `XᵀX` squares the condition number, so QR (or SVD) gives more accurate coefficients on ill-conditioned data.
+
+## Recap in one screen
+
+- A projection is the shadow of one vector onto a direction or subspace.
+- Every vector splits into a projected part and a perpendicular residual.
+- Least squares projects the targets onto the space of achievable predictions, which is where the normal equation comes from.
+- Orthonormal bases make projection a set of dot products, which is why PCA, QR and Fourier methods build them.
+- The hat matrix is the projection in matrix form, and its diagonal gives each point's leverage.

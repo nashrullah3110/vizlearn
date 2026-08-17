@@ -13,6 +13,57 @@ So <strong>vanishing</strong> and <strong>exploding</strong> gradients are not t
 
 <p>The derivative of the sigmoid is <span class="mono-font">&sigma;(x)(1 &minus; &sigma;(x))</span>, which peaks at <strong>0.25</strong> when x = 0 and falls toward zero for inputs of large magnitude.</p><p>Its <em>maximum</em> is 0.25, so every sigmoid layer multiplies the gradient by at most a quarter. Ten layers means a factor of 0.25<sup>10</sup> &asymp; 10<sup>&minus;6</sup> in the best case, and far worse once units saturate. This is the concrete reason deep networks were considered untrainable before roughly 2010: the early layers received no usable learning signal at all.</p><strong>ReLU</strong> changed that. Its derivative is exactly 1 for positive inputs, so the gradient passes through unattenuated however many layers it crosses. That single property, more than any other, is what made depth practical.
 
+## Multiplication through depth
+
+Backpropagation multiplies one factor per layer. That single fact explains both failures.
+
+If each layer contributes a factor of about 0.25 &mdash; the maximum slope of the sigmoid &mdash; then after ten layers the gradient reaching the first layer is:
+
+<p class="mono-font">0.25<sup>10</sup> &asymp; 0.00000095</p>
+
+The early layers receive essentially nothing and stop learning. That is the <strong>vanishing gradient</strong>.
+
+If each factor is about 2 instead, ten layers give 2¹⁰ = 1,024, and thirty layers give a billion. Weights take an enormous step, the loss becomes `NaN`, and training is over in one update. That is the <strong>exploding gradient</strong>.
+
+|Depth|Factor 0.25|Factor 0.9|Factor 1.1|Factor 2|
+|---|---|---|---|---|
+|5|0.001|0.59|1.6|32|
+|10|1e-6|0.35|2.6|1,024|
+|50|8e-31|0.005|117|1e15|
+
+Only factors very close to 1 survive depth. Every technique below is a way of keeping them there.
+
+## Telling the two apart
+
+|Symptom|Vanishing|Exploding|
+|---|---|---|
+|Loss|Falls very slowly, or not at all|Spikes, then `NaN`|
+|Early-layer gradients|Orders of magnitude smaller than late ones|Enormous|
+|Weights|Early layers barely change|Blow up, then become `NaN`|
+|Onset|Gradual, from the start|Sudden, often within a few steps|
+
+The diagnostic is the same for both, and it costs almost nothing:
+
+```python
+for name, p in model.named_parameters():
+    if p.grad is not None:
+        print(f"{name:<40} {p.grad.norm().item():.3e}")
+```
+
+A healthy network shows similar magnitudes across layers. A vanishing one shows a steady decay from output to input, often several orders of magnitude. An exploding one shows values in the thousands or `inf`.
+
+## The fixes for vanishing gradients
+
+<strong>ReLU instead of sigmoid or tanh.</strong> Its derivative is exactly 1 for positive inputs, so active units contribute a factor of 1 rather than at most 0.25. This was the change that made deep networks trainable.
+
+<strong>Residual connections.</strong> `output = F(x) + x` has derivative `F'(x) + 1`. That `+1` is a path along which the gradient flows back unchanged however many blocks it crosses. This is why 100-layer networks train at all, and it is the single most effective fix.
+
+<strong>Normalisation layers.</strong> Batch, layer or group normalisation keeps activations in a range where derivatives stay near 1 rather than in a saturated region.
+
+<strong>Careful initialisation.</strong> He initialisation scales the initial weights by &radic;(2/fan_in), which keeps the variance of activations roughly constant through depth for ReLU networks. Xavier does the same for tanh.
+
+<strong>LSTM and GRU gates</strong> solve the sequential version: their additive cell-state path is the recurrent equivalent of a residual connection, which is why they handle far longer sequences than a plain RNN.
+
 ## Exploration guide
 
 1. <strong>Train without help.</strong> Leave the normalisation and ReLU toggles off and press <strong>Train Network</strong>. Watch the gradient magnitudes at the early layers &mdash; they are orders of magnitude smaller than at the output, so the first layers barely move.
@@ -38,3 +89,55 @@ So <strong>vanishing</strong> and <strong>exploding</strong> gradients are not t
 ## What to remember
 
 Backpropagation multiplies per-layer derivatives together, so anything consistently below 1 shrinks the gradient exponentially with depth and anything above 1 amplifies it. Sigmoid’s maximum derivative of 0.25 made deep networks untrainable; ReLU’s derivative of 1 fixed it, and initialisation, normalisation and residual connections keep the product near 1 by design. When training silently stalls suspect vanishing; when the loss becomes NaN suspect exploding, and clip.
+
+## The fixes for exploding gradients
+
+<strong>Gradient clipping</strong> is the direct and standard answer. Compute the norm of the whole gradient and, if it exceeds a threshold, scale it down proportionally:
+
+```python
+loss.backward()
+torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+optimizer.step()
+```
+
+Clipping by <em>norm</em> preserves the gradient's direction and only limits its length, which is why it is preferred over clipping each value independently. A threshold of 1.0 is the usual default in transformers and recurrent models.
+
+<strong>A lower learning rate</strong> reduces the size of the step even when the gradient is large. Exploding loss within the first few dozen steps is almost always a learning rate problem.
+
+<strong>Warm-up</strong> ramps the learning rate up over the first few hundred steps, avoiding a large early step when the model is badly initialised and Adam's variance estimate is unreliable. Effectively mandatory for transformers.
+
+<strong>Weight decay</strong> keeps weights small, which keeps the Jacobian factors smaller.
+
+<strong>Careful initialisation</strong> again &mdash; weights initialised too large produce factors above 1 from the very first step.
+
+## Why depth was hard before 2015
+
+The history is worth knowing because it explains the standard architecture of everything today.
+
+Networks deeper than a handful of layers did not train reliably. Sigmoid activations vanished gradients; poor initialisation made it worse; recurrent networks could not learn dependencies more than a few steps apart.
+
+Four changes fixed it, all responses to the multiplication problem: ReLU (2011), better initialisation (2010&ndash;2015), batch normalisation (2015) and residual connections (2015). Within a year, 152-layer networks were state of the art.
+
+Transformers inherited all four. Every transformer block is `x + sublayer(norm(x))` &mdash; residual plus normalisation &mdash; with GELU activations and gradient clipping during training. The architecture is a direct answer to this topic.
+
+## Questions people ask
+
+<strong>Which is more common today?</strong> Exploding, in transformers and recurrent models, which is why clipping is standard. Vanishing is largely solved by ReLU and residuals in feed-forward networks.
+
+<strong>Does gradient clipping hurt training?</strong> Slightly, if the threshold is too low &mdash; you are discarding real signal. Log how often clipping triggers; occasionally is healthy, constantly means the threshold is too tight or the learning rate too high.
+
+<strong>Can normalisation alone fix vanishing gradients?</strong> It helps considerably and is not sufficient on its own for very deep networks. Residual connections are what make 100+ layers work.
+
+<strong>Why does my RNN fail on long sequences?</strong> The recurrent weight matrix's largest eigenvalue governs stability: above 1 the state explodes, below 1 it vanishes. Use an LSTM or GRU, or a transformer.
+
+<strong>Is `NaN` always an exploding gradient?</strong> Not always &mdash; `log(0)`, division by zero and `sqrt` of a negative also produce it. Check the loss computation before blaming the gradients.
+
+<strong>Should I clip by value or by norm?</strong> By norm. Clipping values independently distorts the gradient's direction.
+
+## Recap in one screen
+
+- Backpropagation multiplies one factor per layer, so anything not close to 1 compounds catastrophically.
+- Factors below 1 vanish the gradient and freeze the early layers; factors above 1 explode it into `NaN`.
+- Log per-layer gradient norms &mdash; a steady decay means vanishing, huge values mean exploding.
+- ReLU, residual connections, normalisation and He initialisation address vanishing.
+- Gradient clipping, a lower learning rate and warm-up address exploding.

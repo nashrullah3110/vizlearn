@@ -33,6 +33,52 @@ The gradient is a sum over training examples, and how many you include before ea
 - <strong>Stochastic (SGD)</strong> &mdash; use one example. Updates are extremely cheap and extremely noisy; the path jitters, which costs precision but can jolt the model out of poor regions.
 - <strong>Mini-batch</strong> &mdash; use 32 to 256 examples. Close to the exact gradient, cheap enough to update often, and the shape that matches how GPUs actually work. This is what essentially all real training uses.
 
+## Walking downhill on the loss surface
+
+Training is a search. There is a loss function that scores how wrong the model is, and gradient descent is the procedure for finding parameter values that make it small.
+
+<p class="mono-font">w &larr; w &minus; &eta; &times; &part;L/&part;w</p>
+
+The gradient points uphill, so the minus sign walks downhill. `η` is the learning rate: how far to step.
+
+Worked through on one parameter. Loss `L = w²`, so the gradient is `2w`. Start at w = 4 with η = 0.1:
+
+|Step|w|Gradient|New w|
+|---|---|---|---|
+|1|4.00|8.00|3.20|
+|2|3.20|6.40|2.56|
+|3|2.56|5.12|2.05|
+|10|0.43|0.86|0.34|
+
+Two things are visible. It converges towards zero, the true minimum. And the steps shrink as it approaches, because the gradient shrinks &mdash; automatic slowing down, with no schedule required.
+
+## The learning rate decides everything
+
+|Learning rate|Behaviour|
+|---|---|
+|Far too high|Loss oscillates or explodes to `NaN`|
+|Slightly too high|Loss falls then plateaus high, bouncing across the valley|
+|About right|Loss falls steadily and flattens smoothly|
+|Too low|Loss falls, very slowly, and may never arrive|
+
+There is a cheap way to find it rather than guessing: run a short <strong>learning-rate sweep</strong>, increasing the rate exponentially over a few hundred batches while recording the loss. The loss falls, reaches a minimum, then explodes. Pick a value somewhat below where it exploded &mdash; often the steepest part of the descent.
+
+This takes a minute or two and is worth more than any other single piece of tuning.
+
+## Full batch, stochastic, and mini-batch
+
+The gradient is really an average over training examples, and how many you average over is a design choice.
+
+<strong>Full batch</strong> uses the entire dataset for every update. The gradient is accurate and each step is expensive; on a million rows it is unusable.
+
+<strong>Stochastic (one example)</strong> updates after every single row. Steps are cheap and extremely noisy, and it cannot exploit vectorised hardware.
+
+<strong>Mini-batch</strong> uses 32 to 256 examples per update, and it is what everyone actually uses. The gradient is a reasonable estimate, the batch fills a GPU efficiently, and the remaining noise is useful &mdash; it helps the optimiser escape saddle points and shallow local minima.
+
+An epoch is one pass through the data; with 50,000 rows and a batch size of 64 that is 782 updates per epoch, not one.
+
+Batch size and learning rate move together: doubling the batch size roughly halves the gradient noise, and the usual rule is to scale the learning rate linearly with batch size (with a short warm-up for very large batches).
+
 ## Try it yourself
 
 1. <strong>Find the working range.</strong> Set <strong>Learning Rate</strong> to 0.01 and press <strong>Train</strong>. The line converges smoothly onto the data. This is what a healthy run looks like.
@@ -51,3 +97,56 @@ The gradient is a sum over training examples, and how many you include before ea
 ## What to remember
 
 Gradient descent repeatedly moves each parameter against its gradient, scaled by a learning rate, and that single rule trains every neural network in use. The gradient is reliable; the learning rate is the choice you have to get right, because too large diverges and too small never arrives. Mini-batches are the standard compromise between the exact-but-expensive batch gradient and the cheap-but-noisy stochastic one.
+
+## Momentum, and why plain descent is rarely used
+
+Plain gradient descent is inefficient in a common situation: a loss surface that is much steeper in one direction than another. The steps zigzag across the narrow direction and crawl along the shallow one.
+
+<strong>Momentum</strong> fixes it by accumulating a velocity:
+
+<p class="mono-font">v &larr; &beta;v + &part;L/&part;w&nbsp;&nbsp;&nbsp;&nbsp;w &larr; w &minus; &eta;v</p>
+
+With β = 0.9, the update is an exponentially weighted average of recent gradients. Consistent directions build up speed; oscillating ones partly cancel. It is the single cheapest improvement over plain descent, and effectively nobody trains without it or something like it.
+
+<strong>Adam</strong> goes further by keeping a per-parameter estimate of both the mean and the variance of recent gradients, and dividing by the square root of the variance. Parameters with consistently small gradients get larger effective steps. This is why Adam works well with almost no tuning, and why `AdamW` &mdash; the variant that decouples weight decay from the adaptive scaling &mdash; is the default for transformers.
+
+Plain SGD with momentum still wins on some vision benchmarks, generalising slightly better with a well-tuned schedule. AdamW is the safer starting point.
+
+## What a healthy training run looks like
+
+- <strong>Loss falls quickly at first,</strong> then more slowly, then flattens.
+- <strong>Validation loss follows training loss down,</strong> then flattens or turns up. The turn is where overfitting begins and where early stopping should trigger.
+- <strong>Gradient norms stay in a similar range</strong> across layers and across time.
+- <strong>The loss is noisy batch to batch</strong> and smooth when averaged over an epoch. Batch-level noise is expected, not a problem.
+
+And the failures, with their usual causes:
+
+|Symptom|Likely cause|
+|---|---|
+|Loss is `NaN`|Learning rate too high, or `log(0)` in the loss|
+|Loss flat from step one|Learning rate far too low, or a bug in the data|
+|Loss falls then jumps up permanently|Learning rate too high for the later, sharper region|
+|Training loss falls, validation rises|Overfitting &mdash; regularise or stop earlier|
+|Both losses stuck high|Underfitting &mdash; bigger model, better features, longer training|
+
+## Questions people ask
+
+<strong>Which optimiser should I use?</strong> AdamW at 1e-3 (or 3e-4 for transformers) as a default. Try SGD with momentum and a cosine schedule if you are chasing the last fraction on a vision benchmark.
+
+<strong>Does gradient descent find the global minimum?</strong> Almost never, and it does not matter. In high dimensions there are vast numbers of near-equivalent good minima, and the noise from mini-batches helps escape the bad regions.
+
+<strong>Why is my loss noisy?</strong> Because each batch is a different sample. Judge progress on epoch averages, not single batches.
+
+<strong>Should the learning rate change during training?</strong> Yes &mdash; a warm-up followed by cosine decay is the modern default and reliably beats a constant rate.
+
+<strong>How do I know when to stop?</strong> When validation loss stops improving for a set number of epochs. Keep the best checkpoint, not the last.
+
+<strong>What is gradient accumulation?</strong> Calling `backward()` several times before `step()`, so a small GPU can simulate a large batch.
+
+## Recap in one screen
+
+- Step against the gradient, scaled by the learning rate; repeat per batch.
+- The learning rate matters more than anything else &mdash; find it with a short sweep.
+- Mini-batches of 32&ndash;256 balance gradient quality, hardware efficiency and useful noise.
+- Momentum and Adam accelerate progress and damp oscillation; plain descent is rarely used.
+- Watch training and validation loss together, and stop when validation stops improving.

@@ -30,6 +30,50 @@ For <strong>overfitting</strong>, more data is the only fix with no downside, an
 
 For <strong>underfitting</strong>, first confirm the model is training at all &mdash; a learning rate that is too high or too low looks exactly like insufficient capacity. Then widen or deepen the network, remove regularisation, train for longer, or improve the features. A model that cannot overfit a small subset of the training data has a bug, not a capacity problem, and that is the fastest test to run.
 
+## Two ways to be wrong
+
+<strong>Underfitting</strong> is a model too simple to capture the pattern. Training error is high, validation error is high, and the two are similar. The model has not learned enough.
+
+<strong>Overfitting</strong> is a model that learned the training data including its noise. Training error is very low, validation error is much higher, and the gap is the symptom. The model learned too much of the wrong thing.
+
+The diagnosis needs only two numbers:
+
+|Training error|Validation error|Diagnosis|
+|---|---|---|
+|High|High, similar|Underfitting|
+|Low|Much higher|Overfitting|
+|Low|Low, similar|A good fit|
+|High|Lower than training|A bug or a leak|
+
+That last row is worth naming: validation better than training usually means augmentation is applied only to training data, dropout is inflating training loss, or the split leaked.
+
+## Reading the training curve
+
+Plot both losses against epochs and the shape tells you what is happening.
+
+<strong>Both falling, still close:</strong> keep training.
+
+<strong>Both flat and high from early on:</strong> underfitting. The model, the features or the learning rate is the problem.
+
+<strong>Training falling, validation flattening then rising:</strong> the classic overfitting signature. The point where validation turns up is where the model stopped generalising and started memorising, and it is exactly where early stopping should trigger.
+
+<strong>Validation noisy but not trending:</strong> normal. Judge the trend over several epochs, not one.
+
+A related check: if training accuracy reaches 100%, the model has memorised the training set. That is not automatically bad &mdash; large networks often do this and still generalise &mdash; but the validation curve is the only thing that tells you which case you are in.
+
+## Fixing underfitting
+
+The model needs more capacity or better inputs.
+
+- <strong>A bigger model</strong> &mdash; more layers, more units.
+- <strong>Better features.</strong> On tabular data this usually matters more than the architecture.
+- <strong>Train longer.</strong> Check the curve is genuinely flat and not still descending.
+- <strong>Less regularisation</strong> &mdash; lower dropout, less weight decay.
+- <strong>A better learning rate.</strong> A rate far too low looks exactly like underfitting.
+- <strong>Check for bugs.</strong> Wrong labels, a broken loss, or gradients not reaching the parameters all present as underfitting.
+
+The sanity check that settles it: try to overfit a tiny subset &mdash; 20 examples &mdash; deliberately. A correct model and training loop should reach near-zero loss on 20 examples within a few hundred steps. If it cannot, the problem is a bug, not capacity, and no amount of tuning will help.
+
 ## Try this above
 
 1. Set <strong>Model Complexity</strong> to its minimum. The fitted curve cannot follow the data no matter how many <strong>Target Epochs</strong> you allow &mdash; more training will never fix underfitting.
@@ -51,3 +95,55 @@ They need opposite treatment, which is why diagnosing correctly matters more tha
 ## In one line
 
 Too little capacity misses the signal; too much memorises the noise &mdash; and the cures point in opposite directions.
+
+## Fixing overfitting
+
+In rough order of effectiveness:
+
+<strong>More data.</strong> The only fix that reduces variance without adding bias, and the reason "get more data" is such a reliable answer.
+
+<strong>Data augmentation.</strong> Effectively more data, and often the single biggest improvement on image tasks with a few thousand examples.
+
+<strong>Early stopping.</strong> Free, and it directly targets the moment overfitting begins. Keep the best checkpoint, not the last.
+
+<strong>Weight decay.</strong> Penalises large weights, pulling the model towards simpler solutions. Always worth having on.
+
+<strong>Dropout.</strong> Standard in dense layers and transformers, less used in modern convolutional networks.
+
+<strong>A smaller model.</strong> Effective and blunt; try the regularisers first, since a smaller model also lowers the achievable ceiling.
+
+<strong>Transfer learning.</strong> With a few hundred examples, fine-tuning a pretrained model beats training a smaller one from scratch by a wide margin.
+
+<strong>Label smoothing and mixup.</strong> Soften the targets so the model is not pushed towards absolute confidence.
+
+## The modern complication: double descent
+
+The classical picture &mdash; a U-shaped test error, with a sweet spot of complexity in the middle &mdash; is incomplete for very large models.
+
+As model size grows, test error falls, then rises around the point where the model can exactly interpolate the training data, and then <em>falls again</em> as the model grows larger still. Very large networks often generalise well despite fitting their training data perfectly, which classical theory did not predict.
+
+Two practical implications. Training accuracy of 100% is not by itself evidence of a problem &mdash; look at validation. And with modern architectures, "make the model smaller" is a less automatic response than it used to be; more data, augmentation and regularisation usually beat shrinking the network.
+
+The classical U-curve is still real. It is now understood as the first half of a longer story.
+
+## Questions people ask
+
+<strong>How big a train/validation gap is acceptable?</strong> There is no universal number. What matters is whether validation performance is good enough and stable. A 2% gap on a hard task may be fine; a 30% gap rarely is.
+
+<strong>Can a model overfit and underfit at once?</strong> Yes &mdash; high bias and high variance together, usually from a badly chosen model plus insufficient data. Both errors are large and the gap is also large.
+
+<strong>Does more data always help?</strong> With overfitting, yes. With underfitting, no &mdash; a linear model fitted to a million points is still linear.
+
+<strong>Should I stop as soon as validation loss rises?</strong> Use patience &mdash; wait several epochs, since validation loss is noisy and can dip and recover.
+
+<strong>Is 100% training accuracy bad?</strong> Not necessarily, for large models. The validation curve is the evidence that matters.
+
+<strong>How do I know if it is a bug rather than underfitting?</strong> Try to overfit 20 examples. If you cannot, it is a bug.
+
+## Recap in one screen
+
+- Underfitting: both errors high and similar. Overfitting: training low, validation much higher.
+- The gap measures variance; the level of the training error measures bias.
+- Fix underfitting with capacity, features, longer training and less regularisation.
+- Fix overfitting with more data, augmentation, early stopping, weight decay and dropout.
+- Always try to overfit a tiny subset first &mdash; failing that test means a bug, not a modelling problem.

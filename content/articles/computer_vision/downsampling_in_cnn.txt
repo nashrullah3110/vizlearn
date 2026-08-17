@@ -9,6 +9,57 @@ intro: Pooling shrinks a feature map by summarising each small neighbourhood int
 
 <strong>Computation.</strong> Quartering the spatial dimensions quarters the work of every subsequent layer. In a deep network that compounds enormously.<strong>Receptive field.</strong> This is the one people miss. After pooling, each position in the smaller map summarises a larger region of the original image, so a 3&times;3 filter applied afterwards covers twice the input area it would have before. Stacking convolution and pooling is what lets a network built from small filters eventually see the whole image &mdash; without it, a network of 3&times;3 filters would need to be impractically deep.<strong>Translation invariance.</strong> If a feature shifts by one pixel within a pooling window, the maximum is unchanged. This is a genuine but modest benefit &mdash; it tolerates small shifts, not large ones, and it is often overstated.
 
+## Making the map smaller on purpose
+
+A network that kept every layer at 224&times;224 would be enormously expensive and would never see more than a few pixels at a time. Downsampling &mdash; deliberately reducing the spatial size of feature maps &mdash; is what makes deep vision networks affordable and gives them a wide enough view to recognise whole objects.
+
+The three mechanisms:
+
+|Method|How|Parameters|
+|---|---|---|
+|Max pooling|Take the largest value in each window|None|
+|Average pooling|Take the mean of each window|None|
+|Strided convolution|Skip positions while convolving|Learned|
+
+A 2&times;2 max pool with stride 2 on a 4&times;4 map:
+
+```
+6  8  3  1        max of each 2x2 block
+2  4  9  5   ->   [8  9]
+1  0  7  2        [3  7]
+3  2  4  6
+```
+
+Sixteen numbers become four. The map is a quarter of the size, and every subsequent layer costs a quarter as much.
+
+## Three things it buys
+
+<strong>Computation.</strong> The saving compounds through the network. Halving both dimensions once quarters the cost of everything after it.
+
+<strong>Receptive field.</strong> After downsampling, each filter position covers twice as much of the original image. Without it, a 3&times;3 filter stacked twenty times would still only see a 41&times;41 region &mdash; not enough to recognise an object in a 224&times;224 photograph.
+
+<strong>A little translation invariance.</strong> Max pooling reports the strongest response in a window regardless of exactly where in the window it occurred, so a small shift often produces the same output. The effect is real but modest, and it is not a substitute for augmentation.
+
+The cost is precision. Downsampling discards spatial detail permanently, which is fine for "is this a cat?" and a serious problem for "which pixels are the cat?"
+
+## Max or average?
+
+<strong>Max pooling</strong> keeps the strongest evidence and discards the rest. It suits feature detection, where the question is "was this pattern present anywhere in the window", and it produces sparse, high-contrast maps. It has been the default in classification networks for a decade.
+
+<strong>Average pooling</strong> keeps a smoothed summary. It suits situations where overall level matters more than peak response, and it is the standard choice at the very end of a network.
+
+<strong>Global average pooling</strong> deserves separate mention. It reduces each feature map to a single number &mdash; a 7&times;7&times;512 tensor becomes 512 values &mdash; and feeds those straight to the classifier.
+
+That single design change removed most of the parameters from image classifiers. VGG's flatten-and-dense head held about 100 million weights; global average pooling replaces it with none, and it makes the network accept any input size, because the output no longer depends on the spatial dimensions. Every modern architecture uses it.
+
+## The trend towards strided convolutions
+
+Modern architectures increasingly downsample with stride-2 convolutions instead of pooling layers, on the grounds that <em>how</em> to reduce resolution is a decision worth learning rather than fixing.
+
+ResNet uses stride-2 convolutions in its blocks; many detection and segmentation backbones do the same. Pooling has not disappeared &mdash; ResNet still starts with a max pool and ends with a global average pool &mdash; but it is no longer the main downsampling mechanism.
+
+A related refinement addresses aliasing. Downsampling without smoothing first violates the sampling theorem and makes networks sensitive to one-pixel shifts. Adding a small blur before the stride ("anti-aliased downsampling") measurably improves shift-consistency and accuracy, at a small cost.
+
 ## Interactive Exploration Guide
 
 1. <strong>Halve the map.</strong> Draw a pattern, set <strong>Window Size</strong> to 2&times;2 and <strong>Stride</strong> to 2, then press <strong>Animate Pooling</strong>. The output is half the width and height, and the windows tile without overlapping.
@@ -33,3 +84,58 @@ It is also destructive in a way that matters for some tasks. Max pooling discard
 ## What to remember
 
 Pooling summarises each neighbourhood into one value, most often taking the maximum of a 2&times;2 window at stride 2, which quarters the feature map for free &mdash; it has no parameters. Its real value is enlarging the receptive field so small filters can eventually see large structures, with computational saving second and a modest, purely local translation tolerance third. Strided convolutions do the same job with learned weights, which is why newer architectures often skip it.
+
+## Recovering resolution when you need it
+
+Classification can afford to throw resolution away. Segmentation and detection cannot &mdash; they must produce answers at, or near, the original pixel grid.
+
+Three approaches, all in current use:
+
+<strong>Encoder-decoder with skip connections.</strong> U-Net downsamples through an encoder, then upsamples through a decoder, concatenating each decoder stage with the matching encoder feature map. The deep path supplies semantics ("this is a road"); the skip connections supply the fine boundaries that downsampling destroyed. This pairing is the reason U-Net works so well on small datasets.
+
+<strong>Dilated convolutions.</strong> Widen the receptive field by spacing out the filter taps instead of shrinking the map. Resolution is preserved throughout, at higher memory cost. DeepLab is built on this.
+
+<strong>Feature pyramids.</strong> Keep feature maps at several resolutions and make predictions from all of them, so small objects are detected in the high-resolution maps and large ones in the low-resolution maps. Standard in modern object detectors.
+
+## Choosing how much to downsample
+
+The total reduction from input to final feature map is the network's <strong>output stride</strong>. A typical classifier has an output stride of 32: 224&times;224 becomes 7&times;7.
+
+|Task|Typical output stride|Why|
+|---|---|---|
+|Classification|32|Only the label matters|
+|Object detection|8&ndash;32, several scales|Boxes need moderate precision|
+|Semantic segmentation|8&ndash;16|Boundaries need fine precision|
+|Super-resolution|1, or upsampling|Output is a full-size image|
+
+Reducing the output stride from 32 to 8 makes the last stages sixteen times more expensive in area, which is why segmentation networks are slower than classifiers on the same backbone.
+
+## Common mistakes
+
+- <strong>Downsampling too aggressively on small images.</strong> A 32&times;32 CIFAR image cannot survive five stride-2 stages; it would be down to 1&times;1 before the network has done anything.
+- <strong>Expecting pooling to give real invariance.</strong> It tolerates shifts of a pixel or two, not rotation, scale, or a shifted object. Augmentation is what handles those.
+- <strong>Using max pooling right at the end.</strong> Global average pooling is almost always the better final layer.
+- <strong>Flattening a large feature map into a dense layer.</strong> That is where the parameter explosion lives; global average pooling removes it.
+- <strong>Downsampling in a segmentation network without skip connections.</strong> The boundaries will be soft and the output blocky.
+
+## Questions people ask
+
+<strong>Is pooling obsolete?</strong> No &mdash; global average pooling is universal, and max pooling is still common early in a network. What has changed is that mid-network downsampling is now usually strided convolution.
+
+<strong>Does pooling have parameters?</strong> No, which is part of its appeal: it reduces size at almost no cost and cannot overfit.
+
+<strong>What window size should I use?</strong> 2&times;2 with stride 2 is standard and halves each dimension. 3&times;3 with stride 2 gives overlapping windows and is used in some architectures.
+
+<strong>Can I avoid downsampling entirely?</strong> Yes, with dilated convolutions, at considerably higher memory and compute cost.
+
+<strong>Why is my segmentation output blocky?</strong> Because the output stride is too large and the decoder has too little high-resolution information. Add skip connections or reduce the stride.
+
+<strong>Does downsampling cause information loss?</strong> Yes, permanently. That is the trade: cheaper computation and a wider view, in exchange for spatial detail.
+
+## Recap in one screen
+
+- Downsampling shrinks feature maps to cut cost and widen the receptive field.
+- Max pooling keeps the strongest response; average pooling smooths; strided convolution learns what to keep.
+- Global average pooling replaced the huge dense head and removed most of a classifier's parameters.
+- Spatial detail is lost permanently &mdash; segmentation recovers it with skip connections or avoids losing it with dilation.
+- Total reduction is the output stride: 32 for classification, 8&ndash;16 for dense prediction.

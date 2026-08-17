@@ -32,6 +32,63 @@ Press <strong>Sample 500</strong> a few times and watch the histogram converge o
 
 Normal tails are extremely thin &mdash; a 5&sigma; event should essentially never happen. Financial returns, city sizes and word frequencies have far <em>fatter</em> tails, so assuming normality there badly underestimates extreme events. The 2008 financial crisis is the textbook example of trusting a bell curve where none existed.
 
+## The shape that keeps appearing
+
+The normal distribution is the symmetric bell curve, defined entirely by two numbers: the mean &mu; (where the peak sits) and the standard deviation &sigma; (how wide it is).
+
+Its most useful property is the empirical rule, which turns &sigma; into a statement about proportions:
+
+|Range|Share of the data|
+|---|---|
+|&mu; &plusmn; 1&sigma;|68%|
+|&mu; &plusmn; 2&sigma;|95%|
+|&mu; &plusmn; 3&sigma;|99.7%|
+
+So for adult heights with a mean of 170cm and &sigma; of 10cm: about two thirds of people are between 160 and 180, 95% between 150 and 190, and someone at 200cm is a genuine three-sigma rarity &mdash; about 1 in 700.
+
+That is the practical value of the curve. Two numbers, and you can answer "how unusual is this?" for any value.
+
+## The z-score
+
+A z-score converts any value into "how many standard deviations from the mean":
+
+<p class="mono-font">z = (x &minus; &mu;) / &sigma;</p>
+
+A test score of 85 where the mean is 70 and &sigma; is 10 gives z = 1.5 &mdash; one and a half standard deviations above average, better than about 93% of the group.
+
+Standardising this way makes different scales comparable: a z of 1.5 means the same thing whether the underlying variable is heights, salaries or reaction times. That is exactly what `StandardScaler` does to every column before a distance-based model sees it.
+
+|z|Percentile|
+|---|---|
+|&minus;2|2.3%|
+|&minus;1|15.9%|
+|0|50%|
+|1|84.1%|
+|2|97.7%|
+|3|99.9%|
+
+## Why it appears so often: the central limit theorem
+
+The reason the bell curve shows up everywhere is not that nature prefers it. It is a mathematical result: <strong>the sum or average of many independent contributions tends towards a normal distribution, whatever the shape of the individual contributions</strong>.
+
+Roll one die and the outcomes are flat. Roll ten and add them, and the totals form a bell. Human height is the sum of many small genetic and environmental effects; measurement error is the sum of many small disturbances. Both end up normal for the same reason.
+
+Two consequences for practical work:
+
+- <strong>Sample means are normally distributed</strong> even when the underlying data is not, which is why confidence intervals and t-tests work on skewed data given a reasonable sample size.
+- <strong>Individual measurements are often not normal.</strong> Incomes, city sizes and response times are famously right-skewed, and treating them as normal produces bad intervals and worse thresholds.
+
+The mistake to avoid is assuming normality rather than checking it. A histogram, or a Q-Q plot, settles it in seconds.
+
+## Where it is used in machine learning
+
+- <strong>Standardisation.</strong> Subtracting the mean and dividing by &sigma; is the standard preprocessing step for linear models, SVMs, KNN and neural networks.
+- <strong>Weight initialisation.</strong> Networks start with weights drawn from a normal distribution, scaled by the layer size (He, Xavier).
+- <strong>Assumed errors.</strong> Linear regression's inference &mdash; confidence intervals, p-values &mdash; assumes normally distributed residuals. The predictions themselves do not.
+- <strong>Gaussian mixtures</strong> model data as several overlapping bells, giving soft cluster membership.
+- <strong>Anomaly detection.</strong> Flag anything beyond three sigma, when the normality assumption holds.
+- <strong>Noise.</strong> Gaussian noise is the default in augmentation, differential privacy and diffusion models.
+
 ## Exploration guide
 
 1. <strong>Slide &mu;.</strong> The curve translates; its shape never changes.
@@ -43,3 +100,45 @@ Normal tails are extremely thin &mdash; a 5&sigma; event should essentially neve
 ## Where that leaves you
 
 Two parameters describe the entire curve, area equals probability, and 68/95/99.7 holds universally. The central limit theorem is why the shape is so common &mdash; but its thin tails mean it is the wrong model whenever extreme events actually matter.
+
+## When the data is not normal
+
+Assuming a bell curve for skewed data has predictable consequences: thresholds set at three sigma fire far too often, confidence intervals are wrong, and models that assume symmetry systematically under-predict the tail.
+
+Three responses, in order of preference:
+
+<strong>Transform.</strong> A log transform straightens most right-skewed data &mdash; incomes, populations, counts. The Box-Cox and Yeo-Johnson transforms generalise this and can be fitted automatically.
+
+<strong>Use a distribution that fits.</strong> Poisson for counts, exponential for waiting times, log-normal for anything multiplicative, Student's t when the tails are heavier than normal.
+
+<strong>Stop assuming.</strong> Rank-based methods, quantile regression and bootstrapping make no distributional assumption at all. The bootstrap in particular is a general-purpose way to get a confidence interval from data of any shape: resample with replacement a few thousand times and read the interval off the resulting spread.
+
+How to check quickly: plot a histogram, then a Q-Q plot &mdash; if the points fall on the diagonal, normality is a reasonable approximation. Formal tests such as Shapiro-Wilk exist but reject almost any large real dataset, since no real data is exactly normal.
+
+## Two relatives worth knowing
+
+<strong>The log-normal distribution</strong> describes a variable whose <em>logarithm</em> is normal. It arises whenever effects multiply rather than add &mdash; incomes, file sizes, stock prices. It is right-skewed and strictly positive, which fits a great deal of real data that people mistakenly model as normal.
+
+<strong>Student's t distribution</strong> looks like a normal curve with heavier tails. It is what you use for confidence intervals from small samples, where the extra tail weight honestly reflects the uncertainty in estimating &sigma; from few observations. As the sample grows it converges to the normal.
+
+## Questions people ask
+
+<strong>Does my data need to be normal for machine learning?</strong> Mostly no. Trees, forests and boosting do not care. Linear models' <em>inference</em> assumes normal residuals, not normal features. Distance-based models care about scale, which standardisation fixes regardless of shape.
+
+<strong>What is the difference between standardisation and normalisation?</strong> Standardising subtracts the mean and divides by &sigma;, giving mean 0 and &sigma; 1. Normalising usually means rescaling to a fixed range such as [0, 1]. The words are used loosely; say which you mean.
+
+<strong>Is the mean always at the peak?</strong> For a normal distribution the mean, median and mode coincide. For skewed data they separate, and the gap tells you the direction of the skew.
+
+<strong>How many samples until the central limit theorem applies?</strong> The usual rule of thumb is 30, but heavily skewed data needs far more. Simulate it if the answer matters.
+
+<strong>What is a three-sigma event?</strong> A value more than three standard deviations from the mean &mdash; about 0.3% of a normal distribution. In markets and other heavy-tailed settings they happen far more often than the normal model predicts.
+
+<strong>Why do neural network weights start normally distributed?</strong> Because a symmetric, zero-centred spread breaks symmetry between neurons while keeping the initial activations in a sensible range.
+
+## Recap in one screen
+
+- Two numbers, the mean and the standard deviation, describe the whole curve.
+- 68%, 95% and 99.7% fall within one, two and three standard deviations.
+- A z-score expresses any value as a number of standard deviations, making scales comparable.
+- The central limit theorem explains its ubiquity: sums and averages tend to normal.
+- Individual measurements are often skewed &mdash; check before assuming, and transform or use a better-fitting distribution.

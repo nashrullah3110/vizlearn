@@ -31,6 +31,56 @@ Standardisation &mdash; the z-score &mdash; rewrites every value as "how many st
 
 This is what feature scaling, batch normalisation and layer normalisation all compute. It puts features measured in wildly different units onto a common footing, which stops the largest-scaled feature from dominating training purely because of its units.
 
+## Centre and spread
+
+The mean says where the data sits. Variance and standard deviation say how far it typically strays from there &mdash; and without the second number the first one is close to useless.
+
+Two datasets with the same mean of 50:
+
+- A: 49, 50, 50, 51 &mdash; tight.
+- B: 10, 30, 70, 90 &mdash; spread out.
+
+Same centre, entirely different situations. "Average delivery time 3 days" means something quite different at &plusmn;0.5 days than at &plusmn;5.
+
+The calculation, worked through on [2, 4, 4, 4, 5, 5, 7, 9]:
+
+1. <strong>Mean</strong>: 40 / 8 = 5.
+2. <strong>Deviations</strong>: &minus;3, &minus;1, &minus;1, &minus;1, 0, 0, 2, 4.
+3. <strong>Square them</strong>: 9, 1, 1, 1, 0, 0, 4, 16 &mdash; total 32.
+4. <strong>Variance</strong>: 32 / 8 = <strong>4</strong>.
+5. <strong>Standard deviation</strong>: &radic;4 = <strong>2</strong>.
+
+Step 3 is the one that needs justifying: deviations are squared because they would otherwise cancel to exactly zero, and squaring (rather than taking absolute values) keeps the result smooth and differentiable, which matters for everything built on top of it.
+
+## Why both variance and standard deviation exist
+
+Variance is in <em>squared</em> units. If the data is in pounds, the variance is in "squared pounds", which nobody can picture.
+
+The standard deviation is its square root, back in the original units, and is therefore the number you report: "average salary &pound;50,000 with a standard deviation of &pound;12,000" is a sentence people can act on.
+
+Variance survives because it is mathematically better behaved. Variances of independent variables add; standard deviations do not. That single property underlies error propagation, the bias-variance decomposition, portfolio theory and the derivation of most statistical tests.
+
+Rule of thumb: <strong>compute with variance, communicate with standard deviation.</strong>
+
+## The n or n&minus;1 question
+
+Dividing by n gives the <em>population</em> variance &mdash; correct when your data is the entire group you care about.
+
+Dividing by n&minus;1 gives the <em>sample</em> variance &mdash; correct when your data is a sample used to estimate a larger population's variance. The smaller denominator makes the estimate slightly larger, correcting a bias that comes from measuring deviations against the sample's own mean rather than the true one.
+
+In practice: use n&minus;1 for sample data, which is nearly always what you have. NumPy defaults to n (`ddof=0`); pandas defaults to n&minus;1. That inconsistency is a real source of small discrepancies between two analyses of the same data.
+
+```python
+import numpy as np, pandas as pd
+x = [2, 4, 4, 4, 5, 5, 7, 9]
+
+np.std(x)                  # 2.0    - population (ddof=0)
+np.std(x, ddof=1)          # 2.138  - sample
+pd.Series(x).std()         # 2.138  - sample by default
+```
+
+With large n the difference is negligible; with n = 5 it is 12%.
+
 ## Try it yourself
 
 1. <strong>Drag a point far to the right.</strong> The mean drifts toward it and &sigma; grows sharply &mdash; both are sensitive to extremes.
@@ -42,3 +92,54 @@ This is what feature scaling, batch normalisation and layer normalisation all co
 ## Worth remembering
 
 The mean locates the data, the standard deviation measures its spread in the same units, and variance is the squared intermediate that makes the maths work. Squaring is what makes both outlier-sensitive &mdash; and the z-score built from them is the normalisation step in nearly every model you will train.
+
+## Standardisation, and why models need it
+
+Subtracting the mean and dividing by the standard deviation converts any feature into a z-score &mdash; centred at 0, with a spread of 1.
+
+<p class="mono-font">z = (x &minus; &mu;) / &sigma;</p>
+
+The reason this matters is that many algorithms compare features by magnitude. Salary in the tens of thousands and age in the tens are not comparable numbers, so any distance, any regularisation penalty, and any gradient step will be dominated by whichever column happens to use larger units.
+
+Which models need it:
+
+|Model|Needs scaling?|Why|
+|---|---|---|
+|KNN, k-means, SVM|Yes|Built on distances|
+|Linear/logistic with regularisation|Yes|The penalty is on raw coefficient size|
+|Neural networks|Yes|Gradients and initialisation assume comparable scales|
+|PCA|Yes|It maximises variance, which is unit-dependent|
+|Decision trees, forests, boosting|No|Splits are per-feature comparisons|
+
+The rule that keeps it honest: <strong>fit the scaler on the training set only</strong>, then apply it to validation and test data. Fitting on everything leaks the test set's mean and standard deviation into training. A `Pipeline` enforces this automatically.
+
+`RobustScaler` is the variant to reach for when outliers are present: it centres on the median and scales by the interquartile range, so one extreme value cannot distort the whole column.
+
+## Reading the spread
+
+- <strong>Coefficient of variation</strong> (&sigma; / &mu;) makes spread comparable across variables with different units &mdash; a &sigma; of 10 is large for a mean of 20 and tiny for a mean of 10,000.
+- <strong>Interquartile range</strong> is the robust alternative, unaffected by the tails.
+- <strong>Standard error</strong> (&sigma; / &radic;n) is the spread of the <em>mean</em>, not of the data, and is what confidence intervals are built from. Confusing the two makes intervals far too wide or far too narrow.
+- <strong>Variance in the bias-variance decomposition</strong> is the same idea applied to a model's predictions across different training sets.
+
+## Questions people ask
+
+<strong>Can variance be negative?</strong> No &mdash; it is an average of squares. A negative result means a numerical bug, usually in a "shortcut" formula.
+
+<strong>What does a standard deviation of zero mean?</strong> Every value is identical. As a feature that is useless, and it will break standardisation by dividing by zero.
+
+<strong>Which is more robust to outliers?</strong> Neither &mdash; squaring makes both very sensitive. Use the interquartile range or median absolute deviation instead.
+
+<strong>Why square instead of taking absolute values?</strong> Squares are differentiable everywhere and they add cleanly across independent variables. Mean absolute deviation is more robust but harder to work with mathematically.
+
+<strong>Do I standardise the target too?</strong> For neural networks often yes, and remember to invert it before reporting errors. For tree models, no.
+
+<strong>What is `ddof`?</strong> The delta degrees of freedom &mdash; the amount subtracted from n in the denominator. `ddof=1` gives the sample variance.
+
+## Recap in one screen
+
+- The mean gives the centre; variance and standard deviation give the spread, and a centre without a spread says little.
+- Variance is the mean squared deviation; the standard deviation is its square root, in the data's own units.
+- Compute with variance (it adds), report with standard deviation (it is interpretable).
+- Divide by n&minus;1 for samples; check your library's default.
+- Standardisation is required for every distance-based or regularised model, and must be fitted on training data only.

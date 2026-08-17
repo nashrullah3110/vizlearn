@@ -25,6 +25,87 @@ So <span class="mono-font">if items:</span> is the idiomatic way to ask “is th
 
 The trap is that <span class="mono-font">0</span> and <span class="mono-font">None</span> are both falsy but mean different things. If a variable can legitimately be 0, test <span class="mono-font">if x is not None:</span> explicitly &mdash; otherwise a real value of 0 is treated as missing.
 
+## The shape of a decision
+
+An `if` statement runs a block only when a condition is true. `elif` adds further conditions to test if the earlier ones failed, and `else` catches everything remaining.
+
+```python
+temperature = 18
+
+if temperature > 25:
+    print("hot")
+elif temperature > 15:
+    print("mild")
+elif temperature > 5:
+    print("cool")
+else:
+    print("cold")
+```
+
+Two structural rules matter. The colon ends the condition, and the <strong>indentation</strong> defines the block &mdash; in Python, indentation is syntax rather than style, and mixing tabs and spaces is an error rather than an inconsistency.
+
+Only <em>one</em> branch of an if/elif/else chain ever runs: the first whose condition is true. Once one matches, the rest are not even evaluated.
+
+## Order is logic, not layout
+
+Because the first match wins, the order of the branches is part of the meaning. Reorder them and you change the program.
+
+```python
+score = 95
+
+if score > 50:
+    grade = "pass"          # this catches 95 first
+elif score > 90:
+    grade = "distinction"   # unreachable for any passing score
+```
+
+Nobody ever gets a distinction here, and Python will not warn you &mdash; both branches are valid code. The fix is to test the most specific condition first:
+
+```python
+if score > 90:
+    grade = "distinction"
+elif score > 50:
+    grade = "pass"
+else:
+    grade = "fail"
+```
+
+Compare that with separate `if` statements, where every condition is tested and several blocks can run:
+
+```python
+if score > 90:
+    print("distinction")
+if score > 50:
+    print("pass")           # both print for a score of 95
+```
+
+Sometimes that is what you want. Usually it is not, and using `elif` is how you say "these are alternatives".
+
+## Truthiness, and the idioms it produces
+
+Any value can be used as a condition, not just `True` and `False`. Python treats these as false:
+
+<p class="mono-font">False&nbsp;&nbsp;None&nbsp;&nbsp;0&nbsp;&nbsp;0.0&nbsp;&nbsp;""&nbsp;&nbsp;[]&nbsp;&nbsp;{}&nbsp;&nbsp;()&nbsp;&nbsp;set()</p>
+
+Everything else is true, including `-1`, `"False"` and `[0]`.
+
+That gives the idiomatic way to test for emptiness:
+
+```python
+if items:                  # idiomatic
+if len(items) > 0:         # works, but noisier
+if items != []:            # works, and nobody writes this
+```
+
+One important exception: when a value could legitimately be `0` or `""`, truthiness cannot distinguish it from "missing". Test explicitly:
+
+```python
+if quantity is not None:   # 0 is a real quantity
+    process(quantity)
+```
+
+That distinction &mdash; between "empty" and "absent" &mdash; is behind a large share of real-world bugs in every language.
+
 ## Exploration guide
 
 1. <strong>Watch the skip.</strong> Run the example with a value that satisfies the first condition, then add a print inside the second branch. It never appears &mdash; the branch is not merely false, it is never evaluated.
@@ -34,12 +115,74 @@ The trap is that <span class="mono-font">0</span> and <span class="mono-font">No
 
 ## Common mistakes
 
-- <strong>Using <span class="mono-font">=</span> instead of <span class="mono-font">==</span>.</strong> Python raises a SyntaxError here rather than silently assigning, which is one of the friendlier language decisions.
-- <strong>Chaining separate ifs when you meant elif.</strong> Several branches run and the last one wins.
-- <strong><span class="mono-font">if x == True:</span></strong> &mdash; redundant and subtly different from <span class="mono-font">if x:</span>. Write the plain condition.
-- <strong>Mixing tabs and spaces.</strong> Indentation defines the block, so inconsistent whitespace changes which statements belong to the branch. Use four spaces throughout.
-- <strong>Testing a falsy-but-valid value.</strong> <span class="mono-font">if count:</span> treats a genuine count of zero as absent.
+- <strong>Using `=` instead of `==`.</strong> Python raises a `SyntaxError` here rather than silently assigning, which is one of the friendlier things about it.
+- <strong>Getting the branch order wrong,</strong> making a specific case unreachable behind a general one.
+- <strong>Testing `if x == True`.</strong> Write `if x`. And `if x is True` is different again, and almost never what you want.
+- <strong>Deep nesting.</strong> Four levels of `if` is a sign to use early returns or guard clauses instead.
+- <strong>Forgetting that `0` and `""` are falsy</strong> when they are legitimate values. Use `is not None`.
+- <strong>Mixing tabs and spaces,</strong> which produces an indentation error that is invisible on screen. Configure your editor to insert spaces.
 
 ## Key takeaway
 
 An if/elif/else chain evaluates conditions top to bottom and runs exactly one branch, so ordering is part of the logic &mdash; put specific conditions before general ones or the general one will shadow them. Conditions need not be comparisons, since empty containers, zero and None are all falsy; the exception worth remembering is that a meaningful zero must be tested against None explicitly rather than by truthiness.
+
+## Comparisons and boolean operators
+
+```python
+x == y      # equal in value
+x != y      # not equal
+x < y       # less than       (also <=, >, >=)
+x is y      # the same object
+x in items  # membership
+```
+
+Python allows chained comparisons, which read exactly as they do in mathematics:
+
+```python
+if 0 <= score <= 100:      # instead of score >= 0 and score <= 100
+```
+
+`and`, `or` and `not` combine conditions, and they <strong>short-circuit</strong>: `and` stops at the first false operand, `or` at the first true one. That is not just an optimisation &mdash; it is how you write safe guards:
+
+```python
+if user is not None and user.is_admin:      # never evaluates user.is_admin
+    ...                                      # when user is None
+```
+
+Reverse those two and the code raises `AttributeError` on the very case the check was meant to protect against.
+
+`and` and `or` also return one of their operands rather than a boolean, which is why `name = given_name or "Anonymous"` works as a default.
+
+## The conditional expression and the match statement
+
+For a simple either/or value, a one-line conditional expression is often clearer than four lines of `if`:
+
+```python
+status = "adult" if age >= 18 else "minor"
+```
+
+Keep it to genuinely simple cases; nested conditional expressions are hard to read.
+
+Python 3.10 added `match`, for dispatching on structure rather than on a chain of comparisons:
+
+```python
+match command.split():
+    case ["go", direction]:
+        move(direction)
+    case ["take", *items]:
+        pick_up(items)
+    case ["quit"]:
+        exit()
+    case _:
+        print("Unknown command")
+```
+
+It is not a C-style switch &mdash; it destructures values and binds names, which is what makes it worth having. For plain equality against a handful of constants, a dictionary lookup is usually simpler than either.
+
+## Recap in one screen
+
+- Only the first true branch in an if/elif/else chain runs; separate `if`s all run.
+- Branch order is part of the logic &mdash; specific conditions before general ones.
+- Falsy values are `False`, `None`, `0`, `0.0`, `""`, `[]`, `{}`, `()`, `set()`.
+- `and`/`or` short-circuit, which is how `if user and user.is_admin` stays safe.
+- Use `x if cond else y` for simple values, and `match` for structural dispatch.

@@ -21,6 +21,58 @@ Start at <span class="mono-font">&eta;<sub>0</sub> = 0.1</span> and multiply by 
 
 The characteristic sign that it is working is a visible drop in loss immediately after each decay step: the model had been oscillating around a minimum it could not land in, and a smaller step lets it descend the rest of the way.
 
+## One rate does not fit the whole run
+
+Early in training the weights are far from anything useful, and large steps make rapid progress. Late in training the model is close to a good solution, and large steps overshoot it repeatedly &mdash; the loss plateaus and bounces rather than settling.
+
+A schedule changes the learning rate over the course of training to suit both phases: large early, small late.
+
+The effect is not marginal. A well-scheduled run typically reaches a noticeably lower final loss than the best constant rate, and the schedule is one of the cheapest improvements available.
+
+|Schedule|Shape|
+|---|---|
+|Constant|Flat throughout|
+|Step decay|Drops by a factor at fixed epochs|
+|Exponential|Multiplied by a constant each epoch|
+|Cosine|Smooth decay following half a cosine curve|
+|One-cycle|Warm-up, then cosine decay to near zero|
+|Reduce-on-plateau|Drops when validation stops improving|
+
+## Warm-up: why the first steps are different
+
+Starting at full learning rate is often the wrong thing to do, for two specific reasons.
+
+Adam's variance estimate is built from an exponential moving average that starts at zero, so for the first few hundred steps it is unreliable and the effective step size can be far larger than intended.
+
+And a randomly initialised model produces meaningless gradients; taking a large step along them damages the initialisation more than it helps.
+
+<strong>Warm-up</strong> ramps the rate linearly from near zero over the first few hundred to few thousand steps. It is effectively mandatory for transformers, and it is a large part of why very large models train stably at all.
+
+Combining warm-up with cosine decay gives the shape almost every modern recipe uses: up quickly, then a long smooth descent to near zero.
+
+```python
+sched = torch.optim.lr_scheduler.OneCycleLR(
+    opt, max_lr=3e-4,
+    total_steps=epochs * len(loader),
+    pct_start=0.1,           # 10% of the run spent warming up
+)
+
+for batch in loader:
+    ...
+    opt.step()
+    sched.step()             # per batch for OneCycle, not per epoch
+```
+
+Calling `sched.step()` once per epoch when the scheduler expects per-batch stepping is a common bug: the schedule finishes hundreds of times too slowly and the run behaves as if the rate were constant.
+
+## Finding the maximum rate
+
+The schedule needs a peak value, and there is a systematic way to find it rather than guessing.
+
+Run a short <strong>learning-rate sweep</strong>: increase the rate exponentially from about 1e-7 to 1 over a few hundred batches, recording the loss. The curve falls, reaches a minimum, and then explodes upwards. Pick a value somewhat below the explosion point &mdash; often around the steepest descent.
+
+That takes a minute or two of compute and is worth more than any other single act of tuning. The learning rate affects results more than the optimiser choice, the layer count or the width.
+
 ## Try this above
 
 1. Set <strong>Initial LR</strong> high and run to the full <strong>Target Epochs</strong>. The fixed run makes rapid early progress then hovers, never quite settling.
@@ -35,3 +87,59 @@ The characteristic sign that it is working is a visible drop in loss immediately
 ## In one line
 
 Big steps to travel, small steps to arrive &mdash; and get the starting size right before tuning the decay.
+
+## Choosing a schedule
+
+|Situation|Schedule|
+|---|---|
+|Transformers, language models|Linear warm-up then cosine decay|
+|Vision, training from scratch|One-cycle, or cosine with warm-up|
+|Fine-tuning|Low constant rate, or a short cosine decay|
+|Unknown training length|Reduce-on-plateau|
+|Reproducing a paper|Whatever it specifies &mdash; usually step decay|
+
+<strong>Cosine decay</strong> has become the default because it beats step decay in most comparisons and has one fewer thing to tune &mdash; no decision about where the drops go.
+
+<strong>Reduce-on-plateau</strong> is the pragmatic choice when you do not know how long training will take: it watches validation loss and cuts the rate by a factor (typically 10) when improvement stalls. It requires no total-steps estimate, which the cosine schedules do.
+
+<strong>Warm restarts</strong> (SGDR) repeatedly decay to near zero and jump back up. The jumps can knock the model out of a sharp minimum into a better basin, and each cycle's endpoint makes a useful ensemble member.
+
+## What a well-scheduled run looks like
+
+- The loss falls fast during and just after warm-up.
+- It descends steadily through the middle of the cosine.
+- It flattens smoothly in the final phase as the rate approaches zero &mdash; and the final loss is meaningfully lower than the plateau a constant rate would have reached.
+
+Failures and their signatures:
+
+|Symptom|Likely cause|
+|---|---|
+|Loss spikes early|Warm-up too short, or peak rate too high|
+|Loss plateaus and bounces|Rate too high for the current phase|
+|Loss falls but never flattens|Training ended before the schedule did|
+|Loss barely moves at all|Peak rate too low, or scheduler stepped per epoch instead of per batch|
+|Sudden improvement at the very end|Normal &mdash; the final low-rate phase settling into a minimum|
+
+That last row is worth expecting: a visible drop in the closing epochs is the schedule working as intended, not a fluke.
+
+## Questions people ask
+
+<strong>Do I need a schedule with Adam?</strong> Yes. Adam adapts per-parameter scaling; it does not replace a global decay, and every large-model recipe uses both.
+
+<strong>How long should warm-up be?</strong> 5&ndash;10% of total steps, or a fixed few thousand steps for large models.
+
+<strong>Should I step the scheduler per batch or per epoch?</strong> It depends on the scheduler. OneCycle and cosine-with-total-steps expect per batch; StepLR and ReduceLROnPlateau expect per epoch. Read the documentation rather than guessing.
+
+<strong>What if I do not know the total number of steps?</strong> Use reduce-on-plateau, which needs no estimate.
+
+<strong>Can the rate go to exactly zero?</strong> Cosine schedules usually decay to a small floor rather than zero, since zero means no further learning at all.
+
+<strong>Does the schedule interact with batch size?</strong> Yes &mdash; larger batches generally want a proportionally larger peak rate, with a longer warm-up to match.
+
+## Recap in one screen
+
+- Large steps early, small steps late &mdash; that is what a schedule provides, and it beats any constant rate.
+- Warm-up protects the first few hundred steps, when gradients are meaningless and Adam's statistics are unreliable.
+- Linear warm-up plus cosine decay is the modern default.
+- Find the peak rate with a short exponential sweep rather than by guessing.
+- Step the scheduler at the interval it expects &mdash; per batch or per epoch &mdash; or the schedule silently does nothing.

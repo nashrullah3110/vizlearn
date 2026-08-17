@@ -5,15 +5,21 @@ intro: LIKE handles "starts with". Regex handles "a valid email address".
 
 A <strong>regular expression</strong> describes a <em>shape</em> that text may take, rather than the text itself. SQL's <span class="mono-font">LIKE</span> offers exactly two wildcards; regex offers character classes, quantifiers, anchors, alternation and grouping &mdash; enough to validate, extract and clean data directly in the database.
 
-## Every Engine Spells It Differently
+## Every engine spells it differently
 
-- <strong>PostgreSQL</strong> &mdash; <span class="mono-font">~</span> (match), <span class="mono-font">~*</span> (case-insensitive), <span class="mono-font">!~</span> (not match). Also <span class="mono-font">SIMILAR TO</span> and functions like <span class="mono-font">REGEXP_REPLACE</span>.
-- <strong>MySQL / MariaDB</strong> &mdash; <span class="mono-font">REGEXP</span> or <span class="mono-font">RLIKE</span>.
-- <strong>Oracle</strong> &mdash; <span class="mono-font">REGEXP_LIKE()</span>, plus <span class="mono-font">REGEXP_SUBSTR</span> and <span class="mono-font">REGEXP_COUNT</span>.
-- <strong>SQL Server</strong> &mdash; historically none; you use <span class="mono-font">LIKE</span> with its limited bracket syntax, or CLR functions. SQL Server 2025 finally adds <span class="mono-font">REGEXP_LIKE</span>.
-- <strong>SQLite</strong> &mdash; <span class="mono-font">REGEXP</span> exists as an operator but the host application must supply the implementation.
+This is the part that makes regex in SQL awkward: there is no portable syntax.
 
-The dialect differences are mostly in the operator name; the pattern syntax itself is broadly POSIX or PCRE and transfers well.
+|Engine|Match operator|Extract|Replace|
+|---|---|---|---|
+|PostgreSQL|`~` (case-sensitive), `~*`|`REGEXP_SUBSTR`, `substring(x from '...')`|`REGEXP_REPLACE`|
+|MySQL 8+|`REGEXP` / `RLIKE`|`REGEXP_SUBSTR`|`REGEXP_REPLACE`|
+|Oracle|`REGEXP_LIKE(x, '...')`|`REGEXP_SUBSTR`|`REGEXP_REPLACE`|
+|SQL Server|None built in|&mdash;|&mdash; (CLR or `LIKE` tricks)|
+|SQLite|`REGEXP` if the host registers it|&mdash;|&mdash;|
+
+SQL Server's absence is worth planning around: patterns there are usually expressed with `LIKE` plus character-class brackets (`LIKE '[0-9][0-9][0-9]%'`), or the work moves to the application.
+
+Note also that PostgreSQL's `~` is POSIX-flavoured while MySQL 8 uses ICU, so a few advanced constructs differ even between two engines that both "have regex".
 
 ## LIKE vs REGEXP
 
@@ -21,14 +27,77 @@ Try the email-validation pattern in this lab and read the LIKE equivalent undern
 
 One more difference that catches people: <span class="mono-font">LIKE 'abc'</span> must match the <em>whole</em> string, whereas most SQL regex operators match if the pattern is found <em>anywhere</em> in it. That is why anchors <span class="mono-font">^</span> and <span class="mono-font">$</span> matter so much &mdash; toggle them in this lab and watch the match count change.
 
-## The Performance Warning
+## The performance warning
 
-A regex in a WHERE clause is applied row by row and <strong>cannot use a normal B-tree index</strong>. On a large table that is a full scan every time. Practical guidance:
+A regular expression is applied row by row and cannot use an ordinary B-tree index. `WHERE email ~ 'gmail'` on ten million rows is a full table scan, every time.
 
-- Narrow the rows with an indexable condition first, then apply the regex to what survives.
-- Prefer <span class="mono-font">LIKE 'abc%'</span> when it suffices &mdash; a trailing wildcard <em>can</em> use an index.
-- For repeated searches, consider a functional index, a generated column, or full-text search instead.
-- Validate on write (a <span class="mono-font">CHECK</span> constraint) rather than filtering on read, when you can.
+Four ways to keep that from being your query:
+
+1. <strong>Narrow first.</strong> Combine the regex with an indexable condition &mdash; `WHERE created_at > ... AND email ~ '...'` &mdash; so the pattern is only applied to rows that survived the cheap filter.
+2. <strong>Prefer `LIKE` when it suffices.</strong> A prefix `LIKE 'abc%'` <em>can</em> use an index; regex cannot.
+3. <strong>Index the expression.</strong> If you always extract the same thing, store or index it: an expression index on `substring(email from '@(.*)$')`, or a generated column holding the domain.
+4. <strong>Use the right tool for text search.</strong> Word matching, ranking and stemming are what full-text search is for &mdash; PostgreSQL's `tsvector` with a GIN index, or a dedicated search engine. Regex is not a search engine.
+
+There is also a correctness-flavoured performance risk: certain nested-quantifier patterns can take exponential time on adversarial input (catastrophic backtracking). Never apply a user-supplied regular expression to a large table.
+
+## When LIKE is not enough
+
+`LIKE` handles simple patterns: `'a%'` for a prefix, `'%son'` for a suffix, `'_at'` for exactly one character then "at". Two wildcards, no repetition, no alternatives, no character classes.
+
+Regular expressions handle everything else &mdash; validating an email shape, extracting the digits out of a reference code, matching one of several spellings, finding rows where a field contains two consecutive capital letters.
+
+```sql
+-- LIKE: does it start with 'A'?
+SELECT * FROM products WHERE name LIKE 'A%';
+
+-- Regex: is it a plausible UK postcode?
+SELECT * FROM addresses
+WHERE  postcode ~ '^[A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2}$';
+```
+
+The building blocks are the same as in every other language:
+
+|Pattern|Meaning|
+|---|---|
+|`^` &nbsp; `$`|Start and end of the string|
+|`.`|Any single character|
+|`*` `+` `?`|Zero or more, one or more, zero or one|
+|`{2,4}`|Between two and four times|
+|`[abc]` `[^abc]`|One of these; anything but these|
+|`[0-9]` `[A-Za-z]`|Digit; letter|
+|`\|`|Either side &mdash; alternation|
+|`( )`|A group, capturable for extraction|
+|`\d` `\w` `\s`|Digit, word character, whitespace (engine-dependent)|
+
+## Three things they are actually used for
+
+<strong>Validation</strong> &mdash; finding rows that do not match an expected shape:
+
+```sql
+SELECT id, email FROM users
+WHERE  email !~ '^[^@\s]+@[^@\s]+\.[a-z]{2,}$';   -- suspicious addresses
+```
+
+(No regex fully validates an email address; the aim is to catch obvious rubbish, not to be a specification.)
+
+<strong>Extraction</strong> &mdash; pulling a piece out of a larger string:
+
+```sql
+-- the numeric part of a reference like 'INV-2026-00417'
+SELECT REGEXP_REPLACE(reference, '^[A-Z]+-[0-9]{4}-', '') AS number FROM invoices;
+
+-- the domain from an email, using a capture group
+SELECT substring(email from '@(.*)$') AS domain FROM users;
+```
+
+<strong>Cleaning</strong> &mdash; normalising messy input:
+
+```sql
+-- strip everything that is not a digit from a phone number
+SELECT REGEXP_REPLACE(phone, '[^0-9]', '', 'g') FROM contacts;
+```
+
+That `'g'` flag &mdash; replace every occurrence, not just the first &mdash; is a frequent omission in PostgreSQL, where the default is to replace only once.
 
 ## Exploration guide
 
@@ -41,3 +110,34 @@ A regex in a WHERE clause is applied row by row and <strong>cannot use a normal 
 ## What to remember
 
 Reach for regex when the <em>shape</em> of the text matters and LIKE cannot describe it &mdash; validation, extraction, messy-data cleanup. Reach for LIKE when a prefix will do, because it can use an index and regex usually cannot. This lab runs your pattern through a real regex engine, so what matches here is what will match in your database.
+
+## Writing patterns that survive review
+
+- <strong>Anchor them.</strong> Without `^` and `$`, a pattern matches anywhere in the string, which is usually not what a validation rule means.
+- <strong>Escape properly.</strong> A literal dot is `\.`; unescaped it matches any character, so `'^[0-9]+.[0-9]+$'` accepts "12x34".
+- <strong>Watch case sensitivity.</strong> PostgreSQL's `~` is case-sensitive, `~*` is not; MySQL's `REGEXP` follows the column collation.
+- <strong>Prefer explicit classes.</strong> `[0-9]` is unambiguous across engines; `\d` is not always available and may include non-ASCII digits under Unicode rules.
+- <strong>Test against real data</strong>, including the rows you expect to fail. A pattern that matches everything is easy to write and hard to notice.
+- <strong>Comment non-trivial patterns</strong> in the schema or the migration. A postcode regex is unreadable six months later, including to the person who wrote it.
+
+## Questions people ask
+
+<strong>Is `REGEXP` case-sensitive?</strong> Depends on the engine and collation. PostgreSQL: `~` yes, `~*` no. MySQL: follows the column's collation, so often not.
+
+<strong>Can I use a regex in a `CHECK` constraint?</strong> Yes, and it is a legitimate way to enforce a format &mdash; a product code shape, for instance. Keep it simple, because it runs on every insert and update.
+
+<strong>Why does my backslash not work?</strong> Because it is being consumed by the string literal before the regex engine sees it. PostgreSQL's `E'...'` strings and standard strings differ here; doubling the backslash or using a different quoting style usually fixes it.
+
+<strong>Should I validate emails with a regex?</strong> For catching typos, a loose pattern is fine. For genuine validation, send a confirmation message &mdash; that is the only test that proves an address exists.
+
+<strong>Can I extract several matches from one string?</strong> PostgreSQL's `REGEXP_MATCHES(x, pattern, 'g')` returns a row per match; MySQL 8 has `REGEXP_SUBSTR` with an occurrence argument. Neither is portable.
+
+<strong>Is regex slower than `LIKE`?</strong> Generally yes, and more importantly it cannot use an index where a prefix `LIKE` can. Use the simpler tool when it does the job.
+
+## Recap in one screen
+
+- Use `LIKE` for simple prefixes and suffixes; use regex for shapes, alternatives and repetition.
+- The syntax and the functions differ by engine, and SQL Server has no built-in support.
+- The three real jobs are validation, extraction and cleaning.
+- Regex cannot use a B-tree index &mdash; combine it with an indexable filter, or index the extracted expression.
+- Anchor patterns with `^` and `$`, escape literal dots, and never run user-supplied patterns over a large table.

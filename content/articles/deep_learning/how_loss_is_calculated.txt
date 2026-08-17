@@ -12,6 +12,53 @@ A loss collapses a whole batch of predictions into one scalar, and it has to do 
 
 <strong>MSE.</strong> Predictions <span class="mono-font">[2.5, 0.0, 2.0]</span> against targets <span class="mono-font">[3.0, &minus;0.5, 2.0]</span>. The errors are 0.5, 0.5 and 0. Squared: 0.25, 0.25, 0. Mean: <strong>0.167</strong>. Squaring means one error of 2.0 costs more than four errors of 0.5.<strong>Cross-entropy.</strong> If the model gives the correct class a probability of 0.7, the loss is <span class="mono-font">&minus;ln(0.7) = 0.357</span>. If it gives that class only 0.05, the loss is <span class="mono-font">&minus;ln(0.05) = 3.00</span> &mdash; roughly eight times worse. Being confidently wrong is punished far harder than being uncertain.
 
+## One number that says how wrong the model is
+
+Training needs a single scalar to minimise. The loss function is what produces it: compare each prediction with its target, score the discrepancy, and average over the batch.
+
+Everything downstream depends on that one number. The gradient is its derivative, the optimiser follows the gradient, and the model becomes whatever minimises it. Choosing the loss is therefore choosing what the model will optimise for &mdash; a modelling decision, not a technical detail.
+
+The standard choices:
+
+|Task|Loss|Formula|
+|---|---|---|
+|Regression|Mean squared error|mean((y&#770; &minus; y)&sup2;)|
+|Regression, outliers present|Mean absolute error|mean(\|y&#770; &minus; y\|)|
+|Regression, compromise|Huber / smooth L1|Squared near zero, linear beyond|
+|Binary classification|Binary cross-entropy|&minus;[y log p + (1&minus;y) log(1&minus;p)]|
+|Multi-class|Categorical cross-entropy|&minus;log(p of the true class)|
+|Multi-label|Binary cross-entropy per label|Sum over labels|
+|Ranking, embeddings|Triplet, contrastive|Distance-based|
+
+## Worked through, both kinds
+
+<strong>Regression.</strong> Predictions [2.5, 0.0, 2.1] against targets [3.0, &minus;0.5, 2.0]:
+
+- Errors: &minus;0.5, 0.5, 0.1
+- Squared: 0.25, 0.25, 0.01 &rarr; MSE = 0.51/3 = <strong>0.17</strong>
+- Absolute: 0.5, 0.5, 0.1 &rarr; MAE = 1.1/3 = <strong>0.367</strong>
+
+<strong>Classification.</strong> Three samples, true classes 0, 1, 2, and the model gives the correct class probabilities 0.7, 0.2, 0.9:
+
+- Losses: &minus;log(0.7) = 0.357, &minus;log(0.2) = 1.609, &minus;log(0.9) = 0.105
+- Mean = <strong>0.690</strong>
+
+The second sample contributes most of the total, and that is deliberate. Cross-entropy punishes confident mistakes without limit, so the model's attention goes where it is most wrong.
+
+A useful check: at initialisation, cross-entropy over C balanced classes should be about ln(C) &mdash; 2.30 for 10 classes. Seeing that in the first steps means the setup is sane.
+
+## Choosing between squared and absolute error
+
+Both measure regression error and they encode different opinions about outliers.
+
+Squaring makes a single large miss dominate: an error of 10 contributes 100, while twenty errors of 1 contribute 20 in total. The fitted model will distort itself to reduce that one point.
+
+Absolute error treats every unit of error equally, so it is robust &mdash; and it has a corner at zero, which makes its gradient constant in magnitude regardless of how close you are.
+
+<strong>Huber loss</strong> is the standard compromise: squared within a threshold &delta; of zero, linear beyond it. Smooth gradients near the optimum, bounded influence from outliers. It is the default regression loss in several detection frameworks for exactly this reason.
+
+There is a deeper reading. Minimising squared error estimates the conditional <em>mean</em>; minimising absolute error estimates the conditional <em>median</em>. So the choice of loss is a choice about which summary of the target distribution you want predicted.
+
 ## Try this above
 
 1. Raise <strong>Batch Size</strong> and watch the reported loss steady. Averaging over more samples reduces the sample-to-sample swing without changing what is being measured.
@@ -25,3 +72,58 @@ A loss collapses a whole batch of predictions into one scalar, and it has to do 
 ## In one line
 
 The loss is the only thing the network is optimising &mdash; if it does not measure what you care about, nothing downstream can fix that.
+
+## Reduction, weighting and masking
+
+Three details of how a batch's losses are combined matter in practice.
+
+<strong>Reduction.</strong> `mean` averages over the batch and is the default; `sum` totals them, which makes the effective learning rate depend on batch size; `none` returns per-example losses, which is what you need for custom weighting or for finding the hardest examples.
+
+<strong>Class weighting.</strong> On imbalanced data, weighting each class's contribution by the inverse of its frequency stops the majority class dominating the average:
+
+```python
+weights = torch.tensor([1.0, 12.0])          # positive class is 12x rarer
+criterion = nn.CrossEntropyLoss(weight=weights)
+```
+
+<strong>Masking.</strong> Padded positions in a sequence, and pixels marked "unlabelled" in a segmentation mask, must be excluded. `ignore_index` does this:
+
+```python
+criterion = nn.CrossEntropyLoss(ignore_index=-100)     # skip these positions
+```
+
+Forgetting to mask is a real and quiet bug: the model spends a large share of its capacity learning to predict padding tokens, and the reported loss is not comparable to anyone else's.
+
+## Training loss versus the metric you report
+
+These are different things and should be allowed to differ.
+
+The loss must be differentiable so gradients exist. Accuracy, F1, IoU and mAP are not differentiable &mdash; they are step functions of the predictions, with zero gradient almost everywhere. You cannot optimise them directly.
+
+So the standard arrangement is: <strong>train on a smooth surrogate, evaluate on the metric you care about</strong>. Train on cross-entropy, report F1. Train on Dice-plus-cross-entropy, report IoU.
+
+The two can disagree, and that is informative rather than alarming. Validation loss rising while accuracy stays flat usually means the model is becoming overconfident on the examples it already gets right &mdash; a calibration problem rather than a classification one. Early stopping on the metric you care about, rather than on the loss, is often the better choice.
+
+Some metrics have differentiable relaxations &mdash; soft-Dice, soft-IoU, and the CIoU family for bounding boxes &mdash; and using them closes part of the gap between what you optimise and what you measure.
+
+## Questions people ask
+
+<strong>Why is my loss `NaN`?</strong> A `log(0)`, a division by zero, or a learning rate high enough to send the weights to infinity. Use the framework's fused losses, which guard the logarithm.
+
+<strong>Can I add several losses together?</strong> Yes, and it is common in multi-task models. Weight them, and be aware the weights matter: a term ten times larger dominates training regardless of importance.
+
+<strong>Should the loss go to zero?</strong> Not on real data. Irreducible noise means there is a floor, and reaching zero on training data usually means memorisation.
+
+<strong>Why does my validation loss rise while accuracy holds?</strong> Growing overconfidence. Consider label smoothing, and stop on the metric rather than the loss.
+
+<strong>How do I handle imbalanced classes?</strong> Class weights, or focal loss, which down-weights the easy examples the majority class provides.
+
+<strong>Do I apply softmax before the loss?</strong> No &mdash; pass logits. The fused loss applies it internally and stably. Applying it twice is a common silent bug.
+
+## Recap in one screen
+
+- The loss reduces the whole batch to one number, and the model becomes whatever minimises it.
+- MSE for regression, cross-entropy for classification; Huber when outliers are present.
+- Squared error predicts the conditional mean; absolute error predicts the median.
+- Mask padded positions and weight rare classes, or the average is measuring the wrong thing.
+- Train on a differentiable surrogate, evaluate on the metric that matters, and expect them to disagree occasionally.

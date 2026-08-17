@@ -13,6 +13,62 @@ The weights matter. A child holding two points and a child holding eighteen do n
 
 Gain is never negative, and it is zero when the split changes nothing &mdash; when both sides have the same label mix as the parent, the question told you nothing you did not already know.
 
+## How much did that question help?
+
+Information gain measures how much a split reduces uncertainty. It is the difference between the entropy before a question is asked and the average entropy afterwards.
+
+<p class="mono-font">IG = H(parent) &minus; &Sigma; (n&#7522; / n) H(child&#7522;)</p>
+
+The weighting matters: a child holding 90% of the rows counts nine times as much as one holding 10%. Without it, a split that isolates two rows into a pure group would look brilliant.
+
+Worked through on 14 samples, 9 yes and 5 no:
+
+<strong>Parent entropy</strong>: &minus;(9/14)log&#8322;(9/14) &minus; (5/14)log&#8322;(5/14) = <strong>0.940 bits</strong>.
+
+<strong>Split on Outlook</strong>, giving three groups:
+
+|Branch|Rows|Yes|No|Entropy|
+|---|---|---|---|---|
+|Sunny|5|2|3|0.971|
+|Overcast|4|4|0|0.000|
+|Rain|5|3|2|0.971|
+
+Weighted entropy = (5/14)(0.971) + (4/14)(0) + (5/14)(0.971) = <strong>0.694</strong>.
+
+<strong>Information gain</strong> = 0.940 &minus; 0.694 = <strong>0.246 bits</strong>.
+
+The Overcast branch is the interesting one: entropy zero, a completely pure group, and the tree can stop there and make a leaf. That is what a genuinely useful question looks like.
+
+## How a tree uses it
+
+At every node the algorithm loops over every feature and, for numeric features, every candidate threshold. For each candidate it computes the information gain, and it keeps the best. Then it repeats on each child.
+
+This is a <strong>greedy</strong> procedure: it takes the locally best split without considering whether a slightly worse split now would enable a much better one later. Finding the globally optimal tree is computationally intractable, and in practice greedy splitting works well enough that nobody minds.
+
+Splitting continues until a stopping rule fires &mdash; a pure node, a maximum depth, too few samples to split, or no split producing a worthwhile gain.
+
+|Criterion|Formula|Notes|
+|---|---|---|
+|Entropy / information gain|&minus;&Sigma; p log&#8322; p|Used by ID3 and C4.5|
+|Gini impurity|1 &minus; &Sigma; p&sup2;|Scikit-learn's default; no logarithm, so faster|
+|Gain ratio|IG / split entropy|Corrects the bias towards many-valued features|
+|Variance reduction|Reduction in MSE|The regression equivalent|
+
+Gini and entropy pick the same split the overwhelming majority of the time. This is not a decision worth agonising over; depth and minimum leaf size matter far more.
+
+## The bias towards high-cardinality features
+
+Information gain has a systematic flaw: it favours features with many distinct values, because splitting into many small groups almost guarantees pure children.
+
+The extreme case makes it obvious. Split on a customer ID column and every branch has exactly one row, every child is pure, and the information gain is maximal. The tree has learned a lookup table and will generalise to nothing.
+
+Two corrections:
+
+- <strong>Gain ratio</strong> divides the gain by the entropy of the split itself, which is large when a feature produces many branches. C4.5 introduced this specifically for the problem.
+- <strong>Binary splits.</strong> CART, and therefore scikit-learn, only ever splits into two groups, which limits how much a high-cardinality feature can exploit the bias.
+
+The same bias affects the feature importances a tree reports. Impurity-based importance inflates high-cardinality columns, which is why permutation importance &mdash; measured on held-out data &mdash; is the more trustworthy ranking.
+
 ## Guided tour
 
 1. <strong>Look at the parent.</strong> Twenty students, 11 passed and 9 failed, so entropy before any split is 0.993 bits &mdash; almost a full bit, because the classes are nearly balanced and knowing nothing else you would be nearly guessing.
@@ -38,3 +94,52 @@ Entropy has the better story though: it is measured in bits, and gain is literal
 ## Summing up
 
 Information gain is the drop in entropy a split buys: the parent's entropy minus the size-weighted average of its children's. The weighting is what stops a tiny lucky child from looking impressive, and the gain is zero exactly when the split leaves the label mix unchanged. A decision tree builds itself by evaluating this quantity for every feature and every candidate threshold and taking the largest, which also explains its known weaknesses &mdash; the measure rewards splitting on high-cardinality columns, the search is greedy rather than globally optimal, and nothing in the gain itself ever tells you to stop.
+
+## Beyond trees: mutual information
+
+Information gain, computed between a feature and the target rather than inside a tree, is exactly <strong>mutual information</strong> &mdash; how much knowing one variable reduces uncertainty about the other.
+
+That makes it a general-purpose feature-selection tool with one clear advantage over correlation: it detects <em>any</em> dependence, not just linear ones.
+
+```python
+from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
+
+scores = mutual_info_classif(X, y, random_state=0)
+for name, s in sorted(zip(feature_names, scores), key=lambda t: -t[1])[:10]:
+    print(f"{name:<25} {s:.4f}")
+```
+
+A feature with a perfect parabolic relationship to the target has a correlation near zero and high mutual information. If you rank features by correlation alone, you will discard it.
+
+Three cautions. Mutual information is estimated, not computed exactly, for continuous variables &mdash; the estimate depends on binning or nearest-neighbour parameters. It scores features one at a time, so it misses combinations that only matter together. And a high score does not mean a model can use the feature, only that the information is present.
+
+## Common mistakes
+
+- <strong>Forgetting to weight the children.</strong> An unweighted average makes a tiny pure branch look decisive.
+- <strong>Letting an ID-like column into the features.</strong> It will win every split and learn nothing.
+- <strong>Reading impurity-based importance as truth.</strong> It is biased towards high-cardinality features and splits credit arbitrarily between correlated ones.
+- <strong>Growing without a stopping rule.</strong> A tree that splits until every leaf is pure has memorised the training data.
+- <strong>Assuming entropy is better than Gini</strong> because it looks more principled. They agree nearly always, and Gini is cheaper.
+- <strong>Using information gain on continuous targets.</strong> Regression trees use variance reduction instead.
+
+## Questions people ask
+
+<strong>What is a good information gain?</strong> There is no absolute scale &mdash; it is relative to the parent's entropy and to what the other candidate splits achieve. A gain of 0.05 bits from a parent at 0.1 is excellent; from a parent at 1.0 it is marginal.
+
+<strong>Can information gain be negative?</strong> No. The weighted average entropy of the children can never exceed the parent's, so the gain is zero at worst.
+
+<strong>Why does my tree pick a feature I think is useless?</strong> Usually because it has many distinct values, or because it correlates with something that genuinely matters. Check the cardinality first.
+
+<strong>How does this handle missing values?</strong> Implementations vary: C4.5 distributes the row fractionally across branches, CART uses surrogate splits, and LightGBM learns a default direction per split.
+
+<strong>Is information gain used outside decision trees?</strong> Yes &mdash; as mutual information for feature selection, in text analysis for identifying discriminative terms, and in active learning to choose the most informative example to label next.
+
+<strong>Does it work with more than two classes?</strong> Yes. The entropy formula sums over however many classes there are; nothing else changes.
+
+## Recap in one screen
+
+- Information gain is the entropy before a split minus the weighted average entropy after it.
+- Weighting by branch size is essential, or small pure branches dominate.
+- Trees choose the highest-gain split greedily at every node, then repeat.
+- The measure is biased towards features with many distinct values &mdash; gain ratio and binary splits correct for it.
+- Computed against the target, it is mutual information, which detects non-linear dependence that correlation misses.

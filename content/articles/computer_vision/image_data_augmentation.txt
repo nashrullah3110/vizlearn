@@ -11,6 +11,52 @@ Imagine you're training a model to recognize cats. If all your training photos s
 
 By applying these random transformations during training, we ensure the model never sees the exact same image twice. It is forced to learn the underlying patterns of what makes a cat a cat, rather than just memorizing the specific pixels of the training images. This leads to better <strong>generalization</strong>—the ability to perform well on new, unseen data.
 
+## Making more data out of the data you have
+
+A model that has seen one photograph of a cat has seen that cat, at that angle, in that light. Augmentation shows it many plausible variations of the same image, so it learns the cat rather than the photograph.
+
+Each variation is created on the fly during training, so the model rarely sees exactly the same input twice. Nothing is stored, and the dataset on disk is unchanged.
+
+The standard transformations for natural images:
+
+|Transformation|What it teaches|
+|---|---|
+|Horizontal flip|Left-right orientation does not matter|
+|Random crop / resize|Position and scale do not matter|
+|Rotation (small)|Slight tilts are the same object|
+|Brightness / contrast|Lighting varies|
+|Colour jitter|Camera and white balance vary|
+|Gaussian noise / blur|Image quality varies|
+|Random erasing|Partial occlusion still leaves the object recognisable|
+
+The rule that governs all of them: <strong>the transformation must preserve the label</strong>. That is the whole design constraint, and it is where most augmentation mistakes come from.
+
+## Where label preservation fails
+
+<strong>Vertical flips</strong> are fine for satellite and microscope images, and wrong for street scenes &mdash; upside-down cars are not a category your model needs to handle.
+
+<strong>Horizontal flips</strong> are fine for animals and wrong for text, digits and any task involving handedness. A flipped "b" is a "d".
+
+<strong>Heavy rotation</strong> turns a 6 into a 9. For digit recognition, keep rotations small.
+
+<strong>Colour jitter</strong> destroys the signal when colour <em>is</em> the signal &mdash; ripeness, traffic lights, medical staining.
+
+<strong>Aggressive cropping</strong> can remove the object entirely, leaving an image labelled "cat" that contains only carpet.
+
+The practical procedure: apply your augmentation pipeline to a batch, look at the results, and ask whether you would still assign the same label. It takes two minutes and catches almost every mistake of this kind.
+
+## The modern additions
+
+<strong>Mixup</strong> blends two images and their labels in the same proportion &mdash; 70% cat plus 30% dog, labelled 0.7/0.3. It produces soft targets, improves calibration and reduces overconfidence.
+
+<strong>CutMix</strong> pastes a rectangular patch of one image into another and mixes the labels by area. It keeps local detail sharp, which mixup blurs.
+
+<strong>RandAugment</strong> and <strong>AutoAugment</strong> apply a random sequence of operations chosen from a fixed pool, with the strength controlled by one or two parameters. RandAugment in particular removed the need to hand-tune a policy and is a standard part of modern training recipes.
+
+<strong>Random erasing</strong> blanks a random rectangle, forcing the model to rely on more than one region of the object.
+
+For detection and segmentation, the transformation must be applied to the annotations as well as the pixels &mdash; boxes and masks have to move with the image. Albumentations handles this correctly and is the standard choice for those tasks.
+
 ## Guided Experiments with This Interactive
 
 1. <strong>Draw a Base Image:</strong> <p class="font-light opacity-80 mt-1">Start by drawing a simple, asymmetric shape, like the letter 'F'. This will make transformations like rotation and flipping easy to spot.</p>
@@ -32,3 +78,67 @@ By applying these random transformations during training, we ensure the model ne
 - Common techniques include rotation, shifting, zooming, shearing, and color adjustments.
 
 Data augmentation is one of the most effective and widely used tools for improving the performance of any computer vision model.
+
+## Where augmentation belongs in the pipeline
+
+Three rules, all of which are violated regularly.
+
+<strong>Training data only.</strong> Augmenting validation or test data makes the metrics measure something other than real performance, and makes results irreproducible between runs.
+
+<strong>Applied on the fly, not saved to disk.</strong> Random transformation each epoch gives effectively unlimited variation. Pre-generating a fixed set of augmented files gives you a larger dataset with the same limited diversity, and uses far more storage.
+
+<strong>Normalisation last.</strong> Colour and geometric transformations operate on the raw image; standardisation comes after them, immediately before the tensor goes to the model.
+
+```python
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+
+train_tf = A.Compose([
+    A.RandomResizedCrop(224, 224, scale=(0.7, 1.0)),
+    A.HorizontalFlip(p=0.5),
+    A.ColorJitter(0.2, 0.2, 0.2, 0.05, p=0.5),
+    A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+    ToTensorV2(),
+])
+
+val_tf = A.Compose([              # no randomness at all
+    A.Resize(256, 256), A.CenterCrop(224, 224),
+    A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+    ToTensorV2(),
+])
+```
+
+One exception to "training only" is <strong>test-time augmentation</strong>: deliberately predicting on several augmented copies of a test image and averaging the results. It reliably adds a fraction of a percent of accuracy at several times the inference cost, which is worth it in competitions and rarely in production.
+
+## How much is too much
+
+Augmentation is a regulariser, and like any regulariser it can be overdone. The symptoms differ:
+
+- <strong>Too little:</strong> training accuracy far above validation accuracy, and the gap widens with epochs.
+- <strong>Too much:</strong> training accuracy stays low, both curves plateau early, and training takes much longer to converge.
+
+The reasonable starting point for natural images is a random resized crop, a horizontal flip and mild colour jitter. Add strength only if the model is overfitting, and check that the augmented images still look like plausible members of their class.
+
+Note also that augmentation and dataset size interact. With very large datasets the benefit shrinks, because the data already covers the variation. With a few hundred images it is often the single most effective change available.
+
+## Questions people ask
+
+<strong>Does augmentation slow training?</strong> The CPU does the work while the GPU trains, so with enough dataloader workers it is usually free. If GPU utilisation is low, the augmentation pipeline is the first thing to check.
+
+<strong>Should I augment the validation set?</strong> No &mdash; only apply deterministic resizing and normalisation.
+
+<strong>Is mixup always helpful?</strong> It helps most on large datasets and long training runs. On small datasets it can slow convergence noticeably.
+
+<strong>Can I use augmentation with transfer learning?</strong> Yes, and you should &mdash; the small datasets that motivate transfer learning are exactly the ones that overfit without it.
+
+<strong>What about synthetic data from generative models?</strong> Increasingly used, and it carries a risk augmentation does not: the model learns the generator's idea of the class rather than the world's.
+
+<strong>How do I augment for segmentation?</strong> Apply the identical geometric transformation to the mask, with nearest-neighbour interpolation so labels are not blended into invalid values.
+
+## Recap in one screen
+
+- Augmentation shows the model plausible variations of each image so it learns the object, not the photograph.
+- Every transformation must preserve the label &mdash; check by looking at augmented batches.
+- Apply it on the fly to training data only; normalise last.
+- Mixup, CutMix and RandAugment are the standard modern additions.
+- Too little augmentation overfits; too much stalls learning. Start mild and increase only if the gap demands it.

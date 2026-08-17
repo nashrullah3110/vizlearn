@@ -19,6 +19,48 @@ With m = c = 0 every prediction is 0, so the residuals are 2, 4 and 6.
 
 At a learning rate of 0.01: <span class="mono-font">m &larr; 0 + 0.187</span> and <span class="mono-font">c &larr; 0 + 0.08</span>. The line has tilted slightly toward the data. Repeat a few hundred times and it lands on m = 2, c = 0.
 
+## The simplest thing gradient descent can do
+
+Fit a line, `y = wx + b`, by iteratively adjusting w and b to reduce the squared error. It is the smallest complete example of everything training does, with two parameters instead of millions.
+
+The loss is mean squared error:
+
+<p class="mono-font">L = (1/n) &Sigma; (y&#770;&#7522; &minus; y&#7522;)&sup2;&nbsp;&nbsp;&nbsp;where&nbsp;&nbsp;y&#770; = wx + b</p>
+
+Its two gradients, from the chain rule:
+
+<p class="mono-font">&part;L/&part;w = (2/n) &Sigma; (y&#770;&#7522; &minus; y&#7522;) x&#7522;&nbsp;&nbsp;&nbsp;&nbsp;&part;L/&part;b = (2/n) &Sigma; (y&#770;&#7522; &minus; y&#7522;)</p>
+
+Read those two expressions and the algorithm becomes intuitive. Both are driven by the error `(ŷ − y)`. The weight's gradient is additionally multiplied by `x`, so points far from the origin push the slope harder. The bias's gradient is just the average error, so the bias tracks the overall offset.
+
+## Three steps by hand
+
+Data: (1, 2), (2, 4), (3, 6) &mdash; the true line is y = 2x. Start at w = 0, b = 0, learning rate 0.1.
+
+<strong>Step 1.</strong> Predictions are 0, 0, 0; errors −2, −4, −6.
+
+- ∂L/∂w = (2/3)[(−2)(1) + (−4)(2) + (−6)(3)] = (2/3)(−28) = −18.67
+- ∂L/∂b = (2/3)(−12) = −8.0
+- w ← 0 + 1.867 = <strong>1.867</strong>, b ← 0 + 0.8 = <strong>0.8</strong>
+
+<strong>Step 2.</strong> Predictions are 2.67, 4.53, 6.40; errors +0.67, +0.53, +0.40 &mdash; now overshooting slightly, and much smaller.
+
+- w ← 1.72, b ← 0.69
+
+<strong>Step 3 onwards.</strong> The corrections keep shrinking. After a few hundred steps w approaches 2 and b approaches 0.
+
+Two lessons visible in three steps. The first step is enormous because the error is enormous, and the steps shrink automatically as the fit improves &mdash; no schedule needed for that. And the loss overshot from negative to positive error: gradient descent oscillates towards a solution rather than approaching monotonically.
+
+## Why bother, when a formula exists
+
+Ordinary least squares has an exact closed-form solution &mdash; the normal equation &mdash; so iterating towards the answer looks like a step backwards. Three reasons it is not:
+
+<strong>Scale.</strong> The closed form requires inverting a matrix whose size is the number of features, at roughly cubic cost, and it needs the whole dataset in memory. Gradient descent works on mini-batches and scales to any size.
+
+<strong>Generality.</strong> Change the loss to absolute error, or add a non-linear activation, and the closed form disappears. Gradient descent needs only a derivative.
+
+<strong>It is the same algorithm.</strong> This is the point of the exercise: what happens here is exactly what happens in a network with a billion parameters. Same loss, same chain rule, same update rule &mdash; only the number of parameters differs.
+
 ## Try this above
 
 1. Turn on <strong>Show Target OLS Fit</strong> so you can see where gradient descent should end up.
@@ -33,3 +75,68 @@ At a learning rate of 0.01: <span class="mono-font">m &larr; 0 + 0.187</span> an
 ## In one line
 
 Two parameters, the same optimiser as a deep network, and slow enough to watch every step.
+
+## The learning rate, demonstrated
+
+With two parameters the effect of the learning rate is easy to see directly.
+
+|Learning rate|Behaviour on the example above|
+|---|---|
+|0.001|Converges, very slowly &mdash; thousands of steps|
+|0.1|Converges smoothly in a few hundred steps|
+|0.5|Oscillates around the answer before settling|
+|1.5|Diverges &mdash; the loss grows until it overflows|
+
+The divergence case is worth understanding: if the step overshoots far enough that the new error is <em>larger</em> than the old one, the next step is larger still, and the process runs away. That is the same mechanism behind `NaN` losses in deep networks, visible here in two dimensions.
+
+Feature scaling matters for the same reason as in networks. With x values in the thousands, the gradient with respect to w is thousands of times larger than the gradient with respect to b, so the loss surface becomes a narrow ravine and no single learning rate suits both parameters.
+
+```python
+import numpy as np
+
+x = np.array([1, 2, 3], dtype=float)
+y = np.array([2, 4, 6], dtype=float)
+w, b, lr = 0.0, 0.0, 0.1
+
+for step in range(500):
+    pred = w * x + b
+    err = pred - y
+    w -= lr * (2 / len(x)) * (err * x).sum()
+    b -= lr * (2 / len(x)) * err.sum()
+
+print(w, b)      # ~2.0, ~0.0
+```
+
+## From this to a neural network
+
+Three additions turn the code above into a network, and nothing else changes conceptually.
+
+<strong>More parameters.</strong> Replace the scalar w with a matrix, and the multiplication with a matrix product. The gradient formula generalises directly.
+
+<strong>An activation function.</strong> Wrap the output in a non-linearity and the model can fit curves. The chain rule gains one factor per activation.
+
+<strong>Layers.</strong> Feed one layer's output into the next. Backpropagation is the bookkeeping that computes all the gradients efficiently rather than recomputing shared factors.
+
+That is genuinely all of it. Everything else &mdash; Adam, batch normalisation, dropout, schedules &mdash; is a refinement of the same loop: predict, measure error, compute gradients, step.
+
+## Questions people ask
+
+<strong>Why the factor of 2 in the gradients?</strong> It comes from differentiating the square. Some texts use `1/(2n)` in the loss so it cancels; it only rescales the effective learning rate.
+
+<strong>Does it always converge?</strong> For linear regression the loss is convex, so with a small enough learning rate it converges to the unique global minimum. Networks are not convex, and there is no such guarantee.
+
+<strong>How many iterations?</strong> Until the loss stops improving. For this problem, hundreds; for networks, thousands to millions of steps.
+
+<strong>Do I need to scale the inputs?</strong> For gradient descent, yes &mdash; unscaled features create a ravine. The closed-form solution is unaffected.
+
+<strong>What if I use absolute error instead?</strong> The gradient becomes the sign of the error, so every step is the same size regardless of how wrong you are. It is more robust to outliers and slower to settle.
+
+<strong>Is this how scikit-learn's LinearRegression works?</strong> No &mdash; it uses the closed form. `SGDRegressor` is the gradient-descent version.
+
+## Recap in one screen
+
+- Fit `y = wx + b` by stepping both parameters against the gradient of squared error.
+- Both gradients are driven by the error; the weight's is additionally scaled by the input.
+- Steps shrink automatically as the fit improves; too large a rate diverges.
+- The closed-form solution exists but does not scale, does not generalise to other losses, and teaches nothing.
+- Add a matrix, an activation and a second layer, and this is exactly how a neural network trains.

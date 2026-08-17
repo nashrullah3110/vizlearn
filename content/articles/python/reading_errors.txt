@@ -9,6 +9,66 @@ When Python cannot do what a line asks, it stops and prints a traceback. Read it
 
 The line named in a traceback is where things <em>broke</em>, which is not always where you went wrong. A variable assigned the wrong value on line 2 may only cause an error on line 40. The traceback gives you a place to start looking, not always the culprit - so check what the values actually are before assuming the named line is at fault.
 
+## A traceback is a map, read from the bottom
+
+An error message looks intimidating and is actually the most helpful output Python produces. It has three parts, and the useful one is at the bottom.
+
+```
+Traceback (most recent call last):
+  File "app.py", line 42, in <module>
+    total = calculate(order)
+  File "app.py", line 18, in calculate
+    return sum(item.price for item in order.items)
+AttributeError: 'NoneType' object has no attribute 'items'
+```
+
+Read it like this:
+
+1. <strong>The last line</strong> is what went wrong: an `AttributeError`, and the description says something was `None` when an object was expected.
+2. <strong>The line above it</strong> is where it went wrong: line 18, inside `calculate`.
+3. <strong>The lines above that</strong> are how the program got there: line 42 called `calculate`.
+
+"Most recent call last" is the key phrase in the header. The bottom frame is where the exception was raised; the frames above are the trail of calls that led to it.
+
+When a traceback is long and full of library code, look for the last line that mentions <em>your</em> file. That is almost always where the problem actually lives &mdash; the library is just the messenger.
+
+## The error happens after the mistake
+
+This is the idea that turns debugging from guesswork into a method: <strong>the line that fails is often not the line that is wrong</strong>.
+
+In the example above, line 18 is perfectly reasonable code. The real mistake is wherever `order` was set to `None` &mdash; possibly a function that returned nothing because a lookup failed, twenty lines earlier.
+
+So the question to ask is never only "what is wrong with this line?" but "how did this value get here?" Two tools answer it immediately:
+
+```python
+print(f"{order=}")        # shows both the name and the value
+```
+
+and, when printing is not enough:
+
+```python
+breakpoint()              # drops into the debugger at this line
+```
+
+At the debugger prompt, `p order` prints a value, `l` lists the surrounding code, `u` moves up a frame to the caller, and `c` continues. Moving up the frames is the part people miss, and it is exactly how you find where a bad value originated.
+
+## The errors you will meet most
+
+|Error|Means|Usual cause|
+|---|---|---|
+|`SyntaxError`|Python could not parse the file|Missing bracket, quote or colon|
+|`IndentationError`|Indentation is inconsistent|Mixed tabs and spaces|
+|`NameError`|Name does not exist|Typo, or used before defined|
+|`TypeError`|Wrong type for the operation|Text where a number was expected|
+|`ValueError`|Right type, impossible value|`int("abc")`|
+|`AttributeError`|No such attribute or method|Object is `None`, or the wrong type|
+|`KeyError`|Key not in the dictionary|Missing field in a response|
+|`IndexError`|Index out of range|Off-by-one, or an empty list|
+|`ZeroDivisionError`|Division by zero|An empty denominator|
+|`ImportError`|Module not found|Not installed, or the wrong environment|
+
+Two of those have a signature cause worth memorising. `AttributeError: 'NoneType' object has no attribute ...` almost always means a function returned `None` when you expected a value &mdash; frequently a method like `sort()` that changes something in place. And `SyntaxError` reported on a line that looks fine usually means an unclosed bracket on the line above.
+
 ## Things to try
 
 1. <strong>Run the first editor.</strong> Note that <em>about to fail</em> prints first: everything before the error ran normally, and execution stopped at the failing line.
@@ -19,3 +79,79 @@ The line named in a traceback is where things <em>broke</em>, which is not alway
 ## Where that leaves you
 
 A traceback is read bottom-up: the last line is the error type and description, the line above is where it happened. The common types each point at a specific fix - NameError at a typo, TypeError at a conversion, ValueError at the data, IndexError and KeyError at something you asked for that is not there. The named line is where it broke, which is not always where the mistake was.
+
+## Handling errors on purpose
+
+Once you can read an error, the next step is deciding which ones your program should survive.
+
+```python
+try:
+    age = int(input("Age: "))
+except ValueError:
+    print("That is not a whole number.")
+else:
+    print(f"Next year you will be {age + 1}")
+finally:
+    print("Done")
+```
+
+- <strong>`try`</strong> holds the risky code, and as little else as possible.
+- <strong>`except`</strong> catches one specific exception type. Catch the narrowest type that fits.
+- <strong>`else`</strong> runs only if nothing was raised.
+- <strong>`finally`</strong> runs either way &mdash; for cleanup.
+
+The rule that separates useful error handling from harmful error handling:
+
+```python
+try:
+    risky()
+except Exception:
+    pass                  # never do this
+```
+
+A bare `except` with `pass` hides the message that would have told you what went wrong, and the program carries on in a state you no longer understand. If you genuinely cannot handle an error, let it propagate &mdash; a crash with a traceback is far more useful than silent corruption.
+
+When you do catch something, either fix the situation or re-raise with context:
+
+```python
+try:
+    config = load(path)
+except FileNotFoundError as exc:
+    raise RuntimeError(f"config missing at {path}") from exc
+```
+
+`from exc` keeps the original traceback attached, so you get both the what and the why.
+
+## A debugging routine that works
+
+1. <strong>Read the last line of the traceback.</strong> Name the exception type and read the message properly &mdash; it is usually specific.
+2. <strong>Find the last frame in your own code.</strong> That is where to start looking.
+3. <strong>Print the values involved,</strong> with `f"{value=}"` so you see the name, the value and the quoting.
+4. <strong>Check the type,</strong> not just the value. `print(type(x))` resolves a surprising share of `TypeError`s.
+5. <strong>Work backwards</strong> to where the bad value came from.
+6. <strong>Reduce the case.</strong> Cut the input down until the smallest thing that still fails; the answer is often obvious by then.
+7. <strong>Change one thing at a time,</strong> and re-run.
+
+Two extras worth having: `logging` instead of `print` once a program is more than a script, and `python3 -m pdb script.py` to start under the debugger from the first line.
+
+## Questions people ask
+
+<strong>Why does the error point at a line that looks correct?</strong> Because a bracket or quote opened on a previous line was never closed, so Python only noticed at the next statement.
+
+<strong>What is the difference between an error and an exception?</strong> In Python they are the same thing &mdash; exceptions are objects, and errors are the ones that reach the top and stop the program.
+
+<strong>Should I catch `Exception`?</strong> Only at the very edge of an application, and only to log properly before exiting. Never to ignore.
+
+<strong>What is `raise` on its own?</strong> Inside an `except` block, it re-raises the exception currently being handled, preserving the original traceback.
+
+<strong>How do I see errors in a notebook?</strong> The traceback appears under the cell, and `%debug` in the next cell opens a post-mortem debugger at the point of failure.
+
+<strong>Can I make my own exceptions?</strong> Yes, and you should for libraries: `class ConfigError(Exception): pass` lets callers catch exactly your failure and nothing else.
+
+## Recap in one screen
+
+- Read a traceback from the bottom: the last line says what, the frames above say where and how.
+- The failing line is often not the mistaken line &mdash; trace the bad value back to its source.
+- `f"{value=}"` and `breakpoint()` answer most "how did it get like this" questions.
+- Catch specific exceptions, keep `try` blocks small, and never swallow an error with `pass`.
+- Reduce the failing case until it is small; the cause is usually visible by then.

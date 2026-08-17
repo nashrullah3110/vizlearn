@@ -25,6 +25,53 @@ salary&prime; = (60000 &minus; 80000) / 40000 = &minus;0.5
 
 Both are now around 1 in magnitude, both contribute comparably, and both weights receive gradients of a similar size.
 
+## Why unscaled inputs break training
+
+A network's first layer computes `w · x + b`. If one feature ranges over 0&ndash;1 and another over 0&ndash;200,000, then the second feature dominates that sum entirely, and the gradient with respect to its weight is hundreds of thousands of times larger than the gradient for the first.
+
+Three things go wrong at once.
+
+<strong>The loss surface becomes a ravine.</strong> Steep in one direction, nearly flat in another. A learning rate small enough to be stable in the steep direction is far too small to make progress in the flat one, so training crawls.
+
+<strong>Activations saturate.</strong> A weighted sum in the tens of thousands pushes a sigmoid or tanh flat against its asymptote, where the derivative is essentially zero and the unit stops learning.
+
+<strong>Initialisation assumptions break.</strong> He and Xavier initialisation both assume inputs of roughly unit variance. Feed a variance of 10⁹ and the first layer's activations are enormous from the first forward pass.
+
+The fix is one line, and it is not optional. Unlike tree models, which compare features individually and are indifferent to units, every neural network needs its inputs on a comparable scale.
+
+## The three methods
+
+|Method|Formula|Result|Use when|
+|---|---|---|---|
+|Standardisation|(x &minus; &mu;) / &sigma;|Mean 0, sd 1|The default for networks|
+|Min-max|(x &minus; min) / (max &minus; min)|Range 0&ndash;1|Bounded inputs such as pixels|
+|Robust|(x &minus; median) / IQR|Median 0|Outliers present|
+
+<strong>Standardisation</strong> is the usual choice. It is unbounded, so an outlier does not compress everything else into a narrow band, and zero-centred inputs suit the symmetric initialisation schemes.
+
+<strong>Min-max</strong> guarantees a range, which is why pixel values are divided by 255. Its weakness is sensitivity to outliers: one extreme value squashes every other value towards zero.
+
+<strong>Robust scaling</strong> uses the median and interquartile range, so a handful of extreme values cannot distort the transformation.
+
+For heavily skewed features &mdash; income, counts, populations &mdash; a log transform <em>before</em> scaling usually helps more than the choice of scaler, because it addresses the shape rather than just the range.
+
+## Fit on training data only
+
+This is the rule that makes the difference between an honest evaluation and a leak.
+
+```python
+from sklearn.preprocessing import StandardScaler
+
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)     # compute mu and sigma HERE
+X_val   = scaler.transform(X_val)           # apply the same numbers
+X_test  = scaler.transform(X_test)
+```
+
+Calling `fit_transform` on validation or test data computes their means and standard deviations, which means information from those sets has influenced the training pipeline. The reported score is then optimistic, sometimes substantially.
+
+Two further practical points. The fitted scaler must be <strong>saved and shipped with the model</strong> &mdash; a model served with unscaled inputs, or scaled by recomputed statistics, produces confident nonsense. And for neural networks, the <strong>target</strong> is often scaled too, in which case the predictions must be inverse-transformed before any error is reported, or the RMSE is in the wrong units.
+
 ## Guided experiments
 
 1. <strong>Train unscaled.</strong> Set <strong>Data Normalization Method</strong> to none, put <strong>Salary Input</strong> near 200000 and <strong>Age Input</strong> near 30, and press <strong>Start Training</strong>. Training is unstable or crawls, because one input dominates every gradient.
@@ -43,3 +90,51 @@ Both are now around 1 in magnitude, both contribute comparably, and both weights
 ## In one line
 
 Gradients scale with input magnitude, so unscaled features give some weights enormous gradients and others negligible ones, and no single learning rate serves both. Standardisation is the default for neural networks; min-max suits bounded inputs and breaks on outliers. Fit the scaler on the training split only, keep those statistics for validation, test and production, and leave one-hot columns alone.
+
+## Which models care
+
+|Model|Needs scaling?|Why|
+|---|---|---|
+|Neural networks|Yes|Gradients, initialisation, saturation|
+|KNN, k-means, SVM|Yes|Built on distances|
+|Linear/logistic with regularisation|Yes|The penalty is on raw coefficient size|
+|PCA|Yes|It maximises variance, which depends on units|
+|Decision trees, forests, boosting|No|Splits compare one feature at a time|
+
+The last row is the useful contrast. A tree asks "is income above 40,000?", and the answer does not change if income is measured in thousands. That is why gradient boosting needs almost no preprocessing and a neural network needs a pipeline.
+
+Note that scaling does not help underfitting or overfitting directly &mdash; it makes optimisation work. A model that will not train at all often starts training the moment the inputs are scaled, which is why it is the first thing to check.
+
+## Scaling different kinds of input
+
+<strong>Images.</strong> Divide by 255, then standardise per channel with the dataset's statistics &mdash; for ImageNet-pretrained models, the published mean and standard deviation. Getting this wrong costs several points of accuracy with no visible symptom.
+
+<strong>Tabular data.</strong> Standardise numeric columns; leave one-hot columns alone (they are already 0/1, and scaling them distorts the regularisation penalty).
+
+<strong>Text.</strong> Not applicable &mdash; tokens become embedding lookups, and the embeddings are learned at a sensible scale.
+
+<strong>Audio.</strong> Normalise per clip, or use log-mel spectrograms, which compress the dynamic range in the same spirit as a log transform.
+
+<strong>Time series.</strong> Scale using statistics from the training period only &mdash; using the whole series leaks future information into the past, which is the same mistake as fitting on the test set.
+
+## Questions people ask
+
+<strong>Is scaling needed if I use batch normalisation?</strong> Yes. Batch normalisation normalises activations between layers; the first layer still receives the raw input.
+
+<strong>Standardisation or min-max?</strong> Standardisation for most network inputs; min-max for naturally bounded values such as pixels.
+
+<strong>Should I scale one-hot columns?</strong> No. They are already on a 0&ndash;1 scale, and scaling them changes how regularisation treats them.
+
+<strong>What about the target variable?</strong> Scale it for neural network regression, and invert before reporting. Not needed for tree models.
+
+<strong>What happens if a feature has zero variance?</strong> Standardisation divides by zero. Drop the column &mdash; a constant feature carries no information anyway.
+
+<strong>Can I scale after splitting into batches?</strong> The statistics must come from the whole training set, not from a batch. Fit once, apply everywhere.
+
+## Recap in one screen
+
+- Networks need inputs on a comparable scale, or the loss surface becomes a ravine and activations saturate.
+- Standardise by default; min-max for bounded inputs; robust scaling when outliers are present.
+- Log-transform heavily skewed features before scaling.
+- Fit the scaler on training data only, and ship it with the model.
+- Trees do not need it; every distance-based, regularised or gradient-trained model does.

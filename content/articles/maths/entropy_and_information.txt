@@ -25,6 +25,48 @@ That is the entire definition. The minus sign is there only because logs of numb
 
 The interpretation worth memorising: <strong>entropy is the average number of yes/no questions needed to determine the outcome</strong>, if you ask the smartest possible questions. A fair coin needs exactly 1. A fair 8-sided die needs exactly 3, because 2&sup3; = 8.
 
+## Surprise, measured in bits
+
+Entropy measures uncertainty. Concretely, it is the average number of yes/no questions needed to identify an outcome &mdash; or equivalently, how surprised you should expect to be.
+
+<p class="mono-font">H = &minus;&Sigma; p&#7522; log&#8322;(p&#7522;)</p>
+
+Three cases make the formula concrete:
+
+- <strong>A fair coin.</strong> Two outcomes at 0.5: H = &minus;(0.5&times;&minus;1 + 0.5&times;&minus;1) = <strong>1 bit</strong>. One question, and you know.
+- <strong>A biased coin (0.9 / 0.1).</strong> H = &minus;(0.9&times;log&#8322;0.9 + 0.1&times;log&#8322;0.1) = <strong>0.47 bits</strong>. You can usually guess correctly, so there is less to learn.
+- <strong>A two-headed coin.</strong> One outcome at probability 1: H = <strong>0 bits</strong>. No uncertainty, no information in the answer.
+
+The pattern: <strong>entropy is highest when outcomes are equally likely and zero when one outcome is certain</strong>. For n equally likely outcomes it is exactly log&#8322;(n), which is why a fair die is 2.58 bits and a fair 8-sided die is exactly 3.
+
+## Why rare events carry more information
+
+The term inside the sum, &minus;log&#8322;(p), is the <strong>information content</strong> of a single outcome &mdash; how surprising it is.
+
+|Probability|Information|
+|---|---|
+|1.0|0 bits|
+|0.5|1 bit|
+|0.25|2 bits|
+|0.01|6.6 bits|
+|0.001|10 bits|
+
+"The sun rose today" carries almost no information because it was certain. "A meteor landed in the garden" carries a great deal. Entropy is the average of these surprises, weighted by how often each occurs.
+
+The logarithm is not arbitrary: it makes information <em>additive</em>. Two independent events with probabilities p and q have joint probability pq, and &minus;log(pq) = &minus;log(p) &minus; log(q). Learning two independent facts gives you the sum of their information, which is the property any sensible measure must have.
+
+## Where it does work in machine learning
+
+<strong>Decision trees.</strong> Every split is chosen to reduce entropy the most. A node with 50/50 classes has 1 bit of entropy; a perfectly pure node has 0. The reduction is the information gain, and the algorithm greedily takes the largest.
+
+<strong>Cross-entropy loss.</strong> The standard classification loss measures how many extra bits are needed to encode the true labels using the model's predicted distribution. Minimising it is making the model's beliefs match reality.
+
+<strong>Feature selection.</strong> Mutual information &mdash; how much knowing one variable reduces uncertainty about another &mdash; ranks features without assuming a linear relationship, which correlation cannot do.
+
+<strong>Compression.</strong> Shannon's source coding theorem says entropy is the hard lower bound on average bits per symbol. English text has roughly 1&ndash;1.5 bits of entropy per character, which is why text compresses to a fraction of its size and random bytes do not compress at all.
+
+<strong>Language models.</strong> Perplexity is 2 raised to the cross-entropy &mdash; the effective number of equally likely choices the model is deciding between at each step. Lower is better, and it is entropy wearing a friendlier scale.
+
 ## Things to try
 
 1. <strong>Find the maximum.</strong> Click <strong>Make It Maximally Uncertain</strong>. Every outcome gets equal probability and entropy hits its ceiling. Uniform is always the most uncertain a distribution can be.
@@ -55,3 +97,52 @@ Using log base 2 gives bits, which is the interpretable unit and the one this pa
 ## Where that leaves you
 
 Entropy is the average surprise of a distribution, &minus;&Sigma;p·log(p), and reads as the number of yes/no questions needed to pin down the outcome. It is maximal when every outcome is equally likely and exactly zero when one outcome is certain, which is why it works as a measure of uncertainty. Every classification loss in machine learning is built from it: cross-entropy is the average surprise of the true labels under your model, and information gain &mdash; the entropy a split removes &mdash; is how a decision tree decides what to ask.
+
+## Information gain, worked through
+
+A decision tree splitting 10 samples that are 5 yes and 5 no:
+
+- <strong>Before</strong>: H = 1.0 bit (maximum uncertainty).
+- <strong>Split on "is it sunny?"</strong>: sunny gives 4 samples, all yes (H = 0); not sunny gives 6 samples, 1 yes and 5 no (H = 0.65).
+- <strong>Weighted entropy after</strong>: (4/10)&times;0 + (6/10)&times;0.65 = 0.39 bits.
+- <strong>Information gain</strong>: 1.0 &minus; 0.39 = <strong>0.61 bits</strong>.
+
+The tree computes this for every feature and every threshold, and keeps the winner. Gini impurity is the cheaper alternative that almost always picks the same split &mdash; it approximates the same idea without the logarithm.
+
+There is a known bias worth guarding against: information gain favours features with many distinct values, because splitting into many small pure groups always looks good. A unique ID column would score perfectly and generalise not at all. The <em>gain ratio</em>, which divides by the entropy of the split itself, corrects for this.
+
+## The family of related measures
+
+|Measure|Question it answers|
+|---|---|
+|Entropy H(X)|How uncertain is X?|
+|Conditional entropy H(X\|Y)|How uncertain is X once Y is known?|
+|Mutual information I(X;Y)|How much does knowing Y reduce uncertainty about X?|
+|Cross-entropy H(p, q)|Cost of encoding p using a code built for q|
+|KL divergence D(p\|\|q)|The extra cost &mdash; cross-entropy minus entropy|
+
+Mutual information deserves particular attention as a feature-selection tool. Unlike correlation, it detects <em>any</em> dependence, including non-linear ones: a perfect parabolic relationship has near-zero correlation and high mutual information. It is zero exactly when the variables are independent.
+
+KL divergence is not symmetric &mdash; D(p||q) &ne; D(q||p) &mdash; so it is a divergence rather than a distance. That asymmetry has real consequences in variational inference, where which direction you minimise determines whether the fitted distribution covers all the modes or concentrates on one.
+
+## Questions people ask
+
+<strong>Why base 2?</strong> Because it gives the answer in bits, which correspond to yes/no questions. Base e gives nats, and base 10 gives dits &mdash; only the units change.
+
+<strong>What is the maximum entropy?</strong> log&#8322;(n) for n outcomes, reached when all are equally likely.
+
+<strong>Is high entropy good or bad?</strong> Neither &mdash; it depends. High entropy in your labels means a hard problem; high entropy in a decision tree leaf means the split did not help; high entropy in a generated distribution means diversity.
+
+<strong>What is the difference between entropy and cross-entropy?</strong> Entropy is the uncertainty of one distribution. Cross-entropy measures one distribution against another, and equals entropy plus KL divergence.
+
+<strong>Why do trees use Gini instead of entropy?</strong> It is cheaper (no logarithm) and agrees with entropy on the chosen split the overwhelming majority of the time.
+
+<strong>Can entropy be negative?</strong> Not for discrete distributions. Differential entropy for continuous ones can be, which is one of several reasons the continuous version needs more care.
+
+## Recap in one screen
+
+- Entropy is average surprise, in bits: `H = -Σ p log₂ p`.
+- Equally likely outcomes give maximum entropy; a certain outcome gives zero.
+- Rare events carry more information, and the log makes information additive.
+- Decision trees split to reduce entropy; cross-entropy loss trains classifiers; perplexity is entropy for language models.
+- Mutual information detects any dependence, not just linear ones, which makes it a stronger feature-selection signal than correlation.

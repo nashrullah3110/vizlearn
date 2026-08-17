@@ -21,6 +21,55 @@ Dropping units changes the expected magnitude of a layer’s output. If half the
 
 Frameworks fix this with <strong>inverted dropout</strong>: during training, surviving activations are divided by <span class="mono-font">(1 &minus; p)</span>. With p = 0.5 the survivors are doubled, restoring the expected sum, and inference needs no adjustment at all. This is automatic in PyTorch and TensorFlow, and worth knowing about because it explains why a hand-rolled dropout implementation often makes a model worse.
 
+## Randomly switching units off
+
+Dropout is a regulariser with an unusual mechanism: during each training step, every unit in a layer is set to zero with probability p, independently.
+
+With p = 0.5, roughly half the layer disappears on every batch &mdash; a different half each time.
+
+Two ways to read why that helps:
+
+<strong>It prevents co-adaptation.</strong> Without dropout, units can form fragile committees where one unit's output only makes sense given another's. Since any unit may vanish, each has to produce something independently useful.
+
+<strong>It is an implicit ensemble.</strong> A network with n droppable units defines 2&#8319; possible sub-networks, all sharing weights. Training samples from them; inference approximates averaging over them. Ensembles reduce variance, and this is a very cheap way to get one.
+
+The empirical effect is real and large: dropout was one of the main reasons deep networks became trainable on limited data in the early 2010s.
+
+## Train and inference differ
+
+At training time, units are dropped and the remaining activations are scaled up by 1/(1&minus;p) &mdash; "inverted dropout" &mdash; so that the expected total stays the same.
+
+At inference time, nothing is dropped and no scaling is applied. The layer becomes a no-op.
+
+That is why the mode switch matters:
+
+```python
+model.train()      # dropout active
+# ... training ...
+
+model.eval()       # dropout disabled
+with torch.no_grad():
+    preds = model(x)
+```
+
+Forgetting `model.eval()` produces predictions that differ from run to run for the same input, which is confusing to debug and easy to miss if you only look at aggregate metrics.
+
+## How much, and where
+
+|Location|Typical rate|
+|---|---|
+|After dense layers|0.3&ndash;0.5|
+|Between convolutional layers|0.0&ndash;0.1, or none|
+|Transformer sublayers|0.1|
+|Input layer|0.1&ndash;0.2, rarely used|
+|Output layer|Never|
+
+The convolutional row surprises people. Standard dropout works poorly between convolutions, because neighbouring pixels in a feature map are highly correlated &mdash; dropping individual activations removes little information. <strong>DropBlock</strong> and <strong>SpatialDropout</strong>, which drop contiguous regions or entire channels, work much better when regularisation is needed there.
+
+In modern convolutional architectures, dropout has largely been replaced by batch normalisation, weight decay and heavy data augmentation. It remains standard in transformers and in the dense heads of older designs.
+
+Tuning it is straightforward: raise p if training accuracy far exceeds validation accuracy, lower it if both are stuck low and training is slow to converge.
+
 ## Experiments to try
 
 1. <strong>Turn it off.</strong> Set <strong>Dropout</strong> to 0 and press <strong>Simulate Flow</strong>. Every neuron participates and signal reaches the output along every path.
@@ -38,3 +87,56 @@ Frameworks fix this with <strong>inverted dropout</strong>: during training, sur
 ## Key takeaway
 
 Dropout zeroes a random fraction of units on every training pass and disables itself at inference, which forces each neuron to be independently useful rather than co-adapted to specific partners. Read as an ensemble, it trains exponentially many thinned networks that share weights and averages them for free. It regularises a model that is overfitting and harms one that is not, and the scaling that makes it work is handled by the framework &mdash; provided you remember to switch the model into evaluation mode.
+
+## Where dropout sits among the regularisers
+
+|Method|What it does|Best for|
+|---|---|---|
+|Dropout|Randomly zeroes activations|Dense layers, transformers|
+|Weight decay (L2)|Penalises large weights|Everything; always on|
+|Early stopping|Stops when validation stops improving|Everything; free|
+|Data augmentation|Expands the effective dataset|Images, audio, text|
+|Batch normalisation|Normalises activations, adds batch noise|CNNs|
+|Label smoothing|Softens the targets|Classification|
+|Mixup / CutMix|Blends examples and labels|Images|
+
+These combine, and the sensible default stack for a small dataset is weight decay plus early stopping plus augmentation, with dropout added if a gap remains.
+
+Note that dropout and batch normalisation interact awkwardly. Batch normalisation already injects noise through batch statistics, and the variance shift dropout introduces can conflict with the running statistics. If you use both, put dropout after the normalisation, and expect to need a lower rate than you would without it.
+
+## Dropout at inference: measuring uncertainty
+
+There is one deliberate use of dropout at prediction time. Keep it active, run the same input twenty times, and the predictions vary because a different sub-network answers each time.
+
+The spread of those predictions is an estimate of the model's uncertainty &mdash; <strong>Monte Carlo dropout</strong>. It is not a rigorous Bayesian posterior, but it is cheap, requires no retraining, and is far better than the raw softmax confidence for flagging inputs the model has no basis for judging.
+
+```python
+model.train()                       # keep dropout on deliberately
+with torch.no_grad():
+    preds = torch.stack([model(x) for _ in range(20)])
+mean, std = preds.mean(0), preds.std(0)     # prediction and uncertainty
+```
+
+Use `model.train()` carefully here &mdash; it also puts batch normalisation into training mode, which is usually not what you want. Enabling only the dropout modules is the correct approach in a real implementation.
+
+## Questions people ask
+
+<strong>What dropout rate should I use?</strong> 0.5 after dense layers is the classic starting point; 0.1 in transformers. Tune from the size of the train/validation gap.
+
+<strong>Should I use dropout with batch normalisation?</strong> Often unnecessary. If both, put dropout after normalisation and use a lower rate.
+
+<strong>Why do my predictions change between runs?</strong> `model.eval()` was not called, so dropout is still active.
+
+<strong>Does dropout slow training?</strong> It slows convergence in epochs, because each step trains a different sub-network. Wall-clock cost per step is negligible.
+
+<strong>Is dropout still used?</strong> Yes in transformers, less in modern convolutional networks where augmentation and normalisation do the work.
+
+<strong>Can I use dropout on the input?</strong> You can, at a low rate, and it behaves like adding noise to the data. Augmentation is usually a better use of the same idea.
+
+## Recap in one screen
+
+- Dropout zeroes a random fraction of units each training step, preventing units from relying on each other.
+- It approximates training an ensemble of exponentially many sub-networks that share weights.
+- Active in training, disabled at inference &mdash; call `model.eval()`.
+- 0.5 for dense layers, 0.1 for transformers, and rarely between convolutions.
+- Modern vision models substitute augmentation and batch normalisation; keeping dropout on at inference gives a cheap uncertainty estimate.

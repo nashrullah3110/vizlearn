@@ -7,7 +7,37 @@ intro: A function packages a piece of work behind a name. return sends a value b
 
 ## return, and the None you did not ask for
 
-<span class="mono-font">return</span> does two things at once: it sends a value back and it <em>exits the function immediately</em>. Any code after it in the same path never runs, which is what makes early returns a clean way to handle edge cases.<p>A function with no return statement still returns <span class="mono-font">None</span>. So does one that reaches the end without hitting a return. That is why this is such a common bug:</p><p>def double(x):<br>&nbsp;&nbsp;&nbsp;&nbsp;x * 2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# computed, then thrown away<br><br>result = double(5)&nbsp;&nbsp;&rarr; None</p><p>The multiplication happens; nothing is sent back. There is no error, and the None surfaces later as a TypeError somewhere unrelated.</p><p>Distinguish <span class="mono-font">return</span> from <span class="mono-font">print</span>: printing shows a value to a human, returning gives it to the calling code. A function that prints its answer instead of returning it cannot be used in a calculation.</p>
+`return` sends a value back and ends the function immediately.
+
+```python
+def classify(score):
+    if score >= 90:
+        return "distinction"     # exits here
+    if score >= 50:
+        return "pass"
+    return "fail"
+```
+
+A function with no `return` returns `None`. So does a function whose `return` line is never reached &mdash; and that is the source of a common confusing bug:
+
+```python
+def find(items, target):
+    for item in items:
+        if item == target:
+            return item
+    # no return here: returns None when nothing matches
+```
+
+`print` is not `return`. Printing shows a value on screen; returning hands it back to the caller so it can be stored, tested or passed on. A function that only prints cannot be used in a calculation.
+
+Returning several values is really returning one tuple, which the caller can unpack:
+
+```python
+def stats(numbers):
+    return min(numbers), max(numbers), sum(numbers) / len(numbers)
+
+low, high, mean = stats([1, 2, 3])
+```
 
 ## Scope and default arguments
 
@@ -20,6 +50,80 @@ The famous trap is a <strong>mutable default</strong>. The default is evaluated 
 def add(item, target=[]):&nbsp;&nbsp;# wrong<br>&nbsp;&nbsp;&nbsp;&nbsp;target.append(item)<br>&nbsp;&nbsp;&nbsp;&nbsp;return target
 
 Every call that omits <span class="mono-font">target</span> shares the same list, so results accumulate across calls. Use <span class="mono-font">None</span> as the default and create the list inside the body.
+
+## Packaging a piece of work behind a name
+
+A function bundles some steps, gives them a name, and lets you run them again with different inputs.
+
+```python
+def area(width, height):
+    """Return the area of a rectangle."""
+    return width * height
+
+area(3, 4)             # 12
+area(height=4, width=3)  # 12 - keyword arguments, order no longer matters
+```
+
+The line beginning `def` is the definition; nothing runs until the function is called. The string on the first line is the docstring, which `help(area)` and every editor will show.
+
+Three reasons functions matter, in the order you feel them:
+
+1. <strong>No repetition.</strong> Fix a bug once rather than in six places.
+2. <strong>A name is documentation.</strong> `calculate_vat(total)` explains itself; the same three lines inline do not.
+3. <strong>Testability.</strong> A function with inputs and a return value can be tested; a block of code in the middle of a script cannot.
+
+## Arguments: positional, keyword and defaults
+
+```python
+def greet(name, greeting="Hello", punctuation="!"):
+    return f"{greeting}, {name}{punctuation}"
+
+greet("Ada")                          # 'Hello, Ada!'
+greet("Ada", "Hi")                    # 'Hi, Ada!'
+greet("Ada", punctuation="?")         # 'Hello, Ada?'
+```
+
+Parameters with defaults must come after those without. Keyword arguments make a call readable at the point where somebody reads it, which matters more than the keystrokes it costs &mdash; `send(retry=False)` beats `send(False)`.
+
+For variable numbers of arguments:
+
+```python
+def total(*numbers):            # a tuple of positional arguments
+    return sum(numbers)
+
+def configure(**options):       # a dict of keyword arguments
+    print(options)
+
+total(1, 2, 3)                  # 6
+configure(debug=True, port=80)  # {'debug': True, 'port': 80}
+```
+
+## The mutable default argument
+
+This is the most famous trap in the language, and it catches everyone once:
+
+```python
+def add_item(item, basket=[]):      # WRONG
+    basket.append(item)
+    return basket
+
+add_item("apple")     # ['apple']
+add_item("pear")      # ['apple', 'pear']  -- the same list, still there
+```
+
+The default is created <strong>once</strong>, when the function is defined, not each time it is called. Every call that does not pass a basket shares that one list.
+
+The fix is always the same:
+
+```python
+def add_item(item, basket=None):
+    if basket is None:
+        basket = []
+    basket.append(item)
+    return basket
+```
+
+Any mutable default &mdash; list, dict, set &mdash; needs this treatment.
 
 ## Exploration guide
 
@@ -39,3 +143,60 @@ Every call that omits <span class="mono-font">target</span> shares the same list
 ## The short version
 
 A function takes parameters, runs a body, and returns a value; without an explicit return it returns None, which is why a missing return shows up as a confusing error far from its cause. Return exits immediately, local names vanish when the call ends, and default arguments are evaluated once at definition time &mdash; so a mutable default is shared by every call that relies on it.
+
+## Scope: what a function can see
+
+Names created inside a function are local to it and disappear when it returns. Names from the enclosing module are readable but not assignable without saying so.
+
+```python
+count = 0
+
+def increment():
+    count = count + 1     # UnboundLocalError: assigning makes it local
+
+def increment_properly():
+    global count          # rarely the right answer, but it works
+    count += 1
+```
+
+Python resolves names in the order local, enclosing, global, builtin. The error above happens because the assignment marks `count` as local for the whole function, so the read on the right-hand side finds nothing yet.
+
+Reaching for `global` is usually a sign the design wants rethinking. Passing the value in and returning the new one keeps the function testable and its behaviour obvious:
+
+```python
+def increment(count):
+    return count + 1
+```
+
+The same discipline applies to arguments. A function that modifies a list passed into it changes the caller's list, because both names point at the same object. That is sometimes intended and should always be deliberate &mdash; and named accordingly, such as `sort_in_place(items)`.
+
+## Writing functions worth reusing
+
+- <strong>One job each.</strong> If the name needs an "and", it is two functions.
+- <strong>Take arguments, return values.</strong> A function that reads a global and prints its result can only be used one way.
+- <strong>Short.</strong> Beyond roughly 30 lines, something inside usually wants a name of its own.
+- <strong>Name it after what it does,</strong> as a verb phrase: `calculate_tax`, `load_config`, `is_valid`.
+- <strong>Docstring first.</strong> One line saying what it returns is enough for most functions.
+- <strong>Fail loudly.</strong> Raising `ValueError` on bad input is kinder than returning `None` and letting the caller discover it later.
+
+## Questions people ask
+
+<strong>What is the difference between an argument and a parameter?</strong> The parameter is the name in the definition; the argument is the value passed in the call.
+
+<strong>Can a function return more than one value?</strong> It returns one tuple, which unpacks into several names &mdash; which feels identical in practice.
+
+<strong>What is a lambda?</strong> A small anonymous function, `lambda x: x * 2`, useful as a `key=` argument. Anything longer deserves a `def` and a name.
+
+<strong>Does Python pass by value or by reference?</strong> Neither exactly: it passes the reference to the object by value. Mutating an argument affects the caller; rebinding the name does not.
+
+<strong>Can functions be stored in variables?</strong> Yes &mdash; they are objects. You can put them in lists and dictionaries, pass them as arguments and return them, which is what makes decorators and callbacks possible.
+
+<strong>What are type hints for?</strong> Documenting the expected types for readers and tools. Python does not enforce them at runtime.
+
+## Recap in one screen
+
+- `def` names a block of work; nothing runs until it is called.
+- `return` sends a value back and exits; without it, the function returns `None`.
+- Printing is not returning &mdash; only a returned value can be used by the caller.
+- Defaults are evaluated once at definition time, so never use a mutable default; use `None`.
+- Assigning to a name inside a function makes it local for the whole function.

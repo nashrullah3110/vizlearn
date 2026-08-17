@@ -15,11 +15,112 @@ for i, name in enumerate(items):
 
 ## What range actually produces
 
-<span class="mono-font">range</span> takes up to three arguments, matching slice syntax: start (inclusive, default 0), stop (exclusive), and step (default 1).<p>range(5)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr; 0 1 2 3 4<br>range(2, 6)&nbsp;&nbsp;&nbsp;&rarr; 2 3 4 5<br>range(0, 10, 3) &rarr; 0 3 6 9<br>range(5, 0, -1) &rarr; 5 4 3 2 1</p><p>The stop value is excluded, which is why <span class="mono-font">range(5)</span> gives five numbers starting at zero and why <span class="mono-font">range(len(items))</span> covers exactly the valid indices.</p><p>Crucially, range does not build a list. It is a lazy object that computes each value as it is asked for, so <span class="mono-font">range(10_000_000)</span> uses a constant few dozen bytes rather than hundreds of megabytes. Wrapping it in <span class="mono-font">list()</span> throws that advantage away.</p>
+`range` does not build a list. It produces numbers one at a time as the loop asks for them, so `range(10_000_000)` uses a few dozen bytes rather than 400MB.
+
+```python
+range(5)          # 0, 1, 2, 3, 4        - stop only
+range(2, 6)       # 2, 3, 4, 5           - start and stop
+range(0, 10, 2)   # 0, 2, 4, 6, 8        - with a step
+range(5, 0, -1)   # 5, 4, 3, 2, 1        - counting down
+list(range(3))    # [0, 1, 2]            - materialise it if you must
+```
+
+The stop value is always excluded, exactly as in slicing, and for the same reason: `range(len(items))` then covers every valid index precisely once.
+
+`for _ in range(3):` is the idiom for "do this three times" &mdash; the underscore signals that the value is deliberately unused.
 
 ## break, continue, else
 
 <span class="mono-font">break</span> exits the loop immediately. <span class="mono-font">continue</span> skips to the next iteration. Both apply to the innermost loop only.<p>Python also allows an <span class="mono-font">else</span> on a loop, which is genuinely useful and almost universally misread. The else block runs when the loop finishes <strong>without</strong> hitting a break:</p><p>for item in items:<br>&nbsp;&nbsp;&nbsp;&nbsp;if item == target:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break<br>else:<br>&nbsp;&nbsp;&nbsp;&nbsp;print("not found")</p><p>Read it as “no break” rather than “else” and it makes sense: it is the natural place for the not-found case, without needing a flag variable.</p>
+
+## Looping over things, not over numbers
+
+Many languages loop by counting: start an index at 0, compare it against a length, increment it. Python loops over the items directly.
+
+```python
+names = ["Ada", "Grace", "Alan"]
+
+for name in names:            # idiomatic Python
+    print(name)
+
+for i in range(len(names)):   # what people write coming from other languages
+    print(names[i])
+```
+
+The first version is shorter, cannot go out of bounds, and works unchanged on lists, strings, dictionaries, sets, files and generators &mdash; anything that can be iterated.
+
+When you genuinely need the position as well, `enumerate` gives both:
+
+```python
+for index, name in enumerate(names):
+    print(index, name)
+
+for number, name in enumerate(names, start=1):   # 1, 2, 3 for display
+    print(f"{number}. {name}")
+```
+
+And to walk two sequences together, `zip`:
+
+```python
+for name, score in zip(names, scores):
+    print(name, score)
+```
+
+`zip` stops at the shorter sequence, silently. If that would hide a bug, `zip(a, b, strict=True)` in Python 3.10+ raises instead.
+
+## break, continue, and the else nobody expects
+
+```python
+for item in items:
+    if item.broken:
+        break        # leave the loop entirely
+    if item.skip:
+        continue     # jump to the next iteration
+    process(item)
+```
+
+Python also allows an `else` on a loop, which runs <em>only if the loop finished without breaking</em>:
+
+```python
+for user in users:
+    if user.email == target:
+        print("found")
+        break
+else:
+    print("not found")     # runs only if no break happened
+```
+
+It reads oddly &mdash; "else" suggests a condition &mdash; but it removes the `found = False` flag variable that this pattern otherwise needs. Think of it as "no break".
+
+## Loops over dictionaries and nesting
+
+```python
+prices = {"apple": 1.20, "pear": 0.90}
+
+for key in prices:                    # keys by default
+    print(key)
+
+for key, value in prices.items():     # both, and the usual choice
+    print(key, value)
+
+for value in prices.values():
+    print(value)
+```
+
+Nested loops run the inner loop completely for each pass of the outer one, so two loops over 1,000 items each is a million iterations. That multiplication is worth keeping in mind &mdash; most accidentally slow Python is a nested loop that could have been a dictionary or set lookup.
+
+```python
+# slow: for each order, scan every customer
+for order in orders:
+    for customer in customers:
+        if customer.id == order.customer_id:
+            ...
+
+# fast: build the lookup once
+by_id = {c.id: c for c in customers}
+for order in orders:
+    customer = by_id[order.customer_id]
+```
 
 ## Experiments to try
 
@@ -30,12 +131,60 @@ for i, name in enumerate(items):
 
 ## Common mistakes
 
-- <strong>Looping over indices out of habit.</strong> <span class="mono-font">for i in range(len(items))</span> when you only use <span class="mono-font">items[i]</span> is a C idiom transplanted into Python.
-- <strong>Off-by-one from the exclusive stop.</strong> To count 1 to 10 you need <span class="mono-font">range(1, 11)</span>.
-- <strong>Modifying a list while looping over it.</strong> Removing items shifts everything after them, so the loop silently skips elements. Iterate over a copy, or build a new list.
-- <strong>Expecting the loop variable to be scoped to the loop.</strong> It leaks into the surrounding scope and keeps its final value after the loop ends.
-- <strong>Forgetting range is lazy.</strong> Printing it shows <span class="mono-font">range(0, 5)</span> rather than the numbers; wrap it in <span class="mono-font">list()</span> only to inspect it, not in real code.
+- <strong>Modifying a list while looping over it.</strong> Deleting items shifts the indices under the iterator and items get skipped. Loop over a copy (`for x in items[:]`) or build a new list.
+- <strong>Using `range(len(x))` when you do not need the index.</strong> Loop over the items, or use `enumerate`.
+- <strong>Expecting `range` to include the stop value.</strong> `range(1, 10)` ends at 9.
+- <strong>Assuming `zip` warns about different lengths.</strong> It stops at the shortest without a word; pass `strict=True` when that matters.
+- <strong>Reusing the loop variable afterwards.</strong> It survives the loop and holds the last value, which is legal and usually a mistake waiting to happen.
+- <strong>Building a string with `+=` in a loop.</strong> Strings are immutable, so every step copies the whole thing. Collect the pieces in a list and `"".join(parts)`.
 
 ## The short version
 
 A for loop iterates over elements directly, and <span class="mono-font">enumerate</span> is how you get the index when you actually need it. <span class="mono-font">range</span> generates numbers lazily with an exclusive stop, so it costs nothing regardless of size. The loop <span class="mono-font">else</span> runs only when no break occurred, which makes it the clean way to handle a search that found nothing.
+
+## Comprehensions: the loop you write as an expression
+
+When a loop's only job is to build a list, a comprehension says so more directly:
+
+```python
+squares = [n * n for n in range(10)]
+evens   = [n for n in numbers if n % 2 == 0]
+names   = [u.name.title() for u in users if u.active]
+```
+
+The same shape builds dictionaries and sets:
+
+```python
+lengths = {word: len(word) for word in words}
+initials = {name[0] for name in names}          # a set, so no duplicates
+```
+
+And parentheses make a generator, which produces items lazily and is the right choice for large data or for feeding straight into `sum`, `max` or `any`:
+
+```python
+total = sum(order.amount for order in orders)   # no intermediate list
+```
+
+Use a comprehension when the logic fits on one readable line. When it needs two conditions, a nested loop and a conditional expression, the plain loop is the clearer code.
+
+## Questions people ask
+
+<strong>How do I loop a fixed number of times?</strong> `for _ in range(n):`.
+
+<strong>How do I loop backwards?</strong> `for x in reversed(items):`, or `range(len(items) - 1, -1, -1)` when you need indices.
+
+<strong>Can I loop over two lists at once?</strong> `zip(a, b)`, and `zip(a, b, c)` for three.
+
+<strong>Is a `for` loop faster than a `while` loop?</strong> Usually, because the iteration is handled in C rather than by re-evaluating a condition in Python. Comprehensions are faster again for building lists.
+
+<strong>How do I get both index and value?</strong> `enumerate(items)`, with `start=1` if you want human-friendly numbering.
+
+<strong>What is the difference between `range` and a list?</strong> `range` generates numbers on demand and stores only start, stop and step; a list stores every element.
+
+## Recap in one screen
+
+- Loop over items directly; use `enumerate` for positions and `zip` for parallel sequences.
+- `range(start, stop, step)` excludes the stop and produces values lazily.
+- `break` leaves the loop, `continue` skips an iteration, and `else` runs only if no `break` happened.
+- Nested loops multiply &mdash; replace an inner search with a dictionary or set lookup.
+- Comprehensions are the idiomatic way to build a list, dict or set from an iterable.

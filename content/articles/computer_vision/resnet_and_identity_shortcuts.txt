@@ -9,6 +9,42 @@ ResNet's headline idea is the identity shortcut: instead of a block computing <c
 
 Before ResNet, simply stacking more convolutional layers past a certain depth made plain networks <em>harder</em> to train, not just slower — a well-documented empirical finding known as the degradation problem. One real contributor: if each block's weights shrink the signal even slightly, a long enough plain stack keeps shrinking it, layer after layer, until by the far end there is barely any signal left carrying information forward. A shortcut connection breaks that: because <code>relu(f(x))</code> can never be negative, adding it to <code>x</code> can never make the running signal smaller than <code>x</code> was — the identity path is a floor the plain stack simply doesn't have.
 
+## The problem ResNet solved
+
+Before 2015 the assumption was that deeper networks would be better, and the evidence said otherwise. A 56-layer plain network scored <em>worse</em> than a 20-layer one &mdash; not just on test data, but on <strong>training</strong> data.
+
+That is the crucial detail. Worse test accuracy would be overfitting. Worse training accuracy means the deeper network could not even fit what the shallower one could, despite being strictly more expressive: it could in principle copy the 20-layer network and make the remaining 36 layers do nothing.
+
+The problem was optimisation, not capacity. Gradients degrade as they pass back through many layers, and learning an exact identity mapping through a stack of convolutions and non-linearities turns out to be surprisingly hard.
+
+## Learn the difference, not the whole thing
+
+ResNet's answer is one line of arithmetic:
+
+<p class="mono-font">output = F(x) + x</p>
+
+Instead of asking a block to produce the desired output `H(x)` directly, ask it to produce the <em>residual</em> `F(x) = H(x) − x`, and add the input back.
+
+Now "do nothing" is trivially available: drive the block's weights towards zero and the output is exactly `x`. A layer that has nothing useful to add can get out of the way, which is precisely what the plain deep network could not manage.
+
+The gradient consequence is just as important. Differentiating `F(x) + x` with respect to `x` gives `F'(x) + 1`. That `+1` is a path along which the gradient flows back unchanged, however many blocks it passes through. The chain rule's product of factors can no longer collapse to nothing, because every block contributes a term of exactly 1.
+
+That single addition made 50, 101 and 152-layer networks trainable, and the same idea now appears in essentially every deep architecture, transformers included.
+
+## What is inside a block
+
+<strong>The basic block</strong>, used in ResNet-18 and 34:
+
+<p class="mono-font">x &rarr; Conv3&times;3 &rarr; BN &rarr; ReLU &rarr; Conv3&times;3 &rarr; BN &rarr; (+x) &rarr; ReLU</p>
+
+<strong>The bottleneck block</strong>, used in ResNet-50 and deeper, sandwiches an expensive 3&times;3 between two cheap 1&times;1 convolutions that shrink and then restore the channel count:
+
+<p class="mono-font">x &rarr; Conv1&times;1 (reduce) &rarr; Conv3&times;3 &rarr; Conv1&times;1 (restore) &rarr; (+x)</p>
+
+The bottleneck exists for cost. Doing a 3&times;3 convolution on 256 channels is four times the work of reducing to 64, convolving, and expanding back &mdash; which is why deep ResNets use it everywhere.
+
+Two details worth knowing. The addition happens <em>before</em> the final ReLU, so the identity path is not passed through a non-linearity. And when a block changes the channel count or the spatial size, the shortcut cannot be a plain identity &mdash; a 1&times;1 convolution with matching stride is used to project `x` to the right shape.
+
 ## Guided tour
 
 1. <strong>Read the norms at depth 10.</strong> The plain stack's signal has shrunk to a small fraction of where it started; the version with the shortcut is larger than where it started, not smaller.
@@ -23,3 +59,59 @@ Here the shortcut version's norm keeps <em>growing</em> with depth rather than s
 ## In one line
 
 A plain stack of layers with a contractive weight matrix shrinks its forward signal geometrically with depth — the same kind of multiplicative decay that causes vanishing gradients on the way back. An identity shortcut adds a nonnegative quantity back onto the running signal at every block, which makes shrinkage below the starting point mathematically impossible. It is the same one-line change, x + f(x) instead of f(x), showing up on both passes through the network.
+
+## Why it works, in more than one sense
+
+Three explanations are offered, and they are complementary rather than competing.
+
+<strong>Optimisation.</strong> Identity is easy to represent, so adding layers cannot make the achievable function set worse in practice, only in principle.
+
+<strong>Gradient flow.</strong> The `+1` in the derivative gives every block a direct path back to the loss, which is what makes 100-layer training stable.
+
+<strong>Ensemble behaviour.</strong> A network with n residual blocks contains 2&#8319; possible paths from input to output, since each block can be taken or skipped. Empirically, removing a single block from a trained ResNet barely changes its accuracy &mdash; behaviour much more like an ensemble of many shallow networks than like one very deep one.
+
+The loss-landscape view adds a fourth: visualisations of the loss surface show that skip connections turn a chaotic, spiky landscape into a much smoother one, which is a fairly direct explanation of why optimisation succeeds.
+
+## The family, and its descendants
+
+|Model|Depth|Notes|
+|---|---|---|
+|ResNet-18 / 34|Basic blocks|Fast; good default for small datasets|
+|ResNet-50|Bottleneck|The workhorse; the most common backbone in vision|
+|ResNet-101 / 152|Bottleneck|Better accuracy, materially slower|
+|Pre-activation ResNet|BN&ndash;ReLU&ndash;Conv order|Cleaner identity path; trains deeper|
+|ResNeXt|Grouped convolutions|More accuracy at the same cost|
+|DenseNet|Concatenate instead of add|Every layer sees all previous ones|
+|ConvNeXt|Modernised ResNet|Matches transformers on vision benchmarks|
+
+The idea escaped computer vision entirely. Every transformer block is `x + Attention(LayerNorm(x))` followed by `x + FFN(LayerNorm(x))` &mdash; the same residual structure, which is what makes 100-layer language models trainable. U-Net's skip connections carry the same intuition into segmentation.
+
+## Practical notes
+
+- <strong>ResNet-50 pretrained on ImageNet is the sensible default backbone</strong> for a new vision project. It is well-supported everywhere, and fine-tunes reliably.
+- <strong>The shortcut must match shapes.</strong> When channels or stride change, use the 1&times;1 projection; frameworks do this automatically, but hand-written blocks frequently get it wrong.
+- <strong>Do not put a ReLU on the identity path.</strong> The whole point is that the path is clean.
+- <strong>Batch normalisation and residuals work together.</strong> Removing BN from a deep ResNet usually breaks training unless the initialisation is adjusted to compensate.
+- <strong>Depth is not free.</strong> ResNet-152 is roughly three times the compute of ResNet-50 for a few points of accuracy; on most problems the smaller model plus better data wins.
+
+## Questions people ask
+
+<strong>Why add rather than concatenate?</strong> Addition keeps the channel count constant and costs nothing. DenseNet concatenates instead, which reuses features more explicitly at the cost of growing width.
+
+<strong>Does the shortcut have parameters?</strong> Not when it is a plain identity. It does when a projection is needed to change shape.
+
+<strong>Can I add skip connections to any network?</strong> Yes, provided the shapes match, and it usually helps for anything more than a few layers deep.
+
+<strong>Why does the identity make gradients flow?</strong> Because differentiating `F(x) + x` gives `F'(x) + 1`, and that constant term cannot vanish however many blocks it passes through.
+
+<strong>Is ResNet still relevant?</strong> Very. It remains one of the most-used backbones in production, and ConvNeXt shows a modernised version still competes with vision transformers.
+
+<strong>How deep can I go?</strong> ResNet-1000 has been trained as an experiment. Beyond about 150 layers the accuracy returns are small and the cost is not.
+
+## Recap in one screen
+
+- Deep plain networks were worse on <em>training</em> data &mdash; an optimisation failure, not overfitting.
+- A residual block learns `F(x)` and outputs `F(x) + x`, so doing nothing is easy to represent.
+- The derivative gains a `+1`, giving gradients a clean path back through any number of blocks.
+- Bottleneck blocks use 1&times;1 convolutions either side of the 3&times;3 to cut cost.
+- The same shortcut idea underpins transformers, U-Net and almost every modern deep architecture.

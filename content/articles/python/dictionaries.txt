@@ -13,11 +13,30 @@ Lookup is <strong>O(1)</strong> &mdash; the cost does not grow with the size of 
 
 ## Getting values without crashing
 
-Indexing a missing key raises <span class="mono-font">KeyError</span>. When a key may legitimately be absent, that is the wrong tool:
+`prices["plum"]` raises `KeyError` if the key is absent. Three safer ways, each right in a different situation:
 
-ages["zoe"]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr; KeyError<br>ages.get("zoe")&nbsp;&nbsp;&nbsp;&rarr; None<br>ages.get("zoe", 0)&nbsp;&rarr; 0&nbsp;&nbsp;&nbsp;custom default<br>"zoe" in ages&nbsp;&nbsp;&nbsp;&nbsp;&rarr; False
+```python
+prices.get("plum")            # None if missing
+prices.get("plum", 0)         # a default of your choosing
+prices.setdefault("plum", 0)  # returns it, and inserts it if absent
 
-Use <span class="mono-font">get</span> when absence is expected and normal; let the KeyError happen when absence means something has genuinely gone wrong. Both are correct in the right place, and choosing between them is a statement about your assumptions.
+if "plum" in prices:          # explicit check
+    ...
+```
+
+For counting and grouping, the standard library has purpose-built tools that remove the boilerplate entirely:
+
+```python
+from collections import Counter, defaultdict
+
+Counter(words).most_common(3)          # the three most frequent words
+
+groups = defaultdict(list)
+for user in users:
+    groups[user.country].append(user)  # no "if key not in dict" needed
+```
+
+`defaultdict(list)` creates an empty list the first time a key is touched, which turns a four-line grouping pattern into one line.
 
 ## Iterating
 
@@ -26,6 +45,48 @@ for key in ages:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# ke
 Iterating a dict directly gives keys, which is why <span class="mono-font">for key in ages</span> needs no method call. <span class="mono-font">items()</span> is what you want most of the time.
 
 Since Python 3.7 dictionaries preserve <strong>insertion order</strong> as a language guarantee, so iteration returns keys in the order they were first added. Deleting a key and re-adding it moves it to the end.
+
+## Looking things up by name
+
+A list finds things by position. A dictionary finds them by whatever key you choose &mdash; a name, an id, a date, any immutable value.
+
+```python
+prices = {"apple": 1.20, "pear": 0.90, "fig": 3.50}
+
+prices["apple"]           # 1.20
+prices["plum"] = 2.10     # add
+prices["apple"] = 1.30    # update - same syntax, because the key exists
+del prices["fig"]         # remove
+len(prices)               # 3
+"pear" in prices          # True - checks keys, not values
+```
+
+Keys must be <strong>hashable</strong>, which in practice means immutable: strings, numbers, tuples and booleans work; lists, dicts and sets do not. Values can be anything at all, including other dictionaries.
+
+Since Python 3.7, dictionaries keep insertion order, so iterating gives you the keys in the order they were added. That is a language guarantee now, not an implementation detail.
+
+## Iterating over a dictionary
+
+```python
+for key in prices:                    # keys by default
+for key, value in prices.items():     # the usual choice
+for value in prices.values():
+```
+
+Building dictionaries with comprehensions works exactly as it does for lists:
+
+```python
+lengths  = {word: len(word) for word in words}
+inverted = {value: key for key, value in original.items()}
+filtered = {k: v for k, v in prices.items() if v > 1.00}
+```
+
+Merging is a `|` in Python 3.9+, with the right-hand side winning on conflicts:
+
+```python
+defaults = {"colour": "red", "size": "M"}
+settings = defaults | user_choices
+```
 
 ## Exploration guide
 
@@ -36,18 +97,79 @@ Since Python 3.7 dictionaries preserve <strong>insertion order</strong> as a lan
 
 ## Why dicts turn quadratic loops linear
 
-This is the practical reason dictionaries matter so much. Checking membership in a list is O(n) because it scans; checking membership in a dict or set is O(1).
+A dictionary lookup hashes the key and jumps straight to it, taking roughly constant time regardless of size. Searching a list scans it.
 
-So a loop over n items that checks each against a list of n items is O(n&sup2;) &mdash; a million operations for a thousand items. Convert the inner list to a set or dict first and the same loop is O(n): a thousand operations. That single substitution is the most common large speedup in everyday Python, and it is why building a lookup dict before a loop is such a reliable habit.
+That difference decides how a program scales:
+
+```python
+# slow: for each of 10,000 orders, scan 10,000 customers  -> 100,000,000 steps
+for order in orders:
+    for customer in customers:
+        if customer.id == order.customer_id:
+            ...
+
+# fast: build the index once, then one lookup each  -> 20,000 steps
+by_id = {c.id: c for c in customers}
+for order in orders:
+    customer = by_id[order.customer_id]
+```
+
+This single transformation &mdash; replacing a nested scan with a dictionary built beforehand &mdash; is the most common and most effective optimisation in everyday Python, and it usually makes the code shorter as well as faster.
 
 ## Common mistakes
 
-- <strong>Indexing where <span class="mono-font">get</span> belongs.</strong> Turns an expected absence into a crash.
-- <strong>Mutating while iterating.</strong> Adding or removing keys inside a <span class="mono-font">for</span> loop over the dict raises RuntimeError. Iterate over <span class="mono-font">list(d)</span> instead.
-- <strong>Using a mutable object as a key.</strong> Lists and dicts are unhashable; tuples of immutables work.
-- <strong>Searching values in a loop.</strong> <span class="mono-font">v in d.values()</span> is O(n) and undoes the whole benefit.
-- <strong>Hand-rolling counting.</strong> <span class="mono-font">collections.Counter</span> and <span class="mono-font">defaultdict</span> already do it.
+- <strong>Using a list as a key.</strong> `TypeError: unhashable type: 'list'`. Use a tuple.
+- <strong>Assuming `in` checks values.</strong> `"apple" in prices` tests keys; use `1.20 in prices.values()` for values.
+- <strong>Modifying a dictionary while iterating it.</strong> `RuntimeError: dictionary changed size during iteration`. Iterate over `list(prices.keys())` if you must delete while looping.
+- <strong>Reaching for `try/except KeyError` where `.get()` reads better</strong> &mdash; though `try/except` is right when a missing key is genuinely exceptional.
+- <strong>Copying with `=`.</strong> `b = a` gives two names for one dictionary; use `a.copy()`, or `copy.deepcopy(a)` for nested structures.
+- <strong>Rebuilding the same lookup inside a loop</strong>, which throws away the entire advantage. Build it once, outside.
 
 ## What to remember
 
 A dictionary maps unique, immutable keys to values with O(1) lookup, insertion and deletion, and preserves insertion order. Use <span class="mono-font">get</span> when a key may reasonably be missing and indexing when it may not. Its biggest practical use is replacing repeated list scans: swapping an <span class="mono-font">in list</span> check for an <span class="mono-font">in dict</span> check is what turns an accidental O(n&sup2;) into O(n).
+
+## Nested dictionaries and real data
+
+JSON maps directly onto dictionaries and lists, which is why they turn up constantly when working with APIs and config files.
+
+```python
+data = {
+    "user": {"name": "Ada", "roles": ["admin", "dev"]},
+    "active": True,
+}
+
+data["user"]["name"]                     # 'Ada'
+data["user"]["roles"][0]                 # 'admin'
+data["user"].get("email", "none")        # safe on a missing key
+```
+
+Deep access is where `KeyError` bites, because any level can be missing. Chaining `.get()` handles it:
+
+```python
+email = data.get("user", {}).get("email")     # None rather than an exception
+```
+
+For genuinely deep structures, a small helper or a library such as `glom` beats a chain of five `.get({})` calls.
+
+## Questions people ask
+
+<strong>Are dictionaries ordered?</strong> Yes, by insertion, guaranteed since Python 3.7.
+
+<strong>Can two keys be equal?</strong> No. Assigning to an existing key replaces its value.
+
+<strong>How do I sort a dictionary?</strong> `dict(sorted(prices.items(), key=lambda kv: kv[1]))` sorts by value; use `kv[0]` for keys.
+
+<strong>What is the difference from a set?</strong> A set is effectively a dictionary with keys and no values &mdash; same fast membership testing, no associated data.
+
+<strong>How much memory does a dict use?</strong> More than a list of the same values, because it stores hashes and keeps spare capacity. The lookup speed is what you are buying.
+
+<strong>When should I use a dataclass instead?</strong> When the keys are fixed and known &mdash; a record with `name`, `email` and `age` is better as a dataclass, which gives you attribute access, type hints and validation.
+
+## Recap in one screen
+
+- A dictionary maps keys to values, with roughly constant-time lookup by key.
+- Keys must be immutable; values can be anything, including nested dicts and lists.
+- `.get(key, default)` avoids `KeyError`; `defaultdict` and `Counter` remove common boilerplate.
+- `.items()` is the normal way to iterate over both parts.
+- Replacing a nested search loop with a pre-built dictionary is the classic Python speed-up.

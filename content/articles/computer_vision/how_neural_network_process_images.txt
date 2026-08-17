@@ -11,6 +11,51 @@ Think of a digital image as a spreadsheet where each cell is a pixel holding a c
 
 If the image is colored, it contains three channels: Red, Green, and Blue (RGB). The network needs separate input nodes for every color value of every pixel. The math for the total number of inputs is simple: <strong>Width &times; Height &times; Channels = Total Nodes.</strong>
 
+## An image is a grid of numbers
+
+Before anything else, a picture has to become arithmetic. A greyscale image is a grid of brightness values from 0 (black) to 255 (white). A colour image is three such grids stacked &mdash; red, green and blue.
+
+A 224&times;224 colour photograph is therefore a block of numbers with shape (224, 224, 3), or 150,528 values. That is what the network actually receives; there is no image in there, only a tensor.
+
+Almost every pipeline rescales those values to 0&ndash;1 by dividing by 255, or standardises them per channel using the dataset's mean and standard deviation. The reason is the same as for tabular data: gradients and initialisation schemes assume inputs of roughly unit scale, and raw 0&ndash;255 values make the first layer's activations far too large.
+
+## Why a dense layer is the wrong tool
+
+Feed that image to an ordinary fully connected layer with 1,000 units and you need 150,528 &times; 1,000 = <strong>150 million weights in the first layer alone</strong>. Three problems follow immediately.
+
+<strong>It is unaffordable.</strong> That many parameters need enormous data and memory, and most of them will be fitting noise.
+
+<strong>It throws away the structure.</strong> Flattening the grid into a list destroys the fact that neighbouring pixels are related. To a dense layer, pixel (0,0) and pixel (0,1) are no more related than pixel (0,0) and pixel (200,150).
+
+<strong>It has to relearn everything everywhere.</strong> A dense layer that learns to detect an edge in the top-left corner has learned nothing about edges in the bottom-right. Every position needs its own weights.
+
+Convolution fixes all three at once by making two assumptions about images that happen to be true.
+
+## Local connections and shared weights
+
+<strong>Locality.</strong> A small filter &mdash; typically 3&times;3 &mdash; looks at a tiny patch rather than the whole image. Meaningful visual structure is local: an edge, a corner or a texture is defined by a handful of neighbouring pixels.
+
+<strong>Weight sharing.</strong> That same filter slides across the entire image. One set of nine weights is applied everywhere, so a vertical-edge detector learned in one place works in every place.
+
+The arithmetic is startling. A 3&times;3 filter over 3 input channels is 27 weights plus a bias. Use 64 such filters and the layer has 1,792 parameters &mdash; against 150 million for the dense equivalent, and it works better.
+
+This also gives the network <strong>translation equivariance</strong>: move the cat two pixels right and the feature map moves two pixels right. The network does not have to see cats in every position to recognise them.
+
+## The hierarchy that emerges
+
+Stacking convolution layers builds features of increasing abstraction, and this is not a metaphor &mdash; it is visible when you inspect trained filters.
+
+|Depth|What the filters respond to|
+|---|---|
+|Layer 1|Edges at various orientations, colour blobs|
+|Layer 2|Corners, curves, simple textures|
+|Layers 3&ndash;4|Repeated patterns, parts &mdash; eyes, wheels, letters|
+|Deep layers|Object parts and whole objects|
+
+Each layer sees a wider region of the original image than the last, because each of its inputs already summarised a patch. That growing window is the <strong>receptive field</strong>, and it is why depth matters: a network needs enough layers for its deepest neurons to see the whole object.
+
+A complete classifier is then: several convolution and pooling blocks to build features, followed by pooling or flattening, and finally one or two dense layers to turn those features into class scores.
+
 ## Guided Experiments with This Interactive
 
 1. <strong>Observe the Math:</strong> <p class="font-light opacity-80 mt-1">Look at the right column. For a 16x16 RGB image, you'll see the 2D matrix labeled <code>16 x 16 x 3</code>. This means there are 768 individual color values. Scroll the 1D Input Vector horizontally to see all 768 "nodes" laid out end-to-end!</p>
@@ -32,3 +77,49 @@ This exact problem led to the invention of Convolutional Neural Networks (CNNs),
 - High resolution images create massive input layers, making them computationally expensive.
 
 Flattening is the bridge between raw image files and the mathematical matrix operations that power Artificial Intelligence.
+
+## What each piece contributes
+
+<strong>Convolution</strong> detects patterns and produces feature maps &mdash; one per filter, each highlighting where its pattern was found.
+
+<strong>ReLU</strong> zeroes negative responses. Without a non-linearity, stacked convolutions collapse into a single convolution, and depth buys nothing.
+
+<strong>Pooling</strong> (or a strided convolution) shrinks the spatial dimensions, which reduces computation, widens the receptive field, and adds a little tolerance to small shifts.
+
+<strong>Batch normalisation</strong> keeps activations in a stable range, making deeper networks trainable and allowing higher learning rates.
+
+<strong>Global average pooling</strong> collapses each feature map to a single number, replacing the huge flatten-then-dense step used by older architectures and removing most of their parameters.
+
+<strong>The classifier head</strong> maps the final features to class scores, which a softmax turns into probabilities.
+
+## Where the assumptions break
+
+Convolution works because of assumptions about images, and it is worth knowing when they do not hold.
+
+<strong>Rotation and scale are not free.</strong> Convolution is equivariant to translation, not to rotation or resizing. A network trained on upright faces will struggle with faces at 90&deg;, which is exactly why rotation and scaling are standard data augmentations.
+
+<strong>Global relationships need depth or attention.</strong> A 3&times;3 filter sees three pixels; relating opposite corners of an image requires many layers of accumulated receptive field. Vision transformers take the other route, comparing all patches directly with attention from the first layer &mdash; which is why they need more data but capture long-range structure more easily.
+
+<strong>Not all grids are images.</strong> Convolution assumes neighbouring positions are related. Applied to a table of unrelated columns, that assumption is false and the inductive bias is wasted.
+
+## Questions people ask
+
+<strong>Why 3&times;3 filters almost everywhere?</strong> Two stacked 3&times;3 layers see the same region as one 5&times;5 but use fewer parameters and include an extra non-linearity. VGG established this and it stuck.
+
+<strong>Does the input have to be a fixed size?</strong> Convolutions do not care, but a flatten-then-dense head does. Global average pooling removes the constraint, which is why modern architectures accept varying sizes.
+
+<strong>Why normalise pixel values?</strong> Because 0&ndash;255 inputs produce large activations and awkward gradients. Scaling to 0&ndash;1 or standardising per channel is standard.
+
+<strong>How many filters should a layer have?</strong> Typically doubling with depth &mdash; 32, 64, 128, 256 &mdash; as spatial size shrinks and the number of distinct patterns to represent grows.
+
+<strong>Do CNNs see like humans?</strong> Not really. They are far more sensitive to texture than to shape, and small adversarial changes invisible to a person can flip a prediction entirely.
+
+<strong>Are CNNs obsolete now that transformers exist?</strong> No. They remain more data-efficient, faster on small images, and the standard choice on limited hardware. Hybrid designs are common.
+
+## Recap in one screen
+
+- An image is a grid of numbers; colour adds three channels.
+- A dense layer on raw pixels needs hundreds of millions of weights and ignores spatial structure.
+- Convolution assumes locality and shares one small filter across the whole image, cutting parameters by orders of magnitude.
+- Stacked layers build a hierarchy: edges, then textures, then parts, then objects.
+- Translation is handled naturally; rotation and scale must come from augmentation.

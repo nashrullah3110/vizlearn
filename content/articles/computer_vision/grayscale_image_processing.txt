@@ -11,6 +11,50 @@ The most fundamental concept in all of computer vision is that images are just d
 
 As you draw on the canvas, you are directly changing the numbers in the matrix on the right. A bright stroke sets pixel values to 255, while the empty canvas is all zeros. Every filter you apply is just a rule that transforms these numbers.
 
+## One number per pixel
+
+A greyscale image stores a single brightness value per pixel, conventionally 0 for black and 255 for white in 8-bit images. A colour image stores three.
+
+That reduction has a direct cost and a direct benefit. A 1920&times;1080 image is 2 million values in greyscale and 6 million in colour, so converting cuts memory and computation by two thirds. What you lose is every distinction that depends on hue: a red apple and a green apple of the same brightness become identical.
+
+The conversion is not a plain average. Human vision is far more sensitive to green than to blue, so the standard weighting reflects perceived brightness:
+
+<p class="mono-font">Y = 0.299R + 0.587G + 0.114B</p>
+
+A plain `(R+G+B)/3` makes blues look too light and greens too dark. Both are one line of code; the weighted version is the one that matches what people see.
+
+## The operations that matter
+
+<strong>Thresholding</strong> turns greyscale into binary &mdash; every pixel becomes black or white:
+
+```python
+import cv2
+_, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+_, otsu   = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+adaptive  = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                  cv2.THRESH_BINARY, blockSize=11, C=2)
+```
+
+A fixed threshold fails as soon as lighting varies. <strong>Otsu's method</strong> chooses the threshold automatically by finding the value that best separates the histogram into two groups. <strong>Adaptive thresholding</strong> computes a different threshold for each neighbourhood, and is what you want for a photograph of a document with a shadow across it.
+
+<strong>Histogram equalisation</strong> redistributes brightness values to use the full range, revealing detail in images that are too dark or too flat. CLAHE &mdash; the adaptive version, applied in tiles &mdash; avoids the over-amplified noise that global equalisation produces in already-good regions.
+
+<strong>Morphological operations</strong> work on binary images: erosion shrinks white regions, dilation grows them, opening (erode then dilate) removes small specks, and closing (dilate then erode) fills small holes. They are the standard cleanup after thresholding.
+
+## When greyscale is the right choice
+
+|Task|Greyscale enough?|
+|---|---|
+|OCR and document processing|Yes &mdash; text is defined by shape|
+|Edge and corner detection|Yes &mdash; brightness gradients carry it|
+|Medical X-ray and CT|Yes &mdash; the data is single-channel already|
+|Face detection (classical)|Yes &mdash; Haar cascades use intensity patterns|
+|Fruit ripeness, traffic lights|No &mdash; colour <em>is</em> the signal|
+|Skin lesion analysis|No &mdash; hue carries diagnostic information|
+|General object classification|Usually not &mdash; colour helps materially|
+
+The rule of thumb: if a human could do the task from a black-and-white photograph, greyscale is probably enough. If they would ask to see it in colour, it is not.
+
 ## Guided Experiments with This Interactive
 
 1. <strong>Draw and Observe:</strong> <p class="font-light opacity-80 mt-1">Draw a simple diagonal line on the canvas. Watch the corresponding cells in the matrix light up with values like 255, 120, and 80. Notice how the "brush" has a soft edge, creating intermediate gray values, not just pure white.</p>
@@ -32,3 +76,45 @@ As you draw on the canvas, you are directly changing the numbers in the matrix o
 - <strong>Neighborhood operations</strong> (like Blur and Edge Detection) calculate a pixel's new value based on its neighbors.
 
 Mastering this fundamental concept—that images are just grids of numbers—is the key to understanding all of computer vision.
+
+## Greyscale and neural networks
+
+Feeding greyscale images to a CNN changes exactly one thing: the input has one channel instead of three, so the first layer's filters have a third as many weights. Everything after that is unchanged.
+
+Two practical points arise when combining greyscale data with pretrained models.
+
+<strong>Pretrained networks expect three channels.</strong> A ResNet trained on ImageNet has a first layer shaped for RGB. The usual fix is to replicate the greyscale channel three times, which works and wastes a little computation. The better fix is to sum the pretrained first-layer weights across the channel dimension, producing a single-channel filter that behaves identically on grey input.
+
+<strong>Colour augmentation stops applying.</strong> Hue and saturation jitter are meaningless on single-channel data. Brightness and contrast augmentation still apply, and matter more.
+
+Whether to discard colour is worth testing rather than assuming. On many datasets the accuracy difference is small and the speed gain is real; on others &mdash; anything where category correlates with colour &mdash; it is a substantial loss.
+
+## Bit depth, and where 8 bits is not enough
+
+Most consumer images use 8 bits per channel: 256 levels. That is enough for a photograph on a screen and not enough for several serious applications.
+
+Medical imaging uses 12 or 16 bits, giving 4,096 or 65,536 levels, because subtle tissue differences occupy a narrow band that 8 bits would flatten. Scientific and astronomical imaging is similar. Satellite data often carries more.
+
+When working with such data, two habits matter: do not casually convert to 8 bits for convenience, and normalise using the actual data range rather than assuming 0&ndash;255. A 16-bit medical image divided by 255 produces values in the thousands, and a network fed those will not train.
+
+## Questions people ask
+
+<strong>Why not just average the channels?</strong> Because human brightness perception is not uniform across colours. The weighted formula matches perception; the average does not.
+
+<strong>Does greyscale conversion lose information?</strong> Yes, irreversibly &mdash; many colours map to the same grey value.
+
+<strong>Is greyscale faster to process?</strong> Roughly three times less data, and the first convolution layer is a third the size. Later layers are unaffected.
+
+<strong>Should I convert before or after augmentation?</strong> Before, if you are not using colour augmentation; the pipeline is then cheaper throughout.
+
+<strong>What is the difference between greyscale and binary?</strong> Greyscale has a range of intensities; binary has exactly two values, produced by thresholding.
+
+<strong>When does adaptive thresholding beat Otsu?</strong> Whenever illumination varies across the image &mdash; a photographed page with a shadow is the canonical case.
+
+## Recap in one screen
+
+- Greyscale keeps one brightness value per pixel; use the perceptual weighting, not a plain average.
+- It cuts data and first-layer parameters by about two thirds, and discards every hue distinction.
+- Thresholding, histogram equalisation and morphology are the core operations, and adaptive variants handle uneven lighting.
+- Use it when shape carries the task; keep colour when colour <em>is</em> the task.
+- Pretrained models expect three channels &mdash; replicate the channel or fold the first-layer weights.

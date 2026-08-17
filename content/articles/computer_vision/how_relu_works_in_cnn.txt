@@ -13,6 +13,36 @@ Mathematically: <code>f(x) = max(0, x)</code>
 
 In a biological sense, think of a node as a neuron. If the incoming signal (pre-activation) is negative, the neuron decides it's not relevant and does not "fire" (outputs 0). If the signal is positive, it fires proportionately to the signal's strength.
 
+## The simplest useful non-linearity
+
+<p class="mono-font">ReLU(x) = max(0, x)</p>
+
+Negative values become zero; positive values pass through unchanged. That is the entire function, and it replaced far more sophisticated alternatives because of what it does to training.
+
+Its derivative is equally simple: exactly 1 for positive inputs, exactly 0 for negative ones.
+
+That derivative of 1 is the crucial property. The chain rule multiplies one factor per layer, so a network of sigmoids &mdash; whose derivative peaks at 0.25 &mdash; loses a factor of at least four per layer, and after ten layers the gradient reaching the input is a millionth of what left the loss. ReLU contributes a factor of exactly 1 wherever it is active, so gradients pass through depth intact.
+
+This is not a small optimisation. Networks deeper than a handful of layers were not practically trainable before ReLU, and much of the deep learning era rests on this one-line function.
+
+## Why any non-linearity is needed at all
+
+Without one, stacked layers collapse. Two linear layers compute `W₂(W₁x) = (W₂W₁)x`, which is a single matrix &mdash; so a hundred linear layers can express exactly what one can: a straight boundary.
+
+Inserting a non-linear function between layers is what lets a network represent curves, corners and disjoint regions. Depth only buys expressiveness when something bends between the layers.
+
+ReLU bends in the simplest possible way &mdash; one kink at the origin &mdash; and that turns out to be enough. A network of ReLUs is a piecewise-linear function, and with enough pieces it can approximate anything.
+
+## The other properties that matter
+
+<strong>Speed.</strong> A comparison against zero, against an exponential for sigmoid or tanh. On billions of activations that difference is real, and it applies to both the forward and backward pass.
+
+<strong>Sparsity.</strong> Roughly half the activations in a randomly initialised layer are zero, and trained networks often reach 50&ndash;80% sparsity. Sparse activations are cheaper, and there is evidence they make representations more disentangled.
+
+<strong>No saturation on the positive side.</strong> Sigmoid flattens at both ends, so a strongly activated neuron learns almost nothing. ReLU's positive side never flattens.
+
+The price is the negative side. A neuron whose inputs always produce a negative pre-activation outputs zero, receives a gradient of zero, and stops updating &mdash; permanently. This is the <strong>dying ReLU</strong> problem, and a network can lose a substantial fraction of its neurons this way, usually after a too-large learning rate has pushed weights into a bad region.
+
 ## Guided Experiments with This Interactive
 
 1. <strong>Observe the Clipping:</strong> <p class="font-light opacity-80 mt-1">Look at the Pre-Activation sliders on the left. Set a few to negative numbers and a few to positive. Notice the Outputs on the right immediately clip the negative ones to exactly <strong>0.00</strong> (turning grey), while the positive ones carry over perfectly.</p>
@@ -32,3 +62,57 @@ To solve this, variants like <strong>Leaky ReLU</strong> were invented, which al
 - It provides essential non-linearity to CNNs.
 - It is computationally extremely cheap compared to functions like Sigmoid or Tanh.
 - It promotes network sparsity (many inactive nodes).
+
+## The variants, and when they help
+
+|Activation|Negative side|Notes|
+|---|---|---|
+|ReLU|Exactly 0|The default; fast; can die|
+|Leaky ReLU|0.01x|Keeps a small gradient alive|
+|PReLU|&alpha;x, with &alpha; learned|Slightly better, slightly more to fit|
+|ELU|&alpha;(e&#7530; &minus; 1)|Smooth, mean closer to zero, more expensive|
+|GELU|x &middot; &Phi;(x)|Smooth; standard in transformers|
+|SiLU / Swish|x &middot; sigmoid(x)|Smooth; common in modern vision models|
+
+For convolutional networks, plain ReLU remains the sensible default. Leaky ReLU is the first thing to try if you observe many dead units. GELU and SiLU dominate in transformers and in recent efficient vision architectures, where their smoothness appears to help slightly &mdash; at a small computational cost.
+
+Preventing dead units matters more than choosing among the variants:
+
+- Use <strong>He initialisation</strong>, which is designed for ReLU and scales the initial weights by &radic;(2/fan_in). Xavier initialisation, designed for tanh, leaves ReLU networks with activations that shrink through depth.
+- Lower the <strong>learning rate</strong> if you see a sudden collapse in the fraction of active units.
+- Add <strong>batch normalisation</strong> before the activation, which keeps pre-activations centred and makes the dead region much harder to fall into.
+
+## Where ReLU sits in a block
+
+The conventional order in a convolutional network is:
+
+<p class="mono-font">Conv &rarr; BatchNorm &rarr; ReLU</p>
+
+Batch normalisation before the activation is the arrangement the original paper used and it remains standard. It keeps the input to ReLU centred so that roughly half the units are active, which is what the initialisation assumed.
+
+Note that the convolution's bias is redundant when batch normalisation follows, because the normalisation subtracts the mean anyway &mdash; which is why `bias=False` is common on convolutions in ResNet-style code.
+
+In residual blocks the placement is more delicate: the pre-activation variant (BN &rarr; ReLU &rarr; Conv) trains deeper networks better, because it leaves the identity path completely clean, and that detail was worth a paper of its own.
+
+## Questions people ask
+
+<strong>How do I know if my ReLUs are dying?</strong> Log the fraction of zero activations per layer. Around 50% is healthy; 90%+ that keeps rising is a problem.
+
+<strong>Is ReLU differentiable at zero?</strong> Not strictly &mdash; there is a corner. Frameworks define the derivative there as 0 by convention, and it causes no practical trouble because exactly zero almost never occurs.
+
+<strong>Should I use ReLU on the output layer?</strong> Only for regression targets that must be non-negative. Classification uses softmax or sigmoid; unbounded regression uses no activation.
+
+<strong>Does ReLU cause exploding gradients?</strong> It does not damp them, since the positive-side derivative is 1. Combined with poor initialisation or a high learning rate that can allow explosion, which is what gradient clipping and normalisation address.
+
+<strong>Why does ReLU work despite discarding half the information?</strong> Because the network compensates by learning filters in both polarities, and the sparsity it produces appears to be useful rather than merely lossy.
+
+<strong>Is GELU better than ReLU?</strong> Marginally, in transformers. In convolutional networks the difference is usually within noise, and ReLU is faster.
+
+## Recap in one screen
+
+- `max(0, x)`: negatives become zero, positives pass through.
+- Its derivative is exactly 1 on the positive side, which is what lets gradients survive depth.
+- Without a non-linearity, stacked layers collapse into one linear map.
+- It is fast and produces sparse activations; the cost is dead neurons on the negative side.
+- He initialisation, batch normalisation and a sensible learning rate prevent most dying-ReLU problems.
+- Conv &rarr; BatchNorm &rarr; ReLU is the standard block order.

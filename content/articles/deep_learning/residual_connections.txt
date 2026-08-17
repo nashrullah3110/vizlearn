@@ -13,6 +13,52 @@ residual: x<sub>i+1</sub> = x<sub>i</sub> + f(x<sub>i</sub>) &nbsp;&nbsp;&rarr;&
 
 Adding the input back on gives the local derivative a constant <span class="mono-font">+1</span> term. Whatever f' does — shrink toward zero, even go slightly negative — the identity path contributes exactly 1 at every layer, so the product across the whole stack can no longer collapse toward zero the way a chain of pure f' terms does. The gradient always has at least the unimpeded identity route back to the input.
 
+## Add the input back
+
+A residual connection adds a layer's input to its output:
+
+<p class="mono-font">output = F(x) + x</p>
+
+`F` is whatever the block computes &mdash; typically two convolutions with normalisation and activation, or an attention sublayer in a transformer. The `+ x` is the shortcut, and it costs nothing: no parameters, one addition.
+
+That one addition is arguably the most important architectural idea in modern deep learning. Before it, networks beyond about 20 layers trained badly. After it, 152 layers became routine and 100-layer transformers followed.
+
+## The two reasons it works
+
+<strong>Identity becomes easy to represent.</strong> Ask a block to produce the output directly and it must learn a mapping. Ask it to produce the <em>difference</em> and it can output nothing &mdash; drive the weights towards zero &mdash; and the block passes its input through unchanged.
+
+That matters because deep plain networks were failing on <em>training</em> data, not just test data. A 56-layer network scored worse than a 20-layer one at fitting the training set, despite being able in principle to copy the shallower network and make the extra layers do nothing. It could not find that solution. Residual connections make it the default starting point.
+
+<strong>Gradients get a clean path.</strong> Differentiating `F(x) + x` with respect to `x` gives `F'(x) + 1`. That constant term means the gradient reaching earlier layers can never be crushed to nothing by the product of many small factors &mdash; there is always a route back with a factor of exactly 1.
+
+## Where the addition goes
+
+Two details matter in implementation.
+
+<strong>The addition happens before the final activation</strong> in the original ResNet block:
+
+<p class="mono-font">x &rarr; Conv &rarr; BN &rarr; ReLU &rarr; Conv &rarr; BN &rarr; (+x) &rarr; ReLU</p>
+
+<strong>Pre-activation ordering trains deeper.</strong> Moving normalisation and activation to the start of the block &mdash; `BN → ReLU → Conv → BN → ReLU → Conv → (+x)` &mdash; leaves the identity path with nothing on it at all, and was shown to train 1,000-layer networks. Transformers use this arrangement: `x + sublayer(norm(x))`.
+
+<strong>Shapes must match.</strong> `F(x) + x` requires both terms to have the same shape. When a block changes the channel count or downsamples, the shortcut needs a 1&times;1 convolution with matching stride to project `x`. Frameworks handle it; hand-written blocks frequently forget, and the error is immediate.
+
+```python
+class ResidualBlock(nn.Module):
+    def __init__(self, cin, cout, stride=1):
+        super().__init__()
+        self.body = nn.Sequential(
+            nn.Conv2d(cin, cout, 3, stride, 1, bias=False), nn.BatchNorm2d(cout),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(cout, cout, 3, 1, 1, bias=False), nn.BatchNorm2d(cout),
+        )
+        self.short = nn.Identity() if (stride == 1 and cin == cout) else nn.Sequential(
+            nn.Conv2d(cin, cout, 1, stride, bias=False), nn.BatchNorm2d(cout))
+
+    def forward(self, x):
+        return torch.relu(self.body(x) + self.short(x))
+```
+
 ## Exploration guide
 
 1. <strong>Read the plain stack at 10 layers.</strong> The gradient at the input is 0.55<sup>10</sup> &asymp; 0.0025 — over 99% of it is gone before it reaches the first layer.
@@ -23,3 +69,63 @@ Adding the input back on gives the local derivative a constant <span class="mono
 ## Where that leaves you
 
 A residual connection adds the block's input back onto its output, which adds a constant 1 to that layer's local derivative during backpropagation. A chain of derivatives all below 1 shrinks geometrically and vanishes; a chain that includes a guaranteed +1 at every step cannot collapse toward zero regardless of how small the learned part's derivative is. This is why residual connections, not just wider layers or better optimisers, were the change that made networks with over a hundred layers trainable at all.
+
+## Add or concatenate?
+
+Two ways to reuse an earlier layer's output, with different trade-offs.
+
+<strong>Addition</strong> (ResNet) keeps the channel count constant and costs nothing. The two signals are summed, so they must be comparable in scale.
+
+<strong>Concatenation</strong> (DenseNet, U-Net) stacks them along the channel axis, preserving both separately and letting the next layer decide how to weigh them. It grows the width, so the following convolution is more expensive.
+
+|&nbsp;|Addition|Concatenation|
+|---|---|---|
+|Channel count|Unchanged|Grows|
+|Cost|Free|Wider next layer|
+|Information|Merged|Both kept separately|
+|Used by|ResNet, transformers|DenseNet, U-Net|
+
+U-Net's choice is instructive. Its skip connections carry high-resolution boundary detail from the encoder to the decoder, where the deep path carries semantics. Concatenating keeps those two very different signals distinct rather than summing them into one, and the following convolution learns how to combine them.
+
+## Everywhere, in one form or another
+
+The idea escaped computer vision within a year:
+
+- <strong>Transformers.</strong> Every block is `x + attention(norm(x))` then `x + ffn(norm(x))`. Without these, deep transformers do not train.
+- <strong>U-Net.</strong> Encoder-to-decoder skips are what keep segmentation boundaries sharp.
+- <strong>LSTM and GRU.</strong> The additive cell-state path is the recurrent equivalent, and it is why they handle far longer sequences than a plain RNN.
+- <strong>Diffusion models.</strong> Built on residual U-Nets.
+- <strong>DenseNet.</strong> Every layer receives the concatenated outputs of all previous ones.
+- <strong>Highway networks</strong> preceded ResNet with a gated version, where a learned gate decided how much to pass through. ResNet showed the ungated version works better and is simpler.
+
+If you take one design rule from this topic: <strong>any network deeper than about ten layers should have residual connections.</strong>
+
+## The ensemble view
+
+A network with n residual blocks contains 2&#8319; possible paths from input to output, since each block can be traversed or effectively skipped.
+
+The empirical evidence for this reading is striking: removing a single block from a trained ResNet barely changes its accuracy. Removing a layer from a plain deep network destroys it. A residual network behaves much more like an ensemble of many shallow networks than like one very deep one.
+
+That also explains why residual networks are unusually robust to layer dropping and to architectural surgery, and why <strong>stochastic depth</strong> &mdash; randomly skipping whole blocks during training &mdash; works as a regulariser.
+
+## Questions people ask
+
+<strong>Do residual connections have parameters?</strong> Not when the shapes match. A projection shortcut has a 1&times;1 convolution's worth.
+
+<strong>Can I add them to any network?</strong> Yes, wherever the shapes match, and it usually helps beyond a few layers deep.
+
+<strong>Why not just use fewer layers?</strong> Depth buys representational efficiency &mdash; composed features rather than enumerated ones. Residuals are what make depth usable.
+
+<strong>Do they prevent overfitting?</strong> No, they address an optimisation problem. Regularisation is a separate concern.
+
+<strong>What if I scale the shortcut?</strong> Multiplying it by a constant less than 1 reintroduces decay through depth. Keep it at exactly 1.
+
+<strong>Is initialising the last normalisation to zero a real technique?</strong> Yes &mdash; setting `γ = 0` in the final normalisation of each block makes the block start as an exact identity, which stabilises very deep and very large models.
+
+## Recap in one screen
+
+- `output = F(x) + x`: the block learns the difference, so doing nothing is trivially available.
+- The derivative gains a `+1`, giving gradients a route back that cannot vanish.
+- Shapes must match; use a 1&times;1 projection when channels or stride change.
+- Addition keeps width constant; concatenation keeps both signals separate and grows it.
+- Present in transformers, U-Net, LSTMs and diffusion models &mdash; anything deep uses some version of it.

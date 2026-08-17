@@ -27,6 +27,72 @@ Multiplying two n&times;n matrices needs about <span class="mono-font">n&sup3;</
 
 Watch the "Total ops" counter as you raise the sliders. That cubic growth is the entire reason GPUs &mdash; chips designed to do thousands of independent multiply-adds at once &mdash; became the hardware of deep learning.
 
+## What multiplying two matrices means
+
+Matrix multiplication looks like an arbitrary rule until you see what it is for: <strong>applying a transformation to a collection of vectors, all at once</strong>.
+
+Every row of the first matrix meets every column of the second, and each meeting produces one number &mdash; the dot product of that row and that column.
+
+```
+A (2x3)            B (3x2)              AB (2x2)
+[1 2 3]            [7  8]               [1*7+2*9+3*11   1*8+2*10+3*12]
+[4 5 6]            [9 10]        =      [4*7+5*9+6*11   4*8+5*10+6*12]
+                   [11 12]
+```
+
+Working the top-left entry through: 1&times;7 + 2&times;9 + 3&times;11 = 7 + 18 + 33 = <strong>58</strong>. The top-right: 1&times;8 + 2&times;10 + 3&times;12 = 8 + 20 + 36 = <strong>64</strong>. The full result is [[58, 64], [139, 154]].
+
+## The shape rule, and why it exists
+
+<p class="mono-font">(m &times; n) &times; (n &times; p) = (m &times; p)</p>
+
+The inner dimensions must match; the outer ones become the result's shape. A 2&times;3 times a 3&times;2 works and gives 2&times;2. A 2&times;3 times a 2&times;3 does not work at all.
+
+The rule is not arbitrary. Each output entry is a dot product between a row of A and a column of B, and a dot product needs both vectors to have the same length. A's rows have `n` entries; B's columns have `n` entries. Match, or there is nothing to compute.
+
+Checking shapes before writing any code is the fastest debugging habit in linear algebra. In practice:
+
+```python
+import numpy as np
+
+A = np.array([[1, 2, 3], [4, 5, 6]])      # (2, 3)
+B = np.array([[7, 8], [9, 10], [11, 12]]) # (3, 2)
+
+A @ B          # (2, 2) - the @ operator is matrix multiplication
+A.shape, B.shape, (A @ B).shape
+A * B          # ERROR - * is elementwise, and these shapes disagree
+```
+
+The distinction between `@` and `*` is the single most common source of NumPy bugs: `*` multiplies corresponding entries, `@` does the row-by-column operation above.
+
+## Order matters, and that is the point
+
+<p class="mono-font">AB &ne; BA</p>
+
+Sometimes `BA` is not even a legal shape. When both are legal, they are usually different matrices.
+
+This is not a defect; it reflects reality. Matrices represent transformations, and transformations do not generally commute. Rotate a book 90&deg; then flip it, versus flip it then rotate: the book ends up in different orientations. The matrices behave the same way.
+
+What matrix multiplication <em>does</em> keep:
+
+- <strong>Associative</strong>: (AB)C = A(BC). The grouping is free, which matters enormously for efficiency &mdash; multiplying in the cheaper order can save orders of magnitude of work.
+- <strong>Distributive</strong>: A(B + C) = AB + AC.
+- <strong>Identity</strong>: AI = IA = A, where I has ones on the diagonal.
+
+And a fact worth carrying: `(AB)ᵀ = BᵀAᵀ` &mdash; transposing a product reverses the order.
+
+## Why this is the core operation of machine learning
+
+A single neural network layer is one matrix multiplication and one addition:
+
+<p class="mono-font">output = input &times; W + b</p>
+
+If a batch of 32 examples with 100 features each is a 32&times;100 matrix, and the layer has 50 units, then W is 100&times;50 and the output is 32&times;50. One operation, the entire batch processed.
+
+That is why GPUs matter. They are built to perform thousands of multiply-and-add operations simultaneously, and matrix multiplication is exactly that pattern. Training a large model is, at the arithmetic level, mostly this operation repeated billions of times.
+
+The same shape reasoning explains most deep learning error messages. "Expected input of size (*, 100) but got (*, 128)" is the shape rule above, refusing to multiply mismatched dimensions.
+
 ## Guided tour
 
 1. <strong>Click the top-left cell of C.</strong> Only the first row of A and first column of B light up &mdash; the rest of both matrices is irrelevant to that number.
@@ -37,3 +103,46 @@ Watch the "Total ops" counter as you raise the sliders. That cubic growth is the
 ## Summing up
 
 Row against column, multiply and add, repeat for every output cell. The inner dimensions must agree, the order cannot be swapped, and the cost grows cubically &mdash; three facts that explain tensor errors, layer ordering and the entire GPU industry.
+
+## Composition: several transformations as one
+
+Because matrix multiplication is associative, a chain of transformations can be collapsed into a single matrix before it is ever applied to data.
+
+Rotate, then scale, then translate: multiply the three matrices together once, and apply the single result to a million points. Computer graphics pipelines are built on this, and so is every framework that fuses layers for inference.
+
+The order in the product is the reverse of the order the operations happen in when they act on a column vector: `M = T · S · R` applies R first. That reversal catches everyone once, and it comes straight from `M·v = T·(S·(R·v))`.
+
+## Cost, and why the order of a chain matters
+
+Multiplying an (m&times;n) by an (n&times;p) matrix costs roughly m&times;n&times;p multiply-add operations. So the associativity above has real consequences.
+
+Take A (10&times;1000), B (1000&times;10), C (10&times;1000):
+
+- `(AB)C` costs 10&times;1000&times;10 + 10&times;10&times;1000 = 200,000 operations.
+- `A(BC)` costs 1000&times;10&times;1000 + 10&times;1000&times;1000 = 20,000,000 operations.
+
+Same answer, one hundred times the work. This is why the order in which you group a chain of matrix products is a real optimisation, and why libraries such as `np.linalg.multi_dot` choose the grouping for you.
+
+The naive algorithm is cubic for square matrices, and asymptotically faster algorithms exist (Strassen and its successors). In practice, the constant factors and cache behaviour of the straightforward algorithm on optimised hardware usually win for realistic sizes.
+
+## Questions people ask
+
+<strong>Why is `A * B` different from `A @ B` in NumPy?</strong> `*` multiplies element by element and requires matching shapes (or broadcastable ones); `@` is the row-by-column matrix product.
+
+<strong>Can I multiply a matrix by a vector?</strong> Yes &mdash; treat the vector as an n&times;1 matrix. `(m&times;n) @ (n&times;1)` gives an m&times;1 result, which is the standard "apply a transformation to a point".
+
+<strong>Why does my deep learning code complain about shapes?</strong> Because the inner dimensions do not match. Print the shapes at each step; the mismatch is always visible.
+
+<strong>Is matrix multiplication ever commutative?</strong> For particular pairs, yes &mdash; a matrix and its inverse, a matrix and the identity, two diagonal matrices. In general, no.
+
+<strong>What is the identity matrix?</strong> Ones on the main diagonal, zeros elsewhere. Multiplying by it changes nothing, which makes it the matrix equivalent of 1.
+
+<strong>How do I know if a product is possible?</strong> Write the shapes side by side: (m&times;<strong>n</strong>)(<strong>n</strong>&times;p). If the two inner numbers match, it works.
+
+## Recap in one screen
+
+- Each entry of the product is the dot product of a row from the left and a column from the right.
+- Inner dimensions must match; the outer ones give the result's shape.
+- Order matters &mdash; AB is not BA &mdash; but grouping is free, and choosing the grouping can change the cost enormously.
+- `@` is matrix multiplication, `*` is elementwise. Confusing them is the classic NumPy bug.
+- A neural network layer is one matrix multiplication, which is why GPUs are built for this operation.

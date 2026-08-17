@@ -25,6 +25,49 @@ Cosine &nbsp; d = 1 &minus; (p &middot; q) / (‖p‖ ‖q‖)
 
 The odd one out. It measures the <em>angle</em> between the two vectors as seen from the origin, and takes no account of how long either is.
 
+## Several ways to measure "far apart"
+
+Distance is the foundation of clustering, nearest-neighbour methods, anomaly detection and most retrieval systems &mdash; and there is more than one sensible definition.
+
+|Metric|Formula|Picture|
+|---|---|---|
+|Euclidean|&radic;&Sigma;(x&#7522; &minus; y&#7522;)&sup2;|Straight line, as the crow flies|
+|Manhattan|&Sigma;\|x&#7522; &minus; y&#7522;\||Along a street grid|
+|Chebyshev|max\|x&#7522; &minus; y&#7522;\||The largest single-axis gap|
+|Cosine|1 &minus; cos&theta;|Angle, ignoring length|
+|Hamming|Count of differing positions|Categorical or binary data|
+|Jaccard|1 &minus; \|A&cap;B\| / \|A&cup;B\||Sets and their overlap|
+
+For the points (0, 0) and (3, 4):
+
+- Euclidean: &radic;(9 + 16) = <strong>5</strong>
+- Manhattan: 3 + 4 = <strong>7</strong>
+- Chebyshev: max(3, 4) = <strong>4</strong>
+
+All three are legitimate answers to "how far apart are these", and which is correct depends entirely on what movement is possible in your problem.
+
+## Choosing between them
+
+<strong>Euclidean</strong> is the default and the right choice for continuous, well-scaled features in a modest number of dimensions. It is what k-means minimises and what most distance-based models assume.
+
+<strong>Manhattan</strong> is more robust to outliers, because it does not square the differences &mdash; one wildly different feature does not dominate the total. It also holds up somewhat better in high dimensions, and is the natural choice when features are genuinely independent axes that cannot be traded off against each other.
+
+<strong>Cosine</strong> ignores magnitude entirely and compares direction. It is the standard for text, embeddings and any sparse high-dimensional representation, because a long document should not be far from a short document about the same subject.
+
+<strong>Hamming</strong> and <strong>Jaccard</strong> apply where the data is categorical or set-valued &mdash; comparing binary fingerprints, tag sets, or which products two customers bought.
+
+The Minkowski distance unifies the first three with a parameter p: p = 1 is Manhattan, p = 2 is Euclidean, and p &rarr; &infin; is Chebyshev. Scikit-learn exposes exactly this as the `p` argument.
+
+## Scaling is not optional
+
+Every distance except cosine adds up per-feature differences, so a feature with a large numeric range dominates the total.
+
+Salary (20,000&ndash;200,000) against age (18&ndash;80): two people differing by 35 years and &pound;500 have a squared distance of 1,225 + 250,000. The age difference contributes 0.5% of the total. Age has effectively been deleted from the model.
+
+Standardise, or normalise to a range, before computing any distance. This is the most common reason KNN, k-means and DBSCAN "do not work", and it is a one-line fix.
+
+The related trap is <strong>correlated features</strong>. Three near-duplicate columns count that information three times in the distance. Mahalanobis distance handles this properly by using the inverse covariance matrix &mdash; measuring distance in units of the data's own spread &mdash; which is why it is the standard choice for multivariate outlier detection.
+
 ## Exploration guide
 
 1. <strong>Read the classic triangle.</strong> Leave P at (1, 1) and Q at (4, 5). Euclidean reads exactly 5 &mdash; the 3-4-5 triangle &mdash; while Manhattan reads 7 and Chebyshev reads 4. Three answers, same two points.
@@ -44,9 +87,19 @@ One useful fact: on vectors normalised to unit length, ranking by cosine and ran
 
 ## The curse of dimensionality
 
-In high dimensions, distance stops being informative. As dimensions are added, the gap between the nearest and furthest points in a dataset shrinks relative to their absolute distance, so everything becomes roughly equidistant from everything else and "nearest neighbour" loses meaning.
+Distances behave strangely as dimensions increase, and it affects every distance-based method.
 
-Manhattan degrades more slowly than Euclidean here, which is why it is sometimes preferred on high-dimensional data. The more common fixes are to reduce the dimension first, or to use a metric learned for the task rather than an off-the-shelf one.
+In high-dimensional space, the distance to the nearest point and the distance to the furthest point become proportionally similar. With 1,000 features, "nearest neighbour" can be barely nearer than average, and any method built on that ranking degrades towards guessing.
+
+The intuition: adding a dimension adds another positive term to every distance, so all distances grow &mdash; and they grow at similar rates, compressing the relative differences.
+
+Three practical responses:
+
+1. <strong>Reduce first.</strong> PCA to 20&ndash;50 components before KNN or k-means, which usually improves both speed and accuracy.
+2. <strong>Select features.</strong> Every irrelevant column adds pure noise to every distance.
+3. <strong>Switch metric.</strong> Cosine and Manhattan hold up better than Euclidean in very high dimensions.
+
+This is also why embeddings work despite having hundreds of dimensions: they are trained so that meaningful directions carry the variation, rather than being raw, mostly-irrelevant measurements.
 
 ## Failure modes
 
@@ -58,3 +111,33 @@ Manhattan degrades more slowly than Euclidean here, which is why it is sometimes
 ## Worth remembering
 
 Euclidean, Manhattan and Chebyshev are the L2, L1 and L&infin; norms of the difference between two points, always ordered Chebyshev &le; Euclidean &le; Manhattan and agreeing only when a single coordinate differs; their equal-distance rings are a circle, a diamond and a square, which is what makes them disagree. Cosine is a different kind of measure entirely &mdash; it compares direction from the origin and ignores magnitude, which is why stretching a vector leaves it unchanged and why it is the standard for text and embeddings. Whichever you choose, scale the features first, because an unscaled metric measures units rather than similarity.
+
+## What makes something a metric
+
+A proper distance metric satisfies four conditions: it is never negative, it is zero only between identical points, it is symmetric, and it obeys the triangle inequality &mdash; going via a third point is never shorter.
+
+That last condition is not pedantry: it is what allows spatial indexes such as KD-trees and ball trees to prune the search space and answer nearest-neighbour queries quickly.
+
+Cosine <em>similarity</em> is not a metric (it is a similarity, not a distance), and cosine <em>distance</em> (1 &minus; similarity) does not satisfy the triangle inequality either &mdash; which is why libraries often normalise vectors and use Euclidean distance instead, since on unit vectors the two produce the same ranking.
+
+## Questions people ask
+
+<strong>Which metric should I use by default?</strong> Euclidean on scaled continuous features; cosine for text and embeddings; Hamming or Jaccard for categorical and set data.
+
+<strong>Does the metric change the clusters?</strong> Substantially. Running k-means with cosine distance on the same data can produce entirely different groups &mdash; and note that standard k-means assumes Euclidean, so switching metric strictly means switching algorithm.
+
+<strong>Can I mix numeric and categorical features?</strong> Gower distance handles mixed types by combining per-feature measures. One-hot encoding plus Euclidean is the common approximation and treats every category as equally distant.
+
+<strong>Why is cosine used for embeddings?</strong> Because the length of an embedding often reflects frequency or confidence rather than meaning, and the direction is what carries the semantics.
+
+<strong>Is squared Euclidean distance ever used?</strong> Often &mdash; it avoids the square root, is cheaper, and gives the same ranking. k-means minimises exactly this.
+
+<strong>How do I speed up nearest-neighbour search?</strong> KD-trees below about 20 dimensions, ball trees a little beyond, and approximate methods (HNSW, IVF) for anything large or high-dimensional.
+
+## Recap in one screen
+
+- Distance has several definitions; Euclidean, Manhattan, cosine, Hamming and Jaccard each fit different data.
+- Scale your features first &mdash; unscaled columns hijack every distance calculation.
+- Cosine ignores magnitude and compares direction, which is what text and embeddings need.
+- Correlated features are double-counted; Mahalanobis distance corrects for that.
+- In very high dimensions all distances converge &mdash; reduce dimensionality before relying on them.

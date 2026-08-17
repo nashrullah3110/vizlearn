@@ -13,6 +13,58 @@ To fix this, we artificially expand the original image by adding a border of zer
 
 By adding a 1-pixel border of zeros (Padding = 1), our 8x8 image becomes 10x10. Now, when the 3x3 kernel slides over it, the output feature map is exactly 8x8. Because the input and output dimensions are the same, this specific padding amount is commonly referred to as <strong>"Same" Padding</strong>.
 
+## The edges lose out
+
+Slide a 3&times;3 filter over a 5&times;5 image and it only fits in 3&times;3 positions. The output is smaller than the input, and the reason is at the borders: a pixel in the corner has no neighbours on two sides, so the filter cannot be centred there.
+
+Two consequences follow, and the second is the one that matters.
+
+<strong>The image shrinks.</strong> Each 3&times;3 convolution removes one pixel from every side. After ten such layers a 32&times;32 image is down to 12&times;12, and depth becomes limited by arithmetic rather than by design.
+
+<strong>Edge pixels are undersampled.</strong> A pixel in the middle is covered by nine different filter positions; a corner pixel by one. Without padding, the network sees the borders far less often than the centre, and information there is systematically underused.
+
+Padding fixes both by adding a border of extra values around the input before convolving.
+
+## The three modes
+
+|Mode|What it does|Output size|
+|---|---|---|
+|`valid`|No padding at all|Shrinks|
+|`same`|Pad enough to preserve size|Unchanged (stride 1)|
+|`full`|Pad so every input pixel gets full coverage|Grows|
+
+`same` is the everyday choice, and it is what almost every modern architecture uses in its convolution blocks. The required padding is (kernel &minus; 1) / 2, so 1 for a 3&times;3 kernel and 2 for a 5&times;5 &mdash; which incidentally is why odd kernel sizes are preferred: even ones cannot be padded symmetrically.
+
+`valid` remains useful when you deliberately want to reduce size without pooling, and in the final layers of some detection heads.
+
+The output size formula covers all cases:
+
+<p class="mono-font">out = floor( (in + 2&times;pad &minus; kernel) / stride ) + 1</p>
+
+32&times;32 with a 3&times;3 kernel, padding 1, stride 1 gives (32 + 2 &minus; 3) + 1 = <strong>32</strong>. With padding 0 it gives <strong>30</strong>.
+
+## What to put in the padded border
+
+The default is zeros, and it is nearly always fine. But zeros are a fabrication: the network sees a black frame that is not part of the image, and filters near the border learn from content that does not exist.
+
+Alternatives, all available in modern frameworks:
+
+- <strong>Reflect</strong> mirrors the pixels near the edge. The border looks like plausible image content, which matters for tasks where edge artefacts are visible &mdash; denoising, super-resolution, style transfer.
+- <strong>Replicate</strong> repeats the outermost pixel outwards. Simple and smooth.
+- <strong>Circular</strong> wraps around, appropriate for genuinely periodic data such as panoramas or spectrograms along the frequency axis.
+
+For classification, zero padding is the standard and the difference is negligible. For dense prediction tasks that output an image, reflection padding often visibly reduces edge artefacts.
+
+## Why keeping the size matters architecturally
+
+Preserving spatial dimensions through the convolutions lets you separate two decisions that would otherwise be tangled: <em>how deep</em> the network is, and <em>how much</em> downsampling it does.
+
+With `same` padding, convolution layers do feature extraction and pooling (or strided convolution) does the downsampling, deliberately and where you choose. Without it, every convolution silently shrinks the map, and a deep network runs out of pixels.
+
+It also matters for architectures that must produce full-resolution output. A U-Net concatenates encoder feature maps with decoder ones of matching size &mdash; and `same` padding is what makes those sizes match cleanly. The original U-Net used `valid` padding and had to crop the skip connections, which is a real complication its successors avoid.
+
+Residual connections have the same requirement: `x + F(x)` needs both terms to have the same shape.
+
 ## Guided Experiments with This Interactive
 
 1. <strong>Observe "Valid" Shrinkage (P=0):</strong> <p class="font-light opacity-80 mt-1">Make sure Padding is set to <strong>P = 0</strong>. Look at the Output Feature Map on the right. Notice it is physically smaller (6x6) than the base 8x8 input. Click <strong>Slide Window</strong> and watch how the kernel box is restricted; it can never reach the very corners of your drawing.</p>
@@ -39,3 +91,42 @@ The dimension of the output feature map ($O$) can always be calculated using:
 - Padding ensures edge pixels are given equal processing weight as center pixels.
 
 By manipulating padding, machine learning engineers control the spatial dimensions flowing through a neural network's architecture.
+
+## Padding is not free
+
+Each padded border adds computation and memory. For a 3&times;3 kernel on a 224&times;224 image the overhead is about 2%, which is negligible. On small feature maps deep in the network &mdash; 7&times;7 &mdash; a padding of 1 adds nearly 30% more positions, which is not.
+
+There is also a subtler cost: the network can learn to use the padded border as a cue for position. Because zero padding appears only at the edges, a CNN can infer roughly where in the image a patch sits &mdash; which is sometimes useful and sometimes a shortcut that will not generalise to different image sizes.
+
+The practical advice remains simple: use `same` padding with odd kernels in the feature-extraction blocks, and change it only when you have a specific reason.
+
+## Common mistakes
+
+- <strong>Using an even kernel size with `same` padding.</strong> Symmetric padding is impossible, so frameworks pad asymmetrically and the output is subtly offset.
+- <strong>Forgetting padding shrinks the map.</strong> Ten unpadded 3&times;3 layers cost 20 pixels in each dimension, which is fatal on small inputs.
+- <strong>Mismatched shapes in a skip connection.</strong> The commonest cause is `valid` padding in one branch and `same` in the other.
+- <strong>Zero padding on data where zero is meaningful.</strong> In some medical and scientific imaging, zero is a real value, and a black border is a real signal. Reflect padding avoids the confusion.
+- <strong>Assuming padding preserves size regardless of stride.</strong> `same` preserves size only at stride 1; with stride 2 the output halves whatever the padding.
+
+## Questions people ask
+
+<strong>Does padding add information?</strong> No &mdash; it adds space so the filter can reach the edges. The padded values carry no content.
+
+<strong>Which padding mode should I use?</strong> Zeros for classification, reflect for tasks that produce images, circular for genuinely periodic data.
+
+<strong>Why do frameworks default to `valid`?</strong> Historical convention in some, `same` in others. Always check rather than assume &mdash; PyTorch's `Conv2d` defaults to `padding=0`, which is `valid`.
+
+<strong>Can padding be different on each side?</strong> Yes &mdash; frameworks accept per-side padding, which is how even kernels and odd input sizes are handled.
+
+<strong>Does padding affect the receptive field?</strong> It affects which input regions each output position covers at the edges, but not the size of the receptive field itself.
+
+<strong>Should I pad the pooling layers too?</strong> Usually not. Pooling is meant to reduce size, and padding it adds artificial zeros to the max or average.
+
+## Recap in one screen
+
+- Without padding, convolution shrinks the image and undersamples the border pixels.
+- `same` padding preserves size at stride 1 and is the everyday default; `valid` means none.
+- Output size = floor((in + 2&times;pad &minus; kernel)/stride) + 1.
+- Odd kernels are preferred because they can be padded symmetrically.
+- Zeros are the standard filling; reflect and replicate suit image-to-image tasks.
+- Preserving size is what makes skip and residual connections line up.

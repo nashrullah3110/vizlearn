@@ -9,6 +9,87 @@ Older languages gave you one division that returned a whole number, quietly thro
 
 <code class="mono-font">%</code> returns the remainder after floor division: <code class="mono-font">7 % 3</code> is <code class="mono-font">1</code> because 7 is 2 threes and 1 left over. It is the operator behind the two most common checks in data work: <code class="mono-font">n % 2 == 0</code> tests whether a number is even, and <code class="mono-font">index % length</code> wraps an index around a list, which is exactly how carousels and round-robins keep from falling off the end.
 
+## The two kinds of number
+
+```python
+count = 42          # int   - whole numbers, any size
+price = 19.99       # float - decimals, with a small rounding error
+```
+
+Python integers have no size limit &mdash; `2 ** 1000` produces an exact 302-digit number &mdash; which is unusual among programming languages and occasionally very convenient.
+
+Floats are the compromise every language makes for decimals: fast, fixed size, and approximate.
+
+The arithmetic operators:
+
+```python
+7 + 3      # 10
+7 - 3      # 4
+7 * 3      # 21
+7 / 3      # 2.3333...  - true division, ALWAYS returns a float
+7 // 3     # 2          - floor division, discards the remainder
+7 % 3      # 1          - modulo, the remainder
+7 ** 3     # 343        - power
+```
+
+The two to watch are `/` and `//`. In Python 3, `6 / 3` gives `2.0`, not `2` &mdash; a float, even when it divides exactly. Use `//` when you want a whole number, such as an index or a count of complete groups.
+
+## What modulo is actually for
+
+`%` returns the remainder, and it answers three questions that come up constantly:
+
+```python
+n % 2 == 0            # is n even?
+n % 15 == 0           # is n divisible by 15?
+seconds % 60          # seconds left over after whole minutes
+index % len(items)    # wrap around to the start of a list
+```
+
+The wrap-around use is the neatest: `(i + 1) % len(colours)` cycles through a list for ever without ever going out of bounds &mdash; the standard way to rotate through colours, players or servers.
+
+Modulo with negative numbers follows the sign of the <em>right</em> operand in Python: `-7 % 3` is `2`, not `-1`. That differs from C and JavaScript and is worth remembering when porting code.
+
+## Floating point, and where it goes wrong
+
+```python
+0.1 + 0.2            # 0.30000000000000004
+0.1 + 0.2 == 0.3     # False
+```
+
+This is not a Python bug. Floats are stored in binary, and 0.1 has no exact binary representation, in the same way that 1/3 has no exact decimal one. The error is around 10&#8315;&#185;&#8310; and it compounds across long calculations.
+
+Two consequences to build into your habits:
+
+<strong>Never compare floats with `==`.</strong> Use a tolerance:
+
+```python
+import math
+math.isclose(0.1 + 0.2, 0.3)      # True
+```
+
+<strong>Never use floats for money.</strong> Use `decimal.Decimal`, or work in whole pence:
+
+```python
+from decimal import Decimal
+Decimal("0.1") + Decimal("0.2")   # Decimal('0.3')  - exact
+```
+
+Note the strings in that example: `Decimal(0.1)` from a float would inherit the error you were trying to escape.
+
+## Rounding, and the surprise in it
+
+```python
+round(2.5)       # 2   -- not 3
+round(3.5)       # 4
+round(2.675, 2)  # 2.67 -- not 2.68
+```
+
+The first two use <strong>banker's rounding</strong>: exact halves round to the nearest even number. Over many values this avoids the upward bias that always-round-up introduces, which is why it is the standard in finance and statistics.
+
+The third is the float problem again &mdash; 2.675 is really 2.67499999... in binary, so it rounds down. `Decimal` gives the answer you expected.
+
+Related tools: `math.floor` and `math.ceil` always go down and up, `int()` truncates towards zero (so `int(-2.7)` is `-2`, not `-3`), and `abs()` drops the sign.
+
 ## Guided experiments
 
 1. <strong>Read the first four lines.</strong> Line by line: 3.5, then 3 (fraction thrown away), then 1 (the leftover), then 1024. Note that <code class="mono-font">7 // 2</code> gives 3 while <code class="mono-font">7 / 2</code> gives 3.5 — same inputs, different promises.
@@ -19,3 +100,65 @@ Older languages gave you one division that returned a whole number, quietly thro
 ## In one line
 
 Python has three division-shaped operators for three different jobs: <code class="mono-font">/</code> when you want the exact answer, <code class="mono-font">//</code> when you want whole-number chunks, and <code class="mono-font">%</code> when you want the remainder that chunking throws away. Getting the right one wrong is a classic source of bugs that produce no error at all — the program just silently rounds. When numbers misbehave, check your operators before your logic.
+
+## The operators that shorten common code
+
+```python
+x = 5
+x += 3       # x = x + 3, and the same for -= *= /= //= %= **=
+
+a, b = b, a  # swap, with no temporary variable
+
+7 < x < 20   # chained comparison, evaluated once
+
+divmod(17, 5)          # (3, 2) - quotient and remainder together
+sum([1, 2, 3])         # 6
+min(values), max(values)
+abs(-4)                # 4
+```
+
+The `math` module carries the rest of the standard toolkit:
+
+```python
+import math
+
+math.sqrt(16)        # 4.0
+math.floor(3.7)      # 3
+math.ceil(3.2)       # 4
+math.pi              # 3.141592653589793
+math.log(100, 10)    # 2.0
+math.inf             # infinity, useful as a starting "worst value"
+```
+
+`math.inf` deserves a mention: initialising `best = math.inf` before a loop looking for a minimum is cleaner and safer than picking an arbitrary large number.
+
+## Common mistakes
+
+- <strong>Expecting `/` to give a whole number.</strong> It returns a float in Python 3; use `//`.
+- <strong>Comparing floats with `==`.</strong> Use `math.isclose`.
+- <strong>Using floats for money.</strong> Use `Decimal` or integer pence.
+- <strong>Assuming `round` always rounds halves up.</strong> It rounds to even.
+- <strong>Forgetting `input()` returns a string.</strong> `input("n: ") * 3` repeats the text; wrap it in `int()`.
+- <strong>Integer division on negatives.</strong> `-7 // 2` is `-4`, because it floors rather than truncating.
+
+## Questions people ask
+
+<strong>Is there a maximum integer?</strong> No. Python integers grow to whatever memory allows.
+
+<strong>How do I round to two decimal places for display?</strong> `f"{value:.2f}"`, which formats without changing the stored value.
+
+<strong>What is the difference between `//` and `int()`?</strong> `//` floors towards negative infinity; `int()` truncates towards zero. They differ on negative numbers.
+
+<strong>How do I generate a random number?</strong> `random.randint(1, 6)` for integers, `random.random()` for a float between 0 and 1. For anything security-related use the `secrets` module instead.
+
+<strong>Why is `0.1 + 0.2` not `0.3`?</strong> Binary floating point cannot represent 0.1 exactly. Every language with IEEE 754 floats behaves the same way.
+
+<strong>Is `**` the same as `math.pow`?</strong> Nearly &mdash; `**` keeps integers exact where it can, while `math.pow` always returns a float.
+
+## Recap in one screen
+
+- `int` is unbounded and exact; `float` is fast and approximate.
+- `/` always returns a float; `//` floors; `%` gives the remainder and is how you wrap around a list.
+- Floats cannot represent decimals exactly &mdash; compare with `math.isclose`, and use `Decimal` for money.
+- `round` uses banker's rounding, so `round(2.5)` is 2.
+- `input()` returns text; convert it before doing arithmetic.

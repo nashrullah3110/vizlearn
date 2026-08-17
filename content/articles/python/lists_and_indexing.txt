@@ -7,7 +7,64 @@ A list holds several values in a fixed order under one name. You write it with s
 
 ## Why counting starts at zero
 
-An index is best read as "how far from the start", not "which one". The first item is zero steps from the start, so it is at index 0. Once you read it that way, <code class='mono-font'>colours[2]</code> being the third colour stops feeling like a trick.
+The index is an <em>offset</em> from the start, not a position. The first item is zero steps from the beginning, the second is one step, and so on.
+
+That framing makes the rest consistent. `scores[0:3]` means "start at offset 0, stop before offset 3" &mdash; three items, and the length of the slice is simply `stop - start`. Adjacent slices `[0:3]` and `[3:6]` neither overlap nor leave a gap. None of that arithmetic works as cleanly with one-based indexing, which is why the convention won.
+
+## An ordered, changeable collection
+
+A list holds items in order, allows duplicates, and can be changed after it is created.
+
+```python
+scores = [88, 92, 79, 95, 61]
+
+scores[0]        # 88   - first item
+scores[-1]       # 61   - last item, without knowing the length
+len(scores)      # 5
+scores[2] = 80   # lists are mutable: item 2 is now 80
+```
+
+Negative indexing is one of Python's genuinely nice ideas: `-1` is the last element, `-2` the second to last. No `len(x) - 1` arithmetic, and no off-by-one errors from writing it.
+
+An index past the end raises `IndexError` rather than returning `None`, which is deliberate &mdash; a silent `None` would propagate somewhere far away before failing.
+
+## Slicing: taking a piece
+
+```python
+letters = ['a', 'b', 'c', 'd', 'e', 'f']
+
+letters[1:4]     # ['b', 'c', 'd']   - from 1, up to but not including 4
+letters[:3]      # ['a', 'b', 'c']   - from the start
+letters[3:]      # ['d', 'e', 'f']   - to the end
+letters[-2:]     # ['e', 'f']        - the last two
+letters[::2]     # ['a', 'c', 'e']   - every second item
+letters[::-1]    # ['f', 'e', ... ]  - reversed
+letters[:]       # a shallow copy of the whole list
+```
+
+The stop is always exclusive. That is the single rule behind every slicing question, and once it is internalised the rest follows.
+
+Slicing never raises `IndexError`. `letters[10:20]` on a six-item list returns `[]` rather than failing, which is convenient and occasionally hides a bug.
+
+## The methods you will actually use
+
+```python
+items = [3, 1, 2]
+
+items.append(4)         # [3, 1, 2, 4]     - add one item to the end
+items.extend([5, 6])    # [3, 1, 2, 4, 5, 6] - add several
+items.insert(0, 0)      # [0, 3, 1, 2, ...]  - insert at a position
+items.remove(3)         # remove the first 3 by value; ValueError if absent
+last = items.pop()      # remove and return the last item
+items.sort()            # sorts IN PLACE, returns None
+items.reverse()         # reverses in place
+
+ordered = sorted(items)          # returns a NEW sorted list
+backwards = sorted(items, reverse=True)
+by_length = sorted(words, key=len)
+```
+
+The `sort()`/`sorted()` distinction is the classic beginner trap: `items = items.sort()` sets `items` to `None`, because `sort()` returns nothing. Methods that change a list in place return `None` by convention, precisely so this mistake fails loudly.
 
 ## Try it yourself
 
@@ -19,3 +76,106 @@ An index is best read as "how far from the start", not "which one". The first it
 ## Worth remembering
 
 A list is an ordered, changeable row of values indexed from zero. Reading past the end raises IndexError instead of guessing, and the difference between a method that returns a new list and one that edits the original is worth learning early - it explains most beginner bugs involving None.
+
+## Copying, and the aliasing trap
+
+```python
+a = [1, 2, 3]
+b = a             # NOT a copy - another name for the same list
+b.append(4)
+print(a)          # [1, 2, 3, 4]
+
+c = a.copy()      # a real (shallow) copy
+c.append(5)
+print(a)          # unchanged
+```
+
+"Shallow" matters when the list contains other mutable objects:
+
+```python
+grid = [[0, 0], [0, 0]]
+flat = grid.copy()
+flat[0].append(9)
+print(grid)       # [[0, 0, 9], [0, 0]]  - the inner lists are still shared
+```
+
+Use `copy.deepcopy()` when you need the nested objects copied too.
+
+The same aliasing rule produces the most notorious Python gotcha of all:
+
+```python
+board = [[0] * 3] * 3      # three references to ONE row
+board[0][0] = 1
+print(board)               # [[1,0,0], [1,0,0], [1,0,0]]
+
+board = [[0] * 3 for _ in range(3)]   # three separate rows - correct
+```
+
+## List comprehensions
+
+The idiomatic way to build a list from another iterable:
+
+```python
+squares  = [n * n for n in range(10)]
+evens    = [n for n in numbers if n % 2 == 0]
+upper    = [name.upper() for name in names]
+pairs    = [(x, y) for x in range(3) for y in range(3)]
+```
+
+Read it as "give me <em>this</em>, for each item, where <em>this condition</em> holds". It is shorter than the loop-and-append version, and generally faster, because the append is done in C rather than through the interpreter.
+
+Keep them to one line of logic. A comprehension with two conditions, a nested loop and a conditional expression is harder to read than the loop it replaced &mdash; at which point write the loop.
+
+For very large sequences, a generator expression `(n * n for n in range(10_000_000))` produces items lazily and uses almost no memory.
+
+## Questions people ask
+
+<strong>What is the difference between `append` and `extend`?</strong> `append` adds one item &mdash; `[1,2].append([3,4])` gives `[1, 2, [3, 4]]`. `extend` adds each item of an iterable, giving `[1, 2, 3, 4]`.
+
+<strong>How do I remove an item?</strong> `remove(value)` by value, `pop(index)` by position (returning it), `del items[i]` by position, or a comprehension to filter several at once.
+
+<strong>Why should I not modify a list while looping over it?</strong> Because the iterator's position and the list's indices go out of step, and items get skipped. Build a new list instead.
+
+<strong>Are lists slow?</strong> Indexing and appending are fast. `in` and `remove` scan the whole list, so for membership testing on large collections use a set.
+
+<strong>How do I flatten a nested list?</strong> `[item for row in grid for item in row]` &mdash; the loops read left to right, outer first.
+
+<strong>What is the difference between a list and a tuple?</strong> Tuples are immutable and can be dictionary keys; lists are mutable and cannot.
+
+## Recap in one screen
+
+- Lists are ordered, mutable and allow duplicates; indexing starts at 0 and `-1` is the last item.
+- A slice `[start:stop]` includes the start and excludes the stop; slices never raise `IndexError`.
+- In-place methods (`sort`, `append`, `reverse`) return `None`; `sorted()` returns a new list.
+- Assigning a list to another name shares it &mdash; copy explicitly, and deep-copy nested structures.
+- Build lists with comprehensions, and use a set when you mostly need membership tests.
+
+## Where lists fit among the other collections
+
+|Type|Ordered|Changeable|Duplicates|Good at|
+|---|---|---|---|---|
+|`list`|Yes|Yes|Yes|Ordered data you will modify|
+|`tuple`|Yes|No|Yes|Fixed records; dictionary keys|
+|`set`|No|Yes|No|Membership tests; removing duplicates|
+|`dict`|Yes (insertion)|Yes|Keys unique|Looking things up by name|
+
+The row that changes how code performs is the set. Checking `x in my_list` looks at every element until it finds a match &mdash; on a list of 100,000 items that is up to 100,000 comparisons. Checking `x in my_set` hashes the value and looks in one place, taking about the same time whatever the size.
+
+```python
+seen = set()
+for row in rows:
+    if row.id in seen:        # fast even with millions of ids
+        continue
+    seen.add(row.id)
+```
+
+Converting a list to a set also deduplicates it in one step: `unique = list(set(items))` &mdash; at the cost of losing the order. To deduplicate <em>and</em> keep order, `list(dict.fromkeys(items))` works, because dictionaries remember insertion order.
+
+## Common mistakes
+
+- <strong>`items = items.sort()`.</strong> `sort()` returns `None`, so this destroys the list. Use `items.sort()` alone, or `new = sorted(items)`.
+- <strong>Modifying a list while iterating over it.</strong> Removing items shifts the indices under the iterator and rows get skipped. Build a new list instead: `keep = [x for x in items if not stale(x)]`.
+- <strong>Using a list as a default argument.</strong> `def add(item, target=[]):` creates the list once, at definition time, and every call shares it. Use `target=None` and create the list inside.
+- <strong>`[[0] * 3] * 3` for a grid.</strong> Three references to one row. Use a comprehension.
+- <strong>Assuming `b = a` copies.</strong> It does not, and the bug appears far from the assignment.
+- <strong>Using `in` on a large list in a loop.</strong> That is an accidental quadratic algorithm; a set makes it linear.

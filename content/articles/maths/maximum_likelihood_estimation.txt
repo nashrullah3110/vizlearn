@@ -32,6 +32,55 @@ log L = log p(x&#8321;) + log p(x&#8322;) + &hellip; + log p(x&#8345;)
 
 The logarithm is monotonic, so whatever maximises the sum also maximises the product. Nothing is lost, and the arithmetic becomes stable.
 
+## Which parameters make the data least surprising?
+
+Maximum likelihood estimation turns "fit a model" into a precise question: <strong>of all the parameter values I could choose, which makes the data I actually observed most probable?</strong>
+
+Flip a coin 10 times and get 7 heads. For any bias p, the probability of that outcome is:
+
+<p class="mono-font">L(p) = C(10,7) &times; p&#8311; &times; (1&minus;p)&sup3;</p>
+
+Evaluate it at a few values:
+
+|p|Likelihood|
+|---|---|
+|0.3|0.009|
+|0.5|0.117|
+|0.7|<strong>0.267</strong>|
+|0.9|0.057|
+
+The maximum is at p = 0.7, which is exactly the observed proportion. That is not a coincidence &mdash; for a binomial, the maximum likelihood estimate is always the sample proportion, and it can be derived in three lines of calculus.
+
+Note the shift in perspective. A probability treats the parameters as fixed and asks about the data. A <em>likelihood</em> treats the data as fixed and asks about the parameters. Same formula, read in the other direction.
+
+## Logs, and why the estimate is always found that way
+
+The likelihood of n independent observations is a product of n terms, each below 1. For n = 1,000 that underflows to exactly zero in floating point, and the calculation is destroyed before it starts.
+
+Taking logarithms turns the product into a sum:
+
+<p class="mono-font">log L(&theta;) = &Sigma; log P(x&#7522; | &theta;)</p>
+
+Because log is monotonic, whatever maximises the log-likelihood also maximises the likelihood &mdash; so nothing is lost, and everything becomes numerically stable and easy to differentiate.
+
+By convention optimisers minimise, so what is actually minimised is the <strong>negative log-likelihood</strong>. That phrase, and the abbreviation NLL, appear throughout machine learning for exactly this reason.
+
+## Why your loss function is what it is
+
+This is the payoff, and it is a genuinely unifying idea: <strong>the standard loss functions are negative log-likelihoods under different assumptions about the noise</strong>.
+
+|Assumption about the errors|Maximum likelihood gives you|
+|---|---|
+|Normally distributed|Mean squared error|
+|Laplace distributed|Mean absolute error|
+|Bernoulli outcome|Binary cross-entropy|
+|Categorical outcome|Categorical cross-entropy|
+|Poisson counts|Poisson loss|
+
+So choosing MSE is not a neutral default &mdash; it is an assumption that errors are symmetric, bell-shaped and constant in spread. When that is wrong (heavy tails, skew, counts), the loss is fighting the data, and switching to the likelihood that matches the process usually beats any amount of model tuning.
+
+The same framework explains regularisation. Adding a prior over the parameters and maximising the posterior instead of the likelihood &mdash; maximum a posteriori estimation &mdash; produces ridge regression from a normal prior and lasso from a Laplace prior. The penalty term is the log of the prior.
+
 ## Exploration guide
 
 1. <strong>Search by hand.</strong> Drag the <strong>Guessed Mean</strong> slider slowly across its range and watch the log-likelihood readout rise to a peak and fall away. There is exactly one best answer and you can feel where it is.
@@ -61,3 +110,59 @@ So "minimising the loss" and "maximising the likelihood" are usually the same se
 ## Worth remembering
 
 Maximum likelihood picks the distribution that makes the observed data least surprising, by holding the data fixed and varying the parameters &mdash; the reverse of a probability question. The likelihood is the product of each point's density, and because that product underflows to zero on any real sample, it is always computed as a sum of logarithms instead, which is safe because the logarithm is monotonic. For a normal distribution the answer comes out as exactly the sample mean and sample spread, and changing only the assumed noise turns the same principle into squared error, log loss or cross-entropy &mdash; which is why minimising a loss and maximising a likelihood are usually the same thing.
+
+## Properties, and the one caveat
+
+Maximum likelihood estimators have attractive theoretical properties, which is why the method is the default across statistics:
+
+- <strong>Consistent.</strong> With enough data, the estimate converges to the true parameter value.
+- <strong>Asymptotically efficient.</strong> No other consistent estimator has smaller variance in the large-sample limit.
+- <strong>Invariant.</strong> If &theta;-hat is the MLE of &theta;, then g(&theta;-hat) is the MLE of g(&theta;) &mdash; so you can estimate on whichever scale is convenient.
+
+The caveat is that they are not necessarily <strong>unbiased</strong> in small samples. The classic example is variance: the maximum likelihood estimate divides by n and systematically underestimates the true variance, which is why the sample variance divides by n&minus;1 instead. That correction is a deliberate departure from the MLE.
+
+The other practical caveat is overfitting. Maximising likelihood alone will happily choose parameters that explain the training data perfectly and generalise poorly &mdash; a mixture model can put a component on a single point with vanishing variance and drive the likelihood to infinity. Regularisation, priors, and held-out validation are the answers.
+
+## Finding the maximum in practice
+
+Some models have a closed form: the mean for a normal, the proportion for a binomial, the sample mean for a Poisson rate. Most do not, and the maximum is found numerically.
+
+```python
+from scipy.optimize import minimize
+import numpy as np
+
+def neg_log_likelihood(params, data):
+    mu, log_sigma = params                 # optimise log sigma to keep it positive
+    sigma = np.exp(log_sigma)
+    return -np.sum(-0.5 * np.log(2 * np.pi * sigma**2)
+                   - (data - mu)**2 / (2 * sigma**2))
+
+result = minimize(neg_log_likelihood, x0=[0.0, 0.0], args=(data,))
+```
+
+Two habits from that snippet generalise. Optimise unconstrained transforms of constrained parameters &mdash; log of a standard deviation, logit of a probability &mdash; so the optimiser cannot wander into invalid values. And write the negative log-likelihood, because every optimiser minimises.
+
+Training a neural network is the same procedure at scale: the loss is a negative log-likelihood, and gradient descent is the numerical maximiser.
+
+## Questions people ask
+
+<strong>What is the difference between probability and likelihood?</strong> Probability fixes the parameters and asks about data; likelihood fixes the data and asks about parameters. The function is the same; what varies is different.
+
+<strong>Why maximise the log instead of the likelihood?</strong> Products of many small numbers underflow, and sums are easier to differentiate. The maximum is in the same place.
+
+<strong>Is MLE the same as least squares?</strong> Least squares <em>is</em> the MLE when the errors are assumed normal with constant variance. Change the noise assumption and you get a different loss.
+
+<strong>How does this relate to Bayesian estimation?</strong> MLE uses only the data. MAP adds a prior and maximises the posterior. Full Bayesian inference keeps the whole posterior distribution rather than one point.
+
+<strong>Can likelihood exceed 1?</strong> For continuous data, yes &mdash; likelihoods are densities, not probabilities. Only the location of the maximum matters.
+
+<strong>What if the likelihood has several peaks?</strong> Then the optimiser may land on a local one. Multiple random restarts are the standard defence, and it is exactly why k-means and mixture models use `n_init`.
+
+## Recap in one screen
+
+- MLE picks the parameters that make the observed data most probable.
+- Work with the log-likelihood: products become sums, and underflow disappears.
+- Optimisers minimise, so the quantity in code is the negative log-likelihood.
+- MSE, MAE and cross-entropy are all negative log-likelihoods under different noise assumptions.
+- Adding a prior turns MLE into MAP, and recovers ridge and lasso as special cases.
+- Consistent and efficient in large samples; biased and prone to overfitting in small ones.
