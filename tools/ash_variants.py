@@ -1,34 +1,32 @@
 # -*- coding: utf-8 -*-
-"""Five arrangements of the Ash palette.
+"""The finalised Ash theme for the hub.
 
-Ash was chosen. Three things change here beyond the earlier fixes:
+Ash was chosen, then Minimal out of the five arrangements, so what is left
+here is one theme rather than a set. The other four layouts are gone; the
+constants they used (BRIEF, SPLIT, CONSOLE, LEDGER) are kept below because
+they are the record of what was tried, and re-adding one is a single line in
+VARIANTS.
 
-**The muddy button.** One colour was doing two jobs. `--accent-primary` has to
+**Two accent roles.** One colour was doing two jobs. `--accent-primary` has to
 clear 4.5:1 against the page for links and labels, which in light mode forces
 it down to a dark brown - and `.vz-cta-primary` then *filled* with it and put
-near-black text on top. The result was a heavy brown slab at the top of the
-page carrying text at about 2.5:1, which is both ugly and genuinely hard to
-read. Two roles now: `--accent-primary` for anything that is text on the page
-background, and `--accent-fill` for anything the accent fills, which can stay
-a bright amber because its contrast comes from the dark `--on-accent` text
-sitting on it. Same colour family, no mud, and both pairs measured.
-
-The accent glow behind the button goes too. A blurred coloured halo under a
-saturated fill is the other thing that makes a bright control tiring.
+near-black text on top, so the most prominent control on the page carried its
+label at about 2.5:1. Now `--accent-primary` is only ever text on the page
+background, and `--accent-fill` is what the accent fills, which stays a bright
+amber because its contrast comes from the dark `--on-accent` text on it.
+Measured at 6.46:1 light and 8.19:1 dark. The blurred halo under the button
+goes with it: coloured blur under a saturated fill is a steady cost to read.
 
 **The opening.** The three-card intro band and the "New here?" note are
-removed - that is the whole `<section class="vz-intro-band">`, since its
-heading exists only to introduce those cards. Nothing else is deleted; the
-hero keeps its badge, headline, lede, both buttons, the stats row and the
-study-tool links. What varies between these five is how that material is
-arranged, because "there is a lot at the beginning" is a layout problem
-rather than a content one.
+removed - the whole `<section class="vz-intro-band">`, since its heading only
+existed to introduce those cards.
 
-  Brief    centred and compressed, the stats reduced to one quiet line
-  Split    headline left, the numbers set beside it rather than under it
-  Console  the hero inside a bordered window, stats along its foot
-  Minimal  headline, lede, one button; everything else demoted
-  Ledger   the stats promoted into a bordered four-up under the buttons
+**The order.** Four blocks of prose used to sit between the hero and the
+modules, so the page opened with reading and kept the interactive part for
+the end. Only the six start-here cards are above the rails now; the chart,
+the three steps and the questions follow them. That leaves about seventy
+words before the first thing you can click, and spreads the reading down the
+page instead of stacking it at the top.
 """
 
 from phosphor_variants import FIXES_CSS as PHOSPHOR_FIXES, MONO  # noqa: F401
