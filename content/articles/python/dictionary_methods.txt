@@ -1,0 +1,44 @@
+title: Dictionary Methods: A Practical Guide
+intro: A handful of dictionary methods replace the same few blocks of code people write by hand. Learning them is mostly learning to recognise the pattern they collapse.
+
+## get, instead of checking first
+
+prices["kiwi"]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# KeyError<br>prices.get("kiwi")&nbsp;&nbsp;&nbsp;&nbsp;# None<br>prices.get("kiwi", 0)&nbsp;# 0
+
+`get` is for when a missing key is expected and has a sensible default. Square brackets are for when a missing key is a bug &mdash; and there the `KeyError` is doing you a favour by failing loudly.
+
+Do not reach for `get` reflexively. `d.get(k)` returning `None` where you expected a value produces a `TypeError` several lines later, far from the cause.
+
+## items, keys, values
+
+for k, v in d.items():
+
+`items()` is what you want most of the time. Plain `for k in d` iterates keys, which is easy to forget and produces a confusing error when you then treat `k` as a value.
+
+All three are views, not lists: they reflect later changes to the dict and are cheap to create. Wrap in `list()` if you need a snapshot &mdash; and you do need one if you intend to modify the dict while looping.
+
+## The counting pattern
+
+The block everyone writes first:
+
+if w in counts:<br>&nbsp;&nbsp;&nbsp;&nbsp;counts[w] += 1<br>else:<br>&nbsp;&nbsp;&nbsp;&nbsp;counts[w] = 1
+
+collapses to:
+
+counts[w] = counts.get(w, 0) + 1
+
+and, if counting is all you are doing, to `Counter(words)` from `collections`, which is faster and says what it means.
+
+## The grouping pattern
+
+teams.setdefault(team, []).append(name)
+
+`setdefault` returns the value at that key, inserting the default first if the key was absent. So this reads "get the list for this team, making an empty one if needed, and append to it" &mdash; three lines in one.
+
+`defaultdict(list)` does the same job when every access should create a default. `setdefault` is better when only some do.
+
+## pop and update
+
+d.pop("a")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# remove and return; raises if absent<br>d.pop("a", None)&nbsp;&nbsp;&nbsp;# ...unless given a default<br>d.update(other)&nbsp;&nbsp;&nbsp;&nbsp;# merge in place<br>a | b&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# a new merged dict (3.9+)
+
+With `|`, the right-hand side wins on conflicts, which makes `defaults | overrides` a clean way to layer configuration.

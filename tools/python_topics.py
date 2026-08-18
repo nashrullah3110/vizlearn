@@ -3096,6 +3096,1700 @@ The same applies to the two default-argument patterns from earlier in the track:
 )
 
 
+# ---------------------------------------------------------------------------
+# 23. String methods
+# ---------------------------------------------------------------------------
+topic(
+    "string_methods",
+    "String Methods",
+    "Working with Text",
+    "split, join, strip, replace and the case methods - and the fact that "
+    "none of them change the string they are called on.",
+    _svg(_box(14, 34, 52, 24, S) + _txt(40, 50, '" a,b "') +
+         '<path d="M70 46 L92 46" stroke="%s" stroke-width="2"/>' % A +
+         _box(96, 34, 50, 24, S, A) + _txt(121, 50, "[a, b]", A)),
+    [("string_methods.py", '''line = "  ana,bo,cy  "
+
+print("original :", repr(line))
+print("strip    :", repr(line.strip()))
+print("split    :", line.strip().split(","))
+print("join     :", " | ".join(["ana", "bo", "cy"]))
+print("replace  :", "a-b-c".replace("-", "+"))
+print("upper    :", "ana".upper())
+print("title    :", "ana bo".title())
+
+# The one that matters: strings are immutable.
+print()
+name = "ana"
+name.upper()                      # result thrown away
+print("after name.upper() :", name)
+name = name.upper()               # rebind to keep it
+print("after rebinding    :", name)
+
+# Tests that read as English.
+print()
+for w in ["report.csv", "notes.txt"]:
+    print(f"  {w:12} endswith .csv? {w.endswith('.csv')}")
+'''),
+     ("split_join.py", '''# split with no argument handles any run of whitespace.
+messy = "  the   quick\\tbrown \\n fox  "
+print("split()    :", messy.split())
+print("split(' ') :", messy.split(" "))
+print("-> split() collapses runs; split(' ') does not")
+
+# maxsplit, and splitting from the right.
+path = "a/b/c/d.txt"
+print()
+print("split('/', 1)  :", path.split("/", 1))
+print("rsplit('/', 1) :", path.rsplit("/", 1))
+
+# join needs strings; numbers must be converted first.
+print()
+nums = [1, 2, 3]
+try:
+    ",".join(nums)
+except TypeError as e:
+    print("join numbers ->", e)
+print("with str()   :", ",".join(str(n) for n in nums))
+
+# strip removes CHARACTERS, not a suffix. This surprises people.
+print()
+print("'banana'.strip('ab') :", "banana".strip("ab"))
+print("-> it stripped b, a and n... no: only a and b, from both ends")
+print("removesuffix         :", "report.csv".removesuffix(".csv"))
+'''),
+     ],
+    ["Strings are immutable: every method returns a new one and leaves the "
+     "original alone.",
+     "<code class='mono-font'>split()</code> with no argument splits on any run "
+     "of whitespace; <code class='mono-font'>split(' ')</code> does not.",
+     "<code class='mono-font'>join</code> is called on the separator: "
+     "<code class='mono-font'>\", \".join(parts)</code>.",
+     "<code class='mono-font'>strip(\"ab\")</code> removes any of those "
+     "characters, not the string \"ab\". Use "
+     "<code class='mono-font'>removesuffix</code> for that."],
+    """title: String Methods: A Practical Guide
+intro: Python strings carry a large set of methods for splitting, joining, trimming and testing. All of them share one property that catches beginners: none of them change the string.
+
+## Nothing is modified in place
+
+name = "ana"<br>name.upper()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# result discarded<br>print(name)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# still "ana"
+
+Strings are immutable, so a method that "changes" one actually returns a new one. If you do not keep the result, nothing happened. The fix is to rebind:
+
+name = name.upper()
+
+This is the single most common string mistake, and it fails silently &mdash; no error, just the old value.
+
+## split and join
+
+parts = "a,b,c".split(",")&nbsp;&nbsp;&nbsp;&nbsp;# ['a', 'b', 'c']<br>",".join(parts)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 'a,b,c'
+
+`join` is called on the separator, not on the list, which reads backwards until you have seen it a few times. Think of it as "put this between them".
+
+`join` requires strings. A list of numbers raises `TypeError`, so convert first: `",".join(str(n) for n in nums)`.
+
+`split()` with no argument is a different function in practice: it splits on any run of whitespace and discards empties, which is what you want for scruffy text. `split(" ")` splits on each single space and will hand you empty strings between doubled spaces.
+
+## strip removes characters, not a suffix
+
+"banana".strip("ab")
+
+removes any leading or trailing `a` or `b` &mdash; it does not remove the string `"ab"`. The argument is a set of characters. This trips people who write `filename.strip(".csv")` and find it also ate a trailing `s` or `v`.
+
+For that job:
+
+"report.csv".removesuffix(".csv")
+
+`removeprefix` and `removesuffix` were added in Python 3.9 precisely because the `strip` misuse was so common.
+
+## Tests that read as English
+
+`startswith`, `endswith`, `isdigit`, `isalpha` all return booleans and read naturally in a condition. `endswith` accepts a tuple, so `name.endswith((".jpg", ".png"))` is one call rather than two comparisons.
+
+## Case methods and comparison
+
+`upper`, `lower` and `title` return new strings. For case-insensitive comparison, `lower()` both sides &mdash; or `casefold()`, which handles a few non-English cases `lower` does not.
+""",
+    [{"q": "After `name = 'ana'` then `name.upper()`, what is name?",
+      "options": ["'ANA'", "'ana'", "None", "An error"],
+      "answer": 1,
+      "why": "Strings are immutable. The method returned a new string that was "
+             "discarded; the original is untouched. You have to rebind."},
+     {"q": "What does `'banana'.strip('ab')` remove?",
+      "options": ["The substring 'ab'", "Any leading or trailing a or b characters",
+                  "All a and b anywhere", "Nothing"],
+      "answer": 1,
+      "why": "The argument is a set of characters trimmed from both ends, not a "
+             "substring. removesuffix is the method for removing an ending."},
+     {"q": "`', '.join([1, 2])` does what?",
+      "options": ["Returns '1, 2'", "Raises TypeError", "Returns [1, 2]",
+                  "Returns '12'"],
+      "answer": 1,
+      "why": "join works on strings only. Convert first: ', '.join(str(n) for n "
+             "in nums)."}],
+)
+
+
+# ---------------------------------------------------------------------------
+# 24. input() and output
+# ---------------------------------------------------------------------------
+topic(
+    "input_and_output",
+    "input() and Output",
+    "Talking to the User",
+    "Reading a line from the user, why it is always text, and the print "
+    "options worth knowing.",
+    _svg(_txt(80, 26, "input()", A, 11) +
+         '<path d="M80 32 L80 44" stroke="%s" stroke-width="2"/>' % M +
+         _box(46, 46, 68, 22, S) + _txt(80, 61, '"42"') +
+         _txt(136, 61, "str", M, 8)),
+    [("input_basics.py", '''# This page runs in your browser, which has no keyboard to read from,
+# so input() raises here. That is worth seeing rather than hiding.
+try:
+    name = input("Your name: ")
+    print("Hello,", name)
+except OSError as e:
+    print("input() in the browser ->", type(e).__name__, e)
+    print("On your own machine it would wait for a line and return it.")
+
+# Everything below is what you would do with what it returns.
+print()
+typed = "42"                       # stand-in for input()
+print("what input gives you:", repr(typed), type(typed).__name__)
+
+# It is ALWAYS a string, even when it looks like a number.
+print("typed + typed :", typed + typed)
+print("int(typed) * 2:", int(typed) * 2)
+
+# The usual safe read, as a function.
+def read_int(text, default=0):
+    try:
+        return int(text.strip())
+    except (ValueError, AttributeError):
+        return default
+
+print()
+for raw in ["7", " 8 ", "eight", ""]:
+    print(f"  {raw!r:8} -> {read_int(raw)}")
+'''),
+     ("print_options.py", '''# print takes several values and separates them with a space.
+print("a", "b", "c")
+print("a", "b", "c", sep="-")
+print("a", "b", "c", sep="")
+
+# end= controls what goes after. Default is a newline.
+print()
+for i in range(5):
+    print(i, end=" ")
+print()                            # the newline the loop suppressed
+
+# Building a line piece by piece.
+print()
+for i in range(1, 4):
+    print(f"{i}x", end="")
+print("done")
+
+# print converts with str() for you; f-strings give you control.
+value = 2 / 3
+print()
+print("print   :", value)
+print("f-string:", f"{value:.3f}")
+
+# Printing a collection shows its repr, which quotes strings.
+print()
+print("list  :", ["a", "b"])
+print("joined:", ", ".join(["a", "b"]))
+'''),
+     ],
+    ["<code class='mono-font'>input()</code> always returns a string, even when "
+     "the user types digits.",
+     "It needs a keyboard, so it raises in this in-browser runtime. On your "
+     "machine it waits for a line.",
+     "<code class='mono-font'>print(a, b, sep=\"-\")</code> changes the "
+     "separator; <code class='mono-font'>end=\"\"</code> suppresses the newline.",
+     "Convert with <code class='mono-font'>int()</code> inside a "
+     "<code class='mono-font'>try</code>, because the user can type anything."],
+    """title: input() and Output: A Practical Guide
+intro: input() reads one line from the user and returns it as a string &mdash; always a string, whatever it looks like. print() sends values the other way, with two options worth knowing.
+
+## A note about this page
+
+The editors here run Python in your browser, which has no keyboard attached to standard input, so `input()` raises `OSError`. The first program calls it inside a `try` so you can see exactly that, rather than the page pretending otherwise. Everything else uses a stand-in value, and behaves identically to what you would get from a real terminal.
+
+## It is always text
+
+typed = input("Age: ")&nbsp;&nbsp;# user types 42<br>typed + typed&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# "4242", not 84
+
+This is the first surprise everyone meets. `input` cannot know whether "42" is meant as a number, a house number or a password, so it does not guess. Convert explicitly:
+
+age = int(input("Age: "))
+
+## Convert defensively
+
+That one-liner raises `ValueError` the moment somebody types "forty" or presses enter on an empty line. For anything a real person will use:
+
+def read_int(text, default=0):<br>&nbsp;&nbsp;&nbsp;&nbsp;try:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return int(text.strip())<br>&nbsp;&nbsp;&nbsp;&nbsp;except (ValueError, AttributeError):<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return default
+
+`strip()` first, because people type spaces.
+
+## The prompt is an argument
+
+`input("Your name: ")` prints the prompt and reads on the same line. A separate `print` before it works too but puts the cursor on the next line, which reads worse.
+
+## print has two useful options
+
+print("a", "b", sep="-")&nbsp;&nbsp;&nbsp;&nbsp;# a-b<br>print(i, end=" ")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# no newline
+
+`sep` sits between the values; the default is a single space. `end` goes after them; the default is a newline. `end=""` is how you build a line across several prints &mdash; and you then need a bare `print()` to close it, which the page demonstrates.
+
+## print versus f-strings
+
+`print` calls `str()` on whatever you give it, which is fine for quick output. When the formatting matters &mdash; decimal places, alignment, thousands separators &mdash; build the string yourself with an f-string and print that. The two are complementary, not competing.
+
+One detail worth noticing: printing a list shows its `repr`, so strings appear with quotes. `", ".join(items)` is what you want when the output is for a person.
+""",
+    [{"q": "The user types 42. What does `input()` return?",
+      "options": ["The integer 42", "The string '42'", "42.0", "It depends"],
+      "answer": 1,
+      "why": "Always a string. input cannot know what the digits are meant to "
+             "be, so it does not guess - which is why '42' + '42' is '4242'."},
+     {"q": "What does `print(i, end=' ')` do?",
+      "options": ["Prints a space before i", "Prints i followed by a space "
+                  "instead of a newline", "Skips the print", "Adds a space to i"],
+      "answer": 1,
+      "why": "end replaces the trailing newline, which is how you print several "
+             "values on one line. A bare print() then closes the line."},
+     {"q": "Why does `int(input())` need a try/except in real programs?",
+      "options": ["input is slow", "The user can type something that is not a "
+                  "number", "int is deprecated", "It does not"],
+      "answer": 1,
+      "why": "Any non-numeric text raises ValueError, and an empty line does "
+             "too. Anything a person types needs handling."}],
+)
+
+
+# ---------------------------------------------------------------------------
+# 25. Slicing with step and negatives
+# ---------------------------------------------------------------------------
+topic(
+    "slicing_step_negatives",
+    "Slicing with Step",
+    "Taking Pieces",
+    "The third slice argument, counting from the end, and why the stop index "
+    "is never included.",
+    _svg("".join(_box(16 + i * 22, 34, 18, 22, A if i in (1, 3) else S) +
+                 _txt(25 + i * 22, 49, str(i), A if i in (1, 3) else M, 8)
+                 for i in range(6)) +
+         _txt(80, 72, "[1:5:2]", A, 9)),
+    [("slicing.py", '''s = "abcdefgh"
+print("s           :", s)
+print("s[2:5]      :", s[2:5])        # stop excluded
+print("s[:3]       :", s[:3])
+print("s[5:]       :", s[5:])
+print("s[:]        :", s[:])          # a full copy
+
+# Negative indices count from the end.
+print()
+print("s[-1]       :", s[-1])
+print("s[-3:]      :", s[-3:])
+print("s[:-2]      :", s[:-2])
+print("s[-4:-2]    :", s[-4:-2])
+
+# The third value is the step.
+print()
+print("s[::2]      :", s[::2])
+print("s[1::2]     :", s[1::2])
+print("s[::-1]     :", s[::-1])       # reversed
+print("s[::-2]     :", s[::-2])
+
+# Slicing never raises for out-of-range. Indexing does.
+print()
+print("s[2:99]     :", s[2:99])
+try:
+    s[99]
+except IndexError as e:
+    print("s[99]       -> IndexError:", e)
+'''),
+     ("slicing_lists.py", '''nums = [0, 1, 2, 3, 4, 5]
+
+# Slicing a list gives a NEW list.
+part = nums[1:4]
+part[0] = 99
+print("slice changed:", part)
+print("original     :", nums, " <- untouched")
+
+# Which makes [:] the classic shallow copy.
+copy = nums[:]
+copy.append(6)
+print()
+print("copy :", copy)
+print("nums :", nums)
+
+# Assigning INTO a slice mutates in place, and can change the length.
+nums[1:3] = ["a", "b", "c"]
+print()
+print("after nums[1:3] = 3 items:", nums)
+
+# Reversing: three ways, one of which is not a copy.
+data = [1, 2, 3]
+print()
+print("data[::-1]      :", data[::-1], " (new list)")
+print("reversed(data)  :", list(reversed(data)), " (lazy, no copy)")
+data.reverse()
+print("data.reverse()  :", data, " (in place, returns None)")
+'''),
+     ],
+    ["<code class='mono-font'>[start:stop:step]</code>, and the stop is never "
+     "included.",
+     "Negative indices count from the end: "
+     "<code class='mono-font'>-1</code> is the last item.",
+     "<code class='mono-font'>[::-1]</code> reverses. "
+     "<code class='mono-font'>[:]</code> copies.",
+     "Slicing out of range is silent; indexing out of range raises "
+     "<code class='mono-font'>IndexError</code>."],
+    """title: Slicing with Step: A Practical Guide
+intro: A slice takes a piece of a sequence using up to three numbers: where to start, where to stop, and how big a step to take. Two rules explain nearly all of its behaviour.
+
+## The stop is excluded
+
+s[2:5]
+
+gives the items at 2, 3 and 4. This is the same rule as `range`, and it has the same payoff: `s[:3]` and `s[3:]` split the sequence with no overlap and no gap, and the length of `s[a:b]` is `b - a`.
+
+Leave either end off and it means "from the beginning" or "to the end". Leave both off and `s[:]` is the whole thing &mdash; which is the idiomatic shallow copy of a list.
+
+## Negative indices count from the right
+
+s[-1]&nbsp;&nbsp;&nbsp;&nbsp;# last item<br>s[-3:]&nbsp;&nbsp;&nbsp;# last three<br>s[:-2]&nbsp;&nbsp;&nbsp;# everything except the last two
+
+`-1` is the last element, not "one before the start". Mixing the two conventions is fine: `s[2:-1]` is "from index 2 to the second-to-last".
+
+## The third value is the step
+
+s[::2]&nbsp;&nbsp;&nbsp;&nbsp;# every second item<br>s[1::2]&nbsp;&nbsp;&nbsp;# every second, starting at 1<br>s[::-1]&nbsp;&nbsp;&nbsp;# reversed
+
+`[::-1]` is the standard reverse idiom and worth memorising as one symbol rather than parsing each time. A negative step walks backwards, so start and stop swap roles &mdash; which is why `s[5:2:-1]` gives you something and `s[2:5:-1]` gives you nothing.
+
+## Slicing forgives, indexing does not
+
+s[2:99]&nbsp;&nbsp;&nbsp;# fine, gives what exists<br>s[99]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# IndexError
+
+A slice clamps to the available range and returns what it can, including an empty result. That is convenient and occasionally hides a bug, because an empty slice looks like valid data rather than a mistake.
+
+## Slices copy, and assignment mutates
+
+A slice of a list is a new list, so changing it leaves the original alone. But assigning <em>into</em> a slice changes the original in place, and can change its length:
+
+nums[1:3] = ["a", "b", "c"]
+
+replaces two items with three. That is a genuine feature and a genuine surprise.
+
+## Reversing three ways
+
+`data[::-1]` builds a new reversed list. `reversed(data)` returns a lazy iterator and copies nothing. `data.reverse()` reorders in place and returns `None` &mdash; the same trap as `.sort()`.
+""",
+    [{"q": "What is `'abcdef'[1:4]`?",
+      "options": ["'abcd'", "'bcd'", "'bcde'", "'bc'"],
+      "answer": 1,
+      "why": "Start at index 1, stop before index 4: characters 1, 2 and 3."},
+     {"q": "What does `s[::-1]` do?",
+      "options": ["Removes the last item", "Reverses the sequence",
+                  "Takes every second item", "Raises an error"],
+      "answer": 1,
+      "why": "A step of -1 walks the whole sequence backwards. It is the "
+             "standard reverse idiom."},
+     {"q": "`s[99]` raises IndexError but `s[2:99]` does not. Why?",
+      "options": ["Slices clamp to what exists", "s[2:99] also raises",
+                  "Slices are cached", "99 is special"],
+      "answer": 0,
+      "why": "A slice returns whatever part of the range exists, possibly "
+             "nothing. Indexing demands that exact position, so it raises."}],
+)
+
+# ---------------------------------------------------------------------------
+# 26. Mutability and aliasing
+# ---------------------------------------------------------------------------
+topic(
+    "mutability_and_aliasing",
+    "Mutability and Aliasing",
+    "Names and Objects",
+    "Two names pointing at one list, why changing one changes both, and the "
+    "difference between rebinding a name and mutating an object.",
+    _svg(_box(14, 24, 34, 18, S) + _txt(31, 37, "a") +
+         _box(14, 52, 34, 18, S) + _txt(31, 65, "b") +
+         '<path d="M50 33 L92 44 M50 61 L92 48" stroke="%s" stroke-width="2"/>' % A +
+         _box(94, 34, 52, 22, S, A) + _txt(120, 49, "[1,2]", A)),
+    [("aliasing.py", '''a = [1, 2, 3]
+b = a                      # NOT a copy - a second name for the same list
+
+b.append(4)
+print("a:", a)
+print("b:", b)
+print("same object?", a is b)
+
+# A copy breaks the link.
+print()
+c = a[:]                   # or list(a), or a.copy()
+c.append(5)
+print("a:", a)
+print("c:", c)
+print("same object?", a is c)
+
+# Rebinding a name does not touch the object.
+print()
+x = [1, 2]
+y = x
+y = [9, 9]                 # y now points somewhere else
+print("x:", x, " y:", y)
+
+# Mutating does.
+x = [1, 2]
+y = x
+y.append(3)
+print("x:", x, " y:", y)
+'''),
+     ("mutable_arguments.py", '''# Passing a list into a function passes the same object.
+def add_zero(items):
+    items.append(0)        # mutates the caller's list
+
+nums = [1, 2]
+add_zero(nums)
+print("after add_zero :", nums)
+
+# Rebinding inside the function does not affect the caller.
+def replace(items):
+    items = [9, 9]         # a new local name only
+
+nums = [1, 2]
+replace(nums)
+print("after replace  :", nums)
+
+# Immutable types cannot be mutated, so this question never arises.
+def bump(n):
+    n += 1                 # rebinds a local
+    return n
+
+count = 5
+bump(count)
+print("after bump     :", count)
+
+# The multiplication trap: one inner list, referenced three times.
+print()
+grid = [[0] * 3] * 3
+grid[0][0] = 1
+print("grid = [[0]*3]*3 :", grid)
+grid = [[0] * 3 for _ in range(3)]
+grid[0][0] = 1
+print("with a comprehension:", grid)
+'''),
+     ],
+    ["<code class='mono-font'>b = a</code> gives the object a second name. It "
+     "does not copy anything.",
+     "<code class='mono-font'>is</code> asks \"the same object?\"; "
+     "<code class='mono-font'>==</code> asks \"the same contents?\".",
+     "Rebinding a name inside a function is local. Mutating the object is "
+     "visible to the caller.",
+     "<code class='mono-font'>[[0]*3]*3</code> repeats one inner list three "
+     "times. Use a comprehension."],
+    """title: Mutability and Aliasing: A Practical Guide
+intro: A name in Python is a label attached to an object, not a box holding a value. Once that clicks, a whole family of confusing behaviour becomes obvious.
+
+## Assignment does not copy
+
+a = [1, 2, 3]<br>b = a<br>b.append(4)<br>print(a)&nbsp;&nbsp;# [1, 2, 3, 4]
+
+`b = a` attaches a second label to the same list. There is one list and two names for it, so a change through either name is visible through both. `a is b` is `True`, which is the test for "the same object" as opposed to `==`, which asks about contents.
+
+To get a second list, ask for one: `a[:]`, `list(a)` or `a.copy()`.
+
+## Rebinding versus mutating
+
+This is the distinction that explains the rest:
+
+y = [9, 9]&nbsp;&nbsp;&nbsp;&nbsp;# rebinding: point y at a different object<br>y.append(3)&nbsp;&nbsp;# mutating: change the object y points at
+
+Rebinding affects only that name. Mutating affects every name pointing at that object. Both use `y`, which is why they look similar and behave nothing alike.
+
+## Inside functions
+
+def add_zero(items):<br>&nbsp;&nbsp;&nbsp;&nbsp;items.append(0)&nbsp;&nbsp;# caller sees this
+
+def replace(items):<br>&nbsp;&nbsp;&nbsp;&nbsp;items = [9, 9]&nbsp;&nbsp;&nbsp;&nbsp;# caller sees nothing
+
+The parameter is another name for the caller's object. Mutate it and the caller's list changes. Rebind it and you have only pointed the local name elsewhere.
+
+This is not "pass by reference" or "pass by value" &mdash; it is simply the same naming rule as everywhere else in the language.
+
+## Immutable types dodge the question
+
+Numbers, strings and tuples cannot be mutated, so there is no way for one name to change what another sees. `n += 1` inside a function must rebind, because there is no other option. That is why the whole issue only ever comes up with lists, dicts and sets.
+
+## The multiplication trap
+
+grid = [[0] * 3] * 3<br>grid[0][0] = 1&nbsp;&nbsp;# every row changes
+
+`[0] * 3` builds one row. Multiplying the outer list by 3 does not build three rows &mdash; it stores three references to the same row. Setting one cell appears to set three.
+
+grid = [[0] * 3 for _ in range(3)]
+
+The comprehension evaluates `[0] * 3` afresh each pass, so there really are three lists. This is the same rule as the mutable default argument: one object created once, shared everywhere.
+""",
+    [{"q": "After `a = [1]; b = a; b.append(2)`, what is `a`?",
+      "options": ["[1]", "[1, 2]", "[2]", "An error"],
+      "answer": 1,
+      "why": "b = a creates a second name for one list, not a copy. The append "
+             "is visible through both names."},
+     {"q": "A function does `items = [9]`. What does the caller see?",
+      "options": ["Its list becomes [9]", "No change - only the local name was "
+                  "rebound", "An error", "Its list is emptied"],
+      "answer": 1,
+      "why": "Rebinding points the local name at a new object. Only mutating "
+             "the original object is visible to the caller."},
+     {"q": "Why does `[[0]*3]*3` misbehave?",
+      "options": ["It creates 9 separate zeros", "The outer multiplication "
+                  "repeats one inner list by reference", "It is a syntax error",
+                  "It does not - it works fine"],
+      "answer": 1,
+      "why": "There is one inner list with three references to it, so writing "
+             "to one row appears to write to all three."}],
+)
+
+
+# ---------------------------------------------------------------------------
+# 27. Shallow vs deep copying
+# ---------------------------------------------------------------------------
+topic(
+    "shallow_and_deep_copy",
+    "Shallow vs Deep Copying",
+    "Copying Properly",
+    "Why a copy of a list of lists still shares its inner lists, and when you "
+    "need copy.deepcopy.",
+    _svg(_box(12, 22, 40, 18, S) + _txt(32, 35, "orig") +
+         _box(12, 50, 40, 18, S) + _txt(32, 63, "copy") +
+         '<path d="M54 31 L92 44 M54 59 L92 48" stroke="%s" stroke-width="2"/>' % A +
+         _box(94, 34, 52, 22, S, A) + _txt(120, 49, "inner", A)),
+    [("shallow.py", '''import copy
+
+original = [[1, 2], [3, 4]]
+
+# A shallow copy: new outer list, SAME inner lists.
+shallow = original[:]
+shallow[0][0] = 99
+
+print("original:", original)
+print("shallow :", shallow)
+print("-> the inner list is shared, so both changed")
+print("outer is same object?", original is shallow)
+print("inner is same object?", original[0] is shallow[0])
+
+# A deep copy rebuilds the whole structure.
+print()
+original = [[1, 2], [3, 4]]
+deep = copy.deepcopy(original)
+deep[0][0] = 99
+print("original:", original)
+print("deep    :", deep)
+print("inner is same object?", original[0] is deep[0])
+'''),
+     ("copy_when.py", '''import copy
+
+# With immutable contents, a shallow copy is enough.
+words = ["a", "b"]
+shallow = words[:]
+shallow[0] = "z"
+print("words  :", words)
+print("shallow:", shallow)
+print("-> strings cannot be mutated, so there is nothing to share")
+
+# Three ways to make a shallow copy, all equivalent.
+nums = [1, 2, 3]
+print()
+print("slice   :", nums[:])
+print("list()  :", list(nums))
+print(".copy() :", nums.copy())
+
+# Dicts too - and the same trap.
+print()
+config = {"limits": {"max": 10}}
+shallow = config.copy()
+shallow["limits"]["max"] = 999
+print("config :", config, " <- changed through the copy")
+
+deep = copy.deepcopy({"limits": {"max": 10}})
+deep["limits"]["max"] = 999
+print("deep   : original stayed at 10")
+
+# deepcopy handles shared references and cycles correctly.
+print()
+inner = [1]
+data = [inner, inner]
+d = copy.deepcopy(data)
+print("shared inner stayed shared in the deep copy:", d[0] is d[1])
+'''),
+     ],
+    ["A shallow copy duplicates the outer container and reuses everything "
+     "inside it.",
+     "<code class='mono-font'>[:]</code>, <code class='mono-font'>list(x)</code> "
+     "and <code class='mono-font'>x.copy()</code> are all shallow.",
+     "Nested mutable data is when you need "
+     "<code class='mono-font'>copy.deepcopy</code>.",
+     "If everything inside is immutable, shallow is enough - there is nothing "
+     "to share."],
+    """title: Shallow vs Deep Copying: A Practical Guide
+intro: Copying a list gives you a new list. It does not give you new copies of the things inside it, and that distinction is where the bugs live.
+
+## What a shallow copy actually does
+
+original = [[1, 2], [3, 4]]<br>shallow = original[:]<br>shallow[0][0] = 99<br>print(original)&nbsp;&nbsp;# [[99, 2], [3, 4]]
+
+The outer list is new &mdash; `original is shallow` is `False`, and appending to one does not affect the other. But the two inner lists were not copied; both outer lists point at the same two inner lists. Change something one level down and both see it.
+
+`original[0] is shallow[0]` is `True`, which is the whole story in one line.
+
+## The three shallow copies
+
+nums[:]&nbsp;&nbsp;&nbsp;&nbsp;list(nums)&nbsp;&nbsp;&nbsp;&nbsp;nums.copy()
+
+All equivalent. `dict.copy()` and `set.copy()` behave the same way, and `dict(d)` is the dict equivalent of `list(l)`.
+
+## When shallow is enough
+
+If everything inside is immutable &mdash; numbers, strings, tuples of those &mdash; a shallow copy is a complete copy in every way that matters. There is nothing shared that can change, so the distinction disappears.
+
+That covers most everyday copying, which is why `[:]` is so common and why the problem stays hidden until the day your data has a list inside a list.
+
+## When you need deep
+
+import copy<br>deep = copy.deepcopy(original)
+
+`deepcopy` walks the whole structure and rebuilds every mutable object it finds. Nested config dictionaries, lists of records, anything parsed from JSON &mdash; these are the cases.
+
+It is slower, and for large structures noticeably so. It also handles the hard cases correctly: shared references stay shared in the copy, and cycles do not cause infinite recursion. Writing your own recursive copy usually gets both of those wrong.
+
+## The dict version of the trap
+
+config = {"limits": {"max": 10}}<br>shallow = config.copy()<br>shallow["limits"]["max"] = 999
+
+The original now reads 999 too. This is the same rule and it bites harder with configuration, because the nesting is the point of the structure.
+
+## The rule
+
+Ask what is inside. Flat and immutable: use a slice or `.copy()`. Nested and mutable: use `deepcopy`, or restructure so you are not copying a mutable tree at all.
+""",
+    [{"q": "After a shallow copy of `[[1, 2]]`, changing `copy[0][0]`:",
+      "options": ["Changes only the copy", "Changes the original too",
+                  "Raises an error", "Creates a new inner list"],
+      "answer": 1,
+      "why": "The outer list is new but the inner list is shared, so a change "
+             "one level down is visible through both."},
+     {"q": "When is a shallow copy sufficient?",
+      "options": ["Always", "When everything inside is immutable", "Never",
+                  "Only for dicts"],
+      "answer": 1,
+      "why": "With immutable contents there is nothing shared that can change, "
+             "so the shallow copy behaves like a complete one."},
+     {"q": "Which of these is NOT a shallow copy of a list?",
+      "options": ["nums[:]", "list(nums)", "nums.copy()", "copy.deepcopy(nums)"],
+      "answer": 3,
+      "why": "deepcopy rebuilds every mutable object inside as well. The other "
+             "three duplicate only the outer list."}],
+)
+
+
+# ---------------------------------------------------------------------------
+# 28. Dictionary methods
+# ---------------------------------------------------------------------------
+topic(
+    "dictionary_methods",
+    "Dictionary Methods",
+    "Working with Mappings",
+    "get, setdefault, items, pop and update - the methods that replace the "
+    "if-key-in-dict dance.",
+    _svg(_box(18, 26, 52, 18, S) + _txt(44, 39, "key") +
+         '<path d="M74 35 L92 35" stroke="%s" stroke-width="2"/>' % A +
+         _box(96, 26, 46, 18, S, A) + _txt(119, 39, "value", A) +
+         _box(18, 52, 124, 18, S) + _txt(80, 65, ".get(key, default)", M, 8)),
+    [("dict_methods.py", '''prices = {"apple": 3, "fig": 5}
+
+# [] raises on a missing key; get returns None or a default.
+print("prices['apple'] :", prices["apple"])
+try:
+    prices["kiwi"]
+except KeyError as e:
+    print("prices['kiwi']  -> KeyError", e)
+print("get('kiwi')     :", prices.get("kiwi"))
+print("get with default:", prices.get("kiwi", 0))
+
+# Iterating: keys, values, or both.
+print()
+print("keys  :", list(prices.keys()))
+print("values:", list(prices.values()))
+for k, v in prices.items():
+    print(f"  {k:6} {v}")
+
+# Plain iteration gives keys.
+print()
+print("for k in prices ->", [k for k in prices])
+'''),
+     ("dict_patterns.py", '''# Counting: the dance, then the two shortcuts.
+words = ["a", "b", "a", "c", "a"]
+
+counts = {}
+for w in words:
+    if w in counts:
+        counts[w] += 1
+    else:
+        counts[w] = 1
+print("if/else   :", counts)
+
+counts = {}
+for w in words:
+    counts[w] = counts.get(w, 0) + 1
+print("get       :", counts)
+
+from collections import Counter
+print("Counter   :", dict(Counter(words)))
+
+# Grouping: setdefault returns the value, creating it if absent.
+print()
+people = [("eng", "ana"), ("ops", "bo"), ("eng", "cy")]
+teams = {}
+for team, name in people:
+    teams.setdefault(team, []).append(name)
+print("setdefault:", teams)
+
+# pop removes and returns; update merges.
+print()
+d = {"a": 1, "b": 2}
+print("pop('a')  :", d.pop("a"), "->", d)
+print("pop missing with default:", d.pop("zz", "none"))
+d.update({"c": 3})
+print("update    :", d)
+print("merge with |:", {"a": 1} | {"b": 2})
+'''),
+     ],
+    ["<code class='mono-font'>d[k]</code> raises on a missing key; "
+     "<code class='mono-font'>d.get(k, default)</code> does not.",
+     "<code class='mono-font'>d.items()</code> yields key/value pairs; plain "
+     "iteration gives keys only.",
+     "<code class='mono-font'>d.setdefault(k, [])</code> returns the value, "
+     "creating it first if the key was missing.",
+     "<code class='mono-font'>counts[w] = counts.get(w, 0) + 1</code> replaces "
+     "the whole if/else counting block."],
+    """title: Dictionary Methods: A Practical Guide
+intro: A handful of dictionary methods replace the same few blocks of code people write by hand. Learning them is mostly learning to recognise the pattern they collapse.
+
+## get, instead of checking first
+
+prices["kiwi"]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# KeyError<br>prices.get("kiwi")&nbsp;&nbsp;&nbsp;&nbsp;# None<br>prices.get("kiwi", 0)&nbsp;# 0
+
+`get` is for when a missing key is expected and has a sensible default. Square brackets are for when a missing key is a bug &mdash; and there the `KeyError` is doing you a favour by failing loudly.
+
+Do not reach for `get` reflexively. `d.get(k)` returning `None` where you expected a value produces a `TypeError` several lines later, far from the cause.
+
+## items, keys, values
+
+for k, v in d.items():
+
+`items()` is what you want most of the time. Plain `for k in d` iterates keys, which is easy to forget and produces a confusing error when you then treat `k` as a value.
+
+All three are views, not lists: they reflect later changes to the dict and are cheap to create. Wrap in `list()` if you need a snapshot &mdash; and you do need one if you intend to modify the dict while looping.
+
+## The counting pattern
+
+The block everyone writes first:
+
+if w in counts:<br>&nbsp;&nbsp;&nbsp;&nbsp;counts[w] += 1<br>else:<br>&nbsp;&nbsp;&nbsp;&nbsp;counts[w] = 1
+
+collapses to:
+
+counts[w] = counts.get(w, 0) + 1
+
+and, if counting is all you are doing, to `Counter(words)` from `collections`, which is faster and says what it means.
+
+## The grouping pattern
+
+teams.setdefault(team, []).append(name)
+
+`setdefault` returns the value at that key, inserting the default first if the key was absent. So this reads "get the list for this team, making an empty one if needed, and append to it" &mdash; three lines in one.
+
+`defaultdict(list)` does the same job when every access should create a default. `setdefault` is better when only some do.
+
+## pop and update
+
+d.pop("a")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# remove and return; raises if absent<br>d.pop("a", None)&nbsp;&nbsp;&nbsp;# ...unless given a default<br>d.update(other)&nbsp;&nbsp;&nbsp;&nbsp;# merge in place<br>a | b&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# a new merged dict (3.9+)
+
+With `|`, the right-hand side wins on conflicts, which makes `defaults | overrides` a clean way to layer configuration.
+""",
+    [{"q": "What does `d.get('missing')` return?",
+      "options": ["KeyError", "None", "An empty string", "0"],
+      "answer": 1,
+      "why": "get returns None for a missing key, or whatever default you pass "
+             "as the second argument. Square brackets raise instead."},
+     {"q": "`teams.setdefault(k, []).append(x)` does what?",
+      "options": ["Only works if k exists", "Gets the list at k, creating an "
+                  "empty one first if absent, then appends",
+                  "Replaces the value at k", "Raises if k is missing"],
+      "answer": 1,
+      "why": "setdefault returns the existing value, inserting the default "
+             "first when the key is absent - which is the grouping idiom."},
+     {"q": "`for k in d` iterates over what?",
+      "options": ["Keys", "Values", "Key-value pairs", "Nothing"],
+      "answer": 0,
+      "why": "Plain iteration gives keys. Use d.items() for pairs and "
+             "d.values() for values."}],
+)
+
+# ---------------------------------------------------------------------------
+# 29. Nested data structures
+# ---------------------------------------------------------------------------
+topic(
+    "nested_data_structures",
+    "Nested Data Structures",
+    "Real-World Shapes",
+    "Lists of dictionaries, dictionaries of lists, and how to walk data that "
+    "arrives the way real data arrives.",
+    _svg(_box(16, 20, 128, 16, S) + _txt(80, 32, "[ { } , { } ]", M, 9) +
+         _box(28, 44, 48, 16, S) + _txt(52, 56, "name", A, 8) +
+         _box(84, 44, 48, 16, S) + _txt(108, 56, "tags[]", A, 8)),
+    [("nested.py", '''people = [
+    {"name": "ana", "langs": ["python", "sql"]},
+    {"name": "bo",  "langs": ["go"]},
+    {"name": "cy",  "langs": []},
+]
+
+# One index, then one key, then one index.
+print("first person :", people[0]["name"])
+print("their 2nd lang:", people[0]["langs"][1])
+
+# Walking the whole thing.
+print()
+for person in people:
+    langs = ", ".join(person["langs"]) or "none"
+    print(f"  {person['name']:5} {langs}")
+
+# Flattening: every language anyone knows.
+print()
+all_langs = [lang for person in people for lang in person["langs"]]
+print("all   :", all_langs)
+print("unique:", sorted(set(all_langs)))
+
+# Filtering on a nested value.
+print()
+print("knows python:", [p["name"] for p in people if "python" in p["langs"]])
+'''),
+     ("nested_safe.py", '''data = {"user": {"profile": {"city": "Delhi"}}}
+
+# Chained [] raises as soon as one level is missing.
+print("present:", data["user"]["profile"]["city"])
+try:
+    data["user"]["settings"]["theme"]
+except KeyError as e:
+    print("missing -> KeyError", e)
+
+# Chained get, with a dict default so the next get still works.
+print()
+city = data.get("user", {}).get("profile", {}).get("city")
+theme = data.get("user", {}).get("settings", {}).get("theme", "default")
+print("city :", city)
+print("theme:", theme)
+
+# Grouping flat rows into a nested shape.
+print()
+rows = [("eng", "ana"), ("ops", "bo"), ("eng", "cy")]
+teams = {}
+for team, name in rows:
+    teams.setdefault(team, []).append(name)
+print("grouped:", teams)
+
+# Summing a nested field.
+print()
+orders = [{"items": [{"price": 3}, {"price": 5}]}, {"items": [{"price": 2}]}]
+total = sum(item["price"] for o in orders for item in o["items"])
+print("total  :", total)
+
+# Printing nested data readably.
+import json
+print()
+print(json.dumps(teams, indent=2))
+'''),
+     ],
+    ["Read the access left to right: "
+     "<code class='mono-font'>people[0][\"langs\"][1]</code> is index, key, index.",
+     "A chain of <code class='mono-font'>[]</code> raises at the first missing "
+     "level.",
+     "<code class='mono-font'>.get(k, {})</code> lets the next "
+     "<code class='mono-font'>.get</code> keep working.",
+     "A nested comprehension flattens: "
+     "<code class='mono-font'>[x for row in rows for x in row]</code>."],
+    """title: Nested Data Structures: A Practical Guide
+intro: Real data is rarely a flat list. It is a list of records, each with fields, some of which are themselves lists. Working with it is the same handful of moves repeated at different depths.
+
+## Reading a path
+
+people[0]["langs"][1]
+
+Left to right: index the list, look up the key, index that list. Each step returns something, and the next step operates on it. If you are unsure what a line does, evaluate it one piece at a time &mdash; `people[0]`, then `people[0]["langs"]` &mdash; which is exactly what an editor's debugger shows you.
+
+## Walking it
+
+for person in people:<br>&nbsp;&nbsp;&nbsp;&nbsp;for lang in person["langs"]:
+
+The outer loop takes records, the inner takes the list inside each one. That is the shape of most processing you will do, and the flatten version of it is a nested comprehension:
+
+[lang for person in people for lang in person["langs"]]
+
+Same clause order as the loops, and worth using only when it fits on one line.
+
+## The missing-key problem
+
+data["user"]["settings"]["theme"]
+
+raises as soon as any level is absent, and the `KeyError` names only the key that failed, not the path you were walking. Two ways to be safe:
+
+data.get("user", {}).get("settings", {}).get("theme", "default")
+
+Each `get` returns `{}` rather than `None` when absent, so the next `get` still has a dictionary to call. That `{}` default is the trick that makes the chain work.
+
+For anything deeper than two or three levels, a small helper is clearer than a long chain, and a `try/except KeyError` around the whole path is clearer still when a missing value really is exceptional.
+
+## Building nested shapes
+
+Flat rows into groups is the most common transformation:
+
+teams.setdefault(team, []).append(name)
+
+and summing across two levels is a single generator expression:
+
+sum(item["price"] for o in orders for item in o["items"])
+
+## Printing it
+
+Nested structures print as one dense line. `json.dumps(data, indent=2)` renders them readably and is the fastest way to see the shape of something you have just parsed. It only works for JSON-compatible types, which covers most data that arrived as JSON in the first place.
+""",
+    [{"q": "`people[0]['langs'][1]` reads as:",
+      "options": ["key, index, key", "index, key, index", "three indexes",
+                  "three keys"],
+      "answer": 1,
+      "why": "Left to right: index the list of people, look up the langs key, "
+             "then index that list."},
+     {"q": "Why use `.get('user', {})` rather than `.get('user')` in a chain?",
+      "options": ["It is faster", "So the next .get has a dict to call rather "
+                  "than None", "It avoids typing", "There is no difference"],
+      "answer": 1,
+      "why": "None has no .get method, so the chain would raise AttributeError. "
+             "An empty dict keeps the chain valid."},
+     {"q": "What does `[x for row in rows for x in row]` do?",
+      "options": ["Filters rows", "Flattens a list of lists", "Sorts the rows",
+                  "Counts items"],
+      "answer": 1,
+      "why": "The clauses are in the same order as nested loops: take each row, "
+             "then each item in it, producing one flat list."}],
+)
+
+
+# ---------------------------------------------------------------------------
+# 30. lambda, map, filter
+# ---------------------------------------------------------------------------
+topic(
+    "lambda_map_filter",
+    "lambda, map and filter",
+    "Functions as Values",
+    "Small anonymous functions, the two builtins that take them, and why a "
+    "comprehension usually reads better.",
+    _svg(_box(14, 34, 36, 22, S) + _txt(32, 49, "[1,2]") +
+         _box(56, 34, 42, 22, S, A) + _txt(77, 49, "map(f)", A) +
+         _box(104, 34, 42, 22, S) + _txt(125, 49, "[1,4]")),
+    [("lambda.py", '''# A lambda is a function with no name and one expression.
+square = lambda n: n * n
+def square_def(n):
+    return n * n
+
+print("lambda:", square(4))
+print("def   :", square_def(4))
+
+# Its real use is as an argument, where naming it would be noise.
+people = [("ana", 30), ("bo", 25)]
+print()
+print("by age:", sorted(people, key=lambda p: p[1]))
+
+# map applies a function to every item.
+nums = [1, 2, 3, 4]
+print()
+print("map      :", list(map(lambda n: n * n, nums)))
+print("comprehension:", [n * n for n in nums])
+
+# filter keeps the items where it returns True.
+print("filter   :", list(filter(lambda n: n % 2 == 0, nums)))
+print("comprehension:", [n for n in nums if n % 2 == 0])
+'''),
+     ("map_filter_lazy.py", '''nums = [1, 2, 3, 4, 5]
+
+# map and filter are lazy: they yield on demand.
+m = map(lambda n: n * n, nums)
+print("the object   :", m)
+print("as a list    :", list(m))
+print("again        :", list(m), " <- exhausted, gives nothing")
+
+# An existing function needs no lambda at all.
+print()
+words = ["10", "2", "33"]
+print("map(int, ...)     :", list(map(int, words)))
+print("lambda equivalent :", list(map(lambda w: int(w), words)))
+print("-> the lambda adds nothing here")
+
+# Where map genuinely wins: two sequences at once.
+print()
+a, b = [1, 2, 3], [10, 20, 30]
+print("map over two:", list(map(lambda x, y: x + y, a, b)))
+print("comprehension:", [x + y for x, y in zip(a, b)])
+
+# A lambda cannot contain a statement.
+print()
+# bad = lambda n: print(n); return n     # SyntaxError
+ok = lambda n: n if n > 0 else 0
+print("conditional in a lambda:", [ok(n) for n in (-2, 3)])
+'''),
+     ],
+    ["A lambda holds one expression and returns it. No statements, no "
+     "<code class='mono-font'>return</code>.",
+     "<code class='mono-font'>map</code> and <code class='mono-font'>filter</code> "
+     "are lazy - wrap in <code class='mono-font'>list()</code> to see them.",
+     "<code class='mono-font'>map(int, words)</code> needs no lambda. "
+     "<code class='mono-font'>map(lambda w: int(w), words)</code> adds nothing.",
+     "A comprehension usually reads better; "
+     "<code class='mono-font'>sorted(key=...)</code> is where lambdas shine."],
+    """title: lambda, map and filter: A Practical Guide
+intro: A lambda is a function written inline as an expression. map and filter are the two builtins that take one. All three are worth knowing, and in most Python code a comprehension is the better choice.
+
+## What a lambda is
+
+square = lambda n: n * n
+
+That is the same as a two-line `def`, minus the name. The body is a single expression and its value is returned automatically &mdash; there is no `return`, and no room for a statement. `lambda n: print(n); return n` is a syntax error.
+
+Assigning a lambda to a name, as above, is the one usage style guides actively discourage: if it deserves a name it deserves a `def`, which also gives it a useful name in tracebacks.
+
+## Where a lambda earns its place
+
+sorted(people, key=lambda p: p[1])
+
+As an argument, where the function is tiny, used once, and naming it would add a line without adding meaning. `sorted`, `min`, `max` and `groupby` are where you will actually write them.
+
+## map and filter
+
+map(f, items)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# apply f to each<br>filter(f, items)&nbsp;&nbsp;# keep those where f is true
+
+Both are lazy: they return iterators, not lists. Printing one shows `&lt;map object&gt;`, and consuming it twice gives nothing the second time &mdash; the page demonstrates exactly that, because it catches people.
+
+The comprehension equivalents are usually clearer:
+
+[n * n for n in nums]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# instead of map<br>[n for n in nums if n % 2 == 0]&nbsp;# instead of filter
+
+They read left to right, they do not need `list()` around them, and they do not need a lambda at all.
+
+## When map is genuinely better
+
+Two cases. First, when the function already exists:
+
+map(int, words)
+
+No lambda, no comprehension variable &mdash; just "convert each of these". Writing `map(lambda w: int(w), words)` instead is pure ceremony.
+
+Second, when consuming several sequences in parallel:
+
+map(lambda x, y: x + y, a, b)
+
+though `[x + y for x, y in zip(a, b)]` says the same thing and most readers will parse it faster.
+
+## The judgement
+
+Know all three, because you will read them. Write comprehensions by default, `map(existing_function, items)` when it is that shape exactly, and lambdas mainly as `key=` arguments.
+""",
+    [{"q": "What can a lambda body contain?",
+      "options": ["Any statements", "A single expression", "Up to three lines",
+                  "Only arithmetic"],
+      "answer": 1,
+      "why": "One expression, whose value is returned automatically. No return "
+             "statement, no assignments, no loops."},
+     {"q": "`list(m)` twice on a map object gives what the second time?",
+      "options": ["The same list", "An empty list", "An error", "Half the list"],
+      "answer": 1,
+      "why": "map is a lazy iterator and is exhausted after one pass. Store the "
+             "list if you need it more than once."},
+     {"q": "Which is preferred: `map(lambda w: int(w), ws)` or `map(int, ws)`?",
+      "options": ["The lambda version", "map(int, ws)", "They differ in result",
+                  "Neither - always use a loop"],
+      "answer": 1,
+      "why": "The function already exists, so wrapping it in a lambda adds "
+             "nothing but noise."}],
+)
+
+
+# ---------------------------------------------------------------------------
+# 31. Files and with
+# ---------------------------------------------------------------------------
+topic(
+    "files_and_with",
+    "Files and with",
+    "Reading and Writing",
+    "Opening a file so it always closes, reading it a line at a time, and the "
+    "modes that truncate what was there.",
+    _svg(_box(46, 18, 68, 54, S) +
+         '<path d="M46 34 L114 34" stroke="%s" stroke-width="1.5"/>' % B +
+         _txt(80, 30, "with open()", A, 8) +
+         _txt(80, 50, "read", M, 9) + _txt(80, 64, "auto-close", M, 8)),
+    [("files.py", '''# This runs against an in-memory filesystem in your browser,
+# so the file is real for the length of the program and then gone.
+with open("notes.txt", "w") as f:
+    f.write("first line\\n")
+    f.write("second line\\n")
+
+# with closes the file for you, even if the block raises.
+with open("notes.txt") as f:
+    content = f.read()
+print("read()      :", repr(content))
+
+with open("notes.txt") as f:
+    lines = f.readlines()
+print("readlines() :", lines)
+
+# Iterating the file is the memory-friendly way: one line at a time.
+print()
+with open("notes.txt") as f:
+    for n, line in enumerate(f, start=1):
+        print(f"  {n}: {line.rstrip()}")
+'''),
+     ("file_modes.py", '''# "w" truncates. Any existing contents are gone before you write a byte.
+with open("log.txt", "w") as f:
+    f.write("one\\n")
+with open("log.txt", "w") as f:
+    f.write("two\\n")
+with open("log.txt") as f:
+    print('after two "w" opens :', repr(f.read()))
+
+# "a" appends.
+with open("log.txt", "a") as f:
+    f.write("three\\n")
+with open("log.txt") as f:
+    print('after "a"           :', repr(f.read()))
+
+# Reading a file that is not there raises rather than returning empty.
+print()
+try:
+    open("nope.txt")
+except FileNotFoundError as e:
+    print("missing file ->", type(e).__name__)
+
+# Why `with` and not open/close by hand.
+print()
+f = open("log.txt")
+print("closed before:", f.closed)
+f.close()
+print("closed after :", f.closed)
+
+with open("log.txt") as g:
+    pass
+print("with block   :", g.closed, " <- closed automatically")
+'''),
+     ],
+    ["<code class='mono-font'>with</code> closes the file when the block ends, "
+     "including when it raises.",
+     "<code class='mono-font'>\"w\"</code> truncates the file immediately. "
+     "<code class='mono-font'>\"a\"</code> appends.",
+     "Iterating the file object reads one line at a time - the right way for "
+     "large files.",
+     "Lines keep their trailing newline. Use "
+     "<code class='mono-font'>.rstrip()</code>."],
+    """title: Files and with: A Practical Guide
+intro: Opening a file gives you an object to read or write. The with statement makes sure it is closed afterwards, which is the part that is easy to skip and expensive to get wrong.
+
+## A note about this page
+
+These editors run Python in your browser against an in-memory filesystem. The files are real while the program runs and vanish afterwards, so everything below behaves exactly as it would on your machine &mdash; it just does not persist.
+
+## with, and why
+
+with open("notes.txt") as f:<br>&nbsp;&nbsp;&nbsp;&nbsp;content = f.read()
+
+When the block ends the file is closed, whether it ended normally or by raising. Doing it by hand means `f.close()` in a `finally`, and forgetting it leaves the handle open &mdash; which on a long-running program eventually exhausts the operating system's limit, and on a write leaves data sitting in a buffer that never reaches the disk.
+
+`with` is not a style preference here. It is the correct way to open a file.
+
+## Three ways to read
+
+f.read()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# the whole thing as one string<br>f.readlines()&nbsp;&nbsp;# a list of lines<br>for line in f:&nbsp;# one line at a time
+
+The third is the one to reach for by default. It holds a single line in memory regardless of file size, so it works on a file larger than your RAM, and it reads no worse than the others.
+
+Lines keep their trailing `\\n`, which is why `line.rstrip()` appears in almost every loop over a file.
+
+## The modes
+
+"r"&nbsp;&nbsp;read, the default &mdash; raises if the file is missing<br>"w"&nbsp;&nbsp;write &mdash; <strong>truncates immediately</strong><br>"a"&nbsp;&nbsp;append &mdash; writes to the end<br>"x"&nbsp;&nbsp;create &mdash; raises if it already exists
+
+`"w"` is the dangerous one. It empties the file the moment it is opened, before you write anything, so an `open(path, "w")` that then raises leaves you with nothing. When you mean "add to this", `"a"` is the mode.
+
+`"x"` is worth remembering when overwriting would be a bug: it refuses rather than destroying.
+
+## Missing files raise
+
+`open("nope.txt")` raises `FileNotFoundError`, it does not return an empty file. Handle it, or let it propagate &mdash; both are reasonable, but do not check with `os.path.exists` first: the file can disappear between the check and the open, and the `try` handles that correctly anyway.
+
+## Text and encoding
+
+Files open in text mode and decode using your platform's default encoding, which differs between machines. For anything portable, say what you mean: `open(path, encoding="utf-8")`.
+""",
+    [{"q": "What does `with` do for a file?",
+      "options": ["Makes reading faster", "Closes it when the block ends, even "
+                  "on an exception", "Locks it", "Creates it if missing"],
+      "answer": 1,
+      "why": "Guaranteed cleanup is the point. Without it you need a "
+             "try/finally, and a forgotten close leaves buffered writes "
+             "unflushed."},
+     {"q": "Opening an existing file with mode \"w\" does what?",
+      "options": ["Appends to it", "Truncates it immediately", "Raises an error",
+                  "Reads it"],
+      "answer": 1,
+      "why": "\"w\" empties the file the moment it opens, before any write. Use "
+             "\"a\" to add to a file."},
+     {"q": "Why iterate `for line in f` rather than use readlines()?",
+      "options": ["It is the only way", "It holds one line in memory instead of "
+                  "the whole file", "readlines is deprecated", "It strips newlines"],
+      "answer": 1,
+      "why": "Iterating streams the file a line at a time, so it works on files "
+             "larger than memory."}],
+)
+
+
+# ---------------------------------------------------------------------------
+# 32. Modules and import
+# ---------------------------------------------------------------------------
+topic(
+    "modules_and_import",
+    "Modules and import",
+    "Using Other Code",
+    "The forms of import, what each one puts in your namespace, and why "
+    "import * is discouraged.",
+    _svg(_box(16, 30, 44, 26, S) + _txt(38, 47, "math", M) +
+         '<path d="M64 43 L92 43" stroke="%s" stroke-width="2"/>' % A +
+         _txt(78, 36, "import", A, 8) +
+         _box(96, 30, 50, 26, S, A) + _txt(121, 47, "your code", A, 8)),
+    [("imports.py", '''# The plain form: the module name becomes the namespace.
+import math
+print("math.sqrt(9)   :", math.sqrt(9))
+print("math.pi        :", round(math.pi, 4))
+
+# from ... import: the name lands directly in your namespace.
+from math import sqrt, floor
+print("sqrt(9)        :", sqrt(9))
+print("floor(3.7)     :", floor(3.7))
+
+# as: rename on the way in, usually to shorten or to avoid a clash.
+import json as j
+print("json as j      :", j.dumps({"a": 1}))
+
+from datetime import datetime as dt
+print("datetime as dt :", type(dt.now()).__name__)
+
+# The module object itself.
+print()
+print("math is a", type(math).__name__)
+print("a few names   :", [n for n in dir(math) if n.startswith("f")][:5])
+'''),
+     ("import_care.py", '''# import * dumps every public name in, and you cannot see what arrived.
+from math import *
+print("sqrt came in from somewhere:", sqrt(16))
+
+# The problem: names collide silently and the last import wins.
+def gamma(x):
+    return "my own gamma"
+
+print("my gamma :", gamma(1))
+from math import gamma          # silently replaces it
+print("after import *-style shadowing:", gamma(1))
+
+# The standard library has the answer to a lot of things.
+print()
+import random, statistics, collections
+random.seed(0)
+nums = [random.randint(1, 10) for _ in range(8)]
+print("nums    :", nums)
+print("mean    :", round(statistics.mean(nums), 2))
+print("counts  :", dict(collections.Counter(nums)))
+
+# Imports are cached: importing twice does not run the module twice.
+print()
+import sys
+print("math already loaded:", "math" in sys.modules)
+'''),
+     ],
+    ["<code class='mono-font'>import math</code> keeps the module name as a "
+     "prefix, which shows where a function came from.",
+     "<code class='mono-font'>from math import sqrt</code> puts "
+     "<code class='mono-font'>sqrt</code> straight into your namespace.",
+     "<code class='mono-font'>import *</code> hides where names came from and "
+     "silently overwrites your own.",
+     "Imports are cached: a module runs once per program, no matter how often "
+     "it is imported."],
+    """title: Modules and import: A Practical Guide
+intro: A module is a file of Python. import runs it once and gives you access to what it defines. The forms of import differ only in what ends up in your namespace, and that difference matters more than it first appears.
+
+## The three forms
+
+import math&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# math.sqrt(9)<br>from math import sqrt&nbsp;&nbsp;# sqrt(9)<br>import numpy as np&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# np.array(...)
+
+The first keeps the module as a prefix. That is a feature: reading `math.sqrt` a hundred lines later tells you immediately where it came from, and it cannot collide with anything of yours.
+
+The second is shorter and right when you use one or two names heavily and there is no ambiguity.
+
+`as` renames on the way in, for length (`numpy as np`) or to avoid a clash with a name you already have.
+
+## import * and why not
+
+from math import *
+
+This pulls in every public name at once. Two problems, and the second is the serious one.
+
+You can no longer tell where a name came from. `sqrt(16)` appears from nowhere, and finding its source means guessing which of the star-imports supplied it.
+
+Worse, it silently overwrites. If you defined `gamma` and then star-import a module that also defines `gamma`, yours is gone with no warning at all &mdash; the page demonstrates precisely that, printing the function's own output before and after.
+
+The place it is acceptable is an interactive session where you are exploring, and even there it is a habit worth not forming.
+
+## Imports are cached
+
+Importing a module twice does not run it twice. Python keeps a table in `sys.modules` and hands back the same module object. So imports are cheap to repeat, and any code at the top level of a module runs exactly once per program &mdash; which is why putting slow work or side effects at module level is a trap.
+
+## Where imports go
+
+At the top of the file, one per line, standard library first, then third-party, then your own. That is not aesthetics: an import buried inside a function runs on every call and hides a dependency from anyone scanning the file.
+
+## The standard library is large
+
+Before installing anything, check what ships with Python. `collections`, `itertools`, `datetime`, `json`, `random`, `statistics`, `pathlib` and `re` cover an enormous amount of everyday work, and the page uses three of them in six lines.
+""",
+    [{"q": "What is the main problem with `from module import *`?",
+      "options": ["It is slow", "It hides where names came from and can silently "
+                  "overwrite yours", "It only works once", "It cannot import "
+                  "functions"],
+      "answer": 1,
+      "why": "Names appear from nowhere, and a clash replaces your own "
+             "definition with no warning at all."},
+     {"q": "What does `import math` put in your namespace?",
+      "options": ["Every function in math", "The name math only", "sqrt and pi",
+                  "Nothing"],
+      "answer": 1,
+      "why": "Just the module object. Its contents stay behind the math. "
+             "prefix, which is what makes the origin of a call obvious."},
+     {"q": "Importing the same module twice does what?",
+      "options": ["Runs it twice", "Uses the cached module - it runs once",
+                  "Raises an error", "Doubles memory"],
+      "answer": 1,
+      "why": "Python caches modules in sys.modules, so top-level code runs "
+             "exactly once per program."}],
+)
+
+
+# ---------------------------------------------------------------------------
+# 33. Generators and yield
+# ---------------------------------------------------------------------------
+topic(
+    "generators_and_yield",
+    "Generators and yield",
+    "Values on Demand",
+    "A function that pauses instead of returning, producing one value at a "
+    "time and holding almost nothing in memory.",
+    _svg(_box(14, 34, 40, 22, S) + _txt(34, 49, "gen()") +
+         "".join('<circle cx="%d" cy="45" r="5" fill="%s"/>' % (74 + i * 20, A if i == 0 else "none")
+                 + ('' if i == 0 else '<circle cx="%d" cy="45" r="5" fill="none" stroke="%s"/>' % (74 + i * 20, M))
+                 for i in range(4)) +
+         _txt(80, 72, "one at a time", M, 8)),
+    [("generators.py", '''def countdown(n):
+    while n > 0:
+        yield n            # pause here and hand n back
+        n -= 1
+
+# Calling it runs no code - it builds a generator.
+g = countdown(3)
+print("the object:", g)
+
+print("next      :", next(g))
+print("next      :", next(g))
+print("rest      :", list(g))
+
+# In a for loop, which is how you normally use one.
+print()
+for n in countdown(3):
+    print("  ", n)
+
+# A generator is exhausted after one pass.
+print()
+g = countdown(2)
+print("first pass :", list(g))
+print("second pass:", list(g))
+'''),
+     ("generator_memory.py", '''import sys
+
+# A list holds everything. A generator holds a position.
+squares_list = [n * n for n in range(100_000)]
+squares_gen = (n * n for n in range(100_000))
+
+print("list bytes:", sys.getsizeof(squares_list))
+print("gen  bytes:", sys.getsizeof(squares_gen))
+print("same sum  :", sum(squares_list) == sum(n * n for n in range(100_000)))
+
+# Generators can be infinite, because nothing is built up front.
+def naturals():
+    n = 1
+    while True:
+        yield n
+        n += 1
+
+from itertools import islice
+print()
+print("first 5 of an infinite generator:", list(islice(naturals(), 5)))
+
+# Chaining generators: each stage pulls from the one before it.
+def evens(source):
+    for n in source:
+        if n % 2 == 0:
+            yield n
+
+def doubled(source):
+    for n in source:
+        yield n * 2
+
+pipeline = doubled(evens(naturals()))
+print("pipeline first 5:", list(islice(pipeline, 5)))
+print("-> nothing was stored; each value was pulled through on demand")
+'''),
+     ],
+    ["<code class='mono-font'>yield</code> pauses the function and hands a value "
+     "back; the next request resumes it.",
+     "Calling a generator function runs none of its body - it returns a "
+     "generator.",
+     "A generator is exhausted after one pass. Rebuild it to iterate again.",
+     "<code class='mono-font'>(x for x in y)</code> is a generator expression - "
+     "a comprehension with round brackets."],
+    """title: Generators and yield: A Practical Guide
+intro: A generator is a function that pauses. Instead of computing everything and returning it, it hands back one value, freezes, and resumes where it stopped when the next value is asked for.
+
+## yield instead of return
+
+def countdown(n):<br>&nbsp;&nbsp;&nbsp;&nbsp;while n &gt; 0:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;yield n<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n -= 1
+
+`return` ends a function. `yield` suspends it, keeping every local variable exactly as it was, and the function continues from that line when the next value is requested.
+
+Calling `countdown(3)` runs none of the body. It returns a generator object; the code inside starts running only when something asks for a value &mdash; `next()`, a `for` loop, `list()`, `sum()`.
+
+## Why bother
+
+Memory. A list comprehension over a million items builds a million items. A generator holds a position and the local variables, which is a fixed few hundred bytes whatever the size &mdash; the page prints both.
+
+That is what makes infinite sequences possible:
+
+def naturals():<br>&nbsp;&nbsp;&nbsp;&nbsp;n = 1<br>&nbsp;&nbsp;&nbsp;&nbsp;while True:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;yield n<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n += 1
+
+Nothing is built up front, so there is nothing to run out of. Take what you need with `itertools.islice`.
+
+## Exhausted after one pass
+
+g = countdown(2)<br>list(g)&nbsp;&nbsp;# [2, 1]<br>list(g)&nbsp;&nbsp;# []
+
+A generator walks forward once and does not rewind. If you need the values twice, either store them in a list or call the generator function again to get a fresh one. This catches everyone once, usually as a mysteriously empty second loop.
+
+## Generator expressions
+
+(n * n for n in nums)
+
+Round brackets instead of square. Identical syntax to a comprehension, no list built. Inside a call you can drop the extra brackets: `sum(n * n for n in nums)`.
+
+## Pipelines
+
+Generators compose. Each stage pulls from the one before it, so a chain of three generators still holds one value at a time:
+
+doubled(evens(naturals()))
+
+No stage stores anything, and nothing runs until the end of the chain is asked for a value. That is the pattern behind most stream processing in Python, and it is why generators are worth the concept even when memory is not tight.
+""",
+    [{"q": "What does calling a generator function do?",
+      "options": ["Runs the body and returns a list", "Returns a generator "
+                  "without running the body", "Raises unless you use next()",
+                  "Runs the body up to the first yield"],
+      "answer": 1,
+      "why": "It builds a generator object. Nothing inside runs until a value "
+             "is requested."},
+     {"q": "`list(g)` twice on the same generator gives what the second time?",
+      "options": ["The same values", "An empty list", "An error", "Half the values"],
+      "answer": 1,
+      "why": "A generator walks forward once and is then exhausted. Call the "
+             "function again for a fresh one."},
+     {"q": "How does `(x*x for x in nums)` differ from `[x*x for x in nums]`?",
+      "options": ["No difference", "It produces values on demand instead of "
+                  "building a list", "It is a tuple", "It sorts the result"],
+      "answer": 1,
+      "why": "Round brackets make a generator expression: nothing is built, and "
+             "values are produced as they are asked for."}],
+)
+
+
+# ---------------------------------------------------------------------------
+# 34. Inheritance
+# ---------------------------------------------------------------------------
+topic(
+    "inheritance",
+    "Inheritance",
+    "Building on a Class",
+    "One class taking another's behaviour, overriding part of it, and calling "
+    "back into the parent with super().",
+    _svg(_box(56, 14, 48, 18, S, A) + _txt(80, 27, "Animal", A) +
+         '<path d="M80 34 L50 46 M80 34 L110 46" stroke="%s" stroke-width="1.5"/>' % M +
+         _box(26, 48, 48, 18, S) + _txt(50, 61, "Dog") +
+         _box(86, 48, 48, 18, S) + _txt(110, 61, "Cat")),
+    [("inheritance.py", '''class Animal:
+    def __init__(self, name):
+        self.name = name
+
+    def speak(self):
+        return "..."
+
+    def describe(self):
+        return f"{self.name} says {self.speak()}"
+
+class Dog(Animal):
+    def speak(self):               # override
+        return "woof"
+
+class Cat(Animal):
+    def speak(self):
+        return "meow"
+
+for a in (Dog("rex"), Cat("mia"), Animal("thing")):
+    print(a.describe())
+
+# describe() was written once and calls whichever speak() the object has.
+print()
+print("Dog is an Animal:", isinstance(Dog("x"), Animal))
+print("Dog inherits describe:", "describe" in dir(Dog))
+'''),
+     ("super_and_mro.py", '''class Animal:
+    def __init__(self, name):
+        self.name = name
+        print("  Animal.__init__ ran")
+
+class Dog(Animal):
+    def __init__(self, name, breed):
+        super().__init__(name)     # let the parent do its part
+        self.breed = breed
+
+d = Dog("rex", "collie")
+print("name :", d.name, " breed:", d.breed)
+
+# Forgetting super() means the parent's setup never happens.
+class Broken(Animal):
+    def __init__(self, name, breed):
+        self.breed = breed         # no super() call
+
+b = Broken("rex", "collie")
+try:
+    print(b.name)
+except AttributeError as e:
+    print("Broken ->", type(e).__name__, e)
+
+# Extending rather than replacing.
+print()
+class Loud(Animal):
+    def speak(self):
+        return super().speak().upper() + "!!!"
+
+class Base(Animal):
+    def speak(self):
+        return "hello"
+
+class LoudBase(Loud, Base):
+    pass
+
+print("LoudBase says:", LoudBase("x").speak())
+print("lookup order :", [c.__name__ for c in LoudBase.__mro__][:4])
+'''),
+     ],
+    ["<code class='mono-font'>class Dog(Animal)</code> gives Dog everything "
+     "Animal has, before Dog adds anything.",
+     "Defining a method with the same name overrides it; the parent's version "
+     "is still reachable with <code class='mono-font'>super()</code>.",
+     "A subclass <code class='mono-font'>__init__</code> should call "
+     "<code class='mono-font'>super().__init__(...)</code> or the parent's "
+     "setup never runs.",
+     "Prefer composition when the relationship is \"has a\" rather than \"is a\"."],
+    """title: Inheritance: A Practical Guide
+intro: A class can be built on another one, taking its attributes and methods and changing only what differs. Used carefully it removes real duplication; used loosely it produces hierarchies nobody can follow.
+
+## The basic move
+
+class Dog(Animal):<br>&nbsp;&nbsp;&nbsp;&nbsp;def speak(self):<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return "woof"
+
+`Dog` gets everything `Animal` has. Where it defines a method of the same name, that version wins &mdash; that is overriding.
+
+The payoff shows up in methods the parent already wrote:
+
+def describe(self):<br>&nbsp;&nbsp;&nbsp;&nbsp;return f"{self.name} says {self.speak()}"
+
+`describe` was written once on `Animal` and calls whichever `speak` the actual object has. Add a tenth animal and `describe` needs no change. That is the whole argument for inheritance in one method.
+
+## super()
+
+class Dog(Animal):<br>&nbsp;&nbsp;&nbsp;&nbsp;def __init__(self, name, breed):<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;super().__init__(name)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.breed = breed
+
+A subclass `__init__` replaces the parent's, so the parent's setup does not happen unless you ask for it. Forget `super().__init__(name)` and `self.name` never gets set &mdash; the failure arrives later as an `AttributeError` from some unrelated method, which the page demonstrates.
+
+`super()` also works for extending rather than replacing:
+
+return super().speak().upper() + "!!!"
+
+Take the parent's answer, then modify it.
+
+## The lookup order
+
+With several parents, Python walks a defined order &mdash; the MRO, visible as `Cls.__mro__` &mdash; taking the first match. Reading it is how you answer "which version actually ran".
+
+Multiple inheritance is a sharp tool. Mixins with distinct responsibilities are fine; deep diamond hierarchies are how codebases become unreadable.
+
+## is-a, not has-a
+
+Inherit when the subclass genuinely <em>is</em> a kind of the parent and can be used wherever the parent is expected. A `Dog` is an `Animal`, so `describe` works on both.
+
+When the relationship is "has a" &mdash; a `Car` has an `Engine` &mdash; hold the other object as an attribute instead. Composition is easier to change later, because it does not tie two classes together permanently to share a couple of methods.
+
+The common failure is inheriting to reuse a method. If that is the only reason, a function or a held object is nearly always the better answer.
+""",
+    [{"q": "What happens if a subclass __init__ does not call super().__init__()?",
+      "options": ["Python calls it automatically", "The parent's setup never "
+                  "runs", "It raises immediately", "The subclass cannot be "
+                  "instantiated"],
+      "answer": 1,
+      "why": "The subclass __init__ replaces the parent's entirely. Attributes "
+             "the parent would have set are simply missing, and you find out "
+             "later via AttributeError."},
+     {"q": "Why can `describe()` on the parent call the child's `speak()`?",
+      "options": ["It cannot", "Method lookup starts on the actual object's "
+                  "class", "describe is copied into each child",
+                  "Only with super()"],
+      "answer": 1,
+      "why": "Lookup starts at the instance's own class, so the override is "
+             "found first. That is what lets a parent method work for every "
+             "subclass."},
+     {"q": "A Car has an Engine. Should Car inherit from Engine?",
+      "options": ["Yes", "No - that is a has-a relationship, so hold one as an "
+                  "attribute", "Only if Engine has no __init__", "Yes, for speed"],
+      "answer": 1,
+      "why": "Inheritance is for is-a. Composition - holding the object as an "
+             "attribute - is easier to change and does not tie the two classes "
+             "together."}],
+)
+
+
 # The MCQ bank, keyed the way tools/labs.py keys everything else.
 CHECKS = {
     "python/%s.html" % t["slug"]: {"check": t["check"]} for t in TOPICS

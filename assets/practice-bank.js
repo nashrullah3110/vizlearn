@@ -8481,6 +8481,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "python/dictionary_methods.html",
+  "title": "Dictionary Methods",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does `d.get('missing')` return?",
+    "o": [
+     "KeyError",
+     "None",
+     "An empty string",
+     "0"
+    ],
+    "a": 1,
+    "w": "get returns None for a missing key, or whatever default you pass as the second argument. Square brackets raise instead."
+   },
+   {
+    "t": "`teams.setdefault(k, []).append(x)` does what?",
+    "o": [
+     "Only works if k exists",
+     "Gets the list at k, creating an empty one first if absent, then appends",
+     "Replaces the value at k",
+     "Raises if k is missing"
+    ],
+    "a": 1,
+    "w": "setdefault returns the existing value, inserting the default first when the key is absent - which is the grouping idiom."
+   },
+   {
+    "t": "`for k in d` iterates over what?",
+    "o": [
+     "Keys",
+     "Values",
+     "Key-value pairs",
+     "Nothing"
+    ],
+    "a": 0,
+    "w": "Plain iteration gives keys. Use d.items() for pairs and d.values() for values."
+   }
+  ]
+ },
+ {
+  "path": "python/files_and_with.html",
+  "title": "Files and with",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does `with` do for a file?",
+    "o": [
+     "Makes reading faster",
+     "Closes it when the block ends, even on an exception",
+     "Locks it",
+     "Creates it if missing"
+    ],
+    "a": 1,
+    "w": "Guaranteed cleanup is the point. Without it you need a try/finally, and a forgotten close leaves buffered writes unflushed."
+   },
+   {
+    "t": "Opening an existing file with mode \"w\" does what?",
+    "o": [
+     "Appends to it",
+     "Truncates it immediately",
+     "Raises an error",
+     "Reads it"
+    ],
+    "a": 1,
+    "w": "\"w\" empties the file the moment it opens, before any write. Use \"a\" to add to a file."
+   },
+   {
+    "t": "Why iterate `for line in f` rather than use readlines()?",
+    "o": [
+     "It is the only way",
+     "It holds one line in memory instead of the whole file",
+     "readlines is deprecated",
+     "It strips newlines"
+    ],
+    "a": 1,
+    "w": "Iterating streams the file a line at a time, so it works on files larger than memory."
+   }
+  ]
+ },
+ {
   "path": "python/for_loops_and_range.html",
   "title": "For Loops and range()",
   "cat": "Python",
@@ -8601,6 +8681,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "python/generators_and_yield.html",
+  "title": "Generators and yield",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does calling a generator function do?",
+    "o": [
+     "Runs the body and returns a list",
+     "Returns a generator without running the body",
+     "Raises unless you use next()",
+     "Runs the body up to the first yield"
+    ],
+    "a": 1,
+    "w": "It builds a generator object. Nothing inside runs until a value is requested."
+   },
+   {
+    "t": "`list(g)` twice on the same generator gives what the second time?",
+    "o": [
+     "The same values",
+     "An empty list",
+     "An error",
+     "Half the values"
+    ],
+    "a": 1,
+    "w": "A generator walks forward once and is then exhausted. Call the function again for a fresh one."
+   },
+   {
+    "t": "How does `(x*x for x in nums)` differ from `[x*x for x in nums]`?",
+    "o": [
+     "No difference",
+     "It produces values on demand instead of building a list",
+     "It is a tuple",
+     "It sorts the result"
+    ],
+    "a": 1,
+    "w": "Round brackets make a generator expression: nothing is built, and values are produced as they are asked for."
+   }
+  ]
+ },
+ {
   "path": "python/hello_python.html",
   "title": "Hello, Python!",
   "cat": "Python",
@@ -8677,6 +8797,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 2,
     "w": "else is optional, and there can be at most one. elif is the clause you can repeat."
+   }
+  ]
+ },
+ {
+  "path": "python/inheritance.html",
+  "title": "Inheritance",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What happens if a subclass __init__ does not call super().__init__()?",
+    "o": [
+     "Python calls it automatically",
+     "The parent's setup never runs",
+     "It raises immediately",
+     "The subclass cannot be instantiated"
+    ],
+    "a": 1,
+    "w": "The subclass __init__ replaces the parent's entirely. Attributes the parent would have set are simply missing, and you find out later via AttributeError."
+   },
+   {
+    "t": "Why can `describe()` on the parent call the child's `speak()`?",
+    "o": [
+     "It cannot",
+     "Method lookup starts on the actual object's class",
+     "describe is copied into each child",
+     "Only with super()"
+    ],
+    "a": 1,
+    "w": "Lookup starts at the instance's own class, so the override is found first. That is what lets a parent method work for every subclass."
+   },
+   {
+    "t": "A Car has an Engine. Should Car inherit from Engine?",
+    "o": [
+     "Yes",
+     "No - that is a has-a relationship, so hold one as an attribute",
+     "Only if Engine has no __init__",
+     "Yes, for speed"
+    ],
+    "a": 1,
+    "w": "Inheritance is for is-a. Composition - holding the object as an attribute - is easier to change and does not tie the two classes together."
    }
   ]
  },
@@ -8761,6 +8921,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "python/modules_and_import.html",
+  "title": "Modules and import",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What is the main problem with `from module import *`?",
+    "o": [
+     "It is slow",
+     "It hides where names came from and can silently overwrite yours",
+     "It only works once",
+     "It cannot import functions"
+    ],
+    "a": 1,
+    "w": "Names appear from nowhere, and a clash replaces your own definition with no warning at all."
+   },
+   {
+    "t": "What does `import math` put in your namespace?",
+    "o": [
+     "Every function in math",
+     "The name math only",
+     "sqrt and pi",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "Just the module object. Its contents stay behind the math. prefix, which is what makes the origin of a call obvious."
+   },
+   {
+    "t": "Importing the same module twice does what?",
+    "o": [
+     "Runs it twice",
+     "Uses the cached module - it runs once",
+     "Raises an error",
+     "Doubles memory"
+    ],
+    "a": 1,
+    "w": "Python caches modules in sys.modules, so top-level code runs exactly once per program."
+   }
+  ]
+ },
+ {
+  "path": "python/mutability_and_aliasing.html",
+  "title": "Mutability and Aliasing",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "After `a = [1]; b = a; b.append(2)`, what is `a`?",
+    "o": [
+     "[1]",
+     "[1, 2]",
+     "[2]",
+     "An error"
+    ],
+    "a": 1,
+    "w": "b = a creates a second name for one list, not a copy. The append is visible through both names."
+   },
+   {
+    "t": "A function does `items = [9]`. What does the caller see?",
+    "o": [
+     "Its list becomes [9]",
+     "No change - only the local name was rebound",
+     "An error",
+     "Its list is emptied"
+    ],
+    "a": 1,
+    "w": "Rebinding points the local name at a new object. Only mutating the original object is visible to the caller."
+   },
+   {
+    "t": "Why does `[[0]*3]*3` misbehave?",
+    "o": [
+     "It creates 9 separate zeros",
+     "The outer multiplication repeats one inner list by reference",
+     "It is a syntax error",
+     "It does not - it works fine"
+    ],
+    "a": 1,
+    "w": "There is one inner list with three references to it, so writing to one row appears to write to all three."
+   }
+  ]
+ },
+ {
   "path": "python/nested_conditionals.html",
   "title": "Nested Conditionals",
   "cat": "Python",
@@ -8797,6 +9037,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "elif expresses several mutually exclusive outcomes of a single decision. Nesting expresses decisions that live inside other decisions."
+   }
+  ]
+ },
+ {
+  "path": "python/nested_data_structures.html",
+  "title": "Nested Data Structures",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "`people[0]['langs'][1]` reads as:",
+    "o": [
+     "key, index, key",
+     "index, key, index",
+     "three indexes",
+     "three keys"
+    ],
+    "a": 1,
+    "w": "Left to right: index the list of people, look up the langs key, then index that list."
+   },
+   {
+    "t": "Why use `.get('user', {})` rather than `.get('user')` in a chain?",
+    "o": [
+     "It is faster",
+     "So the next .get has a dict to call rather than None",
+     "It avoids typing",
+     "There is no difference"
+    ],
+    "a": 1,
+    "w": "None has no .get method, so the chain would raise AttributeError. An empty dict keeps the chain valid."
+   },
+   {
+    "t": "What does `[x for row in rows for x in row]` do?",
+    "o": [
+     "Filters rows",
+     "Flattens a list of lists",
+     "Sorts the rows",
+     "Counts items"
+    ],
+    "a": 1,
+    "w": "The clauses are in the same order as nested loops: take each row, then each item in it, producing one flat list."
    }
   ]
  },
@@ -8997,6 +9277,126 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "`^` is symmetric difference: everything in exactly one of the two sets. 'b' is in both, so it is excluded."
+   }
+  ]
+ },
+ {
+  "path": "python/shallow_and_deep_copy.html",
+  "title": "Shallow vs Deep Copying",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "After a shallow copy of `[[1, 2]]`, changing `copy[0][0]`:",
+    "o": [
+     "Changes only the copy",
+     "Changes the original too",
+     "Raises an error",
+     "Creates a new inner list"
+    ],
+    "a": 1,
+    "w": "The outer list is new but the inner list is shared, so a change one level down is visible through both."
+   },
+   {
+    "t": "When is a shallow copy sufficient?",
+    "o": [
+     "Always",
+     "When everything inside is immutable",
+     "Never",
+     "Only for dicts"
+    ],
+    "a": 1,
+    "w": "With immutable contents there is nothing shared that can change, so the shallow copy behaves like a complete one."
+   },
+   {
+    "t": "Which of these is NOT a shallow copy of a list?",
+    "o": [
+     "nums[:]",
+     "list(nums)",
+     "nums.copy()",
+     "copy.deepcopy(nums)"
+    ],
+    "a": 3,
+    "w": "deepcopy rebuilds every mutable object inside as well. The other three duplicate only the outer list."
+   }
+  ]
+ },
+ {
+  "path": "python/slicing_step_negatives.html",
+  "title": "Slicing with Step",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What is `'abcdef'[1:4]`?",
+    "o": [
+     "'abcd'",
+     "'bcd'",
+     "'bcde'",
+     "'bc'"
+    ],
+    "a": 1,
+    "w": "Start at index 1, stop before index 4: characters 1, 2 and 3."
+   },
+   {
+    "t": "What does `s[::-1]` do?",
+    "o": [
+     "Removes the last item",
+     "Reverses the sequence",
+     "Takes every second item",
+     "Raises an error"
+    ],
+    "a": 1,
+    "w": "A step of -1 walks the whole sequence backwards. It is the standard reverse idiom."
+   },
+   {
+    "t": "`s[99]` raises IndexError but `s[2:99]` does not. Why?",
+    "o": [
+     "Slices clamp to what exists",
+     "s[2:99] also raises",
+     "Slices are cached",
+     "99 is special"
+    ],
+    "a": 0,
+    "w": "A slice returns whatever part of the range exists, possibly nothing. Indexing demands that exact position, so it raises."
+   }
+  ]
+ },
+ {
+  "path": "python/string_methods.html",
+  "title": "String Methods",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "After `name = 'ana'` then `name.upper()`, what is name?",
+    "o": [
+     "'ANA'",
+     "'ana'",
+     "None",
+     "An error"
+    ],
+    "a": 1,
+    "w": "Strings are immutable. The method returned a new string that was discarded; the original is untouched. You have to rebind."
+   },
+   {
+    "t": "What does `'banana'.strip('ab')` remove?",
+    "o": [
+     "The substring 'ab'",
+     "Any leading or trailing a or b characters",
+     "All a and b anywhere",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "The argument is a set of characters trimmed from both ends, not a substring. removesuffix is the method for removing an ending."
+   },
+   {
+    "t": "`', '.join([1, 2])` does what?",
+    "o": [
+     "Returns '1, 2'",
+     "Raises TypeError",
+     "Returns [1, 2]",
+     "Returns '12'"
+    ],
+    "a": 1,
+    "w": "join works on strings only. Convert first: ', '.join(str(n) for n in nums)."
    }
   ]
  },
@@ -9357,6 +9757,86 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Zero iterations means zero breaks, so the loop completed normally and the else runs."
+   }
+  ]
+ },
+ {
+  "path": "python/input_and_output.html",
+  "title": "input() and Output",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "The user types 42. What does `input()` return?",
+    "o": [
+     "The integer 42",
+     "The string '42'",
+     "42.0",
+     "It depends"
+    ],
+    "a": 1,
+    "w": "Always a string. input cannot know what the digits are meant to be, so it does not guess - which is why '42' + '42' is '4242'."
+   },
+   {
+    "t": "What does `print(i, end=' ')` do?",
+    "o": [
+     "Prints a space before i",
+     "Prints i followed by a space instead of a newline",
+     "Skips the print",
+     "Adds a space to i"
+    ],
+    "a": 1,
+    "w": "end replaces the trailing newline, which is how you print several values on one line. A bare print() then closes the line."
+   },
+   {
+    "t": "Why does `int(input())` need a try/except in real programs?",
+    "o": [
+     "input is slow",
+     "The user can type something that is not a number",
+     "int is deprecated",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "Any non-numeric text raises ValueError, and an empty line does too. Anything a person types needs handling."
+   }
+  ]
+ },
+ {
+  "path": "python/lambda_map_filter.html",
+  "title": "lambda, map and filter",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What can a lambda body contain?",
+    "o": [
+     "Any statements",
+     "A single expression",
+     "Up to three lines",
+     "Only arithmetic"
+    ],
+    "a": 1,
+    "w": "One expression, whose value is returned automatically. No return statement, no assignments, no loops."
+   },
+   {
+    "t": "`list(m)` twice on a map object gives what the second time?",
+    "o": [
+     "The same list",
+     "An empty list",
+     "An error",
+     "Half the list"
+    ],
+    "a": 1,
+    "w": "map is a lazy iterator and is exhausted after one pass. Store the list if you need it more than once."
+   },
+   {
+    "t": "Which is preferred: `map(lambda w: int(w), ws)` or `map(int, ws)`?",
+    "o": [
+     "The lambda version",
+     "map(int, ws)",
+     "They differ in result",
+     "Neither - always use a loop"
+    ],
+    "a": 1,
+    "w": "The function already exists, so wrapping it in a lambda adds nothing but noise."
    }
   ]
  },

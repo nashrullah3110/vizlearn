@@ -1,0 +1,38 @@
+title: Files and with: A Practical Guide
+intro: Opening a file gives you an object to read or write. The with statement makes sure it is closed afterwards, which is the part that is easy to skip and expensive to get wrong.
+
+## A note about this page
+
+These editors run Python in your browser against an in-memory filesystem. The files are real while the program runs and vanish afterwards, so everything below behaves exactly as it would on your machine &mdash; it just does not persist.
+
+## with, and why
+
+with open("notes.txt") as f:<br>&nbsp;&nbsp;&nbsp;&nbsp;content = f.read()
+
+When the block ends the file is closed, whether it ended normally or by raising. Doing it by hand means `f.close()` in a `finally`, and forgetting it leaves the handle open &mdash; which on a long-running program eventually exhausts the operating system's limit, and on a write leaves data sitting in a buffer that never reaches the disk.
+
+`with` is not a style preference here. It is the correct way to open a file.
+
+## Three ways to read
+
+f.read()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# the whole thing as one string<br>f.readlines()&nbsp;&nbsp;# a list of lines<br>for line in f:&nbsp;# one line at a time
+
+The third is the one to reach for by default. It holds a single line in memory regardless of file size, so it works on a file larger than your RAM, and it reads no worse than the others.
+
+Lines keep their trailing `\n`, which is why `line.rstrip()` appears in almost every loop over a file.
+
+## The modes
+
+"r"&nbsp;&nbsp;read, the default &mdash; raises if the file is missing<br>"w"&nbsp;&nbsp;write &mdash; <strong>truncates immediately</strong><br>"a"&nbsp;&nbsp;append &mdash; writes to the end<br>"x"&nbsp;&nbsp;create &mdash; raises if it already exists
+
+`"w"` is the dangerous one. It empties the file the moment it is opened, before you write anything, so an `open(path, "w")` that then raises leaves you with nothing. When you mean "add to this", `"a"` is the mode.
+
+`"x"` is worth remembering when overwriting would be a bug: it refuses rather than destroying.
+
+## Missing files raise
+
+`open("nope.txt")` raises `FileNotFoundError`, it does not return an empty file. Handle it, or let it propagate &mdash; both are reasonable, but do not check with `os.path.exists` first: the file can disappear between the check and the open, and the `try` handles that correctly anyway.
+
+## Text and encoding
+
+Files open in text mode and decode using your platform's default encoding, which differs between machines. For anything portable, say what you mean: `open(path, encoding="utf-8")`.

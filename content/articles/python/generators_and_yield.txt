@@ -1,0 +1,40 @@
+title: Generators and yield: A Practical Guide
+intro: A generator is a function that pauses. Instead of computing everything and returning it, it hands back one value, freezes, and resumes where it stopped when the next value is asked for.
+
+## yield instead of return
+
+def countdown(n):<br>&nbsp;&nbsp;&nbsp;&nbsp;while n &gt; 0:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;yield n<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n -= 1
+
+`return` ends a function. `yield` suspends it, keeping every local variable exactly as it was, and the function continues from that line when the next value is requested.
+
+Calling `countdown(3)` runs none of the body. It returns a generator object; the code inside starts running only when something asks for a value &mdash; `next()`, a `for` loop, `list()`, `sum()`.
+
+## Why bother
+
+Memory. A list comprehension over a million items builds a million items. A generator holds a position and the local variables, which is a fixed few hundred bytes whatever the size &mdash; the page prints both.
+
+That is what makes infinite sequences possible:
+
+def naturals():<br>&nbsp;&nbsp;&nbsp;&nbsp;n = 1<br>&nbsp;&nbsp;&nbsp;&nbsp;while True:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;yield n<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n += 1
+
+Nothing is built up front, so there is nothing to run out of. Take what you need with `itertools.islice`.
+
+## Exhausted after one pass
+
+g = countdown(2)<br>list(g)&nbsp;&nbsp;# [2, 1]<br>list(g)&nbsp;&nbsp;# []
+
+A generator walks forward once and does not rewind. If you need the values twice, either store them in a list or call the generator function again to get a fresh one. This catches everyone once, usually as a mysteriously empty second loop.
+
+## Generator expressions
+
+(n * n for n in nums)
+
+Round brackets instead of square. Identical syntax to a comprehension, no list built. Inside a call you can drop the extra brackets: `sum(n * n for n in nums)`.
+
+## Pipelines
+
+Generators compose. Each stage pulls from the one before it, so a chain of three generators still holds one value at a time:
+
+doubled(evens(naturals()))
+
+No stage stores anything, and nothing runs until the end of the chain is asked for a value. That is the pattern behind most stream processing in Python, and it is why generators are worth the concept even when memory is not tight.

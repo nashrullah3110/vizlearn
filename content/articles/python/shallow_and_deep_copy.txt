@@ -1,0 +1,40 @@
+title: Shallow vs Deep Copying: A Practical Guide
+intro: Copying a list gives you a new list. It does not give you new copies of the things inside it, and that distinction is where the bugs live.
+
+## What a shallow copy actually does
+
+original = [[1, 2], [3, 4]]<br>shallow = original[:]<br>shallow[0][0] = 99<br>print(original)&nbsp;&nbsp;# [[99, 2], [3, 4]]
+
+The outer list is new &mdash; `original is shallow` is `False`, and appending to one does not affect the other. But the two inner lists were not copied; both outer lists point at the same two inner lists. Change something one level down and both see it.
+
+`original[0] is shallow[0]` is `True`, which is the whole story in one line.
+
+## The three shallow copies
+
+nums[:]&nbsp;&nbsp;&nbsp;&nbsp;list(nums)&nbsp;&nbsp;&nbsp;&nbsp;nums.copy()
+
+All equivalent. `dict.copy()` and `set.copy()` behave the same way, and `dict(d)` is the dict equivalent of `list(l)`.
+
+## When shallow is enough
+
+If everything inside is immutable &mdash; numbers, strings, tuples of those &mdash; a shallow copy is a complete copy in every way that matters. There is nothing shared that can change, so the distinction disappears.
+
+That covers most everyday copying, which is why `[:]` is so common and why the problem stays hidden until the day your data has a list inside a list.
+
+## When you need deep
+
+import copy<br>deep = copy.deepcopy(original)
+
+`deepcopy` walks the whole structure and rebuilds every mutable object it finds. Nested config dictionaries, lists of records, anything parsed from JSON &mdash; these are the cases.
+
+It is slower, and for large structures noticeably so. It also handles the hard cases correctly: shared references stay shared in the copy, and cycles do not cause infinite recursion. Writing your own recursive copy usually gets both of those wrong.
+
+## The dict version of the trap
+
+config = {"limits": {"max": 10}}<br>shallow = config.copy()<br>shallow["limits"]["max"] = 999
+
+The original now reads 999 too. This is the same rule and it bites harder with configuration, because the nesting is the point of the structure.
+
+## The rule
+
+Ask what is inside. Flat and immutable: use a slice or `.copy()`. Nested and mutable: use `deepcopy`, or restructure so you are not copying a mutable tree at all.

@@ -2436,6 +2436,22 @@ window.VIZLEARN_MODULES = [
   "desc": "Store values under names instead of positions, look them up by key, and handle the key that is not there."
  },
  {
+  "title": "Dictionary Methods",
+  "path": "python/dictionary_methods.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Files and with",
+  "path": "python/files_and_with.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "For Loops and range()",
   "path": "python/for_loops_and_range.html",
   "category": "Python",
@@ -2460,6 +2476,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Define a function, pass it arguments, and see why printing a result is not the same as returning one."
  },
  {
+  "title": "Generators and yield",
+  "path": "python/generators_and_yield.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Hello, Python!",
   "path": "python/hello_python.html",
   "category": "Python",
@@ -2474,6 +2498,14 @@ window.VIZLEARN_MODULES = [
   "topic": "python",
   "icon": "code",
   "desc": "Branch on a condition, and watch indentation decide which lines belong to which branch."
+ },
+ {
+  "title": "Inheritance",
+  "path": "python/inheritance.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
  },
  {
   "title": "List Comprehensions",
@@ -2492,8 +2524,32 @@ window.VIZLEARN_MODULES = [
   "desc": "Build a list, reach into it by index, and see why Python counts positions from zero."
  },
  {
+  "title": "Modules and import",
+  "path": "python/modules_and_import.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Mutability and Aliasing",
+  "path": "python/mutability_and_aliasing.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Nested Conditionals",
   "path": "python/nested_conditionals.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Nested Data Structures",
+  "path": "python/nested_data_structures.html",
   "category": "Python",
   "topic": "python",
   "icon": "code",
@@ -2534,6 +2590,30 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Sets and Set Operations",
   "path": "python/sets_and_set_operations.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Shallow vs Deep Copying",
+  "path": "python/shallow_and_deep_copy.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Slicing with Step",
+  "path": "python/slicing_step_negatives.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "String Methods",
+  "path": "python/string_methods.html",
   "category": "Python",
   "topic": "python",
   "icon": "code",
@@ -2606,6 +2686,22 @@ window.VIZLEARN_MODULES = [
  {
   "title": "for/else and while/else",
   "path": "python/loop_else.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "input() and Output",
+  "path": "python/input_and_output.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "lambda, map and filter",
+  "path": "python/lambda_map_filter.html",
   "category": "Python",
   "topic": "python",
   "icon": "code",

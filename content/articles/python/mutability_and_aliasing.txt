@@ -1,0 +1,42 @@
+title: Mutability and Aliasing: A Practical Guide
+intro: A name in Python is a label attached to an object, not a box holding a value. Once that clicks, a whole family of confusing behaviour becomes obvious.
+
+## Assignment does not copy
+
+a = [1, 2, 3]<br>b = a<br>b.append(4)<br>print(a)&nbsp;&nbsp;# [1, 2, 3, 4]
+
+`b = a` attaches a second label to the same list. There is one list and two names for it, so a change through either name is visible through both. `a is b` is `True`, which is the test for "the same object" as opposed to `==`, which asks about contents.
+
+To get a second list, ask for one: `a[:]`, `list(a)` or `a.copy()`.
+
+## Rebinding versus mutating
+
+This is the distinction that explains the rest:
+
+y = [9, 9]&nbsp;&nbsp;&nbsp;&nbsp;# rebinding: point y at a different object<br>y.append(3)&nbsp;&nbsp;# mutating: change the object y points at
+
+Rebinding affects only that name. Mutating affects every name pointing at that object. Both use `y`, which is why they look similar and behave nothing alike.
+
+## Inside functions
+
+def add_zero(items):<br>&nbsp;&nbsp;&nbsp;&nbsp;items.append(0)&nbsp;&nbsp;# caller sees this
+
+def replace(items):<br>&nbsp;&nbsp;&nbsp;&nbsp;items = [9, 9]&nbsp;&nbsp;&nbsp;&nbsp;# caller sees nothing
+
+The parameter is another name for the caller's object. Mutate it and the caller's list changes. Rebind it and you have only pointed the local name elsewhere.
+
+This is not "pass by reference" or "pass by value" &mdash; it is simply the same naming rule as everywhere else in the language.
+
+## Immutable types dodge the question
+
+Numbers, strings and tuples cannot be mutated, so there is no way for one name to change what another sees. `n += 1` inside a function must rebind, because there is no other option. That is why the whole issue only ever comes up with lists, dicts and sets.
+
+## The multiplication trap
+
+grid = [[0] * 3] * 3<br>grid[0][0] = 1&nbsp;&nbsp;# every row changes
+
+`[0] * 3` builds one row. Multiplying the outer list by 3 does not build three rows &mdash; it stores three references to the same row. Setting one cell appears to set three.
+
+grid = [[0] * 3 for _ in range(3)]
+
+The comprehension evaluates `[0] * 3` afresh each pass, so there really are three lists. This is the same rule as the mutable default argument: one object created once, shared everywhere.
