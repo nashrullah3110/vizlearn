@@ -1,0 +1,45 @@
+title: try and except: A Practical Guide
+intro: A try block runs code that might fail; an except block says what to do when a specific failure happens. The difficulty is not the syntax &mdash; it is being disciplined about which failures you actually catch.
+
+## The shape
+
+try:<br>&nbsp;&nbsp;&nbsp;&nbsp;return int(text)<br>except ValueError:<br>&nbsp;&nbsp;&nbsp;&nbsp;return None
+
+If `int()` raises `ValueError`, control jumps to the handler. If it raises anything else, the handler is skipped and the error keeps travelling up. That selectivity is the point.
+
+## Catch what you expect, nothing more
+
+except:&nbsp;&nbsp;&nbsp;&nbsp;# catches everything
+
+This is almost always a mistake. It catches the error you were thinking of, and also your typos, your `NameError`s, your `AttributeError`s from a refactor you half-finished. The program stops crashing and starts producing wrong answers quietly, which is strictly worse: a crash tells you where to look.
+
+The second program on this page has a deliberate typo inside a bare `except`. It returns 0, cheerfully, and nothing anywhere says a name was misspelled.
+
+Name the exception:
+
+except ValueError:<br>except (KeyError, IndexError):<br>except Exception as e:&nbsp;&nbsp;# broad, but at least not BaseException
+
+## as e, and why you want it
+
+except ValueError as e:<br>&nbsp;&nbsp;&nbsp;&nbsp;print("could not convert:", e)
+
+The exception object carries the detail &mdash; which key was missing, which value would not parse. Discarding it and printing "something went wrong" throws away the only part that would have helped.
+
+## else and finally
+
+- `else` runs when the `try` block raised nothing. It keeps the risky line alone in the `try`, so the handler cannot accidentally catch an error from the follow-up code.
+- `finally` runs either way, raised or not. It is where cleanup goes.
+
+For files and locks, prefer `with`, which does the same job with less ceremony.
+
+## Raising your own
+
+Handling is half of it. When a caller hands you something impossible, say so:
+
+if age &lt; 0:<br>&nbsp;&nbsp;&nbsp;&nbsp;raise ValueError(f"age cannot be negative, got {age}")
+
+Include the offending value in the message. "Invalid input" costs the next person a debugging session; "got -1" ends it immediately.
+
+## Ask forgiveness, not permission
+
+Python leans toward trying the operation and handling the failure, rather than checking first. Checking `if key in d` before `d[key]` does the lookup twice and still has a gap between the check and the use. Try it and catch `KeyError`; it is faster in the common case and correct in all of them.

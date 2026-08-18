@@ -2380,12 +2380,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Paste any text and watch a word cloud size each term by how often it appears, exposing what a document is really about."
  },
  {
+  "title": "*args and **kwargs",
+  "path": "python/args_and_kwargs.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Learn *args and **kwargs | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
   "title": "Booleans and Comparisons",
   "path": "python/booleans_and_comparisons.html",
   "category": "Python",
   "topic": "python",
   "icon": "code",
   "desc": "Compare values, combine them with and, or and not, and see which everyday values Python already treats as false."
+ },
+ {
+  "title": "Classes and Objects",
+  "path": "python/classes_and_objects.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Learn Classes and Objects | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Dictionaries",
@@ -2402,6 +2418,14 @@ window.VIZLEARN_MODULES = [
   "topic": "python",
   "icon": "code",
   "desc": "Loop over a list, count with range(), and accumulate a result across the passes of a for loop."
+ },
+ {
+  "title": "Function Arguments",
+  "path": "python/function_arguments.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Learn Function Arguments | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Functions and Return Values",
@@ -2428,12 +2452,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Branch on a condition, and watch indentation decide which lines belong to which branch."
  },
  {
+  "title": "List Comprehensions",
+  "path": "python/list_comprehensions.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Learn List Comprehensions | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
   "title": "Lists and Indexing",
   "path": "python/lists_and_indexing.html",
   "category": "Python",
   "topic": "python",
   "icon": "code",
   "desc": "Build a list, reach into it by index, and see why Python counts positions from zero."
+ },
+ {
+  "title": "Nested For Loops",
+  "path": "python/nested_for_loops.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Learn Nested For Loops | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Numbers and Operators",
@@ -2452,12 +2492,36 @@ window.VIZLEARN_MODULES = [
   "desc": "Read a traceback from the bottom up, recognise the common Python error types, and turn each message into the fix it points at."
  },
  {
+  "title": "Sets and Set Operations",
+  "path": "python/sets_and_set_operations.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Learn Sets and Set Operations | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
   "title": "Strings and Slicing",
   "path": "python/strings_and_slicing.html",
   "category": "Python",
   "topic": "python",
   "icon": "code",
   "desc": "Strings are sequences. Index into them, slice them with start:stop:step, and use the methods that make text manipulation read like English."
+ },
+ {
+  "title": "Tuples and Unpacking",
+  "path": "python/tuples_and_unpacking.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Learn Tuples and Unpacking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "Variable Scope",
+  "path": "python/variable_scope.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Learn Variable Scope | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Variables and Types",
@@ -2474,6 +2538,22 @@ window.VIZLEARN_MODULES = [
   "topic": "python",
   "icon": "code",
   "desc": "Loop while a condition holds, exit early with break, skip a pass with continue, and see what makes a loop run forever."
+ },
+ {
+  "title": "f-strings and Formatting",
+  "path": "python/f_strings_and_formatting.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Learn f-strings and Formatting | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "try and except",
+  "path": "python/try_and_except.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": "Learn try and except | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  }
 ];
 

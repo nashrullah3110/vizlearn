@@ -8201,6 +8201,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "python/args_and_kwargs.html",
+  "title": "*args and **kwargs",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "Inside `def f(*args)`, what type is `args`?",
+    "o": [
+     "A list",
+     "A tuple",
+     "A dict",
+     "A set"
+    ],
+    "a": 1,
+    "w": "A tuple. **kwargs gives a dict; *args gives a tuple, which is immutable and reflects that the arguments are fixed once passed."
+   },
+   {
+    "t": "`volume(*[2, 3, 4])` is the same as what?",
+    "o": [
+     "volume([2, 3, 4])",
+     "volume(2, 3, 4)",
+     "volume(24)",
+     "A TypeError"
+    ],
+    "a": 1,
+    "w": "At a call site the star spreads the list across the parameters. Without it you would pass one argument - the list itself."
+   },
+   {
+    "t": "Why does the wrapper pattern use both `*args` and `**kwargs`?",
+    "o": [
+     "To be faster",
+     "So it can forward any call without knowing the signature",
+     "Because Python requires both",
+     "To sort the arguments"
+    ],
+    "a": 1,
+    "w": "Together they capture every positional and keyword argument, so the wrapper forwards whatever it was given to a function whose parameters it does not need to know."
+   }
+  ]
+ },
+ {
   "path": "python/booleans_and_comparisons.html",
   "title": "Booleans and Comparisons",
   "cat": "Python",
@@ -8237,6 +8277,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "= assigns, == compares. Python raises a SyntaxError if you use = inside an if, which catches the typo early."
+   }
+  ]
+ },
+ {
+  "path": "python/classes_and_objects.html",
+  "title": "Classes and Objects",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What is `self`?",
+    "o": [
+     "A reserved keyword",
+     "The instance the method was called on",
+     "The class itself",
+     "A copy of the object"
+    ],
+    "a": 1,
+    "w": "It is the instance, passed as the first argument. `a.speak()` is exactly `Dog.speak(a)` - the name self is convention, not syntax."
+   },
+   {
+    "t": "`total = 0` written directly in the class body is:",
+    "o": [
+     "A separate value per instance",
+     "One value shared by every instance",
+     "A syntax error",
+     "A local variable"
+    ],
+    "a": 1,
+    "w": "It is a class attribute - one object shared by all instances. Per-instance data is assigned to self inside __init__."
+   },
+   {
+    "t": "You print an object and get `<__main__.Point object at 0x...>`. The fix?",
+    "o": [
+     "Define __init__",
+     "Define __repr__",
+     "Use str() instead",
+     "Rename the class"
+    ],
+    "a": 1,
+    "w": "__repr__ decides how the object shows up when printed or shown in a list. Two lines, and every debug print afterwards is readable."
    }
   ]
  },
@@ -8317,6 +8397,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 0,
     "w": "Strings are iterable, so a for loop walks them one character at a time."
+   }
+  ]
+ },
+ {
+  "path": "python/function_arguments.html",
+  "title": "Function Arguments",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "When is a default argument value evaluated?",
+    "o": [
+     "On every call",
+     "Once, when the function is defined",
+     "The first time the function is called",
+     "When the module is imported and again per call"
+    ],
+    "a": 1,
+    "w": "Once, at definition time. That single fact is what makes a mutable default accumulate across calls."
+   },
+   {
+    "t": "What is the fix for `def f(items=[])`?",
+    "o": [
+     "Use a tuple instead",
+     "Default to None and build the list inside",
+     "Copy the list at the end",
+     "Nothing - it is fine"
+    ],
+    "a": 1,
+    "w": "None is immutable so nothing accumulates, and the fresh list is created inside the call where it belongs."
+   },
+   {
+    "t": "Which call is a syntax error?",
+    "o": [
+     "f('a', b=2)",
+     "f(a='a', b=2)",
+     "f(b=2, 'a')",
+     "f('a', 2)"
+    ],
+    "a": 2,
+    "w": "Positional arguments must come before keyword ones; otherwise Python cannot work out which parameter the positional value was meant for."
    }
   ]
  },
@@ -8441,6 +8561,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "python/list_comprehensions.html",
+  "title": "List Comprehensions",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "Where does the filtering `if` go in a comprehension?",
+    "o": [
+     "Before the expression",
+     "At the end, after the for clause",
+     "Anywhere",
+     "Comprehensions cannot filter"
+    ],
+    "a": 1,
+    "w": "The trailing `if` filters. An `if/else` that chooses between two values goes in the expression at the front instead - a different job in a different place."
+   },
+   {
+    "t": "What does `(n * n for n in nums)` create?",
+    "o": [
+     "A list",
+     "A tuple",
+     "A generator",
+     "A set"
+    ],
+    "a": 2,
+    "w": "Round brackets make a generator expression, which produces values one at a time instead of building the whole result in memory."
+   },
+   {
+    "t": "In `[n for row in grid for n in row]`, which loop is the outer one?",
+    "o": [
+     "`for n in row`",
+     "`for row in grid`",
+     "They run in parallel",
+     "Neither - it is not a nested loop"
+    ],
+    "a": 1,
+    "w": "The clauses appear in the same order as the nested loops: the first for is the outer one."
+   }
+  ]
+ },
+ {
   "path": "python/lists_and_indexing.html",
   "title": "Lists and Indexing",
   "cat": "Python",
@@ -8477,6 +8637,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "sorted() returns a NEW sorted list and leaves the original alone. nums.sort() is the one that reorders in place - and it returns None, which is where the confusion usually starts."
+   }
+  ]
+ },
+ {
+  "path": "python/nested_for_loops.html",
+  "title": "Nested For Loops",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "Two loops nested over the same 500-item list. How many inner bodies run?",
+    "o": [
+     "500",
+     "1,000",
+     "250,000",
+     "It depends on the data"
+    ],
+    "a": 2,
+    "w": "500 outer passes, each running 500 inner passes: 500 x 500 = 250,000. Nesting multiplies."
+   },
+   {
+    "t": "A `break` in the inner loop of a nested pair does what?",
+    "o": [
+     "Leaves both loops",
+     "Leaves the inner loop only",
+     "Skips to the next inner item",
+     "Raises an error"
+    ],
+    "a": 1,
+    "w": "break leaves the loop containing it. The outer loop carries on with its next pass, which surprises people expecting to be out of both."
+   },
+   {
+    "t": "You double the size of the input to a doubly-nested loop. The work:",
+    "o": [
+     "Doubles",
+     "Quadruples",
+     "Stays the same",
+     "Grows by 2 bodies"
+    ],
+    "a": 1,
+    "w": "n squared: doubling n gives (2n) squared = 4 n squared. That is why nested loops are the first thing to look at when something is slow."
    }
   ]
  },
@@ -8561,6 +8761,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "python/sets_and_set_operations.html",
+  "title": "Sets and Set Operations",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does `{}` create?",
+    "o": [
+     "An empty set",
+     "An empty dictionary",
+     "An empty tuple",
+     "A syntax error"
+    ],
+    "a": 1,
+    "w": "Dictionaries claimed the braces first. An empty set is written `set()`."
+   },
+   {
+    "t": "Why is `x in big_set` so much faster than `x in big_list`?",
+    "o": [
+     "Sets are stored sorted",
+     "A set jumps straight to a slot from the hash; a list must scan",
+     "Sets are held in memory, lists on disk",
+     "It is not faster"
+    ],
+    "a": 1,
+    "w": "The hash tells the set roughly where the item would live, so it checks one place. A list has no such shortcut and compares elements one by one."
+   },
+   {
+    "t": "`{\"a\", \"b\"} ^ {\"b\", \"c\"}` gives what?",
+    "o": [
+     "{'b'}",
+     "{'a', 'c'}",
+     "{'a', 'b', 'c'}",
+     "set()"
+    ],
+    "a": 1,
+    "w": "`^` is symmetric difference: everything in exactly one of the two sets. 'b' is in both, so it is excluded."
+   }
+  ]
+ },
+ {
   "path": "python/strings_and_slicing.html",
   "title": "Strings and Slicing",
   "cat": "Python",
@@ -8597,6 +8837,86 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 0,
     "w": "Strings are objects with methods, and most return a NEW string rather than editing the one in place - \"hello\" is unchanged after the call."
+   }
+  ]
+ },
+ {
+  "path": "python/tuples_and_unpacking.html",
+  "title": "Tuples and Unpacking",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "Why can a tuple be a dictionary key when a list cannot?",
+    "o": [
+     "Tuples are smaller",
+     "Tuples are hashable because they cannot change",
+     "Lists are too slow",
+     "Dictionaries only accept brackets"
+    ],
+    "a": 1,
+    "w": "A key must hash to the same value forever. A list can change after insertion, so the dictionary would look in the wrong place; Python prevents that by making lists unhashable."
+   },
+   {
+    "t": "What is `type((5))`?",
+    "o": [
+     "tuple",
+     "int",
+     "list",
+     "SyntaxError"
+    ],
+    "a": 1,
+    "w": "The comma makes a tuple, not the brackets. `(5)` is just 5 in brackets; `(5,)` is a one-element tuple."
+   },
+   {
+    "t": "In `a, b = b, a`, why is no temporary variable needed?",
+    "o": [
+     "Python swaps in place",
+     "The right side becomes a tuple first, then is unpacked",
+     "Assignment happens left to right",
+     "It only works for numbers"
+    ],
+    "a": 1,
+    "w": "Python evaluates the whole right-hand side into a tuple before assigning anything, so both old values are safely captured."
+   }
+  ]
+ },
+ {
+  "path": "python/variable_scope.html",
+  "title": "Variable Scope",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What order does Python search for a name?",
+    "o": [
+     "Global, Local, Builtin, Enclosing",
+     "Local, Enclosing, Global, Builtin",
+     "Builtin, Global, Enclosing, Local",
+     "Local, Global only"
+    ],
+    "a": 1,
+    "w": "LEGB. The first match wins, which is why shadowing a builtin like `list` quietly changes what that name means for the rest of the scope."
+   },
+   {
+    "t": "Why does reading `x` before `x = 1` inside a function raise?",
+    "o": [
+     "x was never defined anywhere",
+     "The assignment makes x local for the whole function",
+     "print runs before assignment",
+     "It does not raise"
+    ],
+    "a": 1,
+    "w": "Python decides at compile time that an assigned name is local for the entire function, so the earlier read refers to a local that has no value yet."
+   },
+   {
+    "t": "`items.append(1)` inside a function affects the outer list. Why no `global`?",
+    "o": [
+     "append is special",
+     "It mutates the object rather than rebinding the name",
+     "Lists are always global",
+     "It does not actually affect it"
+    ],
+    "a": 1,
+    "w": "Only assignment creates a local name. Mutating the object the name already points at needs no declaration."
    }
   ]
  },
@@ -8677,6 +8997,86 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 0,
     "w": "It is tested before each pass, so a while loop whose condition starts false never runs its body at all."
+   }
+  ]
+ },
+ {
+  "path": "python/f_strings_and_formatting.html",
+  "title": "f-strings and Formatting",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does `f\"{2/3:.2f}\"` produce?",
+    "o": [
+     "'0.67'",
+     "'0.666666'",
+     "0.67 as a float",
+     "A syntax error"
+    ],
+    "a": 0,
+    "w": "It produces the string '0.67'. Formatting affects the text produced, not the underlying value, which still has all its digits."
+   },
+   {
+    "t": "What is `{price:>10.2f}` doing?",
+    "o": [
+     "Rounding price to 10 decimals",
+     "Right-aligning in 10 columns with 2 decimals",
+     "Multiplying by 10",
+     "Left-aligning in 2 columns"
+    ],
+    "a": 1,
+    "w": "`>` right-aligns, 10 is the field width, .2f is two decimal places. Combining them is how columns line up."
+   },
+   {
+    "t": "You write `\"{name} scored\"` with no f prefix. What prints?",
+    "o": [
+     "The value of name",
+     "The literal text {name} scored",
+     "An error",
+     "An empty string"
+    ],
+    "a": 1,
+    "w": "Without the f prefix the braces are ordinary characters. This is a quiet bug: nothing raises, the output is just wrong."
+   }
+  ]
+ },
+ {
+  "path": "python/try_and_except.html",
+  "title": "try and except",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "Why is a bare `except:` discouraged?",
+    "o": [
+     "It is slower",
+     "It catches your own bugs too, hiding them",
+     "It only works in functions",
+     "It cannot be combined with finally"
+    ],
+    "a": 1,
+    "w": "It swallows NameError, AttributeError and everything else, so a typo becomes a wrong answer rather than a crash that tells you where to look."
+   },
+   {
+    "t": "When does an `else` block on a try run?",
+    "o": [
+     "Always",
+     "Only when an exception was raised",
+     "Only when no exception was raised",
+     "Never - try has no else"
+    ],
+    "a": 2,
+    "w": "else runs when the try block completed without raising. It keeps follow-up code out of the try, so the handler cannot catch errors from it by accident."
+   },
+   {
+    "t": "What does `as e` give you?",
+    "o": [
+     "A copy of the try block",
+     "The exception object, with its detail",
+     "The line number only",
+     "A retry counter"
+    ],
+    "a": 1,
+    "w": "The exception object carries the specifics - which key, which value - which is the part worth logging."
    }
   ]
  }

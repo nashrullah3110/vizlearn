@@ -2132,3 +2132,11 @@ LABS = {
 from interview import CHECKS as _INTERVIEW_CHECKS  # noqa: E402
 
 LABS.update(_INTERVIEW_CHECKS)
+
+# The generated Python modules author their questions beside the programs they
+# are about (tools/python_topics.py), for the same reason the interview track
+# does: a question written against the exact code on the page cannot drift
+# from it.
+from python_topics import CHECKS as _PYTHON_CHECKS  # noqa: E402
+
+LABS.update(_PYTHON_CHECKS)

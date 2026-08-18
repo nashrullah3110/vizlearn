@@ -1,0 +1,42 @@
+title: Function Arguments: A Practical Guide
+intro: Python matches arguments to parameters two ways &mdash; by position and by name &mdash; and gives parameters default values. One of those defaults has a trap in it that every Python programmer meets exactly once.
+
+## Positional and keyword
+
+def greet(name, greeting="Hello"):
+
+`greet("ana")` matches by position: the first argument becomes `name`. `greet("ana", greeting="Hi")` names the second explicitly. Both reach the same function; the difference is what the call site tells a reader.
+
+Keywords earn their place when the value alone is meaningless. `send(msg, True)` tells you nothing; `send(msg, urgent=True)` tells you everything. A boolean argument is almost always worth naming.
+
+One rule: in a call, positional arguments come first. `f(greeting="Hi", "ana")` is a syntax error, because Python cannot tell where the positional one was meant to go.
+
+## Defaults
+
+A parameter with a default becomes optional:
+
+def greet(name, greeting="Hello", excited=False):
+
+Callers supply what they care about and ignore the rest. Defaults must come after all non-default parameters, for the same reason: otherwise a positional call would be ambiguous.
+
+## The mutable default trap
+
+This looks reasonable and is not:
+
+def add_item(item, basket=[]):<br>&nbsp;&nbsp;&nbsp;&nbsp;basket.append(item)<br>&nbsp;&nbsp;&nbsp;&nbsp;return basket
+
+Call it three times with no basket and you get one item, then two, then three &mdash; all in the same list. The reason is a single rule with a large consequence: <strong>default values are evaluated once, when the `def` runs</strong>, not on each call. That one list is created at definition time and reused forever, so every mutation accumulates.
+
+The second program on this page prints the id of the default object before and after a call, to show it really is the same object rather than a new one that happens to have old contents.
+
+The fix is idiomatic and worth memorising:
+
+def add_item(item, basket=None):<br>&nbsp;&nbsp;&nbsp;&nbsp;if basket is None:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;basket = []
+
+`None` is immutable, so there is nothing to accumulate, and the fresh list is built inside the call where it belongs.
+
+Immutable defaults &mdash; numbers, strings, `True`, `None`, tuples &mdash; are all safe. The rule is simply: never default a parameter to a list, dict or set.
+
+## Why this design
+
+It would be possible to re-evaluate defaults on every call, and some languages do. Python evaluates once because a default is just an expression bound at definition time, like any other value in the enclosing scope. Once you know that, the behaviour stops being surprising &mdash; but it is worth knowing before it costs you an afternoon.
