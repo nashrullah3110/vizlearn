@@ -2385,7 +2385,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn *args and **kwargs | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Booleans and Comparisons",
@@ -2401,7 +2401,31 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Classes and Objects | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
+ },
+ {
+  "title": "Conditional Comprehensions",
+  "path": "python/conditional_comprehensions.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Conditional Expressions",
+  "path": "python/conditional_expressions.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Dict and Set Comprehensions",
+  "path": "python/dict_and_set_comprehensions.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
  },
  {
   "title": "Dictionaries",
@@ -2425,7 +2449,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Function Arguments | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Functions and Return Values",
@@ -2457,7 +2481,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn List Comprehensions | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Lists and Indexing",
@@ -2468,12 +2492,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Build a list, reach into it by index, and see why Python counts positions from zero."
  },
  {
+  "title": "Nested Conditionals",
+  "path": "python/nested_conditionals.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Nested For Loops",
   "path": "python/nested_for_loops.html",
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Nested For Loops | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
+ },
+ {
+  "title": "None and Truthiness",
+  "path": "python/none_and_truthiness.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
  },
  {
   "title": "Numbers and Operators",
@@ -2497,7 +2537,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Sets and Set Operations | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Strings and Slicing",
@@ -2513,7 +2553,15 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Tuples and Unpacking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
+ },
+ {
+  "title": "Type Conversion",
+  "path": "python/type_conversion.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
  },
  {
   "title": "Variable Scope",
@@ -2521,7 +2569,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Variable Scope | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Variables and Types",
@@ -2540,12 +2588,52 @@ window.VIZLEARN_MODULES = [
   "desc": "Loop while a condition holds, exit early with break, skip a pass with continue, and see what makes a loop run forever."
  },
  {
+  "title": "enumerate()",
+  "path": "python/enumerate_function.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "f-strings and Formatting",
   "path": "python/f_strings_and_formatting.html",
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn f-strings and Formatting | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
+ },
+ {
+  "title": "for/else and while/else",
+  "path": "python/loop_else.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "match and case",
+  "path": "python/match_and_case.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "range() with step",
+  "path": "python/range_step.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "sorted() with key=",
+  "path": "python/sorted_with_key.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
  },
  {
   "title": "try and except",
@@ -2553,7 +2641,15 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn try and except | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
+ },
+ {
+  "title": "zip()",
+  "path": "python/zip_function.html",
+  "category": "Python",
+  "topic": "python",
+  "icon": "code",
+  "desc": ""
  }
 ];
 

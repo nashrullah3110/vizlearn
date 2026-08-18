@@ -1,0 +1,46 @@
+title: zip(): A Practical Guide
+intro: zip walks several sequences in step, yielding one tuple per position. It is the clean answer to "I have two lists that line up" &mdash; with one behaviour worth knowing before it bites.
+
+## The basic shape
+
+for name, score in zip(names, scores):
+
+Each pass gives you the next item from each list. The alternative is `for i in range(len(names))` followed by two lookups, which works and puts an index between you and the values.
+
+It takes any number of iterables:
+
+for name, score, grade in zip(names, scores, grades):
+
+## Building a dict
+
+dict(zip(keys, values))
+
+This is the standard idiom for turning two parallel lists into a mapping, and it is worth recognising on sight because it appears everywhere.
+
+## It truncates, and it does not tell you
+
+This is the part that costs people an afternoon:
+
+zip(["ana", "bo", "cy", "dee"], [91, 78])
+
+gives two pairs. `cy` and `dee` are gone. No error, no warning &mdash; `zip` stops when the shortest input runs out, by design.
+
+When the lists come from the same source that is usually harmless. When one is data and the other is a lookup that quietly returned fewer rows, you get a silently shortened result, which is the worst kind of wrong.
+
+Two ways to be explicit:
+
+zip(a, b, strict=True)&nbsp;&nbsp;# raises ValueError on mismatch (3.10+)<br>zip_longest(a, b, fillvalue=0)&nbsp;&nbsp;# pads instead, from itertools
+
+If the lists are supposed to be the same length, `strict=True` turns a silent bug into an immediate error. That is nearly always the better trade.
+
+## Unzipping
+
+The same function reverses itself with a star:
+
+who, what = zip(*pairs)
+
+`zip(*pairs)` spreads the list of pairs into arguments, so `zip` receives each pair as a separate iterable and re-pairs them by position. The results come back as tuples, not lists &mdash; wrap in `list()` if that matters.
+
+## It is lazy
+
+`zip` returns an iterator, not a list. It produces pairs as they are asked for, which is what lets it work on files and generators. It also means you can only walk it once: consume it in a loop and it is exhausted. `list(zip(...))` when you need to keep the result.

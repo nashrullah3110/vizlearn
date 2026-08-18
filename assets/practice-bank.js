@@ -8321,6 +8321,126 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "python/conditional_comprehensions.html",
+  "title": "Conditional Comprehensions",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "Which position takes an `else`?",
+    "o": [
+     "The trailing if",
+     "The if/else in the expression at the front",
+     "Both",
+     "Neither"
+    ],
+    "a": 1,
+    "w": "The expression must produce a value for every item, so its else is mandatory. The trailing if is a filter and takes none."
+   },
+   {
+    "t": "`[x for x in xs if c]` and `[a if c else b for x in xs]` differ how?",
+    "o": [
+     "No difference",
+     "The first can drop items; the second always returns one value per item",
+     "The second is faster",
+     "The first requires a list"
+    ],
+    "a": 1,
+    "w": "Filtering changes how many items come out. Choosing changes what each item becomes, and the count is unchanged."
+   },
+   {
+    "t": "In a comprehension with both, which runs first?",
+    "o": [
+     "The expression",
+     "The filter",
+     "They run in parallel",
+     "Undefined"
+    ],
+    "a": 1,
+    "w": "The filter runs first, so the expression only ever sees items that passed it - which is what makes filtering out None before comparing safe."
+   }
+  ]
+ },
+ {
+  "path": "python/conditional_expressions.html",
+  "title": "Conditional Expressions",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does `x = 5 if False` do?",
+    "o": [
+     "Sets x to None",
+     "Sets x to False",
+     "Raises SyntaxError",
+     "Leaves x unchanged"
+    ],
+    "a": 2,
+    "w": "An expression must produce a value on every path, so the else is mandatory. There is no one-armed conditional expression."
+   },
+   {
+    "t": "`value or 'default'` differs from a conditional expression how?",
+    "o": [
+     "It is faster",
+     "It also replaces 0, '' and other falsy values",
+     "It only works on strings",
+     "There is no difference"
+    ],
+    "a": 1,
+    "w": "`or` tests truthiness, not presence. If 0 or an empty string is a real value in your data, `or` throws it away silently."
+   },
+   {
+    "t": "Why can a conditional expression go inside an f-string?",
+    "o": [
+     "f-strings allow statements",
+     "Because it is an expression, and f-strings interpolate expressions",
+     "It cannot",
+     "Only if bracketed"
+    ],
+    "a": 1,
+    "w": "f-strings evaluate expressions in their braces. A four-line if statement is not an expression and cannot appear there."
+   }
+  ]
+ },
+ {
+  "path": "python/dict_and_set_comprehensions.html",
+  "title": "Dict and Set Comprehensions",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does `{n for n in [1, 2, 2]}` build?",
+    "o": [
+     "A list",
+     "A dict",
+     "A set with two items",
+     "A set with three items"
+    ],
+    "a": 2,
+    "w": "Braces with no colon build a set, and a set deduplicates: {1, 2}."
+   },
+   {
+    "t": "`{k: v for k, v in [('a', 1), ('a', 2)]}` gives what?",
+    "o": [
+     "{'a': 1}",
+     "{'a': 2}",
+     "An error",
+     "{'a': [1, 2]}"
+    ],
+    "a": 1,
+    "w": "The later duplicate key silently overwrites the earlier value. Nothing warns you, which matters when the input might have duplicates."
+   },
+   {
+    "t": "How do you write an empty set comprehension result's type literal?",
+    "o": [
+     "{}",
+     "set()",
+     "{,}",
+     "[]"
+    ],
+    "a": 1,
+    "w": "{} is an empty dict. There is no empty-set literal, so set() is the only way to write one."
+   }
+  ]
+ },
+ {
   "path": "python/dictionaries.html",
   "title": "Dictionaries",
   "cat": "Python",
@@ -8641,6 +8761,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "python/nested_conditionals.html",
+  "title": "Nested Conditionals",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "`if a:` containing only `if b:` with no else is the same as what?",
+    "o": [
+     "if a or b:",
+     "if a and b:",
+     "if not a:",
+     "Nothing - it cannot be flattened"
+    ],
+    "a": 1,
+    "w": "Both conditions must hold and nothing else happens, so `and` says it in one line at one indentation level."
+   },
+   {
+    "t": "What is a guard clause?",
+    "o": [
+     "A try/except around the function",
+     "An early return that handles one case and leaves",
+     "A nested if",
+     "A type check"
+    ],
+    "a": 1,
+    "w": "It handles a refusal immediately and returns, so the remainder of the function is not indented inside an else."
+   },
+   {
+    "t": "How does an `elif` chain differ from nested ifs?",
+    "o": [
+     "It is faster",
+     "It is one decision at one indentation level, not a tree",
+     "It cannot have an else",
+     "It only works on numbers"
+    ],
+    "a": 1,
+    "w": "elif expresses several mutually exclusive outcomes of a single decision. Nesting expresses decisions that live inside other decisions."
+   }
+  ]
+ },
+ {
   "path": "python/nested_for_loops.html",
   "title": "Nested For Loops",
   "cat": "Python",
@@ -8677,6 +8837,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "n squared: doubling n gives (2n) squared = 4 n squared. That is why nested loops are the first thing to look at when something is slow."
+   }
+  ]
+ },
+ {
+  "path": "python/none_and_truthiness.html",
+  "title": "None and Truthiness",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "Which of these is truthy?",
+    "o": [
+     "0",
+     "''",
+     "'0'",
+     "[]"
+    ],
+    "a": 2,
+    "w": "'0' is a non-empty string, so it is True. Only the empty string is falsy - which bites when reading text input."
+   },
+   {
+    "t": "A function returns an index or None. Why is `if not result` a bug?",
+    "o": [
+     "It is slower",
+     "Index 0 is falsy, so a real result is treated as missing",
+     "not cannot be used on integers",
+     "It raises on None"
+    ],
+    "a": 1,
+    "w": "0 and None both take the false branch, so finding something at the first position reports as not found. Nothing raises; the answer is just wrong."
+   },
+   {
+    "t": "Why `is None` rather than `== None`?",
+    "o": [
+     "They are identical",
+     "There is one None object, so identity is exact and cannot be overridden",
+     "`==` is deprecated",
+     "`is` works on more types"
+    ],
+    "a": 1,
+    "w": "None is a singleton, so identity is the precise test. A class can define __eq__ to make == None true for something that is not None."
    }
   ]
  },
@@ -8881,6 +9081,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "python/type_conversion.html",
+  "title": "Type Conversion",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does `int(\"3.9\")` do?",
+    "o": [
+     "Returns 3",
+     "Returns 4",
+     "Raises ValueError",
+     "Returns 3.9"
+    ],
+    "a": 2,
+    "w": "From a string, int refuses anything that is not a whole number. From a float, int(3.9) truncates to 3 - the two behave differently on purpose."
+   },
+   {
+    "t": "`round(2.5)` returns what?",
+    "o": [
+     "3",
+     "2",
+     "2.5",
+     "An error"
+    ],
+    "a": 1,
+    "w": "Python rounds a tie to the nearest even number, which avoids biasing a long run of values upward. round(3.5) is 4."
+   },
+   {
+    "t": "`bool(\"0\")` is:",
+    "o": [
+     "False",
+     "True",
+     "An error",
+     "0"
+    ],
+    "a": 1,
+    "w": "Only an empty string is falsy. \"0\" has a character in it, so it is True - a classic bug when reading text input."
+   }
+  ]
+ },
+ {
   "path": "python/variable_scope.html",
   "title": "Variable Scope",
   "cat": "Python",
@@ -9001,6 +9241,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "python/enumerate_function.html",
+  "title": "enumerate()",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does `enumerate(['a', 'b'])` yield?",
+    "o": [
+     "'a', 'b'",
+     "0, 1",
+     "(0, 'a') then (1, 'b')",
+     "A dictionary"
+    ],
+    "a": 2,
+    "w": "It yields tuples of index and item. The `for i, x` form unpacks them, which is why the tuples are usually invisible."
+   },
+   {
+    "t": "With `enumerate(names, start=1)`, which item does n=1 refer to?",
+    "o": [
+     "names[1]",
+     "names[0]",
+     "The last item",
+     "It raises"
+    ],
+    "a": 1,
+    "w": "start= changes the label only. The first item is still index 0, so using n to index back into the list is off by one."
+   },
+   {
+    "t": "Why prefer enumerate over `for i in range(len(items))`?",
+    "o": [
+     "It is the only way to get an index",
+     "It gives the item directly instead of indexing back in",
+     "It sorts the list",
+     "range does not work on lists"
+    ],
+    "a": 1,
+    "w": "You get both the position and the value without a second lookup, and without an index you could get wrong."
+   }
+  ]
+ },
+ {
   "path": "python/f_strings_and_formatting.html",
   "title": "f-strings and Formatting",
   "cat": "Python",
@@ -9041,6 +9321,166 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "python/loop_else.html",
+  "title": "for/else and while/else",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "When does a for/else's else block run?",
+    "o": [
+     "When the loop body never ran",
+     "When the loop finished without a break",
+     "Always",
+     "Only when an exception occurred"
+    ],
+    "a": 1,
+    "w": "It means nobreak. A loop over an empty sequence never breaks, so the else still runs - which is why the 'did not run' reading is wrong."
+   },
+   {
+    "t": "What does for/else replace in ordinary code?",
+    "o": [
+     "The break statement",
+     "A found = False flag checked after the loop",
+     "The range function",
+     "try/except"
+    ],
+    "a": 1,
+    "w": "The flag exists only to carry 'we never found it' past the loop. The else block is that branch, without the extra variable."
+   },
+   {
+    "t": "`for x in []: pass` followed by `else: print('hi')` prints what?",
+    "o": [
+     "Nothing",
+     "hi",
+     "An error",
+     "Depends on Python version"
+    ],
+    "a": 1,
+    "w": "Zero iterations means zero breaks, so the loop completed normally and the else runs."
+   }
+  ]
+ },
+ {
+  "path": "python/match_and_case.html",
+  "title": "match and case",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does a bare `case status:` do?",
+    "o": [
+     "Compares against the variable status",
+     "Matches anything and binds the name status",
+     "Raises an error",
+     "Matches only strings"
+    ],
+    "a": 1,
+    "w": "A bare name is a capture pattern - it matches everything. This is the classic match bug, because the first such case swallows every value and nothing complains."
+   },
+   {
+    "t": "What happens when no case matches and there is no `case _`?",
+    "o": [
+     "An error is raised",
+     "Nothing happens - it falls through",
+     "The first case runs",
+     "The program exits"
+    ],
+    "a": 1,
+    "w": "match is not exhaustive by default. With no matching case and no wildcard, the block simply does nothing."
+   },
+   {
+    "t": "`case {\"type\": \"click\", \"x\": x}` does what beyond matching?",
+    "o": [
+     "Nothing else",
+     "Binds x to the value found at that key",
+     "Deletes the key",
+     "Converts the dict to a list"
+    ],
+    "a": 1,
+    "w": "Patterns destructure as they match, which is the main reason match exists - it replaces a check followed by a separate lookup."
+   }
+  ]
+ },
+ {
+  "path": "python/range_step.html",
+  "title": "range() with step",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does `list(range(5, 0))` give?",
+    "o": [
+     "[5, 4, 3, 2, 1]",
+     "[]",
+     "[0, 1, 2, 3, 4]",
+     "An error"
+    ],
+    "a": 1,
+    "w": "With no step it counts up, and 5 is already past the stop of 0, so the range is empty. Counting down needs an explicit negative step."
+   },
+   {
+    "t": "To walk indices of a 4-item list backwards including 0, you need:",
+    "o": [
+     "range(3, 0, -1)",
+     "range(3, -1, -1)",
+     "range(4, 0, -1)",
+     "range(0, 4, -1)"
+    ],
+    "a": 1,
+    "w": "The stop is excluded, so stopping at -1 is what makes 0 the last value produced."
+   },
+   {
+    "t": "Why is `999_999 in range(1_000_000)` fast?",
+    "o": [
+     "The range is cached",
+     "It computes the answer arithmetically rather than scanning",
+     "Ranges are sorted",
+     "It is not fast"
+    ],
+    "a": 1,
+    "w": "A range knows its start, stop and step, so membership is a calculation. It is the one sequence where `in` does not scan."
+   }
+  ]
+ },
+ {
+  "path": "python/sorted_with_key.html",
+  "title": "sorted() with key=",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "What does `nums = nums.sort()` leave in nums?",
+    "o": [
+     "The sorted list",
+     "None",
+     "The original list",
+     "An error"
+    ],
+    "a": 1,
+    "w": ".sort() sorts in place and returns None, so the assignment replaces the list with None. Use sorted() if you want a value back."
+   },
+   {
+    "t": "How do you sort by count descending, then name ascending?",
+    "o": [
+     "reverse=True",
+     "key=lambda x: (-x.count, x.name)",
+     "Two separate sorts with reverse",
+     "It is not possible"
+    ],
+    "a": 1,
+    "w": "reverse=True flips every field. Negating just the numeric part of a tuple key reverses that field alone."
+   },
+   {
+    "t": "What does a stable sort guarantee?",
+    "o": [
+     "It never crashes",
+     "Items comparing equal keep their original order",
+     "It is always fastest",
+     "The list is copied"
+    ],
+    "a": 1,
+    "w": "Stability is what makes sorting in several passes work: a later sort does not scramble the order established by an earlier one."
+   }
+  ]
+ },
+ {
   "path": "python/try_and_except.html",
   "title": "try and except",
   "cat": "Python",
@@ -9077,6 +9517,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "The exception object carries the specifics - which key, which value - which is the part worth logging."
+   }
+  ]
+ },
+ {
+  "path": "python/zip_function.html",
+  "title": "zip()",
+  "cat": "Python",
+  "q": [
+   {
+    "t": "`zip(['a','b','c'], [1,2])` produces how many pairs?",
+    "o": [
+     "3",
+     "2",
+     "An error",
+     "5"
+    ],
+    "a": 1,
+    "w": "zip stops at the shortest input, silently. 'c' is dropped with no warning at all, which is why strict=True exists."
+   },
+   {
+    "t": "How do you make a length mismatch an error?",
+    "o": [
+     "zip_longest",
+     "zip(a, b, strict=True)",
+     "len(a) == len(b)",
+     "You cannot"
+    ],
+    "a": 1,
+    "w": "strict=True raises ValueError when the inputs differ in length (Python 3.10+), turning a silent truncation into a visible bug."
+   },
+   {
+    "t": "What does `zip(*pairs)` do?",
+    "o": [
+     "Sorts the pairs",
+     "Unzips them back into separate sequences",
+     "Removes duplicates",
+     "Nothing useful"
+    ],
+    "a": 1,
+    "w": "The star spreads the pairs into separate arguments, so zip re-groups them by position - the inverse of zipping."
    }
   ]
  }

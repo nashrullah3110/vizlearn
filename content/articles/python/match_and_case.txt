@@ -1,0 +1,44 @@
+title: match and case: A Practical Guide
+intro: match tests a value against patterns rather than conditions. For plain literals it is a tidier if-chain; for structured data it is something an if-chain cannot do at all, because the pattern takes the value apart while matching it.
+
+## The tidy version of an if-chain
+
+match status:<br>&nbsp;&nbsp;&nbsp;&nbsp;case 200:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return "ok"<br>&nbsp;&nbsp;&nbsp;&nbsp;case 500 | 502 | 503:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return "server error"<br>&nbsp;&nbsp;&nbsp;&nbsp;case _:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return "unhandled"
+
+`|` groups alternatives, `_` is the default. The first matching case wins and the rest are skipped &mdash; there is no fall-through and no `break`.
+
+If this were all `match` did it would be barely worth the keyword, and the page prints an if-chain beside it that agrees on every input.
+
+## What it actually adds
+
+case {"type": "click", "x": x, "y": y}:
+
+This matches a dictionary that has a `type` of `"click"`, and in the same breath binds `x` and `y` to the values it found. One line replaces a type check, two key checks and two lookups &mdash; and it cannot go out of step with itself the way that sequence can.
+
+The same applies to sequences:
+
+case [first, *rest]:
+
+matches any list and splits it into head and tail as it goes.
+
+## Guards
+
+A pattern can carry a condition:
+
+case int() if n &lt; 0:
+
+The pattern narrows the shape, the guard narrows the value. Together they express "an integer, and a negative one" in the place where you are already looking.
+
+## The trap: a bare name matches everything
+
+case status:
+
+This does not compare against a variable called `status`. A bare name is a capture pattern: it matches anything and binds the name. It is the single most common `match` mistake, and it fails quietly &mdash; the first case swallows every value.
+
+To compare against a constant, use a dotted name (`case Status.OK:`), a literal, or a guard.
+
+## When to use it
+
+For two or three literal comparisons, `if` is shorter and everyone reads it. Reach for `match` when you are inspecting the *shape* of data &mdash; parsed JSON, events, commands, ASTs &mdash; where the alternative is a stack of `isinstance` checks and key lookups. That is the job it was added for.
+
+`match` needs Python 3.10 or newer.
