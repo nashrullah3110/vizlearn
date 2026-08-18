@@ -64,4 +64,5 @@ shortest first.
 Two pages have no content file: `computer_vision/cnn.html` and
 `natural_language_processing/rnn.html`. Their prose sits directly in the page
 rather than in the standard article card, so `build_articles.py` cannot
-address them yet.
+address them. Edit those two in the HTML itself, inside the
+`<main data-vz-prose>` block and outside every `VIZLEARN:*` marker.
