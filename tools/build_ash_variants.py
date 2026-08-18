@@ -432,7 +432,7 @@ def build(src, v, sections, closing):
         out = out[:at] + chunk + "\n    " + out[at:]
 
     body = out.rfind("</body>")
-    out = out[:body] + RADAR_JS + switcher(v) + "\n" + out[body:]
+    out = out[:body] + RADAR_JS + "\n" + out[body:]
     return out.replace("<title>", "<title>Phosphor %s &middot; " % v["name"], 1)
 
 
@@ -453,9 +453,11 @@ def main():
 
     n = counts()
     tracks = track_data()
-    sections = (how_it_works() + tracks_section(tracks, n["modules"], n["tracks"])
-                + start_here(tracks) + faq())
-    closing = cta(n["modules"])
+    # Above the module rails: one short, immediately clickable section.
+    sections = start_here(tracks)
+    # Below them: the chart, then the explanatory prose, then the close.
+    closing = (tracks_section(tracks, n["modules"], n["tracks"])
+               + how_it_works() + faq() + cta(n["modules"]))
 
     for v in VARIANTS:
         rel = "theme-ash-%s.html" % v["slug"]

@@ -496,6 +496,109 @@
         <div class="math-block">
             $$\mathbf{h}^{(l)}_t = \tanh\left(\mathbf{W}_{forward}^{(l)} \mathbf{input}_t + \mathbf{b}^{(l)} + \mathbf{W}_{recurrent}^{(l)} \mathbf{h}^{(l)}_{t-1}\right)$$
         </div>
+        <p>
+            Read that equation as a sentence: <em>the new memory is a squashed sum of what just arrived and what I already remembered.</em> The $\tanh$ keeps the hidden state bounded between $-1$ and $1$, which prevents the values from growing without limit as they are fed back in step after step.
+        </p>
+
+        <h3>6. Counting the Weights</h3>
+        <p>
+            An RNN cell has three sets of learnable parameters, and every one of them is <strong>shared across all time steps</strong>. That sharing is what makes a recurrent network able to handle sequences of any length with a fixed number of weights.
+        </p>
+        <ul style="color: var(--text-muted);">
+            <li>$\mathbf{W}_{forward}$ &mdash; shape $(h \times d)$, mapping the input at this step into hidden space.</li>
+            <li>$\mathbf{W}_{recurrent}$ &mdash; shape $(h \times h)$, mapping the previous hidden state into the new one.</li>
+            <li>$\mathbf{b}$ &mdash; one bias per hidden unit, shape $(h)$.</li>
+        </ul>
+        <div class="math-block">
+            $$ \text{params} = h \times d + h \times h + h = h(d + h + 1) $$
+        </div>
+        <p>
+            With an input size $d = 50$ and a hidden size $h = 100$, that is $100 \times (50 + 100 + 1) = 15{,}100$ weights &mdash; whether the sequence is 6 steps long or 600. The recurrent matrix dominates as the hidden size grows, since it scales with $h^2$ while the input matrix scales only with $h \times d$.
+        </p>
+        <p>
+            This is the direct analogue of parameter sharing in a convolutional network. There, one filter is reused at every <em>position</em>; here, one weight matrix is reused at every <em>time step</em>. Both assume that what is worth computing at one place in the data is worth computing everywhere in it.
+        </p>
+
+        <h3>7. Backpropagation Through Time</h3>
+        <p>
+            Training works by unrolling the network exactly as the visualisation above shows it, treating the result as a very deep feedforward network, and running ordinary backpropagation. The gradient for the shared weights is the <em>sum</em> of their contributions at every time step &mdash; which is why one weight matrix can be trained by many steps at once.
+        </p>
+        <p>
+            The complication is depth. A 100-step sequence unrolls into a 100-layer network, and the gradient must travel back through all of it. Because each step multiplies by the same recurrent matrix, that repeated multiplication is where recurrent networks get their notorious training problems.
+        </p>
+        <p>
+            Two practical techniques address the cost rather than the mathematics. <strong>Truncated backpropagation through time</strong> unrolls only the most recent $k$ steps, capping memory use at the price of never learning dependencies longer than $k$. <strong>Gradient clipping</strong> rescales any gradient whose norm exceeds a threshold, which is a crude fix and an extremely effective one.
+        </p>
+
+        <h3>8. Vanishing and Exploding Gradients</h3>
+        <p>
+            Propagating a gradient back through $n$ time steps involves multiplying by the recurrent weight matrix roughly $n$ times. The outcome depends on the magnitude of that matrix, and neither case is benign:
+        </p>
+        <ul style="color: var(--text-muted);">
+            <li><strong>Vanishing:</strong> if the relevant factors are smaller than 1, repeated multiplication drives the gradient towards zero. Early time steps receive almost no learning signal, so the network cannot associate a cause with an effect that arrives much later.</li>
+            <li><strong>Exploding:</strong> if they are larger than 1, the gradient grows exponentially, the weight update overshoots wildly, and the loss becomes <code>NaN</code> within a few batches.</li>
+        </ul>
+        <p>
+            Exploding gradients are loud and easy to fix &mdash; clip them. Vanishing gradients are the harder problem, because nothing crashes. Training appears to proceed, the loss falls a little, and the model simply never learns anything that depends on information from more than ten or twenty steps ago.
+        </p>
+        <p>
+            The classic demonstration is a sentence whose subject and verb are far apart: <em>"The keys that I left on the table in the hallway upstairs <strong>are</strong> missing."</em> Choosing "are" over "is" requires remembering that the subject was plural, eleven words earlier. A plain RNN reliably fails at this, and the failure is a property of the architecture rather than of insufficient training.
+        </p>
+
+        <h3>9. LSTM and GRU: Adding a Gate</h3>
+        <p>
+            <strong>Long Short-Term Memory</strong> cells solve the vanishing-gradient problem by adding a separate <em>cell state</em> that information can travel along almost unchanged, plus three learned gates that decide what happens to it:
+        </p>
+        <ul style="color: var(--text-muted);">
+            <li><strong>Forget gate:</strong> how much of the existing cell state to discard.</li>
+            <li><strong>Input gate:</strong> how much of the newly computed candidate to write in.</li>
+            <li><strong>Output gate:</strong> how much of the cell state to expose as this step's hidden state.</li>
+        </ul>
+        <p>
+            The important structural difference is that the cell state is updated by <em>addition</em> rather than by repeated matrix multiplication. Addition does not shrink a gradient, so a signal can survive hundreds of steps. This is the same trick as a residual connection in a deep convolutional network, arrived at independently and years earlier.
+        </p>
+        <p>
+            A <strong>GRU</strong> merges the forget and input gates into a single update gate and drops the separate cell state, giving roughly three-quarters of the parameters and comparable accuracy on most tasks. The practical advice is unglamorous: try a GRU first because it trains faster, and switch to an LSTM if the task genuinely needs longer memory.
+        </p>
+
+        <h3>10. Bidirectional and Stacked Variants</h3>
+        <p>
+            A plain RNN reads left to right, so its state at step $t$ knows nothing about what comes later. For many tasks that is an artificial handicap &mdash; when classifying the sentiment of a complete review, the end of the sentence is available and useful.
+        </p>
+        <p>
+            A <strong>bidirectional RNN</strong> runs two independent recurrences, one forward and one backward, and concatenates their hidden states. Every position then has context from both directions, at twice the parameters and twice the compute. It is the right default for classification and tagging, and it is <em>impossible</em> for genuine real-time prediction, since the backward pass needs the whole sequence up front.
+        </p>
+        <p>
+            Stacking, which you can switch on with the "Hidden Layers" control above, is the other axis. Two or three layers usually help; beyond that, returns diminish quickly and training difficulty rises. Depth in a recurrent network is far less productive than depth in a convolutional one, because the unrolled network is already extremely deep in the time direction.
+        </p>
+
+        <h3>11. What Replaced Them, and What Did Not</h3>
+        <p>
+            Since 2017, <strong>Transformers</strong> have displaced RNNs across most of natural language processing, for one decisive reason: an RNN must process step $t$ before step $t+1$, so training cannot be parallelised along the sequence. A Transformer's attention mechanism looks at all positions simultaneously, which maps directly onto GPU hardware and made training on internet-scale corpora feasible.
+        </p>
+        <p>
+            Attention also connects any two positions in one step rather than through a chain of $n$ intermediate states, which removes the long-range dependency problem outright instead of mitigating it.
+        </p>
+        <p>
+            Recurrent models remain preferable in specific circumstances, and they are worth knowing rather than being treated as history:
+        </p>
+        <ul style="color: var(--text-muted);">
+            <li><strong>Streaming inference.</strong> An RNN carries a fixed-size state and processes one step at a time, so cost per token is constant. Attention over a growing context is not.</li>
+            <li><strong>Small models and small data.</strong> Attention has weaker built-in assumptions and needs more examples to compensate.</li>
+            <li><strong>Embedded and low-memory settings,</strong> where a Transformer's attention matrix does not fit.</li>
+            <li><strong>Very long sequences,</strong> where full attention costs $O(n^2)$ and a recurrence costs $O(n)$ &mdash; which is exactly why recent state-space models such as Mamba revisit the recurrent formulation.</li>
+        </ul>
+
+        <h3>12. Recap</h3>
+        <ul style="color: var(--text-muted);">
+            <li>An RNN processes a sequence one step at a time, carrying a hidden state that summarises everything seen so far.</li>
+            <li>The same weights are applied at every time step, so parameter count is $h(d + h + 1)$ regardless of sequence length.</li>
+            <li>Unrolling turns the network into a deep feedforward graph; gradients are summed across steps during backpropagation through time.</li>
+            <li>Repeated multiplication by the recurrent matrix causes vanishing or exploding gradients &mdash; clip the second, and change architecture for the first.</li>
+            <li>LSTMs and GRUs add gates and an additive path for information, which is what makes long-range dependencies learnable.</li>
+            <li>Bidirectional layers add future context and rule out streaming use; stacking helps up to about three layers.</li>
+            <li>Transformers superseded RNNs mainly because they parallelise across the sequence, but constant-cost streaming keeps recurrence relevant.</li>
+        </ul>
 
     </main>
 

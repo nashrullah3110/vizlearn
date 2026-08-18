@@ -446,6 +446,123 @@
         <p>
             This forces the network's outputs to sum exactly to $1.0$ ($100\%$), converting raw network confidence scores into strict class probabilities.
         </p>
+
+        <h3>5. Padding, Stride and Output Size</h3>
+        <p>
+            Two settings control how the filter moves, and together they decide the size of every feature map in the network. <strong>Stride</strong> is how far the filter jumps between positions &mdash; a stride of 1 slides one pixel at a time, a stride of 2 skips every other position and halves the output. <strong>Padding</strong> adds a border of zeros around the input so the filter can be centred on the edge pixels.
+        </p>
+        <p>
+            Without padding, every convolution shrinks the image slightly, because the filter cannot hang over the edge. A 3x3 filter on a 28x28 image produces a 26x26 output, and after ten such layers there is nothing left. This is why "same" padding &mdash; enough zeros to keep the output size equal to the input &mdash; is the common default in deep networks.
+        </p>
+        <div class="math-block">
+            $$ O = \left\lfloor \frac{I - K + 2P}{S} \right\rfloor + 1 $$
+        </div>
+        <p>
+            Here $I$ is the input side length, $K$ the kernel size, $P$ the padding and $S$ the stride. A 28x28 input with a 3x3 kernel, no padding and stride 1 gives $\lfloor (28 - 3 + 0)/1 \rfloor + 1 = 26$. Add one pixel of padding on each side and the output returns to 28. Set the stride to 2 instead and it drops to 13.
+        </p>
+        <p>
+            Working this out by hand for each layer is worth doing once. Almost every shape-mismatch error in a CNN comes from a stride or padding value that produced a different size than expected, and the formula above tells you exactly what a layer will emit before you run it.
+        </p>
+
+        <h3>6. Counting the Parameters</h3>
+        <p>
+            A convolutional layer's parameter count depends on the filter size and the number of channels &mdash; <em>not</em> on the size of the image. That single fact explains most of what makes CNNs practical.
+        </p>
+        <div class="math-block">
+            $$ \text{params} = (K_h \times K_w \times C_{in} + 1) \times C_{out} $$
+        </div>
+        <p>
+            The $+1$ is the bias, one per output channel. A layer taking a 3-channel colour image and producing 32 feature maps with 3x3 filters has $(3 \times 3 \times 3 + 1) \times 32 = 896$ weights. The same layer applied to a 4-megapixel photograph still has 896 weights, because the filter is <em>reused</em> at every position.
+        </p>
+        <p>
+            This reuse is called <strong>parameter sharing</strong>, and it carries an assumption worth stating: a feature worth detecting in one part of the image is worth detecting everywhere. An edge detector is useful in the top-left corner and in the centre, so one set of weights can serve both. That assumption holds well for photographs and holds badly for data where absolute position matters &mdash; which is why CNNs are not automatically the right tool for every grid-shaped input.
+        </p>
+        <p>
+            The dense layers at the end are usually where the parameters actually live. Flattening a $7 \times 7 \times 64$ volume gives 3,136 values, and connecting those to 128 units costs over 400,000 weights &mdash; several hundred times more than the convolutional layer above. When a model is too large, the classifier head is normally the first place to look.
+        </p>
+
+        <h3>7. The Receptive Field</h3>
+        <p>
+            A single neuron in the first convolutional layer sees only a 3x3 patch of the original image. A neuron in the second layer sees a 3x3 patch <em>of the first layer's output</em>, and each of those values already summarised a 3x3 region &mdash; so it indirectly sees a 5x5 region of the input. This growing window is the <strong>receptive field</strong>.
+        </p>
+        <p>
+            Stacking layers grows the receptive field slowly; pooling and strided convolutions grow it quickly, because each of their outputs already covers a wider area. This is the real reason depth matters in a CNN: the network cannot recognise a face until some neuron somewhere can see a whole face at once.
+        </p>
+        <p>
+            It also explains the standard shape of a CNN. Early layers have small receptive fields and learn local, generic patterns &mdash; edges, corners, colour transitions. Middle layers combine those into textures and parts. Late layers, with receptive fields covering most of the image, respond to whole objects. Nobody designs this hierarchy; it emerges from training, and it is remarkably consistent across networks and datasets.
+        </p>
+
+        <h3>8. Why Not Just Use a Dense Network?</h3>
+        <p>
+            A fully connected layer on a modest 224x224 colour image would need $224 \times 224 \times 3 = 150{,}528$ inputs. Connecting those to just 1,000 hidden units costs over 150 million weights &mdash; for one layer. Beyond the memory cost, a model that large will memorise its training set long before it learns anything general.
+        </p>
+        <p>
+            Convolution replaces that with three structural assumptions, each of which removes parameters:
+        </p>
+        <ul style="color: var(--text-muted);">
+            <li><strong>Locality.</strong> Nearby pixels are related; distant ones are mostly not. So each neuron looks at a small patch instead of the whole image.</li>
+            <li><strong>Parameter sharing.</strong> The same filter is applied everywhere, so one set of weights serves every position.</li>
+            <li><strong>Translation invariance.</strong> Pooling means a feature detected slightly to the left still registers, so the network does not need separate evidence for every possible position.</li>
+        </ul>
+        <p>
+            These are exactly the properties images happen to have, which is why the architecture works so well on them &mdash; and why the same architecture applied to tabular data, where columns have no spatial relationship, performs no better than a plain dense network.
+        </p>
+
+        <h3>9. A Worked Example: One Digit, End to End</h3>
+        <p>
+            Take the 28x28 grayscale digit you can draw above and follow its shape through a small network. Each line is one layer, and the numbers come straight from the output-size and parameter formulas.
+        </p>
+        <ul style="color: var(--text-muted);">
+            <li><strong>Input:</strong> $28 \times 28 \times 1$ &mdash; one channel, since the image is grayscale.</li>
+            <li><strong>Conv 3x3, 32 filters, same padding:</strong> $28 \times 28 \times 32$. Parameters: $(3 \times 3 \times 1 + 1) \times 32 = 320$.</li>
+            <li><strong>ReLU:</strong> shape unchanged, zero parameters. Negative activations become 0.</li>
+            <li><strong>Max pool 2x2, stride 2:</strong> $14 \times 14 \times 32$. No parameters &mdash; pooling has nothing to learn.</li>
+            <li><strong>Conv 3x3, 64 filters, same padding:</strong> $14 \times 14 \times 64$. Parameters: $(3 \times 3 \times 32 + 1) \times 64 = 18{,}496$.</li>
+            <li><strong>Max pool 2x2, stride 2:</strong> $7 \times 7 \times 64$.</li>
+            <li><strong>Flatten:</strong> 3,136 values in a single vector.</li>
+            <li><strong>Dense 128:</strong> $3{,}136 \times 128 + 128 = 401{,}536$ parameters &mdash; by far the largest layer.</li>
+            <li><strong>Dense 10 with softmax:</strong> $128 \times 10 + 10 = 1{,}290$ parameters, producing ten probabilities that sum to 1.</li>
+        </ul>
+        <p>
+            Total: about 421,000 parameters, of which 95% sit in that one dense layer. Notice how the spatial dimensions shrink while the channel count grows &mdash; the network trades <em>where</em> information is for <em>what</em> it is. By the final convolution, each of the 64 channels at each of the 49 positions represents a fairly abstract pattern rather than a pixel.
+        </p>
+
+        <h3>10. Training in Practice</h3>
+        <p>
+            Training a CNN is ordinary gradient descent: run a batch forward, compare the predicted distribution to the true label with cross-entropy loss, backpropagate, and adjust every weight slightly. What differs from a dense network is which practical techniques matter.
+        </p>
+        <ul style="color: var(--text-muted);">
+            <li><strong>Data augmentation.</strong> Random shifts, small rotations, flips and crops multiply the effective dataset size for free. For image models this is usually the single most effective regulariser.</li>
+            <li><strong>Batch normalisation.</strong> Normalising activations within each batch lets you use higher learning rates and makes deep stacks trainable at all.</li>
+            <li><strong>Dropout in the dense head.</strong> Since most parameters live there, that is where overfitting starts.</li>
+            <li><strong>Transfer learning.</strong> Start from weights trained on a large dataset and fine-tune. The early layers have already learned edges and textures, and those transfer to almost any image task.</li>
+            <li><strong>Learning-rate scheduling.</strong> A high rate early to make progress, decayed later to settle into a minimum.</li>
+        </ul>
+        <p>
+            The training signal to watch is the gap between training and validation accuracy. A model that fits the training set well and generalises poorly needs more data, more augmentation or more regularisation &mdash; not more layers.
+        </p>
+
+        <h3>11. Where CNNs Struggle</h3>
+        <p>
+            Pooling gives <em>approximate</em> translation invariance, and nothing more. A CNN is not naturally invariant to rotation or scale &mdash; a digit rotated ninety degrees is, as far as the network is concerned, an unfamiliar shape. Augmentation is how that robustness gets added, by showing the network rotated examples during training rather than by building the invariance into the architecture.
+        </p>
+        <p>
+            The other well-known limitation is that pooling discards spatial relationships along with position. A network that has learned to detect eyes, a nose and a mouth may respond strongly to an image containing all of them in the wrong arrangement, because the evidence is present even though the configuration is nonsense.
+        </p>
+        <p>
+            Since 2020, <strong>Vision Transformers</strong> have matched or exceeded CNNs on large datasets by dropping the locality assumption entirely and letting attention decide which parts of the image relate to which. They need considerably more data to reach that point, which is precisely because they lack the built-in assumptions that make CNNs so efficient on small datasets. Convolution remains the better choice when data is limited, and the two approaches are increasingly combined.
+        </p>
+
+        <h3>12. Recap</h3>
+        <ul style="color: var(--text-muted);">
+            <li>Convolution slides a small learned filter across the image and computes a dot product at every position, producing a feature map.</li>
+            <li>Output size is $\lfloor (I - K + 2P)/S \rfloor + 1$; padding preserves size, stride shrinks it.</li>
+            <li>Parameters are $(K_h \times K_w \times C_{in} + 1) \times C_{out}$ &mdash; independent of image size, because filters are reused everywhere.</li>
+            <li>ReLU supplies the non-linearity; without it the whole stack collapses to a single linear map.</li>
+            <li>Pooling shrinks the feature maps, grows the receptive field, and buys approximate translation invariance.</li>
+            <li>Depth matters because the receptive field must eventually cover a whole object for the network to recognise it.</li>
+            <li>Most parameters usually sit in the dense classifier, which is where overfitting and model bloat begin.</li>
+        </ul>
     </main>
 
     <!-- Standard VizLearn Footer -->

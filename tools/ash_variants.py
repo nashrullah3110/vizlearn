@@ -238,26 +238,11 @@ LEDGER = """
 
 
 VARIANTS = [
-    {"slug": "brief", "name": "Brief",
-     "blurb": "Centred and compressed. The stats drop their panel and become "
-              "one quiet line, so the tracks start a screen earlier.",
-     "layout": BRIEF},
-    {"slug": "split", "name": "Split",
-     "blurb": "Headline and lede left, the numbers set beside them instead of "
-              "under them. Removes a full-width row from the opening.",
-     "layout": SPLIT},
-    {"slug": "console", "name": "Console",
-     "blurb": "The hero as a bordered window with a title bar and the stats "
-              "along its foot - the terminal idiom the type already implies.",
-     "layout": CONSOLE},
     {"slug": "minimal", "name": "Minimal",
-     "blurb": "Headline, lede, one button. Everything else is still there and "
-              "deliberately quieter, so there is one obvious thing to do.",
+     "blurb": "Headline, lede, one button, then straight into the modules. "
+              "The explanatory sections sit below the rails rather than in "
+              "front of them.",
      "layout": MINIMAL},
-    {"slug": "ledger", "name": "Ledger",
-     "blurb": "The four numbers promoted into a ruled four-up under the "
-              "buttons, matching the tables further down the page.",
-     "layout": LEDGER},
 ]
 
 
