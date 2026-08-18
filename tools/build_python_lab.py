@@ -75,8 +75,8 @@ print("sqrt(2)      :", round(math.sqrt(2), 6))
 
 def body():
     return """
-        <div class="vz-lab-grid">
-            <div class="vz-py" data-vz-py>
+            <div class="vz-py vz-ide" data-vz-py data-vz-ide="python-lab">
+                <div class="vz-ide-pane vz-ide-code">
                 <script type="text/plain" class="py-src">%(starter)s</script>
                 <div class="vz-code-bar">
                     <span class="vz-code-dot"></span><span>main.py</span>
@@ -97,15 +97,21 @@ def body():
                     <button type="button" class="py-reset-btn">Reset</button>
                     <span class="py-status"></span>
                 </div>
+                </div>
+                <div class="vz-ide-split" role="separator" tabindex="0"
+                     aria-orientation="vertical" aria-label="Resize editor and output"
+                     aria-valuemin="20" aria-valuemax="80" aria-valuenow="50"></div>
+                <div class="vz-ide-pane vz-ide-out">
                 <div class="vz-console">
                     <div class="vz-console-bar">Output</div>
                     <!-- .py-output stays: vizlearn-python.js writes into it. -->
                     <pre class="vz-console-body py-output" aria-live="polite"
                          data-empty="Press Run to execute this code."></pre>
                 </div>
+                </div>
             </div>
 
-            <div>
+        <div class="vz-lab-docs">
                 <section class="vz-lab-side">
                     <h2>What this is</h2>
                     <p>CPython compiled to WebAssembly, running on your own machine. Your
@@ -149,7 +155,7 @@ def body():
 
 
 def main():
-    rel = tool.write(KEY, tool.render(KEY, CSS, body(), wide=True))
+    rel = tool.write(KEY, tool.render(KEY, CSS, body(), wide=True, app=True))
     print("python lab page           : %s" % rel)
     return 0
 

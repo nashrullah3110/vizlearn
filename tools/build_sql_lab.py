@@ -20,13 +20,11 @@ import lib_tool_page as tool
 KEY = "sql-lab"
 
 CSS = """
-        .vz-sql-grid { display: grid; gap: 1.25rem; grid-template-columns: 1fr; }
         @media (min-width: 1024px) {
             /* Stretch, not start: the sidebar is much taller than the editor,
                and aligning to the top left a 451px void beside it. The editor
                column now fills the row and the result panel takes the slack,
                which is also where extra rows want to go. */
-            .vz-sql-grid { grid-template-columns: minmax(0, 1fr) 18rem; align-items: stretch; }
             .vz-sql-editor-col { display: flex; flex-direction: column; }
             .vz-sql-editor-col .vz-console { flex: 1 1 auto; display: flex; flex-direction: column; }
             .vz-sql-editor-col .vz-console-body { flex: 1 1 auto; max-height: none; }
@@ -167,8 +165,8 @@ ORDER  BY total_sales DESC;
 
 def body():
     return """
-        <div class="vz-sql-grid" data-vz-sql>
-            <div class="vz-sql-editor-col">
+        <div class="vz-sql-grid vz-ide" data-vz-sql data-vz-ide="sql-lab">
+            <div class="vz-ide-pane vz-ide-code">
                 <script type="text/plain" class="sql-seed">%(seed)s</script>
                 <div class="vz-code-bar">
                     <span class="vz-code-dot"></span><span>query.sql</span>
@@ -191,14 +189,20 @@ def body():
                             aria-label="Reset the database to the sample tables">Reset database</button>
                     <span class="sql-status" aria-live="polite"></span>
                 </div>
+                </div>
+                <div class="vz-ide-split" role="separator" tabindex="0"
+                     aria-orientation="vertical" aria-label="Resize editor and output"
+                     aria-valuemin="20" aria-valuemax="80" aria-valuenow="50"></div>
+                <div class="vz-ide-pane vz-ide-out">
                 <div class="vz-console">
                     <div class="vz-console-bar">Result</div>
                     <div class="vz-console-body sql-result" aria-live="polite"
                          data-empty="Run a query to see rows here."></div>
                 </div>
+                </div>
             </div>
 
-            <div>
+        <div class="vz-lab-docs">
                 <section class="vz-sql-side">
                     <h2>Tables</h2>
                     <div class="sql-schema"></div>
@@ -238,7 +242,7 @@ def body():
 
 
 def main():
-    rel = tool.write(KEY, tool.render(KEY, CSS, body(), wide=True))
+    rel = tool.write(KEY, tool.render(KEY, CSS, body(), wide=True, app=True))
     print("sql lab page              : %s" % rel)
     return 0
 

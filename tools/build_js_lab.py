@@ -70,8 +70,8 @@ console.log("shuffle :", tracks.slice().sort(() => Math.random() - 0.5));
 
 def body():
     return """
-        <div class="vz-lab-grid">
-            <div class="vz-js" data-vz-js>
+            <div class="vz-js vz-ide" data-vz-js data-vz-ide="js-lab">
+                <div class="vz-ide-pane vz-ide-code">
                 <script type="text/plain" class="js-src">%(starter)s</script>
                 <div class="vz-code-bar">
                     <span class="vz-code-dot"></span><span>main.js</span>
@@ -92,15 +92,21 @@ def body():
                     <button type="button" class="js-reset-btn">Reset</button>
                     <span class="js-status"></span>
                 </div>
+                </div>
+                <div class="vz-ide-split" role="separator" tabindex="0"
+                     aria-orientation="vertical" aria-label="Resize editor and output"
+                     aria-valuemin="20" aria-valuemax="80" aria-valuenow="50"></div>
+                <div class="vz-ide-pane vz-ide-out">
                 <div class="vz-console">
                     <div class="vz-console-bar">Output</div>
                     <!-- .js-output stays: vizlearn-js.js writes into it. -->
                     <pre class="vz-console-body js-output" aria-live="polite"
                          data-empty="Press Run to execute this code."></pre>
                 </div>
+                </div>
             </div>
 
-            <div>
+        <div class="vz-lab-docs">
                 <section class="vz-lab-side">
                     <h2>What this is</h2>
                     <p>Your browser&rsquo;s own JavaScript engine, running your code in a
@@ -147,7 +153,7 @@ def body():
 
 
 def main():
-    rel = tool.write(KEY, tool.render(KEY, CSS, body(), wide=True))
+    rel = tool.write(KEY, tool.render(KEY, CSS, body(), wide=True, app=True))
     print("js lab page               : %s" % rel)
     return 0
 

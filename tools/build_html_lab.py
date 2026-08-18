@@ -81,8 +81,8 @@ def body():
     # browser keeps the whole starter; assets/vizlearn-html.js unescapes it.
     starter = STARTER.strip().replace("</script>", "<\\/script>")
     return """
-        <div class="vz-lab-grid">
-            <div class="vz-html" data-vz-html>
+            <div class="vz-html vz-ide" data-vz-html data-vz-ide="html-lab">
+                <div class="vz-ide-pane vz-ide-code">
                 <script type="text/plain" class="html-src">%(starter)s</script>
                 <div class="vz-code-bar">
                     <span class="vz-code-dot"></span><span>index.html</span>
@@ -103,6 +103,11 @@ def body():
                     <button type="button" class="html-reset-btn">Reset</button>
                     <span class="html-status"></span>
                 </div>
+                </div>
+                <div class="vz-ide-split" role="separator" tabindex="0"
+                     aria-orientation="vertical" aria-label="Resize editor and output"
+                     aria-valuemin="20" aria-valuemax="80" aria-valuenow="50"></div>
+                <div class="vz-ide-pane vz-ide-out">
                 <iframe class="html-preview" sandbox="allow-scripts"
                         title="Live preview of the HTML in the editor"></iframe>
                 <div class="vz-console">
@@ -111,9 +116,10 @@ def body():
                     <pre class="vz-console-body html-console" aria-live="polite"
                          data-empty="console.log output from your page appears here."></pre>
                 </div>
+                </div>
             </div>
 
-            <div>
+        <div class="vz-lab-docs">
                 <section class="vz-lab-side">
                     <h2>What this is</h2>
                     <p>Your markup rendered by the browser&rsquo;s own engine in a
@@ -158,7 +164,7 @@ def body():
 
 
 def main():
-    rel = tool.write(KEY, tool.render(KEY, CSS, body(), wide=True))
+    rel = tool.write(KEY, tool.render(KEY, CSS, body(), wide=True, app=True))
     print("html lab page             : %s" % rel)
     return 0
 

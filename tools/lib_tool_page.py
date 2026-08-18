@@ -41,12 +41,16 @@ COMMON_CSS = """
 """
 
 
-def render(key, css, body, wide=False):
+def render(key, css, body, wide=False, app=False):
     """Full HTML for the tool page `key`.
 
     `css` is dropped into the shell's page-specific <style>; `body` is the
     <main> contents. `%(p)s` in `body` is expanded to the root-relative prefix
     so a caller can link to assets without knowing its own depth.
+
+    `app=True` renders the page as a tool rather than a document: no
+    breadcrumb, no hero, no reading column, and <main> free to fill the
+    viewport. The four labs use it; everything else is a document.
     """
     tool = TOOL_PAGES[key]
     rel = tool["rel"]
@@ -55,6 +59,25 @@ def render(key, css, body, wide=False):
     head = shell.head_top(tool["title"] + " | VizLearn", PREFIX).replace(
         "/* page-specific rules go here; the shared system is in vizlearn.css */",
         (COMMON_CSS + css).strip("\n"))
+
+    if app:
+        # A tool leads with the tool. The title and lead still appear - they
+        # are what the page is about, and the only prose a crawler sees above
+        # the fold - but as one compact bar rather than a hero block.
+        bar = (
+            '        <div class="vz-lab-head">\n'
+            '            <h1>%s</h1>\n'
+            '            <p>%s</p>\n'
+            '            <a class="vz-lab-home" href="%sindex.html">&larr; VizLearn</a>\n'
+            '        </div>\n' % (tool["title"], tool["lead"], PREFIX)
+        )
+        main = """
+    <main class="flex-1 w-full">
+%(bar)s%(body)s
+    </main>
+""" % {"bar": bar, "body": body % {"p": PREFIX}}
+        return (head + shell.header(PREFIX) + main + shell.close(PREFIX)).replace(
+            "<body ", "<body data-vz-lab ", 1)
 
     main = """
     <main class="flex-1 p-4 md:p-8 %(max)s mx-auto w-full">
