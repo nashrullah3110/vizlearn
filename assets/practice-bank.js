@@ -1808,7 +1808,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Quick Context”?",
-    "ans": "Imagine you're training a model to recognize cats. If all your training photos show cats perfectly centered and facing forward, the model might fail to recognize a cat that's slightly off-center or tilted. Data augmentation solves this. It teaches the model the concept of \"cat-ness\" is invariant to changes in position, scale, and orientation."
+    "ans": "Image Data Augmentation is a critical technique in training deep learning models for computer vision. The core idea is to artificially expand your training dataset by creating modified copies of existing images. By showing a model the same image—but rotated, zoomed, shifted, or with altered brightness—we teach it to recognize the core subject matter regardless of these variations."
    },
    {
     "t": "What does this module say about “The Core Idea: Invariance and Generalization”?",
@@ -1922,7 +1922,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “Start here”?",
-    "ans": "Think of a color image not as a single flat picture, but as three separate grayscale images stacked on top of each other. Each of these \"layers\" is a channel , representing the intensity of Red, Green, or Blue light for every pixel."
+    "ans": "RGB Image Processing is a fundamental concept in computer vision. It's the basis for how computers \"see\" and manipulate color images. Every colored pixel on your screen is a combination of three values: Red, Green, and Blue."
    },
    {
     "t": "What does this module say about “The Core Idea: Channels as Layers”?",
@@ -2062,16 +2062,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
+    "t": "What does this module say about “Start here”?",
+    "ans": "CASE is an if/else that lives inside a SELECT list, evaluated once per row. A VIEW is a query with a name, so you can SELECT from it like a table without repeating the logic every time."
+   },
+   {
     "t": "What does this module say about “Views: a name for a query, not a copy of it”?",
     "ans": "A plain view stores no data. Every time you query it, the underlying SELECT runs again against the current table — which is the whole point of the raise experiment below. This is different from a materialized view , which does store a snapshot and has to be refreshed explicitly to catch up with changes underneath it."
    },
    {
     "t": "What does this module say about “CASE: if/else inside a query”?",
     "ans": "CASE is SQL's conditional expression. It returns a value, so it can appear anywhere a value can — in SELECT , in ORDER BY , inside an aggregate, even in WHERE ."
-   },
-   {
-    "t": "What does this module say about “Conditional aggregation: the pattern worth learning”?",
-    "ans": "Putting CASE inside an aggregate turns rows into columns, which is how summary reports are built without a pivot feature."
    }
   ]
  },
@@ -2128,7 +2128,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “The idea in brief”?",
-    "ans": "Both are valid SQL, both run without complaint, and both are the reason database people flinch at typing UPDATE into a production console."
+    "ans": "Data Manipulation Language covers the statements that read and change rows: INSERT , UPDATE , DELETE and SELECT . Where DDL defines the container, DML fills and reshapes its contents."
    },
    {
     "t": "What does this module say about “The Four Statements”?",
@@ -2170,7 +2170,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Two things people are surprised by”?",
-    "ans": "WHERE and HAVING both remove rows. The difference is when they run, and everything else follows from that."
+    "ans": "HAVING works without GROUP BY. With no GROUP BY the whole table is one implicit group, so SELECT SUM (amount) FROM sales HAVING SUM (amount) > 5000 returns either one row or none. An aggregate in HAVING need not appear in SELECT. You can filter on COUNT (*) while selecting only the region. The aggregate is computed either way; SELECT just decides what is shown."
    }
   ]
  },
@@ -2385,7 +2385,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “Quick Context”?",
-    "ans": "The magic of window functions is the OVER() clause. This clause defines the \"window\" or set of rows the function should consider for its calculation. It has two key components:"
+    "ans": "Window functions are a powerful feature in SQL that perform a calculation across a set of table rows that are somehow related to the current row. Unlike aggregate functions ( SUM , COUNT ), which collapse rows into a single output row, window functions return a value for every single row ."
    },
    {
     "t": "What does this module say about “The Core Idea: A \"Window\" into Your Data”?",
@@ -2879,7 +2879,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Grid search, random search, and why random usually wins”?",
-    "ans": "Parameters are learned by gradient descent. Hyperparameters are the settings you choose before training starts, and they decide how well that learning goes."
+    "ans": "Grid search tries every combination on a predefined grid. With 5 learning rates and 5 layer widths that is 25 runs, and adding a third hyperparameter with 5 values makes it 125. The cost is exponential in the number of hyperparameters. Random search samples combinations at random from ranges you specify."
    }
   ]
  },
@@ -2890,7 +2890,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “Start here”?",
-    "ans": "LayerNorm normalizes each sample against itself — the mean and standard deviation are computed across that one row's own features, so no other sample's presence or absence changes the answer."
+    "ans": "BatchNorm normalizes each feature — each column — using the mean and standard deviation computed across every sample currently in the batch. That is powerful, and it has one structural weakness: its statistics depend on which other examples happen to be in the batch with you, which becomes a real problem at batch size 1 and in architectures like transformers where \"the batch\" is not a stable, meaningful group."
    },
    {
     "t": "What does this module say about “Normalising across features, not across the batch”?",
@@ -3228,8 +3228,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "An overfitting model has found a way to fit noise, and doing that almost always requires large weights — sharp, wiggly functions need big coefficients. Regularisation exploits that by adding the size of the weights to the loss:"
    },
    {
-    "t": "What does this module say about “Constraining the model on purpose”?",
-    "ans": "A network with millions of parameters can fit almost any training set exactly, including its noise. Regularisation is any deliberate constraint that makes that harder, trading a little training accuracy for better generalisation."
+    "t": "What does this module say about “L1 and L2, and why one is sparse”?",
+    "ans": "L2 (ridge, weight decay) penalises the sum of squared weights: penalty = Σ w i ² → gradient = 2w i"
    }
   ]
  },
@@ -3248,7 +3248,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “The two reasons it works”?",
-    "ans": "That matters because deep plain networks were failing on training data, not just test data. A 56-layer network scored worse than a 20-layer one at fitting the training set, despite being able in principle to copy the shallower network and make the extra layers do nothing. It could not find that solution. Residual connections make it the default starting point."
+    "ans": "Identity becomes easy to represent. Ask a block to produce the output directly and it must learn a mapping. Ask it to produce the difference and it can output nothing — drive the weights towards zero — and the block passes its input through unchanged."
    }
   ]
  },
@@ -3419,7 +3419,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Fixed-size vs semantic”?",
-    "ans": "Even a well-placed boundary loses something: whatever came just before a chunk starts is not in it, even though it might be exactly the context needed to make the chunk's first sentence make sense. Overlap re-includes the last few words of the previous chunk at the start of the next one, at the direct cost of storing and embedding the same words twice."
+    "ans": "Fixed-size chunking counts a fixed number of words or tokens and cuts there, with no regard for what is at that position — a heading, mid-word, mid-sentence, anywhere. It is simple, predictable, and blind. Semantic chunking respects natural boundaries — sentences, paragraphs, headings — and only splits at those boundaries, accepting some variation in chunk size in exchange for every chunk being a coherent unit."
    },
    {
     "t": "What does this module say about “Why overlap exists”?",
@@ -3551,12 +3551,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Cosine similarity divides out vector length and only ever measures direction; dot product does not, so it rewards longer vectors regardless of whether that length means anything. The two metrics agree only when every vector has the same length — true if you normalise your embeddings to unit length, false otherwise."
    },
    {
-    "t": "What does this module say about “Stretch Doc B”?",
-    "ans": "same direction as before, just longer — like a verbose, repetitive document embedding"
+    "t": "What does this module say about “What this is”?",
+    "ans": "Cosine similarity asks \"what angle apart are these two vectors\" and ignores length entirely. Dot product asks \"how much do these two vectors agree, weighted by how long they both are\" — length is part of the answer, not discarded."
    },
    {
-    "t": "What does this module say about “When magnitude is noise, and when it is signal”?",
-    "ans": "That fourth row is the one people miss. If the embedding model was trained with an inner-product objective, its geometry is arranged for the dot product, and using cosine may not be what it was optimised for. Model documentation usually states which to use, and following it matters more than the general argument."
+    "t": "What does this module say about “Stretch Doc B”?",
+    "ans": "same direction as before, just longer — like a verbose, repetitive document embedding"
    }
   ]
  },
@@ -3701,12 +3701,12 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Gen AI",
   "q": [
    {
-    "t": "What does this module say about “Fusion”?",
-    "ans": "small k lets rank-1 dominate; large k (60 is the common default) smooths everything out"
+    "t": "What does this module say about “The idea in brief”?",
+    "ans": "Dense retrieval and BM25 fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously."
    },
    {
-    "t": "What does this module say about “The idea in brief”?",
-    "ans": "A cosine similarity lives between -1 and 1. A BM25 score is an unbounded sum that depends on corpus size and term rarity. Averaging the two numbers directly is meaningless — a BM25 score of 8 is not \"worth\" anything in particular next to a cosine of 0.6. Reciprocal Rank Fusion sidesteps this by throwing the scores away and using only each document's position in each list."
+    "t": "What does this module say about “Fusion”?",
+    "ans": "small k lets rank-1 dominate; large k (60 is the common default) smooths everything out"
    },
    {
     "t": "What does this module say about “Why fuse ranks, not raw scores”?",
@@ -3922,8 +3922,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "the HyDE passage below is written by hand as a labelled example of what an LLM would draft — no model runs in this page"
    },
    {
-    "t": "What does this module say about “Query rewriting”?",
-    "ans": "Use a model to reformulate the question before searching. Several distinct operations hide under the same name:"
+    "t": "What does this module say about “Two ways to close the gap”?",
+    "ans": "Query expansion adds related terms to the original query — synonyms, likely technical vocabulary — widening what it can match against. HyDE (Hypothetical Document Embeddings) goes further: ask a language model to draft a plausible answer to the question, without ever checking whether that answer is true, and embed that hypothetical answer instead of the question."
    }
   ]
  },
@@ -6756,7 +6756,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Window size and stride”?",
-    "ans": "Machine learning models expect a table: one row per example, one column per feature, and rows that do not depend on each other. A time series is none of those things — it is one long sequence where every value depends on the ones before it."
+    "ans": "Window size (W) is how much history the model sees per prediction, and it is a real modelling assumption: it asserts that nothing older than W steps matters. Too small and the model cannot see the pattern — a weekly cycle needs at least seven daily steps. Too large and each example carries mostly irrelevant history, the input dimension grows, and the number of examples shrinks."
    }
   ]
  },
@@ -6830,7 +6830,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “The three families of fix”?",
-    "ans": "The instinct on seeing an imbalanced dataset is to resample it immediately. That is usually the third-best move. Two cheaper things come first, and often one of them is enough."
+    "ans": "Resample the data. Oversampling duplicates minority rows — simple, and risks overfitting to the few examples you have. SMOTE improves on it by synthesising new minority points along the lines between existing neighbours rather than copying. Undersampling discards majority rows, which balances the classes and throws away real information; it is reasonable when the majority class is genuinely enormous."
    },
    {
     "t": "What does this module say about “Start by changing nothing about the data”?",
@@ -6887,7 +6887,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Quick Context”?",
-    "ans": "P(A | B) is read \"the probability of A given B\". The bar does not mean division and it does not mean \"and\". It means: assume B happened, throw away every outcome where it did not, and ask about A within what remains."
+    "ans": "Probability counts favourable outcomes against all possible outcomes. Conditional probability changes one thing: it shrinks what counts as possible. P(A | B) is read \"the probability of A given B\". The bar does not mean division and it does not mean \"and\". It means: assume B happened, throw away every outcome where it did not, and ask about A within what remains."
    },
    {
     "t": "What does this module say about “Probability, once you know something”?",
@@ -6902,7 +6902,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “Quick Context”?",
-    "ans": "Correlation is covariance with the units removed. That single change is what makes it comparable across datasets — and, as we will see, still leaves it blind to anything that is not a straight line."
+    "ans": "Variance describes how one variable spreads out. Covariance is the same idea for two: when x is above its mean, is y usually above its mean too? Correlation is covariance with the units removed. That single change is what makes it comparable across datasets — and, as we will see, still leaves it blind to anything that is not a straight line."
    },
    {
     "t": "What does this module say about “Why correlation exists”?",
@@ -6921,7 +6921,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “Quick Context”?",
-    "ans": "The answer is always at least H(p), and the excess is the KL divergence. Every classifier trained with \"cross-entropy loss\" is being pushed to make that excess smaller."
+    "ans": "Entropy is the average surprise of a distribution — the shortest average code length you could achieve if you knew the true probabilities. Cross-entropy asks a harsher question: what does it cost if you build your code for q and the data actually comes from p? The answer is always at least H(p), and the excess is the KL divergence."
    },
    {
     "t": "What does this module say about “Entropy, cross-entropy and KL, in one relationship”?",
@@ -7126,8 +7126,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A matrix is a transformation . Once you can do something to space, three questions follow immediately: what does nothing, what puts it back, and what happens if you read the matrix sideways."
    },
    {
-    "t": "What does this module say about “Not every matrix has an inverse”?",
-    "ans": "A matrix is invertible only if its determinant is non-zero. Zero determinant means the transformation collapsed a dimension — flattened a plane onto a line — and no operation can recover what was lost, because many different inputs now map to the same output."
+    "t": "What does this module say about “Three operations that keep appearing”?",
+    "ans": "The identity matrix I has ones on the diagonal and zeros elsewhere. Multiplying by it changes nothing:"
    }
   ]
  },
@@ -7138,7 +7138,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “Quick Context”?",
-    "ans": "A decision tree does nothing cleverer than this. At every node it tries every feature and every threshold, computes the gain for each, and keeps the winner. Then it repeats on both children until some stopping rule fires."
+    "ans": "Entropy measures how mixed a set of labels is: 1 bit for an even fifty-fifty split of two classes, 0 bits when every label is the same. Information gain is simply how much that number falls when you split the set in two. A decision tree does nothing cleverer than this. At every node it tries every feature and every threshold, computes the gain for each, and keeps the winner."
    },
    {
     "t": "What does this module say about “How much did that question help”?",
@@ -7779,7 +7779,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Why batch norm fails on sequences”?",
-    "ans": "Layer norm sidesteps all three. It uses only the sample’s own features, so it is independent of batch size, identical at training and inference, and unaffected by how many other sequences are present or how long they are."
+    "ans": "Variable length. Sequences in a batch have different lengths, so timestep 50 might have 32 real values in one batch and 3 in another, with the rest padding. Statistics computed over that are unstable, and computed over padding they are simply wrong. Per-timestep statistics."
    },
    {
     "t": "What does this module say about “Two different meanings of \"normalisation\"”?",
@@ -7813,7 +7813,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “Quick Context”?",
-    "ans": "For a bag of words that would be a feature. For language it is fatal: \"dog bites man\" and \"man bites dog\" contain exactly the same words, and a model that cannot tell them apart cannot do anything useful. An RNN got order for free by reading left to right. Throwing out recurrence threw that away too, and it has to be put back by hand."
+    "ans": "Self-attention computes every position from every other position by dot products and weighted sums. Nowhere in that computation does an index appear. Permute the input and the outputs permute with it, unchanged — the mechanism is permutation-equivariant . For a bag of words that would be a feature."
    },
    {
     "t": "What does this module say about “The obvious ideas, and why they fail”?",
@@ -7938,8 +7938,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Once you accept that text must become numbers, the question is which numbers. The four classic answers form a ladder — each rung keeps more information or removes more distortion than the one below it."
    },
    {
-    "t": "What does this module say about “From words to numbers, four ways”?",
-    "ans": "Every model needs numbers. The methods form a clear progression, each fixing a limitation of the last."
+    "t": "What does this module say about “Label Encoding & One-Hot”?",
+    "ans": "Label encoding assigns each vocabulary word an integer. It's maximally compact, but the integers imply a fake ordering — the model may conclude that word #7 is \"more\" than word #3. One-hot encoding removes that lie by giving each word its own dimension: a vector of zeros with a single 1."
    }
   ]
  },

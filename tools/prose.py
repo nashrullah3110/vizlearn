@@ -42,6 +42,11 @@ import re
 # text -> html
 # --------------------------------------------------------------------------
 
+# Tags that can open a paragraph without making it stop being one.
+INLINE_LEAD = re.compile(
+    r"<(strong|em|b|i|span|code|a|sup|sub|small|mark|abbr|kbd|u|s)\b",
+    re.I)
+
 BOLD = re.compile(r"\*\*(.+?)\*\*", re.S)
 CODE = re.compile(r"`([^`]+)`")
 
@@ -100,7 +105,13 @@ def _block(lines):
         return ""
     first = lines[0].lstrip()
 
-    if first.startswith("<"):
+    # A block that opens with a *block-level* tag is markup the author wrote
+    # and is passed through untouched. A block that merely opens with an
+    # inline tag is still a paragraph: 3690 of them across the articles begin
+    # with a bold lead-in, and treating those as raw HTML meant they got no
+    # <p> wrapper - so they ran into the sentence before them - and never
+    # reached inline(), so their backticks printed literally to the reader.
+    if first.startswith("<") and not INLINE_LEAD.match(first):
         return "\n".join(lines)
     if BULLET.match(lines[0]):
         return _list(lines, BULLET, "ul")
@@ -172,7 +183,10 @@ def parse(text):
         if m:
             if heading is not None:
                 sections.append((heading, body_html("\n".join(buf))))
-            heading, buf = m.group(1), []
+            # Headings take the same inline pass as body text, or a
+            # heading like `The `or` lookalike` prints its backticks.
+            # Anchor ids are unaffected: slug() strips tags first.
+            heading, buf = inline(m.group(1)), []
         else:
             buf.append(line)
     if heading is not None:

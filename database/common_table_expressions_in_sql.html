@@ -517,21 +517,21 @@ SELECT * FROM org ORDER BY level;</code></pre><p>The anchor runs once and produc
                 </div>
                 <div>
                     <h3>Practical patterns</h3>
-                    <strong>Generating a date series</strong>, so that days with no data still appear in a report:<pre><code class="language-sql">WITH RECURSIVE dates AS (
+                    <p><strong>Generating a date series</strong>, so that days with no data still appear in a report:</p><pre><code class="language-sql">WITH RECURSIVE dates AS (
   SELECT DATE &#x27;2026-01-01&#x27; AS d
   UNION ALL
   SELECT d + 1 FROM dates WHERE d &lt; DATE &#x27;2026-01-31&#x27;
 )
 SELECT dates.d, COALESCE(SUM(o.total), 0) AS revenue
 FROM   dates LEFT JOIN orders o ON o.order_date = dates.d
-GROUP  BY dates.d ORDER BY dates.d;</code></pre><strong>Splitting a data-cleaning pipeline into readable stages</strong>: one CTE to deduplicate, one to normalise values, one to join reference data, and a final `SELECT` that reads like a summary of the whole thing.<strong>Reusing an expensive filter</strong> that would otherwise be written twice in a `UNION` or a self-join.<strong>Writable CTEs</strong>, in PostgreSQL, where a CTE can contain `INSERT`, `UPDATE` or `DELETE` with `RETURNING` &mdash; the standard way to move rows between tables in a single statement:<pre><code class="language-sql">WITH moved AS (
+GROUP  BY dates.d ORDER BY dates.d;</code></pre><p><strong>Splitting a data-cleaning pipeline into readable stages</strong>: one CTE to deduplicate, one to normalise values, one to join reference data, and a final <code>SELECT</code> that reads like a summary of the whole thing.</p><p><strong>Reusing an expensive filter</strong> that would otherwise be written twice in a <code>UNION</code> or a self-join.</p><p><strong>Writable CTEs</strong>, in PostgreSQL, where a CTE can contain <code>INSERT</code>, <code>UPDATE</code> or <code>DELETE</code> with <code>RETURNING</code> &mdash; the standard way to move rows between tables in a single statement:</p><pre><code class="language-sql">WITH moved AS (
   DELETE FROM active_orders WHERE completed_at IS NOT NULL RETURNING *
 )
 INSERT INTO archived_orders SELECT * FROM moved;</code></pre>
                 </div>
                 <div>
                     <h3>Questions people ask</h3>
-                    <strong>Are CTEs slower than subqueries?</strong> Not on current engines, where they are inlined. On PostgreSQL 11 and earlier, they could be either faster or slower because they were always materialised.<strong>Can I use a CTE in an `INSERT` or `UPDATE`?</strong> Yes &mdash; `WITH ... UPDATE ...` and `WITH ... INSERT ...` are both valid, and useful for computing the rows to change in a readable way.<strong>How many CTEs can I chain?</strong> No practical limit. Readability is the constraint; past six or seven stages, consider a view or a materialised table.<strong>Can a CTE reference a later CTE?</strong> No &mdash; references only go backwards. Recursive CTEs reference themselves, which is the one exception.<strong>Do all databases support them?</strong> Yes in current versions: PostgreSQL, MySQL 8+, SQL Server, Oracle, SQLite 3.8.3+. Recursion is supported by all of those too, with minor syntax differences (Oracle and SQL Server omit the `RECURSIVE` keyword).<strong>When should I use a temporary table instead?</strong> When the intermediate result is large, used by several separate statements, or worth indexing. A CTE cannot be indexed and does not outlive its statement.
+                    <p><strong>Are CTEs slower than subqueries?</strong> Not on current engines, where they are inlined. On PostgreSQL 11 and earlier, they could be either faster or slower because they were always materialised.</p><p><strong>Can I use a CTE in an <code>INSERT</code> or <code>UPDATE</code>?</strong> Yes &mdash; <code>WITH ... UPDATE ...</code> and <code>WITH ... INSERT ...</code> are both valid, and useful for computing the rows to change in a readable way.</p><p><strong>How many CTEs can I chain?</strong> No practical limit. Readability is the constraint; past six or seven stages, consider a view or a materialised table.</p><p><strong>Can a CTE reference a later CTE?</strong> No &mdash; references only go backwards. Recursive CTEs reference themselves, which is the one exception.</p><p><strong>Do all databases support them?</strong> Yes in current versions: PostgreSQL, MySQL 8+, SQL Server, Oracle, SQLite 3.8.3+. Recursion is supported by all of those too, with minor syntax differences (Oracle and SQL Server omit the <code>RECURSIVE</code> keyword).</p><p><strong>When should I use a temporary table instead?</strong> When the intermediate result is large, used by several separate statements, or worth indexing. A CTE cannot be indexed and does not outlive its statement.</p>
                 </div>
                 <div>
                     <h3>Recap in one screen</h3>
