@@ -119,7 +119,12 @@ intro: A tuple is a sequence that cannot be changed once built. That single rest
 
 A list and a tuple both hold an ordered run of items, and both index the same way. The difference is one word: a tuple is immutable. Once it exists, no element can be replaced.
 
-point = (3, 4)<br>point[0] = 99&nbsp;&nbsp;# TypeError
+
+```python
+point = (3, 4)
+point[0] = 99  # TypeError
+```
+
 
 That sounds like a limitation and is mostly a guarantee. If you hand a list to a function, the function can change it under you. Hand it a tuple and it cannot.
 
@@ -157,7 +162,12 @@ This reads better than returning a list, because the shape is fixed: exactly two
 
 The most common surprise is that brackets do not make a tuple &mdash; commas do.
 
-type((5))&nbsp;&nbsp;&nbsp;# int<br>type((5,))&nbsp;&nbsp;# tuple
+
+```python
+type((5))   # int
+type((5,))  # tuple
+```
+
 
 A single-element tuple needs the trailing comma. It looks like a typo and is not. This bites when a function is supposed to return one item as a tuple and quietly returns the item instead.
 
@@ -392,7 +402,13 @@ intro: A loop inside a loop runs the inner one from the top on every pass of the
 
 ## The order things happen
 
-for row in range(3):<br>&nbsp;&nbsp;&nbsp;&nbsp;for col in range(4):<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;print(row, col)
+
+```python
+for row in range(3):
+    for col in range(4):
+        print(row, col)
+```
+
 
 The outer loop takes `row = 0` and then hands control to the inner loop, which runs all four of its passes before the outer loop moves to `row = 1`. Twelve lines print, in row-major order. The inner variable resets each time; the outer one does not.
 
@@ -518,7 +534,13 @@ intro: A comprehension is a loop that builds a list, written as a single express
 
 Nearly every comprehension started life as this shape:
 
-result = []<br>for item in things:<br>&nbsp;&nbsp;&nbsp;&nbsp;result.append(f(item))
+
+```python
+result = []
+for item in things:
+    result.append(f(item))
+```
+
 
 which becomes:
 
@@ -795,7 +817,13 @@ Callers supply what they care about and ignore the rest. Defaults must come afte
 
 This looks reasonable and is not:
 
-def add_item(item, basket=[]):<br>&nbsp;&nbsp;&nbsp;&nbsp;basket.append(item)<br>&nbsp;&nbsp;&nbsp;&nbsp;return basket
+
+```python
+def add_item(item, basket=[]):
+    basket.append(item)
+    return basket
+```
+
 
 Call it three times with no basket and you get one item, then two, then three &mdash; all in the same list. The reason is a single rule with a large consequence: <strong>default values are evaluated once, when the `def` runs</strong>, not on each call. That one list is created at definition time and reused forever, so every mutation accumulates.
 
@@ -803,7 +831,13 @@ The second program on this page prints the id of the default object before and a
 
 The fix is idiomatic and worth memorising:
 
-def add_item(item, basket=None):<br>&nbsp;&nbsp;&nbsp;&nbsp;if basket is None:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;basket = []
+
+```python
+def add_item(item, basket=None):
+    if basket is None:
+        basket = []
+```
+
 
 `None` is immutable, so there is nothing to accumulate, and the fresh list is built inside the call where it belongs.
 
@@ -913,7 +947,12 @@ intro: One star collects any number of positional arguments into a tuple; two st
 
 ## Collecting
 
-def total(*args):<br>&nbsp;&nbsp;&nbsp;&nbsp;return sum(args)
+
+```python
+def total(*args):
+    return sum(args)
+```
+
 
 `total(1, 2, 3)` gives `args = (1, 2, 3)`. `total()` gives `args = ()`. The function accepts any number of positional arguments without knowing in advance how many, and inside it `args` is an ordinary tuple.
 
@@ -935,7 +974,12 @@ Named parameters first, then `*args`, then `**kwargs`. Python needs the fixed on
 
 The same star at a call site does the opposite job:
 
-dims = [2, 3, 4]<br>volume(*dims)&nbsp;&nbsp;&nbsp;&nbsp;# same as volume(2, 3, 4)
+
+```python
+dims = [2, 3, 4]
+volume(*dims)    # same as volume(2, 3, 4)
+```
+
 
 Without the star you pass one argument &mdash; the list itself &mdash; and get a `TypeError` about missing parameters. With it, the list is spread across the parameters in order.
 
@@ -947,7 +991,13 @@ volume(**{"length": 2, "width": 3, "height": 4})
 
 This is where the two halves meet, and it is by far the most common real use:
 
-def logged(func, *args, **kwargs):<br>&nbsp;&nbsp;&nbsp;&nbsp;print("calling", func.__name__)<br>&nbsp;&nbsp;&nbsp;&nbsp;return func(*args, **kwargs)
+
+```python
+def logged(func, *args, **kwargs):
+    print("calling", func.__name__)
+    return func(*args, **kwargs)
+```
+
 
 `logged` accepts anything and forwards it untouched. It does not need to know the signature of what it is wrapping. Every decorator, every wrapper, every "do this then call that" helper is built on this shape.
 
@@ -1084,7 +1134,13 @@ The first match wins, which is why naming a variable `list` or `sum` shadows the
 
 A function can read an outer name without ceremony:
 
-x = "global"<br>def show():<br>&nbsp;&nbsp;&nbsp;&nbsp;print(x)&nbsp;&nbsp;# fine
+
+```python
+x = "global"
+def show():
+    print(x)  # fine
+```
+
 
 But assigning to that name inside the function does not change the outer one. It creates a new local name that happens to be spelled the same, and it disappears when the function returns.
 
@@ -1092,7 +1148,13 @@ But assigning to that name inside the function does not change the outer one. It
 
 <strong>If a name is assigned anywhere in a function, it is local for the entire function</strong> &mdash; including lines that run before the assignment.
 
-def broken():<br>&nbsp;&nbsp;&nbsp;&nbsp;print(x)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# UnboundLocalError<br>&nbsp;&nbsp;&nbsp;&nbsp;x = "too late"
+
+```python
+def broken():
+    print(x)      # UnboundLocalError
+    x = "too late"
+```
+
 
 That `print` looks like it should read the global, and it would have, if the line below it did not exist. Python decides local-or-not when it compiles the function, not while running it. The error message &mdash; "local variable referenced before assignment" &mdash; is precise once you know this, and baffling before.
 
@@ -1100,11 +1162,25 @@ That `print` looks like it should read the global, and it would have, if the lin
 
 To rebind rather than shadow, say so:
 
-def bump():<br>&nbsp;&nbsp;&nbsp;&nbsp;global count<br>&nbsp;&nbsp;&nbsp;&nbsp;count += 1
+
+```python
+def bump():
+    global count
+    count += 1
+```
+
 
 `global` reaches module level. `nonlocal` reaches the nearest enclosing function, which is what makes closures able to keep state:
 
-def counter():<br>&nbsp;&nbsp;&nbsp;&nbsp;n = 0<br>&nbsp;&nbsp;&nbsp;&nbsp;def step():<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;nonlocal n<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n += 1
+
+```python
+def counter():
+    n = 0
+    def step():
+        nonlocal n
+        n += 1
+```
+
 
 Both are worth knowing and neither is worth reaching for often. A function that rebinds globals is a function whose behaviour depends on when you call it, which is exactly the kind of thing that makes bugs hard to find. Returning a value is nearly always better.
 
@@ -1232,7 +1308,14 @@ intro: A try block runs code that might fail; an except block says what to do wh
 
 ## The shape
 
-try:<br>&nbsp;&nbsp;&nbsp;&nbsp;return int(text)<br>except ValueError:<br>&nbsp;&nbsp;&nbsp;&nbsp;return None
+
+```python
+try:
+    return int(text)
+except ValueError:
+    return None
+```
+
 
 If `int()` raises `ValueError`, control jumps to the handler. If it raises anything else, the handler is skipped and the error keeps travelling up. That selectivity is the point.
 
@@ -1250,7 +1333,12 @@ except ValueError:<br>except (KeyError, IndexError):<br>except Exception as e:&n
 
 ## as e, and why you want it
 
-except ValueError as e:<br>&nbsp;&nbsp;&nbsp;&nbsp;print("could not convert:", e)
+
+```python
+except ValueError as e:
+    print("could not convert:", e)
+```
+
 
 The exception object carries the detail &mdash; which key was missing, which value would not parse. Discarding it and printing "something went wrong" throws away the only part that would have helped.
 
@@ -1265,7 +1353,12 @@ For files and locks, prefer `with`, which does the same job with less ceremony.
 
 Handling is half of it. When a caller hands you something impossible, say so:
 
-if age &lt; 0:<br>&nbsp;&nbsp;&nbsp;&nbsp;raise ValueError(f"age cannot be negative, got {age}")
+
+```python
+if age < 0:
+    raise ValueError(f"age cannot be negative, got {age}")
+```
+
 
 Include the offending value in the message. "Invalid input" costs the next person a debugging session; "got -1" ends it immediately.
 
@@ -1383,7 +1476,13 @@ intro: A class bundles data with the functions that operate on it. The class is 
 
 ## Template and instance
 
-class Dog:<br>&nbsp;&nbsp;&nbsp;&nbsp;def __init__(self, name, age):<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.name = name
+
+```python
+class Dog:
+    def __init__(self, name, age):
+        self.name = name
+```
+
 
 `Dog` describes what a dog is. `Dog("rex", 3)` builds one. Build two and they are independent: changing `a.age` leaves `b.age` alone, because each instance has its own attributes.
 
@@ -1403,7 +1502,14 @@ Every method that touches instance data needs it, and every attribute belonging 
 
 ## Class attributes are shared
 
-class Counter:<br>&nbsp;&nbsp;&nbsp;&nbsp;total = 0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# one, for everybody<br>&nbsp;&nbsp;&nbsp;&nbsp;def __init__(self):<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.count = 0&nbsp;&nbsp;# one per instance
+
+```python
+class Counter:
+    total = 0      # one, for everybody
+    def __init__(self):
+        self.count = 0  # one per instance
+```
+
 
 `self.count` belongs to the object. `Counter.total` belongs to the class and every instance sees the same one. This is occasionally what you want &mdash; a registry, a shared cache, a constant &mdash; and is a bug the rest of the time, in the same family as the mutable default argument.
 
@@ -1411,7 +1517,12 @@ class Counter:<br>&nbsp;&nbsp;&nbsp;&nbsp;total = 0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp
 
 By default, printing an object gives you something like `&lt;__main__.Point object at 0x104...&gt;`, which tells you nothing. Define `__repr__` and you decide:
 
-def __repr__(self):<br>&nbsp;&nbsp;&nbsp;&nbsp;return f"Point({self.x}, {self.y})"
+
+```python
+def __repr__(self):
+    return f"Point({self.x}, {self.y})"
+```
+
 
 It costs two lines and pays for itself the first time you print a list of them.
 
@@ -1673,7 +1784,17 @@ intro: match tests a value against patterns rather than conditions. For plain li
 
 ## The tidy version of an if-chain
 
-match status:<br>&nbsp;&nbsp;&nbsp;&nbsp;case 200:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return "ok"<br>&nbsp;&nbsp;&nbsp;&nbsp;case 500 | 502 | 503:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return "server error"<br>&nbsp;&nbsp;&nbsp;&nbsp;case _:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return "unhandled"
+
+```python
+match status:
+    case 200:
+        return "ok"
+    case 500 | 502 | 503:
+        return "server error"
+    case _:
+        return "unhandled"
+```
+
 
 `|` groups alternatives, `_` is the default. The first matching case wins and the rest are skipped &mdash; there is no fall-through and no `break`.
 
@@ -1822,7 +1943,15 @@ intro: A loop can have an else. It runs when the loop finished normally &mdash; 
 
 ## The rule, exactly
 
-for item in items:<br>&nbsp;&nbsp;&nbsp;&nbsp;if item == target:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break<br>else:<br>&nbsp;&nbsp;&nbsp;&nbsp;print("not found")
+
+```python
+for item in items:
+    if item == target:
+        break
+else:
+    print("not found")
+```
+
 
 The `else` runs if the loop ran to completion without hitting `break`. Iterate zero times? The else runs. Iterate a million times and finish? The else runs. Break out on the first pass? It does not.
 
@@ -1832,7 +1961,17 @@ The keyword is badly chosen. If it were called `nobreak`, nobody would ever have
 
 This shape appears constantly:
 
-found = False<br>for item in items:<br>&nbsp;&nbsp;&nbsp;&nbsp;if match(item):<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;found = True<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break<br>if not found:<br>&nbsp;&nbsp;&nbsp;&nbsp;...
+
+```python
+found = False
+for item in items:
+    if match(item):
+        found = True
+        break
+if not found:
+    ...
+```
+
 
 The flag exists only to carry one bit of information past the end of the loop. `for/else` carries it for you: the else block <em>is</em> the "we never found it" branch. One fewer variable, and one fewer chance to forget to set it.
 
@@ -1840,7 +1979,15 @@ The flag exists only to carry one bit of information past the end of the loop. `
 
 Searching, and primality testing, which is the same shape:
 
-for i in range(2, int(n ** 0.5) + 1):<br>&nbsp;&nbsp;&nbsp;&nbsp;if n % i == 0:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return i<br>else:<br>&nbsp;&nbsp;&nbsp;&nbsp;return None
+
+```python
+for i in range(2, int(n ** 0.5) + 1):
+    if n % i == 0:
+        return i
+else:
+    return None
+```
+
 
 "Tried every divisor, none worked" is exactly the else branch.
 
@@ -1965,7 +2112,13 @@ intro: An if inside an if is sometimes exactly right and more often a shape that
 
 ## When nesting is just `and`
 
-if age &gt;= 18:<br>&nbsp;&nbsp;&nbsp;&nbsp;if member:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;allow()
+
+```python
+if age >= 18:
+    if member:
+        allow()
+```
+
 
 If the inner `if` is the entire body of the outer one, and there is no `else` on either, the two conditions are simply both required:
 
@@ -1977,7 +2130,13 @@ Same behaviour, one level of indentation, and the condition reads as one thought
 
 Nesting earns its place when the branches diverge &mdash; when the inner decision only makes sense inside the outer one, and each has its own alternative:
 
-if age &lt; 18:<br>&nbsp;&nbsp;&nbsp;&nbsp;return 0 if member else 5<br>return 8 if member else 12
+
+```python
+if age < 18:
+    return 0 if member else 5
+return 8 if member else 12
+```
+
 
 Here "member" means something different in each branch. That is a real tree, not an accidental one.
 
@@ -1985,13 +2144,27 @@ Here "member" means something different in each branch. That is a real tree, not
 
 The most common nested shape is a series of refusals, each with an `else`:
 
-if active:<br>&nbsp;&nbsp;&nbsp;&nbsp;if no_fines:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if available:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return "yes"
+
+```python
+if active:
+    if no_fines:
+        if available:
+            return "yes"
+```
+
 
 Four levels deep, and the success case &mdash; the thing the function is for &mdash; is buried furthest from the left margin, while every failure sits in an `else` far from the condition that caused it.
 
 Inverted, each failure handles itself and leaves:
 
-if not active:&nbsp;&nbsp;&nbsp;&nbsp;return "membership inactive"<br>if fines &gt; 0:&nbsp;&nbsp;&nbsp;&nbsp;return "unpaid fines"<br>if not available: return "book is out"<br>return "yes"
+
+```python
+if not active:    return "membership inactive"
+if fines > 0:    return "unpaid fines"
+if not available: return "book is out"
+return "yes"
+```
+
 
 Now every rule sits beside its own message, the happy path is the last line at zero indentation, and adding a rule is one line rather than another level. The page runs both over the same four cases and prints them side by side, because the point is that the behaviour is identical and only the shape changed.
 
@@ -2108,11 +2281,23 @@ intro: enumerate walks a sequence and hands you the position along with the item
 
 The counter:
 
-i = 0<br>for name in names:<br>&nbsp;&nbsp;&nbsp;&nbsp;print(i, name)<br>&nbsp;&nbsp;&nbsp;&nbsp;i += 1
+
+```python
+i = 0
+for name in names:
+    print(i, name)
+    i += 1
+```
+
 
 and the index:
 
-for i in range(len(names)):<br>&nbsp;&nbsp;&nbsp;&nbsp;print(i, names[i])
+
+```python
+for i in range(len(names)):
+    print(i, names[i])
+```
+
 
 Both work. The first has a variable to initialise and remember to increment; forget the increment and the loop runs forever printing zero. The second reads the list twice per pass &mdash; once for the length, once per lookup &mdash; and puts `names[i]` where you wanted `name`.
 
@@ -2265,7 +2450,12 @@ When the lists come from the same source that is usually harmless. When one is d
 
 Two ways to be explicit:
 
-zip(a, b, strict=True)&nbsp;&nbsp;# raises ValueError on mismatch (3.10+)<br>zip_longest(a, b, fillvalue=0)&nbsp;&nbsp;# pads instead, from itertools
+
+```python
+zip(a, b, strict=True)  # raises ValueError on mismatch (3.10+)
+zip_longest(a, b, fillvalue=0)  # pads instead, from itertools
+```
+
 
 If the lists are supposed to be the same length, `strict=True` turns a silent bug into an immediate error. That is nearly always the better trade.
 
@@ -2378,7 +2568,12 @@ sorted(words, key=len)
 
 Anything callable works: a builtin, a lambda, a named function.
 
-sorted(people, key=lambda p: p[1])&nbsp;&nbsp;&nbsp;&nbsp;# by the second element<br>sorted(rows, key=lambda r: r["score"])&nbsp;&nbsp;# by a dict field
+
+```python
+sorted(people, key=lambda p: p[1])    # by the second element
+sorted(rows, key=lambda r: r["score"])  # by a dict field
+```
+
 
 ## Tuple keys give you tiebreaks
 
@@ -2390,7 +2585,12 @@ sorted(data, key=lambda t: (t[1], t[0]))
 
 ## sorted() versus .sort()
 
-new = sorted(nums)&nbsp;&nbsp;# a new list, original untouched<br>nums.sort()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# rearranges in place, returns None
+
+```python
+new = sorted(nums)  # a new list, original untouched
+nums.sort()         # rearranges in place, returns None
+```
+
 
 The trap is writing `nums = nums.sort()`, which assigns `None` and destroys the list. It is a common enough mistake that recognising it is worth more than the rule: if a sort produced `None`, this is why.
 
@@ -2493,7 +2693,13 @@ intro: range takes up to three arguments &mdash; start, stop and step &mdash; an
 
 ## The three forms
 
-range(5)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 0 1 2 3 4<br>range(2, 6)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 2 3 4 5<br>range(0, 10, 2)&nbsp;&nbsp;# 0 2 4 6 8
+
+```python
+range(5)         # 0 1 2 3 4
+range(2, 6)      # 2 3 4 5
+range(0, 10, 2)  # 0 2 4 6 8
+```
+
 
 One argument is the stop. Two are start and stop. Three add the step. The step can be any non-zero integer.
 
@@ -2511,11 +2717,21 @@ The step is negative <em>and</em> the stop is below the start. Get one wrong and
 
 The classic mistake is stopping at 0 when you meant to include it:
 
-range(3, 0, -1)&nbsp;&nbsp;&nbsp;# 3 2 1&nbsp;&nbsp;- misses 0<br>range(3, -1, -1)&nbsp;&nbsp;# 3 2 1 0
+
+```python
+range(3, 0, -1)   # 3 2 1  - misses 0
+range(3, -1, -1)  # 3 2 1 0
+```
+
 
 To walk a list backwards by index you need `range(len(items) - 1, -1, -1)`, which is three fiddly numbers in a row and exactly why the alternatives exist:
 
-for x in reversed(items):<br>for x in items[::-1]:
+
+```python
+for x in reversed(items):
+for x in items[::-1]:
+```
+
 
 Both say "backwards" without arithmetic. Reach for a backwards `range` only when you genuinely need the index.
 
@@ -2778,7 +2994,12 @@ Read it in execution order rather than left to right: take each `n`, keep it onl
 
 That ordering is not a detail. If the filter is removing `None` values, the expression never sees them:
 
-["pass" if r["score"] &gt;= 50 else "fail"<br>&nbsp;for r in rows if r["score"] is not None]
+
+```python
+["pass" if r["score"] >= 50 else "fail"
+ for r in rows if r["score"] is not None]
+```
+
 
 Swap the two and the comparison raises on the first missing score.
 
@@ -2909,7 +3130,12 @@ This is the single most common source of confusion for beginners, and it is not 
 
 ## int() is strict about strings and loose about floats
 
-int("3.9")&nbsp;&nbsp;# ValueError<br>int(3.9)&nbsp;&nbsp;&nbsp;&nbsp;# 3
+
+```python
+int("3.9")  # ValueError
+int(3.9)    # 3
+```
+
 
 From a string, `int` refuses anything that is not a whole number, because guessing which way to go would be a decision it has no business making. From a float, it truncates toward zero &mdash; `int(-3.9)` is `-3`, not `-4`. If you want nearest, say `round`.
 
@@ -2917,7 +3143,12 @@ It does tolerate surrounding whitespace, which is convenient when parsing scruff
 
 ## round() does not round half up
 
-round(2.5)&nbsp;&nbsp;# 2<br>round(3.5)&nbsp;&nbsp;# 4
+
+```python
+round(2.5)  # 2
+round(3.5)  # 4
+```
+
 
 On an exact tie, Python rounds to the nearest <em>even</em> number. This is deliberate: always rounding halves up biases a long run of numbers upward. It surprises people once, and it is correct.
 
@@ -2931,7 +3162,14 @@ Binary floating point cannot represent 0.1 exactly, so the sum is a hair off. Th
 
 Do not check first &mdash; try, and handle the failure:
 
-try:<br>&nbsp;&nbsp;&nbsp;&nbsp;return int(text)<br>except (ValueError, TypeError):<br>&nbsp;&nbsp;&nbsp;&nbsp;return default
+
+```python
+try:
+    return int(text)
+except (ValueError, TypeError):
+    return default
+```
+
 
 `ValueError` covers bad text and `TypeError` covers `None`. Testing `text.isdigit()` first looks tidier and gets negative numbers and whitespace wrong.
 
@@ -3053,7 +3291,13 @@ is how Python asks "is this empty?", and it is preferred over `len(items) == 0` 
 
 The trouble starts when a value can legitimately be `0` or `""`:
 
-result = find(items, "a")&nbsp;&nbsp;# returns index 0<br>if not result:<br>&nbsp;&nbsp;&nbsp;&nbsp;print("not found")&nbsp;&nbsp;# WRONG
+
+```python
+result = find(items, "a")  # returns index 0
+if not result:
+    print("not found")  # WRONG
+```
+
 
 Index 0 is falsy, so "found at the first position" and "not found at all" take the same branch. Nothing raises. The program is simply wrong for one input, and that input is the first element, which many test cases skip.
 
@@ -3173,7 +3417,13 @@ intro: Python strings carry a large set of methods for splitting, joining, trimm
 
 ## Nothing is modified in place
 
-name = "ana"<br>name.upper()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# result discarded<br>print(name)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# still "ana"
+
+```python
+name = "ana"
+name.upper()      # result discarded
+print(name)      # still "ana"
+```
+
 
 Strings are immutable, so a method that "changes" one actually returns a new one. If you do not keep the result, nothing happened. The fix is to rebind:
 
@@ -3183,7 +3433,12 @@ This is the single most common string mistake, and it fails silently &mdash; no 
 
 ## split and join
 
-parts = "a,b,c".split(",")&nbsp;&nbsp;&nbsp;&nbsp;# ['a', 'b', 'c']<br>",".join(parts)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 'a,b,c'
+
+```python
+parts = "a,b,c".split(",")    # ['a', 'b', 'c']
+",".join(parts)          # 'a,b,c'
+```
+
 
 `join` is called on the separator, not on the list, which reads backwards until you have seen it a few times. Think of it as "put this between them".
 
@@ -3319,7 +3574,12 @@ The editors here run Python in your browser, which has no keyboard attached to s
 
 ## It is always text
 
-typed = input("Age: ")&nbsp;&nbsp;# user types 42<br>typed + typed&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# "4242", not 84
+
+```python
+typed = input("Age: ")  # user types 42
+typed + typed          # "4242", not 84
+```
+
 
 This is the first surprise everyone meets. `input` cannot know whether "42" is meant as a number, a house number or a password, so it does not guess. Convert explicitly:
 
@@ -3329,7 +3589,15 @@ age = int(input("Age: "))
 
 That one-liner raises `ValueError` the moment somebody types "forty" or presses enter on an empty line. For anything a real person will use:
 
-def read_int(text, default=0):<br>&nbsp;&nbsp;&nbsp;&nbsp;try:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return int(text.strip())<br>&nbsp;&nbsp;&nbsp;&nbsp;except (ValueError, AttributeError):<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return default
+
+```python
+def read_int(text, default=0):
+    try:
+        return int(text.strip())
+    except (ValueError, AttributeError):
+        return default
+```
+
 
 `strip()` first, because people type spaces.
 
@@ -3339,7 +3607,12 @@ def read_int(text, default=0):<br>&nbsp;&nbsp;&nbsp;&nbsp;try:<br>&nbsp;&nbsp;&n
 
 ## print has two useful options
 
-print("a", "b", sep="-")&nbsp;&nbsp;&nbsp;&nbsp;# a-b<br>print(i, end=" ")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# no newline
+
+```python
+print("a", "b", sep="-")    # a-b
+print(i, end=" ")         # no newline
+```
+
 
 `sep` sits between the values; the default is a single space. `end` goes after them; the default is a newline. `end=""` is how you build a line across several prints &mdash; and you then need a bare `print()` to close it, which the page demonstrates.
 
@@ -3461,19 +3734,36 @@ Leave either end off and it means "from the beginning" or "to the end". Leave bo
 
 ## Negative indices count from the right
 
-s[-1]&nbsp;&nbsp;&nbsp;&nbsp;# last item<br>s[-3:]&nbsp;&nbsp;&nbsp;# last three<br>s[:-2]&nbsp;&nbsp;&nbsp;# everything except the last two
+
+```python
+s[-1]    # last item
+s[-3:]   # last three
+s[:-2]   # everything except the last two
+```
+
 
 `-1` is the last element, not "one before the start". Mixing the two conventions is fine: `s[2:-1]` is "from index 2 to the second-to-last".
 
 ## The third value is the step
 
-s[::2]&nbsp;&nbsp;&nbsp;&nbsp;# every second item<br>s[1::2]&nbsp;&nbsp;&nbsp;# every second, starting at 1<br>s[::-1]&nbsp;&nbsp;&nbsp;# reversed
+
+```python
+s[::2]    # every second item
+s[1::2]   # every second, starting at 1
+s[::-1]   # reversed
+```
+
 
 `[::-1]` is the standard reverse idiom and worth memorising as one symbol rather than parsing each time. A negative step walks backwards, so start and stop swap roles &mdash; which is why `s[5:2:-1]` gives you something and `s[2:5:-1]` gives you nothing.
 
 ## Slicing forgives, indexing does not
 
-s[2:99]&nbsp;&nbsp;&nbsp;# fine, gives what exists<br>s[99]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# IndexError
+
+```python
+s[2:99]   # fine, gives what exists
+s[99]     # IndexError
+```
+
 
 A slice clamps to the available range and returns what it can, including an empty result. That is convenient and occasionally hides a bug, because an empty slice looks like valid data rather than a mistake.
 
@@ -3597,7 +3887,14 @@ intro: A name in Python is a label attached to an object, not a box holding a va
 
 ## Assignment does not copy
 
-a = [1, 2, 3]<br>b = a<br>b.append(4)<br>print(a)&nbsp;&nbsp;# [1, 2, 3, 4]
+
+```python
+a = [1, 2, 3]
+b = a
+b.append(4)
+print(a)  # [1, 2, 3, 4]
+```
+
 
 `b = a` attaches a second label to the same list. There is one list and two names for it, so a change through either name is visible through both. `a is b` is `True`, which is the test for "the same object" as opposed to `==`, which asks about contents.
 
@@ -3607,15 +3904,30 @@ To get a second list, ask for one: `a[:]`, `list(a)` or `a.copy()`.
 
 This is the distinction that explains the rest:
 
-y = [9, 9]&nbsp;&nbsp;&nbsp;&nbsp;# rebinding: point y at a different object<br>y.append(3)&nbsp;&nbsp;# mutating: change the object y points at
+
+```python
+y = [9, 9]    # rebinding: point y at a different object
+y.append(3)  # mutating: change the object y points at
+```
+
 
 Rebinding affects only that name. Mutating affects every name pointing at that object. Both use `y`, which is why they look similar and behave nothing alike.
 
 ## Inside functions
 
-def add_zero(items):<br>&nbsp;&nbsp;&nbsp;&nbsp;items.append(0)&nbsp;&nbsp;# caller sees this
 
-def replace(items):<br>&nbsp;&nbsp;&nbsp;&nbsp;items = [9, 9]&nbsp;&nbsp;&nbsp;&nbsp;# caller sees nothing
+```python
+def add_zero(items):
+    items.append(0)  # caller sees this
+```
+
+
+
+```python
+def replace(items):
+    items = [9, 9]    # caller sees nothing
+```
+
 
 The parameter is another name for the caller's object. Mutate it and the caller's list changes. Rebind it and you have only pointed the local name elsewhere.
 
@@ -3627,7 +3939,12 @@ Numbers, strings and tuples cannot be mutated, so there is no way for one name t
 
 ## The multiplication trap
 
-grid = [[0] * 3] * 3<br>grid[0][0] = 1&nbsp;&nbsp;# every row changes
+
+```python
+grid = [[0] * 3] * 3
+grid[0][0] = 1  # every row changes
+```
+
 
 `[0] * 3` builds one row. Multiplying the outer list by 3 does not build three rows &mdash; it stores three references to the same row. Setting one cell appears to set three.
 
@@ -3741,7 +4058,14 @@ intro: Copying a list gives you a new list. It does not give you new copies of t
 
 ## What a shallow copy actually does
 
-original = [[1, 2], [3, 4]]<br>shallow = original[:]<br>shallow[0][0] = 99<br>print(original)&nbsp;&nbsp;# [[99, 2], [3, 4]]
+
+```python
+original = [[1, 2], [3, 4]]
+shallow = original[:]
+shallow[0][0] = 99
+print(original)  # [[99, 2], [3, 4]]
+```
+
 
 The outer list is new &mdash; `original is shallow` is `False`, and appending to one does not affect the other. But the two inner lists were not copied; both outer lists point at the same two inner lists. Change something one level down and both see it.
 
@@ -3761,7 +4085,12 @@ That covers most everyday copying, which is why `[:]` is so common and why the p
 
 ## When you need deep
 
-import copy<br>deep = copy.deepcopy(original)
+
+```python
+import copy
+deep = copy.deepcopy(original)
+```
+
 
 `deepcopy` walks the whole structure and rebuilds every mutable object it finds. Nested config dictionaries, lists of records, anything parsed from JSON &mdash; these are the cases.
 
@@ -3769,7 +4098,13 @@ It is slower, and for large structures noticeably so. It also handles the hard c
 
 ## The dict version of the trap
 
-config = {"limits": {"max": 10}}<br>shallow = config.copy()<br>shallow["limits"]["max"] = 999
+
+```python
+config = {"limits": {"max": 10}}
+shallow = config.copy()
+shallow["limits"]["max"] = 999
+```
+
 
 The original now reads 999 too. This is the same rule and it bites harder with configuration, because the nesting is the point of the structure.
 
@@ -3882,7 +4217,13 @@ intro: A handful of dictionary methods replace the same few blocks of code peopl
 
 ## get, instead of checking first
 
-prices["kiwi"]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# KeyError<br>prices.get("kiwi")&nbsp;&nbsp;&nbsp;&nbsp;# None<br>prices.get("kiwi", 0)&nbsp;# 0
+
+```python
+prices["kiwi"]        # KeyError
+prices.get("kiwi")    # None
+prices.get("kiwi", 0) # 0
+```
+
 
 `get` is for when a missing key is expected and has a sensible default. Square brackets are for when a missing key is a bug &mdash; and there the `KeyError` is doing you a favour by failing loudly.
 
@@ -3900,7 +4241,14 @@ All three are views, not lists: they reflect later changes to the dict and are c
 
 The block everyone writes first:
 
-if w in counts:<br>&nbsp;&nbsp;&nbsp;&nbsp;counts[w] += 1<br>else:<br>&nbsp;&nbsp;&nbsp;&nbsp;counts[w] = 1
+
+```python
+if w in counts:
+    counts[w] += 1
+else:
+    counts[w] = 1
+```
+
 
 collapses to:
 
@@ -3918,7 +4266,14 @@ teams.setdefault(team, []).append(name)
 
 ## pop and update
 
-d.pop("a")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# remove and return; raises if absent<br>d.pop("a", None)&nbsp;&nbsp;&nbsp;# ...unless given a default<br>d.update(other)&nbsp;&nbsp;&nbsp;&nbsp;# merge in place<br>a | b&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# a new merged dict (3.9+)
+
+```python
+d.pop("a")         # remove and return; raises if absent
+d.pop("a", None)   # ...unless given a default
+d.update(other)    # merge in place
+a | b            # a new merged dict (3.9+)
+```
+
 
 With `|`, the right-hand side wins on conflicts, which makes `defaults | overrides` a clean way to layer configuration.
 """,
@@ -4034,7 +4389,12 @@ Left to right: index the list, look up the key, index that list. Each step retur
 
 ## Walking it
 
-for person in people:<br>&nbsp;&nbsp;&nbsp;&nbsp;for lang in person["langs"]:
+
+```python
+for person in people:
+    for lang in person["langs"]:
+```
+
 
 The outer loop takes records, the inner takes the list inside each one. That is the shape of most processing you will do, and the flatten version of it is a nested comprehension:
 
@@ -4179,7 +4539,12 @@ As an argument, where the function is tiny, used once, and naming it would add a
 
 ## map and filter
 
-map(f, items)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# apply f to each<br>filter(f, items)&nbsp;&nbsp;# keep those where f is true
+
+```python
+map(f, items)     # apply f to each
+filter(f, items)  # keep those where f is true
+```
+
 
 Both are lazy: they return iterators, not lists. Printing one shows `&lt;map object&gt;`, and consuming it twice gives nothing the second time &mdash; the page demonstrates exactly that, because it catches people.
 
@@ -4311,7 +4676,12 @@ These editors run Python in your browser against an in-memory filesystem. The fi
 
 ## with, and why
 
-with open("notes.txt") as f:<br>&nbsp;&nbsp;&nbsp;&nbsp;content = f.read()
+
+```python
+with open("notes.txt") as f:
+    content = f.read()
+```
+
 
 When the block ends the file is closed, whether it ended normally or by raising. Doing it by hand means `f.close()` in a `finally`, and forgetting it leaves the handle open &mdash; which on a long-running program eventually exhausts the operating system's limit, and on a write leaves data sitting in a buffer that never reaches the disk.
 
@@ -4319,7 +4689,13 @@ When the block ends the file is closed, whether it ended normally or by raising.
 
 ## Three ways to read
 
-f.read()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# the whole thing as one string<br>f.readlines()&nbsp;&nbsp;# a list of lines<br>for line in f:&nbsp;# one line at a time
+
+```python
+f.read()       # the whole thing as one string
+f.readlines()  # a list of lines
+for line in f: # one line at a time
+```
+
 
 The third is the one to reach for by default. It holds a single line in memory regardless of file size, so it works on a file larger than your RAM, and it reads no worse than the others.
 
@@ -4438,7 +4814,13 @@ intro: A module is a file of Python. import runs it once and gives you access to
 
 ## The three forms
 
-import math&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# math.sqrt(9)<br>from math import sqrt&nbsp;&nbsp;# sqrt(9)<br>import numpy as np&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# np.array(...)
+
+```python
+import math            # math.sqrt(9)
+from math import sqrt  # sqrt(9)
+import numpy as np     # np.array(...)
+```
+
 
 The first keeps the module as a prefix. That is a feature: reading `math.sqrt` a hundred lines later tells you immediately where it came from, and it cannot collide with anything of yours.
 
@@ -4578,7 +4960,14 @@ intro: A generator is a function that pauses. Instead of computing everything an
 
 ## yield instead of return
 
-def countdown(n):<br>&nbsp;&nbsp;&nbsp;&nbsp;while n &gt; 0:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;yield n<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n -= 1
+
+```python
+def countdown(n):
+    while n > 0:
+        yield n
+        n -= 1
+```
+
 
 `return` ends a function. `yield` suspends it, keeping every local variable exactly as it was, and the function continues from that line when the next value is requested.
 
@@ -4590,13 +4979,27 @@ Memory. A list comprehension over a million items builds a million items. A gene
 
 That is what makes infinite sequences possible:
 
-def naturals():<br>&nbsp;&nbsp;&nbsp;&nbsp;n = 1<br>&nbsp;&nbsp;&nbsp;&nbsp;while True:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;yield n<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n += 1
+
+```python
+def naturals():
+    n = 1
+    while True:
+        yield n
+        n += 1
+```
+
 
 Nothing is built up front, so there is nothing to run out of. Take what you need with `itertools.islice`.
 
 ## Exhausted after one pass
 
-g = countdown(2)<br>list(g)&nbsp;&nbsp;# [2, 1]<br>list(g)&nbsp;&nbsp;# []
+
+```python
+g = countdown(2)
+list(g)  # [2, 1]
+list(g)  # []
+```
+
 
 A generator walks forward once and does not rewind. If you need the values twice, either store them in a list or call the generator function again to get a fresh one. This catches everyone once, usually as a mysteriously empty second loop.
 
@@ -4728,19 +5131,37 @@ intro: A class can be built on another one, taking its attributes and methods an
 
 ## The basic move
 
-class Dog(Animal):<br>&nbsp;&nbsp;&nbsp;&nbsp;def speak(self):<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return "woof"
+
+```python
+class Dog(Animal):
+    def speak(self):
+        return "woof"
+```
+
 
 `Dog` gets everything `Animal` has. Where it defines a method of the same name, that version wins &mdash; that is overriding.
 
 The payoff shows up in methods the parent already wrote:
 
-def describe(self):<br>&nbsp;&nbsp;&nbsp;&nbsp;return f"{self.name} says {self.speak()}"
+
+```python
+def describe(self):
+    return f"{self.name} says {self.speak()}"
+```
+
 
 `describe` was written once on `Animal` and calls whichever `speak` the actual object has. Add a tenth animal and `describe` needs no change. That is the whole argument for inheritance in one method.
 
 ## super()
 
-class Dog(Animal):<br>&nbsp;&nbsp;&nbsp;&nbsp;def __init__(self, name, breed):<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;super().__init__(name)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.breed = breed
+
+```python
+class Dog(Animal):
+    def __init__(self, name, breed):
+        super().__init__(name)
+        self.breed = breed
+```
+
 
 A subclass `__init__` replaces the parent's, so the parent's setup does not happen unless you ask for it. Forget `super().__init__(name)` and `self.name` never gets set &mdash; the failure arrives later as an `AttributeError` from some unrelated method, which the page demonstrates.
 
