@@ -24,6 +24,15 @@ tools/check_theme_contrast.py measures both modes and fails on a regression.
 MONO = ('ui-monospace, SFMono-Regular, "JetBrains Mono", "Cascadia Mono", '
         'Menlo, Consolas, "Liberation Mono", monospace')
 
+# Article prose only. Monospace is the site's voice and it stays on every
+# heading, label, control and code block - but it is measurably slower to read
+# at paragraph length, because every glyph is the same width and word shapes
+# stop being distinctive. A 900-word article is where that cost is paid, so
+# that is the one place a proportional face is used. Inter is already being
+# downloaded for the page, so this costs no extra request.
+SANS = ('Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, '
+        '"Helvetica Neue", Arial, sans-serif')
+
 DARK = {
     "accent": "#eaa94a",
     "fill": "#eaa94a", "fill_hi": "#f2b661", "on_fill": "#1c1e1f",
@@ -46,6 +55,7 @@ def tokens(mode):
     a = p["accent"]
     return {
         "--vz-mono": MONO,
+        "--vz-sans": SANS,
         "--vz-raise": p["raise"],
         "--vz-band": p["band"],
 

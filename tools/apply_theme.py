@@ -113,6 +113,12 @@ def process(path):
     src = re.sub(r"\s*backdrop-filter:\s*blur\(12px\);", "", src)
     src = re.sub(r"\s*-webkit-backdrop-filter:\s*blur\(12px\);", "", src)
 
+    # Space Grotesk is no longer used anywhere - headings are monospace
+    # and the canvas labels were rewritten - so stop paying to download
+    # it. Generated pages get the link from lib_shell, which was fixed
+    # too; this catches the hand-written ones on every build.
+    src = src.replace("family=Space+Grotesk:wght@300;500;700&", "")
+
     for old, new in GREEN_MAP:
         src = src.replace(old, new)
 
