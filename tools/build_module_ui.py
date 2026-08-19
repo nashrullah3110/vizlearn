@@ -411,6 +411,20 @@ def main():
                 if "data-vz-prose" not in tag:
                     src = src[:close] + " data-vz-prose" + src[close:]
                     prose_tagged += 1
+        elif "data-vz-prose" not in src and 'class="vz-article' in src:
+            # 52 pages carry .vz-article but no ARTICLE_MARKER, so the branch
+            # above never reached them and their prose section stayed
+            # untagged. That is invisible until something keys off the
+            # attribute - the article card's width does - at which point they
+            # are the only pages still laid out the old way. Tag the section
+            # that actually contains the article.
+            vm = src.find('class="vz-article')
+            sm = src.rfind("<section", 0, vm)
+            if sm != -1:
+                close = src.find(">", sm)
+                if close != -1 and "data-vz-prose" not in src[sm:close]:
+                    src = src[:close] + " data-vz-prose" + src[close:]
+                    prose_tagged += 1
         elif "data-vz-prose" not in src and 'class="vz-article' not in src:
             # Two pages carry no marker but put their article in a
             # <main class="... prose">, which is Tailwind Typography's own
