@@ -2507,7 +2507,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What is meant by “BETWEEN a AND b” here?",
-    "ans": "is inclusive at both ends. For dates this is a common source of off-by-one bugs, because BETWEEN '2026-01-01' AND '2026-01-31' excludes anything timestamped later on the 31st. Prefer >= start AND ."
+    "ans": "is inclusive at both ends. For dates this is a common source of off-by-one bugs, because BETWEEN '2026-01-01' AND '2026-01-31' excludes anything timestamped later on the 31st. Prefer >= start AND < next_start ."
    },
    {
     "t": "What is meant by “IN (...)” here?",

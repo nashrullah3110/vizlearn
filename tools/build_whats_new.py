@@ -76,6 +76,27 @@ CSS = """
             text-decoration: none;
         }
         .vz-n-mod:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .vz-n-intro { max-width: 68ch; margin-bottom: 2.75rem; }
+        .vz-n-intro p {
+            font-family: var(--vz-sans);
+            font-size: 1rem;
+            line-height: 1.7;
+            color: var(--text-muted);
+            margin-bottom: 0.9rem;
+        }
+        .vz-n-intro h2 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin: 1.6rem 0 0.6rem;
+        }
+        .vz-n-tracks {
+            font-family: var(--vz-sans);
+            font-size: 0.92rem;
+            line-height: 1.65;
+            color: var(--text-muted);
+            margin: 0 0 0.7rem;
+        }
         .vz-n-mod span {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.62rem;
@@ -104,11 +125,79 @@ def modules_by_date():
     return out
 
 
+WORDS = {1: "One", 2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six",
+         7: "Seven", 8: "Eight", 9: "Nine", 10: "Ten", 11: "Eleven",
+         12: "Twelve"}
+
+
+def spell(n):
+    return WORDS.get(n, str(n))
+
+
+def track_sentence(day):
+    """A written line describing which tracks a day's modules landed in.
+
+    A bare grid of module titles reads as a list of links rather than as a
+    record of what happened. Naming the tracks, in order of how much each one
+    grew, says the thing the grid only implies.
+    """
+    counts = defaultdict(int)
+    for m in day:
+        counts[track_of(m)] += 1
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    n = len(day)
+    if len(ranked) == 1:
+        if n == 1:
+            return "One new module, in the %s track." % ranked[0][0]
+        return "%s new modules, all of them in the %s track." % (spell(n), ranked[0][0])
+    parts = ["%s in %s" % (spell(c).lower() if c < 13 else c, t) for t, c in ranked]
+    if len(parts) == 2:
+        spread = " and ".join(parts)
+    else:
+        spread = ", ".join(parts[:-1]) + " and " + parts[-1]
+    return "%s new modules: %s." % (spell(n), spread)
+
+
 def track_of(mod):
     for t in TOPICS.values():
         if t["dir"] == mod["dir"]:
             return t["title"]
     return mod.get("category", "")
+
+
+INTRO = """\
+<div class="vz-n-intro">
+<p>This is the written record of what VizLearn has become, in the order it
+happened. Every entry below is either a set of modules that went live on a
+particular day, or a change to how the site itself works &mdash; a new kind of
+visualisation, a fix to something that was misleading, a rewrite of a page that
+was not carrying its weight.</p>
+
+<h2>Where the dates come from</h2>
+<p>The module entries are not maintained by hand. Each module's first commit in
+the repository is what dates it, and this page groups modules by that date. That
+means a module appears here the moment it actually ships, and the list cannot
+quietly drift out of step with the site. The same date drives the published date
+on the module's own page, so the two can never disagree.</p>
+<p>Everything that is not a module &mdash; the features, the corrections, the
+structural changes &mdash; is written by hand, because nothing in the repository
+knows why a change was made. Those entries say what changed and, where it
+matters, what was wrong before.</p>
+
+<h2>What counts as news</h2>
+<p>Modules committed before %(since)s are not listed. They are not new; they are
+what the site was when it started, and putting a hundred and eighty of them
+under a single date would bury everything that came after. If you are looking
+for those, the track pages list every module in the order they are meant to be
+read, and the concept map shows how the tracks depend on one another.</p>
+
+<h2>Reading a release</h2>
+<p>Each block names its date, says which tracks grew and by how much, and then
+lists the individual modules with the track each one belongs to. Every title is
+a link straight to the module. Where a release also changed how the site
+behaves, those notes sit above the module list.</p>
+</div>
+"""
 
 
 def build_body():
@@ -132,8 +221,8 @@ def build_body():
 
         day = sorted(mods.get(d, []), key=lambda m: m["title"])
         if day:
-            block.append('<p class="vz-n-sub">%d new module%s</p>'
-                         % (len(day), "" if len(day) == 1 else "s"))
+            block.append('<p class="vz-n-tracks">%s</p>'
+                         % html.escape(track_sentence(day)))
             block.append('<div class="vz-n-mods">')
             for m in day:
                 block.append('<a class="vz-n-mod" href="../%s">%s<span>%s</span></a>'
@@ -145,13 +234,14 @@ def build_body():
         out.append("".join(block))
 
     total = sum(len(v) for v in mods.values())
-    return ('            <p style="font-family:\'JetBrains Mono\',monospace;font-size:.75rem;'
+    return ('%s\n'
+            '            <p style="font-family:\'JetBrains Mono\',monospace;font-size:.75rem;'
             'color:var(--text-muted);margin-bottom:1.5rem">%d modules added since %s</p>\n'
             '%s\n'
             '            <p class="vz-t-note">Module additions on this page are read '
             'from the repository history rather than kept by hand, so nothing here can '
             'drift from what actually shipped.</p>\n'
-            % (total, pretty_date(SINCE),
+            % (INTRO % {"since": pretty_date(SINCE)}, total, pretty_date(SINCE),
                "\n".join("            " + b for b in out)))
 
 

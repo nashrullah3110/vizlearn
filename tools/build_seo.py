@@ -33,6 +33,19 @@ LIGHT_BG = "#f0fdf4"   # --bg-body in light mode, the default theme
 # ads on; it also serves as the site-verification signal during review. It does
 # nothing visible until the account is approved.
 ADSENSE_CLIENT = "ca-pub-7551664560637561"
+
+# Display-unit slot IDs, filled in from the AdSense dashboard once the units
+# exist. An empty string means "this placement is off": tools/build_ads.py
+# writes its markers either way, so switching a placement on is this one
+# constant plus a rebuild, not another pass over 343 pages.
+#
+# "top" sits between the visualisation and the written article; "bottom" sits
+# below the article and above the footer. Nothing is placed inside a
+# visualisation, which is what about.html promises readers.
+AD_SLOTS = {
+    "top": "",
+    "bottom": "",
+}
 ADSENSE_TAG = (
     '    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js'
     '?client=%s" crossorigin="anonymous"></script>' % ADSENSE_CLIENT
@@ -360,15 +373,16 @@ def generated_description(rel, mods):
 
 
 # App pages, not articles. /saved/ is a bookmarks list, /map/ a navigation
-# graph, /practice/ a spaced-repetition queue and /whats-new/ a changelog -
-# between 25 and 139 words of prose each, all of it furniture. Indexed, they
-# only drag down the site's average page quality; /glossary/ is excluded from
-# this list because it is real content.
+# graph and /practice/ a spaced-repetition queue - each is a few dozen words
+# of prose wrapped around state that only exists in the reader's own browser,
+# so there is nothing on them for a crawler to index. /glossary/ and
+# /whats-new/ are excluded from this list because they are real content: the
+# first defines every term the modules assume, the second is a written record
+# of what shipped and when.
 NOINDEX = {
     "saved/index.html",
     "map/index.html",
     "practice/index.html",
-    "whats-new/index.html",
 }
 
 

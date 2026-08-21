@@ -51,9 +51,25 @@ BOLD = re.compile(r"\*\*(.+?)\*\*", re.S)
 CODE = re.compile(r"`([^`]+)`")
 
 
+def code_span(text):
+    """The inside of a `backtick span`, made safe to drop into the document.
+
+    Angle brackets have to be escaped or the browser parses them: an article
+    that mentioned `<h1>` was emitting a real, empty <h1> element into the
+    page, and `<s>` in the tokenisation article was striking through the rest
+    of the sentence. `<lambda>` and `<UNK>` were worse - an unknown element
+    swallows its own name, so the text simply vanished.
+
+    Ampersands are deliberately left alone. Articles write entities inside
+    code spans on purpose - `&lambda;`, `&minus;`, `&lt;map object&gt;` - and
+    escaping those would print the entity source instead of the character.
+    """
+    return text.replace("<", "&lt;").replace(">", "&gt;")
+
+
 def inline(s):
     """**bold** and `code`, left alone inside a tag's attributes."""
-    s = CODE.sub(lambda m: "<code>%s</code>" % m.group(1), s)
+    s = CODE.sub(lambda m: "<code>%s</code>" % code_span(m.group(1)), s)
     return BOLD.sub(lambda m: "<strong>%s</strong>" % m.group(1), s)
 
 

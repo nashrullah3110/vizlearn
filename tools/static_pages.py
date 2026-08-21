@@ -110,11 +110,46 @@ PAGES = {
          "<p>Factual errors in the written explanations, and animations that misrepresent "
          "the algorithm, are the two things I most want to hear about.</p>"),
 
+        ("What happens to a correction",
+         "<p>Every page on this site is generated from source rather than edited by hand, "
+         "so a fix is never a patch to one file. A reported error gets reproduced first, "
+         "then corrected at the point it comes from &mdash; the written explanation, the "
+         "code that draws the visualisation, or the numbers the two share &mdash; and the "
+         "whole site is rebuilt from there.</p>"
+         "<p>That is slower than editing a page in place, but it means the same mistake "
+         "cannot survive somewhere else. When a module states a number, that number is "
+         "computed by the same code the visualisation runs, so a correction to one is "
+         "automatically a correction to the other.</p>"
+         "<p>Once a fix ships, the module's updated date changes and the change is listed "
+         "on <a href=\"whats-new/\">What's New</a>, so you can confirm it landed without "
+         "having to take my word for it.</p>"),
+
+        ("How long a reply takes",
+         "<p>This is a one-person site with no support desk behind it, so there is no "
+         "service-level promise to make. In practice: a clear factual correction usually "
+         "gets acknowledged within a few days and fixed in the same week, because it is "
+         "the highest-value message I receive. A module request, a licensing question or "
+         "anything that needs a considered answer can take longer.</p>"
+         "<p>If a fortnight goes by with nothing, the message went astray rather than "
+         "being ignored &mdash; send it again.</p>"),
+
         ("Requesting a module",
          "<p>If there is a topic you keep failing to find a good explanation of, send it "
          "over. Requests that name the specific thing that is confusing (\"why does padding "
          "change the output size\") are far more useful than a broad subject, because the "
          "confusion is what a module is built around.</p>"),
+
+        ("What this address is not for",
+         "<p>I cannot debug your code, complete an assignment, or work through a problem "
+         "set for you. If a module left you unable to do something the module claims to "
+         "teach, that is worth writing in about, because it means the explanation is not "
+         "doing its job &mdash; but frame it that way rather than as a question to be "
+         "answered.</p>"
+         "<p>For running code, the four labs on this site &mdash; "
+         "<a href=\"python-lab/\">Python</a>, <a href=\"sql-lab/\">SQL</a>, "
+         "<a href=\"js-lab/\">JavaScript</a> and <a href=\"html-lab/\">HTML</a> "
+         "&mdash; run entirely in your browser and will usually tell you more, faster, "
+         "than an email will.</p>"),
 
         ("Using VizLearn in teaching",
          "<p>You are welcome to link to any module from a course page, a reading list or a "
