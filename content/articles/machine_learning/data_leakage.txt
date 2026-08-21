@@ -1,0 +1,132 @@
+title: Data Leakage
+intro: The mistake that makes your model look better and your results worthless.
+
+## What it is
+
+Leakage is any route by which information about the data you are evaluating on
+reaches the model before the evaluation. The model then answers a question it
+was quietly shown the answer to, and the score you report measures nothing you
+can act on.
+
+It has no error message. Nothing crashes, nothing warns, and the only symptom is
+that the number is better than you expected &mdash; which is not a symptom
+anyone investigates.
+
+## Watch it happen, on data with nothing in it
+
+The dataset behind the chart is 300 rows and several hundred columns of pure
+noise. The labels are assigned independently of every column. There is no signal
+whatsoever, and the only honest score is 50%.
+
+Set the control to **Once, on the whole dataset**. Five columns are picked by
+correlating each one with the label across all 300 rows, and only then is the
+data cross-validated. The reported accuracy is well above 50%, on data that
+contains nothing.
+
+Now set it to **Inside each fold**. The selection is redone within each fold's
+training rows, and the reported accuracy falls back to chance &mdash; in fact
+slightly below it, which is worth a sentence of its own further down.
+
+Drag the number of columns up. The inflation grows: 40 candidate columns buy a
+few points, 600 buy considerably more. With more columns to search there is
+always some that correlate with the labels by chance, and the selection was
+allowed to see the labels of the rows it was later tested on.
+
+Nothing about the model changed between those two settings. The only difference
+is whether the rows being scored had a say in which columns were used.
+
+## Why the honest number lands below 50%
+
+The correct setting reports something like 45%, not 50%, and that is not a bug
+in the demonstration.
+
+A column is chosen inside a fold because it happened to separate the classes in
+those training rows. On pure noise that separation is entirely accidental, and
+an accident large enough to win a search over hundreds of columns is an extreme
+one. Extremes regress: on the held-out rows, that column is as likely to lean
+the other way as this way, and the centroid built from the training rows then
+points slightly the wrong direction.
+
+So selecting features on noise does not merely fail to help. It can actively
+mislead, and a model built on selected noise can score worse than one that
+ignores the data entirely. That is worth knowing on its own, and it is the
+strongest available argument for checking whether a feature-selection step is
+earning its place.
+
+## Why a scaler counts as a model
+
+The instinct that makes this feel harmless is that scaling is "just
+preprocessing". But `StandardScaler` has parameters &mdash; a mean and a
+standard deviation &mdash; and it *learns* them from data. Anything that learns
+parameters from data must learn them from training data only.
+
+The same argument applies to every step that looks at the data as a whole:
+
+- imputing missing values with a column mean
+- selecting the top *k* features by correlation with the target
+- fitting a PCA rotation
+- learning target encodings for categorical columns
+- computing TF-IDF weights
+- resampling to balance classes
+
+Every one of those is fitted, and every one leaks if fitted before the split.
+
+They do not leak equally, and it is worth being straight about that. A scaler
+fitted on a few hundred well-behaved rows leaks a real but tiny amount: the mean
+barely moves when you add the validation rows to it, and the reported score may
+shift by a fraction of a per cent. Feature selection leaks enormously, which is
+why it is the demonstration above. The scaler case still matters, because a
+fraction of a per cent is enough to change which of two models you ship, and
+because the habit that prevents one prevents the other.
+
+## The other kind
+
+The second family has nothing to do with order of operations. It is a feature
+that could not exist at prediction time.
+
+A model predicting whether a customer will churn, trained on a table that
+includes `cancellation_reason`. A model predicting loan default with a column
+for `recovery_amount`. A medical model given a field that is only filled in once
+a diagnosis has been made.
+
+These are obvious when written out and very hard to spot in a warehouse table
+with three hundred columns, most of them undocumented. The diagnostic question
+is not "is this related to the target" but **"would this value be present, and
+correct, at the moment I need a prediction?"**
+
+A near-perfect score is the strongest evidence of leakage there is. If a model
+reports 99% on a problem people find hard, the correct first response is
+suspicion, not celebration.
+
+## Leakage across time and groups
+
+Two subtler cases are worth naming.
+
+**Time.** A random split of time-series data puts future rows in the training
+set and past rows in the test set, so the model is asked to predict backwards
+after being shown what happened. Split by time, always.
+
+**Groups.** If one patient contributes ten scans, a random split scatters them
+across train and test. The model can recognise the patient rather than the
+condition, and the score reflects that. Split by group.
+
+## The fix
+
+Put every fitted step inside a [pipeline](ml_pipelines.html) and cross-validate
+the pipeline, not the model. Then each fold fits its own scaler, its own imputer
+and its own feature selection on that fold's training portion, which is exactly
+what you would have to do in production.
+
+This is not a stylistic preference. It is the only arrangement in which the
+order of operations cannot be got wrong by accident.
+
+## Where it goes wrong
+
+**Scaling or imputing before `train_test_split`.** The commonest form.
+
+**Selecting features on the full dataset.** Produces plausible scores from noise.
+
+**Random splits on time series or grouped data.**
+
+**Believing a suspiciously good result.** It is nearly always leakage, and
+finding out later is much more expensive than checking now.

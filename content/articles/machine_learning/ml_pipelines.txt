@@ -1,0 +1,107 @@
+title: Pipelines
+intro: Not a convenience wrapper. The arrangement in which the order of operations cannot be got wrong.
+
+## The same demonstration, one level up
+
+The chart is the one from the [leakage](data_leakage.html) module, relabelled:
+300 rows of pure noise, five columns chosen by their correlation with the label,
+and a choice about *when* that choice is made.
+
+By hand, before cross-validation, the reported accuracy sits well above the 50%
+the data deserves. Inside a pipeline, where every fold selects its own columns
+from its own training rows, it falls to the truth.
+
+The model is identical in both. What changed is which object owns the fitting,
+and that is the entire argument for pipelines. It is not about tidiness.
+
+## What goes wrong by hand
+
+The by-hand workflow looks reasonable written out:
+
+```
+X = impute(X)
+X = scale(X)
+X = select_features(X, y)
+scores = cross_val_score(model, X, y, cv=5)
+```
+
+Every one of those three steps has been fitted on all the data, and
+`cross_val_score` then splits data that has already been contaminated. Each fold
+was scaled using a mean that included its own validation rows, imputed using a
+median that included them, and reduced to features chosen partly because they
+correlated with their labels.
+
+Nothing errors. The score is simply too high, by an amount that depends on the
+data and cannot be estimated after the fact.
+
+## What a pipeline changes
+
+```
+pipe = Pipeline([
+    ("impute", SimpleImputer(strategy="median")),
+    ("scale",  StandardScaler()),
+    ("select", SelectKBest(k=20)),
+    ("model",  KNeighborsClassifier()),
+])
+scores = cross_val_score(pipe, X, y, cv=5)
+```
+
+`cross_val_score` now receives one estimator. On each fold it calls `fit` on the
+pipeline with that fold's training rows, and the pipeline fits the imputer, then
+the scaler, then the feature selector, then the model &mdash; all on those rows
+only. Scoring calls `transform` on the validation rows using the parameters just
+learned.
+
+The correct order is not something you remembered to do. It is the only thing
+the object can do.
+
+## The three other things it buys
+
+**Hyperparameter search over preprocessing.** Because the steps are part of one
+estimator, a grid can range over them:
+
+```
+{"impute__strategy": ["mean", "median"],
+ "select__k": [10, 20, 40],
+ "model__n_neighbors": [3, 5, 11]}
+```
+
+Whether the median beats the mean becomes a question the search answers, on the
+same footing as the model's own parameters. Doing this by hand correctly is
+possible and nobody does it.
+
+**No train/serve gap.** The fitted pipeline is one object. Save it, load it in
+the service, call `predict` on raw input. There is no second implementation of
+the preprocessing to drift out of step with the first &mdash; which is a real
+and common production failure, and a silent one.
+
+**Different columns, different treatment.** `ColumnTransformer` routes numeric
+columns to an imputer and scaler, categorical ones to a different imputer and a
+one-hot encoder, and text to a vectoriser, then hands the combined result to the
+model. That is what an actual table needs, and it stays one object.
+
+## Cross-validation still needs care
+
+A pipeline stops leakage between preprocessing and evaluation. It does not fix
+splits that were wrong to begin with.
+
+If rows are grouped &mdash; several scans per patient &mdash; use `GroupKFold`
+so a patient cannot appear on both sides. If the data is a time series, use
+`TimeSeriesSplit` so training always precedes validation. And if you tune
+hyperparameters on the same folds you report, that number is optimistic too;
+nested cross-validation is the honest version.
+
+## Where it goes wrong
+
+**Calling `fit` on the test data.** Use `transform`. `fit_transform` on the test
+set refits everything and undoes the whole point.
+
+**Steps that are not fitted.** A log transform has no parameters and cannot
+leak, so it does not have to be in the pipeline &mdash; but putting it there
+keeps the preprocessing in one place, which is worth more than the exemption.
+
+**Resampling inside a plain pipeline.** SMOTE and friends must run on the
+training fold only. `imblearn`'s pipeline handles this; scikit-learn's does not.
+
+**Assuming a pipeline validates your splits.** It fits each fold correctly. It
+cannot know that your folds mix one patient across both sides.

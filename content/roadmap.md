@@ -33,6 +33,12 @@ the error messages are the database's own. Isolation levels and deadlocks step
 through a scripted two-transaction schedule instead, because one connection
 cannot demonstrate two.
 
+**Machine Learning: 25 -> 35.** Tier 1 is complete, generated from
+`tools/ml_topics.py` with the simulations in `assets/vizlearn-ml.js`. Every
+score is computed in the browser from data generated in the browser, so the
+leakage module genuinely selects features with the labels in hand and genuinely
+reports the inflated number that follows.
+
 ## Computer Vision (20)
 
 Twelve of the twenty modules are CNN internals. What is missing is the layer
@@ -129,6 +135,8 @@ interpretation - which is where real projects fail.
 | Threshold tuning | 0.5 is a default, not a decision |
 | Grid search vs random search | Same budget; random wins in high dimensions |
 | Learning curves | Train/validation gap diagnosing bias vs variance |
+
+All ten are built.
 
 ### Tier 2 - models and interpretation
 

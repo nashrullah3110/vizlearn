@@ -55,6 +55,14 @@ SEQUENCE = {
     # Prepare data -> fit a first model -> measure it -> more models -> pitfalls.
     "ml": [
         "machine_learning/train_test_split.html",
+        # Preprocessing, in the order the mistakes compound: scaling first
+        # because it is the step that leaks, leakage immediately after it,
+        # then the two data problems that need the same discipline.
+        "machine_learning/feature_scaling.html",
+        "machine_learning/data_leakage.html",
+        "machine_learning/handling_missing_values.html",
+        "machine_learning/outliers_and_influence.html",
+        "machine_learning/ml_pipelines.html",
         "machine_learning/label_encoding.html",
         "machine_learning/one_hot_encoding.html",
         "machine_learning/linear_regression_with_ols.html",
@@ -62,7 +70,10 @@ SEQUENCE = {
         "machine_learning/logistic_regression.html",
         "machine_learning/knn.html",
         "machine_learning/confusion_matrix.html",
+        "machine_learning/precision_recall_and_f1.html",
         "machine_learning/roc_curve_and_auc.html",
+        "machine_learning/precision_recall_vs_roc.html",
+        "machine_learning/threshold_tuning.html",
         "machine_learning/decision_tree.html",
         "machine_learning/random_forest.html",
         "machine_learning/gradient_boosting.html",
@@ -73,6 +84,8 @@ SEQUENCE = {
         "machine_learning/cosine_similarity.html",
         "machine_learning/cross_validation.html",
         "machine_learning/bias_vs_variance.html",
+        "machine_learning/learning_curves.html",
+        "machine_learning/grid_vs_random_search.html",
         "machine_learning/ridge_and_lasso_regression.html",
         "machine_learning/label_imbalance_problem.html",
         "machine_learning/training_on_label_imbalanced_dataset.html",

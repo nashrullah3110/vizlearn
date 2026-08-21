@@ -121,7 +121,10 @@ SHARED_SCRIPTS = ("modules.js", "search.js", "vizlearn.js", "vizlearn-lab.js",
                   # generated database/ modules. The SQL engine itself is
                   # vizlearn-sql.js, which is loaded per page because it pulls
                   # a wasm payload; this only wires buttons.
-                  "vizlearn-dbq.js")
+                  "vizlearn-dbq.js",
+                  # The workflow simulations on the generated machine_learning/
+                  # modules. Binds only to [data-vz-ml].
+                  "vizlearn-ml.js")
 # The one-time migration wrote these directly; drop the loose copies.
 LOOSE_SCRIPT = re.compile(
     r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa|vizlearn-keys|glossary|vizlearn-glossary|vizlearn-python|vizlearn-rails|vizlearn-js|vizlearn-html|vizlearn-code|vizlearn-interview|vizlearn-ragviz)\.js"></script>\n?')

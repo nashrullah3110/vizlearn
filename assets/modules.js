@@ -1852,6 +1852,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Measure similarity by angle instead of distance. Drag two vectors apart and watch the cosine similarity score respond in real time."
  },
  {
+  "title": "Data Leakage",
+  "path": "machine_learning/data_leakage.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
+ },
+ {
   "title": "Decision Tree Analysis",
   "path": "machine_learning/decision_tree.html",
   "category": "Machine Learning",
@@ -1868,12 +1876,36 @@ window.VIZLEARN_MODULES = [
   "desc": "Compare MAE, MSE, RMSE and R-squared on identical predictions and see which kinds of error each metric punishes hardest."
  },
  {
+  "title": "Feature Scaling",
+  "path": "machine_learning/feature_scaling.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
+ },
+ {
   "title": "Gradient Boosting",
   "path": "machine_learning/gradient_boosting.html",
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
   "desc": "Add one small tree at a time, each fitted to the residuals left by the last. Watch the errors shrink, and watch it overfit when the trees get too deep."
+ },
+ {
+  "title": "Grid Search against Random Search",
+  "path": "machine_learning/grid_vs_random_search.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
+ },
+ {
+  "title": "Handling Missing Values",
+  "path": "machine_learning/handling_missing_values.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
  },
  {
   "title": "Hard vs Soft Labelling",
@@ -1924,6 +1956,14 @@ window.VIZLEARN_MODULES = [
   "desc": "See how a model scores 99% accuracy while missing every fraud case, and why imbalance breaks your intuition about metrics."
  },
  {
+  "title": "Learning Curves",
+  "path": "machine_learning/learning_curves.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
+ },
+ {
   "title": "Linear Regression with OLS",
   "path": "machine_learning/linear_regression_with_ols.html",
   "category": "Machine Learning",
@@ -1962,6 +2002,38 @@ window.VIZLEARN_MODULES = [
   "topic": "ml",
   "icon": "brain",
   "desc": "Expand a categorical column into binary columns and see how one-hot encoding avoids implying an order that was never there."
+ },
+ {
+  "title": "Outliers and Influence",
+  "path": "machine_learning/outliers_and_influence.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
+ },
+ {
+  "title": "Pipelines",
+  "path": "machine_learning/ml_pipelines.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
+ },
+ {
+  "title": "Precision, Recall and F1",
+  "path": "machine_learning/precision_recall_and_f1.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
+ },
+ {
+  "title": "Precision-Recall against ROC",
+  "path": "machine_learning/precision_recall_vs_roc.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
  },
  {
   "title": "Principal Component Analysis",
@@ -2010,6 +2082,14 @@ window.VIZLEARN_MODULES = [
   "topic": "ml",
   "icon": "brain",
   "desc": "Add points from two classes and watch a support vector machine find the hyperplane with the widest possible margin between them."
+ },
+ {
+  "title": "Threshold Tuning",
+  "path": "machine_learning/threshold_tuning.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
  },
  {
   "title": "Train-Test Split Method",

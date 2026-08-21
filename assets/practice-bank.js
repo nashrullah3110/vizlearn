@@ -7103,6 +7103,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "machine_learning/data_leakage.html",
+  "title": "Data Leakage",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Why does fitting a StandardScaler before the train/test split count as leakage?",
+    "o": [
+     "It slows training down",
+     "The mean and standard deviation are learned parameters, so test rows influence what the model sees",
+     "It changes the test labels",
+     "It only matters for k-NN"
+    ],
+    "a": 1,
+    "w": "Anything that learns parameters from data must learn them from training data only. Otherwise the reported score stops being an estimate of performance on unseen data."
+   },
+   {
+    "t": "What is the right question to ask about a suspicious feature?",
+    "o": [
+     "Is it correlated with the target?",
+     "Would this value be present and correct at the moment a prediction is needed?",
+     "Is it numeric or categorical?",
+     "Does removing it hurt the score?"
+    ],
+    "a": 1,
+    "w": "A cancellation reason correlates beautifully with churn and does not exist before the customer churns. Correlation is exactly what makes leaked features look valuable."
+   },
+   {
+    "t": "Why does a random split leak on time-series data?",
+    "o": [
+     "The rows are correlated",
+     "Future rows land in training and past rows in test, so the model predicts backwards after seeing what happened",
+     "Time cannot be a feature",
+     "The test set becomes too small"
+    ],
+    "a": 1,
+    "w": "Production always predicts forward from the past. A random split evaluates a situation that can never occur, so the score does not describe the deployed system."
+   }
+  ]
+ },
+ {
   "path": "machine_learning/decision_tree.html",
   "title": "Decision Tree Analysis",
   "cat": "Machine Learning",
@@ -7141,6 +7181,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "machine_learning/feature_scaling.html",
+  "title": "Feature Scaling",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Why is k-NN affected by feature scaling but a decision tree is not?",
+    "o": [
+     "Trees ignore numeric columns",
+     "k-NN sums squared differences, so the larger-scaled column dominates; a tree's splits are unchanged by any monotonic rescaling",
+     "Trees scale internally",
+     "k-NN requires normalised inputs to run"
+    ],
+    "a": 1,
+    "w": "Rescaling changes `income > 45000` into `income' > 0.53`, which partitions exactly the same rows. Distance, by contrast, is dominated by whichever column has the biggest numbers."
+   },
+   {
+    "t": "What is MinMaxScaler's main weakness compared with StandardScaler?",
+    "o": [
+     "It is slower",
+     "It uses the minimum and maximum, so one extreme value compresses all the real data",
+     "It cannot handle negative numbers",
+     "It changes the shape of the distribution"
+    ],
+    "a": 1,
+    "w": "Min and max are the two most outlier-sensitive statistics there are. One salary of ten million maps to 1.0 and pushes every real salary into a sliver at the bottom."
+   },
+   {
+    "t": "Where must a scaler's mean and standard deviation come from?",
+    "o": [
+     "The whole dataset",
+     "The training data only",
+     "The test data",
+     "A standard reference table"
+    ],
+    "a": 1,
+    "w": "They are learned parameters. Computing them across everything lets test-set information reach the model before evaluation, and the reported score stops estimating anything."
+   }
+  ]
+ },
+ {
   "path": "machine_learning/gradient_boosting.html",
   "title": "Gradient Boosting",
   "cat": "Machine Learning",
@@ -7156,6 +7236,86 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What is meant by “CatBoost” here?",
     "ans": "— the one to reach for with many categorical columns. It encodes them with target statistics computed in a way that avoids leaking the target, and its defaults are unusually good, so it often wins with no tuning at all."
+   }
+  ]
+ },
+ {
+  "path": "machine_learning/grid_vs_random_search.html",
+  "title": "Grid Search against Random Search",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Why does a 4x4 grid of 16 trials explore an important hyperparameter poorly?",
+    "o": [
+     "Grids are slower",
+     "All four points in a column share the same value, so 16 trials give only 4 distinct values of that parameter",
+     "It cannot sample the edges",
+     "The lattice is biased toward the centre"
+    ],
+    "a": 1,
+    "w": "The other trials in a column vary only the axis that does not matter. Random search of the same 16 trials gives 16 distinct values of every parameter."
+   },
+   {
+    "t": "How should a learning rate be sampled in a random search?",
+    "o": [
+     "Uniformly between the bounds",
+     "Log-uniformly",
+     "Normally around the default",
+     "In equal steps"
+    ],
+    "a": 1,
+    "w": "Uniform sampling between 0.0001 and 0.1 puts about 90% of the draws above 0.01, which leaves the small-value region essentially unexplored."
+   },
+   {
+    "t": "What should you check if the best value found sits at the edge of the search range?",
+    "o": [
+     "Nothing, edges are common",
+     "Widen the range - no search finds what lies outside its bounds",
+     "Reduce the number of trials",
+     "Switch to grid search"
+    ],
+    "a": 1,
+    "w": "A best value at the boundary is evidence the optimum is beyond it. The search reported the best point it was allowed to consider, not the best point."
+   }
+  ]
+ },
+ {
+  "path": "machine_learning/handling_missing_values.html",
+  "title": "Handling Missing Values",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "What does 'missing not at random' mean?",
+    "o": [
+     "The values were lost by a bug",
+     "Whether a value is absent depends on the value itself, such as high earners declining to state income",
+     "The missing rows are scattered evenly",
+     "The column has no default"
+    ],
+    "a": 1,
+    "w": "It is the hard case and the common one: dropping such rows removes a biased sample, and imputing a central value pulls every statistic toward the middle."
+   },
+   {
+    "t": "Why does mean imputation weaken a column's correlations?",
+    "o": [
+     "It changes the units",
+     "The imputed rows all carry the same value and no relationship to other columns, diluting the real relationship",
+     "It introduces outliers",
+     "It removes the column's variance entirely"
+    ],
+    "a": 1,
+    "w": "A pile of identical values has no variance and no covariance with anything, so it drags every measured relationship toward zero."
+   },
+   {
+    "t": "Why add a missing-value indicator column?",
+    "o": [
+     "To make the imputation reversible",
+     "Because the fact that a value was absent is often predictive in itself",
+     "It is required by scikit-learn",
+     "It speeds up training"
+    ],
+    "a": 1,
+    "w": "When absence depends on the value - high earners declining to answer - 'declined to answer' predicts the answer. Plain imputation throws that away for free."
    }
   ]
  },
@@ -7316,6 +7476,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "machine_learning/learning_curves.html",
+  "title": "Learning Curves",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Training error is high and the two curves have converged. What does that mean?",
+    "o": [
+     "Variance - collect more data",
+     "Bias - the model is too simple, and more data will not help",
+     "The split is wrong",
+     "The model is well fitted"
+    ],
+    "a": 1,
+    "w": "The model cannot fit data it has already seen, so unseen data is not the problem. The curves have already converged, so adding examples moves neither."
+   },
+   {
+    "t": "What tells you whether collecting more data will help?",
+    "o": [
+     "The size of the gap",
+     "Whether the validation curve is still falling at your current dataset size",
+     "The training error alone",
+     "The number of features"
+    ],
+    "a": 1,
+    "w": "A still-descending validation curve means more examples will improve the model, and its slope suggests by how much. A flat one means the effort belongs elsewhere."
+   },
+   {
+    "t": "High training error AND a large gap suggests what?",
+    "o": [
+     "Severe overfitting",
+     "A bug - check the split, the labels, and whether validation comes from a different distribution",
+     "Ideal capacity",
+     "Too much regularisation"
+    ],
+    "a": 1,
+    "w": "Bias and variance alone do not produce that combination. It usually means mislabelled data or a validation set drawn from somewhere else."
+   }
+  ]
+ },
+ {
   "path": "machine_learning/linear_regression_with_ols.html",
   "title": "Linear Regression with OLS",
   "cat": "Machine Learning",
@@ -7453,6 +7653,166 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "machine_learning/outliers_and_influence.html",
+  "title": "Outliers and Influence",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Why does least squares react so strongly to a single distant point?",
+    "o": [
+     "It weights recent points more",
+     "It minimises squared error, so a point twice as far off pulls four times as hard",
+     "It ignores points near the mean",
+     "It fits the maximum rather than the average"
+    ],
+    "a": 1,
+    "w": "The objective is willing to move a long way to reduce one large residual, even at a small cost to every other point. That is what the loss function asks for."
+   },
+   {
+    "t": "What makes a point 'influential' rather than merely an outlier?",
+    "o": [
+     "It has a large residual",
+     "It is unusual in x as well as y, so removing it changes the model",
+     "It is the newest observation",
+     "It has a missing value"
+    ],
+    "a": 1,
+    "w": "The line pivots about the mean of x, so a point far along x sits at the end of a long lever. Extreme in y near the pivot is harmless; the combination is not."
+   },
+   {
+    "t": "What is wrong with removing anything beyond three standard deviations?",
+    "o": [
+     "Three is too strict",
+     "The outlier has already inflated the standard deviation being used to judge it",
+     "It requires a normal distribution",
+     "It removes too few points"
+    ],
+    "a": 1,
+    "w": "The rule uses a statistic the outlier corrupts, so a large enough outlier widens the threshold enough to protect itself. Robust measures like the median absolute deviation avoid this."
+   }
+  ]
+ },
+ {
+  "path": "machine_learning/ml_pipelines.html",
+  "title": "Pipelines",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "What does cross-validating a pipeline do that cross-validating a model does not?",
+    "o": [
+     "It runs faster",
+     "It refits every preprocessing step on each fold's training portion",
+     "It uses more folds",
+     "It tunes hyperparameters automatically"
+    ],
+    "a": 1,
+    "w": "Preprocessing fitted by hand beforehand has already seen every validation row. Inside a pipeline the correct order is the only thing the object can do."
+   },
+   {
+    "t": "Why does a pipeline remove the train/serve gap?",
+    "o": [
+     "It compresses the model",
+     "The fitted object contains the preprocessing, so there is no second implementation to drift out of step",
+     "It logs predictions",
+     "It validates input types"
+    ],
+    "a": 1,
+    "w": "Reimplementing preprocessing in the serving code is a common production failure and a silent one - the model receives differently-prepared inputs and quietly degrades."
+   },
+   {
+    "t": "What does a pipeline NOT protect you from?",
+    "o": [
+     "Fitting a scaler on test data",
+     "Splits that were wrong to begin with, such as one patient appearing on both sides",
+     "Imputing before scaling",
+     "Feature selection leakage"
+    ],
+    "a": 1,
+    "w": "It fits each fold correctly but cannot know your folds are badly formed. Grouped data needs GroupKFold and time series need TimeSeriesSplit."
+   }
+  ]
+ },
+ {
+  "path": "machine_learning/precision_recall_and_f1.html",
+  "title": "Precision, Recall and F1",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "What happens to precision and recall as the threshold falls?",
+    "o": [
+     "Both rise",
+     "Both fall",
+     "Recall rises and precision falls",
+     "They are unaffected by the threshold"
+    ],
+    "a": 2,
+    "w": "A lower threshold flags more cases, so more real positives are caught (recall up) but the flagged set fills with negatives (precision down). The threshold picks a point on the trade-off, it does not improve the model."
+   },
+   {
+    "t": "Why is F1 a harmonic rather than arithmetic mean?",
+    "o": [
+     "It is faster to compute",
+     "The harmonic mean is pulled toward the smaller value, so it stays low unless both are high",
+     "It bounds the result to [0, 1]",
+     "It handles zero denominators"
+    ],
+    "a": 1,
+    "w": "Precision 1.0 with recall 0.01 averages arithmetically to a respectable 0.505 and gives an F1 of 0.0198. The harmonic mean refuses to be gamed by a degenerate model."
+   },
+   {
+    "t": "Why is accuracy misleading when 1% of cases are positive?",
+    "o": [
+     "It ignores true negatives",
+     "Predicting 'never positive' scores 99% while catching nothing",
+     "It cannot be computed",
+     "It depends on the threshold"
+    ],
+    "a": 1,
+    "w": "Accuracy measures the class balance more than the model. Precision and recall would both be zero, which is the honest description of that model."
+   }
+  ]
+ },
+ {
+  "path": "machine_learning/precision_recall_vs_roc.html",
+  "title": "Precision-Recall against ROC",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Why does ROC stay flattering as positives become rare?",
+    "o": [
+     "It uses accuracy",
+     "TPR and FPR are each computed within one class, so neither depends on the balance between them",
+     "It ignores false positives",
+     "It is computed at a single threshold"
+    ],
+    "a": 1,
+    "w": "Adding a million negatives leaves TPR untouched and changes FPR only through its own proportionally larger denominator. Precision's denominator mixes both classes, so it falls."
+   },
+   {
+    "t": "10,000 rows, 100 positive, 90% recall and 5% false positive rate. What is precision?",
+    "o": [
+     "90%",
+     "About 15%",
+     "About 50%",
+     "5%"
+    ],
+    "a": 1,
+    "w": "90 true positives against 495 false positives from the 9,900 negatives gives 90/585, about 15%. A 5% FPR sounds excellent and produces five wrong flags for every right one."
+   },
+   {
+    "t": "What is the no-skill baseline on a PR curve?",
+    "o": [
+     "The diagonal",
+     "A horizontal line at the positive rate",
+     "Always 0.5",
+     "There is none"
+    ],
+    "a": 1,
+    "w": "It moves with the base rate, which is why a PR AUC must never be quoted without it. 0.4 is poor on balanced data and outstanding at a 2% positive rate."
+   }
+  ]
+ },
+ {
   "path": "machine_learning/pca.html",
   "title": "Principal Component Analysis",
   "cat": "Machine Learning",
@@ -7584,6 +7944,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “What are Support Vectors”?",
     "ans": "The data points that lie exactly on the margin boundaries are called Support Vectors . These are the most critical data points in the dataset because they alone \"support\" or define the position and orientation of the optimal hyperplane."
+   }
+  ]
+ },
+ {
+  "path": "machine_learning/threshold_tuning.html",
+  "title": "Threshold Tuning",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Where does the 0.5 default threshold come from?",
+    "o": [
+     "It is derived from the training data",
+     "It is the library's default, optimal only when classes are balanced and both errors cost the same",
+     "It maximises accuracy on any dataset",
+     "It is the median predicted probability"
+    ],
+    "a": 1,
+    "w": "A default has to be something. Change the balance or the relative cost of the two mistakes and 0.5 stops being the right cut."
+   },
+   {
+    "t": "If a miss costs ten times a false alarm, roughly what threshold does the cost formula give?",
+    "o": [
+     "0.5",
+     "About 0.09",
+     "0.9",
+     "It depends only on the model"
+    ],
+    "a": 1,
+    "w": "cost_FP / (cost_FP + cost_FN) = 1/11, about 0.09. The default of 0.5 would be about five times too strict for that problem."
+   },
+   {
+    "t": "How does threshold tuning differ from calibration?",
+    "o": [
+     "They are the same thing",
+     "Tuning picks a cut on the scores as given; calibration changes the scores so 0.8 really means 80%",
+     "Calibration only applies to trees",
+     "Tuning requires the test set"
+    ],
+    "a": 1,
+    "w": "They are independent. A badly calibrated model can rank perfectly and a tuned threshold still works - but deriving the threshold from the cost formula needs p to be a real probability."
    }
   ]
  },

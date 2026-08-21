@@ -1,0 +1,105 @@
+title: Feature Scaling
+intro: Why a column measured in pounds drowns out a column measured in years, and which models care.
+
+## The problem is the units
+
+The data here has two columns: age, spanning roughly 25 to 55, and income,
+spanning roughly 20,000 to 70,000. They describe a person about equally well.
+
+Set the scaler to None and look at the readout. The income range is around a
+thousand times the age range. Now consider what k-NN does &mdash; it finds the
+nearest points by Euclidean distance:
+
+```
+distance^2 = (age1 - age2)^2 + (income1 - income2)^2
+```
+
+A ten-year age difference contributes 100 to that sum. A ten-pound income
+difference contributes 100 as well. A five-thousand-pound difference contributes
+twenty-five million.
+
+The age term is not merely less important. It is numerically irrelevant: any
+plausible age difference is lost in the rounding of the income term. The model
+is effectively one-dimensional, and nobody asked for that.
+
+## What the scalers do
+
+Switch to **StandardScaler**. Each column has its mean subtracted and is divided
+by its standard deviation, so both end up centred on 0 with a spread of about 1.
+The scatter becomes roughly circular, both columns contribute comparably, and
+the accuracy in the readout moves.
+
+```
+z = (x - mean) / std
+```
+
+Switch to **MinMaxScaler**. Each column is mapped onto [0, 1] using its minimum
+and maximum:
+
+```
+x' = (x - min) / (max - min)
+```
+
+Both fix the units problem. They differ in how they handle extremes, and that is
+the basis for choosing.
+
+| | StandardScaler | MinMaxScaler |
+|---|---|---|
+| Output range | unbounded, roughly &minus;3 to 3 | exactly [0, 1] |
+| Uses | mean, standard deviation | minimum, maximum |
+| One extreme value | shifts the mean a little | compresses everything else |
+| Good for | most things, especially with outliers | bounded inputs, image pixels, neural nets |
+
+MinMax's weakness is worth stating plainly. Both statistics it uses are the most
+outlier-sensitive numbers available. One salary of ten million maps to 1.0 and
+crushes every real salary into the bottom half of a per cent of the range.
+
+## Which models care
+
+**Sensitive**, because they measure distance or magnitude:
+
+- k-NN and k-means &mdash; distance is the entire algorithm
+- SVM with an RBF or polynomial kernel &mdash; the kernel is a distance
+- PCA &mdash; it finds directions of maximum variance, and unscaled variance is
+  dominated by whichever column has the biggest units
+- Neural networks &mdash; not for correctness, but gradients on wildly different
+  scales make optimisation slow and unstable
+- Ridge and Lasso &mdash; the penalty is on coefficient size, and coefficient
+  size depends on the units of its column
+
+**Not sensitive:**
+
+- Decision trees, random forests, gradient boosting
+
+That last group surprises people, and the reason is worth having. A tree split
+asks `is income > 45000`. Rescale the column and the question becomes
+`is income' > 0.53`, which partitions the rows into exactly the same two groups.
+Any monotonic transformation leaves every possible split unchanged, so the tree
+is identical. Scaling before a random forest is not wrong; it is simply a
+no-op.
+
+## The rule that matters more than the choice
+
+Fit the scaler on the **training data only**, then apply it to the test data
+without refitting.
+
+The mean and standard deviation are learned parameters. Computing them from the
+whole dataset lets information about the test set reach the model before it is
+evaluated, and the reported score stops being an estimate of anything. That is
+[data leakage](data_leakage.html), it is the most common serious mistake in
+applied machine learning, and it is why scalers belong inside a
+[pipeline](ml_pipelines.html) rather than being applied by hand.
+
+## Where it goes wrong
+
+**Fitting the scaler on everything.** The number you report goes up and the
+model does not get better.
+
+**Scaling the target variable and forgetting to invert it.** Predictions come
+back in scaled units and the error metric is meaningless.
+
+**MinMax on data with outliers.** The real data ends up in a sliver of the
+range.
+
+**Scaling one-hot columns.** They are already 0 and 1. StandardScaler turns them
+into two arbitrary values and makes the model harder to read for no gain.

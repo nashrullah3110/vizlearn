@@ -1,0 +1,103 @@
+title: Outliers and Influence
+intro: One row out of twenty-five, and the reason it can decide your answer.
+
+## Drag it
+
+The chart holds twenty-four points along a clear upward line, plus one
+highlighted point you can move. The dashed line is the least-squares fit without
+it; the solid line is the fit with it.
+
+Drag the point straight up. The solid line rotates. Drag it to the far right and
+up, and the line follows it much further. The readout reports both slopes and
+the percentage difference between them, and it does not take much to change the
+answer by tens of per cent.
+
+Twenty-four rows are saying one thing. The twenty-fifth overrules them.
+
+## Why squaring does this
+
+Least squares chooses the line minimising the **sum of squared** residuals.
+Squaring is what makes a single point so powerful: a point twice as far from the
+line contributes four times the penalty, and one ten times as far contributes a
+hundred times.
+
+The fit is therefore willing to move a long way to reduce one large residual,
+even at the cost of small increases across every other point. That is not a bug
+in the implementation; it is what the objective function asks for.
+
+## Leverage: where it sits matters as much as how far off it is
+
+Drag the point up while keeping it near the middle of the x range, then drag it
+up while keeping it at the far right. The second position moves the line much
+more.
+
+That difference is **leverage**. A regression line pivots roughly about the mean
+of x, so a point near that mean is close to the pivot and has little turning
+effect no matter how far off it is vertically. A point at the extreme of x sits
+at the end of a long lever.
+
+The distinction is worth having in three words:
+
+- **Outlier** &mdash; unusual in y, a large residual.
+- **High leverage** &mdash; unusual in x, far from the pivot.
+- **Influential** &mdash; both, so removing it changes the model. This is the
+  one that matters, and Cook's distance is the standard way to measure it.
+
+A high-leverage point that happens to lie on the trend is harmless. A moderate
+outlier in the middle is harmless. The combination is not.
+
+## Before you remove anything
+
+The temptation is to delete the point. Resist it long enough to ask which of
+three things it is.
+
+**An error.** A misplaced decimal, a sensor fault, a unit mix-up, a placeholder
+like 999 or &minus;1 meaning "unknown". Fix it or remove it, and record that you
+did.
+
+**A different population.** The row is correct but does not belong to the
+question &mdash; a wholesale order in a table of retail purchases. Exclude it and
+say so, or model the groups separately.
+
+**A real, extreme member of the population.** The row is correct and belongs.
+This one you keep. Removing genuine extremes because they are inconvenient is
+how a result stops describing the world, and it is much more common than
+deliberate fraud.
+
+If you cannot tell which, report the analysis both ways. A conclusion that
+survives the point and a conclusion that depends on it are different findings,
+and the reader is entitled to know which they have.
+
+## Ways to be less fragile
+
+**Robust loss.** Huber loss is squared for small residuals and linear for large
+ones, so a distant point pulls hard but not quadratically hard. RANSAC fits on
+random subsets and keeps the consensus.
+
+**Quantile regression.** Models the median rather than the mean, and the median
+does not move when one point is dragged to infinity.
+
+**Winsorising.** Clip values at, say, the 1st and 99th percentiles. Keeps the
+row, caps its influence.
+
+**Use a model that does not care.** Trees split on order, not on distance, so
+a value of a million and a value of a thousand are the same split if nothing
+lies between them.
+
+**Transform.** A log transform on a skewed positive column often turns
+"outliers" into ordinary members of a normal-shaped distribution, which is
+usually a sign the column was on the wrong scale.
+
+## Where it goes wrong
+
+**Deleting by rule.** "Beyond three standard deviations" uses the standard
+deviation, which the outlier itself has already inflated.
+
+**Treating placeholders as data.** 999 for unknown age, &minus;1 for missing.
+These are not outliers; they are missing values wearing a number.
+
+**Removing points until the model fits.** At that stage the model describes the
+selection, not the phenomenon.
+
+**Checking only y.** High-leverage points can be unremarkable in y and still
+dominate the fit.

@@ -2153,3 +2153,9 @@ LABS.update(_CV_CHECKS)
 from db_topics import CHECKS as _DB_CHECKS  # noqa: E402
 
 LABS.update(_DB_CHECKS)
+
+# And the generated machine learning workflow modules (tools/ml_topics.py),
+# where a question is written against the exact simulation on the page.
+from ml_topics import CHECKS as _ML_CHECKS  # noqa: E402
+
+LABS.update(_ML_CHECKS)

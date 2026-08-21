@@ -1,0 +1,94 @@
+title: Grid Search against Random Search
+intro: Why the same number of trials finds a better answer when you stop being systematic.
+
+## The setup
+
+The background shading is the true score surface, and it is deliberately
+lopsided. The horizontal axis is a hyperparameter that matters a great deal
+&mdash; a learning rate, a regularisation strength &mdash; and the vertical axis
+is one that barely does. The optimum is a narrow vertical band.
+
+This lopsidedness is the normal case, not a contrived one. In most models one or
+two hyperparameters dominate and the rest are close to noise, and you usually do
+not know in advance which is which.
+
+## Count the distinct values
+
+Set the method to **Grid** with 16 trials. Sixteen points appear in a 4&times;4
+lattice. Read the line under the chart: 16 trials, **4** distinct values of the
+parameter that matters.
+
+Every point in a column shares an x. The other three trials in that column tell
+you nothing new about the axis you care about, because they only vary the axis
+you do not.
+
+Now switch to **Random**, same 16 trials. Sixteen points scattered, and
+**16** distinct values of the parameter that matters. Same cost, four times the
+resolution where resolution counts.
+
+Push the budget to 64. Grid gives 8 distinct values from 64 trials; random gives
+64. The gap widens as the budget grows, and it widens much faster as dimensions
+are added &mdash; a grid over five parameters at four values each is 1,024
+trials and still only four values of each.
+
+## The argument in one line
+
+A grid of *n* points per axis over *d* axes costs *n^d* trials and buys *n*
+distinct values of each parameter. Random search of the same *n^d* trials buys
+*n^d* distinct values of every parameter.
+
+If only one axis matters, grid search has wasted all but *n* of its trials on
+that axis. This is Bergstra and Bengio's 2012 result, and it changed default
+practice.
+
+## Watch the luck
+
+Move the **seed** slider with random selected. The best point found moves, and
+the best score wobbles. Random search is random; a single run can be unlucky.
+
+That is a real cost and a smaller one than it looks. Because the surface is
+broad along the unimportant axis, most draws land somewhere reasonable, and the
+distribution of outcomes is much better than grid's guaranteed coarseness. But
+it does mean a single random run is not a strong claim, and comparisons should
+allow for the variation.
+
+## When grid search is still right
+
+**Few parameters, genuinely discrete.** Three kernels, four values of *k*: a
+grid is exhaustive and the exhaustiveness is worth having.
+
+**Reproducibility matters more than efficiency.** A grid is deterministic and
+easy to describe in a paper.
+
+**You are refining.** Random search to find the region, a small grid to comb it.
+This combination is better than either alone.
+
+## What replaced both
+
+**Bayesian optimisation** builds a model of the score surface from the trials so
+far and proposes the point most likely to improve. Optuna and Hyperopt do this,
+and on expensive objectives &mdash; where one trial takes an hour &mdash; it is
+clearly better than either method here.
+
+**Successive halving** and **Hyperband** attack the cost differently: start many
+configurations cheaply, kill the worst, give the survivors more budget. When a
+trial's early performance predicts its final performance, this is dramatically
+more efficient.
+
+For anything cheap, random search remains an excellent default. It has no
+hyperparameters of its own, it parallelises perfectly, and it is very hard to
+use wrongly.
+
+## Where it goes wrong
+
+**Sampling scale.** A learning rate should be sampled log-uniformly. Uniform
+between 0.0001 and 0.1 puts 90% of the draws above 0.01.
+
+**Tuning on the test set.** Same error as everywhere else. Tune on validation.
+
+**Searching a range that excludes the answer.** No search finds what is outside
+its bounds. Check whether the best value sits at the edge of the range; if it
+does, widen it and search again.
+
+**Not searching preprocessing.** Put the whole [pipeline](ml_pipelines.html) in
+the search, so imputation and scaling choices are tuned alongside the model.
