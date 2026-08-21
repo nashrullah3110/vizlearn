@@ -40,3 +40,67 @@ At the top of the file, one per line, standard library first, then third-party, 
 ## The standard library is large
 
 Before installing anything, check what ships with Python. `collections`, `itertools`, `datetime`, `json`, `random`, `statistics`, `pathlib` and `re` cover an enormous amount of everyday work, and the page uses three of them in six lines.
+
+## What a module actually is
+
+A module is a file, and importing it runs that file top to bottom, once. Every
+function definition, class definition and top-level statement executes at that
+moment, and the resulting names become attributes of the module object.
+
+That single fact explains several things at once. It explains why top-level code
+in a module runs when someone imports it, which is why print statements left at
+module level surface in surprising places. It explains why circular imports are a
+problem: two modules each trying to finish running before the other can. And it
+explains the caching - having run it once, Python keeps the result.
+
+## The `__main__` guard
+
+Because importing runs the file, a script that does work at the top level does
+that work when imported too. The guard prevents it:
+
+```python
+def main():
+    ...
+
+if __name__ == "__main__":
+    main()
+```
+
+`__name__` is `"__main__"` when the file is run directly and the module's name
+when it is imported. So the file can be both a usable script and an importable
+module, which is what makes it testable - a test can import `main` without
+running it.
+
+## Packages and relative imports
+
+A directory with an `__init__.py` is a package, and modules inside it can import
+from each other relatively:
+
+```python
+from . import helpers          # same package
+from .models import Record     # a module in the same package
+```
+
+Relative imports only work inside a package and only when the package is being
+imported, not when a file inside it is run directly as a script. That
+restriction is behind a large share of `ImportError: attempted relative import
+with no known parent package` messages, and the usual answer is to run the module
+with `python -m package.module` rather than by path.
+
+## Where Python looks
+
+Imports resolve against `sys.path`, which starts with the directory of the script
+being run, then the standard library, then installed packages. The first match
+wins, and that ordering is why a local file named `random.py` or `json.py`
+shadows the standard library module of the same name and produces errors that
+look impossible.
+
+Naming a file after a module you also import is worth avoiding for exactly this
+reason - the failure is confusing out of all proportion to the mistake.
+
+## Import cost
+
+Imports are cheap after the first, but the first one runs the whole module. A
+library that does substantial work at import time makes every program that
+imports it slower to start, which is why heavy setup belongs in a function the
+caller chooses to call rather than at module level.

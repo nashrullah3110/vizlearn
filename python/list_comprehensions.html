@@ -185,7 +185,7 @@
                     <p>Nearly every comprehension started life as this shape:</p><pre><code class="language-python">result = []
 for item in things:
     result.append(f(item))</code></pre><p>which becomes:</p><p>result = [f(item) for item in things]</p><p>Read it left to right: <em>what to build</em>, then <em>where the items come from</em>. The three moving parts of the loop &mdash; create the list, iterate, append &mdash; collapse into one line where the intent is the first thing you see.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-filtering">Filtering</a></li><li><a href="#vz-s-nesting-reads-outer-first">Nesting reads outer-first</a></li><li><a href="#vz-s-comprehension-or-generator">Comprehension or generator</a></li><li><a href="#vz-s-the-rule-of-thumb">The rule of thumb</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-filtering">Filtering</a></li><li><a href="#vz-s-nesting-reads-outer-first">Nesting reads outer-first</a></li><li><a href="#vz-s-comprehension-or-generator">Comprehension or generator</a></li><li><a href="#vz-s-the-rule-of-thumb">The rule of thumb</a></li><li><a href="#vz-s-a-worked-example-step-by-step">A worked example, step by step</a></li><li><a href="#vz-s-the-variable-does-not-leak">The variable does not leak</a></li><li><a href="#vz-s-conditional-expression-versus-filter-once-more">Conditional expression versus filter, once more</a></li><li><a href="#vz-s-building-a-dict-or-a-set-the-same-way">Building a dict or a set the same way</a></li><li><a href="#vz-s-what-a-comprehension-is-really-for">What a comprehension is really for</a></li><li><a href="#vz-s-building-something-other-than-a-list">Building something other than a list</a></li><li><a href="#vz-s-a-note-on-nesting">A note on nesting</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -331,6 +331,41 @@ print("gen sum    :", sum(n * n for n in range(10_000)))</script>
                 <div>
                     <h3 id="vz-s-the-rule-of-thumb">The rule of thumb</h3>
                     <p>Use a comprehension when it fits on one line and reads as a sentence. When you need a second <code>for</code>, a filter, and a conditional expression at once, write the loop. Comprehensions are for making simple transformations obvious, not for proving a loop can be compressed.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-a-worked-example-step-by-step">A worked example, step by step</h3>
+                    <p>Take a list of records and pull out the names of everyone who passed:</p><pre><code class="language-python">rows = [{&quot;name&quot;: &quot;ana&quot;, &quot;score&quot;: 91},
+        {&quot;name&quot;: &quot;bo&quot;, &quot;score&quot;: 43},
+        {&quot;name&quot;: &quot;cy&quot;, &quot;score&quot;: 68}]
+
+passed = [r[&quot;name&quot;] for r in rows if r[&quot;score&quot;] &gt;= 50]</code></pre><p>Read it in the order it executes, which is not the order it is written: take each <code>r</code> from <code>rows</code>, keep it if the score clears 50, and collect <code>r["name"]</code>. The expression at the front is applied last, to whatever survives the filter.</p><p>Written as a loop that is four lines and one more variable to name.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-the-variable-does-not-leak">The variable does not leak</h3>
+                    <pre><code class="language-python">squares = [n * n for n in range(5)]
+print(n)        # NameError</code></pre><p>The loop variable belongs to the comprehension and is gone afterwards. That is a deliberate difference from a <code>for</code> statement, whose variable outlives the loop, and it is the reason a comprehension cannot quietly overwrite an <code>n</code> you were using elsewhere.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-conditional-expression-versus-filter-once-more">Conditional expression versus filter, once more</h3>
+                    <p>These two look similar and do different jobs:</p><pre><code class="language-python">[n for n in nums if n &gt; 0]                 # filter: some items are dropped
+[&quot;pos&quot; if n &gt; 0 else &quot;neg&quot; for n in nums]  # map: every item is kept</code></pre><p>The first can return a shorter list. The second always returns one item per input. If you find yourself wanting <code>if ... else</code> at the end, you almost certainly want it at the front instead.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-building-a-dict-or-a-set-the-same-way">Building a dict or a set the same way</h3>
+                    <p>The syntax generalises:</p><pre><code class="language-python">{w: len(w) for w in words}      # dict comprehension
+{len(w) for w in words}         # set comprehension</code></pre><p>Braces with a colon give a dictionary; braces without give a set. Both take the same trailing <code>if</code>, and both are worth reaching for when the loop version would be three lines of <code>result[key] = value</code>.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-what-a-comprehension-is-really-for">What a comprehension is really for</h3>
+                    <p>The value of a comprehension is not that it is shorter. It is that it says "this is a transformation" in a way a loop cannot. A loop that builds a list is three separate statements - create, iterate, append - and a reader has to hold all three to work out that nothing else is happening in between. A comprehension states the shape of the result on the first line, and there is nowhere for anything else to hide.</p><p>That is also the test for whether you should use one. If the body does one thing to each item, a comprehension expresses it better. If it does several things, updates something outside itself, or needs a <code>try</code>, the loop is not just acceptable but correct, because those are exactly the things a comprehension cannot contain and should not be contorted into.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-building-something-other-than-a-list">Building something other than a list</h3>
+                    <p>The same syntax makes dictionaries and sets, and swapping the brackets for round ones makes a generator that builds nothing at all. Choosing between them is choosing what you need afterwards. If you are going to iterate the result once and throw it away, the generator does less work and uses a fixed amount of memory whatever the size of the input. If you need to index it, measure its length or walk it twice, you need the list.</p><p>The habit worth forming is to write the generator version inside <code>sum</code>, <code>any</code>, <code>all</code>, <code>min</code>, <code>max</code> and <code>join</code>, because those consume exactly once, and to reach for the list only when the result has a life beyond that line.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-a-note-on-nesting">A note on nesting</h3>
+                    <p>A comprehension containing a second <code>for</code> is a nested loop, and it is subject to the same multiplication of work described elsewhere on this site. Flattening a list of lists is a fair use. Comparing every pair of items is not - it is the same quadratic cost written more compactly, and compactness is the last thing that helps when something is slow.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

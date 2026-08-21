@@ -5211,6 +5211,16 @@ The common failure is inheriting to reuse a method. If that is the only reason, 
 )
 
 
+# The first pass wrote about 300 words a topic, which explains a feature
+# without being worth landing on. python_extra.py carries the rest - a worked
+# example, the mistakes people make, and where the feature sits next to its
+# alternatives - appended by slug so neither file becomes unreadable.
+from python_extra import EXTRA as _EXTRA  # noqa: E402
+
+for _t in TOPICS:
+    _t["article"] = _t["article"].rstrip() + "\n" + _EXTRA.get(_t["slug"], "")
+
+
 # The MCQ bank, keyed the way tools/labs.py keys everything else.
 CHECKS = {
     "python/%s.html" % t["slug"]: {"check": t["check"]} for t in TOPICS

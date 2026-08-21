@@ -38,3 +38,93 @@ Set members must be hashable, for the same reason dictionary keys must be: the s
 ## When not to use one
 
 If order matters, if duplicates are meaningful, or if you need to index by position, use a list. A set answers one question extremely well &mdash; "is this in here?" &mdash; and refuses most others.
+
+## Order, and why you cannot rely on it
+
+A set has no order. Printing one twice in the same run usually gives the same
+arrangement, which tempts people into depending on it, and that arrangement
+can change between runs or between versions. If you need a stable order, sort
+on the way out:
+
+```python
+for name in sorted(unique_names):
+    ...
+```
+
+If you need to keep the order things first appeared, a set is the wrong tool:
+
+```python
+list(dict.fromkeys(items))     # de-duplicated, original order kept
+```
+
+Dictionaries preserve insertion order, so this is the standard trick for
+"unique but in the order I saw them".
+
+## Modifying a set
+
+```python
+seen.add("x")          # one item
+seen.update(others)    # many
+seen.discard("x")      # remove, no error if absent
+seen.remove("x")       # remove, KeyError if absent
+```
+
+`discard` and `remove` differ only in what happens when the item is not there,
+and choosing between them is a small design decision: `remove` says "this
+should have been present", `discard` says "get rid of it if it is".
+
+The operators have in-place forms too: `a |= b` adds everything from b, `a &= b`
+keeps only what both share.
+
+## A frozen set, for when a set needs to be a key
+
+Sets are mutable, so a set cannot be a dictionary key or a member of another
+set. `frozenset` is the immutable version:
+
+```python
+groups = {frozenset({"ana", "bo"}): "pair one"}
+```
+
+This comes up when the key is genuinely a collection - a set of tags, a group
+of users - and you need to look something up by it.
+
+## The cost, concretely
+
+Building a set from a list is one pass, so converting is cheap. The win comes
+when you test membership more than once. Converting a list to a set to do a
+single lookup is slower than just scanning the list; converting once and then
+testing thousands of times is the case the second program on this page
+measures, and there the difference is not subtle.
+
+## What "hashable" is really asking
+
+A set decides where to store an item by computing its hash, so the hash has to
+stay the same for as long as the item is in the set. That is the entire reason
+lists and dictionaries cannot be set members: they can change, the hash would
+change with them, and the set would be looking in the wrong place for something
+it definitely contains.
+
+This is not a rule Python invented to be awkward. It falls straight out of how
+the lookup works. The same constraint applies to dictionary keys, which is why
+the two rules are always taught together, and why the error message mentions
+hashability rather than mutability.
+
+Strings, numbers, booleans, `None` and tuples of those are all hashable and can
+go in a set. Anything you can mutate cannot.
+
+## Sets in everyday code
+
+Three patterns cover most real uses.
+
+Deduplication is the obvious one: `set(values)` collapses repeats in a single
+pass, and wrapping it in `sorted()` gives back a predictable order.
+
+Membership testing is the important one. Any time a loop contains `if x in
+something`, ask what `something` is. If it is a list that does not change during
+the loop, converting it to a set once before the loop turns a scan into a
+lookup, and that single change is often the entire fix for a slow function.
+
+Comparing two collections is the one people forget exists. "Which users are in
+both groups", "which required fields are missing", "which files changed" are all
+one operator rather than a loop with an `if` inside it, and the operator version
+is far harder to get subtly wrong.

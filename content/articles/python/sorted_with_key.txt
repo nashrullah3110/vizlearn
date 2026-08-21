@@ -44,3 +44,63 @@ Python's sort is stable: items that compare equal keep their original relative o
 ## The performance note
 
 `key` is called exactly once per item, not on every comparison, so an expensive key function is affordable. Doing the same work inside a comparison would cost far more.
+
+## What key actually does
+
+`key` takes a function, calls it once on every element, and sorts by whatever
+comes back. The original items are what you get out - the key is used for
+comparison only, and then discarded.
+
+That single sentence explains most of what people find confusing. The function
+is not a comparison between two items; it is a transformation of one item into
+something sortable. So `key=len` sorts by length, `key=str.lower` sorts
+case-insensitively, and `key=lambda r: r["score"]` sorts records by a field
+without changing them.
+
+It also explains why `key` is fast. Each element is transformed once, not once
+per comparison, which is why this is preferred over the old `cmp` approach that
+Python removed in version 3.
+
+## Sorting by more than one thing
+
+Return a tuple, and the sort compares position by position:
+
+```python
+sorted(people, key=lambda p: (p.surname, p.forename))
+```
+
+Surname first, forename only where surnames match. This extends to as many
+levels as you need, and it is far easier to get right than sorting repeatedly.
+
+Mixing directions is the awkward case, because `reverse=True` applies to the
+whole sort. For numbers, negating one component works: `key=lambda p: (-p.score,
+p.name)` gives highest score first, then name ascending. For strings there is no
+negation, and the usual answer is two stable sorts, applied least significant
+first.
+
+## Stability, and why it is useful
+
+Python's sort is stable: items that compare equal keep their original order.
+That is what makes the two-pass approach work at all, and it is a guarantee you
+can rely on rather than an implementation detail.
+
+## sorted versus .sort
+
+`sorted(x)` returns a new list and leaves the original alone. `x.sort()` reorders
+in place and returns `None`. The second is the source of a small, common bug:
+
+```python
+names = names.sort()      # names is now None
+```
+
+The method returns `None` deliberately, as a signal that it mutated rather than
+produced. Every in-place method in the standard library does the same -
+`reverse`, `append`, `extend`, `update` - and once you know the convention, the
+`None` stops being a surprise and starts being a hint.
+
+## The same key everywhere
+
+`key` is not a sorting feature. `min`, `max` and `itertools.groupby` all take it
+and mean the same thing by it, so `max(people, key=lambda p: p.score)` finds the
+top scorer without sorting anything - which is both faster and clearer than
+sorting and taking the last element.

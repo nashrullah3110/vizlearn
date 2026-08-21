@@ -44,3 +44,75 @@ Remember that a set has no order, so the printed result may not match the input 
 ## When to use them
 
 Same rule as list comprehensions: when it fits on a line and reads as a sentence. A dict comprehension with a conditional key expression and a filter is a line you will re-read; a loop is fine, and often kinder.
+
+## Inverting and filtering a mapping
+
+Two jobs come up so often that the comprehension form is worth memorising as an
+idiom rather than derived each time.
+
+Inverting swaps keys and values:
+
+```python
+{v: k for k, v in original.items()}
+```
+
+Worth pausing on: this is only lossless if the values were unique. Duplicated
+values collapse, and the last one processed wins, silently. If that matters,
+group instead of inverting.
+
+Filtering keeps part of a mapping:
+
+```python
+{k: v for k, v in config.items() if v is not None}
+```
+
+That is the standard way to drop unset options before merging configuration,
+and it reads better than building an empty dict and assigning into it.
+
+## Dict comprehensions and duplicate keys
+
+A dict comprehension has no duplicate protection. If the key expression produces
+the same key twice, the later value overwrites the earlier one and nothing is
+reported. This is the same behaviour as a dict literal with a repeated key, and
+it is worth remembering whenever the key is computed rather than taken directly
+from a unique field.
+
+If you need to know about collisions, build with a loop and check, or count with
+`collections.Counter` first.
+
+## Set comprehensions, and what they are for
+
+A set comprehension is a comprehension whose result must be unique, and the two
+common uses are extracting a distinct field and computing a distinct derived
+value:
+
+```python
+{r["city"] for r in rows}
+{len(w) for w in words}
+```
+
+Both could be written as `set([...])` around a list comprehension. The direct
+form avoids building the intermediate list, and says up front that uniqueness is
+the point rather than an afterthought.
+
+## Telling the three apart
+
+The bracket decides everything, and the difference between a dict and a set
+comprehension is one colon:
+
+```python
+[x for x in it]        # list
+{x for x in it}        # set
+{x: f(x) for x in it}  # dict
+(x for x in it)        # generator
+```
+
+This is also why `{}` is an empty dict and not an empty set - the dict form
+claimed the braces first, and an empty one has no colon to distinguish it.
+
+## When a loop is still better
+
+The same limit applies as to list comprehensions. One transformation, one
+optional filter, one line: use the comprehension. As soon as the value needs
+several steps, a `try`, or a condition on the key as well as the value, the loop
+version is easier to read and much easier to change later.

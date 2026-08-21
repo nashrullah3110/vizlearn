@@ -62,3 +62,65 @@ a | b            # a new merged dict (3.9+)
 
 
 With `|`, the right-hand side wins on conflicts, which makes `defaults | overrides` a clean way to layer configuration.
+
+## Views, and why they are not lists
+
+`keys()`, `values()` and `items()` return views: live windows onto the
+dictionary rather than snapshots of it. Add a key and every existing view
+reflects it immediately, because a view holds no data of its own.
+
+That is efficient and it has one consequence worth knowing. Modifying a
+dictionary while looping over one of its views raises `RuntimeError:
+dictionary changed size during iteration`. The fix is to iterate over a snapshot:
+
+```python
+for key in list(d):
+    if should_remove(key):
+        del d[key]
+```
+
+`list(d)` copies the keys first, so the loop is walking its own list and the
+dictionary is free to change underneath.
+
+Key and item views also behave like sets, which is occasionally very handy:
+`d1.keys() & d2.keys()` gives the keys both dictionaries share, without a loop.
+
+## Order is guaranteed now
+
+Since Python 3.7, dictionaries keep insertion order as a language guarantee
+rather than an implementation accident. That is why `dict.fromkeys(items)` is the
+standard order-preserving deduplication, and why iterating a dictionary produces
+a stable, predictable sequence.
+
+It does not make a dictionary a substitute for a sorted structure - the order is
+insertion order, not sorted order - but it does mean you can rely on what you
+put in first coming out first.
+
+## Choosing between get, setdefault and defaultdict
+
+Three tools that overlap, and the distinction is about what should happen when a
+key is missing.
+
+`get` reads and never writes. Use it when a missing key has a sensible fallback
+and you do not want to add anything to the dictionary.
+
+`setdefault` reads and writes: it inserts the default when the key is absent and
+returns whatever is now there. Use it for the grouping idiom, where you want the
+list to exist so you can append to it.
+
+`defaultdict(list)` moves that behaviour into the dictionary itself, so every
+missing key springs into existence on access. Use it when *every* access should
+create a default. Its downside is exactly that: a typo'd key lookup silently
+creates an empty entry instead of raising, which can mask a bug.
+
+## Merging
+
+```python
+merged = {**defaults, **overrides}     # 3.5+
+merged = defaults | overrides          # 3.9+
+defaults |= overrides                  # in place
+```
+
+Later keys win in all three. This is the clean way to layer configuration, and
+it beats a loop of `if key not in d` conditions because the precedence is stated
+by the order of the operands rather than buried in the logic.

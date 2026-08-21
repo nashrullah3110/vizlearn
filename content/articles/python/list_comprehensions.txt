@@ -50,3 +50,96 @@ The comprehension builds the whole list first &mdash; every element in memory &m
 ## The rule of thumb
 
 Use a comprehension when it fits on one line and reads as a sentence. When you need a second `for`, a filter, and a conditional expression at once, write the loop. Comprehensions are for making simple transformations obvious, not for proving a loop can be compressed.
+
+## A worked example, step by step
+
+Take a list of records and pull out the names of everyone who passed:
+
+```python
+rows = [{"name": "ana", "score": 91},
+        {"name": "bo", "score": 43},
+        {"name": "cy", "score": 68}]
+
+passed = [r["name"] for r in rows if r["score"] >= 50]
+```
+
+Read it in the order it executes, which is not the order it is written: take
+each `r` from `rows`, keep it if the score clears 50, and collect
+`r["name"]`. The expression at the front is applied last, to whatever survives
+the filter.
+
+Written as a loop that is four lines and one more variable to name.
+
+## The variable does not leak
+
+```python
+squares = [n * n for n in range(5)]
+print(n)        # NameError
+```
+
+The loop variable belongs to the comprehension and is gone afterwards. That is
+a deliberate difference from a `for` statement, whose variable outlives the
+loop, and it is the reason a comprehension cannot quietly overwrite an `n` you
+were using elsewhere.
+
+## Conditional expression versus filter, once more
+
+These two look similar and do different jobs:
+
+```python
+[n for n in nums if n > 0]                 # filter: some items are dropped
+["pos" if n > 0 else "neg" for n in nums]  # map: every item is kept
+```
+
+The first can return a shorter list. The second always returns one item per
+input. If you find yourself wanting `if ... else` at the end, you almost
+certainly want it at the front instead.
+
+## Building a dict or a set the same way
+
+The syntax generalises:
+
+```python
+{w: len(w) for w in words}      # dict comprehension
+{len(w) for w in words}         # set comprehension
+```
+
+Braces with a colon give a dictionary; braces without give a set. Both take the
+same trailing `if`, and both are worth reaching for when the loop version would
+be three lines of `result[key] = value`.
+
+## What a comprehension is really for
+
+The value of a comprehension is not that it is shorter. It is that it says
+"this is a transformation" in a way a loop cannot. A loop that builds a list is
+three separate statements - create, iterate, append - and a reader has to hold
+all three to work out that nothing else is happening in between. A
+comprehension states the shape of the result on the first line, and there is
+nowhere for anything else to hide.
+
+That is also the test for whether you should use one. If the body does one
+thing to each item, a comprehension expresses it better. If it does several
+things, updates something outside itself, or needs a `try`, the loop is not just
+acceptable but correct, because those are exactly the things a comprehension
+cannot contain and should not be contorted into.
+
+## Building something other than a list
+
+The same syntax makes dictionaries and sets, and swapping the brackets for
+round ones makes a generator that builds nothing at all. Choosing between them
+is choosing what you need afterwards. If you are going to iterate the result
+once and throw it away, the generator does less work and uses a fixed amount of
+memory whatever the size of the input. If you need to index it, measure its
+length or walk it twice, you need the list.
+
+The habit worth forming is to write the generator version inside `sum`, `any`,
+`all`, `min`, `max` and `join`, because those consume exactly once, and to
+reach for the list only when the result has a life beyond that line.
+
+## A note on nesting
+
+A comprehension containing a second `for` is a nested loop, and it is subject to
+the same multiplication of work described elsewhere on this site. Flattening a
+list of lists is a fair use. Comparing every pair of items is not - it is the
+same quadratic cost written more compactly, and compactness is the last thing
+that helps when something is slow.

@@ -49,3 +49,61 @@ though `[x + y for x, y in zip(a, b)]` says the same thing and most readers will
 ## The judgement
 
 Know all three, because you will read them. Write comprehensions by default, `map(existing_function, items)` when it is that shape exactly, and lambdas mainly as `key=` arguments.
+
+## Why the style guide discourages naming a lambda
+
+`square = lambda n: n * n` works and is discouraged, for a concrete reason
+rather than an aesthetic one. A `def` gives the function a name in its own
+metadata, so a traceback says `square` instead of `<lambda>`. When something
+raises three frames deep, that difference is the gap between reading the
+traceback and guessing.
+
+`def` also allows a docstring, type annotations, multiple statements and a
+default argument - all of which you will eventually want, and adding any of them
+means converting anyway.
+
+The rule that follows: if it needs a name, it needs a `def`.
+
+## Closures in a loop
+
+A classic trap, and it looks like a lambda problem while actually being a scope
+one:
+
+```python
+funcs = [lambda: i for i in range(3)]
+print([f() for f in funcs])      # [2, 2, 2]
+```
+
+Every lambda captured the *variable* `i`, not its value at the time, and by the
+time they run the loop has finished with `i` at 2. Binding the value explicitly
+as a default argument fixes it:
+
+```python
+funcs = [lambda i=i: i for i in range(3)]   # [0, 1, 2]
+```
+
+This is worth recognising because it appears whenever functions are built in a
+loop - event handlers, callbacks, partial applications - and the symptom is
+always the same: they all behave like the last one.
+
+## functools.partial
+
+When the goal is to fix some arguments of an existing function, `partial` says it
+more directly than a lambda:
+
+```python
+from functools import partial
+to_int = partial(int, base=16)
+```
+
+It also produces something introspectable and picklable, which a lambda is not -
+relevant the moment multiprocessing is involved, because lambdas cannot be sent
+to worker processes.
+
+## Reading functional code
+
+`map` and `filter` are worth knowing well even if you write comprehensions,
+because a great deal of existing Python uses them, and because they compose with
+the rest of `itertools`. Being able to read `filter(None, values)` - which drops
+falsy items, using `None` as "no function" - is more useful than an opinion about
+whether you would have written it that way.

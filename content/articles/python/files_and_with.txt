@@ -47,3 +47,63 @@ Lines keep their trailing `\n`, which is why `line.rstrip()` appears in almost e
 ## Text and encoding
 
 Files open in text mode and decode using your platform's default encoding, which differs between machines. For anything portable, say what you mean: `open(path, encoding="utf-8")`.
+
+## Paths, and why pathlib is worth the switch
+
+String concatenation for paths breaks across operating systems and on edge cases
+like trailing slashes. `pathlib` handles both and reads better:
+
+```python
+from pathlib import Path
+
+data = Path("content") / "articles" / "notes.txt"
+text = data.read_text(encoding="utf-8")
+```
+
+`read_text` and `write_text` open, read or write, and close in one call, which
+covers the common case where you want the whole file and do not need to stream
+it. For anything iterative, `data.open()` gives you the same file object `open`
+would.
+
+`Path` also carries the questions you would otherwise ask the `os` module:
+`.exists()`, `.suffix`, `.stem`, `.parent`, `.glob("*.txt")`.
+
+## Encoding is not optional in practice
+
+Text mode decodes bytes into a string using an encoding, and if you do not name
+one, Python uses the platform default. That default differs between machines,
+which is how a script that works on one computer produces `UnicodeDecodeError` on
+another, with data that has not changed.
+
+Naming it removes the whole class of problem:
+
+```python
+open(path, encoding="utf-8")
+```
+
+If you are handling files you did not create and cannot assume, `errors="replace"`
+lets you read something rather than crashing, at the cost of substituting the
+bytes it could not decode.
+
+## Writing safely
+
+Writing directly over the only copy of a file has an obvious failure mode: if the
+program dies halfway, the original is gone and the replacement is incomplete. The
+standard remedy is to write beside it and rename:
+
+```python
+tmp = path.with_suffix(".tmp")
+tmp.write_text(new_content, encoding="utf-8")
+tmp.replace(path)
+```
+
+`replace` is atomic on the same filesystem, so a reader sees either the old file
+or the new one and never a half-written one.
+
+## Binary mode
+
+Adding `b` - `open(path, "rb")` - skips decoding and gives bytes. That is what
+you want for images, archives, and anything you are copying rather than reading.
+The mistake in the other direction is more common: opening a text file in binary
+mode and then being puzzled that comparisons against strings all fail, because
+`b"abc"` and `"abc"` are different types that never compare equal.

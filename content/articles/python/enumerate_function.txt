@@ -50,3 +50,64 @@ This is for output humans read &mdash; line numbers, ranked lists, steps. It cha
 ## When you do not need it
 
 If you never use the index, do not ask for it. `for name in names` is the shorter, clearer loop, and reaching for `enumerate` out of habit adds a variable nothing reads.
+
+## What it replaces, and why that matters
+
+Before `enumerate`, keeping a counter alongside a loop meant one of two things:
+initialising `i = 0` and remembering to increment it at the bottom of the body,
+or looping over `range(len(items))` and indexing back into the list.
+
+Both work. Both have a specific failure. The manual counter breaks the moment
+the body has an early `continue` above the increment, and the bug is invisible -
+the loop still runs, the numbers are just wrong. The `range(len(...))` version
+puts an index between you and the value, so every use is `items[i]` rather than
+`item`, which is noisier and offers an off-by-one error where none needs to
+exist.
+
+`enumerate` removes the counter entirely. There is nothing to forget to
+increment and nothing to index.
+
+## The start argument
+
+```python
+for n, line in enumerate(lines, start=1):
+    print(f"{n}: {line}")
+```
+
+Line numbers, question numbers, ranked results and anything else a human reads
+usually start at one. Passing `start=1` is better than writing `n + 1` inside
+the body, because it states the intent once at the top rather than repeating an
+adjustment everywhere the number is used - and it means you cannot apply the
+adjustment in one place and forget it in another.
+
+## It works on anything iterable
+
+`enumerate` is not a list feature. It works on strings, files, generators,
+dictionary views and anything else you can loop over, and it does not build a
+list to do it - it yields pairs as the loop asks for them.
+
+That makes `for n, line in enumerate(f)` a perfectly good way to number the
+lines of a file too large to hold in memory, which the `range(len(...))` form
+cannot do at all, because there is no length to take.
+
+## Unpacking is doing the work
+
+`enumerate` yields tuples. Writing `for n, item in ...` is tuple unpacking, the
+same feature that makes `for k, v in d.items()` work. Occasionally you will see
+it left packed:
+
+```python
+for pair in enumerate(items):
+    print(pair)      # (0, 'a')
+```
+
+which is legal and rarely what you want. The unpacked form is the point: it
+gives both halves a name at the top of the loop, so the body never has to say
+`pair[0]`.
+
+## When you do not need it
+
+If you never use the index, do not ask for one. `for item in items` is the
+correct loop, and `for i, item in enumerate(items)` with `i` unused is noise
+that a linter will flag. The convention when you need one and not the other is
+to name the unused variable `_`.

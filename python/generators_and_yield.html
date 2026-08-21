@@ -186,7 +186,7 @@
     while n &gt; 0:
         yield n
         n -= 1</code></pre><p><code>return</code> ends a function. <code>yield</code> suspends it, keeping every local variable exactly as it was, and the function continues from that line when the next value is requested.</p><p>Calling <code>countdown(3)</code> runs none of the body. It returns a generator object; the code inside starts running only when something asks for a value &mdash; <code>next()</code>, a <code>for</code> loop, <code>list()</code>, <code>sum()</code>.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-why-bother">Why bother</a></li><li><a href="#vz-s-exhausted-after-one-pass">Exhausted after one pass</a></li><li><a href="#vz-s-generator-expressions">Generator expressions</a></li><li><a href="#vz-s-pipelines">Pipelines</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-why-bother">Why bother</a></li><li><a href="#vz-s-exhausted-after-one-pass">Exhausted after one pass</a></li><li><a href="#vz-s-generator-expressions">Generator expressions</a></li><li><a href="#vz-s-pipelines">Pipelines</a></li><li><a href="#vz-s-what-lazy-buys-you-in-practice">What &quot;lazy&quot; buys you in practice</a></li><li><a href="#vz-s-reading-files-the-canonical-example">Reading files, the canonical example</a></li><li><a href="#vz-s-yield-from">yield from</a></li><li><a href="#vz-s-generators-and-pipelines">Generators and pipelines</a></li><li><a href="#vz-s-when-a-list-is-simply-better">When a list is simply better</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -350,6 +350,32 @@ list(g)  # []</code></pre><p>A generator walks forward once and does not rewind.
                 <div>
                     <h3 id="vz-s-pipelines">Pipelines</h3>
                     <p>Generators compose. Each stage pulls from the one before it, so a chain of three generators still holds one value at a time:</p><p>doubled(evens(naturals()))</p><p>No stage stores anything, and nothing runs until the end of the chain is asked for a value. That is the pattern behind most stream processing in Python, and it is why generators are worth the concept even when memory is not tight.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-what-lazy-buys-you-in-practice">What "lazy" buys you in practice</h3>
+                    <p>Three things, and they are easy to state concretely.</p><p>Memory that does not scale with the input: a generator over a ten-million-line file holds one line, not ten million. Work that is never done: if the consumer stops after ten items, the generator computed ten, not the whole sequence. And the ability to represent something that has no end, because nothing is built up front.</p><p>The cost is that you get one pass and no length. If you need <code>len()</code>, indexing, or a second traversal, you need a list, and calling <code>list()</code> on the generator is the explicit way to say so.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-reading-files-the-canonical-example">Reading files, the canonical example</h3>
+                    <pre><code class="language-python">def lines_matching(path, needle):
+    with open(path, encoding=&quot;utf-8&quot;) as f:
+        for line in f:
+            if needle in line:
+                yield line.rstrip()</code></pre><p>The file object is already a generator of lines, and this wraps it in another that filters. Nothing is read until the caller starts iterating, and only one line is in memory at a time regardless of file size.</p><p>Note the <code>with</code> inside the generator: the file stays open across yields and closes when the generator is exhausted or garbage-collected. That is usually what you want and is worth being conscious of, because a generator abandoned halfway holds the file open until it is collected.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-yield-from">yield from</h3>
+                    <p>Delegating to another iterable is one line:</p><pre><code class="language-python">def all_items(groups):
+    for group in groups:
+        yield from group</code></pre><p><code>yield from group</code> yields every item of <code>group</code> in turn, which is both shorter and faster than the explicit inner loop, and it becomes genuinely valuable with recursive structures - walking a tree of nested lists is four lines with <code>yield from</code> and considerably more without.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-generators-and-pipelines">Generators and pipelines</h3>
+                    <p>Because each stage pulls from the previous one, a chain of generators processes one item end-to-end before starting the next. Memory stays flat no matter how many stages there are, and no intermediate lists exist.</p><p>This is the shape behind most stream processing in Python: read, filter, transform, aggregate - each a small generator, composed at the end. The alternative, building a list at every stage, works fine until the data does not fit, at which point the pipeline version is the only one that still runs.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-when-a-list-is-simply-better">When a list is simply better</h3>
+                    <p>Small collections, results you need twice, anything you want to index, and anything you want to print for debugging. A generator that you immediately wrap in <code>list()</code> has bought nothing, and a comprehension says what you meant more directly.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

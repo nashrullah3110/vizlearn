@@ -185,7 +185,7 @@
                     <pre><code class="language-python">if age &gt;= 18:
     if member:
         allow()</code></pre><p>If the inner <code>if</code> is the entire body of the outer one, and there is no <code>else</code> on either, the two conditions are simply both required:</p><p>if age &gt;= 18 and member:</p><p>Same behaviour, one level of indentation, and the condition reads as one thought instead of two.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-when-it-genuinely-nests">When it genuinely nests</a></li><li><a href="#vz-s-guard-clauses-flatten-the-rest">Guard clauses flatten the rest</a></li><li><a href="#vz-s-elif-is-not-nesting">elif is not nesting</a></li><li><a href="#vz-s-the-rule-of-thumb">The rule of thumb</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-when-it-genuinely-nests">When it genuinely nests</a></li><li><a href="#vz-s-guard-clauses-flatten-the-rest">Guard clauses flatten the rest</a></li><li><a href="#vz-s-elif-is-not-nesting">elif is not nesting</a></li><li><a href="#vz-s-the-rule-of-thumb">The rule of thumb</a></li><li><a href="#vz-s-guard-clauses-and-why-they-read-better">Guard clauses, and why they read better</a></li><li><a href="#vz-s-when-nesting-is-genuinely-right">When nesting is genuinely right</a></li><li><a href="#vz-s-combining-with-and-or">Combining with and or</a></li><li><a href="#vz-s-depth-as-a-design-signal">Depth as a design signal</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -358,6 +358,29 @@ return &quot;yes&quot;</code></pre><p>Now every rule sits beside its own message
                 <div>
                     <h3 id="vz-s-the-rule-of-thumb">The rule of thumb</h3>
                     <p>Two levels is normal. Three is worth a second look. Four almost always means either a set of guard clauses waiting to be inverted, or a block that wants to be its own function.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-guard-clauses-and-why-they-read-better">Guard clauses, and why they read better</h3>
+                    <p>A nested conditional builds a staircase: each condition indents the next, and by the third level the code that actually does something is a long way from the left margin. The alternative is to handle the exceptional cases first and leave early, so the main path stays at the top level.</p><pre><code class="language-python">def borrow(user, book):
+    if not user.active:
+        return &quot;membership inactive&quot;
+    if user.fines &gt; 0:
+        return &quot;clear your fines first&quot;
+    if not book.available:
+        return &quot;already on loan&quot;
+    return &quot;enjoy the book&quot;</code></pre><p>Every line reads as one rule. Adding a rule is one line in the middle; removing one is deleting a line. The nested version needs re-indenting for either.</p><p>The reason this works is that it separates "reasons you cannot" from "what happens when you can". Those are different kinds of statement, and the staircase version tangles them together, which is why it gets harder to read exactly as the number of rules grows.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-when-nesting-is-genuinely-right">When nesting is genuinely right</h3>
+                    <p>Guard clauses suit functions, because <code>return</code> is what makes them possible. Inside a loop or a block where you cannot return, the staircase is sometimes unavoidable - though <code>continue</code> plays the same role in a loop that <code>return</code> plays in a function, and is under-used for it.</p><p>Nesting is also right when the conditions are genuinely dependent: when the second question only makes sense if the first was true. <code>if user is not None:</code> followed by <code>if user.active:</code> is not a staircase to flatten, it is two questions where the second would raise without the first.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-combining-with-and-or">Combining with and or</h3>
+                    <p>Two shallow conditions can often become one:</p><pre><code class="language-python">if user.active and not user.fines:</code></pre><p>This is clearer than nesting when the combination is what you mean, and worse than nesting when you need different responses to each failure - as soon as you want to tell the user *which* rule stopped them, the conditions have to be separate again.</p><p>Both <code>and</code> and <code>or</code> short-circuit, which is what makes <code>if user is not None and user.active</code> safe: the second half is never evaluated when the first is false. That ordering is load-bearing, and swapping the halves turns a working check into an <code>AttributeError</code>.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-depth-as-a-design-signal">Depth as a design signal</h3>
+                    <p>Three levels of nested conditions inside a loop inside a function is usually not a formatting problem, it is a sign that the function is making several different decisions and would be clearer as two or three named functions. The indentation is doing you a favour by making that visible.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

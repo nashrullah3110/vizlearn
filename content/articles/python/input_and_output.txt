@@ -54,3 +54,77 @@ print(i, end=" ")         # no newline
 `print` calls `str()` on whatever you give it, which is fine for quick output. When the formatting matters &mdash; decimal places, alignment, thousands separators &mdash; build the string yourself with an f-string and print that. The two are complementary, not competing.
 
 One detail worth noticing: printing a list shows its `repr`, so strings appear with quotes. `", ".join(items)` is what you want when the output is for a person.
+
+## Validating in a loop
+
+A single `int(input())` is fine in an example and unusable in a program a person
+will actually operate, because the first typo ends it. The shape that works asks
+again:
+
+```python
+def ask_int(prompt):
+    while True:
+        raw = input(prompt).strip()
+        try:
+            return int(raw)
+        except ValueError:
+            print(f"'{raw}' is not a whole number - try again.")
+```
+
+Three things are worth copying from that. The prompt says what is wanted. The
+error message repeats what was typed, so the person can see the typo. And the
+loop only exits on success, so the caller can rely on getting a number.
+
+## Sentinel values and ending a loop
+
+When you do not know how many values are coming, a sentinel ends the input:
+
+```python
+while True:
+    line = input("value (blank to finish): ").strip()
+    if not line:
+        break
+    values.append(line)
+```
+
+An empty line is the usual choice because it is what pressing enter produces. If
+blank is a legitimate value, pick something explicit like `done` and say so in
+the prompt.
+
+## Reading from a pipe rather than a person
+
+`input` reads a line from standard input, and standard input is not always a
+keyboard. If your program is run as `cat data.txt | python script.py`, the same
+`input` calls read lines from the file, and an `EOFError` is raised when it runs
+out - which is the same error you get if someone presses Ctrl-D.
+
+That is worth handling in anything that might be piped:
+
+```python
+try:
+    line = input()
+except EOFError:
+    line = None
+```
+
+It is also why this page's first program raises in the browser: there is no
+standard input attached at all.
+
+## Printing for people versus printing for programs
+
+Output aimed at a person wants formatting, alignment and separators.
+Output aimed at another program wants to be trivially parseable - one record per
+line, a consistent separator, no decorative headers.
+
+Mixing the two is what makes a script hard to use in a pipeline. If a program
+might be consumed by another, keep the data on standard output and put the
+progress messages, prompts and warnings on standard error:
+
+```python
+import sys
+print("processing...", file=sys.stderr)
+print(result)
+```
+
+Then `script.py > out.txt` captures exactly the results and leaves the chatter
+on screen.

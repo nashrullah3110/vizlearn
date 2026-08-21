@@ -184,7 +184,7 @@
                     <h3 id="vz-s-the-difference-that-matters">The difference that matters</h3>
                     <p>A list and a tuple both hold an ordered run of items, and both index the same way. The difference is one word: a tuple is immutable. Once it exists, no element can be replaced.</p><pre><code class="language-python">point = (3, 4)
 point[0] = 99  # TypeError</code></pre><p>That sounds like a limitation and is mostly a guarantee. If you hand a list to a function, the function can change it under you. Hand it a tuple and it cannot.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-why-immutability-buys-you-a-dictionary-key">Why immutability buys you a dictionary key</a></li><li><a href="#vz-s-unpacking-is-the-point">Unpacking is the point</a></li><li><a href="#vz-s-returning-more-than-one-thing">Returning more than one thing</a></li><li><a href="#vz-s-the-comma-is-the-tuple">The comma is the tuple</a></li><li><a href="#vz-s-when-to-reach-for-which">When to reach for which</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-why-immutability-buys-you-a-dictionary-key">Why immutability buys you a dictionary key</a></li><li><a href="#vz-s-unpacking-is-the-point">Unpacking is the point</a></li><li><a href="#vz-s-returning-more-than-one-thing">Returning more than one thing</a></li><li><a href="#vz-s-the-comma-is-the-tuple">The comma is the tuple</a></li><li><a href="#vz-s-when-to-reach-for-which">When to reach for which</a></li><li><a href="#vz-s-unpacking-in-places-you-did-not-expect">Unpacking in places you did not expect</a></li><li><a href="#vz-s-where-the-wrong-number-of-names-bites">Where the wrong number of names bites</a></li><li><a href="#vz-s-named-tuples-when-positions-stop-being-obvious">Named tuples, when positions stop being obvious</a></li><li><a href="#vz-s-why-immutability-is-not-just-a-restriction">Why immutability is not just a restriction</a></li><li><a href="#vz-s-choosing-between-a-tuple-a-list-and-a-small-clas">Choosing between a tuple, a list and a small class</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -328,6 +328,32 @@ type((5,))  # tuple</code></pre><p>A single-element tuple needs the trailing com
                 <div>
                     <h3 id="vz-s-when-to-reach-for-which">When to reach for which</h3>
                     <p>Use a list when the collection will grow, shrink or be sorted in place. Use a tuple when the group is fixed at creation and its positions mean something: a coordinate, an RGB colour, a row from a database. If you find yourself never mutating a list, a tuple states that intent and gets you hashability for free.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-unpacking-in-places-you-did-not-expect">Unpacking in places you did not expect</h3>
+                    <p>Unpacking is not limited to assignment. It is how a for loop reads pairs:</p><pre><code class="language-python">for name, score in [(&quot;ana&quot;, 91), (&quot;bo&quot;, 78)]:
+    print(name, score)</code></pre><p>Each item is a two-tuple, and the loop unpacks it into two names on the way in. <code>dict.items()</code> yields tuples, which is why <code>for k, v in d.items()</code> works at all, and <code>enumerate</code> yields <code>(index, value)</code> for the same reason.</p><p>A star collects the middle:</p><pre><code class="language-python">first, *rest = [1, 2, 3, 4]      # first = 1, rest = [2, 3, 4]
+head, *body, tail = &quot;a b c d&quot;.split()</code></pre><p>The starred name always becomes a list, even when it captures nothing, which means <code>rest</code> is <code>[]</code> rather than <code>None</code> for a one-item sequence. That is worth knowing before you write <code>if rest is None</code>.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-where-the-wrong-number-of-names-bites">Where the wrong number of names bites</h3>
+                    <pre><code class="language-python">x, y = (1, 2, 3)</code></pre><p>raises <code>ValueError: too many values to unpack</code>. That looks like an annoyance and is a safety net: it fires the moment the shape of your data changes. Code that indexed <code>point[0]</code> and <code>point[1]</code> would have carried on quietly with a three-element point and produced wrong answers much later.</p><p>The same error appears when a function you expected to return two things returns one, which is usually the real bug rather than the unpacking.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-named-tuples-when-positions-stop-being-obvious">Named tuples, when positions stop being obvious</h3>
+                    <p>Positional access stops reading well past two or three fields. <code>record[4]</code> tells nobody anything.</p><pre><code class="language-python">from collections import namedtuple
+
+Point = namedtuple(&quot;Point&quot;, &quot;x y&quot;)
+p = Point(3, 4)
+print(p.x, p[0])        # both work</code></pre><p>A named tuple is still a tuple - immutable, hashable, unpackable - but its fields have names. It costs one line and it is the usual answer when a plain tuple has grown past the point where you can remember what position two was.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-why-immutability-is-not-just-a-restriction">Why immutability is not just a restriction</h3>
+                    <p>It is tempting to read "cannot be changed" as a limitation you work around. In practice it is a property you rely on. An immutable object can be shared freely between functions, threads and data structures, because no holder of it can surprise another holder by editing it. That is why the language reaches for tuples in exactly the places where a surprise would be expensive: function arguments arrive as a tuple, exceptions carry their arguments as a tuple, and a function returning several values returns a tuple rather than a list.</p><p>The immutability is shallow, and this catches people. A tuple guarantees that its slots keep pointing at the same objects; it says nothing about those objects. A tuple containing a list will happily let you append to that list, and the tuple is unchanged as far as Python is concerned, because it still points at the same list. This is also why such a tuple is not hashable: its contents can change, so any hash computed from them would go stale.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-choosing-between-a-tuple-a-list-and-a-small-clas">Choosing between a tuple, a list and a small class</h3>
+                    <p>Three options, and the decision is usually about what the positions mean.</p><p>A list is right when the items are the same kind of thing and the collection grows, shrinks or gets sorted: a list of scores, a list of users, a queue of jobs. Position carries no meaning beyond order.</p><p>A tuple is right when the group is fixed at creation and each position means something specific: a coordinate pair, an RGB colour, a database row. Position is the meaning, which is exactly why the group must not change length.</p><p>A small class or a dataclass takes over when there are more than about three fields, or when you find yourself writing a comment to remember what position three was. Names beat positions the moment positions stop being obvious, and a named tuple is the halfway house that keeps tuple behaviour while adding them.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

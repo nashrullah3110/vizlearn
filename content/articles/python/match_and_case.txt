@@ -52,3 +52,52 @@ To compare against a constant, use a dotted name (`case Status.OK:`), a literal,
 For two or three literal comparisons, `if` is shorter and everyone reads it. Reach for `match` when you are inspecting the *shape* of data &mdash; parsed JSON, events, commands, ASTs &mdash; where the alternative is a stack of `isinstance` checks and key lookups. That is the job it was added for.
 
 `match` needs Python 3.10 or newer.
+
+## Why it was added
+
+Python resisted a switch statement for decades on the grounds that a chain of
+`if`/`elif` already did the job, and for comparing a value against a few
+constants that argument still holds. `match` was not added to replace those.
+
+It was added for structural pattern matching: inspecting the *shape* of data and
+pulling it apart in the same step. The code it replaces is a stack of
+`isinstance` checks, key lookups and length tests, written in a specific order,
+where getting the order wrong or forgetting a check produces a bug that only
+appears on unusual input. That pattern shows up constantly in anything that
+handles parsed JSON, events, commands or syntax trees.
+
+Once you see it as "destructure and dispatch" rather than "switch", the design
+choices stop looking strange.
+
+## Patterns you will use
+
+Literal patterns match constants. Sequence patterns like `[a, b]` or
+`[first, *rest]` match lists and tuples of the right shape and bind the parts.
+Mapping patterns like `{"type": "click", "x": x}` match dictionaries that
+*contain* those keys - extra keys are allowed, which is what makes them useful
+against real payloads that carry more than you care about.
+
+Class patterns match an instance and can pull attributes out of it:
+`case Point(x=0, y=y)` matches a Point on the y-axis and binds `y`. Combined
+with a guard, that covers a surprising amount of dispatch logic in one readable
+block.
+
+## The two rules to remember
+
+A bare name captures rather than compares, and it matches everything. If you
+want to compare against a constant you have stored somewhere, it must be a
+dotted name - `case Status.OK` - or a literal. This is the single most common
+`match` bug, and the failure mode is silent: the first such case swallows every
+value and the ones below it never run.
+
+And `match` is not exhaustive. If nothing matches and there is no `case _`,
+the statement simply does nothing and execution continues. Coming from
+languages where the compiler insists on exhaustiveness, that is worth
+remembering, because a missing case here is a quiet no-op rather than an error.
+
+## Version, and whether to use it
+
+`match` requires Python 3.10. If your code has to run on anything older, the
+`if`/`elif` version is the only option, and for two or three literal
+comparisons it is the better one regardless: shorter, universally understood,
+and with none of the capture-pattern sharp edges.

@@ -43,3 +43,76 @@ Chained filters mean the same as one `and`. The `and` version is usually clearer
 [n for row in grid for n in row if n % 2]
 
 A trailing `if` attaches to the clause it follows &mdash; here the inner loop. Placing a filter after the first `for` instead would filter rows rather than cells. When there are two loops and a condition, this is where a comprehension starts costing more to read than it saves, and the loop version is the kinder choice.
+
+## Two conditionals, two positions, two jobs
+
+This is the single point worth being certain about, because the two forms look
+similar, sit in the same expression, and do different things.
+
+The trailing `if` filters. It decides whether an item appears at all, so the
+result can be shorter than the input:
+
+```python
+[n for n in nums if n > 0]
+```
+
+The leading `if`/`else` chooses a value. Every item still appears, so the result
+is always the same length as the input:
+
+```python
+[n if n > 0 else 0 for n in nums]
+```
+
+A useful way to remember it: the front of a comprehension is the expression that
+produces each item, and an expression must always produce something - which is
+why the `else` is compulsory there and forbidden at the end.
+
+## Combining both
+
+They can appear together, and the reading order is worth stating explicitly:
+
+```python
+["high" if n > 100 else "low" for n in nums if n is not None]
+```
+
+The trailing filter runs first, deciding which items survive. The leading
+conditional then runs on each survivor, deciding what it becomes. Filter, then
+map - even though the map is written first.
+
+Once a line contains both, it is close to the limit of what reads well, and a
+second filter or a nested loop pushes it past.
+
+## Filtering out None before working with values
+
+The combination above is not a contrived example; it is the common shape when
+data has gaps. Guarding in the filter means the expression at the front never
+sees a `None`, which lets it do arithmetic or call methods without a defensive
+check:
+
+```python
+[r["score"] * 2 for r in rows if r["score"] is not None]
+```
+
+Written the other way round - a conditional expression testing for `None` on
+every item - the line is longer and still produces an entry for rows that had no
+score, which is usually not what was wanted.
+
+## Multiple conditions
+
+Several filters can be chained, and they behave as `and`:
+
+```python
+[n for n in nums if n > 0 if n % 2 == 0]
+```
+
+which is identical to writing `if n > 0 and n % 2 == 0`. The chained form
+occasionally reads better when the conditions test unrelated things; the
+combined form is more familiar. Neither is wrong, and consistency within a file
+matters more than the choice.
+
+## Where to draw the line
+
+A comprehension carrying a filter, a conditional expression and a nested loop is
+a program written on one line. It will be correct and it will cost every future
+reader - including you - a slow minute. The loop version is four lines that
+never need decoding, and no reviewer has ever objected to it.

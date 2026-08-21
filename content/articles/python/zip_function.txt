@@ -49,3 +49,65 @@ who, what = zip(*pairs)
 ## It is lazy
 
 `zip` returns an iterator, not a list. It produces pairs as they are asked for, which is what lets it work on files and generators. It also means you can only walk it once: consume it in a loop and it is exhausted. `list(zip(...))` when you need to keep the result.
+
+## Walking two things at once
+
+The job `zip` does is small and comes up constantly: you have two or more
+sequences whose positions correspond, and you want to work with matching items
+together. Names and scores, keys and values, inputs and expected outputs,
+columns and headers.
+
+Without it, the loop goes through indices and reaches back into both lists,
+which reintroduces exactly the off-by-one risk that looping over items avoids.
+With it, each iteration hands you one item from each and the indices disappear.
+
+## Stopping at the shortest
+
+`zip` stops when its shortest input runs out. This is a genuine design decision
+rather than an oversight, and it cuts both ways.
+
+It is convenient when you deliberately pair a finite list against an infinite
+generator, because you get exactly as many pairs as the finite side has. It is
+dangerous when the two lists were supposed to be the same length and are not,
+because the extra items are dropped in silence and the program produces a
+short, plausible, wrong answer.
+
+Since Python 3.10 you can ask for the check:
+
+```python
+zip(a, b, strict=True)     # ValueError if the lengths differ
+```
+
+Use it whenever equal lengths are an assumption rather than a coincidence. If
+you want the opposite - pad the short one instead of truncating - `itertools`
+has `zip_longest`, which fills with `None` or a value you choose.
+
+## Building a dictionary from two lists
+
+```python
+dict(zip(keys, values))
+```
+
+This is the standard way to turn parallel lists into a mapping, and it reads
+better than any loop version. It appears constantly when handling CSV rows,
+where the header row supplies the keys and each data row supplies the values.
+
+## Unzipping
+
+The same function undoes itself, which surprises people:
+
+```python
+pairs = [("ana", 91), ("bo", 78)]
+names, scores = zip(*pairs)
+```
+
+The star spreads the list of pairs into separate arguments, and `zip` then
+takes one item from each, which recombines them by position. The results are
+tuples rather than lists, which matters only if you intend to mutate them.
+
+## It is lazy
+
+Like `map` and `filter`, `zip` returns an iterator rather than a list. Printing
+it shows an object, and consuming it twice gives nothing the second time. In a
+`for` loop that is invisible and ideal; the moment you want to keep the result,
+wrap it in `list()`.

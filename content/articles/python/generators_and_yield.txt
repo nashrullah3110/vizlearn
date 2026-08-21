@@ -59,3 +59,69 @@ Generators compose. Each stage pulls from the one before it, so a chain of three
 doubled(evens(naturals()))
 
 No stage stores anything, and nothing runs until the end of the chain is asked for a value. That is the pattern behind most stream processing in Python, and it is why generators are worth the concept even when memory is not tight.
+
+## What "lazy" buys you in practice
+
+Three things, and they are easy to state concretely.
+
+Memory that does not scale with the input: a generator over a ten-million-line
+file holds one line, not ten million. Work that is never done: if the consumer
+stops after ten items, the generator computed ten, not the whole sequence. And
+the ability to represent something that has no end, because nothing is built up
+front.
+
+The cost is that you get one pass and no length. If you need `len()`, indexing,
+or a second traversal, you need a list, and calling `list()` on the generator is
+the explicit way to say so.
+
+## Reading files, the canonical example
+
+```python
+def lines_matching(path, needle):
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            if needle in line:
+                yield line.rstrip()
+```
+
+The file object is already a generator of lines, and this wraps it in another
+that filters. Nothing is read until the caller starts iterating, and only one
+line is in memory at a time regardless of file size.
+
+Note the `with` inside the generator: the file stays open across yields and
+closes when the generator is exhausted or garbage-collected. That is usually what
+you want and is worth being conscious of, because a generator abandoned halfway
+holds the file open until it is collected.
+
+## yield from
+
+Delegating to another iterable is one line:
+
+```python
+def all_items(groups):
+    for group in groups:
+        yield from group
+```
+
+`yield from group` yields every item of `group` in turn, which is both shorter
+and faster than the explicit inner loop, and it becomes genuinely valuable with
+recursive structures - walking a tree of nested lists is four lines with
+`yield from` and considerably more without.
+
+## Generators and pipelines
+
+Because each stage pulls from the previous one, a chain of generators processes
+one item end-to-end before starting the next. Memory stays flat no matter how
+many stages there are, and no intermediate lists exist.
+
+This is the shape behind most stream processing in Python: read, filter,
+transform, aggregate - each a small generator, composed at the end. The
+alternative, building a list at every stage, works fine until the data does not
+fit, at which point the pipeline version is the only one that still runs.
+
+## When a list is simply better
+
+Small collections, results you need twice, anything you want to index, and
+anything you want to print for debugging. A generator that you immediately wrap
+in `list()` has bought nothing, and a comprehension says what you meant more
+directly.

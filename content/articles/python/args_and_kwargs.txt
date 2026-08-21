@@ -64,3 +64,49 @@ The stars also work when building literals:
 [*first, *second]&nbsp;&nbsp;&nbsp;&nbsp;{**defaults, **overrides}
 
 The dict form is a neat way to layer configuration: later keys win, so overrides beat defaults.
+
+## Where you will actually meet them
+
+Almost every use of `*args` and `**kwargs` in real code falls into one of three
+shapes, and recognising them makes the feature far less abstract.
+
+The first is a function that genuinely takes an unknown number of things:
+`print`, `max`, `os.path.join`. These are rare to write and common to use.
+
+The second is a wrapper. A decorator, a retry helper, a logging shim - anything
+that stands in front of another function and passes the call along. Here the
+star forms are not a convenience, they are the only way to write the wrapper
+without hard-coding the signature of everything it might wrap.
+
+The third is a subclass extending its parent. `def __init__(self, *args,
+extra=None, **kwargs)` accepts whatever the parent accepts, adds one option of
+its own, and forwards the rest with `super().__init__(*args, **kwargs)`. This
+keeps working when the parent gains a parameter, which is the whole point.
+
+## The cost of being too flexible
+
+A signature of `(*args, **kwargs)` accepts everything, and that is its problem
+as well as its purpose. Nobody can tell what the function wants by reading it.
+An editor cannot autocomplete the call. A typo in a keyword name no longer
+raises a clear `TypeError` about an unexpected argument - it lands silently in
+`kwargs` and surfaces later as a missing key, or worse, as a default quietly
+being used instead of the value you thought you passed.
+
+So the rule is about position in the system rather than taste. At the surface,
+where people call your code directly, name the parameters. In the middle, where
+you are forwarding a call you did not construct, use the stars. The further a
+function is from a human caller, the more flexibility costs you nothing.
+
+## Reading someone else's signature
+
+When you meet `def f(a, b=1, *args, c, **kwargs)`, read it in the order Python
+binds it. `a` is required and positional. `b` is positional with a default.
+`args` collects any further positional arguments. `c` comes after `*args`, which
+makes it keyword-only and, because it has no default, required by name.
+`kwargs` collects the rest.
+
+The one that surprises people is `c`. Anything after `*args` can only be passed
+by keyword, whether or not it has a default. That is the mechanism behind
+keyword-only parameters, and it is why library authors sometimes write a bare
+`*` in a signature: it turns everything after it into a name you have to say
+out loud at the call site.

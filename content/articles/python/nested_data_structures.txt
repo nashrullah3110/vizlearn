@@ -47,3 +47,52 @@ sum(item["price"] for o in orders for item in o["items"])
 ## Printing it
 
 Nested structures print as one dense line. `json.dumps(data, indent=2)` renders them readably and is the fastest way to see the shape of something you have just parsed. It only works for JSON-compatible types, which covers most data that arrived as JSON in the first place.
+
+## The shape of data that arrives
+
+Most real data is a list of records, and most records are dictionaries. API
+responses, parsed JSON, CSV rows read with `DictReader`, database results - all
+the same shape.
+
+Recognising this makes the code predictable. The outer loop takes records; a key
+lookup takes a field; an inner loop takes a list-valued field. Three moves cover
+almost everything, and they compose to any depth.
+
+The depth itself is the thing to keep an eye on. Two levels are easy to hold in
+your head. Four levels of mixed lists and dictionaries is where a small helper
+function - `def city_of(record):` - pays for itself immediately, because it gives
+the path a name and one place to fix when the shape changes.
+
+## Modifying nested structures
+
+Reading a nested value is safe; writing one is where aliasing matters. If you
+copied the outer list shallowly and then edit a dictionary inside it, both copies
+change, because they hold the same dictionaries.
+
+That is not a reason to deepcopy everything. It is a reason to decide
+deliberately: either the structure is shared and everyone knows it, or you take a
+deep copy at the boundary where it enters your code.
+
+## Flattening and grouping
+
+The two transformations that come up constantly are inverses of each other.
+
+Flattening turns a nested structure into a flat one - all languages anyone knows,
+all items across all orders - and a nested comprehension or `itertools.chain` does
+it in a line.
+
+Grouping turns a flat list into a nested one, keyed by some field.
+`setdefault` or `defaultdict(list)` is the idiom, and it is worth writing out
+once until it feels automatic, because half of the reporting code anyone ever
+writes is a grouping followed by an aggregation.
+
+## JSON is the same shape
+
+`json.load` produces exactly these structures - dictionaries, lists, strings,
+numbers, booleans and `None` - which is why working with parsed JSON needs no new
+skills beyond this page. `json.dumps(data, indent=2)` prints them back readably,
+and is the fastest way to understand something you have just fetched.
+
+The one asymmetry: JSON object keys are always strings. A dictionary keyed by
+integers survives the round trip as string keys, which is a small surprise that
+shows up when a lookup that worked before saving fails after loading.

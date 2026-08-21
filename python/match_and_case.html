@@ -189,7 +189,7 @@
         return &quot;server error&quot;
     case _:
         return &quot;unhandled&quot;</code></pre><p><code>|</code> groups alternatives, <code>_</code> is the default. The first matching case wins and the rest are skipped &mdash; there is no fall-through and no <code>break</code>.</p><p>If this were all <code>match</code> did it would be barely worth the keyword, and the page prints an if-chain beside it that agrees on every input.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-what-it-actually-adds">What it actually adds</a></li><li><a href="#vz-s-guards">Guards</a></li><li><a href="#vz-s-the-trap-a-bare-name-matches-everything">The trap: a bare name matches everything</a></li><li><a href="#vz-s-when-to-use-it">When to use it</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-what-it-actually-adds">What it actually adds</a></li><li><a href="#vz-s-guards">Guards</a></li><li><a href="#vz-s-the-trap-a-bare-name-matches-everything">The trap: a bare name matches everything</a></li><li><a href="#vz-s-when-to-use-it">When to use it</a></li><li><a href="#vz-s-why-it-was-added">Why it was added</a></li><li><a href="#vz-s-patterns-you-will-use">Patterns you will use</a></li><li><a href="#vz-s-the-two-rules-to-remember">The two rules to remember</a></li><li><a href="#vz-s-version-and-whether-to-use-it">Version, and whether to use it</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -356,6 +356,22 @@ for n in (-5, 0, 42, 1000):
                 <div>
                     <h3 id="vz-s-when-to-use-it">When to use it</h3>
                     <p>For two or three literal comparisons, <code>if</code> is shorter and everyone reads it. Reach for <code>match</code> when you are inspecting the *shape* of data &mdash; parsed JSON, events, commands, ASTs &mdash; where the alternative is a stack of <code>isinstance</code> checks and key lookups. That is the job it was added for.</p><p><code>match</code> needs Python 3.10 or newer.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-why-it-was-added">Why it was added</h3>
+                    <p>Python resisted a switch statement for decades on the grounds that a chain of <code>if</code>/<code>elif</code> already did the job, and for comparing a value against a few constants that argument still holds. <code>match</code> was not added to replace those.</p><p>It was added for structural pattern matching: inspecting the *shape* of data and pulling it apart in the same step. The code it replaces is a stack of <code>isinstance</code> checks, key lookups and length tests, written in a specific order, where getting the order wrong or forgetting a check produces a bug that only appears on unusual input. That pattern shows up constantly in anything that handles parsed JSON, events, commands or syntax trees.</p><p>Once you see it as "destructure and dispatch" rather than "switch", the design choices stop looking strange.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-patterns-you-will-use">Patterns you will use</h3>
+                    <p>Literal patterns match constants. Sequence patterns like <code>[a, b]</code> or <code>[first, *rest]</code> match lists and tuples of the right shape and bind the parts. Mapping patterns like <code>{"type": "click", "x": x}</code> match dictionaries that *contain* those keys - extra keys are allowed, which is what makes them useful against real payloads that carry more than you care about.</p><p>Class patterns match an instance and can pull attributes out of it: <code>case Point(x=0, y=y)</code> matches a Point on the y-axis and binds <code>y</code>. Combined with a guard, that covers a surprising amount of dispatch logic in one readable block.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-the-two-rules-to-remember">The two rules to remember</h3>
+                    <p>A bare name captures rather than compares, and it matches everything. If you want to compare against a constant you have stored somewhere, it must be a dotted name - <code>case Status.OK</code> - or a literal. This is the single most common <code>match</code> bug, and the failure mode is silent: the first such case swallows every value and the ones below it never run.</p><p>And <code>match</code> is not exhaustive. If nothing matches and there is no <code>case _</code>, the statement simply does nothing and execution continues. Coming from languages where the compiler insists on exhaustiveness, that is worth remembering, because a missing case here is a quiet no-op rather than an error.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-version-and-whether-to-use-it">Version, and whether to use it</h3>
+                    <p><code>match</code> requires Python 3.10. If your code has to run on anything older, the <code>if</code>/<code>elif</code> version is the only option, and for two or three literal comparisons it is the better one regardless: shorter, universally understood, and with none of the capture-pattern sharp edges.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

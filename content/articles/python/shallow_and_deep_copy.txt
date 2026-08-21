@@ -56,3 +56,58 @@ The original now reads 999 too. This is the same rule and it bites harder with c
 ## The rule
 
 Ask what is inside. Flat and immutable: use a slice or `.copy()`. Nested and mutable: use `deepcopy`, or restructure so you are not copying a mutable tree at all.
+
+## Copying an object, not just a container
+
+`copy.copy` works on your own classes too, and it copies the same way: a new
+object whose attributes point at the same values. If an attribute is a list, both
+copies share it.
+
+Classes can control this. Defining `__copy__` and `__deepcopy__` lets an object
+say how it should be duplicated, which matters when it holds something that
+should not be copied at all - an open file, a database connection, a lock. In
+practice you rarely write these, but knowing they exist explains why copying some
+library objects behaves in ways a plain attribute copy would not.
+
+## Why deepcopy is slower than it looks
+
+`deepcopy` walks the entire object graph, duplicates every mutable thing it
+finds, and keeps a record of what it has already copied so that shared references
+stay shared and cycles do not become infinite recursion.
+
+That bookkeeping is why it is slow on large structures, and it is also why it is
+correct in cases a hand-written recursive copy usually gets wrong. If you have
+ever written a recursive copy helper and hit `RecursionError` on data that
+referred back to itself, that is the problem `deepcopy` already solved.
+
+## Cheaper alternatives
+
+Often the goal is not a copy at all, but a modified version of something,
+without disturbing the original. Several types offer that directly:
+
+```python
+new_config = {**defaults, **overrides}    # merged, both untouched
+new_items = [*items, extra]               # extended, original untouched
+new_point = point._replace(x=5)           # namedtuple
+```
+
+Each of these produces a new outer object and leaves the inputs alone, at the
+cost of a shallow copy rather than a deep one - which is exactly right when the
+contents are immutable.
+
+If the contents are mutable and you find yourself needing `deepcopy` frequently,
+that is often a signal that the structure would be better as immutable data:
+tuples, frozensets, or small classes that return new instances rather than
+mutating themselves.
+
+## A practical rule for configuration
+
+Nested dictionaries loaded from JSON or YAML are the single most common place
+this bites, because the nesting is the whole point and `.copy()` looks like it
+did the job.
+
+If a function takes a config dict and changes anything inside it, either it
+should be documented as doing so, or it should deepcopy first. Silently editing a
+nested value in a structure the caller still holds is the sort of bug that gets
+diagnosed as "the settings randomly change", which is a long way from where the
+mutation actually happened.

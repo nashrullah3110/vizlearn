@@ -40,3 +40,58 @@ It looks like "use the default when value is missing", and it is really "use the
 return value if value is not None else "default"
 
 says what was meant. The page runs both over `"set"`, `""`, `0` and `None` so the divergence is visible rather than theoretical.
+
+## Where it belongs, and where it does not
+
+A conditional expression is at its best when the two values are short, closely
+related, and the condition is easy to read. `"pass" if score >= 50 else "fail"`
+is a sentence. `compute_full_report(user, opts) if user.is_active and not
+user.suspended else default_report()` is not, even though it is legal and does
+the same kind of job.
+
+The practical test is whether the line still reads left to right in one pass. If
+your eye has to go back to the middle to find the condition, or the line wraps,
+the statement form will be clearer and will cost you three extra lines that
+nobody has ever regretted.
+
+## In default values and arguments
+
+One place the expression form is genuinely the only option is inside another
+expression. Function arguments are the common case:
+
+```python
+connect(host, timeout=timeout if timeout else DEFAULT_TIMEOUT)
+```
+
+and so are dictionary values, list elements and f-string slots. You cannot put
+an `if` statement in any of those, so if the choice has to happen there, this is
+how it happens.
+
+Worth noticing in that example: `timeout if timeout else DEFAULT` has the same
+falsy-value problem as `or`. If zero is a legitimate timeout meaning "do not
+wait", this discards it. `timeout if timeout is not None else DEFAULT` is the
+version that survives contact with real data.
+
+## Nesting, and the readable alternative
+
+Chained conditional expressions are the classic overreach, and the reason is
+that they invert how people read a decision. A reader looking for the default
+case has to scan to the very end of the line, and adding a band means editing
+the middle of a long string of `else`s.
+
+When the mapping is from ranges to values, a small loop over pairs often reads
+better than either the chain or a stack of `if`s:
+
+```python
+BANDS = [(90, "A"), (80, "B"), (70, "C")]
+
+def grade(score):
+    for cutoff, letter in BANDS:
+        if score >= cutoff:
+            return letter
+    return "F"
+```
+
+The bands are now data, which means they can be changed, tested and displayed
+without touching the logic. That is usually the real win, and it is easy to
+miss while arguing about one-liners.

@@ -186,7 +186,7 @@
 b = a
 b.append(4)
 print(a)  # [1, 2, 3, 4]</code></pre><p><code>b = a</code> attaches a second label to the same list. There is one list and two names for it, so a change through either name is visible through both. <code>a is b</code> is <code>True</code>, which is the test for "the same object" as opposed to <code>==</code>, which asks about contents.</p><p>To get a second list, ask for one: <code>a[:]</code>, <code>list(a)</code> or <code>a.copy()</code>.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-rebinding-versus-mutating">Rebinding versus mutating</a></li><li><a href="#vz-s-inside-functions">Inside functions</a></li><li><a href="#vz-s-immutable-types-dodge-the-question">Immutable types dodge the question</a></li><li><a href="#vz-s-the-multiplication-trap">The multiplication trap</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-rebinding-versus-mutating">Rebinding versus mutating</a></li><li><a href="#vz-s-inside-functions">Inside functions</a></li><li><a href="#vz-s-immutable-types-dodge-the-question">Immutable types dodge the question</a></li><li><a href="#vz-s-the-multiplication-trap">The multiplication trap</a></li><li><a href="#vz-s-which-types-are-which">Which types are which</a></li><li><a href="#vz-s-equality-and-identity">Equality and identity</a></li><li><a href="#vz-s-passing-to-functions-stated-precisely">Passing to functions, stated precisely</a></li><li><a href="#vz-s-defensive-copies">Defensive copies</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -352,6 +352,25 @@ y.append(3)  # mutating: change the object y points at</code></pre><p>Rebinding 
                     <h3 id="vz-s-the-multiplication-trap">The multiplication trap</h3>
                     <pre><code class="language-python">grid = [[0] * 3] * 3
 grid[0][0] = 1  # every row changes</code></pre><p><code>[0] * 3</code> builds one row. Multiplying the outer list by 3 does not build three rows &mdash; it stores three references to the same row. Setting one cell appears to set three.</p><p>grid = [[0] * 3 for _ in range(3)]</p><p>The comprehension evaluates <code>[0] * 3</code> afresh each pass, so there really are three lists. This is the same rule as the mutable default argument: one object created once, shared everywhere.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-which-types-are-which">Which types are which</h3>
+                    <p>The distinction is worth memorising as a list, because it explains behaviour across the whole language.</p><p>Immutable: <code>int</code>, <code>float</code>, <code>bool</code>, <code>str</code>, <code>bytes</code>, <code>tuple</code>, <code>frozenset</code>, <code>None</code>. Mutable: <code>list</code>, <code>dict</code>, <code>set</code>, <code>bytearray</code>, and nearly every class you write yourself.</p><p>Every rule about aliasing, dictionary keys, default arguments and copying falls out of that split. Immutable objects can be shared without risk, which is why they can be dictionary keys and set members and safe defaults. Mutable objects cannot.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-equality-and-identity">Equality and identity</h3>
+                    <p>Two separate questions, and Python has an operator for each:</p><pre><code class="language-python">a == b      # do they hold the same value?
+a is b      # are they the same object?</code></pre><p>Two lists with identical contents are equal and are not identical. Confusing the two produces code that works by accident, particularly with small integers and short strings, which Python caches: <code>x = 256; y = 256; x is y</code> is often <code>True</code>, and the same test with <code>257</code> is often <code>False</code>. That is an implementation detail and precisely why <code>is</code> should be reserved for <code>None</code> and for genuine identity questions.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-passing-to-functions-stated-precisely">Passing to functions, stated precisely</h3>
+                    <p>Python is neither pass-by-value nor pass-by-reference in the C sense. What is passed is a reference to the object, by value - the function gets its own name pointing at the caller's object.</p><p>So the function can mutate the object and the caller sees it, and the function can rebind its own name and the caller does not. Both facts come from the same mechanism, and once you hold "names point at objects" in your head, no further rule is needed.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-defensive-copies">Defensive copies</h3>
+                    <p>When a function stores something it was given, it is worth thinking about who else holds it:</p><pre><code class="language-python">class Basket:
+    def __init__(self, items):
+        self.items = list(items)     # our own copy</code></pre><p>Without the copy, the caller's list and the object's list are the same list, and a later change on either side surprises the other. Copying at the boundary costs one call and removes an entire category of bug where two parts of a program share state neither of them knows about.</p><p>The same reasoning applies on the way out: returning <code>self.items</code> directly hands callers a handle on your internals. Returning <code>list(self.items)</code> or a tuple keeps the boundary intact.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

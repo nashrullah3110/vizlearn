@@ -68,3 +68,66 @@ An `elif` chain is one decision with several outcomes, all at the same indentati
 ## The rule of thumb
 
 Two levels is normal. Three is worth a second look. Four almost always means either a set of guard clauses waiting to be inverted, or a block that wants to be its own function.
+
+## Guard clauses, and why they read better
+
+A nested conditional builds a staircase: each condition indents the next, and by
+the third level the code that actually does something is a long way from the
+left margin. The alternative is to handle the exceptional cases first and leave
+early, so the main path stays at the top level.
+
+```python
+def borrow(user, book):
+    if not user.active:
+        return "membership inactive"
+    if user.fines > 0:
+        return "clear your fines first"
+    if not book.available:
+        return "already on loan"
+    return "enjoy the book"
+```
+
+Every line reads as one rule. Adding a rule is one line in the middle; removing
+one is deleting a line. The nested version needs re-indenting for either.
+
+The reason this works is that it separates "reasons you cannot" from "what
+happens when you can". Those are different kinds of statement, and the staircase
+version tangles them together, which is why it gets harder to read exactly as
+the number of rules grows.
+
+## When nesting is genuinely right
+
+Guard clauses suit functions, because `return` is what makes them possible.
+Inside a loop or a block where you cannot return, the staircase is sometimes
+unavoidable - though `continue` plays the same role in a loop that `return`
+plays in a function, and is under-used for it.
+
+Nesting is also right when the conditions are genuinely dependent: when the
+second question only makes sense if the first was true. `if user is not None:`
+followed by `if user.active:` is not a staircase to flatten, it is two questions
+where the second would raise without the first.
+
+## Combining with and or
+
+Two shallow conditions can often become one:
+
+```python
+if user.active and not user.fines:
+```
+
+This is clearer than nesting when the combination is what you mean, and worse
+than nesting when you need different responses to each failure - as soon as you
+want to tell the user *which* rule stopped them, the conditions have to be
+separate again.
+
+Both `and` and `or` short-circuit, which is what makes `if user is not None and
+user.active` safe: the second half is never evaluated when the first is false.
+That ordering is load-bearing, and swapping the halves turns a working check
+into an `AttributeError`.
+
+## Depth as a design signal
+
+Three levels of nested conditions inside a loop inside a function is usually not
+a formatting problem, it is a sign that the function is making several different
+decisions and would be clearer as two or three named functions. The indentation
+is doing you a favour by making that visible.

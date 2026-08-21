@@ -184,7 +184,7 @@
                     <h3 id="vz-s-key-is-a-function-of-one-item">key is a function of one item</h3>
                     <p>sorted(words, key=len)</p><p><code>key</code> is called once per item and returns the value to sort on. Here <code>len</code> turns each word into its length, and the words come back shortest first. The items in the result are still the words; only the comparison changed.</p><p>Anything callable works: a builtin, a lambda, a named function.</p><pre><code class="language-python">sorted(people, key=lambda p: p[1])    # by the second element
 sorted(rows, key=lambda r: r[&quot;score&quot;])  # by a dict field</code></pre>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-tuple-keys-give-you-tiebreaks">Tuple keys give you tiebreaks</a></li><li><a href="#vz-s-sorted-versus-sort">sorted() versus .sort()</a></li><li><a href="#vz-s-stability-and-why-it-matters">Stability, and why it matters</a></li><li><a href="#vz-s-the-performance-note">The performance note</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-tuple-keys-give-you-tiebreaks">Tuple keys give you tiebreaks</a></li><li><a href="#vz-s-sorted-versus-sort">sorted() versus .sort()</a></li><li><a href="#vz-s-stability-and-why-it-matters">Stability, and why it matters</a></li><li><a href="#vz-s-the-performance-note">The performance note</a></li><li><a href="#vz-s-what-key-actually-does">What key actually does</a></li><li><a href="#vz-s-sorting-by-more-than-one-thing">Sorting by more than one thing</a></li><li><a href="#vz-s-stability-and-why-it-is-useful">Stability, and why it is useful</a></li><li><a href="#vz-s-sorted-versus-sort">sorted versus .sort</a></li><li><a href="#vz-s-the-same-key-everywhere">The same key everywhere</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -330,6 +330,26 @@ nums.sort()         # rearranges in place, returns None</code></pre><p>The trap 
                 <div>
                     <h3 id="vz-s-the-performance-note">The performance note</h3>
                     <p><code>key</code> is called exactly once per item, not on every comparison, so an expensive key function is affordable. Doing the same work inside a comparison would cost far more.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-what-key-actually-does">What key actually does</h3>
+                    <p><code>key</code> takes a function, calls it once on every element, and sorts by whatever comes back. The original items are what you get out - the key is used for comparison only, and then discarded.</p><p>That single sentence explains most of what people find confusing. The function is not a comparison between two items; it is a transformation of one item into something sortable. So <code>key=len</code> sorts by length, <code>key=str.lower</code> sorts case-insensitively, and <code>key=lambda r: r["score"]</code> sorts records by a field without changing them.</p><p>It also explains why <code>key</code> is fast. Each element is transformed once, not once per comparison, which is why this is preferred over the old <code>cmp</code> approach that Python removed in version 3.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-sorting-by-more-than-one-thing">Sorting by more than one thing</h3>
+                    <p>Return a tuple, and the sort compares position by position:</p><pre><code class="language-python">sorted(people, key=lambda p: (p.surname, p.forename))</code></pre><p>Surname first, forename only where surnames match. This extends to as many levels as you need, and it is far easier to get right than sorting repeatedly.</p><p>Mixing directions is the awkward case, because <code>reverse=True</code> applies to the whole sort. For numbers, negating one component works: <code>key=lambda p: (-p.score, p.name)</code> gives highest score first, then name ascending. For strings there is no negation, and the usual answer is two stable sorts, applied least significant first.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-stability-and-why-it-is-useful">Stability, and why it is useful</h3>
+                    <p>Python's sort is stable: items that compare equal keep their original order. That is what makes the two-pass approach work at all, and it is a guarantee you can rely on rather than an implementation detail.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-sorted-versus-sort">sorted versus .sort</h3>
+                    <p><code>sorted(x)</code> returns a new list and leaves the original alone. <code>x.sort()</code> reorders in place and returns <code>None</code>. The second is the source of a small, common bug:</p><pre><code class="language-python">names = names.sort()      # names is now None</code></pre><p>The method returns <code>None</code> deliberately, as a signal that it mutated rather than produced. Every in-place method in the standard library does the same - <code>reverse</code>, <code>append</code>, <code>extend</code>, <code>update</code> - and once you know the convention, the <code>None</code> stops being a surprise and starts being a hint.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-the-same-key-everywhere">The same key everywhere</h3>
+                    <p><code>key</code> is not a sorting feature. <code>min</code>, <code>max</code> and <code>itertools.groupby</code> all take it and mean the same thing by it, so <code>max(people, key=lambda p: p.score)</code> finds the top scorer without sorting anything - which is both faster and clearer than sorting and taking the last element.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

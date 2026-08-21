@@ -55,3 +55,57 @@ replaces two items with three. That is a genuine feature and a genuine surprise.
 ## Reversing three ways
 
 `data[::-1]` builds a new reversed list. `reversed(data)` returns a lazy iterator and copies nothing. `data.reverse()` reorders in place and returns `None` &mdash; the same trap as `.sort()`.
+
+## Why the stop is excluded
+
+Excluding the stop looks arbitrary until you notice what it buys. The length of
+`a[i:j]` is exactly `j - i`, with no adjustment. `a[:n]` and `a[n:]` split a
+sequence with nothing lost and nothing repeated. And `a[i:i]` is empty, which is
+the sensible answer for a zero-width slice.
+
+Every one of those becomes an off-by-one special case if the stop is inclusive.
+The convention is the same one `range` uses, which is why the two compose so
+predictably.
+
+## Slicing does not raise
+
+`a[5:99]` on a three-item list returns what exists, and `a[99:]` returns an empty
+list. No exception either way. That is convenient when you are taking "up to
+ten" of something and there might be fewer.
+
+It is also a place bugs hide, because an empty slice looks like legitimate data.
+A function that slices with a computed index and returns nothing has not
+necessarily worked correctly - it may have computed the wrong index and been
+silently forgiven. When the index must be valid, index rather than slice, and
+let `IndexError` tell you.
+
+## Copies, views and strings
+
+A slice of a list is a shallow copy: a new list holding the same objects. That is
+why `b = a[:]` is a copy idiom, and why changing `b[0] = x` leaves `a` alone
+while `b[0].append(x)` does not - the outer list is new, the items are shared.
+
+A slice of a string is a new string, because strings are immutable and there is
+nothing else it could be. That makes `s[::-1]` a genuine copy in reverse, which
+matters only when the string is very large.
+
+## Assigning into a slice
+
+Lists let you assign to a slice, and the replacement need not be the same length:
+
+```python
+nums[1:3] = ["a", "b", "c"]     # two items become three
+del nums[1:3]                   # or remove them entirely
+```
+
+This changes the list in place, including its length, and it is the one part of
+slicing that mutates rather than copies. It is worth knowing mainly so that you
+recognise it in other people's code, and because it explains why `a[:] = b`
+replaces the contents of `a` while `a = b` merely rebinds the name.
+
+## Step with a negative start and stop
+
+Combining a negative step with negative indices is where slices become
+write-only. `a[-2::-1]` is "start at the second-to-last, walk backwards to the
+beginning" - correct, and not obvious on sight. When a slice needs a comment,
+`reversed()` and an explicit loop usually say it better.

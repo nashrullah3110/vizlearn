@@ -342,6 +342,27 @@ for line in f: # one line at a time</code></pre><p>The third is the one to reach
                     <h3>Text and encoding</h3>
                     <p>Files open in text mode and decode using your platform's default encoding, which differs between machines. For anything portable, say what you mean: <code>open(path, encoding="utf-8")</code>.</p>
                 </div>
+                <div>
+                    <h3>Paths, and why pathlib is worth the switch</h3>
+                    <p>String concatenation for paths breaks across operating systems and on edge cases like trailing slashes. <code>pathlib</code> handles both and reads better:</p><pre><code class="language-python">from pathlib import Path
+
+data = Path(&quot;content&quot;) / &quot;articles&quot; / &quot;notes.txt&quot;
+text = data.read_text(encoding=&quot;utf-8&quot;)</code></pre><p><code>read_text</code> and <code>write_text</code> open, read or write, and close in one call, which covers the common case where you want the whole file and do not need to stream it. For anything iterative, <code>data.open()</code> gives you the same file object <code>open</code> would.</p><p><code>Path</code> also carries the questions you would otherwise ask the <code>os</code> module: <code>.exists()</code>, <code>.suffix</code>, <code>.stem</code>, <code>.parent</code>, <code>.glob("*.txt")</code>.</p>
+                </div>
+                <div>
+                    <h3>Encoding is not optional in practice</h3>
+                    <p>Text mode decodes bytes into a string using an encoding, and if you do not name one, Python uses the platform default. That default differs between machines, which is how a script that works on one computer produces <code>UnicodeDecodeError</code> on another, with data that has not changed.</p><p>Naming it removes the whole class of problem:</p><pre><code class="language-python">open(path, encoding=&quot;utf-8&quot;)</code></pre><p>If you are handling files you did not create and cannot assume, <code>errors="replace"</code> lets you read something rather than crashing, at the cost of substituting the bytes it could not decode.</p>
+                </div>
+                <div>
+                    <h3>Writing safely</h3>
+                    <p>Writing directly over the only copy of a file has an obvious failure mode: if the program dies halfway, the original is gone and the replacement is incomplete. The standard remedy is to write beside it and rename:</p><pre><code class="language-python">tmp = path.with_suffix(&quot;.tmp&quot;)
+tmp.write_text(new_content, encoding=&quot;utf-8&quot;)
+tmp.replace(path)</code></pre><p><code>replace</code> is atomic on the same filesystem, so a reader sees either the old file or the new one and never a half-written one.</p>
+                </div>
+                <div>
+                    <h3>Binary mode</h3>
+                    <p>Adding <code>b</code> - <code>open(path, "rb")</code> - skips decoding and gives bytes. That is what you want for images, archives, and anything you are copying rather than reading. The mistake in the other direction is more common: opening a text file in binary mode and then being puzzled that comparisons against strings all fail, because <code>b"abc"</code> and <code>"abc"</code> are different types that never compare equal.</p>
+                </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->
         </div>

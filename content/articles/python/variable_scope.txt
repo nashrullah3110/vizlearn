@@ -69,3 +69,55 @@ Both are worth knowing and neither is worth reaching for often. A function that 
 ## Mutating is not assigning
 
 One clarification that resolves a lot of confusion: `items.append(1)` is not an assignment. It mutates the object the name already points at, so it affects the outer list without needing `global`. `items = [1]` is an assignment, and creates a local. The distinction is the object versus the name.
+
+## Why the rule exists
+
+Deciding local-or-not at compile time looks like an odd choice until you
+consider the alternative. If Python worked out scope while running, then whether
+a name was local could depend on which branch had executed, and the same line
+could mean two different things on two different runs. Instead the compiler
+scans the whole function body once: if a name is assigned anywhere in it, that
+name is local everywhere in it.
+
+That single rule explains the `UnboundLocalError` that catches everyone. The
+read on line one is a read of a local variable, because line five assigns to it,
+and the local has no value yet. The error message is precise; it just describes
+a decision made before the function ran.
+
+## Closures, and why they are useful
+
+A function defined inside another function can see the enclosing function's
+variables, and it keeps seeing them after the outer function has returned. That
+combination - an inner function plus the variables it captured - is a closure,
+and it is how a function can carry state without a class or a global.
+
+The counter on this page is the small version. The pattern scales to
+configuration: a function that builds and returns another function with some
+settings already baked in. `make_formatter(currency="GBP")` returns something
+you can call many times without repeating the currency.
+
+`nonlocal` exists because assigning inside the inner function would otherwise
+create a new local there, exactly as it would at module level. It says "this
+name belongs to the function that wraps me", and it is the only way to update
+captured state rather than merely read it.
+
+## Globals, and when they stop being harmless
+
+Reading a module-level constant from inside a function is ordinary and fine -
+that is what constants are for. Writing to a module-level name from inside a
+function is where trouble starts, because the function's behaviour now depends
+on what ran before it, and testing it in isolation stops being possible.
+
+The practical test is whether calling the function twice with the same arguments
+gives the same answer. If a `global` statement means it does not, the state
+probably wants to be a parameter, a return value, or an attribute on an object -
+all three of which make the dependency visible in the signature rather than
+buried in the body.
+
+## Shadowing builtins
+
+`list`, `dict`, `set`, `id`, `type`, `sum`, `input` and `max` are all ordinary
+names that happen to be defined in the builtin scope, and assigning to any of
+them inside your code hides the original for the rest of that scope. It is legal
+and it produces confusing failures later, usually when something calls `list(x)`
+and gets a `TypeError` about your list not being callable.

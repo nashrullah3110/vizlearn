@@ -60,3 +60,92 @@ A single-element tuple needs the trailing comma. It looks like a typo and is not
 ## When to reach for which
 
 Use a list when the collection will grow, shrink or be sorted in place. Use a tuple when the group is fixed at creation and its positions mean something: a coordinate, an RGB colour, a row from a database. If you find yourself never mutating a list, a tuple states that intent and gets you hashability for free.
+
+## Unpacking in places you did not expect
+
+Unpacking is not limited to assignment. It is how a for loop reads pairs:
+
+```python
+for name, score in [("ana", 91), ("bo", 78)]:
+    print(name, score)
+```
+
+Each item is a two-tuple, and the loop unpacks it into two names on the way
+in. `dict.items()` yields tuples, which is why `for k, v in d.items()` works
+at all, and `enumerate` yields `(index, value)` for the same reason.
+
+A star collects the middle:
+
+```python
+first, *rest = [1, 2, 3, 4]      # first = 1, rest = [2, 3, 4]
+head, *body, tail = "a b c d".split()
+```
+
+The starred name always becomes a list, even when it captures nothing, which
+means `rest` is `[]` rather than `None` for a one-item sequence. That is worth
+knowing before you write `if rest is None`.
+
+## Where the wrong number of names bites
+
+```python
+x, y = (1, 2, 3)
+```
+
+raises `ValueError: too many values to unpack`. That looks like an annoyance
+and is a safety net: it fires the moment the shape of your data changes. Code
+that indexed `point[0]` and `point[1]` would have carried on quietly with a
+three-element point and produced wrong answers much later.
+
+The same error appears when a function you expected to return two things
+returns one, which is usually the real bug rather than the unpacking.
+
+## Named tuples, when positions stop being obvious
+
+Positional access stops reading well past two or three fields. `record[4]`
+tells nobody anything.
+
+```python
+from collections import namedtuple
+
+Point = namedtuple("Point", "x y")
+p = Point(3, 4)
+print(p.x, p[0])        # both work
+```
+
+A named tuple is still a tuple - immutable, hashable, unpackable - but its
+fields have names. It costs one line and it is the usual answer when a plain
+tuple has grown past the point where you can remember what position two was.
+
+## Why immutability is not just a restriction
+
+It is tempting to read "cannot be changed" as a limitation you work around. In
+practice it is a property you rely on. An immutable object can be shared freely
+between functions, threads and data structures, because no holder of it can
+surprise another holder by editing it. That is why the language reaches for
+tuples in exactly the places where a surprise would be expensive: function
+arguments arrive as a tuple, exceptions carry their arguments as a tuple, and a
+function returning several values returns a tuple rather than a list.
+
+The immutability is shallow, and this catches people. A tuple guarantees that
+its slots keep pointing at the same objects; it says nothing about those
+objects. A tuple containing a list will happily let you append to that list,
+and the tuple is unchanged as far as Python is concerned, because it still
+points at the same list. This is also why such a tuple is not hashable: its
+contents can change, so any hash computed from them would go stale.
+
+## Choosing between a tuple, a list and a small class
+
+Three options, and the decision is usually about what the positions mean.
+
+A list is right when the items are the same kind of thing and the collection
+grows, shrinks or gets sorted: a list of scores, a list of users, a queue of
+jobs. Position carries no meaning beyond order.
+
+A tuple is right when the group is fixed at creation and each position means
+something specific: a coordinate pair, an RGB colour, a database row. Position
+is the meaning, which is exactly why the group must not change length.
+
+A small class or a dataclass takes over when there are more than about three
+fields, or when you find yourself writing a comment to remember what position
+three was. Names beat positions the moment positions stop being obvious, and a
+named tuple is the halfway house that keeps tuple behaviour while adding them.

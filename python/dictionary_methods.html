@@ -185,7 +185,7 @@
                     <pre><code class="language-python">prices[&quot;kiwi&quot;]        # KeyError
 prices.get(&quot;kiwi&quot;)    # None
 prices.get(&quot;kiwi&quot;, 0) # 0</code></pre><p><code>get</code> is for when a missing key is expected and has a sensible default. Square brackets are for when a missing key is a bug &mdash; and there the <code>KeyError</code> is doing you a favour by failing loudly.</p><p>Do not reach for <code>get</code> reflexively. <code>d.get(k)</code> returning <code>None</code> where you expected a value produces a <code>TypeError</code> several lines later, far from the cause.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-items-keys-values">items, keys, values</a></li><li><a href="#vz-s-the-counting-pattern">The counting pattern</a></li><li><a href="#vz-s-the-grouping-pattern">The grouping pattern</a></li><li><a href="#vz-s-pop-and-update">pop and update</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-items-keys-values">items, keys, values</a></li><li><a href="#vz-s-the-counting-pattern">The counting pattern</a></li><li><a href="#vz-s-the-grouping-pattern">The grouping pattern</a></li><li><a href="#vz-s-pop-and-update">pop and update</a></li><li><a href="#vz-s-views-and-why-they-are-not-lists">Views, and why they are not lists</a></li><li><a href="#vz-s-order-is-guaranteed-now">Order is guaranteed now</a></li><li><a href="#vz-s-choosing-between-get-setdefault-and-defaultdict">Choosing between get, setdefault and defaultdict</a></li><li><a href="#vz-s-merging">Merging</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -348,6 +348,26 @@ else:
 d.pop(&quot;a&quot;, None)   # ...unless given a default
 d.update(other)    # merge in place
 a | b            # a new merged dict (3.9+)</code></pre><p>With <code>|</code>, the right-hand side wins on conflicts, which makes <code>defaults | overrides</code> a clean way to layer configuration.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-views-and-why-they-are-not-lists">Views, and why they are not lists</h3>
+                    <p><code>keys()</code>, <code>values()</code> and <code>items()</code> return views: live windows onto the dictionary rather than snapshots of it. Add a key and every existing view reflects it immediately, because a view holds no data of its own.</p><p>That is efficient and it has one consequence worth knowing. Modifying a dictionary while looping over one of its views raises <code>RuntimeError: dictionary changed size during iteration</code>. The fix is to iterate over a snapshot:</p><pre><code class="language-python">for key in list(d):
+    if should_remove(key):
+        del d[key]</code></pre><p><code>list(d)</code> copies the keys first, so the loop is walking its own list and the dictionary is free to change underneath.</p><p>Key and item views also behave like sets, which is occasionally very handy: <code>d1.keys() & d2.keys()</code> gives the keys both dictionaries share, without a loop.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-order-is-guaranteed-now">Order is guaranteed now</h3>
+                    <p>Since Python 3.7, dictionaries keep insertion order as a language guarantee rather than an implementation accident. That is why <code>dict.fromkeys(items)</code> is the standard order-preserving deduplication, and why iterating a dictionary produces a stable, predictable sequence.</p><p>It does not make a dictionary a substitute for a sorted structure - the order is insertion order, not sorted order - but it does mean you can rely on what you put in first coming out first.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-choosing-between-get-setdefault-and-defaultdict">Choosing between get, setdefault and defaultdict</h3>
+                    <p>Three tools that overlap, and the distinction is about what should happen when a key is missing.</p><p><code>get</code> reads and never writes. Use it when a missing key has a sensible fallback and you do not want to add anything to the dictionary.</p><p><code>setdefault</code> reads and writes: it inserts the default when the key is absent and returns whatever is now there. Use it for the grouping idiom, where you want the list to exist so you can append to it.</p><p><code>defaultdict(list)</code> moves that behaviour into the dictionary itself, so every missing key springs into existence on access. Use it when *every* access should create a default. Its downside is exactly that: a typo'd key lookup silently creates an empty entry instead of raising, which can mask a bug.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-merging">Merging</h3>
+                    <pre><code class="language-python">merged = {**defaults, **overrides}     # 3.5+
+merged = defaults | overrides          # 3.9+
+defaults |= overrides                  # in place</code></pre><p>Later keys win in all three. This is the clean way to layer configuration, and it beats a loop of <code>if key not in d</code> conditions because the precedence is stated by the order of the operands rather than buried in the logic.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

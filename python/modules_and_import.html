@@ -185,7 +185,7 @@
                     <pre><code class="language-python">import math            # math.sqrt(9)
 from math import sqrt  # sqrt(9)
 import numpy as np     # np.array(...)</code></pre><p>The first keeps the module as a prefix. That is a feature: reading <code>math.sqrt</code> a hundred lines later tells you immediately where it came from, and it cannot collide with anything of yours.</p><p>The second is shorter and right when you use one or two names heavily and there is no ambiguity.</p><p><code>as</code> renames on the way in, for length (<code>numpy as np</code>) or to avoid a clash with a name you already have.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-import-and-why-not">import * and why not</a></li><li><a href="#vz-s-imports-are-cached">Imports are cached</a></li><li><a href="#vz-s-where-imports-go">Where imports go</a></li><li><a href="#vz-s-the-standard-library-is-large">The standard library is large</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-import-and-why-not">import * and why not</a></li><li><a href="#vz-s-imports-are-cached">Imports are cached</a></li><li><a href="#vz-s-where-imports-go">Where imports go</a></li><li><a href="#vz-s-the-standard-library-is-large">The standard library is large</a></li><li><a href="#vz-s-what-a-module-actually-is">What a module actually is</a></li><li><a href="#vz-s-the-main-guard">The __main__ guard</a></li><li><a href="#vz-s-packages-and-relative-imports">Packages and relative imports</a></li><li><a href="#vz-s-where-python-looks">Where Python looks</a></li><li><a href="#vz-s-import-cost">Import cost</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -332,6 +332,31 @@ print("math already loaded:", "math" in sys.modules)</script>
                 <div>
                     <h3 id="vz-s-the-standard-library-is-large">The standard library is large</h3>
                     <p>Before installing anything, check what ships with Python. <code>collections</code>, <code>itertools</code>, <code>datetime</code>, <code>json</code>, <code>random</code>, <code>statistics</code>, <code>pathlib</code> and <code>re</code> cover an enormous amount of everyday work, and the page uses three of them in six lines.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-what-a-module-actually-is">What a module actually is</h3>
+                    <p>A module is a file, and importing it runs that file top to bottom, once. Every function definition, class definition and top-level statement executes at that moment, and the resulting names become attributes of the module object.</p><p>That single fact explains several things at once. It explains why top-level code in a module runs when someone imports it, which is why print statements left at module level surface in surprising places. It explains why circular imports are a problem: two modules each trying to finish running before the other can. And it explains the caching - having run it once, Python keeps the result.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-the-main-guard">The <code>__main__</code> guard</h3>
+                    <p>Because importing runs the file, a script that does work at the top level does that work when imported too. The guard prevents it:</p><pre><code class="language-python">def main():
+    ...
+
+if __name__ == &quot;__main__&quot;:
+    main()</code></pre><p><code>__name__</code> is <code>"__main__"</code> when the file is run directly and the module's name when it is imported. So the file can be both a usable script and an importable module, which is what makes it testable - a test can import <code>main</code> without running it.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-packages-and-relative-imports">Packages and relative imports</h3>
+                    <p>A directory with an <code>__init__.py</code> is a package, and modules inside it can import from each other relatively:</p><pre><code class="language-python">from . import helpers          # same package
+from .models import Record     # a module in the same package</code></pre><p>Relative imports only work inside a package and only when the package is being imported, not when a file inside it is run directly as a script. That restriction is behind a large share of <code>ImportError: attempted relative import with no known parent package</code> messages, and the usual answer is to run the module with <code>python -m package.module</code> rather than by path.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-where-python-looks">Where Python looks</h3>
+                    <p>Imports resolve against <code>sys.path</code>, which starts with the directory of the script being run, then the standard library, then installed packages. The first match wins, and that ordering is why a local file named <code>random.py</code> or <code>json.py</code> shadows the standard library module of the same name and produces errors that look impossible.</p><p>Naming a file after a module you also import is worth avoiding for exactly this reason - the failure is confusing out of all proportion to the mistake.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-import-cost">Import cost</h3>
+                    <p>Imports are cheap after the first, but the first one runs the whole module. A library that does substantial work at import time makes every program that imports it slower to start, which is why heavy setup belongs in a function the caller chooses to call rather than at module level.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

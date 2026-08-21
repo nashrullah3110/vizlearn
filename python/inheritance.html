@@ -186,7 +186,7 @@
     def speak(self):
         return &quot;woof&quot;</code></pre><p><code>Dog</code> gets everything <code>Animal</code> has. Where it defines a method of the same name, that version wins &mdash; that is overriding.</p><p>The payoff shows up in methods the parent already wrote:</p><pre><code class="language-python">def describe(self):
     return f&quot;{self.name} says {self.speak()}&quot;</code></pre><p><code>describe</code> was written once on <code>Animal</code> and calls whichever <code>speak</code> the actual object has. Add a tenth animal and <code>describe</code> needs no change. That is the whole argument for inheritance in one method.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-super">super()</a></li><li><a href="#vz-s-the-lookup-order">The lookup order</a></li><li><a href="#vz-s-is-a-not-has-a">is-a, not has-a</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-super">super()</a></li><li><a href="#vz-s-the-lookup-order">The lookup order</a></li><li><a href="#vz-s-is-a-not-has-a">is-a, not has-a</a></li><li><a href="#vz-s-composition-concretely">Composition, concretely</a></li><li><a href="#vz-s-abstract-base-classes">Abstract base classes</a></li><li><a href="#vz-s-duck-typing-means-you-often-need-neither">Duck typing means you often need neither</a></li><li><a href="#vz-s-multiple-inheritance-and-mixins">Multiple inheritance and mixins</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -350,6 +350,35 @@ print("lookup order :", [c.__name__ for c in LoudBase.__mro__][:4])</script>
                 <div>
                     <h3 id="vz-s-is-a-not-has-a">is-a, not has-a</h3>
                     <p>Inherit when the subclass genuinely <em>is</em> a kind of the parent and can be used wherever the parent is expected. A <code>Dog</code> is an <code>Animal</code>, so <code>describe</code> works on both.</p><p>When the relationship is "has a" &mdash; a <code>Car</code> has an <code>Engine</code> &mdash; hold the other object as an attribute instead. Composition is easier to change later, because it does not tie two classes together permanently to share a couple of methods.</p><p>The common failure is inheriting to reuse a method. If that is the only reason, a function or a held object is nearly always the better answer.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-composition-concretely">Composition, concretely</h3>
+                    <p>"Prefer composition" is common advice and rarely shown. The difference is whether the other object is *what you are* or *what you have*:</p><pre><code class="language-python">class Car(Engine):            # inheritance: a Car IS an Engine - wrong
+    ...
+
+class Car:                    # composition: a Car HAS an Engine
+    def __init__(self, engine):
+        self.engine = engine
+
+    def start(self):
+        return self.engine.start()</code></pre><p>The composed version costs one line of delegation and gains a great deal: the engine can be swapped, tested on its own, or shared, and <code>Car</code> exposes only the methods it chose to expose rather than everything <code>Engine</code> happens to define.</p><p>The test is substitutability. If code that expects the parent can be handed the child and keep working, inheritance is honest. If not - if the child overrides methods to raise, or ignores half of what it inherited - the relationship is not "is a".</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-abstract-base-classes">Abstract base classes</h3>
+                    <p>When a parent exists to define an interface rather than to be instantiated, <code>abc</code> makes that explicit:</p><pre><code class="language-python">from abc import ABC, abstractmethod
+
+class Shape(ABC):
+    @abstractmethod
+    def area(self): ...</code></pre><p>Subclasses that forget <code>area</code> fail at construction with a clear message, rather than at some later call site with <code>AttributeError</code>. That turns a runtime surprise into an immediate, located error.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-duck-typing-means-you-often-need-neither">Duck typing means you often need neither</h3>
+                    <p>Python does not require a shared base class for polymorphism. Anything with the right method works:</p><pre><code class="language-python">def describe(thing):
+    return thing.speak()</code></pre><p>This accepts any object with a <code>speak</code> method, related or not. A great deal of Python code that would need an interface in another language needs nothing here, which is worth remembering before building a hierarchy to enable something that already works.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-multiple-inheritance-and-mixins">Multiple inheritance and mixins</h3>
+                    <p>Multiple parents are legal, and the reasonable use is a mixin: a small class providing one capability, with no state of its own and no expectation of being instantiated - <code>JSONSerialisableMixin</code>, <code>TimestampMixin</code>.</p><p>Deep diamond hierarchies are the unreasonable use. When two parents both define the same method and both call <code>super()</code>, the order of execution depends on the MRO, and reasoning about it stops being possible for anyone who did not write it. If you need <code>__mro__</code> to work out which code runs, the design has already cost more than it saved.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

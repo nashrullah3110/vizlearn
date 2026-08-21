@@ -56,3 +56,73 @@ Inherit when the subclass genuinely <em>is</em> a kind of the parent and can be 
 When the relationship is "has a" &mdash; a `Car` has an `Engine` &mdash; hold the other object as an attribute instead. Composition is easier to change later, because it does not tie two classes together permanently to share a couple of methods.
 
 The common failure is inheriting to reuse a method. If that is the only reason, a function or a held object is nearly always the better answer.
+
+## Composition, concretely
+
+"Prefer composition" is common advice and rarely shown. The difference is whether
+the other object is *what you are* or *what you have*:
+
+```python
+class Car(Engine):            # inheritance: a Car IS an Engine - wrong
+    ...
+
+class Car:                    # composition: a Car HAS an Engine
+    def __init__(self, engine):
+        self.engine = engine
+
+    def start(self):
+        return self.engine.start()
+```
+
+The composed version costs one line of delegation and gains a great deal: the
+engine can be swapped, tested on its own, or shared, and `Car` exposes only the
+methods it chose to expose rather than everything `Engine` happens to define.
+
+The test is substitutability. If code that expects the parent can be handed the
+child and keep working, inheritance is honest. If not - if the child overrides
+methods to raise, or ignores half of what it inherited - the relationship is not
+"is a".
+
+## Abstract base classes
+
+When a parent exists to define an interface rather than to be instantiated,
+`abc` makes that explicit:
+
+```python
+from abc import ABC, abstractmethod
+
+class Shape(ABC):
+    @abstractmethod
+    def area(self): ...
+```
+
+Subclasses that forget `area` fail at construction with a clear message, rather
+than at some later call site with `AttributeError`. That turns a runtime
+surprise into an immediate, located error.
+
+## Duck typing means you often need neither
+
+Python does not require a shared base class for polymorphism. Anything with the
+right method works:
+
+```python
+def describe(thing):
+    return thing.speak()
+```
+
+This accepts any object with a `speak` method, related or not. A great deal of
+Python code that would need an interface in another language needs nothing here,
+which is worth remembering before building a hierarchy to enable something that
+already works.
+
+## Multiple inheritance and mixins
+
+Multiple parents are legal, and the reasonable use is a mixin: a small class
+providing one capability, with no state of its own and no expectation of being
+instantiated - `JSONSerialisableMixin`, `TimestampMixin`.
+
+Deep diamond hierarchies are the unreasonable use. When two parents both define
+the same method and both call `super()`, the order of execution depends on the
+MRO, and reasoning about it stops being possible for anyone who did not write it.
+If you need `__mro__` to work out which code runs, the design has already cost
+more than it saved.

@@ -67,3 +67,64 @@ grid[0][0] = 1  # every row changes
 grid = [[0] * 3 for _ in range(3)]
 
 The comprehension evaluates `[0] * 3` afresh each pass, so there really are three lists. This is the same rule as the mutable default argument: one object created once, shared everywhere.
+
+## Which types are which
+
+The distinction is worth memorising as a list, because it explains behaviour
+across the whole language.
+
+Immutable: `int`, `float`, `bool`, `str`, `bytes`, `tuple`, `frozenset`, `None`.
+Mutable: `list`, `dict`, `set`, `bytearray`, and nearly every class you write
+yourself.
+
+Every rule about aliasing, dictionary keys, default arguments and copying falls
+out of that split. Immutable objects can be shared without risk, which is why
+they can be dictionary keys and set members and safe defaults. Mutable objects
+cannot.
+
+## Equality and identity
+
+Two separate questions, and Python has an operator for each:
+
+```python
+a == b      # do they hold the same value?
+a is b      # are they the same object?
+```
+
+Two lists with identical contents are equal and are not identical. Confusing the
+two produces code that works by accident, particularly with small integers and
+short strings, which Python caches: `x = 256; y = 256; x is y` is often `True`,
+and the same test with `257` is often `False`. That is an implementation detail
+and precisely why `is` should be reserved for `None` and for genuine identity
+questions.
+
+## Passing to functions, stated precisely
+
+Python is neither pass-by-value nor pass-by-reference in the C sense. What is
+passed is a reference to the object, by value - the function gets its own name
+pointing at the caller's object.
+
+So the function can mutate the object and the caller sees it, and the function
+can rebind its own name and the caller does not. Both facts come from the same
+mechanism, and once you hold "names point at objects" in your head, no further
+rule is needed.
+
+## Defensive copies
+
+When a function stores something it was given, it is worth thinking about who
+else holds it:
+
+```python
+class Basket:
+    def __init__(self, items):
+        self.items = list(items)     # our own copy
+```
+
+Without the copy, the caller's list and the object's list are the same list, and
+a later change on either side surprises the other. Copying at the boundary costs
+one call and removes an entire category of bug where two parts of a program share
+state neither of them knows about.
+
+The same reasoning applies on the way out: returning `self.items` directly hands
+callers a handle on your internals. Returning `list(self.items)` or a tuple keeps
+the boundary intact.

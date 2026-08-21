@@ -52,3 +52,98 @@ Immutable defaults &mdash; numbers, strings, `True`, `None`, tuples &mdash; are 
 ## Why this design
 
 It would be possible to re-evaluate defaults on every call, and some languages do. Python evaluates once because a default is just an expression bound at definition time, like any other value in the enclosing scope. Once you know that, the behaviour stops being surprising &mdash; but it is worth knowing before it costs you an afternoon.
+
+## Keyword-only parameters
+
+Anything after a bare `*` in the definition can only be passed by name:
+
+```python
+def connect(host, *, timeout=30, retries=3):
+    ...
+
+connect("db.local", timeout=5)      # fine
+connect("db.local", 5)              # TypeError
+```
+
+This is how you stop a call site from becoming a row of unlabelled values.
+`connect("db.local", 5, 2)` tells a reader nothing; forcing the names makes the
+call self-documenting, and it means you can reorder or add options later
+without breaking anyone.
+
+The mirror image is `/`, which marks parameters as positional-only. It appears
+in the standard library more than in application code.
+
+## Arguments are evaluated at the call
+
+```python
+def log(message, when=now()):    # now() runs ONCE, at definition
+```
+
+This is the same rule as the mutable default, wearing different clothes. If you
+want the current time on each call, compute it inside:
+
+```python
+def log(message, when=None):
+    if when is None:
+        when = now()
+```
+
+Any expression in a default - a function call, a list, a dict, an object - is
+evaluated once when the `def` statement runs, and the result is reused forever.
+
+## Too many parameters is a design signal
+
+A function with eight parameters is hard to call correctly and hard to change.
+Two usual remedies:
+
+- group related arguments into a small object or a dataclass, so `draw(config)`
+  replaces `draw(x, y, w, h, colour, border, alpha, z)`
+- split the function, because eight parameters often means it is doing more
+  than one job
+
+Neither is a rule, but if you are counting arguments on your fingers at the
+call site, the call site is telling you something.
+
+## Argument order in the definition
+
+Positional first, then defaults, then `*args`, then keyword-only, then
+`**kwargs`. Python enforces most of that, and the error messages are clear when
+you get it wrong - unlike the mutable default, which never complains at all.
+
+## What the signature communicates
+
+A function signature is the part other people read most and change least. It is
+worth treating as an interface rather than an accident of how the function grew.
+
+Parameters with no default are requirements: the caller must supply them and the
+function cannot work without them. Parameters with defaults are options, and the
+default should be the choice that is right most of the time. If you find
+yourself writing a default that callers nearly always override, the default is
+wrong and it is quietly making every call site longer.
+
+Order matters for reading as much as for the language. Put the thing the
+function is about first - the data, the object, the path - and the modifiers
+after it. `resize(image, width=800)` reads correctly; `resize(width=800,
+image=img)` is legal and reads backwards.
+
+## Passing arguments through
+
+When one function calls another and wants to forward whatever it was given, the
+star forms do it without repeating the signature. That is the right tool for
+wrappers, decorators and thin adapters, where repeating the parameters would
+mean updating two places every time the inner function changes.
+
+It is the wrong tool for a function people call directly. `def process(*args,
+**kwargs)` gives the caller no idea what to pass, gives the editor nothing to
+complete, and turns a mistake that would have been a clear `TypeError` into a
+`KeyError` somewhere deeper. Be explicit at the surface and flexible only where
+you are genuinely forwarding.
+
+## Mutable arguments, not just mutable defaults
+
+The default-argument trap gets the attention, but the same underlying fact -
+that arguments are passed by reference to the same object - applies to every
+call. A function that appends to a list it was given has changed the caller's
+list. Sometimes that is the point and should be said in the name: `add_item`,
+`update_config`, `sort_in_place`. When it is not the point, copy at the top of
+the function or return a new object, and let the caller decide.

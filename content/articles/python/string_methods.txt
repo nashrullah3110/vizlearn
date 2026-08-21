@@ -51,3 +51,71 @@ For that job:
 ## Case methods and comparison
 
 `upper`, `lower` and `title` return new strings. For case-insensitive comparison, `lower()` both sides &mdash; or `casefold()`, which handles a few non-English cases `lower` does not.
+
+## Cleaning input, in order
+
+Text arriving from a person or a file usually needs the same three steps, and
+the order is worth doing deliberately.
+
+Strip first, because trailing whitespace and newlines break comparisons in ways
+that are invisible on screen. Normalise case next, when the comparison should
+ignore it. Only then split or compare.
+
+```python
+line.strip().lower().split(",")
+```
+
+Chaining works because each method returns a new string, which is the same
+immutability that makes forgetting to assign such a common mistake elsewhere.
+
+For case-insensitive comparison across languages, `casefold` is stricter than
+`lower` and handles a handful of cases `lower` does not. For English-only text
+the difference never shows up.
+
+## Searching without exceptions
+
+Three ways to ask whether something appears in a string, and they differ in what
+they give back:
+
+```python
+"cat" in text            # True or False
+text.find("cat")         # index, or -1
+text.index("cat")        # index, or raises ValueError
+```
+
+Use `in` when you only want to know. Use `find` when you want the position and
+absence is expected. Use `index` when absence is a bug and you want it to say so.
+Choosing `find` and then forgetting that `-1` is falsy in a different way from
+`0` is a small classic: `if text.find("cat"):` is true when the match is at
+position one and false when it is at position zero.
+
+## Splitting text into lines and fields
+
+`splitlines()` handles the newline variants that `split("\n")` gets wrong on
+files written on another operating system. `partition` splits once and always
+returns three pieces, which avoids the length check that `split` with a maxsplit
+requires:
+
+```python
+key, sep, value = line.partition("=")
+```
+
+If the separator was absent, `sep` is empty and `value` is empty, and the
+unpacking still works - no `IndexError`, no branch.
+
+## Building strings in a loop
+
+Repeated concatenation inside a loop creates a new string every time, because
+strings cannot be modified in place. For a handful of pieces that is irrelevant.
+For thousands it is genuinely slow, and the fix is to collect and join once:
+
+```python
+parts = []
+for row in rows:
+    parts.append(format(row))
+text = "\n".join(parts)
+```
+
+This is the same reason `join` exists as a method on the separator: it is
+building the whole result in one pass, which it can only do if it is given all
+the pieces at once.

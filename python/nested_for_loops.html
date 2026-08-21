@@ -185,7 +185,7 @@
                     <pre><code class="language-python">for row in range(3):
     for col in range(4):
         print(row, col)</code></pre><p>The outer loop takes <code>row = 0</code> and then hands control to the inner loop, which runs all four of its passes before the outer loop moves to <code>row = 1</code>. Twelve lines print, in row-major order. The inner variable resets each time; the outer one does not.</p><p>This is the natural shape for anything two-dimensional: a grid, a table of rows and columns, every pairing of two lists.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-where-the-newline-goes">Where the newline goes</a></li><li><a href="#vz-s-the-cost-multiplies">The cost multiplies</a></li><li><a href="#vz-s-break-only-leaves-one-loop">break only leaves one loop</a></li><li><a href="#vz-s-when-nesting-is-the-wrong-tool">When nesting is the wrong tool</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-where-the-newline-goes">Where the newline goes</a></li><li><a href="#vz-s-the-cost-multiplies">The cost multiplies</a></li><li><a href="#vz-s-break-only-leaves-one-loop">break only leaves one loop</a></li><li><a href="#vz-s-when-nesting-is-the-wrong-tool">When nesting is the wrong tool</a></li><li><a href="#vz-s-reading-a-grid-row-by-row">Reading a grid, row by row</a></li><li><a href="#vz-s-breaking-out-of-both">Breaking out of both</a></li><li><a href="#vz-s-when-nesting-is-hiding-a-better-idea">When nesting is hiding a better idea</a></li><li><a href="#vz-s-reading-the-cost-without-timing-anything">Reading the cost without timing anything</a></li><li><a href="#vz-s-depth-and-when-to-stop">Depth, and when to stop</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -330,6 +330,50 @@ print("Doubling n doubles the sequential work and quadruples the nested work.")<
                 <div>
                     <h3 id="vz-s-when-nesting-is-the-wrong-tool">When nesting is the wrong tool</h3>
                     <p>If both loops walk the same collection, you are comparing every pair, and that is often avoidable. "Does any pair sum to the target?" looks like a natural nested loop and is a single pass with a set. Nesting is right when the two dimensions are genuinely independent &mdash; rows and columns, users and permissions &mdash; and suspicious when they are the same thing twice.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-reading-a-grid-row-by-row">Reading a grid, row by row</h3>
+                    <p>The most common nested loop walks a two-dimensional structure:</p><pre><code class="language-python">grid = [[1, 2, 3], [4, 5, 6]]
+for row in grid:
+    for value in row:
+        print(value, end=&quot; &quot;)
+    print()</code></pre><p>The outer loop takes a row - itself a list - and the inner loop takes the values in it. Note that the outer variable holds a whole row, not an index, which is what makes this read better than the <code>for i in range(len(grid))</code> version.</p><p>When you need the coordinates as well, <code>enumerate</code> supplies them at both levels:</p><pre><code class="language-python">for r, row in enumerate(grid):
+    for c, value in enumerate(row):
+        print(r, c, value)</code></pre>
+                </div>
+                <div>
+                    <h3 id="vz-s-breaking-out-of-both">Breaking out of both</h3>
+                    <p><code>break</code> leaves one loop. Three ways to leave two, in order of preference:</p><pre><code class="language-python">def find(grid, target):              # 1. a function, and return
+    for row in grid:
+        for value in row:
+            if value == target:
+                return value</code></pre><pre><code class="language-python">found = None                         # 2. a flag the outer loop checks
+for row in grid:
+    for value in row:
+        if value == target:
+            found = value
+            break
+    if found is not None:
+        break</code></pre><p>The function is almost always the right answer: <code>return</code> leaves everything, and the search gets a name.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-when-nesting-is-hiding-a-better-idea">When nesting is hiding a better idea</h3>
+                    <p>Two loops over the same collection compare every pair, and that is <code>n squared</code> work for a question that often has a one-pass answer.</p><pre><code class="language-python">for a in nums:                      # every pair - slow
+    for b in nums:
+        if a + b == target:
+            ...</code></pre><pre><code class="language-python">seen = set()                        # one pass
+for n in nums:
+    if target - n in seen:
+        ...
+    seen.add(n)</code></pre><p>The rule of thumb: if the inner loop is searching for something, a set or a dictionary usually removes it. If the two loops walk genuinely different things - rows and columns, users and permissions - the nesting is correct and there is nothing to remove.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-reading-the-cost-without-timing-anything">Reading the cost without timing anything</h3>
+                    <p>You can tell the cost of a nested loop by reading it. Count how many times each loop runs and multiply. Two loops over the same n-item list run n times n. A loop over n containing a loop over m runs n times m. A loop over n containing a lookup in a set runs n times, because the lookup does not loop.</p><p>That last one is the important case. A nested loop and a loop containing a set lookup can look almost identical on the page and behave completely differently at scale, and the difference is invisible on ten items and decisive on ten thousand.</p><p>This is also why the timings on this page are run at three sizes rather than one. A single measurement tells you how long something took; three tell you how the time grows, which is the thing that actually matters when your data gets bigger.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-depth-and-when-to-stop">Depth, and when to stop</h3>
+                    <p>Two levels of nesting is ordinary. Three is worth a second look. Four is nearly always a sign that some of the structure belongs in a function, because by then nobody can hold all the loop variables in their head at once, and the indentation alone pushes the real work off the right of the screen.</p><p>Pulling the inner loops into a named function costs nothing at runtime and gives each level a name that says what it is iterating over. It also gives you <code>return</code>, which is the cleanest way out of nested loops there is.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

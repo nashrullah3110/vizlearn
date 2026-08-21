@@ -34,3 +34,97 @@ prints `total = 42` &mdash; the expression and its value. It works for any expre
 ## Which to use
 
 Use f-strings. `%` formatting and `.format()` still work and you will meet them in older code, but they exist now mainly to be read, not written. The one place `.format()` still earns its keep is when the template is stored separately from the values &mdash; a message in a config file, for instance &mdash; because an f-string is evaluated where it is written.
+
+## Formatting a table without counting spaces
+
+Alignment is where the format spec earns its keep. Left-align text, right-align
+numbers, and the columns line up whatever the data:
+
+```python
+rows = [("apple", 3, 1.5), ("banana", 12, 0.25), ("cherry", 100, 12.0)]
+print(f"{'item':<10}{'qty':>5}{'price':>10}")
+for item, qty, price in rows:
+    print(f"{item:<10}{qty:>5}{price:>10.2f}")
+```
+
+`<` left, `>` right, `^` centre, and the number after it is the field width.
+Numbers right-aligned with a fixed number of decimals is the combination you
+will use most, because it puts the decimal points under each other.
+
+## Dates, and why the same syntax works
+
+The spec after the colon is handed to the object being formatted, so types can
+define their own:
+
+```python
+from datetime import datetime
+now = datetime(2026, 8, 20, 14, 30)
+print(f"{now:%d %B %Y}")      # 20 August 2026
+print(f"{now:%H:%M}")         # 14:30
+```
+
+That is not a special date feature of f-strings; it is `datetime` interpreting
+the spec it was given. The same mechanism is why `:.2f` means something to a
+float and nothing to a string.
+
+## Quotes inside the braces
+
+Before Python 3.12 you could not reuse the outer quote character inside the
+expression:
+
+```python
+f"{d['key']}"        # fine: single inside double
+f"{d["key"]}"        # SyntaxError before 3.12, allowed after
+```
+
+Sticking to the older form costs nothing and works everywhere, which is the
+usual reason to keep doing it.
+
+## Escaping a brace
+
+A literal brace is doubled:
+
+```python
+print(f"{{not a placeholder}} but {2 + 2} is")
+# {not a placeholder} but 4 is
+```
+
+This matters when you are generating JSON, CSS or anything else that uses
+braces, and it is the first thing to check when an f-string raises a confusing
+`KeyError`.
+
+## Why f-strings replaced everything before them
+
+Python has had four ways to build a string with values in it, and the
+differences are about where the values sit relative to the text.
+
+Concatenation with `+` scatters the sentence across quotes and plus signs, and
+requires `str()` around anything that is not already a string. Percent
+formatting moves the values to the end, so reading the sentence means jumping
+between the template and the tuple. `str.format` is the same shape with better
+syntax. An f-string puts each value exactly where it will appear in the output.
+
+That single property is why the mistakes go away. You cannot pass the arguments
+in the wrong order, because there is no separate argument list. You cannot
+supply too few, because each slot contains its own expression. And you can read
+the line and know what it prints without looking anywhere else.
+
+## What belongs inside the braces
+
+Any expression is legal, which means a great deal is possible and rather less
+is wise. A variable, an attribute, a dictionary lookup, a short method call or
+a small arithmetic expression all read fine. A nested comprehension or a long
+conditional does not: by the time the reader has parsed it they have lost the
+sentence it was embedded in.
+
+The rule that holds up is that an f-string should still read as a sentence with
+holes in it. When the hole is bigger than the sentence, compute the value on
+the line above and give it a name.
+
+## Formatting and correctness
+
+One habit worth keeping: format at the edge, never in the middle. Keep full
+precision in your variables and apply `:.2f` only where the value is printed or
+written out. Rounding early and then continuing to calculate is how totals stop
+matching the numbers above them, and it is a genuinely common source of small,
+hard-to-explain discrepancies in reports.

@@ -35,3 +35,108 @@ Doubling the input quadruples nested work. The second program on this page times
 ## When nesting is the wrong tool
 
 If both loops walk the same collection, you are comparing every pair, and that is often avoidable. "Does any pair sum to the target?" looks like a natural nested loop and is a single pass with a set. Nesting is right when the two dimensions are genuinely independent &mdash; rows and columns, users and permissions &mdash; and suspicious when they are the same thing twice.
+
+## Reading a grid, row by row
+
+The most common nested loop walks a two-dimensional structure:
+
+```python
+grid = [[1, 2, 3], [4, 5, 6]]
+for row in grid:
+    for value in row:
+        print(value, end=" ")
+    print()
+```
+
+The outer loop takes a row - itself a list - and the inner loop takes the
+values in it. Note that the outer variable holds a whole row, not an index,
+which is what makes this read better than the `for i in range(len(grid))`
+version.
+
+When you need the coordinates as well, `enumerate` supplies them at both
+levels:
+
+```python
+for r, row in enumerate(grid):
+    for c, value in enumerate(row):
+        print(r, c, value)
+```
+
+## Breaking out of both
+
+`break` leaves one loop. Three ways to leave two, in order of preference:
+
+```python
+def find(grid, target):              # 1. a function, and return
+    for row in grid:
+        for value in row:
+            if value == target:
+                return value
+```
+
+```python
+found = None                         # 2. a flag the outer loop checks
+for row in grid:
+    for value in row:
+        if value == target:
+            found = value
+            break
+    if found is not None:
+        break
+```
+
+The function is almost always the right answer: `return` leaves everything, and
+the search gets a name.
+
+## When nesting is hiding a better idea
+
+Two loops over the same collection compare every pair, and that is `n squared`
+work for a question that often has a one-pass answer.
+
+```python
+for a in nums:                      # every pair - slow
+    for b in nums:
+        if a + b == target:
+            ...
+```
+
+```python
+seen = set()                        # one pass
+for n in nums:
+    if target - n in seen:
+        ...
+    seen.add(n)
+```
+
+The rule of thumb: if the inner loop is searching for something, a set or a
+dictionary usually removes it. If the two loops walk genuinely different
+things - rows and columns, users and permissions - the nesting is correct and
+there is nothing to remove.
+
+## Reading the cost without timing anything
+
+You can tell the cost of a nested loop by reading it. Count how many times each
+loop runs and multiply. Two loops over the same n-item list run n times n. A
+loop over n containing a loop over m runs n times m. A loop over n containing a
+lookup in a set runs n times, because the lookup does not loop.
+
+That last one is the important case. A nested loop and a loop containing a set
+lookup can look almost identical on the page and behave completely differently
+at scale, and the difference is invisible on ten items and decisive on ten
+thousand.
+
+This is also why the timings on this page are run at three sizes rather than
+one. A single measurement tells you how long something took; three tell you how
+the time grows, which is the thing that actually matters when your data gets
+bigger.
+
+## Depth, and when to stop
+
+Two levels of nesting is ordinary. Three is worth a second look. Four is nearly
+always a sign that some of the structure belongs in a function, because by then
+nobody can hold all the loop variables in their head at once, and the
+indentation alone pushes the real work off the right of the screen.
+
+Pulling the inner loops into a named function costs nothing at runtime and
+gives each level a name that says what it is iterating over. It also gives you
+`return`, which is the cleanest way out of nested loops there is.
