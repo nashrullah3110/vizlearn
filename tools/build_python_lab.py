@@ -142,6 +142,74 @@ def body():
                 </section>
 
                 <section class="vz-lab-side">
+                    <h2>How it runs</h2>
+                    <p>This is not Python translated into JavaScript. It is CPython itself
+                    &mdash; the same interpreter you would install &mdash; compiled to
+                    WebAssembly by the Pyodide project and executed by your browser.
+                    Semantics match a normal interpreter because it <em>is</em> one.</p>
+                    <p>It runs in a worker thread, separate from the page. That is why an
+                    accidental infinite loop freezes the output rather than the whole tab,
+                    and why the editor stays responsive while your code is running. A run
+                    that has not finished within ten seconds is stopped and reported, which
+                    is almost always a loop that never exits.</p>
+                    <p>The first run downloads the interpreter, which takes a few seconds
+                    on a normal connection. After that it is cached, so subsequent runs
+                    start immediately, and the page keeps working with no connection at
+                    all.</p>
+                </section>
+
+                <section class="vz-lab-side">
+                    <h2>Reading a traceback</h2>
+                    <p>Errors appear exactly as they would in a terminal, and they are worth
+                    reading from the bottom up. The last line names the exception and the
+                    message; the lines above it show the call path that reached it, most
+                    recent last.</p>
+                    <p>The four you will meet earliest:
+                    <code>SyntaxError</code> means the file could not be parsed at all, so
+                    nothing ran &mdash; usually a missing bracket or colon on the line
+                    <em>before</em> the one reported.
+                    <code>NameError</code> means a name was used before it was defined,
+                    which is often a typo.
+                    <code>TypeError</code> means an operation met a type it cannot handle,
+                    such as adding a string to a number.
+                    <code>IndentationError</code> means the whitespace does not describe a
+                    consistent block.</p>
+                </section>
+
+                <section class="vz-lab-side">
+                    <h2>Files, timing and limits</h2>
+                    <p>There is an in-memory filesystem, so <code>open</code>,
+                    <code>read</code> and <code>write</code> all work normally. The files
+                    are real for the length of the run and gone afterwards, which makes this
+                    a genuine place to practise file handling without touching your
+                    computer.</p>
+                    <p><code>time.perf_counter</code> works and is accurate enough to
+                    compare two approaches, though everything runs slower than a native
+                    interpreter &mdash; often several times slower. Relative comparisons hold;
+                    absolute numbers do not transfer.</p>
+                    <p>Recursion is limited by the browser stack, which is smaller than a
+                    desktop Python's. Deep recursion raises rather than crashing, and an
+                    iterative version will usually run where a recursive one will not.</p>
+                </section>
+
+                <section class="vz-lab-side">
+                    <h2>Things worth trying</h2>
+                    <ul>
+                        <li>Paste code from anywhere and run it. Nothing is uploaded, so
+                            there is no reason not to.</li>
+                        <li>Break something deliberately &mdash; index past the end of a list,
+                            divide by zero, misspell a method &mdash; and read what comes
+                            back. Recognising tracebacks is most of debugging.</li>
+                        <li>Compare two approaches with <code>time.perf_counter</code>: a
+                            loop against a comprehension, a list against a set for membership
+                            tests.</li>
+                        <li>Use <code>collections.Counter</code>, <code>itertools</code> and
+                            <code>json</code> &mdash; the standard library is all here, and it
+                            is larger than most people use.</li>
+                    </ul>
+                </section>
+
+                <section class="vz-lab-side">
                     <h2>Learning Python?</h2>
                     <p>The <a href="%(p)spython/">Python track</a> teaches it one idea at a
                     time, each with an editor like this one beside the explanation &mdash;

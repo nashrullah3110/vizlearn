@@ -227,6 +227,67 @@ def body():
                     <p><code>Ctrl</code>/<code>Cmd</code> + <code>Enter</code> runs.</p>
                 </section>
 
+                <section class="vz-lab-side">
+                    <h2>Which SQL this is</h2>
+                    <p>SQLite, compiled to WebAssembly and running in your browser. The
+                    database lives in memory: it is created when the page loads, it keeps
+                    your changes while you work, and <code>Reset database</code> puts the
+                    sample tables back exactly as they were.</p>
+                    <p>SQLite is the most widely deployed database in the world and its
+                    dialect is close to standard SQL, so almost everything you write here
+                    transfers to PostgreSQL or MySQL. The differences worth knowing are
+                    small: SQLite is relaxed about types, storing whatever you give a
+                    column; it has no dedicated date type, using text or numbers instead;
+                    and <code>||</code> concatenates strings where MySQL would use
+                    <code>CONCAT</code>.</p>
+                </section>
+
+                <section class="vz-lab-side">
+                    <h2>What is supported</h2>
+                    <ul>
+                        <li><code>SELECT</code> with <code>WHERE</code>,
+                            <code>GROUP BY</code>, <code>HAVING</code>,
+                            <code>ORDER BY</code> and <code>LIMIT</code>.</li>
+                        <li>All the joins &mdash; inner, left, cross, and self-joins.</li>
+                        <li>Common table expressions, including recursive ones, and window
+                            functions such as <code>ROW_NUMBER</code>,
+                            <code>RANK</code> and <code>SUM() OVER ()</code>.</li>
+                        <li><code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>,
+                            <code>CREATE TABLE</code> and <code>CREATE INDEX</code>, so you
+                            can build your own schema and query it.</li>
+                        <li>Transactions, and <code>EXPLAIN QUERY PLAN</code> for seeing how
+                            a query will be executed.</li>
+                    </ul>
+                </section>
+
+                <section class="vz-lab-side">
+                    <h2>Errors you will see</h2>
+                    <p><em>no such column</em> usually means a typo, or a column named in
+                    <code>SELECT</code> that is neither grouped nor aggregated.
+                    <em>no such table</em> means the name is wrong or the table was dropped
+                    &mdash; reset to bring the samples back.
+                    <em>ambiguous column name</em> means two joined tables share a column
+                    name, so it needs qualifying as <code>table.column</code>.</p>
+                    <p>An empty result is not an error. It usually means the
+                    <code>WHERE</code> clause matched nothing, and the quickest way to find
+                    out is to remove conditions one at a time until rows appear.</p>
+                </section>
+
+                <section class="vz-lab-side">
+                    <h2>Things worth trying</h2>
+                    <ul>
+                        <li>Group by two columns and watch the row count change, then add
+                            a column that is neither grouped nor aggregated and see what
+                            SQLite does with it.</li>
+                        <li>Write the same question as a join, as a subquery, and as a CTE,
+                            and compare which one you would rather read in six months.</li>
+                        <li>Put <code>EXPLAIN QUERY PLAN</code> in front of a query, add an
+                            index, and run it again to see the plan change.</li>
+                        <li>Create your own table, insert a few rows, and break a
+                            constraint deliberately.</li>
+                    </ul>
+                </section>
+
                 <section class="vz-sql-side">
                     <h2>Learning SQL?</h2>
                     <p>The <a href="%(p)sdatabase/">Databases &amp; SQL track</a> works through
