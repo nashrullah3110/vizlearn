@@ -1454,4 +1454,333 @@ corners and enlarge the canvas first.
     ],
 )
 
+# ---------------------------------------------------------------------------
+# 9. Receptive field
+# ---------------------------------------------------------------------------
+topic(
+    "receptive_field",
+    "Receptive Field",
+    "CNN Internals",
+    "One pixel deep in a network sees a patch of the original image. Work out "
+    "how big that patch is, and why stacking beats widening.",
+    _svg(_grid(10, 30, 9, 15, 1, fill=S)
+         + _grid(37, 46, 9, 9, 1, fill=S)
+         + _grid(64, 62, 9, 3, 1, fill=S)
+         + _txt(80, 24, "one output, many inputs", M, 8)),
+    {
+        "diagram": "receptive",
+        "controls": [
+            {"key": "layers", "label": "Layers", "type": "range",
+             "min": 1, "max": 4, "step": 1, "value": 3},
+            {"key": "kernel", "label": "Kernel size", "type": "range",
+             "min": 3, "max": 7, "step": 2, "value": 3},
+            {"key": "stride", "label": "Stride", "type": "range",
+             "min": 1, "max": 2, "step": 1, "value": 1},
+        ],
+    },
+    [
+        "The receptive field is how much of the <em>original input</em> a single "
+        "unit can be influenced by.",
+        "With stride 1, each layer adds <code class='mono-font'>k &minus; 1</code> "
+        "to the receptive field. Growth is linear in depth.",
+        "With stride greater than 1, later layers add more, because each step "
+        "covers more original pixels. Growth becomes geometric.",
+        "Three stacked 3&times;3 layers see 7&times;7 using 27 weights per channel "
+        "pair. One 7&times;7 layer sees the same using 49.",
+    ],
+    """
+title: Receptive Field
+intro: How much of the original image a single deep unit can actually see, and why the answer shapes architecture.
+
+## The question
+
+Take one number in the output of a convolutional network's third layer. Change
+a pixel in the input image. Does that number change?
+
+For most pixels, no. A convolution is local &mdash; each output depends only on
+a small window of its input &mdash; and stacking local operations gives an
+output that depends on a larger, but still bounded, region of the original
+image. That region is the unit's **receptive field**, and it is the honest
+answer to "what can this feature possibly be detecting".
+
+A unit with a 7&times;7 receptive field cannot detect a face in a 224&times;224
+photograph. It has never seen a face. It has seen a 7&times;7 patch, and
+whatever it responds to has to be visible in one.
+
+## Counting it, one layer at a time
+
+Drag the layers control above and watch the highlighted band widen as it moves
+down the diagram. Each row shows how many input pixels the layer above can be
+influenced by.
+
+With stride 1 the rule is simple. A single unit sees 1 pixel of its own input.
+One `k`&times;`k` convolution makes that `k`. Another adds `k - 1` more, because
+the window's centre already covers what the previous layer covered and each
+side extends by `(k-1)/2`. So:
+
+```
+r = 1
+for each layer:
+    r = r + (k - 1)
+```
+
+Three 3&times;3 layers: 1 → 3 → 5 → 7. The growth is **linear in depth**, and
+that is slow. A network of twenty 3&times;3 layers at stride 1 has a receptive
+field of 41 pixels &mdash; less than a fifth of a 224-pixel image.
+
+## Stride changes the arithmetic
+
+Set the stride control to 2 and the widening accelerates sharply.
+
+The reason is that stride changes the *spacing* between the positions a layer
+looks at, measured in original pixels. Call that spacing the jump. At stride 1
+the jump stays 1 forever. At stride 2 it doubles every layer, so a step of one
+unit in layer three corresponds to a step of four pixels in the input.
+
+```
+r = 1; jump = 1
+for each layer:
+    r = r + (k - 1) * jump
+    jump = jump * stride
+```
+
+Now the additions themselves grow, and the receptive field expands
+geometrically rather than linearly. This is the real reason architectures
+downsample. Pooling and strided convolutions are usually explained as reducing
+computation, which they do &mdash; but the more important effect is that they
+are the only affordable way to get a deep unit to see the whole image.
+
+## Why 3&times;3 won everything
+
+Two stacked 3&times;3 convolutions have the same 5&times;5 receptive field as
+one 5&times;5 convolution. Three stacked have the same 7&times;7 as one
+7&times;7. So why not just use the big kernel?
+
+Count the weights, per input/output channel pair:
+
+| Arrangement | Receptive field | Weights |
+|---|---|---|
+| One 5&times;5 | 5&times;5 | 25 |
+| Two 3&times;3 | 5&times;5 | 18 |
+| One 7&times;7 | 7&times;7 | 49 |
+| Three 3&times;3 | 7&times;7 | 27 |
+
+The stack is cheaper, and it has a second advantage that matters more: there is
+a non-linearity between the layers. One 7&times;7 convolution is a single
+linear function of its 49 inputs. Three 3&times;3 convolutions with ReLUs
+between them is a composition of three linear functions separated by
+non-linearities, which can represent things a single linear map cannot.
+
+VGG made this argument explicitly in 2014 and effectively ended large kernels
+in general-purpose vision architectures. Everything since is 3&times;3 stacks,
+with the occasional [1&times;1](one_by_one_convolutions.html) for channel work.
+
+## Effective versus theoretical
+
+The number the formula gives is the *theoretical* receptive field: the set of
+pixels that could in principle affect the output.
+
+The **effective** receptive field is smaller and softer. Contributions from the
+edge of the theoretical field pass through fewer paths than contributions from
+the centre, and the number of paths falls off roughly like a Gaussian. In
+practice a unit is strongly influenced by the middle of its field and barely
+influenced by the rim.
+
+The practical consequence is that a network usually needs a theoretical
+receptive field noticeably larger than the objects it has to recognise, not
+merely equal to them. Dilated convolutions exist largely as a way to buy
+receptive field without buying downsampling, which matters when the output has
+to stay at full resolution &mdash; segmentation, most obviously.
+
+## Where it goes wrong
+
+**Assuming depth alone is enough.** Twenty stride-1 layers of 3&times;3 still
+only see 41 pixels. Without downsampling or dilation, a deep network can be
+blind to anything large.
+
+**Forgetting the input resolution.** A receptive field of 100 pixels covers
+half a 224-pixel image and a twentieth of a 2000-pixel one. Resizing the input
+silently changes what the architecture can see.
+
+**Reading detection failures as a data problem.** If the model consistently
+misses large objects, check the receptive field before collecting more images.
+""",
+    [
+        {"q": "With stride 1, how does the receptive field grow as layers are added?",
+         "options": ["Linearly, by k - 1 per layer",
+                     "Geometrically, doubling each layer",
+                     "By k per layer",
+                     "It does not grow"],
+         "answer": 0,
+         "why": "Each layer's window centre already covers the previous field, so only the (k-1)/2 on each side is new. Three 3x3 layers give 1, 3, 5, 7."},
+        {"q": "Why are three stacked 3x3 convolutions usually preferred over one 7x7?",
+         "options": ["They are more accurate by definition",
+                     "Same receptive field, fewer weights, and non-linearities in between",
+                     "7x7 kernels cannot be trained",
+                     "They use less memory at inference only"],
+         "answer": 1,
+         "why": "27 weights against 49 for the same 7x7 field, plus two ReLUs between the layers - so the stack can represent functions a single linear map cannot."},
+        {"q": "Why is the effective receptive field smaller than the theoretical one?",
+         "options": ["Padding removes the edges",
+                     "Edge pixels reach the output through far fewer paths, so their influence falls off",
+                     "The formula is an approximation",
+                     "Stride reduces it"],
+         "answer": 1,
+         "why": "The number of paths from an input pixel to the output falls off roughly like a Gaussian away from the centre, so the rim of the theoretical field contributes very little."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 10. 1x1 convolutions
+# ---------------------------------------------------------------------------
+topic(
+    "one_by_one_convolutions",
+    "1x1 Convolutions",
+    "CNN Internals",
+    "A convolution with no spatial extent sounds pointless. It is one of the "
+    "most useful layers in modern architectures.",
+    _svg("".join('<line x1="46" y1="%d" x2="112" y2="%d" stroke="%s" stroke-width="0.7" stroke-opacity="0.5"/>'
+                 % (26 + i * 13, 32 + j * 17, A)
+                 for i in range(4) for j in range(3))
+         + "".join(_box(34, 20 + i * 13, 12, 10, fill=S) for i in range(4))
+         + "".join(_box(112, 26 + j * 17, 12, 12, fill=S, stroke=A) for j in range(3))
+         + _txt(80, 84, "channels in, channels out", M, 7)),
+    {
+        "diagram": "channels",
+        "controls": [
+            {"key": "cin", "label": "Input channels", "type": "range",
+             "min": 2, "max": 8, "step": 1, "value": 6},
+            {"key": "cout", "label": "Output channels", "type": "range",
+             "min": 1, "max": 8, "step": 1, "value": 3},
+        ],
+    },
+    [
+        "A 1&times;1 convolution looks at one pixel position and <em>all</em> of "
+        "its channels. It mixes channels, never neighbours.",
+        "It is a fully-connected layer applied identically at every spatial "
+        "position, which is why it is written as a convolution at all.",
+        "Its main job is changing the channel count &mdash; usually reducing it "
+        "before an expensive layer, which is what a bottleneck is.",
+        "Weights: <code class='mono-font'>Cin &times; Cout</code>, against "
+        "<code class='mono-font'>9 &times; Cin &times; Cout</code> for a 3&times;3.",
+    ],
+    """
+title: 1x1 Convolutions
+intro: A kernel with no spatial extent, and why almost every modern architecture is full of them.
+
+## The operation that looks like nothing
+
+A 3&times;3 convolution combines a pixel with its eight neighbours. A 1&times;1
+convolution has no neighbours to combine. At first reading it appears to
+multiply each pixel by a number, which is a scaling and hardly worth a layer.
+
+That reading forgets the channel dimension, and the channel dimension is where
+everything happens.
+
+A feature map is not a grid of numbers; it is a **stack** of grids, one per
+channel. A layer with 256 channels holds 256 values at every spatial position.
+A 1&times;1 convolution stands at one position, takes all 256 values there, and
+computes a weighted sum of them &mdash; then does it again for each output
+channel, and then repeats the whole thing at every position with the same
+weights.
+
+So it does not mix neighbours. It mixes **channels**. Drag the two controls
+above and watch the connection pattern: every input channel reaches every
+output channel, and nothing spatial happens at all.
+
+## It is a fully-connected layer in disguise
+
+Fix one spatial position and the operation is exactly a dense layer: `Cin`
+inputs, `Cout` outputs, `Cin × Cout` weights. What makes it a convolution is
+that the same dense layer is applied, unchanged, at every position in the map.
+
+That is the same weight-sharing argument that motivates convolution in the
+first place. If mixing channels in a particular way is useful at one location,
+it is probably useful at all of them, and sharing the weights makes the layer
+independent of the input's spatial size.
+
+## What it is actually for
+
+**Changing the channel count.** This is the common case. A 1&times;1 convolution
+is the cheapest possible way to turn 256 channels into 64, or 64 into 256, and
+it is why the layer is sometimes called a projection.
+
+**Bottlenecks.** Put a channel reduction before an expensive spatial
+convolution and an expansion after it. ResNet's bottleneck block is exactly
+this: 1&times;1 down to 64 channels, 3&times;3 at 64, 1&times;1 back up to 256.
+The 3&times;3 &mdash; by far the costliest part &mdash; runs on a quarter of the
+channels, and the two 1&times;1s cost almost nothing by comparison.
+
+Count it. A 3&times;3 straight from 256 to 256 channels needs
+`9 × 256 × 256 ≈ 590,000` weights. The bottleneck version needs
+`256×64 + 9×64×64 + 64×256 ≈ 70,000`. Same input and output shape, an eighth of
+the parameters, and an extra two non-linearities thrown in.
+
+**Adding non-linearity without touching resolution.** Each 1&times;1 is followed
+by an activation, so a stack of them increases representational depth at
+constant spatial size and negligible cost. This was the "network in network"
+idea that named the technique.
+
+**Replacing the classifier head.** Global average pooling followed by a
+1&times;1 convolution does the job of a large dense layer with a fraction of the
+parameters, and works for any input size.
+
+## The arithmetic
+
+The readout above compares the two counts directly. For `Cin` input and `Cout`
+output channels:
+
+| Kernel | Weights | Sees |
+|---|---|---|
+| 1&times;1 | Cin &times; Cout | one position, all channels |
+| 3&times;3 | 9 &times; Cin &times; Cout | 3&times;3 positions, all channels |
+| Depthwise 3&times;3 | 9 &times; Cin | 3&times;3 positions, one channel each |
+
+That last row is worth noticing. A **depthwise separable** convolution splits
+the work in two: a depthwise 3&times;3 that mixes neighbours but not channels,
+followed by a 1&times;1 that mixes channels but not neighbours. Together they
+approximate a full 3&times;3 at roughly a ninth of the cost. MobileNet is built
+almost entirely from that pair, and half of it is 1&times;1 convolutions.
+
+## Where it goes wrong
+
+**Expecting spatial work from it.** It cannot smooth, sharpen or find an edge.
+If the receptive field needs to grow, a 1&times;1 contributes nothing &mdash;
+its contribution to the [receptive field](receptive_field.html) is exactly
+zero.
+
+**Reducing channels too aggressively.** The bottleneck is a genuine information
+bottleneck. Squeezing 256 channels to 8 before the spatial convolution saves
+computation and can cost more accuracy than it is worth.
+
+**Forgetting the activation.** A 1&times;1 with no non-linearity after it,
+stacked on another linear layer, collapses into a single linear map. Two
+matrices multiplied together are one matrix.
+""",
+    [
+        {"q": "What does a 1x1 convolution actually combine?",
+         "options": ["A pixel and its eight neighbours",
+                     "All the channels at a single spatial position",
+                     "Every pixel in the feature map",
+                     "Two adjacent channels"],
+         "answer": 1,
+         "why": "It has no spatial extent, so it never touches neighbours. At each position it takes a weighted sum across the whole channel stack, and repeats that with shared weights everywhere."},
+        {"q": "Why does a ResNet bottleneck put 1x1 convolutions around the 3x3?",
+         "options": ["To increase the receptive field",
+                     "So the expensive 3x3 runs on far fewer channels",
+                     "To normalise the activations",
+                     "To downsample the spatial dimensions"],
+         "answer": 1,
+         "why": "The 3x3 cost scales with Cin x Cout. Reducing to 64 channels first and expanding after cuts a 590,000-weight block to about 70,000 for the same input and output shape."},
+        {"q": "What happens to two stacked 1x1 convolutions with no activation between them?",
+         "options": ["They double the receptive field",
+                     "They collapse into a single linear map",
+                     "They cannot be trained",
+                     "They become a 2x2 convolution"],
+         "answer": 1,
+         "why": "Each is a matrix multiplication at every position. Two matrices multiplied together are one matrix, so the pair has exactly the representational power of one layer."},
+    ],
+)
+
 CHECKS = {"computer_vision/%s.html" % t["slug"]: {"check": t["check"]} for t in TOPICS}

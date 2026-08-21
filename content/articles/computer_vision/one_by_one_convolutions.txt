@@ -1,0 +1,91 @@
+title: 1x1 Convolutions
+intro: A kernel with no spatial extent, and why almost every modern architecture is full of them.
+
+## The operation that looks like nothing
+
+A 3&times;3 convolution combines a pixel with its eight neighbours. A 1&times;1
+convolution has no neighbours to combine. At first reading it appears to
+multiply each pixel by a number, which is a scaling and hardly worth a layer.
+
+That reading forgets the channel dimension, and the channel dimension is where
+everything happens.
+
+A feature map is not a grid of numbers; it is a **stack** of grids, one per
+channel. A layer with 256 channels holds 256 values at every spatial position.
+A 1&times;1 convolution stands at one position, takes all 256 values there, and
+computes a weighted sum of them &mdash; then does it again for each output
+channel, and then repeats the whole thing at every position with the same
+weights.
+
+So it does not mix neighbours. It mixes **channels**. Drag the two controls
+above and watch the connection pattern: every input channel reaches every
+output channel, and nothing spatial happens at all.
+
+## It is a fully-connected layer in disguise
+
+Fix one spatial position and the operation is exactly a dense layer: `Cin`
+inputs, `Cout` outputs, `Cin × Cout` weights. What makes it a convolution is
+that the same dense layer is applied, unchanged, at every position in the map.
+
+That is the same weight-sharing argument that motivates convolution in the
+first place. If mixing channels in a particular way is useful at one location,
+it is probably useful at all of them, and sharing the weights makes the layer
+independent of the input's spatial size.
+
+## What it is actually for
+
+**Changing the channel count.** This is the common case. A 1&times;1 convolution
+is the cheapest possible way to turn 256 channels into 64, or 64 into 256, and
+it is why the layer is sometimes called a projection.
+
+**Bottlenecks.** Put a channel reduction before an expensive spatial
+convolution and an expansion after it. ResNet's bottleneck block is exactly
+this: 1&times;1 down to 64 channels, 3&times;3 at 64, 1&times;1 back up to 256.
+The 3&times;3 &mdash; by far the costliest part &mdash; runs on a quarter of the
+channels, and the two 1&times;1s cost almost nothing by comparison.
+
+Count it. A 3&times;3 straight from 256 to 256 channels needs
+`9 × 256 × 256 ≈ 590,000` weights. The bottleneck version needs
+`256×64 + 9×64×64 + 64×256 ≈ 70,000`. Same input and output shape, an eighth of
+the parameters, and an extra two non-linearities thrown in.
+
+**Adding non-linearity without touching resolution.** Each 1&times;1 is followed
+by an activation, so a stack of them increases representational depth at
+constant spatial size and negligible cost. This was the "network in network"
+idea that named the technique.
+
+**Replacing the classifier head.** Global average pooling followed by a
+1&times;1 convolution does the job of a large dense layer with a fraction of the
+parameters, and works for any input size.
+
+## The arithmetic
+
+The readout above compares the two counts directly. For `Cin` input and `Cout`
+output channels:
+
+| Kernel | Weights | Sees |
+|---|---|---|
+| 1&times;1 | Cin &times; Cout | one position, all channels |
+| 3&times;3 | 9 &times; Cin &times; Cout | 3&times;3 positions, all channels |
+| Depthwise 3&times;3 | 9 &times; Cin | 3&times;3 positions, one channel each |
+
+That last row is worth noticing. A **depthwise separable** convolution splits
+the work in two: a depthwise 3&times;3 that mixes neighbours but not channels,
+followed by a 1&times;1 that mixes channels but not neighbours. Together they
+approximate a full 3&times;3 at roughly a ninth of the cost. MobileNet is built
+almost entirely from that pair, and half of it is 1&times;1 convolutions.
+
+## Where it goes wrong
+
+**Expecting spatial work from it.** It cannot smooth, sharpen or find an edge.
+If the receptive field needs to grow, a 1&times;1 contributes nothing &mdash;
+its contribution to the [receptive field](receptive_field.html) is exactly
+zero.
+
+**Reducing channels too aggressively.** The bottleneck is a genuine information
+bottleneck. Squeezing 256 channels to 8 before the spatial convolution saves
+computation and can cost more accuracy than it is worth.
+
+**Forgetting the activation.** A 1&times;1 with no non-linearity after it,
+stacked on another linear layer, collapses into a single linear map. Two
+matrices multiplied together are one matrix.

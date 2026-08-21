@@ -16,16 +16,13 @@ gives the current ones.
 `tools/python_topics.py`. Adding a 35th topic is one entry there plus a line
 in `tools/sequence.py`.
 
-**Computer Vision: 20 -> 28.** The eight classical image-processing modules of
-Tier 1 are built, generated from `tools/cv_topics.py` with the arithmetic in
-`assets/vizlearn-cv.js`. Adding a ninth is one entry in `cv_topics.py`, a line
-in `tools/sequence.py`, and - if it needs an operation the harness does not
-have - one function in `OPS`.
-
-Still outstanding from CV Tier 1: **receptive field** and **1x1 convolutions**.
-Both are CNN internals rather than image operations, so neither fits the
-image-in/image-out harness; they need their own SVG visualisation in the style
-of the existing CNN pages.
+**Computer Vision: 20 -> 30.** Tier 1 is complete, generated from
+`tools/cv_topics.py` with the arithmetic in `assets/vizlearn-cv.js`. Eight are
+image operations driven by the pixel harness; receptive field and 1x1
+convolutions are SVG diagrams driven by the same controls, because neither has
+an image to show. Adding an eleventh is one entry in `cv_topics.py`, a line in
+`tools/sequence.py`, and - if the harness lacks the operation - one function in
+`OPS` or `DIAGRAMS`.
 
 ---
 
@@ -50,7 +47,7 @@ the layer above, modern architectures.
 | Receptive field | Trace one output pixel back to the input region it sees |
 | 1x1 convolutions | Channel mixing with no spatial extent |
 
-The first eight are built. The last two are not - see the note under Done.
+All ten are built.
 
 ### Tier 2 - architectures and detection
 

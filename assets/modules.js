@@ -332,6 +332,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive union-find lesson - union by rank and path compression shown live, with the near-constant inverse Ackermann complexity."
  },
  {
+  "title": "1x1 Convolutions",
+  "path": "computer_vision/one_by_one_convolutions.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
+ },
+ {
   "title": "Affine Transforms",
   "path": "computer_vision/affine_transforms.html",
   "category": "Computer Vision",
@@ -506,6 +514,14 @@ window.VIZLEARN_MODULES = [
   "topic": "computer-vision",
   "icon": "eye",
   "desc": "Slide a sensitivity threshold across a real image and watch edges appear wherever brightness changes sharply enough."
+ },
+ {
+  "title": "Receptive Field",
+  "path": "computer_vision/receptive_field.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
  },
  {
   "title": "ResNet and Identity Shortcuts",

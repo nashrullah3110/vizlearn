@@ -1644,6 +1644,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/one_by_one_convolutions.html",
+  "title": "1x1 Convolutions",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "What does a 1x1 convolution actually combine?",
+    "o": [
+     "A pixel and its eight neighbours",
+     "All the channels at a single spatial position",
+     "Every pixel in the feature map",
+     "Two adjacent channels"
+    ],
+    "a": 1,
+    "w": "It has no spatial extent, so it never touches neighbours. At each position it takes a weighted sum across the whole channel stack, and repeats that with shared weights everywhere."
+   },
+   {
+    "t": "Why does a ResNet bottleneck put 1x1 convolutions around the 3x3?",
+    "o": [
+     "To increase the receptive field",
+     "So the expensive 3x3 runs on far fewer channels",
+     "To normalise the activations",
+     "To downsample the spatial dimensions"
+    ],
+    "a": 1,
+    "w": "The 3x3 cost scales with Cin x Cout. Reducing to 64 channels first and expanding after cuts a 590,000-weight block to about 70,000 for the same input and output shape."
+   },
+   {
+    "t": "What happens to two stacked 1x1 convolutions with no activation between them?",
+    "o": [
+     "They double the receptive field",
+     "They collapse into a single linear map",
+     "They cannot be trained",
+     "They become a 2x2 convolution"
+    ],
+    "a": 1,
+    "w": "Each is a matrix multiplication at every position. Two matrices multiplied together are one matrix, so the pair has exactly the representational power of one layer."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/affine_transforms.html",
   "title": "Affine Transforms",
   "cat": "Computer Vision",
@@ -2209,6 +2249,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “The Core Idea: Finding Abrupt Changes”?",
     "ans": "Imagine walking across a flat, grey field that suddenly drops off into a black canyon. Your brain immediately registers that change in elevation. Edge detection algorithms do something similar with pixel values. They \"walk\" across the image and look for sudden jumps in brightness."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/receptive_field.html",
+  "title": "Receptive Field",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "With stride 1, how does the receptive field grow as layers are added?",
+    "o": [
+     "Linearly, by k - 1 per layer",
+     "Geometrically, doubling each layer",
+     "By k per layer",
+     "It does not grow"
+    ],
+    "a": 0,
+    "w": "Each layer's window centre already covers the previous field, so only the (k-1)/2 on each side is new. Three 3x3 layers give 1, 3, 5, 7."
+   },
+   {
+    "t": "Why are three stacked 3x3 convolutions usually preferred over one 7x7?",
+    "o": [
+     "They are more accurate by definition",
+     "Same receptive field, fewer weights, and non-linearities in between",
+     "7x7 kernels cannot be trained",
+     "They use less memory at inference only"
+    ],
+    "a": 1,
+    "w": "27 weights against 49 for the same 7x7 field, plus two ReLUs between the layers - so the stack can represent functions a single linear map cannot."
+   },
+   {
+    "t": "Why is the effective receptive field smaller than the theoretical one?",
+    "o": [
+     "Padding removes the edges",
+     "Edge pixels reach the output through far fewer paths, so their influence falls off",
+     "The formula is an approximation",
+     "Stride reduces it"
+    ],
+    "a": 1,
+    "w": "The number of paths from an input pixel to the output falls off roughly like a Gaussian away from the centre, so the rim of the theoretical field contributes very little."
    }
   ]
  },

@@ -472,6 +472,139 @@
         return [h, mx ? d / mx : 0, mx];
     }
 
+    // -------------------------------------------------------------- diagrams
+
+    /* Two of the Tier 1 modules are about what a convolution does to shape and
+     * to channels rather than to pixels, so there is no image to show. They
+     * get an SVG diagram driven by the same controls and readout as everything
+     * else, which keeps one mental model for the whole track. */
+
+    var SVGNS = "http://www.w3.org/2000/svg";
+
+    function el(name, attrs) {
+        var n = document.createElementNS(SVGNS, name);
+        Object.keys(attrs || {}).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+        return n;
+    }
+
+    function svgRoot(w, h) {
+        var s = el("svg", { viewBox: "0 0 " + w + " " + h, class: "cv-diagram" });
+        s.setAttribute("role", "img");
+        return s;
+    }
+
+    var DIAGRAMS = {
+        /* One output pixel, traced back through however many layers, to the
+         * patch of the input it can actually see. The point the diagram has to
+         * make is that the growth is additive per layer and multiplicative in
+         * stride, which a formula states and a picture shows. */
+        receptive: function (p) {
+            var layers = p.layers, k = p.kernel, stride = p.stride;
+            var W = 620, rowH = 96, H = rowH * (layers + 1) + 34;
+            var svg = svgRoot(W, H);
+
+            // Receptive field size, layer by layer, and the jump between
+            // adjacent output positions.
+            var sizes = [1], jump = 1, r = 1, i;
+            for (i = 0; i < layers; i++) {
+                r = r + (k - 1) * jump;
+                jump = jump * stride;
+                sizes.push(r);
+            }
+
+            var cells = 25, cell = 22, x0 = 26;
+            for (i = layers; i >= 0; i--) {
+                var y = 20 + (layers - i) * rowH;
+                /* sizes is indexed by distance from the output, so the row
+                 * for the output itself is sizes[0] = 1 and the input row is
+                 * sizes[layers] = the full receptive field. Indexing by the
+                 * layer number instead put the wide band at the top and the
+                 * single cell at the bottom, which is the diagram upside
+                 * down. */
+                var size = sizes[layers - i];
+                var lo = Math.round((cells - size) / 2), hi = lo + size - 1;
+                var g = el("g", {});
+                for (var c = 0; c < cells; c++) {
+                    var lit = c >= lo && c <= hi;
+                    g.appendChild(el("rect", {
+                        x: x0 + c * cell, y: y, width: cell - 2, height: cell - 2, rx: 2,
+                        fill: lit ? "var(--accent-fill)" : "var(--bg-surface)",
+                        stroke: "var(--border-subtle)", "stroke-width": 1,
+                        "fill-opacity": lit ? (i === layers ? 1 : 0.55) : 1
+                    }));
+                }
+                var label = i === 0 ? "input"
+                          : (i === layers ? "output" : "layer " + i);
+                var t = el("text", {
+                    x: x0, y: y - 5, fill: "var(--text-muted)",
+                    "font-size": 11, "font-family": "var(--vz-mono)"
+                });
+                t.textContent = label + "  -  " + size + " position" +
+                                (size === 1 ? "" : "s") + " wide";
+                g.appendChild(t);
+                svg.appendChild(g);
+            }
+            return {
+                svg: svg,
+                readout: layers + " layers of " + k + "x" + k + " at stride " +
+                         stride + " - receptive field " + r + "x" + r
+            };
+        },
+
+        /* A 1x1 convolution has no spatial extent, so every interesting thing
+         * about it is in the channel dimension. The diagram is the channel
+         * mixing matrix, and the readout is the parameter count against the
+         * 3x3 that people reach for instead. */
+        channels: function (p) {
+            var cin = p.cin, cout = p.cout;
+            var W = 620, H = 300, svg = svgRoot(W, H);
+            var box = 26, gap = 6;
+            var leftX = 40, rightX = W - 40 - box;
+            var lh = cin * (box + gap) - gap, rh = cout * (box + gap) - gap;
+            var ly = (H - lh) / 2, ry = (H - rh) / 2, i, j;
+
+            for (i = 0; i < cin; i++)
+                for (j = 0; j < cout; j++)
+                    svg.appendChild(el("line", {
+                        x1: leftX + box, y1: ly + i * (box + gap) + box / 2,
+                        x2: rightX, y2: ry + j * (box + gap) + box / 2,
+                        stroke: "var(--accent-primary)", "stroke-width": 0.6,
+                        "stroke-opacity": 0.35
+                    }));
+
+            for (i = 0; i < cin; i++)
+                svg.appendChild(el("rect", {
+                    x: leftX, y: ly + i * (box + gap), width: box, height: box, rx: 3,
+                    fill: "var(--bg-surface)", stroke: "var(--border-subtle)",
+                    "stroke-width": 1
+                }));
+            for (j = 0; j < cout; j++)
+                svg.appendChild(el("rect", {
+                    x: rightX, y: ry + j * (box + gap), width: box, height: box, rx: 3,
+                    fill: "var(--accent-fill)", "fill-opacity": 0.5,
+                    stroke: "var(--border-subtle)", "stroke-width": 1
+                }));
+
+            [[leftX + box / 2, cin + " input channels"],
+             [rightX + box / 2, cout + " output channels"]].forEach(function (pair) {
+                var t = el("text", {
+                    x: pair[0], y: H - 8, fill: "var(--text-muted)",
+                    "font-size": 11, "font-family": "var(--vz-mono)",
+                    "text-anchor": "middle"
+                });
+                t.textContent = pair[1];
+                svg.appendChild(t);
+            });
+
+            var one = cin * cout, three = cin * cout * 9;
+            return {
+                svg: svg,
+                readout: one + " weights as 1x1, " + three + " as 3x3 - " +
+                         "a factor of 9, and no spatial mixing either way"
+            };
+        }
+    };
+
     // ------------------------------------------------------------------ view
 
     function paint(canvas, img) {
@@ -543,15 +676,57 @@
         return { el: wrap, read: read };
     }
 
+    function panelFor(cfg, params, schedule) {
+        var panel = document.createElement("div");
+        panel.className = "cv-controls";
+        (cfg.controls || []).forEach(function (spec) {
+            var c = control(spec, function (key, val) {
+                params[key] = val;
+                schedule();
+            });
+            panel.appendChild(c.el);
+        });
+        return panel;
+    }
+
+    function mountDiagram(root, cfg, diagram, params) {
+        var stage = document.createElement("div");
+        stage.className = "cv-diagram-stage";
+        root.appendChild(stage);
+
+        var readout = document.createElement("p");
+        readout.className = "cv-readout";
+        readout.setAttribute("aria-live", "polite");
+
+        var queued = false;
+        function schedule() {
+            if (queued) return;
+            queued = true;
+            requestAnimationFrame(function () { queued = false; render(); });
+        }
+        function render() {
+            var res = diagram(params);
+            stage.innerHTML = "";
+            stage.appendChild(res.svg);
+            readout.textContent = res.readout || "";
+        }
+
+        root.appendChild(panelFor(cfg, params, schedule));
+        root.appendChild(readout);
+        render();
+        root.dataset.vzCvReady = "1";
+    }
+
     function mount(root) {
         var cfgEl = root.querySelector(".cv-config");
         if (!cfgEl) return;
         var cfg;
         try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
 
-        var op = OPS[cfg.op];
+        var diagram = cfg.diagram ? DIAGRAMS[cfg.diagram] : null;
+        var op = cfg.op ? OPS[cfg.op] : null;
         var makeSource = SOURCES[cfg.source] || SOURCES.shapes;
-        if (!op) return;
+        if (!op && !diagram) return;
 
         var srcImg = makeSource();
         var params = {};
@@ -559,6 +734,8 @@
         Object.keys(cfg.fixed || {}).forEach(function (k) { params[k] = cfg.fixed[k]; });
 
         root.innerHTML = "";
+
+        if (diagram) return mountDiagram(root, cfg, diagram, params);
 
         var stage = document.createElement("div");
         stage.className = "cv-stage";
