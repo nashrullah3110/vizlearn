@@ -26,6 +26,13 @@ an image to show. Adding an eleventh is one entry in `cv_topics.py`, a line in
 
 ---
 
+**Database: 22 -> 32.** Tier 1 is complete, generated from
+`tools/db_topics.py`. Eight run real SQLite in the page through
+`assets/vizlearn-sql.js` - the same engine as /sql-lab/, seeded per module, so
+the error messages are the database's own. Isolation levels and deadlocks step
+through a scripted two-transaction schedule instead, because one connection
+cannot demonstrate two.
+
 ## Computer Vision (20)
 
 Twelve of the twenty modules are CNN internals. What is missing is the layer
@@ -84,6 +91,8 @@ intro page.
 | Composite and covering indexes | Column order matters: the query that uses it and the one that cannot |
 | Isolation levels | Two transactions side by side producing dirty/non-repeatable/phantom reads |
 | Deadlocks | Two transactions taking locks in opposite order |
+
+All ten are built.
 
 ### Tier 2 - scale, NoSQL, safety
 

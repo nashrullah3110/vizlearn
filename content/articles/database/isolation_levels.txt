@@ -1,0 +1,111 @@
+title: Isolation Levels
+intro: What one transaction is allowed to see while another is still running.
+
+## The dial
+
+The I in ACID is isolation: the degree to which concurrent transactions are kept
+from seeing each other's work in progress.
+
+Perfect isolation is easy to define &mdash; run every transaction one after
+another &mdash; and unacceptable in practice, because a database serving one
+transaction at a time serves almost nobody. So the standard defines a dial with
+four settings, described not by what they do but by which **anomalies** they
+permit.
+
+Step through the timeline above at each of the four levels. The schedule never
+changes. What A sees changes at nearly every step.
+
+## The three anomalies
+
+**Dirty read.** Transaction A reads a row that B has changed but not committed.
+If B rolls back, A acted on data that never existed. Step 5 at READ UNCOMMITTED
+shows this: A reads 1500 from a change that is still provisional.
+
+**Non-repeatable read.** A reads a row, B updates it and commits, A reads the
+same row again and gets a different value. Step 7 at READ COMMITTED shows it: A
+reads 1000 and then 1500 inside one transaction, with no error and no warning.
+
+**Phantom read.** A runs a query, B inserts a row matching its condition and
+commits, A runs the same query and gets an extra row. Step 9. The distinction
+from a non-repeatable read is that no row A saw has changed &mdash; a new one
+has arrived.
+
+## The four levels
+
+| Level | Dirty | Non-repeatable | Phantom |
+|---|---|---|---|
+| READ UNCOMMITTED | allowed | allowed | allowed |
+| READ COMMITTED | prevented | allowed | allowed |
+| REPEATABLE READ | prevented | prevented | allowed by the standard |
+| SERIALIZABLE | prevented | prevented | prevented |
+
+**READ UNCOMMITTED** is essentially unused. PostgreSQL accepts the syntax and
+silently gives you READ COMMITTED instead, because its architecture has no way
+to expose uncommitted data.
+
+**READ COMMITTED** is the default in PostgreSQL, Oracle and SQL Server. Each
+*statement* sees a fresh view of committed data. It is a sensible default and
+the anomaly it permits is real: two queries in one transaction can disagree, so
+a report that reads the same table twice can produce internally inconsistent
+totals.
+
+**REPEATABLE READ** pins the transaction to a snapshot taken at its first read.
+Everything it sees is consistent as of that moment, no matter what commits
+elsewhere. It is MySQL InnoDB's default.
+
+**SERIALIZABLE** guarantees the result is equivalent to some serial order.
+Modern implementations achieve this without locking everything, by tracking
+which transactions read which rows and aborting one when a genuine conflict is
+found.
+
+## The thing about SERIALIZABLE that surprises people
+
+It does not make your code wait. It makes your code **fail**.
+
+At step 10 under SERIALIZABLE, A may get a serialization failure instead of a
+successful commit. That is not a malfunction &mdash; it is how the guarantee is
+delivered. The engine allowed both transactions to proceed optimistically,
+found afterwards that no serial order explains what happened, and rejected one.
+
+So any code running at SERIALIZABLE must catch that error and retry the whole
+transaction. Code that assumes commit succeeds will fail intermittently under
+load, which is the worst kind of bug to diagnose.
+
+## Where the standard stops helping
+
+The standard defines levels by which anomalies are *permitted*, not which are
+prevented. An engine is free to prevent more than required, and they do.
+
+PostgreSQL's REPEATABLE READ uses a full snapshot and therefore prevents
+phantoms, which the standard does not require. MySQL's InnoDB prevents them at
+that level too, by a different mechanism (gap locks). So code that relies on
+phantoms being prevented at REPEATABLE READ works on both and is not portable by
+the standard, and code that relies on phantoms *appearing* is wrong on both.
+
+This is why "we use REPEATABLE READ" is an incomplete statement about a system's
+behaviour. The engine matters.
+
+## Choosing
+
+Most applications should stay on the engine's default and reach for something
+stronger where a specific invariant demands it. The pattern that most often
+needs it is read-then-write: check a balance, then deduct from it. Between the
+check and the write, another transaction can change the balance, and no
+isolation level below SERIALIZABLE stops that on its own.
+
+The alternatives are explicit locking (`SELECT ... FOR UPDATE`) or letting the
+database enforce the invariant with a constraint, which needs no isolation
+reasoning at all.
+
+## Where it goes wrong
+
+**Assuming a default.** They differ between engines, and code written against
+one silently changes behaviour on the other.
+
+**Using SERIALIZABLE without retry logic.** Intermittent failures under load.
+
+**Long-running read transactions.** A snapshot held open forces the engine to
+retain old row versions, which bloats storage and slows everything.
+
+**Reasoning about isolation instead of using a constraint.** A `UNIQUE`
+constraint settles "no two of these" regardless of what any transaction sees.

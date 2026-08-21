@@ -1,0 +1,109 @@
+title: Composite and Covering Indexes
+intro: Why column order decides which queries an index can serve, and why one query never touches the table.
+
+## An index is a sorted copy
+
+A single-column index is a sorted list of that column's values, each paired with
+a pointer to its row. Sorted means the database can binary-search it instead of
+reading everything.
+
+A **composite index** on `(status, customer_id)` is a sorted list too, sorted by
+`status` first and, within each status, by `customer_id`. That is the whole
+mechanism, and every rule about composite indexes falls out of it.
+
+Think of a phone book ordered by surname then first name. Finding everyone
+called Hopper is easy. Finding Grace Hopper is easy. Finding everyone whose
+first name is Grace is not &mdash; the Graces are scattered throughout, one per
+surname, and you would have to read the lot.
+
+## The leftmost prefix rule
+
+Run the four variants in order and watch the plan.
+
+**Both columns** &mdash; `SEARCH ... USING INDEX`. The index leads with `status`,
+narrows to `customer_id` within it, and lands on the rows.
+
+**Leading column only** &mdash; still `SEARCH`. All the `paid` rows are
+contiguous, so the index finds the block and reads it. A prefix of the index is
+itself a usable index.
+
+**Second column only** &mdash; `SCAN`. This is the important one. The index
+exists, `customer_id` is in it, and the query cannot use it for a seek, because
+rows for customer 42 are spread across every status value. There is no
+contiguous block to find.
+
+**Covering** &mdash; `USING COVERING INDEX`, discussed below.
+
+So an index on `(a, b, c)` can serve queries filtering on `a`, on `a, b`, or on
+`a, b, c`. It cannot serve `b`, `c`, or `b, c`. **Leading prefixes only.**
+
+## The ordering rule that follows
+
+Given that, the column order in a composite index is a design decision, not a
+detail. Two guidelines:
+
+**Equality before range.** An index on `(status, created_at)` serves
+`WHERE status = 'paid' AND created_at > ?` well: the equality picks a block and
+the range narrows inside it. Reversed, the range comes first and everything
+after it is scattered, so only the range column is really used.
+
+**Order for the queries you actually run.** If most queries filter by customer
+and only some also filter by status, lead with customer. Reading the workload is
+the only way to decide.
+
+## Covering indexes
+
+The fourth variant selects only `status` and `customer_id` &mdash; both of which
+are already stored in the index. The plan says `USING COVERING INDEX`, and the
+table is never read at all.
+
+This is worth understanding because of what an index normally costs. An ordinary
+index lookup happens in two stages: find the entries in the index, then fetch
+each corresponding row from the table. That second stage is random access, and
+on a large table it dominates. Returning a thousand rows can mean a thousand
+scattered reads.
+
+A covering index removes the second stage entirely. Everything the query needs is
+already in the sorted structure it just searched.
+
+Some engines let you add columns purely for coverage without making them part of
+the sort key &mdash; PostgreSQL's `INCLUDE`, SQL Server's `INCLUDE`. That keeps
+the index narrow where it matters for searching while still avoiding the table.
+
+## Two indexes are not one index
+
+A common mistake is to assume that indexes on `(a)` and `(b)` do the work of an
+index on `(a, b)`.
+
+They do not. Given both, a database can search each separately and intersect the
+row sets, which some engines will do &mdash; but that means two searches and a
+merge, against one search on a composite index. It is materially worse, and for
+`ORDER BY a, b` the separate indexes provide no useful ordering at all.
+
+The reverse substitution does work: `(a, b)` covers everything `(a)` alone would
+have, so having both is usually redundant.
+
+## The cost side
+
+Indexes are not free. Every one must be updated on every insert, update and
+delete of an indexed column, so a table with eight indexes does roughly nine
+units of write work instead of one. They take space, they take memory in cache
+that data pages could have used, and an index nobody queries costs all of that
+for nothing.
+
+The practical loop is: find the slow query, read its
+[plan](explain_and_query_plans.html), add the one index the plan asks for, read
+the plan again. Not: add indexes and hope.
+
+## Where it goes wrong
+
+**Indexing every column separately.** Expensive on write, and none of them
+serves a multi-column filter well.
+
+**Putting the range column first.** Everything after it becomes unusable.
+
+**Forgetting the sort.** `ORDER BY` can use an index too, and a composite index
+that matches the ordering removes the sort step entirely.
+
+**Leaving redundant indexes in place.** If `(a, b)` exists, `(a)` is almost
+certainly dead weight.

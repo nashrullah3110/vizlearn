@@ -1,0 +1,99 @@
+title: Constraints: UNIQUE, CHECK and NOT NULL
+intro: Rules written once in the schema, enforced against every client, forever.
+
+## Where a rule should live
+
+"Age must be at least 18" can be written in three places: the form in the
+browser, the service that handles the request, or the table itself.
+
+The first two are worth having and neither is sufficient. A browser check is a
+courtesy to the user and is bypassed by anything that is not a browser. A
+service check holds until someone writes a second service, a migration script,
+a bulk import or a manual fix at the console &mdash; and every one of those is
+written by someone who was not thinking about the rule at the time.
+
+A constraint in the schema holds for all of them, including the ones that do
+not exist yet. It is checked on every write, by the one component every path
+must go through.
+
+## The three, and what each says
+
+**NOT NULL** &mdash; the value must be known. NULL is not a value; it is the
+absence of one. Allowing it means allowing rows where the question was never
+answered, and every query that touches the column then has to decide what to do
+about that.
+
+**UNIQUE** &mdash; no other row may hold this value. It is what stops two
+accounts sharing an email address without requiring a read-then-write in the
+application, which is a race condition even when it looks correct.
+
+**CHECK** &mdash; this expression must be true for every row. It is the general
+case that the other two are special instances of, and it takes ordinary SQL:
+
+```
+CHECK (age >= 18)
+CHECK (salary > 0)
+CHECK (grade IN ('junior', 'mid', 'senior'))
+CHECK (end_date IS NULL OR end_date > start_date)
+```
+
+That last one is worth noticing. A constraint can relate two columns of the same
+row, so "an end date, if present, must come after the start date" is enforceable
+&mdash; a rule that is otherwise checked nowhere and violated eventually.
+
+## Read the error, not the row count
+
+Run each commented statement in turn. The value of doing so is that every one
+fails differently, and the message names the constraint that stopped it:
+
+| Attempt | Message |
+|---|---|
+| Duplicate email | `UNIQUE constraint failed: staff.email` |
+| Age 15 | `CHECK constraint failed` |
+| Negative salary | `CHECK constraint failed` |
+| Grade `'boss'` | `CHECK constraint failed` |
+| Missing salary | `NOT NULL constraint failed: staff.salary` |
+
+Naming constraints explicitly &mdash; `CONSTRAINT staff_age_adult CHECK (...)`
+&mdash; makes those messages far more useful, because "CHECK constraint failed"
+tells you nothing when a table has six of them.
+
+## The NULL subtlety in UNIQUE
+
+`UNIQUE` allows more than one NULL in almost every engine, and people are
+surprised by this until they see the reasoning.
+
+`UNIQUE` forbids two rows being *equal*. Comparing NULL to NULL does not
+produce true; it produces NULL, because two unknown values are not known to be
+the same. So two NULLs are not equal, and the constraint has nothing to object
+to.
+
+The practical consequence is that `UNIQUE` on a nullable column does not
+guarantee one row per real-world thing &mdash; it guarantees one row per *known*
+value. If that is not what you meant, add `NOT NULL`.
+
+## DEFAULT is not a constraint
+
+`DEFAULT 'junior'` supplies a value when the insert omits the column. It
+constrains nothing: an insert that explicitly passes NULL gets NULL, not the
+default, unless `NOT NULL` refuses it.
+
+Defaults and constraints are frequently paired for this reason. The default
+handles the common case, and the constraint handles the case where someone was
+explicit about something they should not have been.
+
+## Where it goes wrong
+
+**Unnamed constraints.** Six `CHECK`s on a table and an error that says only
+"CHECK constraint failed" wastes real time. Name them.
+
+**Constraints that encode volatile policy.** A `CHECK` on a VAT rate has to be
+migrated when the rate changes, and migrating a constraint on a large table is
+not free. Constrain what is structurally true, not what is currently true.
+
+**Assuming UNIQUE means one per thing.** With NULLs allowed it means one per
+known value.
+
+**Adding a constraint to a large live table without thinking.** The database has
+to verify every existing row before it can accept the constraint, and in most
+engines that takes a lock while it does.

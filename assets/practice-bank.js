@@ -2457,6 +2457,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "database/aggregate_functions_in_sql.html",
+  "title": "Aggregate Functions and the NULL Trap",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "What is the difference between COUNT(*) and COUNT(temp_c)?",
+    "o": [
+     "None, they are aliases",
+     "COUNT(*) counts rows; COUNT(temp_c) counts rows where that column is not NULL",
+     "COUNT(*) is slower",
+     "COUNT(temp_c) counts distinct values"
+    ],
+    "a": 1,
+    "w": "The gap between them is exactly the number of missing values in the column, which makes it a one-line data-quality check."
+   },
+   {
+    "t": "AVG(temp_c) over nine rows, four of them NULL, divides the sum by what?",
+    "o": [
+     "9",
+     "5",
+     "4",
+     "It returns NULL"
+    ],
+    "a": 1,
+    "w": "AVG skips NULLs entirely - it is SUM(col)/COUNT(col). Whether that is the answer you want depends on what NULL means in your data."
+   },
+   {
+    "t": "What does SUM return over a group containing no non-NULL values?",
+    "o": [
+     "0",
+     "NULL",
+     "An error",
+     "The row count"
+    ],
+    "a": 1,
+    "w": "Every aggregate except COUNT returns NULL over nothing. That NULL then propagates through any arithmetic it feeds, which is why COALESCE turns up around aggregates so often."
+   }
+  ]
+ },
+ {
   "path": "database/case_and_views_in_sql.html",
   "title": "CASE and Views in SQL",
   "cat": "Database",
@@ -2491,6 +2531,86 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Recursive CTEs: The Real Superpower”?",
     "ans": "This is the thing subqueries genuinely cannot do. A recursive CTE has two halves joined by UNION ALL :"
+   }
+  ]
+ },
+ {
+  "path": "database/composite_and_covering_indexes.html",
+  "title": "Composite and Covering Indexes",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "An index on (status, customer_id) exists. Which query can use it for a seek?",
+    "o": [
+     "WHERE customer_id = 42",
+     "WHERE status = 'paid'",
+     "Neither",
+     "Only queries naming both columns"
+    ],
+    "a": 1,
+    "w": "The index is sorted by status first, so all the 'paid' rows are contiguous. Rows for customer 42 are scattered across every status, so there is no block to find."
+   },
+   {
+    "t": "What does a covering index avoid?",
+    "o": [
+     "The sort step",
+     "Fetching rows from the table, because every column needed is already in the index",
+     "Updating on insert",
+     "The index search itself"
+    ],
+    "a": 1,
+    "w": "An ordinary lookup searches the index and then fetches each row from the table by random access, which usually dominates. A covering index removes that second stage."
+   },
+   {
+    "t": "Why should equality columns come before range columns in a composite index?",
+    "o": [
+     "Equality is faster to compare",
+     "A range makes everything after it scattered, so only the range column is really used",
+     "Ranges cannot be indexed",
+     "It reduces index size"
+    ],
+    "a": 1,
+    "w": "An equality narrows to a contiguous block that the next column is sorted within. Once a range opens up, the following columns are no longer in a single ordered run."
+   }
+  ]
+ },
+ {
+  "path": "database/constraints_in_sql.html",
+  "title": "Constraints: UNIQUE, CHECK and NOT NULL",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "Why does UNIQUE usually permit several NULLs?",
+    "o": [
+     "NULLs are stored separately",
+     "UNIQUE forbids equal values, and two NULLs are not known to be equal",
+     "It is a bug retained for compatibility",
+     "NULL is treated as zero"
+    ],
+    "a": 1,
+    "w": "Comparing NULL to NULL yields NULL, not true. The constraint only rejects rows it can prove equal, so unknown values slip through - add NOT NULL if that is not what you meant."
+   },
+   {
+    "t": "What can a CHECK constraint do that NOT NULL and UNIQUE cannot?",
+    "o": [
+     "Run on delete",
+     "Relate two columns of the same row, such as end_date > start_date",
+     "Reference another table",
+     "Supply a default value"
+    ],
+    "a": 1,
+    "w": "CHECK takes an arbitrary expression over the row, so multi-column rules are enforceable. They are otherwise checked nowhere and violated eventually."
+   },
+   {
+    "t": "Why is a constraint stronger than the same rule in application code?",
+    "o": [
+     "It runs faster",
+     "It holds for every client, including migrations, imports and consoles that were never written yet",
+     "It cannot be dropped",
+     "It produces better error messages"
+    ],
+    "a": 1,
+    "w": "Application validation holds only for the code paths that run it. The database is the one component every write must pass through."
    }
   ]
  },
@@ -2556,6 +2676,126 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "database/deadlocks_in_sql.html",
+  "title": "Deadlocks",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "What distinguishes a deadlock from ordinary lock waiting?",
+    "o": [
+     "The number of rows involved",
+     "A cycle - each transaction waits for another that is itself waiting",
+     "The isolation level",
+     "How long the wait lasts"
+    ],
+    "a": 1,
+    "w": "Ordinary waiting resolves itself when the holder commits. A cycle cannot, because every participant is blocked on another participant that will never move."
+   },
+   {
+    "t": "What is the reliable way to prevent deadlocks?",
+    "o": [
+     "Raise the lock timeout",
+     "Acquire locks in a consistent order everywhere in the application",
+     "Use a lower isolation level",
+     "Add more indexes"
+    ],
+    "a": 1,
+    "w": "A cycle requires two transactions to disagree about the order. Ordering by primary key is the usual choice because it is total and can be applied mechanically."
+   },
+   {
+    "t": "After a deadlock error, what must the application retry?",
+    "o": [
+     "The failed statement",
+     "The whole transaction from the beginning",
+     "Nothing, the engine retries it",
+     "The connection"
+    ],
+    "a": 1,
+    "w": "The victim's transaction was rolled back entirely, so re-running one statement starts from a state that no longer exists."
+   }
+  ]
+ },
+ {
+  "path": "database/exists_vs_in_vs_join.html",
+  "title": "EXISTS, IN and JOIN",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "Why does NOT IN return no rows when the subquery contains a NULL?",
+    "o": [
+     "NULL is treated as zero",
+     "The comparison against NULL is unknown rather than false, and WHERE keeps only definitely-true rows",
+     "NOT IN does not support subqueries",
+     "The subquery fails silently"
+    ],
+    "a": 1,
+    "w": "NOT IN expands to a chain of <> comparisons joined by AND. One unknown makes the whole chain unknown for every row, so nothing survives the WHERE."
+   },
+   {
+    "t": "Why does a JOIN sometimes return a customer twice when EXISTS does not?",
+    "o": [
+     "JOIN ignores the primary key",
+     "A join pairs each left row with every match, so two orders give two rows",
+     "EXISTS deduplicates automatically",
+     "The join is missing a condition"
+    ],
+    "a": 1,
+    "w": "That multiplication is what a join is for when you want the other table's columns. EXISTS asks only whether a match is there, so it never produces the extra rows."
+   },
+   {
+    "t": "Why is `SELECT 1` conventional inside EXISTS?",
+    "o": [
+     "It is faster than SELECT *",
+     "The select list is never read, so naming a column would be misleading",
+     "EXISTS requires a literal",
+     "It avoids a NULL check"
+    ],
+    "a": 1,
+    "w": "EXISTS tests only whether a row was returned. Writing SELECT * suggests the columns matter, and they do not."
+   }
+  ]
+ },
+ {
+  "path": "database/explain_and_query_plans.html",
+  "title": "EXPLAIN and Query Plans",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "In a plan, what does SCAN tell you?",
+    "o": [
+     "The query failed",
+     "Every row will be read and tested",
+     "An index is being used",
+     "The table is sorted"
+    ],
+    "a": 1,
+    "w": "SEARCH ... USING INDEX means it can jump straight to the matches. SCAN on a large table where you expected a lookup is the thing to look for."
+   },
+   {
+    "t": "Why does `WHERE customer_id + 0 = 42` stop using an index on customer_id?",
+    "o": [
+     "Adding zero changes the value",
+     "The index stores column values, not values of expressions over the column",
+     "Arithmetic is not allowed in WHERE",
+     "The index needs rebuilding"
+    ],
+    "a": 1,
+    "w": "The index's ordering is on the bare column. Wrap it in anything - a function, arithmetic, a cast - and that ordering no longer corresponds to what is being asked."
+   },
+   {
+    "t": "When is a full scan the better plan?",
+    "o": [
+     "Never",
+     "On a small table, or when the query matches a large fraction of the rows",
+     "Only when no index exists",
+     "When the table is sorted"
+    ],
+    "a": 1,
+    "w": "An index yields row locations that must then be fetched individually. Fetching most of a table one row at a time costs more than reading it in order."
+   }
+  ]
+ },
+ {
   "path": "database/having_in_sql.html",
   "title": "HAVING in SQL",
   "cat": "Database",
@@ -2594,6 +2834,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What is meant by “Maintenance” here?",
     "ans": "Indexes fragment as data changes and occasionally need rebuilding."
+   }
+  ]
+ },
+ {
+  "path": "database/isolation_levels.html",
+  "title": "Isolation Levels",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "What is a non-repeatable read?",
+    "o": [
+     "Reading uncommitted data",
+     "Reading the same row twice in one transaction and getting different values",
+     "A new row appearing between two queries",
+     "A transaction being rolled back"
+    ],
+    "a": 1,
+    "w": "It is permitted at READ COMMITTED, where each statement sees the latest committed data - so a report reading a table twice can produce internally inconsistent totals."
+   },
+   {
+    "t": "How does SERIALIZABLE typically deliver its guarantee in a modern engine?",
+    "o": [
+     "By running transactions one at a time",
+     "By detecting conflicts and aborting a transaction, which the application must retry",
+     "By locking every table it touches",
+     "By disabling concurrent writes"
+    ],
+    "a": 1,
+    "w": "It lets transactions proceed optimistically and rejects one when no serial order explains the outcome. Code that assumes commit always succeeds fails intermittently under load."
+   },
+   {
+    "t": "Why is 'we use REPEATABLE READ' an incomplete description of behaviour?",
+    "o": [
+     "The level does not exist in all engines",
+     "The standard permits phantoms there, but PostgreSQL and MySQL each prevent them by different mechanisms",
+     "It is the same as SERIALIZABLE",
+     "It only applies to reads"
+    ],
+    "a": 1,
+    "w": "The standard says which anomalies are permitted, not which are prevented, and engines prevent more than required in different ways. The engine matters as much as the level."
    }
   ]
  },
@@ -2674,6 +2954,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "database/primary_and_foreign_keys.html",
+  "title": "Primary and Foreign Keys",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "What two guarantees does declaring a primary key give you?",
+    "o": [
+     "Uniqueness and an index",
+     "Uniqueness and NOT NULL",
+     "NOT NULL and a default",
+     "Uniqueness and sort order"
+    ],
+    "a": 1,
+    "w": "No two rows may share the value, and no row may leave it NULL. A row whose identity is unknown cannot be referred to at all."
+   },
+   {
+    "t": "Why is a surrogate integer usually preferred over an email address as a primary key?",
+    "o": [
+     "Integers sort faster",
+     "Nothing in the world can force it to change, so referencing rows never need updating",
+     "Emails cannot be indexed",
+     "It uses less disk"
+    ],
+    "a": 1,
+    "w": "A natural key carries meaning and meaning changes. A person changing their email would mean updating every referencing row; a meaningless integer is stable by construction."
+   },
+   {
+    "t": "Why does SQLite in particular need `PRAGMA foreign_keys = ON`?",
+    "o": [
+     "It has no foreign keys",
+     "Enforcement is off by default for backwards compatibility, so REFERENCES clauses are accepted but ignored",
+     "It only enforces them on DELETE",
+     "The pragma creates the index"
+    ],
+    "a": 1,
+    "w": "The schema parses and looks correct while guaranteeing nothing, which is worse than having no constraint at all because it invites trust."
+   }
+  ]
+ },
+ {
   "path": "database/query_execution_order.html",
   "title": "Query Execution Order in SQL",
   "cat": "Database",
@@ -2693,6 +3013,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What is meant by “OFFSET” here?",
     "ans": "runs with LIMIT , at the very end, after everything has been produced and sorted — which is exactly why deep offsets are slow."
+   }
+  ]
+ },
+ {
+  "path": "database/recursive_ctes_in_sql.html",
+  "title": "Recursive CTEs",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "What stops a recursive CTE?",
+    "o": [
+     "A fixed iteration limit",
+     "The recursive step returning no rows",
+     "The anchor running out",
+     "A depth column reaching zero"
+    ],
+    "a": 1,
+    "w": "Nothing else halts it. With cyclic data the step keeps producing rows forever, which is why a depth cap or a path check is worth adding."
+   },
+   {
+    "t": "What does the recursive step read on each round?",
+    "o": [
+     "The whole accumulated result so far",
+     "Only the rows produced by the previous round",
+     "Only the anchor's rows",
+     "The base table only"
+    ],
+    "a": 1,
+    "w": "That is exactly what makes it a level-by-level walk. Aggregating across all levels has to happen in the outer query instead."
+   },
+   {
+    "t": "How do you turn a descendants query into an ancestors query?",
+    "o": [
+     "Add ORDER BY DESC",
+     "Swap which side of the join condition the CTE is on, and start from a different anchor",
+     "Use UNION instead of UNION ALL",
+     "It cannot be done"
+    ],
+    "a": 1,
+    "w": "Ancestors and descendants are the same walk with the arrow reversed. The construct is unchanged; only the anchor and the join condition move."
    }
   ]
  },
@@ -2794,6 +3154,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Aggregate without collapsing”?",
     "ans": "GROUP BY answers \"what is the total per region?\" and destroys the individual rows in the process. A window function answers \"what is the total for this row's region, shown next to this row?\" and keeps everything."
+   }
+  ]
+ },
+ {
+  "path": "database/self_joins_in_sql.html",
+  "title": "Self-Joins",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "Why does an inner self-join drop the top of a hierarchy?",
+    "o": [
+     "The root has no id",
+     "The root's parent reference is NULL and NULL matches nothing",
+     "Inner joins skip the first row",
+     "The alias is missing"
+    ],
+    "a": 1,
+    "w": "An inner join needs a match on both sides. The root's manager_id is NULL, so no row matches and it is dropped silently - LEFT JOIN keeps it with a NULL manager."
+   },
+   {
+    "t": "Why is `a.id < b.id` preferred over `a.id <> b.id` when pairing rows?",
+    "o": [
+     "It is faster",
+     "It stops self-pairing and also returns each unordered pair once instead of twice",
+     "<> does not work on integers",
+     "It handles NULLs"
+    ],
+    "a": 1,
+    "w": "<> removes self-pairs but still returns both (A, B) and (B, A). For two distinct rows exactly one ordering satisfies <, so each pair appears once."
+   },
+   {
+    "t": "When does a self-join stop being the right tool?",
+    "o": [
+     "When the table is large",
+     "When the depth of the hierarchy is not known in advance",
+     "When the parent column is nullable",
+     "When more than two columns are selected"
+    ],
+    "a": 1,
+    "w": "Each level costs one written join, so an unknown depth cannot be expressed. That is exactly what a recursive CTE is for."
    }
   ]
  },

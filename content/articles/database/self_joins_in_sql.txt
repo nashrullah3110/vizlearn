@@ -1,0 +1,102 @@
+title: Self-Joins
+intro: A table joined to itself, and the three questions that need one.
+
+## Nothing new, except the alias
+
+A self-join is an ordinary join in which both sides are the same table. There
+is no special keyword and no special execution; the only thing that changes is
+that aliases become mandatory.
+
+```
+FROM  employees e
+JOIN  employees m ON e.manager_id = m.id
+```
+
+`e` and `m` are two independent views of the same rows. Without them, `name`
+would be ambiguous &mdash; the database has two columns with that name in scope
+and no way to guess which was meant.
+
+The mental move that makes this click is to stop thinking of `e` and `m` as one
+table used twice, and start thinking of them as two tables that happen to
+contain identical data. Everything else about joins then applies unchanged.
+
+## When you need one
+
+Self-joins answer questions that involve **comparing a row to another row of the
+same kind**, which SQL otherwise makes awkward.
+
+**Hierarchies stored in one table.** An employee's manager is another employee.
+A category's parent is another category. A reply's target is another comment.
+Joining the table to itself resolves the reference into real columns.
+
+**Row-to-row comparisons.** "Who earns more than their manager" needs both
+salaries available at once. Run the third variant: Barbara earns 101,000 and
+reports to Grace on 98,000, and the join is what puts those two numbers in one
+row so a `WHERE` can compare them.
+
+**Pairing rows within a group.** "Which colleagues share a manager" pairs the
+table with itself on `manager_id`.
+
+## The two conditions that keep pairs sane
+
+The fourth variant contains a detail that looks small and is not:
+
+```
+ON a.manager_id = b.manager_id AND a.id < b.id
+```
+
+Without `a.id < b.id`, two things go wrong. Every row pairs with **itself**,
+because a row trivially shares its own manager. And every genuine pair appears
+**twice**, once as (Alan, Grace) and once as (Grace, Alan).
+
+Writing `a.id <> b.id` fixes the first problem and not the second. Writing
+`a.id < b.id` fixes both at once, because for any two distinct rows exactly one
+ordering satisfies it. That is the standard idiom for "each unordered pair once"
+and it is worth recognising on sight.
+
+## The top of the hierarchy disappears
+
+Run the first variant and count the rows: five, not six. Ada is missing.
+
+Ada is the root &mdash; her `manager_id` is NULL &mdash; and an inner join
+requires a match on both sides. NULL matches nothing, so her row is dropped
+without comment.
+
+The second variant uses `LEFT JOIN` and Ada reappears with a NULL manager. This
+is nearly always what was intended, and the failure is quiet enough to reach
+production: the query works, returns plausible rows, and is missing exactly the
+most senior person in the organisation.
+
+## Depth is where it stops
+
+A self-join resolves **one** level. Employee to manager is one join. Employee to
+manager's manager is two, written out by hand:
+
+```
+FROM employees e
+JOIN employees m  ON e.manager_id = m.id
+JOIN employees mm ON m.manager_id = mm.id
+```
+
+Three levels needs three, and an arbitrary depth cannot be written this way at
+all, because the number of joins would have to depend on the data.
+
+That is the boundary where the technique runs out and
+[recursive CTEs](recursive_ctes_in_sql.html) take over. A recursive CTE walks
+down as many levels as exist, and it is the correct tool the moment the depth is
+not known in advance.
+
+## Where it goes wrong
+
+**Inner join on a nullable parent.** The root vanishes. This is the single most
+common self-join bug.
+
+**Forgetting the anti-self condition.** Without `a.id < b.id` every row pairs
+with itself, and totals come out roughly double.
+
+**Using one for arbitrary depth.** If the query has four copies of the same
+table and someone is about to add a fifth, it wants to be recursive.
+
+**Leaving the join column unindexed.** A self-join reads the table twice. On a
+large table with no index on `manager_id`, that is two full scans and a hash in
+between.

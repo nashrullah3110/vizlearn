@@ -1,0 +1,95 @@
+title: Deadlocks
+intro: Two transactions, two rows, and the one detail that decides whether they finish.
+
+## Waiting is normal; a cycle is not
+
+When a transaction updates a row it takes an exclusive lock and holds it until
+it commits or rolls back. Anything else wanting that row waits.
+
+Waiting is ordinary and self-resolving: the holder finishes, the waiter
+proceeds. A **deadlock** is different. It is a *cycle* in who is waiting for
+whom, and a cycle cannot resolve itself, because every participant is waiting
+for another participant that will never move.
+
+Step through the timeline with "opposite order" selected. Nothing is wrong at
+step 4 &mdash; two transactions holding different rows is just concurrency. The
+problem appears at step 6, when the second edge closes the loop: A holds row 1
+and wants row 2; B holds row 2 and wants row 1. Neither can proceed and neither
+will give up what it has.
+
+## The database will break it, badly
+
+Engines run a deadlock detector that periodically looks for cycles in the
+wait-for graph. When it finds one it picks a **victim** &mdash; usually the
+transaction that has done the least work, so the least is lost &mdash; and kills
+it with a deadlock error. The survivor continues.
+
+That resolution is necessary and it is not a fix. The victim's work is gone. If
+the application does not catch the error and retry, a user's action simply
+failed, and it failed intermittently, under load, in a way that is very hard to
+reproduce.
+
+## The fix is ordering
+
+Switch the timeline to "same order" and step through again. The schedule is
+almost identical; the only change is that B asks for row 1 before row 2, exactly
+as A does.
+
+Now B blocks at step 4 and stays blocked. A proceeds, finishes and releases both
+locks. B unblocks and completes. Both transactions succeed, no error is raised,
+and nothing is retried.
+
+This is the whole technique: **acquire locks in a consistent order everywhere in
+the application.** A cycle requires two transactions to disagree about the order,
+so if nobody disagrees, no cycle can form. Ordering by primary key is the usual
+choice because it is total, arbitrary and easy to apply mechanically.
+
+The classic case is a transfer between two accounts. Written naively it locks
+the source then the destination, and two transfers in opposite directions
+deadlock immediately. Written as "lock the lower id first, then the higher" they
+queue instead.
+
+## What makes it more likely
+
+**Long transactions.** Locks are held to the end, so the longer a transaction
+runs the wider the window in which someone can interleave with it. Do not open a
+transaction and then call an external API inside it.
+
+**Broad locks.** A statement without an index may lock far more rows than it
+needs, because rows it examines and rejects can still be locked. Adding the index
+narrows the query and the locking together, which is why an index sometimes
+fixes a deadlock nobody thought was an index problem.
+
+**Escalation.** Some engines convert many row locks into one table lock past a
+threshold, turning a narrow conflict into a broad one.
+
+**Mixed access patterns.** Different code paths touching the same tables in
+different orders is the underlying cause of most production deadlocks, and it
+tends to appear when two features written months apart meet under load.
+
+## Retry properly
+
+Even with good discipline, deadlocks happen. The handling is a small amount of
+code and it has to be right:
+
+1. Catch the deadlock error specifically, not every error.
+2. Retry the **whole transaction** from the beginning. Re-running the failed
+   statement alone is wrong &mdash; the transaction was rolled back entirely.
+3. Back off before retrying, with some randomness, so two victims do not
+   collide again on the same schedule.
+4. Cap the attempts and log what happened, so a genuine design problem does not
+   hide behind a retry loop that quietly succeeds on the fourth attempt.
+
+## Where it goes wrong
+
+**Treating it as a database configuration problem.** No setting prevents
+deadlocks. The order in which your code takes locks does.
+
+**Retrying the statement instead of the transaction.** The rollback undid
+everything, so the retry starts from a state that no longer exists.
+
+**Assuming reads are safe.** `SELECT ... FOR UPDATE` takes locks and
+participates in cycles exactly like an update.
+
+**Silently swallowing the retry.** A rising deadlock rate is a signal about the
+system's design. Log it.

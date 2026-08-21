@@ -19,6 +19,7 @@ cv_topics.py - plus its place in sequence.py.
 import html
 import json
 import os
+import re
 import sys
 
 import lib_shell as shell
@@ -38,6 +39,23 @@ CSS = """
         .cv-note code { color: var(--accent-primary); }
         .vz-cv-lead { margin-top: 0.5rem; max-width: 60ch; color: var(--text-muted); }
 """
+
+
+# The thumbnails are parsed as SVG by tools/build_og_images.py, and XML defines
+# only five named entities. A stray &rarr; or &mdash; renders fine in the page,
+# where it is HTML, and fails the OG render with "Entity not defined" - which
+# surfaces two build steps later as a missing image. Catch it here instead.
+XML_SAFE = {"amp", "lt", "gt", "quot", "apos"}
+NAMED_ENTITY = re.compile(r"&([a-zA-Z][a-zA-Z0-9]*);")
+
+
+def check_thumbnails():
+    for t in TOPICS:
+        for name in NAMED_ENTITY.findall(t["svg"]):
+            if name not in XML_SAFE:
+                raise SystemExit(
+                    "%s: thumbnail uses &%s; - XML has no such entity. "
+                    "Use a numeric reference." % (t["slug"], name))
 
 
 def rel_for(t):
@@ -139,6 +157,7 @@ def catalog_entry(existing):
 
 
 def main():
+    check_thumbnails()
     os.makedirs(os.path.join(ROOT, DIR), exist_ok=True)
     for t in TOPICS:
         open(os.path.join(ROOT, rel_for(t)), "w", encoding="utf-8").write(page(t))

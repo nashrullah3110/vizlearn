@@ -248,6 +248,12 @@ SEQUENCE = {
         "database/what_are_non_relational_databases.html",
         "database/datatypes_in_sql.html",
         "database/ddl_in_sql.html",
+        # Schema design: what the DDL is for. Keys before constraints
+        # because a foreign key is the constraint everything else leans on,
+        # and both before normalization, which is an argument about how to
+        # arrange tables that already have keys.
+        "database/primary_and_foreign_keys.html",
+        "database/constraints_in_sql.html",
         "database/normalization_in_sql.html",
         "database/dml_in_sql.html",
         "database/transactions_and_acid.html",
@@ -256,16 +262,26 @@ SEQUENCE = {
         "database/order_by_in_sql.html",
         "database/limit_and_offset_in_sql.html",
         "database/case_and_views_in_sql.html",
+        "database/aggregate_functions_in_sql.html",
         "database/groupby_in_sql.html",
         "database/having_in_sql.html",
         "database/query_execution_order.html",
         "database/joins_in_sql.html",
+        "database/self_joins_in_sql.html",
         "database/union_intersect_except_in_sql.html",
         "database/subqueries_in_sql.html",
+        "database/exists_vs_in_vs_join.html",
         "database/common_table_expressions_in_sql.html",
+        "database/recursive_ctes_in_sql.html",
         "database/window_functions_in_sql.html",
         "database/regular_expressions_in_sql.html",
         "database/indexes_in_sql.html",
+        "database/composite_and_covering_indexes.html",
+        "database/explain_and_query_plans.html",
+        # Concurrency last: both of these assume transactions, which
+        # transactions_and_acid introduces much earlier.
+        "database/isolation_levels.html",
+        "database/deadlocks_in_sql.html",
     ],
 
     # How an LLM reads -> how it predicts -> how it is trained -> how it is shrunk.

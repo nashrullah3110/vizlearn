@@ -1,0 +1,103 @@
+title: Aggregate Functions and the NULL Trap
+intro: Five functions that collapse many rows into one, and the one behaviour they share that quietly changes your answers.
+
+## Many rows in, one value out
+
+An aggregate function takes a set of rows and returns a single value. With no
+`GROUP BY`, the set is the whole table; with one, it is each group in turn.
+
+The five that matter are `COUNT`, `SUM`, `AVG`, `MIN` and `MAX`. Run the
+starter query and all five appear side by side over the same nine rows. The
+numbers do not agree with each other in the way you might expect, and the reason
+is NULL.
+
+## COUNT(*) and COUNT(col) are different functions
+
+This is the single most useful distinction on the page.
+
+`COUNT(*)` counts **rows**. It does not look at any column, cannot be affected
+by NULL, and answers "how many records are there".
+
+`COUNT(temp_c)` counts **non-NULL values in that column**. It answers "how many
+records actually have a reading".
+
+The table has nine rows and four of them have no temperature. So `COUNT(*)` is
+9 and `COUNT(temp_c)` is 5, and the gap between them is a free measure of
+missing data:
+
+```
+SELECT COUNT(*) - COUNT(temp_c) AS missing FROM readings;
+```
+
+That one line is worth reaching for whenever a column's quality is in question.
+It needs no subquery, no `IS NULL` filter and no second pass.
+
+## Everything else skips NULL silently
+
+`SUM`, `AVG`, `MIN` and `MAX` all ignore NULL. They do not fail, warn, or
+return NULL because a NULL was present &mdash; they behave as though those rows
+were not there.
+
+For `SUM`, `MIN` and `MAX` this is almost always what you want. For `AVG` it is
+the thing that catches people, because **AVG divides by the count of values, not
+the count of rows**:
+
+```
+AVG(temp_c)  =  SUM(temp_c) / COUNT(temp_c)
+```
+
+Run the second variant. Three numbers appear that all have a claim to being
+"the average temperature", and they differ substantially:
+
+| Expression | What it means |
+|---|---|
+| `AVG(temp_c)` | mean of the readings that exist |
+| `AVG(COALESCE(temp_c, 0))` | mean if a broken sensor means zero degrees |
+| `SUM(temp_c) / COUNT(*)` | total spread across all rows including the broken ones |
+
+Which is correct depends entirely on what NULL means in your data. If the sensor
+failed, the first is right and the others are nonsense &mdash; a broken sensor
+is not a reading of zero. If NULL means "no sales that day", the second may well
+be right. The database cannot decide this for you, and it will not ask.
+
+## The empty group
+
+Run the fourth variant. It restricts to the rows that have no reading at all,
+so there are four rows and zero values, and every aggregate has to say what it
+does with nothing.
+
+`COUNT(*)` is 4 and `COUNT(temp_c)` is 0, as expected. `SUM`, `AVG`, `MIN` and
+`MAX` all come back **NULL** &mdash; not zero, and not an error. The rule is
+that an aggregate over zero values returns NULL, and the single exception is
+`COUNT`, which returns 0 because counting nothing genuinely is zero.
+
+This matters when an aggregate feeds arithmetic. `SUM(amount) * 1.2` over a
+group with no rows is NULL, and NULL propagates through every operation it
+touches until something wraps it in `COALESCE`.
+
+## GROUP BY and the shape of the result
+
+Adding `GROUP BY station` changes the result from one row to one row per
+station. The rule that follows is the one beginners trip on: every column in the
+`SELECT` list must either be aggregated or appear in the `GROUP BY`.
+
+The reason is that the query has to produce exactly one value per group. Given
+three readings for `north`, there is no answer to "what is the id" &mdash;
+there are three, and the database will not choose one. Some engines historically
+allowed it and returned an arbitrary row, which is worse than an error because
+it works until it does not.
+
+## Where it goes wrong
+
+**Using AVG on data where NULL means zero.** The average silently rises. Use
+`COALESCE` when absence really is a zero.
+
+**Assuming COUNT(col) is a faster COUNT(*).** They answer different questions.
+On a nullable column they return different numbers.
+
+**Filtering aggregates in WHERE.** `WHERE COUNT(*) > 5` is an error &mdash;
+`WHERE` runs before grouping, so no counts exist yet. That is what
+[HAVING](having_in_sql.html) is for.
+
+**Forgetting that NULL breaks arithmetic.** One NULL anywhere in an expression
+makes the whole expression NULL.

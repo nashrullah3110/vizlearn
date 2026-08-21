@@ -2147,3 +2147,9 @@ LABS.update(_PYTHON_CHECKS)
 from cv_topics import CHECKS as _CV_CHECKS  # noqa: E402
 
 LABS.update(_CV_CHECKS)
+
+# And the generated database modules (tools/db_topics.py), where a question is
+# written against the exact query and seed data on the page.
+from db_topics import CHECKS as _DB_CHECKS  # noqa: E402
+
+LABS.update(_DB_CHECKS)

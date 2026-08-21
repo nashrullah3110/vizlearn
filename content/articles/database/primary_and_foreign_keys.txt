@@ -1,0 +1,96 @@
+title: Primary and Foreign Keys
+intro: The two constraints that make a row impossible to write if it could not be true.
+
+## A key is a promise about identity
+
+A **primary key** is the column, or set of columns, whose value identifies a
+row uniquely and permanently. Declaring one asks the database for two
+guarantees at once: no two rows share this value, and no row leaves it NULL.
+
+That second half is easy to overlook and does real work. NULL means unknown. A
+row whose identity is unknown cannot be referred to, updated with confidence,
+or joined against, so a nullable identifier is not an identifier at all.
+
+Run the first statement in the editor. The insert is refused, and the message
+comes from SQLite rather than from anything on this page:
+`UNIQUE constraint failed: orders.id`. Nothing in the application had to check
+first, and no amount of concurrent traffic can slip a duplicate past it.
+
+## A foreign key is a promise about reference
+
+A **foreign key** says: whatever value sits in this column must already exist
+in that column of that table. `orders.customer_id` references `customers.id`,
+so an order can only belong to a customer who is really there.
+
+Uncomment the second statement and run it. Order 9 claims customer 77, and
+customer 77 does not exist, so the write fails. Without the constraint the row
+would be accepted and the problem would surface much later, as a join that
+silently returns fewer rows than expected or a report whose totals do not
+reconcile.
+
+This is the value of the constraint and it is worth stating plainly: it turns a
+data-quality problem, which is discovered weeks later by a human, into a write
+error, which is discovered immediately by a machine.
+
+## What happens to the other side
+
+Uncomment the third statement. Deleting customer 1 is refused, because orders 1
+and 2 point at that customer and removing it would leave them pointing at
+nothing. The database will not create the orphan.
+
+Refusing is one of several available answers, chosen with `ON DELETE`:
+
+| Clause | Behaviour |
+|---|---|
+| `RESTRICT` / `NO ACTION` | refuse the delete while children exist (the default) |
+| `CASCADE` | delete the children too |
+| `SET NULL` | keep the children, blank the reference |
+| `SET DEFAULT` | point the children at a default row |
+
+`CASCADE` is convenient and worth respecting. Deleting one customer can silently
+remove thousands of orders, and a cascade that runs through several tables can
+remove a great deal more than the person pressing the button expected.
+
+## Natural against surrogate
+
+Given a table of people, is the primary key the email address or an integer
+that means nothing?
+
+An email address is a **natural key**: it comes from the domain and carries
+meaning. It is also mutable, occasionally shared, sometimes absent, and awkward
+to index. Every row that references it stores a whole string, and a person
+changing their address means updating every one of them.
+
+A meaningless integer is a **surrogate key**. It is stable because nothing in
+the world can force it to change, compact to store and to index, and safe to
+scatter across a dozen referencing tables.
+
+The usual practice is a surrogate primary key plus a `UNIQUE` constraint on the
+natural one, which buys stable identity and still refuses two accounts on the
+same address.
+
+## Composite keys
+
+A key can span several columns. A table recording which student is enrolled on
+which course has a primary key of `(student_id, course_id)`: neither column
+alone identifies a row, and the pair does. That declaration also states a
+business rule &mdash; a student can enrol on a course once &mdash; which the
+database will now enforce for free.
+
+## Where it goes wrong
+
+**Turning foreign keys off for performance.** They cost something on write. The
+cost of not having them is discovered in production, in data that no longer
+makes sense, and it is much harder to pay.
+
+**Forgetting the pragma.** SQLite ships with foreign key enforcement off for
+backwards compatibility. A schema full of `REFERENCES` clauses that were never
+enforced looks correct and guarantees nothing.
+
+**Making the primary key meaningful.** Anything that carries meaning can change,
+and a primary key that changes has to be chased through every table that
+references it.
+
+**Leaving the foreign key column unindexed.** The parent side is indexed by its
+primary key automatically. The child side usually is not, and every cascade or
+referential check then scans the whole child table.

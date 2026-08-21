@@ -572,6 +572,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Learn how Transfer Learning works in Convolutional Neural Networks, select models, and selectively unfreeze layers for fine-tuning."
  },
  {
+  "title": "Aggregate Functions and the NULL Trap",
+  "path": "database/aggregate_functions_in_sql.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
+ },
+ {
   "title": "CASE and Views in SQL",
   "path": "database/case_and_views_in_sql.html",
   "category": "Database",
@@ -586,6 +594,22 @@ window.VIZLEARN_MODULES = [
   "topic": "db",
   "icon": "database",
   "desc": "Interactive SQL CTE lab - see how WITH clauses turn nested subqueries into readable pipelines, and step through a recursive CTE iteration by iteration."
+ },
+ {
+  "title": "Composite and Covering Indexes",
+  "path": "database/composite_and_covering_indexes.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
+ },
+ {
+  "title": "Constraints: UNIQUE, CHECK and NOT NULL",
+  "path": "database/constraints_in_sql.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
  },
  {
   "title": "DDL in SQL",
@@ -612,6 +636,30 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive SQL datatypes lab - integer ranges and overflow, CHAR vs VARCHAR storage, FLOAT vs DECIMAL precision loss, dates and NULL."
  },
  {
+  "title": "Deadlocks",
+  "path": "database/deadlocks_in_sql.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
+ },
+ {
+  "title": "EXISTS, IN and JOIN",
+  "path": "database/exists_vs_in_vs_join.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
+ },
+ {
+  "title": "EXPLAIN and Query Plans",
+  "path": "database/explain_and_query_plans.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
+ },
+ {
   "title": "HAVING in SQL",
   "path": "database/having_in_sql.html",
   "category": "Database",
@@ -626,6 +674,14 @@ window.VIZLEARN_MODULES = [
   "topic": "db",
   "icon": "database",
   "desc": "Walk a B-tree instead of reading every row and watch rows-examined collapse. Then meet the queries an index cannot help, and what it costs on writes."
+ },
+ {
+  "title": "Isolation Levels",
+  "path": "database/isolation_levels.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
  },
  {
   "title": "Limit and Offset in SQL",
@@ -660,12 +716,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Watch rows slide into their new order as you change the sort key, direction, tie-breaker and NULLS placement, with the query building live."
  },
  {
+  "title": "Primary and Foreign Keys",
+  "path": "database/primary_and_foreign_keys.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
+ },
+ {
   "title": "Query Execution Order in SQL",
   "path": "database/query_execution_order.html",
   "category": "Database",
   "topic": "db",
   "icon": "database",
   "desc": "SQL reads top to bottom but runs FROM first and SELECT second-to-last. Step through the real order and watch the row count change at every stage."
+ },
+ {
+  "title": "Recursive CTEs",
+  "path": "database/recursive_ctes_in_sql.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
  },
  {
   "title": "Regular Expressions in SQL",
@@ -698,6 +770,14 @@ window.VIZLEARN_MODULES = [
   "topic": "db",
   "icon": "database",
   "desc": "Rank, total and compare across rows without collapsing them, using OVER and PARTITION BY on a live result set."
+ },
+ {
+  "title": "Self-Joins",
+  "path": "database/self_joins_in_sql.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
  },
  {
   "title": "Subqueries in SQL",

@@ -19,7 +19,7 @@
  *
  * Third-party requests - analytics, ads, fonts - are not touched at all.
  */
-const CACHE = 'vizlearn-6db0d345aa';
+const CACHE = 'vizlearn-523b3133f0';
 const SHELL = [
   "./",
   "./index.html",
@@ -40,6 +40,7 @@ const SHELL = [
   "./assets/vizlearn-interview.js",
   "./assets/vizlearn-ragviz.js",
   "./assets/vizlearn-cv.js",
+  "./assets/vizlearn-dbq.js",
   "./assets/practice-bank.js",
   "./assets/practice.js",
   "./assets/icons.js",

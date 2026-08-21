@@ -1,0 +1,107 @@
+title: EXPLAIN and Query Plans
+intro: The database will tell you what it plans to do. Very few people ask.
+
+## SQL says what, not how
+
+A query states the result you want. It says nothing about how to get it: which
+table to read first, whether to use an index, whether to sort or hash for a
+join. All of that is chosen by the **query optimiser**, at runtime, from the
+statistics it holds about your data.
+
+Which means that two queries returning identical results can differ by orders of
+magnitude in cost, and nothing about the SQL text tells you which is which.
+`EXPLAIN` is how you find out, and it takes about ten seconds.
+
+## SCAN against SEARCH
+
+Run the first variant. The plan reads:
+
+```
+SCAN orders
+```
+
+`SCAN` means the database intends to read **every row** and test each one. Five
+thousand rows here; five million in production, at which point the query is a
+problem.
+
+Run the second variant to create an index on `customer_id`, then the third. The
+plan now reads:
+
+```
+SEARCH orders USING INDEX idx_orders_customer (customer_id=?)
+```
+
+`SEARCH` means it can jump directly to the matching rows. The query text did not
+change. The result does not change. The work changed from thousands of row reads
+to a handful.
+
+That contrast is the whole skill: **look for SCAN on a large table where you
+expected a lookup.** Other engines use different words &mdash; PostgreSQL says
+`Seq Scan` against `Index Scan`, MySQL fills in a `type` column with `ALL`
+against `ref` &mdash; but the distinction is the same everywhere.
+
+## The index it will not use
+
+Run the fourth variant. The index still exists, the query means exactly the same
+thing, and the plan is back to `SCAN`.
+
+The difference is `customer_id + 0` instead of `customer_id`. An index stores
+values of the column, in order. It does not store values of *expressions over*
+the column, so the moment the column is wrapped in anything, the ordering the
+index provides no longer corresponds to what the query is asking about.
+
+This is the most common way a perfectly good index goes unused, and it hides
+inside ordinary-looking SQL:
+
+| Written | Problem | Instead |
+|---|---|---|
+| `WHERE YEAR(created) = 2026` | function on the column | `WHERE created >= '2026-01-01' AND created < '2027-01-01'` |
+| `WHERE LOWER(email) = ?` | function on the column | index on `LOWER(email)`, or store it folded |
+| `WHERE id + 0 = 42` | arithmetic on the column | `WHERE id = 42` |
+| `WHERE status LIKE '%paid'` | leading wildcard | no index can help; a B-tree is ordered by prefix |
+
+The rule: **keep the indexed column bare on one side of the comparison.**
+
+## A scan is not always wrong
+
+On a table of fifty rows, reading all fifty is cheaper than consulting an index
+and then fetching rows one at a time. Optimisers know this and will correctly
+ignore an index on a small table.
+
+The same applies to selectivity. A query matching 60% of the rows is usually
+better served by a scan, because an index gives a list of row locations that
+then have to be fetched individually &mdash; and fetching most of the table one
+row at a time costs more than reading it in order.
+
+This is why plans change as tables grow, and why a query that was fast in staging
+can be slow in production with the same schema and different statistics.
+
+## Estimated against actual
+
+`EXPLAIN` alone shows what the optimiser *intends*, using row-count estimates.
+Those estimates come from statistics that can be stale or simply wrong.
+
+Most engines offer a form that runs the query and reports what really happened
+&mdash; `EXPLAIN ANALYZE` in PostgreSQL, `EXPLAIN ANALYZE` in MySQL 8.0.18 and
+later. Comparing estimated rows against actual rows is the fastest way to find
+out that the optimiser expected 10 rows and got 400,000, which is almost always
+the reason a plan is bad.
+
+Two habits follow: run `ANALYZE` after a bulk load so the statistics reflect the
+data, and be suspicious of any plan step whose estimate is off by more than an
+order of magnitude.
+
+## Where it goes wrong
+
+**Guessing instead of asking.** The plan is one command away and settles the
+argument.
+
+**Reading a plan for a query with no data.** Plans on an empty or tiny table
+tell you nothing about production.
+
+**Adding indexes until it is fast.** Every index costs write time and space, and
+an unused index costs both for nothing. Add the one the plan asks for, then
+check the plan again.
+
+**Assuming the plan is stable.** It is recomputed as statistics change. Today's
+plan is not a guarantee.

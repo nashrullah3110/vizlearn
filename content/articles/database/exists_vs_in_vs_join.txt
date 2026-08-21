@@ -1,0 +1,103 @@
+title: EXISTS, IN and JOIN
+intro: Three ways to ask whether a related row exists, and the one that is quietly wrong.
+
+## The same question
+
+"Which customers have placed an order?" can be written with `EXISTS`, with `IN`,
+or as a `JOIN`. Run the first three variants above and all three return Ada and
+Grace &mdash; except that the JOIN returns Ada twice.
+
+That difference is the first thing to understand, and the NULL behaviour of the
+fourth is the second.
+
+## JOIN multiplies rows
+
+A join does not filter the left table. It pairs every row on the left with every
+matching row on the right, so a customer with three orders produces three
+result rows.
+
+When you want the orders, that is exactly right. When you want the customers,
+it is a bug, and the usual patch is `DISTINCT`. That works, but it is worth
+knowing what it costs: the database produced the duplicate rows and then sorted
+or hashed them away. `EXISTS` never produces them in the first place.
+
+The rule of thumb: **join when you want columns from the other table, use
+EXISTS when you only want to know whether it is there**.
+
+## EXISTS stops early
+
+`EXISTS (subquery)` is true if the subquery returns at least one row. Not how
+many, not which &mdash; just whether. That is why `SELECT 1` is the conventional
+body: nothing in the select list is ever read, so there is no reason to name a
+column.
+
+Because only existence matters, the engine can stop scanning the moment it finds
+one match. For a customer with ten thousand orders, `EXISTS` looks at one.
+
+`EXISTS` is also *correlated*: the subquery references `c.id` from the outer
+query, so it is conceptually re-evaluated per outer row. Planners rarely execute
+it that literally, but writing it that way is what makes the early exit
+available.
+
+## Where NOT IN breaks
+
+Run the fourth variant. `NOT IN` returns **no rows at all**, and `NOT EXISTS`
+returns Alan and Edsger, which is the correct answer.
+
+Nothing is wrong with the data. Order 4 is anonymous, so its `customer_id` is
+NULL, and the subquery returns the list `(1, 1, 2, NULL)`.
+
+`c.id NOT IN (1, 1, 2, NULL)` expands to:
+
+```
+c.id <> 1  AND  c.id <> 1  AND  c.id <> 2  AND  c.id <> NULL
+```
+
+The final comparison is not false &mdash; it is **unknown**. Alan's id is 3, and
+whether 3 differs from an unknown value cannot be determined. `AND` with unknown
+gives unknown, `WHERE` keeps only rows that are definitely true, and so nothing
+survives. Every row is filtered out, for every customer, silently and without an
+error.
+
+`NOT EXISTS` is unaffected because it never compares anything to NULL. It asks
+whether a matching row was found, and the answer to that is always yes or no.
+
+This is the practical rule, and it is worth committing to memory:
+
+> **`NOT IN` with a nullable subquery column is a bug.** Use `NOT EXISTS`, or
+> add `WHERE customer_id IS NOT NULL` to the subquery.
+
+The positive forms do not have this problem. `IN` returns true as soon as it
+finds a real match, and an unknown among the remaining comparisons cannot take
+that away.
+
+## What about performance
+
+Twenty years ago these three had genuinely different costs and the advice was
+elaborate. Modern planners in PostgreSQL, SQL Server and Oracle recognise all
+three shapes and frequently compile them to the same physical plan &mdash;
+usually a semi-join, which is precisely "find whether a match exists, do not
+duplicate rows".
+
+So performance is rarely the reason to choose. The reasons that survive are:
+
+| Want | Use | Because |
+|---|---|---|
+| Columns from the other table | `JOIN` | it is the only one that gives them |
+| Just to know it exists | `EXISTS` | no duplicates, early exit |
+| Absence, nullable column | `NOT EXISTS` | `NOT IN` returns nothing |
+| A short literal list | `IN` | `IN (1, 2, 3)` reads better than anything else |
+
+Check the plan when it matters. [EXPLAIN](explain_and_query_plans.html) settles
+in ten seconds what a rule of thumb argues about indefinitely.
+
+## Where it goes wrong
+
+**`NOT IN` on anything nullable.** The query returns zero rows and looks like a
+data problem.
+
+**`SELECT *` inside `EXISTS`.** Harmless but misleading &mdash; it suggests the
+columns are read, and they never are.
+
+**`DISTINCT` as a reflex.** If a join is producing duplicates, ask whether you
+wanted the join at all. `DISTINCT` hides the symptom and pays for the rows twice.

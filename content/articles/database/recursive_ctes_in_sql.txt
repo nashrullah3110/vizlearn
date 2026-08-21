@@ -1,0 +1,103 @@
+title: Recursive CTEs
+intro: The one construct in SQL that can follow a chain of unknown length.
+
+## Why plain SQL cannot do this
+
+A self-join resolves one level of a hierarchy. Two joins resolve two. To resolve
+five you write five, and to resolve "however many there are" you cannot write
+anything at all, because the number of joins would have to depend on data the
+query has not read yet.
+
+A **recursive CTE** removes that limit. It runs a query, feeds the result back
+into itself, and keeps going until a round produces nothing new.
+
+## The two halves
+
+```
+WITH RECURSIVE chain(...) AS (
+    <anchor>                -- runs once
+    UNION ALL
+    <recursive step>        -- runs repeatedly, reads `chain`
+)
+SELECT ... FROM chain;
+```
+
+The **anchor** is an ordinary query. It runs once and produces the starting
+rows. In the first variant it selects the employee whose `manager_id` is NULL
+&mdash; the root.
+
+The **recursive step** is a query that refers to the CTE by name. It runs against
+the rows the previous round produced, not against everything accumulated so far.
+That distinction is what makes the walk proceed one level at a time.
+
+Execution goes: anchor produces Ada. Step runs against {Ada} and produces Grace
+and Alan. Step runs against {Grace, Alan} and produces Edsger, Barbara, Donald.
+Step runs against those and produces Tony. Then Niklaus. Then the step finds
+nobody reporting to Niklaus, returns no rows, and the recursion halts.
+
+**The empty result is the only stopping condition.** There is no iteration limit
+and no depth check unless you write one.
+
+## Carrying state through
+
+The `level` column in the starter query is not special syntax. It is an ordinary
+column: the anchor sets it to 1, and the step sets it to `c.level + 1`. Anything
+computed the same way rides along with the recursion.
+
+The third variant builds a text path this way, concatenating each name onto the
+one before to produce `Ada > Grace > Edsger > Tony`. Ordering by that string
+gives a correctly nested listing, which is a small trick worth knowing: sorting
+by path sorts a tree into document order.
+
+## Direction is just the join condition
+
+Run the second variant. It starts at Niklaus and walks *up*, and the only thing
+that changed is which side of the join condition is which:
+
+```
+down:  JOIN chain c ON e.manager_id = c.id
+up:    JOIN up    u ON u.manager_id = m.id
+```
+
+Same construct, opposite direction. Ancestors and descendants are the same
+problem with the arrow reversed.
+
+## Generating rows from nothing
+
+The fourth variant has no table in it. The anchor is `SELECT 1` and the step
+adds one until it reaches ten.
+
+This is how you produce a sequence without a helper table: a row per day across
+a date range so a report shows zeros for days with no sales, a row per bucket
+for a histogram, a numbers table for splitting strings. It is one of the most
+useful applications and the one people find last.
+
+## Cycles
+
+Everything above assumes the data is a tree. If someone becomes their own
+manager's manager, the step never returns empty and the query runs until the
+server stops it.
+
+Real data acquires cycles. The defences, in increasing order of robustness:
+
+- Carry a depth column and add `WHERE level < 50` to the step.
+- Carry the path and add `WHERE instr(path, e.name) = 0` to refuse revisiting.
+- Use `UNION` instead of `UNION ALL`, which deduplicates &mdash; this stops a
+  cycle but costs a comparison against the whole accumulated set each round.
+- In PostgreSQL, use the `CYCLE` clause, which does this properly.
+
+A depth cap costs almost nothing and turns a hung query into a wrong-but-finite
+answer, which is far easier to notice.
+
+## Where it goes wrong
+
+**No termination guard.** Cyclic data plus `UNION ALL` runs forever.
+
+**An anchor that matches too much.** If the anchor selects every row rather than
+the roots, every row is a starting point and the result is enormous.
+
+**Expecting the step to see everything found so far.** It sees the previous
+round only. Aggregating across all levels has to happen in the outer query.
+
+**Recursing over a large table without an index on the join column.** Each round
+is a join. Without an index each round is a scan.
