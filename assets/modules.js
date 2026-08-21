@@ -332,6 +332,22 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive union-find lesson - union by rank and path compression shown live, with the near-constant inverse Ackermann complexity."
  },
  {
+  "title": "Affine Transforms",
+  "path": "computer_vision/affine_transforms.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
+ },
+ {
+  "title": "Blur: Gaussian, Median and Bilateral",
+  "path": "computer_vision/blur_gaussian_median_bilateral.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
+ },
+ {
   "title": "CNN Architecture",
   "path": "computer_vision/cnn.html",
   "category": "Computer Vision",
@@ -346,6 +362,22 @@ window.VIZLEARN_MODULES = [
   "topic": "computer-vision",
   "icon": "eye",
   "desc": "Learn how to calculate the number of parameters in Convolutional Neural Networks with this interactive visualizer on VizLearn."
+ },
+ {
+  "title": "Colour Spaces: RGB and HSV",
+  "path": "computer_vision/colour_spaces_rgb_hsv.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
+ },
+ {
+  "title": "Convolution Kernels by Hand",
+  "path": "computer_vision/convolution_kernels.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
  },
  {
   "title": "Convolutional Layer",
@@ -364,6 +396,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Learn how Data Loaders work in Convolutional Neural Networks, why we use batches, and how shuffling and augmentation impact training."
  },
  {
+  "title": "Erosion and Dilation",
+  "path": "computer_vision/erosion_and_dilation.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
+ },
+ {
   "title": "Fully Connected Layer in CNN",
   "path": "computer_vision/how_dense_layer_works_in_cnn.html",
   "category": "Computer Vision",
@@ -378,6 +418,14 @@ window.VIZLEARN_MODULES = [
   "topic": "computer-vision",
   "icon": "eye",
   "desc": "See a grayscale image for what it is: a grid of brightness numbers you can filter, threshold and edit directly."
+ },
+ {
+  "title": "Histograms and Equalisation",
+  "path": "computer_vision/histograms_and_equalisation.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
  },
  {
   "title": "How Neural Networks Process Images",
@@ -468,6 +516,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Push a signal vector through the same contractive layer twenty times, with and without an identity shortcut, and watch one collapse toward zero while the other never can."
  },
  {
+  "title": "Resizing and Interpolation",
+  "path": "computer_vision/resizing_and_interpolation.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
+ },
+ {
   "title": "Semantic Segmentation and U-Net",
   "path": "computer_vision/semantic_segmentation_unet.html",
   "category": "Computer Vision",
@@ -482,6 +538,14 @@ window.VIZLEARN_MODULES = [
   "topic": "computer-vision",
   "icon": "eye",
   "desc": "Learn how Strides work in Convolutional Neural Networks with an interactive visualizer showing how step size downsamples feature maps on VizLearn."
+ },
+ {
+  "title": "Thresholding",
+  "path": "computer_vision/thresholding.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
  },
  {
   "title": "Transfer Learning with CNN",

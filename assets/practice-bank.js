@@ -1644,6 +1644,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/affine_transforms.html",
+  "title": "Affine Transforms",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "What does the determinant ad - bc of an affine transform tell you?",
+    "o": [
+     "The rotation angle",
+     "The factor by which area is scaled",
+     "The translation distance",
+     "The number of pixels lost"
+    ],
+    "a": 1,
+    "w": "A pure rotation has determinant 1 because area is unchanged. Negative means the image was flipped, and zero means the plane has collapsed onto a line and nothing can invert it."
+   },
+   {
+    "t": "Why do implementations iterate over output pixels and apply the inverse transform?",
+    "o": [
+     "It is faster",
+     "Iterating forwards leaves unwritten holes when the transform enlarges",
+     "The forward transform is not defined",
+     "It avoids needing interpolation"
+    ],
+    "a": 1,
+    "w": "Forward mapping scatters input pixels to output positions, leaving gaps under enlargement and collisions under shrinking. Backward mapping writes every output pixel exactly once."
+   },
+   {
+    "t": "Which of these is NOT an affine transform?",
+    "o": [
+     "Rotation",
+     "Shear",
+     "Perspective correction of a tilted photograph",
+     "Uniform scaling"
+    ],
+    "a": 2,
+    "w": "Affine transforms keep parallel lines parallel. Perspective makes parallel lines converge, so it needs a projective transform with eight parameters instead of six."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/blur_gaussian_median_bilateral.html",
+  "title": "Blur: Gaussian, Median and Bilateral",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Why does a Gaussian blur fail to remove salt-and-pepper noise?",
+    "o": [
+     "The radius is always too small",
+     "A mean includes the outlier, so it is spread rather than removed",
+     "It only works on colour images",
+     "Gaussian weights are negative"
+    ],
+    "a": 1,
+    "w": "Averaging incorporates every value it is given. A pixel at 255 among neighbours at 40 pulls the mean up, turning one bright dot into a larger dim smudge."
+   },
+   {
+    "t": "Why does the median filter remove an outlier completely?",
+    "o": [
+     "It clamps values to a range",
+     "An extreme value sorts to one end and is never the middle element",
+     "It replaces outliers with zero",
+     "It detects outliers explicitly"
+    ],
+    "a": 1,
+    "w": "The output is whichever value sits in the middle of the sorted neighbourhood. An extreme value is at an end by definition, so it is simply never selected."
+   },
+   {
+    "t": "What happens to a bilateral filter as its range sigma grows very large?",
+    "o": [
+     "It becomes an ordinary Gaussian blur",
+     "It stops doing anything",
+     "It becomes a median filter",
+     "It sharpens the image"
+    ],
+    "a": 0,
+    "w": "A large range sigma means the similarity term stops discriminating between neighbours, so only the spatial term is left - which is exactly a Gaussian blur."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/cnn.html",
   "title": "CNN Architecture",
   "cat": "Computer Vision",
@@ -1682,6 +1762,86 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What is meant by “More parameters is not more capacity in any useful sense” here?",
     "ans": "if they sit in a badly placed dense layer."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/colour_spaces_rgb_hsv.html",
+  "title": "Colour Spaces: RGB and HSV",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Why is selecting 'anything red' easier in HSV than in RGB?",
+    "o": [
+     "HSV uses fewer numbers",
+     "Hue holds the colour alone, so one range covers dark, pale and vivid reds",
+     "RGB cannot represent red",
+     "HSV is higher precision"
+    ],
+    "a": 1,
+    "w": "In RGB, brightness and purity change all three channels, so a red range is three coupled conditions. In HSV the colour is one number and lighting mostly moves the other two."
+   },
+   {
+    "t": "Why should a hue mask usually also require a minimum saturation?",
+    "o": [
+     "To make it faster",
+     "Near-grey pixels have an unstable, essentially arbitrary hue",
+     "Saturation is more accurate than hue",
+     "Hue is undefined above 180"
+    ],
+    "a": 1,
+    "w": "When R, G and B are nearly equal, the hue angle is decided by tiny differences and jumps around. Requiring real saturation means requiring a definite colour."
+   },
+   {
+    "t": "What breaks a naive `10 < hue < 350` test for red?",
+    "o": [
+     "Hue is circular and red straddles 0",
+     "The range is too wide",
+     "Hue is stored as a float",
+     "Red has no hue"
+    ],
+    "a": 0,
+    "w": "That test selects everything except red. Because the hue axis wraps, red needs two ranges - near 0 and near 360 - or a rotation of the axis first."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/convolution_kernels.html",
+  "title": "Convolution Kernels by Hand",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "A kernel's nine weights sum to zero. What does its output look like on a flat, uniform region?",
+    "o": [
+     "White",
+     "Black or mid-grey",
+     "Unchanged",
+     "Inverted"
+    ],
+    "a": 1,
+    "w": "On a flat region every neighbour has the same value, so the weighted sum is that value times zero, which is zero. Displays usually add 128, giving the familiar flat grey."
+   },
+   {
+    "t": "Why does Sobel X find vertical edges rather than horizontal ones?",
+    "o": [
+     "It scans the image column by column",
+     "It subtracts the left column from the right, and only a vertical edge makes those differ",
+     "It is applied after a rotation",
+     "It uses larger weights"
+    ],
+    "a": 1,
+    "w": "Across a horizontal edge the left and right columns are identical, so the difference is zero. Only a change in the horizontal direction survives."
+   },
+   {
+    "t": "What is the only real difference between this and a CNN's convolutional layer?",
+    "o": [
+     "The CNN uses a different arithmetic operation",
+     "The CNN's kernel weights are learned rather than chosen",
+     "The CNN works in colour",
+     "The CNN does not slide the kernel"
+    ],
+    "a": 1,
+    "w": "The operation is identical. In a CNN the nine numbers are parameters that gradient descent adjusts, which is why early layers often end up resembling edge detectors nobody designed."
    }
   ]
  },
@@ -1745,6 +1905,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/erosion_and_dilation.html",
+  "title": "Erosion and Dilation",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Under erosion, when does a foreground pixel survive?",
+    "o": [
+     "When any pixel under the structuring element is foreground",
+     "When every pixel under the structuring element is foreground",
+     "When the majority are foreground",
+     "When the centre pixel is foreground"
+    ],
+    "a": 1,
+    "w": "Erosion is the 'every' rule. One background pixel anywhere under the element turns the centre off, which is why boundaries retreat and thin features are cut."
+   },
+   {
+    "t": "Why does opening remove small specks without shrinking the larger shapes?",
+    "o": [
+     "It uses a smaller structuring element for the shapes",
+     "The erosion destroys the specks, and the following dilation regrows only what survived",
+     "It detects speck size first",
+     "It operates on the background instead"
+    ],
+    "a": 1,
+    "w": "Dilation can only grow what is still there. Specks removed by the erosion have nothing left to grow, while larger shapes are restored to roughly their original size."
+   },
+   {
+    "t": "How should the structuring element be sized?",
+    "o": [
+     "As large as possible",
+     "Larger than the artefacts to remove, smaller than the features to keep",
+     "Always 3x3",
+     "Equal to the image width divided by ten"
+    ],
+    "a": 1,
+    "w": "That gap is what the operation exploits. If the artefacts and the features are close in size, no element separates them and morphology is the wrong tool."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/how_dense_layer_works_in_cnn.html",
   "title": "Fully Connected Layer in CNN",
   "cat": "Computer Vision",
@@ -1775,6 +1975,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What is meant by “Neighborhood operations” here?",
     "ans": "(like Blur and Edge Detection) calculate a pixel's new value based on its neighbors."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/histograms_and_equalisation.html",
+  "title": "Histograms and Equalisation",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "What does a histogram tell you nothing about?",
+    "o": [
+     "How many pixels are dark",
+     "Where in the image the pixels are",
+     "Whether the image is clipped",
+     "Whether contrast is low"
+    ],
+    "a": 1,
+    "w": "A histogram is a count per value. An image and a randomly shuffled copy of it have identical histograms, because position is discarded entirely."
+   },
+   {
+    "t": "Which function does histogram equalisation use as its lookup table?",
+    "o": [
+     "The cumulative distribution function",
+     "The probability density function",
+     "A Gaussian",
+     "The inverse of the histogram"
+    ],
+    "a": 0,
+    "w": "The fraction of pixels at or below each value, scaled to 0-255. Common values make the CDF climb steeply and so get spread apart; rare values collapse together."
+   },
+   {
+    "t": "Why does CLAHE clip the histogram before computing the CDF?",
+    "o": [
+     "To make it run faster",
+     "To cap how steeply the CDF can climb, which limits noise amplification",
+     "To remove outlier pixels",
+     "To force the histogram to be bimodal"
+    ],
+    "a": 1,
+    "w": "A tall bin means a steep CDF, which pushes nearly-identical neighbouring values far apart. That is exactly what noise amplification is, so limiting bin height limits it."
    }
   ]
  },
@@ -1996,6 +2236,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/resizing_and_interpolation.html",
+  "title": "Resizing and Interpolation",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Why must a segmentation mask be resized with nearest neighbour?",
+    "o": [
+     "It is faster",
+     "Class indices are names, and averaging two of them can produce a third unrelated class",
+     "Masks are always small",
+     "Bilinear does not work on integers"
+    ],
+    "a": 1,
+    "w": "Averaging label 3 and label 5 gives 4, which is a different class entirely. Labels are categorical, so only copying is safe."
+   },
+   {
+    "t": "What causes aliasing when shrinking an image?",
+    "o": [
+     "Using too many bits per pixel",
+     "Sampling without averaging first, so fine detail reappears as a false pattern",
+     "The image being too large",
+     "Bicubic overshoot"
+    ],
+    "a": 1,
+    "w": "Detail finer than the new sampling grid is not lost gracefully - it beats against the grid and produces a pattern that was never in the scene. Averaging before sampling prevents it."
+   },
+   {
+    "t": "Why can bicubic interpolation produce halos near high-contrast edges?",
+    "o": [
+     "It reads too few pixels",
+     "Its cubic weight function overshoots slightly, adding local contrast",
+     "It converts to greyscale",
+     "It averages sixteen pixels equally"
+    ],
+    "a": 1,
+    "w": "The overshoot is what makes bicubic look sharper than bilinear. Beside a strong edge the same overshoot shows up as a faint bright or dark fringe."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/semantic_segmentation_unet.html",
   "title": "Semantic Segmentation and U-Net",
   "cat": "Computer Vision",
@@ -2034,6 +2314,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “How far the filter jumps”?",
     "ans": "Stride is the step size the filter takes as it slides. Stride 1 moves one pixel at a time and looks at every possible position. Stride 2 skips every other position, halving the output in both dimensions."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/thresholding.html",
+  "title": "Thresholding",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "What does Otsu's method maximise when choosing a threshold?",
+    "o": [
+     "The number of foreground pixels",
+     "The variance between the two groups the threshold creates",
+     "The image's overall contrast",
+     "The number of edges detected"
+    ],
+    "a": 1,
+    "w": "It tries every candidate threshold and keeps the one whose two resulting groups have the most separated means, weighted by group size."
+   },
+   {
+    "t": "Why does a single global threshold fail on a page photographed under uneven lighting?",
+    "o": [
+     "The camera resolution is too low",
+     "Lit paper can be brighter than ink on the shadowed side, so the values overlap",
+     "Otsu is not being used",
+     "Paper is not perfectly white"
+    ],
+    "a": 1,
+    "w": "Once background values on one side exceed foreground values on the other, no single cut separates them. Adaptive thresholding computes a local threshold per neighbourhood instead."
+   },
+   {
+    "t": "Why should a median filter usually run before thresholding a noisy image?",
+    "o": [
+     "It makes the image brighter",
+     "Salt-and-pepper pixels sit at extreme values and survive any threshold",
+     "It is required by Otsu",
+     "It converts the image to greyscale"
+    ],
+    "a": 1,
+    "w": "Impulse noise is at 0 or 255 by definition, so it lands on one side of every threshold. Removing it first is cheap and leaves the mask clean."
    }
   ]
  },

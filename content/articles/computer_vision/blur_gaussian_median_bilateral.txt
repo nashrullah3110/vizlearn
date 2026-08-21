@@ -1,0 +1,108 @@
+title: Blur: Gaussian, Median and Bilateral
+intro: Three smoothing filters, one noisy image, and a clear demonstration of why the choice matters.
+
+## The same job, three different assumptions
+
+All three filters answer the same question &mdash; what should this pixel be,
+given its neighbours? &mdash; and they differ in what they assume about how the
+pixel got corrupted. That assumption is the whole story, and it is why one
+filter can be excellent on one kind of noise and useless on another.
+
+The image in the visualisation carries **salt-and-pepper noise**: isolated
+pixels flipped to pure black or pure white. Switch between the three filters
+and the difference is not subtle.
+
+## Gaussian: a weighted average
+
+A Gaussian blur replaces each pixel with a weighted mean of its neighbourhood,
+where the weights fall off with distance according to a Gaussian curve. The
+centre counts most, the corners least.
+
+It is the right filter when the noise is **additive and roughly symmetric**
+&mdash; every pixel nudged up or down by a small random amount. Averaging
+several such pixels cancels the nudges, because they are as often positive as
+negative. Sensor noise in reasonable light behaves like this, and a Gaussian
+handles it well.
+
+On salt-and-pepper it fails, and the reason is structural: a mean includes
+every value it is given. A single pixel at 255 sitting among neighbours at 40
+drags the average up. The filter does not remove the outlier &mdash; it
+*spreads* it over the neighbourhood, converting one bright dot into a larger,
+dimmer smudge. Increase the radius and the smudges grow rather than vanishing.
+
+The other cost is edges. An edge is a place where neighbouring pixels are
+genuinely different, and averaging across it mixes the two sides together. Any
+filter based on a plain average must blur edges, because it has no way to know
+that an edge is there.
+
+## Median: sorting instead of averaging
+
+The median filter takes the neighbourhood, sorts the values, and outputs the
+middle one.
+
+This one change fixes salt-and-pepper completely. To be selected as the median,
+a value has to sit in the middle of the sorted list &mdash; and an extreme
+value, by definition, sorts to one end. It is never chosen. It is not reduced
+or spread; it is simply not selected, and the output takes a value that some
+genuine neighbouring pixel actually had.
+
+Set the filter to Median with radius 2 above. The speckles do not fade; they
+are gone, and the shapes underneath keep their edges. That edge preservation
+is the second benefit: at a boundary, most of the neighbourhood belongs to one
+side or the other, so the median comes from the majority side rather than from
+a blend of both.
+
+The median is a **non-linear** filter, which means it cannot be expressed as a
+convolution kernel and cannot be decomposed into separate horizontal and
+vertical passes. It is correspondingly slower, since a sort is required at
+every pixel.
+
+## Bilateral: averaging only within a region
+
+The bilateral filter keeps the weighted average but multiplies each weight by a
+second factor based on how similar the neighbour's *value* is to the centre
+pixel's.
+
+```
+weight = spatial(distance) * range(|neighbour - centre|)
+```
+
+A neighbour that is nearby and similar gets a large weight. A neighbour that is
+nearby but very different &mdash; because it is on the other side of an edge
+&mdash; gets a weight close to zero and is effectively excluded.
+
+The result smooths within a region and refuses to smooth across a boundary. It
+is what produces the slightly plastic look of smartphone portrait modes: skin
+is smoothed heavily while the outline of the face stays sharp.
+
+The edge sigma control sets how different a neighbour has to be before it is
+ignored. Turn it low and the filter barely does anything, because almost
+everything counts as an edge. Turn it high and the range term stops
+discriminating, and you have an ordinary Gaussian blur back.
+
+## Choosing
+
+| Noise | Use | Because |
+|---|---|---|
+| Small random variation | Gaussian | averaging cancels symmetric errors |
+| Isolated extreme pixels | Median | outliers never sort to the middle |
+| Any, with edges to protect | Bilateral | dissimilar neighbours are excluded |
+| Impulse noise before thresholding | Median | extremes survive every threshold otherwise |
+
+A practical note: these compose. Median first to remove impulses, then a
+gentle Gaussian to handle what remains, is a common and effective pipeline.
+
+## Where it goes wrong
+
+**Blurring before edge detection without thinking.** Some blur helps, since
+edge detectors amplify noise. Too much removes the edges you were looking for.
+The Canny detector builds a Gaussian in for exactly this reason, with a
+parameter to control it.
+
+**Using a large median radius on fine detail.** Thin lines narrower than half
+the window are a minority in every neighbourhood they appear in, so the median
+removes them along with the noise.
+
+**Reaching for bilateral by default.** It is far more expensive than the other
+two and has two parameters instead of one. If the edges do not need protecting,
+it is a slow Gaussian.

@@ -2140,3 +2140,10 @@ LABS.update(_INTERVIEW_CHECKS)
 from python_topics import CHECKS as _PYTHON_CHECKS  # noqa: E402
 
 LABS.update(_PYTHON_CHECKS)
+
+# The generated classical image-processing modules do the same
+# (tools/cv_topics.py). A question there is written against the exact operation
+# the page lets you drive, so it belongs next to the controls rather than here.
+from cv_topics import CHECKS as _CV_CHECKS  # noqa: E402
+
+LABS.update(_CV_CHECKS)

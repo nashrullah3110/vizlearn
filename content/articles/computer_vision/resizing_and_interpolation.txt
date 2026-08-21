@@ -1,0 +1,99 @@
+title: Resizing and Interpolation
+intro: What happens between the pixels, and why the answer looks different every time.
+
+## Enlarging invents; shrinking discards
+
+Resizing is two different problems wearing one name.
+
+**Enlarging** asks for pixels that were never measured. A 4&times;4 image
+stretched to 8&times;8 needs 64 values where 16 exist. The extra 48 have to
+come from somewhere, and wherever they come from, they are a guess. No
+interpolation method adds information &mdash; the choice is only about which
+plausible guess to make.
+
+**Shrinking** has too much data rather than too little, and the risk is
+throwing away the wrong parts.
+
+## Nearest neighbour
+
+For each output pixel, work out where it lands in the input and copy whichever
+input pixel is closest. That is all.
+
+It is the fastest possible method, and it is **exact** in one important sense:
+every output value is a value that genuinely appeared in the input. Nothing is
+averaged, so nothing is invented that was not there.
+
+The cost is blockiness. Neighbouring output pixels that map to the same input
+pixel are identical, so enlarging produces flat squares with hard steps between
+them. Diagonal edges come out as staircases.
+
+That is often exactly right. Pixel art must be scaled with nearest neighbour or
+it stops being pixel art. A segmentation mask where pixel value 3 means "road"
+must be scaled with nearest neighbour, because averaging 3 and 5 gives 4, which
+might mean "building" &mdash; a label is a name, not a quantity, and names do
+not average.
+
+## Bilinear
+
+For each output pixel, find the four input pixels surrounding its position and
+take a weighted average, with weights from how close the position is to each.
+Linear in one direction, then linear in the other; hence bilinear.
+
+Diagonals become smooth, gradients stay gradual, and the staircase disappears.
+The cost is softness: an average of neighbours is by definition less extreme
+than its inputs, so hard edges are pulled apart into ramps. Enlarge by a large
+factor and the result is not blocky but mushy.
+
+Switch between the two above with the downscale factor set high. The same
+information is present in both; only the guessing strategy differs, and it is
+easy to see that neither is simply better.
+
+**Bicubic** extends the idea to sixteen surrounding pixels with a cubic weight
+function. It is sharper than bilinear because the cubic curve overshoots
+slightly at edges, adding a small amount of local contrast. Photo editors
+default to it for that reason. The overshoot is also its failure mode: it can
+produce faint halos beside high-contrast edges.
+
+| Method | Reads | Speed | Good for | Fails at |
+|---|---|---|---|---|
+| Nearest | 1 pixel | fastest | pixel art, label masks | photographs |
+| Bilinear | 4 pixels | fast | general enlargement | large factors |
+| Bicubic | 16 pixels | slower | photographs | can halo |
+| Area | a block | fast | shrinking | not for enlarging |
+
+## Shrinking is a different failure
+
+To halve an image, it is tempting to keep every second pixel. This is wrong,
+and wrong in a way that looks like a bug elsewhere in the program.
+
+Consider a pattern of alternating black and white columns. Keep every second
+column and you may get all the black ones &mdash; a solid black image. Shift by
+one and you get solid white. Detail finer than the new sampling grid does not
+disappear gracefully; it reappears as a completely different, false pattern.
+This is **aliasing**, and it is why photographs of striped shirts on video
+develop rainbow moiré.
+
+The fix is to average before sampling. **Area interpolation** takes the mean of
+every input pixel that falls inside each output pixel's footprint, so nothing
+is silently dropped. Gaussian blurring before downsampling achieves the same
+end, and is what an image pyramid does at every level.
+
+This matters for machine learning specifically. A dataset resized with a
+naive-sampling routine has aliased artefacts that vary with the original
+resolution, and a network will happily learn them.
+
+## Where it goes wrong
+
+**Bilinear on a label mask.** Averaging class indices produces indices that
+mean something else. Nearest neighbour, always.
+
+**Enlarging to fix a low-resolution input.** Upscaling before feeding a model
+adds no information and costs computation. Learned super-resolution is a
+different thing entirely &mdash; it hallucinates plausible detail from a prior,
+which is useful for viewing and dangerous for measurement.
+
+**Repeated resizes.** Each interpolation softens. Resize once from the original
+rather than in steps.
+
+**Ignoring aspect ratio.** Stretching to a square distorts every shape in the
+frame. Pad to the target aspect ratio, then resize.

@@ -1,0 +1,108 @@
+title: Colour Spaces: RGB and HSV
+intro: The same pixel, described two ways, and why one of them makes colour selection trivial.
+
+## RGB describes the hardware
+
+A screen produces colour by mixing three lights. RGB records how much of each:
+three numbers from 0 to 255, one per primary. It is the natural format for a
+display, a camera sensor and a file, and it is what almost every image arrives
+in.
+
+It is a poor format for *reasoning* about colour, and the reason is that the
+three numbers are not independent in any way a person cares about.
+
+Take a mid red, `(200, 60, 60)`. Make it darker and you get `(120, 36, 36)`
+&mdash; all three numbers changed. Make it paler and you get `(220, 140, 140)`
+&mdash; all three again. The colour did not change in either case; the
+brightness did, and then the purity did, and both operations moved every
+channel. There is no single number in RGB that means "how red" or "how bright".
+
+Look at the R, G and B channels in the visualisation above. The red disc is
+bright in R, but so is the yellow one, because yellow is red plus green. None
+of the three channels isolates a colour, because none of them corresponds to
+anything you would name.
+
+## HSV separates the three questions
+
+HSV rewrites the same pixel as three numbers that answer three separate
+questions.
+
+**Hue** is which colour, as an angle around a wheel from 0 to 360 degrees. Red
+is near 0, green near 120, blue near 240. It is circular, so 359 and 1 are
+neighbours.
+
+**Saturation** is how pure the colour is, from 0 to 1. At 0 the pixel is grey
+regardless of hue; at 1 it is the most vivid version of that hue available.
+
+**Value** is how bright, from 0 to 1. At 0 the pixel is black regardless of
+anything else.
+
+The conversion is arithmetic on the RGB triple &mdash; value is the maximum
+channel, saturation is the range between maximum and minimum divided by the
+maximum, and hue is determined by which channel is largest and by how the other
+two compare. No information is added or lost. It is the same pixel in different
+coordinates.
+
+## The thing this makes easy
+
+Switch the visualisation to the H channel. Each disc becomes a flat, uniform
+region, and each is a *different* flat region. That is the payoff: within one
+object, hue barely varies, even where brightness does. A shadow falling across
+a red ball changes V dramatically and leaves H almost alone.
+
+So "find the red object" becomes one comparison:
+
+```
+mask = (hue < 15) or (hue > 345)
+```
+
+Try to write that in RGB. You need red high, green low, blue low &mdash; but
+how high, and relative to what? A dark red has a low R. A pale pink has a high
+G and B. The ranges are coupled, they depend on lighting, and every new
+lighting condition needs them retuned. This is why colour-based tracking,
+chroma keying and skin detection are all done in HSV or a close relative, and
+why the technique is old enough to predate the tools you would use for it now.
+
+Saturation earns its place too. Hue is meaningless for a near-grey pixel
+&mdash; the arithmetic still produces an angle, but it is determined by tiny
+differences and jumps around unstably. A useful mask therefore usually requires
+saturation above some floor as well, which reads as "a definite colour, not
+just a shade".
+
+| Task | Space | Why |
+|---|---|---|
+| Storing or displaying | RGB | matches sensors and screens |
+| Selecting a colour | HSV | one range in hue |
+| Adjusting brightness only | HSV | change V, leave H and S |
+| Equalising contrast in colour | HSV or LAB | one brightness channel to equalise |
+| Measuring perceptual difference | LAB | distances match what eyes report |
+
+## Where HSV stops being enough
+
+HSV is a convenience, not a perceptual model. Its value channel is simply the
+maximum of R, G and B, which does not match how bright a colour looks: pure
+yellow and pure blue both have value 1 and are nowhere near equally bright to a
+human eye.
+
+When the question is genuinely perceptual &mdash; how different do these two
+colours *look*, which of these is closer &mdash; the answer is a space like
+**LAB**, built from measurements of human vision so that equal distances
+correspond to roughly equal perceived differences. Colour-difference metrics
+and palette-matching work there.
+
+## Where it goes wrong
+
+**Forgetting that hue wraps.** Red straddles 0. A naive range test
+`10 < hue < 350` selects everything except red. Two tests are needed, or a
+rotation of the hue axis first.
+
+**Ignoring saturation.** Grey pixels have an arbitrary hue. A hue-only mask
+picks up noise from every washed-out region in the frame.
+
+**Assuming a fixed hue range transfers.** Hue is stable against brightness, not
+against the colour of the light source. Photograph the same red object under
+tungsten and daylight and the hue moves. White balance first, or calibrate per
+scene.
+
+**Reading OpenCV's hue as degrees.** OpenCV stores hue in 0-179 so it fits in a
+byte, not 0-359. Half of every published threshold is wrong for this reason.

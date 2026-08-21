@@ -209,7 +209,19 @@ SEQUENCE = {
         "computer_vision/how_neural_network_process_images.html",
         "computer_vision/grayscale_image_processing.html",
         "computer_vision/rgb_image_processing.html",
+        # The classical floor under the CNN modules, in the order each one
+        # depends on the last: colour before histograms, histograms before
+        # thresholding, thresholding before the morphology that cleans a mask
+        # up, and convolution immediately before the edge detector that is one.
+        "computer_vision/colour_spaces_rgb_hsv.html",
+        "computer_vision/histograms_and_equalisation.html",
+        "computer_vision/thresholding.html",
+        "computer_vision/erosion_and_dilation.html",
+        "computer_vision/blur_gaussian_median_bilateral.html",
+        "computer_vision/convolution_kernels.html",
         "computer_vision/edge_detection.html",
+        "computer_vision/resizing_and_interpolation.html",
+        "computer_vision/affine_transforms.html",
         "computer_vision/feature_map_in_cnn.html",
         "computer_vision/padding_in_cnn.html",
         "computer_vision/strides_in_cnn.html",

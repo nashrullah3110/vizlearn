@@ -113,7 +113,10 @@ SHARED_SCRIPTS = ("modules.js", "search.js", "vizlearn.js", "vizlearn-lab.js",
                   "vizlearn-ragviz.js",
                   # The labs' resizable split. Binds only to [data-vz-ide], so
                   # it costs nothing on the pages that have no editor.
-                  "vizlearn-ide.js")
+                  "vizlearn-ide.js",
+                  # The image-processing harness on the generated
+                  # computer_vision/ modules. Binds only to [data-vz-cv].
+                  "vizlearn-cv.js")
 # The one-time migration wrote these directly; drop the loose copies.
 LOOSE_SCRIPT = re.compile(
     r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa|vizlearn-keys|glossary|vizlearn-glossary|vizlearn-python|vizlearn-rails|vizlearn-js|vizlearn-html|vizlearn-code|vizlearn-interview|vizlearn-ragviz)\.js"></script>\n?')
