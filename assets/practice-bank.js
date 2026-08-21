@@ -3876,16 +3876,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Gen AI",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Permission filtering has to happen inside the search, not around it. Post-filtering ranks first and drops afterwards, so it silently returns fewer results than requested and degrades worst for the most restricted users. Filtering after generation is not a control at all — the model has already read the text. Index a group id and resolve membership per request, because stale permissions fail open."
+    "t": "What is meant by “A user with no groups” here?",
+    "ans": "should retrieve nothing, not everything. A missing or empty filter that matches all documents is the classic catastrophic bug."
    },
    {
-    "t": "What does this module say about “Why post-filtering quietly fails”?",
-    "ans": "Retrieve the top 10 by similarity, then remove what the user may not see. If eight were restricted you return two, and nothing reports that the result set collapsed. The generator answers from thin evidence and sounds no less confident."
+    "t": "What is meant by “A filter on a field that does not exist” here?",
+    "ans": "should fail closed, not open. Some stores silently ignore unknown fields."
    },
    {
-    "t": "What does this module say about “Pre-filtering, and why it is harder than it looks”?",
-    "ans": "Pre-filtering restricts the candidate set before ranking, so the top k is k permitted results. That is the correct behaviour and it fights the index: an HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search — you traverse into a region where everything is filtered out and the walk stalls."
+    "t": "What is meant by “Documents with no ACL recorded” here?",
+    "ans": "— decide whether the default is deny (correct) or allow (dangerous), and make it explicit."
+   },
+   {
+    "t": "What is meant by “Cached results” here?",
+    "ans": "A cache keyed only on the query text will serve one user's authorised results to another. Cache keys must include the permission context."
    }
   ]
  },
@@ -3971,16 +3975,20 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Gen AI",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Recursive chunking splits on the largest natural boundary that fits, descending through a priority list of separators only when a piece is still oversized. The separator list is the whole configuration, and tailoring it to the document type is the cheapest large improvement available to a RAG pipeline."
+    "t": "What is meant by “Confusing characters with tokens,” here?",
+    "ans": "so chunks are four times smaller than intended."
    },
    {
-    "t": "What does this module say about “Why not just split every N characters”?",
-    "ans": "Fixed-size splitting is one line and cuts wherever it lands — mid-sentence, mid-word, mid-number. The retrieved chunk then starts halfway through a thought, and the generator has to answer from a fragment."
+    "t": "What is meant by “No overlap,” here?",
+    "ans": "so a sentence spanning a boundary is lost from both chunks."
    },
    {
-    "t": "What does this module say about “The separator list is the whole configuration”?",
-    "ans": "The default is roughly [\"\\n\\n\", \"\\n\", \". \", \" \", \"\"] — paragraph, line, sentence, word, character. It descends only when a piece still exceeds the limit, so the last entry fires only on text with no whitespace at all."
+    "t": "What is meant by “Too much overlap” here?",
+    "ans": "(50%+), which duplicates storage and fills results with near-identical chunks."
+   },
+   {
+    "t": "What is meant by “Splitting tables,” here?",
+    "ans": "which destroys them. Extract tables separately and keep each whole."
    }
   ]
  },
@@ -4096,7 +4104,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “What it costs”?",
-    "ans": "One embedding call per sentence at index time, against one per chunk for the alternatives. On a large corpus that is a real bill and a slow re-index, though it is paid once rather than per query."
+    "ans": "The cost is real and worth stating plainly: one embedding call per sentence at indexing time ."
    }
   ]
  },
@@ -4114,8 +4122,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "A Markdown heading, an HTML <section> , a PDF outline entry, a slide break: each is a statement by the author that the subject changes here. Semantic chunking spends an embedding per sentence to infer what the markup already says."
    },
    {
-    "t": "What does this module say about “Carrying the heading path”?",
-    "ans": "The half that gets missed. A chunk reading \"must be requested within 14 days\" is useless in isolation — 14 days of what? Prepending the heading path — Refund policy > Exceptions — makes the chunk self-describing."
+    "t": "What does this module say about “What it needs from you”?",
+    "ans": "A parser per format. Markdown is easy, HTML is manageable, PDF is genuinely hard — a PDF has no structure, only positioned glyphs, so headings must be inferred from font size and spacing. Most RAG quality problems on PDFs are really extraction problems."
    }
   ]
  },
@@ -4144,8 +4152,8 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Gen AI",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "softmax(QK T / √d) V . The dot products score every query against every key; the division keeps the softmax out of its saturated region, where gradients vanish; softmax turns scores into weights summing to one; and those weights are applied to the values."
+    "t": "What is meant by “Value” here?",
+    "ans": "— what each position contributes when selected."
    },
    {
     "t": "What does this module say about “Why three and not one”?",
