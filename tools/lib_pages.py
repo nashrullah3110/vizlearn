@@ -16,6 +16,7 @@ one place.
 """
 
 import os
+import re
 import subprocess
 
 from lib_catalog import ROOT, SITE, DIR_META
@@ -423,26 +424,106 @@ def page_url(rel):
 # --------------------------------------------------------------------------
 
 _date_cache = {}
+_dirty = None
+
+
+# The date a page advertises is written into the page, so "has this file
+# changed since HEAD" is circular: stamping today's date makes the file
+# differ from HEAD, which makes it look changed, which stamps today's date.
+# Normalising every date out of both sides before comparing breaks the loop -
+# what is left is the actual content, and only a change to that counts.
+_ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_LONG_DATE = re.compile(
+    r"\b\d{1,2} (?:January|February|March|April|May|June|July|August|"
+    r"September|October|November|December) \d{4}\b")
+
+
+def _undated(text):
+    return _LONG_DATE.sub("D", _ISO_DATE.sub("D", text))
+
+
+def _uncommitted():
+    """Paths whose content differs from HEAD, ignoring dates.
+
+    The build runs before the commit, so asking git for "the last commit that
+    touched this file" gives the date of the change *before* the one being
+    built. That silently backdated every page a build had just rewritten:
+    contact.html went from 283 to 650 words and the sitemap still advertised
+    the previous day's lastmod, which is the opposite of what it should say
+    when the point is to get the page recrawled.
+
+    Read from a single `git diff HEAD -U0` rather than a `git show` per file.
+    Every one of the ~35 build steps is its own process and so builds this set
+    from scratch; at one subprocess per changed page that was thousands of
+    git invocations per build, and the build stopped finishing.
+
+    A file whose non-date lines differ from HEAD changed today, whether or not
+    it has been committed yet. A file where only the dates moved did not - and
+    that distinction has to be made, because the date a page advertises is
+    written into the page, so "has this file changed" is otherwise circular:
+    stamping today makes the file differ, which makes it look changed, which
+    stamps today.
+    """
+    global _dirty
+    if _dirty is not None:
+        return _dirty
+    _dirty = set()
+    try:
+        diff = subprocess.run(
+            ["git", "diff", "HEAD", "-U0", "--no-color"],
+            cwd=ROOT, capture_output=True, text=True, check=False,
+        ).stdout
+    except OSError:
+        return _dirty
+
+    rel, minus, plus = None, [], []
+
+    def settle():
+        if rel is None:
+            return
+        if sorted(_undated(x) for x in minus) != sorted(_undated(x) for x in plus):
+            _dirty.add(rel)
+
+    for line in diff.split("\n"):
+        if line.startswith("diff --git "):
+            settle()
+            # "diff --git a/path b/path" - take the b-side, which is correct
+            # for renames as well.
+            rel = line.split(" b/", 1)[-1]
+            minus, plus = [], []
+        elif line.startswith("Binary files") or line.startswith("new file mode"):
+            if rel:
+                _dirty.add(rel)
+        elif line.startswith("+") and not line.startswith("+++"):
+            plus.append(line[1:])
+        elif line.startswith("-") and not line.startswith("---"):
+            minus.append(line[1:])
+    settle()
+    return _dirty
 
 
 def last_modified(rel):
-    """Date of the last commit that touched this file (YYYY-MM-DD).
+    """Date this page's content last changed (YYYY-MM-DD).
 
-    Falls back to today for files that are not committed yet, which is what a
-    brand-new generated page will be on its first build.
+    The last commit that touched the file, unless the working tree has since
+    changed it - an uncommitted change is today's change, and dating it to
+    the previous commit would tell a crawler nothing had happened.
     """
     if rel in _date_cache:
         return _date_cache[rel]
-    out = ""
-    try:
-        out = subprocess.run(
-            ["git", "log", "-1", "--format=%cs", "--", rel],
-            cwd=ROOT, capture_output=True, text=True, check=False,
-        ).stdout.strip()
-    except OSError:
+    import datetime
+    if rel in _uncommitted():
+        out = datetime.date.today().isoformat()
+    else:
         out = ""
+        try:
+            out = subprocess.run(
+                ["git", "log", "-1", "--format=%cs", "--", rel],
+                cwd=ROOT, capture_output=True, text=True, check=False,
+            ).stdout.strip()
+        except OSError:
+            out = ""
     if not out:
-        import datetime
         out = datetime.date.today().isoformat()
     _date_cache[rel] = out
     return out
