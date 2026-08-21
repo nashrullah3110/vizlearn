@@ -235,6 +235,11 @@ SEQUENCE = {
         "computer_vision/edge_detection.html",
         "computer_vision/resizing_and_interpolation.html",
         "computer_vision/affine_transforms.html",
+        # Classical matching: both are about finding a known thing, and
+        # template matching has to come first because Harris is largely an
+        # answer to what template matching cannot do.
+        "computer_vision/template_matching.html",
+        "computer_vision/harris_corners.html",
         "computer_vision/feature_map_in_cnn.html",
         "computer_vision/receptive_field.html",
         "computer_vision/padding_in_cnn.html",
@@ -244,15 +249,23 @@ SEQUENCE = {
         "computer_vision/downsampling_in_cnn.html",
         "computer_vision/how_dense_layer_works_in_cnn.html",
         "computer_vision/one_by_one_convolutions.html",
+        "computer_vision/depthwise_separable_convolution.html",
+        "computer_vision/dilated_convolutions.html",
+        "computer_vision/global_average_pooling.html",
         "computer_vision/calculating_parameters_in_cnn.html",
         "computer_vision/cnn.html",
         "computer_vision/data_loaders_in_cnn.html",
         "computer_vision/image_data_augmentation.html",
         "computer_vision/transfer_learning_with_cnn.html",
+        "computer_vision/anchor_boxes.html",
         "computer_vision/iou_and_non_max_suppression.html",
+        "computer_vision/mean_average_precision.html",
         "computer_vision/object_detection_with_bounding_boxes.html",
         "computer_vision/resnet_and_identity_shortcuts.html",
+        "computer_vision/segmentation_tasks.html",
         "computer_vision/semantic_segmentation_unet.html",
+        "computer_vision/vision_transformer_patches.html",
+        "computer_vision/grad_cam.html",
     ],
 
     # What a database is -> define -> insert -> query -> aggregate -> advanced.

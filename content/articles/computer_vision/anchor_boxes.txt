@@ -1,0 +1,104 @@
+title: Anchor Boxes
+intro: The prior that turns 'find every object' into 'adjust these boxes slightly', and the assignment rule that trains it.
+
+## Why detectors do not just predict boxes
+
+A detector must output an unknown number of boxes at unknown positions and
+sizes. Neural networks are much better at producing a fixed-size output than a
+variable-length one, and much better at making a small correction than at
+producing a coordinate from nothing.
+
+**Anchors** convert the hard problem into the easy one. Place a fixed set of
+reference boxes at every position of a feature map, and ask the network two
+things per anchor: is there an object here, and how should this box be adjusted
+to fit it?
+
+The output is now a fixed-size tensor, and the regression target is a small
+offset instead of an absolute position.
+
+## What the visualisation shows
+
+The dashed grid is the feature map: one set of anchors per cell. The orange
+rectangle is a ground-truth object. Drag the cell control to move the anchor set
+around, and the size control to change the scale.
+
+Three anchors are drawn at each position, one per aspect ratio &mdash; wide,
+square and tall &mdash; because objects come in shapes and one square box fits
+few of them. Real detectors use three scales as well, so nine anchors per
+position is a common arrangement.
+
+The readout gives the best IoU against the ground truth and what that IoU means
+for training.
+
+## The assignment rule
+
+Every anchor gets a label before training, decided by IoU:
+
+| IoU with the best ground-truth box | Label |
+|---|---|
+| Above ~0.5 | positive &mdash; predict this object, regress the offset |
+| Below ~0.3 | negative &mdash; predict background, no box loss |
+| In between | ignored &mdash; contributes nothing to the loss |
+
+The ignore band exists because those anchors are genuinely ambiguous, and
+forcing them either way teaches the network something untrue.
+
+The page opens on a positive anchor. Drag the size control down and the readout
+walks through all three labels &mdash; positive, then ignored, then negative
+&mdash; without the ground-truth box moving at all. That transition is where an
+anchor stops being useful for an object, and it is why the anchor set has to
+match the objects you expect.
+
+## The imbalance nobody warns you about
+
+A detector places tens of thousands of anchors on an image. An image with three
+objects makes almost every one of them negative &mdash; ratios of a thousand to
+one are normal.
+
+Trained naively, the classification loss is dominated by easy background anchors
+and the model learns to say "background" very confidently and nothing else. Three
+responses became standard:
+
+**Hard negative mining** &mdash; keep only the worst-scoring negatives so the
+ratio stays around 3:1.
+
+**Focal loss** &mdash; down-weight examples the model already gets right, so the
+easy negatives stop dominating. This is what RetinaNet introduced, and it is why
+one-stage detectors caught up with two-stage ones.
+
+**Two-stage detection** &mdash; a region proposal network filters down to a few
+hundred candidates before classification, which sidesteps the imbalance.
+
+## Choosing the anchor set
+
+Anchors are a **prior**, and a wrong prior is expensive. Scales and ratios tuned
+for everyday photographs do badly on aerial imagery, where objects are small and
+often square, or on text detection, where boxes are extremely wide.
+
+YOLOv2 introduced picking them by running k-means over the ground-truth box
+shapes in the training set, using IoU as the distance. That replaced a
+hand-tuned guess with a fitted one, and it is still the sensible default when a
+dataset's objects are unusual.
+
+## Anchor-free detectors
+
+FCOS, CenterNet and DETR drop anchors entirely. FCOS predicts, for each point
+inside an object, the four distances to the box edges. CenterNet predicts object
+centres as a heatmap. DETR predicts a fixed set of boxes directly and matches
+them to ground truth with a Hungarian assignment.
+
+They remove the anchor hyperparameters, which is a real simplification. What they
+do not remove is the assignment problem &mdash; deciding which prediction is
+responsible for which object &mdash; which is simply solved differently.
+
+## Where it goes wrong
+
+**Default anchors on unusual data.** Check the IoU distribution of your anchors
+against your ground-truth boxes before training.
+
+**Ignoring the imbalance.** Without focal loss or mining, the model predicts
+background everywhere and the loss looks fine.
+
+**Too many anchors.** Each one costs memory and computation at every position of
+every feature map, and past a point they overlap so much that extra ones add
+nothing.

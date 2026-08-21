@@ -348,6 +348,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Anchor Boxes",
+  "path": "computer_vision/anchor_boxes.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
+ },
+ {
   "title": "Blur: Gaussian, Median and Bilateral",
   "path": "computer_vision/blur_gaussian_median_bilateral.html",
   "category": "Computer Vision",
@@ -404,6 +412,22 @@ window.VIZLEARN_MODULES = [
   "desc": "Learn how Data Loaders work in Convolutional Neural Networks, why we use batches, and how shuffling and augmentation impact training."
  },
  {
+  "title": "Depthwise Separable Convolution",
+  "path": "computer_vision/depthwise_separable_convolution.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
+ },
+ {
+  "title": "Dilated Convolutions",
+  "path": "computer_vision/dilated_convolutions.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
+ },
+ {
   "title": "Erosion and Dilation",
   "path": "computer_vision/erosion_and_dilation.html",
   "category": "Computer Vision",
@@ -420,12 +444,36 @@ window.VIZLEARN_MODULES = [
   "desc": "Learn how Fully Connected (Dense) Layers work in Convolutional Neural Networks with an interactive visualizer on VizLearn."
  },
  {
+  "title": "Global Average Pooling against Flatten",
+  "path": "computer_vision/global_average_pooling.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
+ },
+ {
+  "title": "Grad-CAM",
+  "path": "computer_vision/grad_cam.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
+ },
+ {
   "title": "Grayscale Image Processing",
   "path": "computer_vision/grayscale_image_processing.html",
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
   "desc": "See a grayscale image for what it is: a grid of brightness numbers you can filter, threshold and edit directly."
+ },
+ {
+  "title": "Harris Corners and Keypoints",
+  "path": "computer_vision/harris_corners.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
  },
  {
   "title": "Histograms and Equalisation",
@@ -458,6 +506,14 @@ window.VIZLEARN_MODULES = [
   "topic": "computer-vision",
   "icon": "eye",
   "desc": "A detector proposes four boxes for two objects. IoU measures the overlap, and Non-Max Suppression uses that number to throw the duplicates away."
+ },
+ {
+  "title": "Mean Average Precision",
+  "path": "computer_vision/mean_average_precision.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
  },
  {
   "title": "Object Detection with Bounding Boxes",
@@ -548,12 +604,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Downsample a mask to see more context, then upsample it back, and watch the boundary blur unless a skip connection carries the resolution pooling just destroyed."
  },
  {
+  "title": "Semantic, Instance and Panoptic Segmentation",
+  "path": "computer_vision/segmentation_tasks.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
+ },
+ {
   "title": "Strides in CNN",
   "path": "computer_vision/strides_in_cnn.html",
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
   "desc": "Learn how Strides work in Convolutional Neural Networks with an interactive visualizer showing how step size downsamples feature maps on VizLearn."
+ },
+ {
+  "title": "Template Matching",
+  "path": "computer_vision/template_matching.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
  },
  {
   "title": "Thresholding",
@@ -570,6 +642,14 @@ window.VIZLEARN_MODULES = [
   "topic": "computer-vision",
   "icon": "eye",
   "desc": "Learn how Transfer Learning works in Convolutional Neural Networks, select models, and selectively unfreeze layers for fine-tuning."
+ },
+ {
+  "title": "Vision Transformer Patches",
+  "path": "computer_vision/vision_transformer_patches.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": ""
  },
  {
   "title": "Aggregate Functions and the NULL Trap",

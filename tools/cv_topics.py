@@ -50,6 +50,12 @@ def _txt(x, y, s, fill=M, size=9, anchor="middle", weight="normal"):
             % (x, y, fill, size, anchor, weight, s))
 
 
+def _line(x1, y1, x2, y2, stroke=A, sw=1.4, dash=None):
+    d = ' stroke-dasharray="%s"' % dash if dash else ""
+    return ('<line x1="%s" y1="%s" x2="%s" y2="%s" stroke="%s" stroke-width="%s"%s/>'
+            % (x1, y1, x2, y2, stroke, sw, d))
+
+
 def _grid(x0, y0, cell, cols, rows, stroke=B, fill="none"):
     out = []
     for r in range(rows):
@@ -228,7 +234,7 @@ second.
 dividing by nine, produces an image nine times too bright &mdash; which, after
 clipping at 255, is a white rectangle.
 
-**Assuming bigger is better.** A 3&times;3 kernel sees a 3&times;3 region. To
+**Assuming bigger is better.** A 3&#215;3 kernel sees a 3&#215;3 region. To
 see further you either use a larger kernel, which costs quadratically more
 multiplications, or stack several small ones, which is what modern
 architectures do and why [receptive field](feature_map_in_cnn.html) is a
@@ -1150,8 +1156,8 @@ intro: What happens between the pixels, and why the answer looks different every
 
 Resizing is two different problems wearing one name.
 
-**Enlarging** asks for pixels that were never measured. A 4&times;4 image
-stretched to 8&times;8 needs 64 values where 16 exist. The extra 48 have to
+**Enlarging** asks for pixels that were never measured. A 4&#215;4 image
+stretched to 8&#215;8 needs 64 values where 16 exist. The extra 48 have to
 come from somewhere, and wherever they come from, they are a guess. No
 interpolation method adds information &mdash; the choice is only about which
 plausible guess to make.
@@ -1318,7 +1324,7 @@ intro: Six numbers that cover every rotation, scale, shear and shift an image ca
 
 Rotating, scaling, shearing and translating look like four separate things.
 They are one thing with different numbers in it &mdash; an **affine transform**,
-written as a 2&times;3 matrix:
+written as a 2&#215;3 matrix:
 
 ```
 | a  b  e |
@@ -1485,8 +1491,8 @@ topic(
         "to the receptive field. Growth is linear in depth.",
         "With stride greater than 1, later layers add more, because each step "
         "covers more original pixels. Growth becomes geometric.",
-        "Three stacked 3&times;3 layers see 7&times;7 using 27 weights per channel "
-        "pair. One 7&times;7 layer sees the same using 49.",
+        "Three stacked 3&#215;3 layers see 7&#215;7 using 27 weights per channel "
+        "pair. One 7&#215;7 layer sees the same using 49.",
     ],
     """
 title: Receptive Field
@@ -1503,8 +1509,8 @@ output that depends on a larger, but still bounded, region of the original
 image. That region is the unit's **receptive field**, and it is the honest
 answer to "what can this feature possibly be detecting".
 
-A unit with a 7&times;7 receptive field cannot detect a face in a 224&times;224
-photograph. It has never seen a face. It has seen a 7&times;7 patch, and
+A unit with a 7&#215;7 receptive field cannot detect a face in a 224&#215;224
+photograph. It has never seen a face. It has seen a 7&#215;7 patch, and
 whatever it responds to has to be visible in one.
 
 ## Counting it, one layer at a time
@@ -1514,7 +1520,7 @@ down the diagram. Each row shows how many input pixels the layer above can be
 influenced by.
 
 With stride 1 the rule is simple. A single unit sees 1 pixel of its own input.
-One `k`&times;`k` convolution makes that `k`. Another adds `k - 1` more, because
+One `k`&#215;`k` convolution makes that `k`. Another adds `k - 1` more, because
 the window's centre already covers what the previous layer covered and each
 side extends by `(k-1)/2`. So:
 
@@ -1524,8 +1530,8 @@ for each layer:
     r = r + (k - 1)
 ```
 
-Three 3&times;3 layers: 1 → 3 → 5 → 7. The growth is **linear in depth**, and
-that is slow. A network of twenty 3&times;3 layers at stride 1 has a receptive
+Three 3&#215;3 layers: 1 → 3 → 5 → 7. The growth is **linear in depth**, and
+that is slow. A network of twenty 3&#215;3 layers at stride 1 has a receptive
 field of 41 pixels &mdash; less than a fifth of a 224-pixel image.
 
 ## Stride changes the arithmetic
@@ -1550,30 +1556,30 @@ downsample. Pooling and strided convolutions are usually explained as reducing
 computation, which they do &mdash; but the more important effect is that they
 are the only affordable way to get a deep unit to see the whole image.
 
-## Why 3&times;3 won everything
+## Why 3&#215;3 won everything
 
-Two stacked 3&times;3 convolutions have the same 5&times;5 receptive field as
-one 5&times;5 convolution. Three stacked have the same 7&times;7 as one
-7&times;7. So why not just use the big kernel?
+Two stacked 3&#215;3 convolutions have the same 5&#215;5 receptive field as
+one 5&#215;5 convolution. Three stacked have the same 7&#215;7 as one
+7&#215;7. So why not just use the big kernel?
 
 Count the weights, per input/output channel pair:
 
 | Arrangement | Receptive field | Weights |
 |---|---|---|
-| One 5&times;5 | 5&times;5 | 25 |
-| Two 3&times;3 | 5&times;5 | 18 |
-| One 7&times;7 | 7&times;7 | 49 |
-| Three 3&times;3 | 7&times;7 | 27 |
+| One 5&#215;5 | 5&#215;5 | 25 |
+| Two 3&#215;3 | 5&#215;5 | 18 |
+| One 7&#215;7 | 7&#215;7 | 49 |
+| Three 3&#215;3 | 7&#215;7 | 27 |
 
 The stack is cheaper, and it has a second advantage that matters more: there is
-a non-linearity between the layers. One 7&times;7 convolution is a single
-linear function of its 49 inputs. Three 3&times;3 convolutions with ReLUs
+a non-linearity between the layers. One 7&#215;7 convolution is a single
+linear function of its 49 inputs. Three 3&#215;3 convolutions with ReLUs
 between them is a composition of three linear functions separated by
 non-linearities, which can represent things a single linear map cannot.
 
 VGG made this argument explicitly in 2014 and effectively ended large kernels
-in general-purpose vision architectures. Everything since is 3&times;3 stacks,
-with the occasional [1&times;1](one_by_one_convolutions.html) for channel work.
+in general-purpose vision architectures. Everything since is 3&#215;3 stacks,
+with the occasional [1&#215;1](one_by_one_convolutions.html) for channel work.
 
 ## Effective versus theoretical
 
@@ -1594,7 +1600,7 @@ to stay at full resolution &mdash; segmentation, most obviously.
 
 ## Where it goes wrong
 
-**Assuming depth alone is enough.** Twenty stride-1 layers of 3&times;3 still
+**Assuming depth alone is enough.** Twenty stride-1 layers of 3&#215;3 still
 only see 41 pixels. Without downsampling or dilation, a deep network can be
 blind to anything large.
 
@@ -1656,14 +1662,14 @@ topic(
         ],
     },
     [
-        "A 1&times;1 convolution looks at one pixel position and <em>all</em> of "
+        "A 1&#215;1 convolution looks at one pixel position and <em>all</em> of "
         "its channels. It mixes channels, never neighbours.",
         "It is a fully-connected layer applied identically at every spatial "
         "position, which is why it is written as a convolution at all.",
         "Its main job is changing the channel count &mdash; usually reducing it "
         "before an expensive layer, which is what a bottleneck is.",
-        "Weights: <code class='mono-font'>Cin &times; Cout</code>, against "
-        "<code class='mono-font'>9 &times; Cin &times; Cout</code> for a 3&times;3.",
+        "Weights: <code class='mono-font'>Cin &#215; Cout</code>, against "
+        "<code class='mono-font'>9 &#215; Cin &#215; Cout</code> for a 3&#215;3.",
     ],
     """
 title: 1x1 Convolutions
@@ -1671,7 +1677,7 @@ intro: A kernel with no spatial extent, and why almost every modern architecture
 
 ## The operation that looks like nothing
 
-A 3&times;3 convolution combines a pixel with its eight neighbours. A 1&times;1
+A 3&#215;3 convolution combines a pixel with its eight neighbours. A 1&#215;1
 convolution has no neighbours to combine. At first reading it appears to
 multiply each pixel by a number, which is a scaling and hardly worth a layer.
 
@@ -1680,7 +1686,7 @@ everything happens.
 
 A feature map is not a grid of numbers; it is a **stack** of grids, one per
 channel. A layer with 256 channels holds 256 values at every spatial position.
-A 1&times;1 convolution stands at one position, takes all 256 values there, and
+A 1&#215;1 convolution stands at one position, takes all 256 values there, and
 computes a weighted sum of them &mdash; then does it again for each output
 channel, and then repeats the whole thing at every position with the same
 weights.
@@ -1702,28 +1708,28 @@ independent of the input's spatial size.
 
 ## What it is actually for
 
-**Changing the channel count.** This is the common case. A 1&times;1 convolution
+**Changing the channel count.** This is the common case. A 1&#215;1 convolution
 is the cheapest possible way to turn 256 channels into 64, or 64 into 256, and
 it is why the layer is sometimes called a projection.
 
 **Bottlenecks.** Put a channel reduction before an expensive spatial
 convolution and an expansion after it. ResNet's bottleneck block is exactly
-this: 1&times;1 down to 64 channels, 3&times;3 at 64, 1&times;1 back up to 256.
-The 3&times;3 &mdash; by far the costliest part &mdash; runs on a quarter of the
-channels, and the two 1&times;1s cost almost nothing by comparison.
+this: 1&#215;1 down to 64 channels, 3&#215;3 at 64, 1&#215;1 back up to 256.
+The 3&#215;3 &mdash; by far the costliest part &mdash; runs on a quarter of the
+channels, and the two 1&#215;1s cost almost nothing by comparison.
 
-Count it. A 3&times;3 straight from 256 to 256 channels needs
+Count it. A 3&#215;3 straight from 256 to 256 channels needs
 `9 × 256 × 256 ≈ 590,000` weights. The bottleneck version needs
 `256×64 + 9×64×64 + 64×256 ≈ 70,000`. Same input and output shape, an eighth of
 the parameters, and an extra two non-linearities thrown in.
 
-**Adding non-linearity without touching resolution.** Each 1&times;1 is followed
+**Adding non-linearity without touching resolution.** Each 1&#215;1 is followed
 by an activation, so a stack of them increases representational depth at
 constant spatial size and negligible cost. This was the "network in network"
 idea that named the technique.
 
 **Replacing the classifier head.** Global average pooling followed by a
-1&times;1 convolution does the job of a large dense layer with a fraction of the
+1&#215;1 convolution does the job of a large dense layer with a fraction of the
 parameters, and works for any input size.
 
 ## The arithmetic
@@ -1733,20 +1739,20 @@ output channels:
 
 | Kernel | Weights | Sees |
 |---|---|---|
-| 1&times;1 | Cin &times; Cout | one position, all channels |
-| 3&times;3 | 9 &times; Cin &times; Cout | 3&times;3 positions, all channels |
-| Depthwise 3&times;3 | 9 &times; Cin | 3&times;3 positions, one channel each |
+| 1&#215;1 | Cin &#215; Cout | one position, all channels |
+| 3&#215;3 | 9 &#215; Cin &#215; Cout | 3&#215;3 positions, all channels |
+| Depthwise 3&#215;3 | 9 &#215; Cin | 3&#215;3 positions, one channel each |
 
 That last row is worth noticing. A **depthwise separable** convolution splits
-the work in two: a depthwise 3&times;3 that mixes neighbours but not channels,
-followed by a 1&times;1 that mixes channels but not neighbours. Together they
-approximate a full 3&times;3 at roughly a ninth of the cost. MobileNet is built
-almost entirely from that pair, and half of it is 1&times;1 convolutions.
+the work in two: a depthwise 3&#215;3 that mixes neighbours but not channels,
+followed by a 1&#215;1 that mixes channels but not neighbours. Together they
+approximate a full 3&#215;3 at roughly a ninth of the cost. MobileNet is built
+almost entirely from that pair, and half of it is 1&#215;1 convolutions.
 
 ## Where it goes wrong
 
 **Expecting spatial work from it.** It cannot smooth, sharpen or find an edge.
-If the receptive field needs to grow, a 1&times;1 contributes nothing &mdash;
+If the receptive field needs to grow, a 1&#215;1 contributes nothing &mdash;
 its contribution to the [receptive field](receptive_field.html) is exactly
 zero.
 
@@ -1754,7 +1760,7 @@ zero.
 bottleneck. Squeezing 256 channels to 8 before the spatial convolution saves
 computation and can cost more accuracy than it is worth.
 
-**Forgetting the activation.** A 1&times;1 with no non-linearity after it,
+**Forgetting the activation.** A 1&#215;1 with no non-linearity after it,
 stacked on another linear layer, collapses into a single linear map. Two
 matrices multiplied together are one matrix.
 """,
@@ -1780,6 +1786,1590 @@ matrices multiplied together are one matrix.
                      "They become a 2x2 convolution"],
          "answer": 1,
          "why": "Each is a matrix multiplication at every position. Two matrices multiplied together are one matrix, so the pair has exactly the representational power of one layer."},
+    ],
+)
+
+# ---------------------------------------------------------------------------
+# 11. Depthwise separable convolution
+# ---------------------------------------------------------------------------
+topic(
+    "depthwise_separable_convolution",
+    "Depthwise Separable Convolution",
+    "Efficiency",
+    "Split a convolution into the part that mixes neighbours and the part that "
+    "mixes channels. The saving is roughly a factor of nine.",
+    _svg(_box(12, 30, 40, 30, fill=S) + _txt(32, 48, "3x3", A, 9)
+         + _txt(60, 48, "+", M, 11)
+         + _box(70, 30, 40, 30, fill=S) + _txt(90, 48, "1x1", A, 9)
+         + _txt(122, 42, "&lt;&lt;", M, 11) + _txt(132, 60, "full", M, 8)
+         + _txt(80, 78, "same job, a ninth of the weights", M, 7)),
+    {
+        "diagram": "separable",
+        "controls": [
+            {"key": "cin", "label": "Input channels", "type": "range",
+             "min": 8, "max": 512, "step": 8, "value": 64},
+            {"key": "cout", "label": "Output channels", "type": "range",
+             "min": 8, "max": 512, "step": 8, "value": 128},
+            {"key": "kernel", "label": "Kernel size", "type": "range",
+             "min": 3, "max": 7, "step": 2, "value": 3},
+        ],
+    },
+    [
+        "A full convolution mixes neighbours <em>and</em> channels in one step, "
+        "which is why it costs <code class='mono-font'>k&sup2; &middot; Cin &middot; Cout</code>.",
+        "The depthwise step runs one <code class='mono-font'>k&#215;k</code> "
+        "filter per input channel, mixing neighbours only.",
+        "The pointwise step is a <code class='mono-font'>1&#215;1</code> "
+        "convolution, mixing channels only.",
+        "Together they cost <code class='mono-font'>k&sup2;&middot;Cin + Cin&middot;Cout</code>, "
+        "which for a 3&#215;3 with many channels is about a ninth.",
+    ],
+    """
+title: Depthwise Separable Convolution
+intro: One convolution split into two, and why almost every model that runs on a phone is built from them.
+
+## What a full convolution is doing
+
+A 3&#215;3 convolution from 64 channels to 128 does two jobs at once. At every
+output position it looks at a 3&#215;3 spatial neighbourhood, and it combines
+all 64 input channels. Each of the 128 output channels needs its own set of
+weights for all of that, so the count is:
+
+```
+k * k * Cin * Cout  =  3 * 3 * 64 * 128  =  73,728
+```
+
+The question that leads to separable convolutions is whether those two jobs
+have to be done together.
+
+## Doing them one at a time
+
+**Depthwise.** Run one `k`&#215;`k` filter per input channel, and keep the
+channels apart. Channel 7 is convolved with filter 7 and produces channel 7 of
+the output. Neighbours are mixed; channels are not. Cost: `k * k * Cin`, so
+`9 * 64 = 576`.
+
+**Pointwise.** Follow it with a [1&#215;1
+convolution](one_by_one_convolutions.html), which combines all the channels at
+each position and has no spatial extent at all. Channels are mixed; neighbours
+are not. Cost: `Cin * Cout`, so `64 * 128 = 8,192`.
+
+Together: **8,768** against 73,728 for the same input and output shape. Drag the
+controls and the ratio in the readout stays close to 8&ndash;9&#215; wherever
+you put them.
+
+## Where the ratio comes from
+
+The saving is
+
+```
+    k^2 * Cin * Cout
+  ---------------------   =   1 / ( 1/Cout + 1/k^2 )
+   k^2 * Cin + Cin * Cout
+```
+
+When `Cout` is large the `1/Cout` term nearly vanishes and the ratio approaches
+`k^2` &mdash; nine for a 3&#215;3. Set the kernel control to 5 or 7 and the
+saving rises toward 25 and 49, which is why separable convolutions matter more
+the larger the kernel.
+
+Set output channels to 8 while leaving input at 64 and the ratio falls, because
+with few output channels the pointwise step is no longer cheap relative to the
+whole. The technique earns its keep in wide layers, which is where the cost was.
+
+## The cost of the saving
+
+It is not free, and pretending otherwise is the usual mistake.
+
+A full convolution can learn any function of a 3&#215;3&#215;`Cin`
+neighbourhood. The separable pair cannot: it is restricted to functions that
+factor into a spatial part and a channel part. That is a strictly smaller family,
+and on the same architecture a separable model usually reaches slightly lower
+accuracy per layer.
+
+What makes it worth doing is that the saving is much larger than the loss. With
+eight times fewer parameters you can afford more layers, wider layers, or a
+model that fits on the device at all &mdash; and the resulting network usually
+beats the full-convolution one at equal cost.
+
+## Where it is used
+
+**MobileNet** is built almost entirely from these pairs, and was the paper that
+made the technique standard for on-device vision.
+
+**Xception** applied the same argument to Inception, arguing that Inception
+modules were already approximating a separable convolution and that the extreme
+version worked better.
+
+**EfficientNet** uses inverted residual blocks that expand channels with a
+1&#215;1, do the spatial work depthwise, and project back down &mdash; the same
+decomposition with an expansion around it.
+
+## A note on speed
+
+Parameter count and wall-clock time are not the same thing. A depthwise
+convolution does very little arithmetic per byte of memory it touches, so it is
+**memory-bound**, and hardware optimised for dense matrix multiplication does not
+reach anything like its peak throughput on one.
+
+An eight-times parameter reduction is therefore often two or three times faster
+in practice rather than eight. Still worth having, and worth measuring rather
+than assuming.
+
+## Where it goes wrong
+
+**Expecting the speed-up to match the parameter count.** Measure it.
+
+**Using it in the first layer.** With three input channels there is almost
+nothing to save, and the restriction costs accuracy where the model can least
+afford it.
+
+**Forgetting the non-linearity.** The depthwise and pointwise steps need an
+activation between them, or the pair is closer to a single linear map than the
+two-stage decomposition it is supposed to be.
+""",
+    [
+        {"q": "What does the depthwise step mix?",
+         "options": ["Channels only", "Neighbours only, keeping channels separate",
+                     "Both", "Neither"],
+         "answer": 1,
+         "why": "One k x k filter per input channel, producing one output channel each. The pointwise 1x1 that follows does the channel mixing."},
+        {"q": "Why does the saving approach k squared for wide layers?",
+         "options": ["The kernel grows",
+                     "The ratio is 1/(1/Cout + 1/k^2), and the 1/Cout term vanishes as Cout grows",
+                     "Depthwise convolutions have no weights",
+                     "Wide layers use fewer channels"],
+         "answer": 1,
+         "why": "With many output channels the pointwise cost becomes small relative to the full convolution, leaving the k^2 factor - nine for a 3x3, 49 for a 7x7."},
+        {"q": "Why is the wall-clock speed-up usually smaller than the parameter saving?",
+         "options": ["The pointwise step dominates",
+                     "A depthwise convolution does little arithmetic per byte touched, so it is memory-bound",
+                     "It needs more layers",
+                     "The weights are stored differently"],
+         "answer": 1,
+         "why": "Hardware tuned for dense matrix multiplication cannot reach peak throughput on an operation that is starved of arithmetic per memory access."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 12. Dilated convolutions
+# ---------------------------------------------------------------------------
+topic(
+    "dilated_convolutions",
+    "Dilated Convolutions",
+    "CNN Internals",
+    "Spread the same nine weights further apart and the receptive field grows "
+    "without any downsampling and without any extra parameters.",
+    _svg("".join(_box(20 + i * 16, 36, 10, 10, fill=(S if i % 2 else A), stroke=B, sw=1)
+                 for i in range(9))
+         + _txt(80, 68, "same nine weights, wider reach", M, 8)),
+    {
+        "diagram": "dilated",
+        "controls": [
+            {"key": "dilation", "label": "Dilation rate", "type": "range",
+             "min": 1, "max": 4, "step": 1, "value": 2},
+            {"key": "layers", "label": "Layers", "type": "range",
+             "min": 1, "max": 3, "step": 1, "value": 2},
+        ],
+    },
+    [
+        "Dilation inserts gaps between the kernel's taps. A 3&#215;3 at "
+        "dilation 2 spans 5&#215;5 while still holding nine weights.",
+        "The parameter count does not change. The "
+        "<a href='receptive_field.html'>receptive field</a> does.",
+        "It buys reach without pooling, so the output stays at full resolution "
+        "&mdash; which is what segmentation needs.",
+        "Stacking the same rate repeatedly leaves gaps that nothing samples. "
+        "Vary the rate instead.",
+    ],
+    """
+title: Dilated Convolutions
+intro: How to see further without downsampling, and the gridding artefact that comes with it.
+
+## The problem it solves
+
+A network has two ways to grow its [receptive
+field](receptive_field.html): stack more layers, which is slow because growth is
+linear, or downsample, which is fast but throws away resolution.
+
+For classification, throwing away resolution is fine &mdash; the answer is one
+label. For **segmentation** it is not, because the output has to be the same size
+as the input, and detail destroyed by pooling has to be reconstructed by
+something.
+
+Dilated convolution is the third way. It grows the receptive field
+geometrically, adds no parameters, and does not reduce resolution at all.
+
+## What dilation does
+
+Take a 3&#215;3 kernel. Instead of reading nine adjacent pixels, read nine
+pixels spaced `d` apart, leaving gaps between them. The weights are unchanged;
+only where they are sampled from moves.
+
+The effective size of a `k`&#215;`k` kernel at dilation `d` is:
+
+```
+effective = k + (k - 1) * (d - 1)
+```
+
+So a 3&#215;3 at dilation 1 spans 3, at dilation 2 spans 5, at dilation 4 spans
+9. Drag the dilation control and the readout confirms it: nine weights, spanning
+whatever you asked for.
+
+That is the whole trick, and its appeal is that everything about the layer's cost
+is unchanged. Same weights, same number of multiplications, wider view.
+
+## Stacking
+
+Drag the layers control up. Two dilated layers reach further than two ordinary
+ones, and the growth compounds, because each layer's reach is measured in the
+already-expanded units of the layer beneath it.
+
+The standard arrangement uses a rising sequence &mdash; dilation 1, then 2, then
+4, then 8 &mdash; which gives exponential receptive-field growth at constant
+resolution. A stack of four such layers sees a 33&#215;33 region using 36
+weights per channel pair and no pooling at all.
+
+## The gridding problem
+
+There is a defect, and it follows directly from the gaps.
+
+Stack several layers all at dilation 2, and some input positions are never
+sampled by any of them. The kernel taps land on even offsets at every level, so
+odd positions in between are simply not read. The output develops a
+checkerboard-like inconsistency, and the network is blind to fine detail that
+happens to fall in the gaps.
+
+The fix is to vary the rate so that the gaps of one layer are covered by another.
+Rates like 1, 2, 5 or 1, 2, 3 are chosen so their sampling patterns interlock,
+and the *hybrid dilated convolution* literature is about picking such sequences.
+The simple version of the rule: do not repeat the same dilation rate several
+times in a row.
+
+## Where it is used
+
+**DeepLab** made dilated convolution central to semantic segmentation, and its
+ASPP module runs several rates in parallel and concatenates them, giving the
+network several scales at once from one feature map.
+
+**WaveNet** used dilation in one dimension over audio, where the receptive field
+has to span thousands of samples and downsampling would destroy the waveform.
+
+**Dense prediction generally** &mdash; depth estimation, optical flow, anything
+whose output is an image &mdash; uses it for the same reason segmentation does.
+
+## Where it goes wrong
+
+**Repeating one rate.** Gridding artefacts, and detail that falls in the gaps is
+never seen.
+
+**Using it where pooling would do.** For classification, downsampling is cheaper
+and reduces computation. Dilation keeps the feature map large, and large feature
+maps cost memory at every layer.
+
+**Assuming it is free.** The parameters are free; the memory is not. A network
+that never downsamples holds full-resolution activations throughout, which is
+often the binding constraint on segmentation models.
+""",
+    [
+        {"q": "How wide does a 3x3 kernel at dilation 3 reach?",
+         "options": ["3", "7", "9", "5"],
+         "answer": 1,
+         "why": "k + (k-1)(d-1) = 3 + 2*2 = 7. Nine weights spanning seven positions - the parameter count is unchanged."},
+        {"q": "What causes gridding artefacts?",
+         "options": ["Too few weights",
+                     "Several layers at the same dilation rate, so some input positions are never sampled by any of them",
+                     "Dilation larger than the kernel",
+                     "Missing padding"],
+         "answer": 1,
+         "why": "The taps land on the same offsets at every level, leaving positions in between unread. Varying the rate so the sampling patterns interlock is the fix."},
+        {"q": "Why is dilation preferred over pooling in segmentation?",
+         "options": ["It is faster",
+                     "It grows the receptive field without reducing resolution, and the output must match the input size",
+                     "It uses fewer weights than pooling",
+                     "Pooling cannot be backpropagated"],
+         "answer": 1,
+         "why": "Detail destroyed by pooling has to be reconstructed by something. Dilation buys reach while the feature map stays full size - at the cost of memory."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 13. Global average pooling vs flatten
+# ---------------------------------------------------------------------------
+topic(
+    "global_average_pooling",
+    "Global Average Pooling against Flatten",
+    "CNN Internals",
+    "How a feature map becomes a vector, and why one of the two ways costs "
+    "fifty times more weights than the other.",
+    _svg(_box(14, 26, 40, 40, fill=S) + _txt(34, 78, "7x7x512", M, 7)
+         + _txt(64, 46, "&#8594;", A, 12)
+         + _box(78, 38, 14, 16, fill=S) + _txt(85, 78, "512", M, 7)
+         + _txt(104, 46, "&#8594;", A, 12)
+         + _box(120, 40, 26, 12, fill=S, stroke=A) + _txt(133, 78, "classes", M, 7)),
+    {
+        "diagram": "gap",
+        "controls": [
+            {"key": "side", "label": "Feature map size", "type": "range",
+             "min": 3, "max": 14, "step": 1, "value": 7},
+            {"key": "channels", "label": "Channels", "type": "range",
+             "min": 32, "max": 1024, "step": 32, "value": 512},
+            {"key": "classes", "label": "Classes", "type": "range",
+             "min": 2, "max": 1000, "step": 2, "value": 10},
+        ],
+    },
+    [
+        "The convolutional part of a network outputs a 3D block. A classifier "
+        "needs a vector, so something has to collapse it.",
+        "<strong>Flatten</strong> reads every value in order. A "
+        "7&#215;7&#215;512 map becomes 25,088 numbers.",
+        "<strong>Global average pooling</strong> takes the mean of each channel. "
+        "The same map becomes 512 numbers.",
+        "Pooling also removes the fixed input size: the mean of a channel is one "
+        "number whatever the spatial dimensions were.",
+    ],
+    """
+title: Global Average Pooling against Flatten
+intro: The step between the convolutions and the classifier, and why the obvious version wastes most of the model's parameters.
+
+## Two ways to collapse a block
+
+Convolutional layers output a 3D block: height &#215; width &#215; channels. A
+classifier needs a single vector. Something has to turn one into the other, and
+there are two candidates.
+
+**Flatten** reads every value in the block into one long vector. For a
+7&#215;7&#215;512 map that is 25,088 numbers, and the dense layer that follows
+needs a weight for each of them per class.
+
+**Global average pooling** takes the mean of each channel over its whole spatial
+extent. Every 7&#215;7 slice becomes one number, and the block becomes 512
+numbers.
+
+## Count them
+
+Drag the controls and watch the readout. At the defaults &mdash;
+7&#215;7&#215;512 into 10 classes:
+
+```
+flatten  ->  7 * 7 * 512 * 10  =  250,880 weights
+GAP      ->          512 * 10  =    5,120 weights
+```
+
+Forty-nine times fewer, and 49 is exactly 7&#215;7. The ratio is always the
+spatial area of the feature map, which is why the saving grows as the map gets
+larger.
+
+Set classes to 1000, as in ImageNet, and the flattened version needs 25 million
+weights in a single layer. Early architectures really did this: **VGG-16 keeps
+about 90% of its 138 million parameters in its final dense layers**, and almost
+all of that is the first one immediately after the flatten.
+
+## What pooling gives up, and what it buys
+
+Averaging discards **where** in the map each activation was. If channel 7
+responds to wheels, flatten preserves that the wheels were at the bottom left,
+and GAP records only that there were wheels.
+
+For classification that is usually the right trade. The question is whether a car
+is present, not where the wheels sat, and the convolutional layers underneath
+have already encoded position-sensitive structure into which channels fire.
+
+Three things are bought in exchange.
+
+**Far fewer parameters**, and therefore much less overfitting. A dense layer with
+25 million weights on a dataset of 50,000 images is an invitation to memorise.
+
+**Any input size.** The mean of a channel is one number regardless of the
+spatial dimensions, so a GAP network accepts a 224-pixel image or a 400-pixel one
+without modification. A flattened network cannot: 25,088 weights expect exactly
+25,088 inputs, which is why older models are rigid about input size.
+
+**Interpretability.** With GAP followed by a single dense layer, each class score
+is a weighted sum of channel means. That weighting is exactly what Class
+Activation Mapping uses to produce a heatmap, and [Grad-CAM](grad_cam.html)
+generalises it.
+
+## What replaced the debate
+
+Every modern architecture uses GAP. ResNet, Inception, MobileNet, EfficientNet
+and the convolutional stems of hybrid transformers all end with a global pool and
+one dense layer.
+
+The exception worth knowing is **Vision Transformers**, which typically use a
+dedicated class token instead &mdash; a learned vector that attends to all the
+[patches](vision_transformer_patches.html) and carries the summary. Some ViT
+variants pool the patch tokens instead and report it works about as well.
+
+## Where it goes wrong
+
+**Pooling too early.** GAP belongs after the last convolutional block. Applied
+midway it destroys the spatial structure the remaining layers need.
+
+**Using flatten because a tutorial did.** Most tutorials predate the change.
+Check what the parameter count is doing before accepting it.
+
+**Expecting GAP to fix a small feature map.** With a 1&#215;1 map there is
+nothing to average and the two are identical.
+
+**Forgetting global max pooling exists.** It takes the maximum instead of the
+mean, and for tasks where one strong local response matters more than an average
+&mdash; some detection and audio tasks &mdash; it can be the better choice.
+""",
+    [
+        {"q": "How many times fewer weights does GAP need than flatten, for a 7x7 feature map?",
+         "options": ["7", "49", "512", "It depends on the number of classes"],
+         "answer": 1,
+         "why": "The ratio is exactly the spatial area of the map. The number of channels and classes appear in both counts and cancel."},
+        {"q": "Why can a GAP network accept any input size?",
+         "options": ["It resizes the input",
+                     "The mean of a channel is one number whatever the spatial dimensions were",
+                     "It uses adaptive convolutions",
+                     "The dense layer is optional"],
+         "answer": 1,
+         "why": "A flattened network's dense layer expects exactly as many inputs as the flatten produced, which fixes the input size. Pooling removes that constraint."},
+        {"q": "What does global average pooling discard?",
+         "options": ["The channel identity",
+                     "Where in the feature map each activation occurred",
+                     "The magnitude of the activations",
+                     "Half the channels"],
+         "answer": 1,
+         "why": "It records that a channel fired, not where. For classification that is usually the right trade, since the convolutional layers already encode structure into which channels fire."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 14. Anchor boxes
+# ---------------------------------------------------------------------------
+topic(
+    "anchor_boxes",
+    "Anchor Boxes",
+    "Detection",
+    "Detectors do not invent boxes. They start from a fixed set at every "
+    "position and learn how to nudge them.",
+    _svg("".join('<rect x="%s" y="%s" width="%s" height="%s" fill="none" stroke="%s" '
+                 'stroke-width="1" stroke-dasharray="3 3"/>' % (18 + i * 26, 22, 26, 20, B)
+                 for i in range(5))
+         + _box(52, 30, 58, 40, fill="none", stroke=A, sw=2)
+         + _txt(80, 82, "fixed shapes, learned offsets", M, 7)),
+    {
+        "diagram": "anchors",
+        "controls": [
+            {"key": "cell", "label": "Grid cell", "type": "range",
+             "min": 0, "max": 23, "step": 1, "value": 8},
+            {"key": "scale", "label": "Anchor size", "type": "range",
+             "min": 40, "max": 220, "step": 5, "value": 180},
+        ],
+    },
+    [
+        "At every position in a feature map the detector places several boxes of "
+        "fixed size and aspect ratio.",
+        "Each anchor is assigned by <a href='iou_and_non_max_suppression.html'>"
+        "IoU</a> against the ground truth: high is positive, low is negative, "
+        "and the band between is ignored.",
+        "The network predicts an <em>offset</em> from its anchor, not a box. "
+        "Regressing a small correction is far easier than regressing coordinates.",
+        "Anchor-free detectors predict the box directly from a point, which "
+        "removes the tuning but not the assignment problem.",
+    ],
+    """
+title: Anchor Boxes
+intro: The prior that turns 'find every object' into 'adjust these boxes slightly', and the assignment rule that trains it.
+
+## Why detectors do not just predict boxes
+
+A detector must output an unknown number of boxes at unknown positions and
+sizes. Neural networks are much better at producing a fixed-size output than a
+variable-length one, and much better at making a small correction than at
+producing a coordinate from nothing.
+
+**Anchors** convert the hard problem into the easy one. Place a fixed set of
+reference boxes at every position of a feature map, and ask the network two
+things per anchor: is there an object here, and how should this box be adjusted
+to fit it?
+
+The output is now a fixed-size tensor, and the regression target is a small
+offset instead of an absolute position.
+
+## What the visualisation shows
+
+The dashed grid is the feature map: one set of anchors per cell. The orange
+rectangle is a ground-truth object. Drag the cell control to move the anchor set
+around, and the size control to change the scale.
+
+Three anchors are drawn at each position, one per aspect ratio &mdash; wide,
+square and tall &mdash; because objects come in shapes and one square box fits
+few of them. Real detectors use three scales as well, so nine anchors per
+position is a common arrangement.
+
+The readout gives the best IoU against the ground truth and what that IoU means
+for training.
+
+## The assignment rule
+
+Every anchor gets a label before training, decided by IoU:
+
+| IoU with the best ground-truth box | Label |
+|---|---|
+| Above ~0.5 | positive &mdash; predict this object, regress the offset |
+| Below ~0.3 | negative &mdash; predict background, no box loss |
+| In between | ignored &mdash; contributes nothing to the loss |
+
+The ignore band exists because those anchors are genuinely ambiguous, and
+forcing them either way teaches the network something untrue.
+
+The page opens on a positive anchor. Drag the size control down and the readout
+walks through all three labels &mdash; positive, then ignored, then negative
+&mdash; without the ground-truth box moving at all. That transition is where an
+anchor stops being useful for an object, and it is why the anchor set has to
+match the objects you expect.
+
+## The imbalance nobody warns you about
+
+A detector places tens of thousands of anchors on an image. An image with three
+objects makes almost every one of them negative &mdash; ratios of a thousand to
+one are normal.
+
+Trained naively, the classification loss is dominated by easy background anchors
+and the model learns to say "background" very confidently and nothing else. Three
+responses became standard:
+
+**Hard negative mining** &mdash; keep only the worst-scoring negatives so the
+ratio stays around 3:1.
+
+**Focal loss** &mdash; down-weight examples the model already gets right, so the
+easy negatives stop dominating. This is what RetinaNet introduced, and it is why
+one-stage detectors caught up with two-stage ones.
+
+**Two-stage detection** &mdash; a region proposal network filters down to a few
+hundred candidates before classification, which sidesteps the imbalance.
+
+## Choosing the anchor set
+
+Anchors are a **prior**, and a wrong prior is expensive. Scales and ratios tuned
+for everyday photographs do badly on aerial imagery, where objects are small and
+often square, or on text detection, where boxes are extremely wide.
+
+YOLOv2 introduced picking them by running k-means over the ground-truth box
+shapes in the training set, using IoU as the distance. That replaced a
+hand-tuned guess with a fitted one, and it is still the sensible default when a
+dataset's objects are unusual.
+
+## Anchor-free detectors
+
+FCOS, CenterNet and DETR drop anchors entirely. FCOS predicts, for each point
+inside an object, the four distances to the box edges. CenterNet predicts object
+centres as a heatmap. DETR predicts a fixed set of boxes directly and matches
+them to ground truth with a Hungarian assignment.
+
+They remove the anchor hyperparameters, which is a real simplification. What they
+do not remove is the assignment problem &mdash; deciding which prediction is
+responsible for which object &mdash; which is simply solved differently.
+
+## Where it goes wrong
+
+**Default anchors on unusual data.** Check the IoU distribution of your anchors
+against your ground-truth boxes before training.
+
+**Ignoring the imbalance.** Without focal loss or mining, the model predicts
+background everywhere and the loss looks fine.
+
+**Too many anchors.** Each one costs memory and computation at every position of
+every feature map, and past a point they overlap so much that extra ones add
+nothing.
+""",
+    [
+        {"q": "What does the network predict for each anchor?",
+         "options": ["Absolute box coordinates",
+                     "An offset from that anchor, plus whether an object is present",
+                     "A segmentation mask",
+                     "The class only"],
+         "answer": 1,
+         "why": "Regressing a small correction to a known reference box is far easier than producing coordinates from nothing, and it makes the output a fixed-size tensor."},
+        {"q": "Why do anchors with middling IoU get ignored rather than labelled?",
+         "options": ["To save computation",
+                     "They are genuinely ambiguous, and forcing them either way teaches the network something untrue",
+                     "They are duplicates",
+                     "IoU cannot be computed for them"],
+         "answer": 1,
+         "why": "An anchor at IoU 0.4 neither clearly covers the object nor clearly misses it. The ignore band keeps that ambiguity out of the loss."},
+        {"q": "Why does focal loss exist?",
+         "options": ["To speed up training",
+                     "Because tens of thousands of anchors are negative, so easy background dominates the loss",
+                     "To handle overlapping boxes",
+                     "To replace IoU"],
+         "answer": 1,
+         "why": "It down-weights examples the model already classifies correctly, which is what let one-stage detectors match two-stage ones."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 15. mAP for object detection
+# ---------------------------------------------------------------------------
+topic(
+    "mean_average_precision",
+    "Mean Average Precision",
+    "Detection",
+    "The number every detection paper reports, built from a precision-recall "
+    "curve one ranked prediction at a time.",
+    _svg(_line(20, 72, 148, 72, B, 1) + _line(20, 72, 20, 16, B, 1)
+         + '<path d="M22 22 C 60 26, 90 48, 146 62" fill="none" stroke="%s" stroke-width="1.8"/>' % A
+         + _txt(96, 34, "AP = area", M, 8)),
+    {
+        "diagram": "map",
+        "controls": [
+            {"key": "iou", "label": "IoU threshold for a hit", "type": "range",
+             "min": 0.5, "max": 0.95, "step": 0.05, "value": 0.5},
+        ],
+    },
+    [
+        "A prediction counts as correct if its "
+        "<a href='iou_and_non_max_suppression.html'>IoU</a> with an unmatched "
+        "ground-truth box clears a threshold.",
+        "Sort every prediction by confidence, walk down the list, and plot "
+        "precision against recall as you go.",
+        "<strong>AP</strong> is the area under that curve for one class. "
+        "<strong>mAP</strong> averages AP across classes.",
+        "COCO's headline number averages again over IoU thresholds from 0.50 to "
+        "0.95, which is why it is so much lower than the old VOC number.",
+    ],
+    """
+title: Mean Average Precision
+intro: How a list of boxes with confidence scores becomes one number, and what that number is not telling you.
+
+## Deciding what counts as correct
+
+Classification has an obvious notion of right. Detection does not: a box that
+covers most of an object is partly right, and "partly" has to be resolved before
+anything can be counted.
+
+The resolution is a threshold on [IoU](iou_and_non_max_suppression.html). A
+prediction is a **true positive** if its IoU with a ground-truth box of the same
+class is at least the threshold, and if that ground-truth box has not already
+been claimed by a higher-confidence prediction. Otherwise it is a false positive.
+Ground-truth boxes nothing matched are false negatives.
+
+That second condition matters. Without it, ten overlapping predictions on one
+object would count as ten successes.
+
+## Building the curve
+
+Sort all predictions for a class by confidence, highest first, and walk down the
+list. After each one, recompute precision and recall over everything seen so far,
+and plot the point.
+
+The curve in the visualisation is exactly that walk, one dot per prediction. It
+starts high &mdash; the most confident predictions are usually right &mdash; and
+sags as the list goes on, because later predictions are less reliable while the
+recall denominator stays fixed.
+
+**Average precision** is the area under that curve. It summarises the whole
+ranking rather than performance at one operating point, which is what makes it
+useful: a detector that ranks its correct predictions above its incorrect ones
+scores well regardless of how its confidences happen to be calibrated.
+
+The exact area calculation has varied. VOC 2007 sampled precision at eleven
+recall levels; VOC 2010 onward and COCO interpolate more finely. The differences
+are small and the definitions are not interchangeable, which is a reason to
+compare numbers only within one convention.
+
+## From AP to mAP
+
+AP is per class. **mAP** is the mean of AP over all classes &mdash; an unweighted
+mean, so a class with ten instances counts as much as a class with ten thousand.
+
+That is a deliberate choice and worth knowing. It means mAP is dragged down hard
+by rare classes the model handles badly, and a model can improve its mAP more by
+fixing one rare class than by getting slightly better at a common one.
+
+## Why COCO's numbers look worse
+
+Drag the IoU control. At 0.5 a loosely fitting box counts as a hit; at 0.9 the
+box has to be nearly exact.
+
+VOC reported mAP at IoU 0.5 alone. COCO's headline metric averages mAP over ten
+thresholds from 0.50 to 0.95 in steps of 0.05, usually written **mAP@[.5:.95]**.
+It rewards precise localisation rather than approximate detection, and it is much
+harsher: a detector reporting 0.80 under VOC might report 0.45 under COCO on the
+same predictions.
+
+So a COCO mAP and a VOC mAP are different measurements and must never be compared
+directly. COCO also reports mAP@0.5 alongside, partly so that comparison remains
+possible.
+
+COCO breaks the number down further &mdash; by object size (small, medium,
+large) and at fixed detection counts. Those breakdowns are usually more
+informative than the headline: "our detector is bad at small objects" is
+actionable in a way that "our mAP is 0.42" is not.
+
+## What mAP does not tell you
+
+**It has no threshold.** AP integrates over every confidence level, so it says
+nothing about which threshold to deploy. That is a separate decision.
+
+**It ignores the cost of errors.** A missed pedestrian and a spurious traffic
+cone count the same.
+
+**It averages away the failures you care about.** A model that is excellent on
+19 classes and useless on the 20th can outscore one that is decent on all of
+them.
+
+**It says nothing about duplicates before NMS.** mAP is computed on
+post-processed output, so a detector that fires many overlapping boxes can look
+fine as long as suppression cleans up.
+
+## Where it goes wrong
+
+**Comparing across datasets or conventions.** VOC against COCO, or one AP
+interpolation against another, are not comparable.
+
+**Reporting mAP alone.** Report the per-class breakdown; it is where the
+information is.
+
+**Tuning NMS to raise mAP.** Easy to do and often makes the deployed detector
+worse, because the operating point that maximises an integral over all
+thresholds is not the one you ship.
+""",
+    [
+        {"q": "Why must a matched ground-truth box be excluded from later matches?",
+         "options": ["To save computation",
+                     "Otherwise several overlapping predictions on one object would each count as a success",
+                     "IoU cannot be computed twice",
+                     "The boxes are consumed by NMS"],
+         "answer": 1,
+         "why": "Only the highest-confidence prediction claims a ground-truth box; the rest become false positives. Without that rule a detector could inflate its score by firing repeatedly."},
+        {"q": "Why is a COCO mAP much lower than a VOC mAP on the same predictions?",
+         "options": ["COCO has more classes",
+                     "COCO averages over IoU thresholds from 0.50 to 0.95, rewarding precise localisation",
+                     "COCO uses a different precision formula",
+                     "COCO images are harder"],
+         "answer": 1,
+         "why": "VOC reported at IoU 0.5 alone. Averaging up to 0.95 demands nearly exact boxes, so the two numbers are different measurements and cannot be compared."},
+        {"q": "What does mAP say about which confidence threshold to deploy?",
+         "options": ["It gives the optimal threshold",
+                     "Nothing - it integrates over every threshold",
+                     "It assumes 0.5",
+                     "It uses the threshold that maximises F1"],
+         "answer": 1,
+         "why": "AP summarises the whole ranking. Choosing an operating point is a separate decision, made from the costs of the two kinds of error."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 16. Template matching
+# ---------------------------------------------------------------------------
+topic(
+    "template_matching",
+    "Template Matching",
+    "Matching",
+    "Slide a patch over the image and score every position. The oldest way to "
+    "find something, and the reason better ways exist.",
+    _svg(_box(14, 24, 88, 46, fill=S)
+         + _box(34, 34, 20, 20, fill="none", stroke=A, sw=1.6)
+         + _txt(58, 82, "patch, everywhere", M, 7)
+         + _box(112, 24, 34, 46, fill=S) + _txt(129, 48, "score", A, 9)),
+    {
+        "op": "template",
+        "source": "shapes",
+        "controls": [
+            {"key": "tx", "label": "Template x", "type": "range",
+             "min": 0, "max": 150, "step": 2, "value": 96},
+            {"key": "ty", "label": "Template y", "type": "range",
+             "min": 0, "max": 102, "step": 2, "value": 30},
+            {"key": "size", "label": "Template size", "type": "range",
+             "min": 8, "max": 40, "step": 2, "value": 24},
+        ],
+    },
+    [
+        "The template is cut from the image itself, so a perfect match exists "
+        "and you can see whether the method finds it.",
+        "Normalised cross-correlation subtracts the mean and divides by the "
+        "standard deviation on both sides, so it survives lighting changes.",
+        "The output is a <strong>response map</strong>: one score per position. "
+        "Its brightest point is the match.",
+        "It is not invariant to rotation or scale. Turn the object ten degrees "
+        "and the correlation collapses.",
+    ],
+    """
+title: Template Matching
+intro: The most direct way to find something in an image, and a clear demonstration of why the field moved on.
+
+## The method
+
+Take a patch &mdash; the **template** &mdash; and place it over every possible
+position in the image. At each position, score how well the template agrees with
+what is underneath. The result is a **response map** with one score per position,
+and the highest score is where the template was found.
+
+The template here is cut from the image itself, using the position controls, so
+a perfect match is guaranteed to exist. The grey square marks where it came from
+and the orange square marks where it was found. Move the controls and they track
+each other, with the correlation in the readout staying at 1.000.
+
+## Scoring: why not just subtract?
+
+The obvious score is the sum of squared differences. It works, and it breaks the
+moment lighting changes: brighten the image by 20 and every difference grows,
+even where the shapes match perfectly.
+
+**Normalised cross-correlation** fixes this by standardising both sides before
+comparing &mdash; subtract the mean, divide by the standard deviation, then take
+the dot product:
+
+```
+NCC = sum( (T - mean_T) * (W - mean_W) ) / ( sd_T * sd_W )
+```
+
+Subtracting the means removes any constant brightness offset. Dividing by the
+standard deviations removes any constant contrast scaling. What is left measures
+**pattern** rather than pixel values, and the result is bounded between
+&minus;1 and 1, which makes scores comparable across positions and images.
+
+That is why NCC is the standard choice, and why the response map here is readable
+as an image: every value is on the same scale.
+
+## Reading the response map
+
+The bright region around the true match is not a single pixel. It is a blob,
+because a template shifted by one pixel still overlaps almost entirely and still
+scores well.
+
+That blob is why picking the maximum is not enough in practice. Several nearby
+positions all score highly, and returning all of them means returning the same
+detection several times. The standard fix is the same one detection uses:
+suppress everything within a radius of a stronger response, which is exactly
+[non-maximum suppression](iou_and_non_max_suppression.html).
+
+Make the template small &mdash; drag the size control down &mdash; and the map
+becomes noisy, with strong responses in places that merely happen to have a
+similar local pattern. A small template does not contain enough structure to be
+distinctive.
+
+## What it cannot do
+
+The limitations are severe and they are the reason the field developed
+alternatives.
+
+**Rotation.** A template rotated by ten degrees no longer aligns, and the
+correlation falls sharply. Handling rotation means searching over angles as well
+as positions.
+
+**Scale.** The same problem in another dimension. Searching over scales too means
+an image pyramid and a much larger search.
+
+**Deformation.** A face is not a rigid patch. Any object that bends, or that
+varies between instances, cannot be represented by one template.
+
+**Cost.** Every position &#215; every scale &#215; every angle, each requiring
+a full patch comparison, is expensive, though correlation via the FFT helps a
+great deal in the translation-only case.
+
+## Where it is still the right tool
+
+Template matching has not disappeared, because when its assumptions hold it is
+exact, needs no training data, and is trivially explainable.
+
+Industrial inspection with a fixed camera and fixed part orientation. Finding a
+known icon on a screen for UI automation. Aligning scanned documents against a
+form. Matching a fixed logo. In all of these, position is the only unknown, which
+is precisely the case the method solves.
+
+Where the assumptions fail, the successors are **keypoint matching** &mdash;
+[Harris corners](harris_corners.html), SIFT, ORB &mdash; which find distinctive
+points and match those, giving rotation and scale invariance for free, and
+learned detectors, which handle deformation and appearance variation as well.
+
+## Where it goes wrong
+
+**Sum of squared differences under changing light.** Use NCC.
+
+**Taking the argmax without suppression.** The peak is a blob, not a point.
+
+**A template that is too small.** Not distinctive; the map fills with false
+peaks.
+
+**Expecting invariance it does not have.** If the object can rotate or change
+size, this is the wrong method, not a method that needs tuning.
+""",
+    [
+        {"q": "Why is normalised cross-correlation preferred over sum of squared differences?",
+         "options": ["It is faster",
+                     "Standardising both sides removes brightness and contrast changes, so it measures pattern rather than pixel values",
+                     "It handles rotation",
+                     "It produces integer scores"],
+         "answer": 1,
+         "why": "Brightening the image by a constant grows every squared difference even where the shapes match perfectly. Subtracting means and dividing by standard deviations removes that."},
+        {"q": "Why is the peak in a response map a blob rather than a point?",
+         "options": ["The image is blurred",
+                     "A template shifted by one pixel still overlaps almost entirely and still scores well",
+                     "The correlation is normalised",
+                     "The template is too large"],
+         "answer": 1,
+         "why": "That is why non-maximum suppression is needed: several nearby positions score highly and would otherwise be returned as separate detections of the same thing."},
+        {"q": "Which of these does template matching handle natively?",
+         "options": ["Rotation", "Scale change", "Translation", "Deformation"],
+         "answer": 2,
+         "why": "Position is the only unknown it searches over. Rotation and scale require searching those dimensions too, and deformation cannot be represented by a rigid patch at all."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 17. Harris corners
+# ---------------------------------------------------------------------------
+topic(
+    "harris_corners",
+    "Harris Corners and Keypoints",
+    "Matching",
+    "A flat region looks the same from everywhere, an edge looks the same along "
+    "itself, and a corner does not. That difference is computable.",
+    _svg(_box(16, 26, 40, 40, fill=S) + _txt(36, 78, "flat", M, 7)
+         + _box(62, 26, 40, 40, fill=S) + _line(62, 46, 102, 46, B, 2)
+         + _txt(82, 78, "edge", M, 7)
+         + _box(108, 26, 40, 40, fill=S) + _line(108, 46, 128, 46, A, 2)
+         + _line(128, 46, 128, 66, A, 2) + _txt(128, 78, "corner", M, 7)),
+    {
+        "op": "harris",
+        "source": "shapes",
+        "controls": [
+            {"key": "window", "label": "Window radius", "type": "range",
+             "min": 1, "max": 4, "step": 1, "value": 2},
+            {"key": "k", "label": "k (sensitivity)", "type": "range",
+             "min": 0.02, "max": 0.2, "step": 0.01, "value": 0.05},
+            {"key": "threshold", "label": "Response threshold", "type": "range",
+             "min": 0.01, "max": 0.6, "step": 0.01, "value": 0.12},
+        ],
+    },
+    [
+        "Shift a small window in any direction. On flat ground nothing changes; "
+        "along an edge nothing changes; at a corner everything changes.",
+        "The <strong>structure tensor</strong> summarises how the gradient "
+        "behaves in a window. Two large eigenvalues means a corner.",
+        "Harris computes <code class='mono-font'>det(M) &minus; k&middot;trace(M)&sup2;</code>, "
+        "which is large when both eigenvalues are, without computing either.",
+        "Corners are stable under rotation and moderate lighting change, which "
+        "is what makes them useful as landmarks.",
+    ],
+    """
+title: Harris Corners and Keypoints
+intro: What makes a point in an image worth remembering, and the determinant that measures it.
+
+## The question behind the detector
+
+To match two photographs of the same scene, you need points you can recognise in
+both. Which points are those?
+
+The Harris insight is to ask what happens when you shift a small window slightly
+in every direction.
+
+**Flat region.** Shift it anywhere and the contents barely change. There is
+nothing to lock onto: this window could be almost anywhere.
+
+**Edge.** Shift it along the edge and nothing changes; shift it across and
+everything does. It is locatable in one direction and free to slide in the other
+&mdash; the aperture problem.
+
+**Corner.** Shift it in any direction at all and the contents change. Its
+position is pinned in both directions, and that is exactly what a landmark needs
+to be.
+
+## Making it arithmetic
+
+The change under a small shift is captured by how the image gradient behaves
+across the window. Collect the gradients into the **structure tensor**:
+
+```
+M  =  [ sum(Ix*Ix)   sum(Ix*Iy) ]
+      [ sum(Ix*Iy)   sum(Iy*Iy) ]
+```
+
+Its two eigenvalues say how strongly the intensity varies along the two principal
+directions:
+
+| &lambda;1 | &lambda;2 | Meaning |
+|---|---|---|
+| small | small | flat |
+| large | small | edge |
+| large | large | **corner** |
+
+Computing eigenvalues at every pixel would be slow, so Harris uses a combination
+that behaves the same way without them:
+
+```
+R  =  det(M) - k * trace(M)^2
+     =  (l1*l2) - k*(l1+l2)^2
+```
+
+`R` is large and positive only when both eigenvalues are large, strongly negative
+at an edge, and near zero on flat ground. The determinant multiplies the
+eigenvalues, so one small eigenvalue kills it; the trace term subtracts a penalty
+that grows when the two are unbalanced.
+
+`k` sets how strictly that balance is enforced &mdash; conventionally between
+0.04 and 0.06. Drag it high in the visualisation and detections thin out to the
+sharpest corners; drag it low and edges start to survive.
+
+## Reading the visualisation
+
+Highlighted pixels are those whose response clears the threshold.
+
+Set the threshold low and whole edges light up, which is the failure mode `R` is
+designed to avoid, appearing because the threshold is admitting weakly negative
+and near-zero responses. Raise it and only the rectangle's four corners and the
+triangle's points remain &mdash; the genuinely distinctive positions.
+
+The window radius controls how much context each decision uses. A small window is
+sensitive to noise and finds many tiny corners. A large one is stable but blurs
+nearby corners into a single response and misses fine structure.
+
+## What it is and is not invariant to
+
+**Rotation: yes.** The eigenvalues of the structure tensor do not depend on the
+coordinate frame, so a rotated corner is still a corner with the same response.
+This is the property that makes Harris useful for matching.
+
+**Illumination: mostly.** A constant brightness offset does not change gradients
+at all. A contrast scaling multiplies them, which scales `R`, so a relative
+threshold is needed rather than an absolute one.
+
+**Scale: no.** This is the significant gap. A corner viewed from twice as far is
+a smaller corner, and a fixed window either sees only part of it or swamps it
+with context.
+
+That gap is what **SIFT** addressed, by searching over scales as well as
+positions and recording the scale at which each keypoint is most distinctive,
+then describing the local gradient pattern so keypoints can be matched rather
+than merely found. **ORB** does something similar much faster using FAST corners
+and binary descriptors, which is why it turns up in real-time systems.
+
+## Where corners are used
+
+Panorama stitching, structure from motion, visual SLAM, camera calibration and
+image registration all rest on finding the same physical points in several images
+and solving for the transform between them. Detection is the first step;
+[template matching](template_matching.html) is the alternative that does not
+survive rotation.
+
+## Where it goes wrong
+
+**An absolute threshold.** Response scales with contrast, so a threshold tuned on
+one image fails on a darker one. Threshold relative to the maximum, as this page
+does.
+
+**No non-maximum suppression.** A corner produces a cluster of high responses,
+not one pixel.
+
+**Expecting scale invariance.** If the camera distance varies, use a
+scale-invariant detector.
+
+**Corners on a blurred image.** Blur destroys the gradients the whole method
+depends on, so denoise gently or not at all before detecting.
+""",
+    [
+        {"q": "What distinguishes a corner from an edge in the structure tensor?",
+         "options": ["A larger determinant only",
+                     "Both eigenvalues are large, rather than one",
+                     "The trace is zero",
+                     "The gradients point the same way"],
+         "answer": 1,
+         "why": "An edge has one large eigenvalue and one small one, so the window can slide along it freely. A corner is pinned in both directions."},
+        {"q": "Why does Harris compute det(M) - k*trace(M)^2 instead of the eigenvalues?",
+         "options": ["It is more accurate",
+                     "It behaves the same way - large only when both eigenvalues are large - without the cost of an eigendecomposition per pixel",
+                     "Eigenvalues can be complex",
+                     "It handles scale"],
+         "answer": 1,
+         "why": "The determinant is the product of the eigenvalues, so one small one kills it, and the trace term penalises imbalance. k sets how strictly."},
+        {"q": "What is Harris NOT invariant to?",
+         "options": ["Rotation", "Constant brightness offset", "Scale", "Translation"],
+         "answer": 2,
+         "why": "A corner viewed from twice the distance is a smaller corner, and a fixed window either sees part of it or swamps it. SIFT addressed this by searching over scales."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 18. Vision Transformer patches
+# ---------------------------------------------------------------------------
+topic(
+    "vision_transformer_patches",
+    "Vision Transformer Patches",
+    "Architectures",
+    "How an image becomes a sequence of tokens, and what that costs when the "
+    "patches get smaller.",
+    _svg(_grid(28, 22, 17, 6, 3, fill=S)
+         + _txt(80, 78, "an image, as a sentence", M, 8)),
+    {
+        "op": "patches",
+        "source": "colour",
+        "controls": [
+            {"key": "patch", "label": "Patch size", "type": "range",
+             "min": 4, "max": 48, "step": 4, "value": 16},
+        ],
+    },
+    [
+        "A transformer takes a sequence of vectors. An image is a grid, so it "
+        "has to be cut into patches and flattened.",
+        "Each patch is flattened to <code class='mono-font'>P&sup2;&#215;3</code> "
+        "numbers and projected to the model's width by a single linear layer.",
+        "The patch grid <em>is</em> the resolution the model sees. There is no "
+        "convolution underneath it.",
+        "Attention cost grows with the square of the token count, so halving the "
+        "patch size costs sixteen times the attention.",
+    ],
+    """
+title: Vision Transformer Patches
+intro: The one step that lets a language architecture read a photograph, and the quadratic cost hiding in it.
+
+## Images are grids; transformers want sequences
+
+A transformer operates on a sequence of vectors and has no built-in notion of
+two dimensions. An image is a grid of pixels. Something has to convert one into
+the other.
+
+The obvious approach &mdash; one token per pixel &mdash; is impossible. A
+224&#215;224 image is 50,176 pixels, and attention costs grow with the square of
+the sequence length, so that is 2.5 billion pairwise interactions per layer.
+
+The Vision Transformer's answer is almost aggressively simple: **cut the image
+into square patches and treat each patch as a token.**
+
+## The whole preprocessing step
+
+Drag the patch control and watch the grid change. That is genuinely all that
+happens to the image before it enters the model:
+
+1. Cut into non-overlapping `P`&#215;`P` patches.
+2. Flatten each patch to a vector of `P * P * 3` numbers.
+3. Multiply by one learned matrix to get the model width.
+4. Add a positional embedding, because otherwise the order is unknown.
+
+At the default of 16 pixels on a 224-pixel image, that is a 14&#215;14 grid,
+196 tokens, each starting as 768 raw numbers. The readout gives the same figures
+for whatever patch size you choose.
+
+Step 3 is the only learned part, and it is a linear projection with no
+non-linearity. Equivalently, it is a convolution with kernel size `P` and stride
+`P` &mdash; which is how it is usually implemented, and a nice reminder that the
+distinction between "convolutional" and "not" is thinner than the naming
+suggests.
+
+## The quadratic cost
+
+Halve the patch size and the token count quadruples, because the grid gains a
+factor of two in each dimension. Attention cost goes with the square of the token
+count, so it rises **sixteenfold**.
+
+| Patch | Tokens (224px) | Attention cost |
+|---|---|---|
+| 32 | 49 | 1&#215; |
+| 16 | 196 | 16&#215; |
+| 8 | 784 | 256&#215; |
+| 4 | 3,136 | 4,096&#215; |
+
+That table is the central constraint on ViT design, and it explains a great deal
+of what followed. Patch size is not a minor hyperparameter; it is the resolution
+at which the model perceives anything, traded directly against compute.
+
+## What is lost inside a patch
+
+A 16&#215;16 patch is compressed to a single vector. Structure within it is not
+attended to at all; whatever the projection preserves is what survives.
+
+This is the ViT's real weakness at small scale. A convolutional network has
+locality built in &mdash; nearby pixels are processed together by construction
+&mdash; and this **inductive bias** matches how images actually work. A ViT has
+none of it. Every relationship, including "these two patches are adjacent", must
+be learned from data through the positional embeddings.
+
+Which is why the original paper's headline finding was about data. On ImageNet
+alone the ViT underperformed a ResNet; pre-trained on 300 million images it
+overtook it. With enough data the model learns the structure that convolution
+assumes, and gains flexibility convolution does not have.
+
+Two responses followed. **DeiT** showed careful augmentation and distillation
+could train a ViT on ImageNet alone. **Swin Transformer** reintroduced locality
+by restricting attention to windows and merging patches hierarchically, which
+gives back the pyramid a CNN has and makes dense prediction practical.
+
+## Positional embeddings
+
+Attention is permutation-invariant: shuffle the tokens and the output is
+shuffled identically, with nothing else changed. Without positional information
+a ViT literally cannot tell a photograph from a jigsaw of itself.
+
+The fix is to add a learned vector per position. It is worth appreciating how
+weak this is compared with convolution: the model is told "this is position 37"
+and must learn from data that position 37 is next to 36 and above 23.
+
+Changing the input resolution changes the number of positions, which is why ViTs
+interpolate their positional embeddings when fine-tuned at a different size.
+
+## Where it goes wrong
+
+**Shrinking the patch to gain resolution.** The attention cost is quadratic in
+tokens, so this gets expensive faster than expected.
+
+**Training a plain ViT on a small dataset.** Without the inductive bias it needs
+either far more data or the DeiT training recipe.
+
+**Forgetting positional embeddings on a resized input.** The count must match,
+and interpolation is required.
+
+**Assuming patches must be square and non-overlapping.** Overlapping patches
+help; several later architectures use them.
+""",
+    [
+        {"q": "What does the projection step applied to each patch amount to?",
+         "options": ["A small CNN",
+                     "A single linear layer, equivalently a convolution with kernel and stride both equal to the patch size",
+                     "An attention block",
+                     "A pooling operation"],
+         "answer": 1,
+         "why": "It is the only learned part of the patching step and it has no non-linearity - which is why it is usually implemented as a strided convolution."},
+        {"q": "Halving the patch size multiplies attention cost by roughly how much?",
+         "options": ["2", "4", "16", "8"],
+         "answer": 2,
+         "why": "Token count quadruples because the grid doubles in each dimension, and attention is quadratic in token count, so cost rises sixteenfold."},
+        {"q": "Why did the original ViT underperform a ResNet on ImageNet alone?",
+         "options": ["It had fewer parameters",
+                     "It has no built-in locality, so relationships convolution assumes must be learned from data",
+                     "Attention cannot represent edges",
+                     "The patches were too large"],
+         "answer": 1,
+         "why": "Pre-trained on 300 million images it overtook the ResNet. With enough data it learns the structure convolution assumes, and gains flexibility convolution lacks."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 19. Grad-CAM
+# ---------------------------------------------------------------------------
+topic(
+    "grad_cam",
+    "Grad-CAM",
+    "Interpretability",
+    "Weight each feature map by how much the score depends on it, add them up, "
+    "and keep the positive part. That is the heatmap.",
+    _svg(_box(12, 24, 30, 20, fill=S) + _txt(27, 38, "map", M, 7)
+         + _box(12, 50, 30, 20, fill=S) + _txt(27, 64, "map", M, 7)
+         + _txt(52, 48, "&#215;w", A, 9)
+         + _box(70, 34, 34, 26, fill=S, stroke=A) + _txt(87, 50, "sum", A, 8)
+         + _txt(112, 48, "ReLU", M, 8)
+         + _txt(80, 82, "evidence for, not against", M, 7)),
+    {
+        "diagram": "gradcam",
+        "controls": [
+            {"key": "w1", "label": "Weight for map 1", "type": "range",
+             "min": -1.5, "max": 2, "step": 0.1, "value": 1.2},
+            {"key": "w2", "label": "Weight for map 2", "type": "range",
+             "min": -1.5, "max": 2, "step": 0.1, "value": 0.6},
+            {"key": "w3", "label": "Weight for map 3", "type": "range",
+             "min": -1.5, "max": 2, "step": 0.1, "value": -0.8},
+        ],
+    },
+    [
+        "The weights are the gradient of the class score with respect to each "
+        "feature map, averaged over its spatial positions.",
+        "A weight says how much raising that map's activations would raise the "
+        "score &mdash; how much the class depends on it.",
+        "The final <code class='mono-font'>ReLU</code> is deliberate: it keeps "
+        "evidence <em>for</em> the class and discards evidence against it.",
+        "The heatmap is the size of the feature map, usually 7&#215;7, and is "
+        "upsampled to the image. It is coarse by construction.",
+    ],
+    """
+title: Grad-CAM
+intro: A heatmap of which regions a network used, built from gradients it already computes.
+
+## The question
+
+A network says "cat". Which part of the image made it say that?
+
+Grad-CAM answers with a heatmap, and it does so using quantities the network
+produces anyway during backpropagation, which is why it works on any
+convolutional architecture without retraining or modification.
+
+## The recipe
+
+Take the feature maps from the last convolutional layer &mdash; typically 512 or
+2048 of them, each perhaps 7&#215;7. Then:
+
+1. Compute the gradient of the class score with respect to each feature map.
+2. Average each gradient over its spatial positions. That number is the map's
+   **weight**.
+3. Sum the feature maps, weighted by those numbers.
+4. Apply a ReLU.
+5. Upsample the result to the image size.
+
+Steps 3 and 4 are what the visualisation shows. Three synthetic feature maps sit
+on the left, each with its own weight slider, and the combined heatmap is on the
+right. The maps are made up; the weighting arithmetic is exactly Grad-CAM's.
+
+## What a weight means
+
+The gradient of the score with respect to a feature map answers: if this map's
+activations rose slightly, how much would the class score rise?
+
+A **large positive weight** means the class depends heavily on that map, so
+wherever it is active is evidence for the class.
+
+A **negative weight** means the opposite &mdash; that feature argues *against*
+this class. Set one of the sliders negative and watch what happens to the
+heatmap: the region belonging to that map does not go dark, it simply stops
+contributing, because of the ReLU.
+
+## Why the ReLU is there
+
+This is the step people skip and then misread the output.
+
+Without the ReLU the heatmap would contain negative regions, meaning "this area
+argued against the class". Grad-CAM discards them deliberately, because the
+question being asked is *what supported this prediction* &mdash; and a
+visualisation mixing support and opposition in one colour scale is very easy to
+misread.
+
+The consequence is that **Grad-CAM never shows you evidence against a class**.
+Drag all three sliders negative: the heatmap is empty, not inverted. If you want
+to know what argued against a prediction, this is the wrong tool, and running it
+on the competing class is usually the practical answer.
+
+## Its limits
+
+**Resolution.** The heatmap has the spatial size of the last convolutional layer,
+often 7&#215;7. Upsampling to 224&#215;224 produces a smooth blob, and that
+smoothness is interpolation rather than evidence. Grad-CAM cannot tell you which
+pixel mattered, only which seventh of the image.
+
+**One layer.** It explains the last convolutional layer. Earlier layers see
+different things, and the choice of layer changes the answer.
+
+**Plausibility is not correctness.** A heatmap over the animal's face looks
+convincing whether or not the model used the face. Grad-CAM shows what the
+gradients say, and there is published work on saliency methods that produce
+sensible-looking maps for randomly initialised networks &mdash; so a
+reasonable-looking heatmap is not evidence the model is reasoning well.
+
+**It does not survive every architecture unchanged.** Transformers have no final
+convolutional layer, so attention rollout or a variant is used instead.
+
+## Relatives
+
+**CAM**, the predecessor, required the architecture to end in [global average
+pooling](global_average_pooling.html) followed by one dense layer, and read the
+weights straight from that layer. Grad-CAM's contribution was getting the same
+weights from gradients instead, which removed the architectural requirement.
+
+**Grad-CAM++** handles several instances of the same class better.
+**Score-CAM** drops gradients entirely, measuring each map's importance by
+occluding with it and seeing what the score does &mdash; slower, and immune to
+gradient saturation.
+
+## Where it goes wrong
+
+**Reading the smooth blob as pixel-level evidence.** It is 7&#215;7,
+interpolated.
+
+**Explaining the wrong class.** Run it on the predicted class *and* on the class
+you expected; the difference is usually the informative part.
+
+**Treating it as proof.** A plausible heatmap is a hypothesis about the model,
+not a verification of it.
+
+**Choosing a layer without saying so.** The layer is a parameter, and the answer
+depends on it.
+""",
+    [
+        {"q": "Where does a feature map's weight come from?",
+         "options": ["The dense layer's coefficients",
+                     "The gradient of the class score with respect to that map, averaged over its spatial positions",
+                     "The map's mean activation",
+                     "A learned attention head"],
+         "answer": 1,
+         "why": "It answers how much raising that map's activations would raise the class score. Getting it from gradients is what freed Grad-CAM from CAM's architectural requirement."},
+        {"q": "What does the final ReLU do?",
+         "options": ["Normalises the heatmap",
+                     "Discards evidence against the class, keeping only what supported it",
+                     "Removes negative gradients before weighting",
+                     "Upsamples the result"],
+         "answer": 1,
+         "why": "Drag all the weights negative and the heatmap is empty rather than inverted. Grad-CAM cannot show what argued against a prediction; run it on the competing class instead."},
+        {"q": "Why is a Grad-CAM heatmap coarse?",
+         "options": ["The gradients are approximated",
+                     "It has the spatial size of the last convolutional layer, often 7x7, and is interpolated up",
+                     "The ReLU removes detail",
+                     "It averages over the batch"],
+         "answer": 1,
+         "why": "The smoothness of the blob is interpolation, not evidence. It can say which seventh of the image mattered, not which pixel."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 20. Instance vs semantic vs panoptic segmentation
+# ---------------------------------------------------------------------------
+topic(
+    "segmentation_tasks",
+    "Semantic, Instance and Panoptic Segmentation",
+    "Segmentation",
+    "Three tasks that all colour in pixels, and differ in exactly two "
+    "questions: do objects get separate ids, and does the background count.",
+    _svg(_box(14, 26, 40, 40, fill=S) + _txt(34, 78, "semantic", M, 7)
+         + _box(60, 26, 40, 40, fill=S, stroke=A) + _txt(80, 78, "instance", M, 7)
+         + _box(106, 26, 40, 40, fill=S, stroke=A) + _txt(126, 78, "panoptic", M, 7)),
+    {
+        "op": "segmentation",
+        "source": "shapes",
+        "controls": [
+            {"key": "task", "label": "Task", "type": "select", "value": "semantic",
+             "options": [{"value": "semantic", "label": "Semantic"},
+                         {"value": "instance", "label": "Instance"},
+                         {"value": "panoptic", "label": "Panoptic"}]},
+        ],
+    },
+    [
+        "<strong>Semantic</strong>: every pixel gets a class. Two adjacent cars "
+        "are one region called 'car'.",
+        "<strong>Instance</strong>: every object gets its own id. The background "
+        "is not labelled at all.",
+        "<strong>Panoptic</strong>: every pixel gets a class <em>and</em> objects "
+        "keep separate ids. Both at once.",
+        "The distinction is <strong>things</strong> (countable objects) against "
+        "<strong>stuff</strong> (sky, road, grass), which has no instances.",
+    ],
+    """
+title: Semantic, Instance and Panoptic Segmentation
+intro: Three tasks, one scene, and the two questions that separate them.
+
+## Two questions
+
+Every segmentation task colours in pixels. What differs is the answer to two
+questions:
+
+1. Do two objects of the same class get **separate identities**?
+2. Does the **background** get labelled?
+
+Switch between the three settings above and watch the two discs and the
+background. That is the entire taxonomy, visible in one scene.
+
+| | Separate ids | Background labelled |
+|---|---|---|
+| Semantic | no | yes |
+| Instance | yes | no |
+| Panoptic | yes | yes |
+
+## Things and stuff
+
+The vocabulary that makes this coherent is **things** against **stuff**.
+
+**Things** are countable: people, cars, dogs, bottles. Asking "how many" makes
+sense, so instances make sense.
+
+**Stuff** is uncountable: sky, road, grass, water. "How many skies" is not a
+question. Stuff has extent but not instances.
+
+Semantic segmentation treats everything as stuff &mdash; it only ever assigns
+classes. Instance segmentation only handles things &mdash; it needs something to
+count. Panoptic segmentation covers both, which is why it needed a name of its
+own.
+
+## Semantic
+
+Every pixel gets a class label. Two overlapping cars are one connected region
+labelled "car", and nothing in the output says there were two.
+
+The standard architectures are fully convolutional: U-Net, DeepLab, SegFormer.
+The metric is mean IoU per class. This is the right task when what matters is
+area rather than count &mdash; how much of this field is diseased, which pixels
+are road, what fraction of the scan is tumour.
+
+## Instance
+
+Every object gets its own mask and identity, and pixels belonging to no object
+are left unlabelled.
+
+Mask R-CNN is the canonical approach: detect boxes first, then predict a mask
+inside each. That ordering has a consequence &mdash; masks can overlap, and a
+pixel can belong to two instances, because nothing forces a single answer per
+pixel.
+
+This is the right task when counting matters: how many cells, how many people,
+which pallet is which.
+
+## Panoptic
+
+Every pixel gets exactly one class, and pixels belonging to things also get an
+instance id. Stuff regions get a class and no id.
+
+The word means "everything visible", and the point of the 2018 paper that named
+it was that the semantic and instance communities had been solving halves of the
+same problem with different metrics and different architectures.
+
+The constraint that makes it harder than running both is **exactly one label per
+pixel**. Instance methods produce overlapping masks and semantic methods ignore
+instances, so combining them requires resolving conflicts. Panoptic FPN and
+Mask2Former do it in one model instead.
+
+Its metric, **PQ**, multiplies a segmentation quality term (mean IoU over matched
+segments) by a recognition quality term (an F1 over whether segments were matched
+at all), which prevents a method from scoring well by getting the pixels roughly
+right while missing objects entirely.
+
+## Choosing
+
+Ask what the output is for.
+
+**Area, no counting** &mdash; semantic. Land cover, tumour extent, drivable
+surface.
+
+**Counting or tracking individuals** &mdash; instance. Cell counting, retail
+stock, people in a queue.
+
+**A complete scene description** &mdash; panoptic. Autonomous driving needs both
+"where is the road" (stuff) and "which car is which" (things), and needs them
+consistent.
+
+## Where it goes wrong
+
+**Using semantic segmentation to count.** Two touching objects are one region.
+Post-hoc connected components will merge them.
+
+**Expecting instance segmentation to label the background.** It does not; that
+is not an oversight.
+
+**Comparing mIoU with PQ.** Different metrics on different tasks.
+
+**Ignoring the one-label constraint.** Merging separate semantic and instance
+outputs into a panoptic one requires a conflict rule, and the rule affects the
+score.
+""",
+    [
+        {"q": "What is the difference between semantic and panoptic segmentation?",
+         "options": ["Panoptic labels the background too",
+                     "Panoptic also gives countable objects separate instance ids",
+                     "Semantic uses boxes",
+                     "Panoptic ignores stuff classes"],
+         "answer": 1,
+         "why": "Both label every pixel with a class. Only panoptic additionally distinguishes two adjacent cars as two objects rather than one 'car' region."},
+        {"q": "Why does instance segmentation not label the background?",
+         "options": ["It is too expensive",
+                     "It handles only 'things' - countable objects - and stuff like sky has no instances to assign",
+                     "The background has no texture",
+                     "It is left to a separate model"],
+         "answer": 1,
+         "why": "Asking 'how many skies' is not a question. Instance methods need something countable, which is exactly why panoptic segmentation needed a name of its own."},
+        {"q": "What makes panoptic harder than running a semantic and an instance model together?",
+         "options": ["Two models are slower",
+                     "Panoptic requires exactly one label per pixel, and instance masks can overlap",
+                     "The metrics are incompatible",
+                     "Stuff classes cannot be detected"],
+         "answer": 1,
+         "why": "Mask R-CNN style methods can assign a pixel to two instances. Producing one consistent labelling requires resolving those conflicts, which is what panoptic architectures do directly."},
     ],
 )
 

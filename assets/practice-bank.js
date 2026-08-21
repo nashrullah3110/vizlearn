@@ -1724,6 +1724,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/anchor_boxes.html",
+  "title": "Anchor Boxes",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "What does the network predict for each anchor?",
+    "o": [
+     "Absolute box coordinates",
+     "An offset from that anchor, plus whether an object is present",
+     "A segmentation mask",
+     "The class only"
+    ],
+    "a": 1,
+    "w": "Regressing a small correction to a known reference box is far easier than producing coordinates from nothing, and it makes the output a fixed-size tensor."
+   },
+   {
+    "t": "Why do anchors with middling IoU get ignored rather than labelled?",
+    "o": [
+     "To save computation",
+     "They are genuinely ambiguous, and forcing them either way teaches the network something untrue",
+     "They are duplicates",
+     "IoU cannot be computed for them"
+    ],
+    "a": 1,
+    "w": "An anchor at IoU 0.4 neither clearly covers the object nor clearly misses it. The ignore band keeps that ambiguity out of the loss."
+   },
+   {
+    "t": "Why does focal loss exist?",
+    "o": [
+     "To speed up training",
+     "Because tens of thousands of anchors are negative, so easy background dominates the loss",
+     "To handle overlapping boxes",
+     "To replace IoU"
+    ],
+    "a": 1,
+    "w": "It down-weights examples the model already classifies correctly, which is what let one-stage detectors match two-stage ones."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/blur_gaussian_median_bilateral.html",
   "title": "Blur: Gaussian, Median and Bilateral",
   "cat": "Computer Vision",
@@ -1945,6 +1985,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/depthwise_separable_convolution.html",
+  "title": "Depthwise Separable Convolution",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "What does the depthwise step mix?",
+    "o": [
+     "Channels only",
+     "Neighbours only, keeping channels separate",
+     "Both",
+     "Neither"
+    ],
+    "a": 1,
+    "w": "One k x k filter per input channel, producing one output channel each. The pointwise 1x1 that follows does the channel mixing."
+   },
+   {
+    "t": "Why does the saving approach k squared for wide layers?",
+    "o": [
+     "The kernel grows",
+     "The ratio is 1/(1/Cout + 1/k^2), and the 1/Cout term vanishes as Cout grows",
+     "Depthwise convolutions have no weights",
+     "Wide layers use fewer channels"
+    ],
+    "a": 1,
+    "w": "With many output channels the pointwise cost becomes small relative to the full convolution, leaving the k^2 factor - nine for a 3x3, 49 for a 7x7."
+   },
+   {
+    "t": "Why is the wall-clock speed-up usually smaller than the parameter saving?",
+    "o": [
+     "The pointwise step dominates",
+     "A depthwise convolution does little arithmetic per byte touched, so it is memory-bound",
+     "It needs more layers",
+     "The weights are stored differently"
+    ],
+    "a": 1,
+    "w": "Hardware tuned for dense matrix multiplication cannot reach peak throughput on an operation that is starved of arithmetic per memory access."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/dilated_convolutions.html",
+  "title": "Dilated Convolutions",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "How wide does a 3x3 kernel at dilation 3 reach?",
+    "o": [
+     "3",
+     "7",
+     "9",
+     "5"
+    ],
+    "a": 1,
+    "w": "k + (k-1)(d-1) = 3 + 2*2 = 7. Nine weights spanning seven positions - the parameter count is unchanged."
+   },
+   {
+    "t": "What causes gridding artefacts?",
+    "o": [
+     "Too few weights",
+     "Several layers at the same dilation rate, so some input positions are never sampled by any of them",
+     "Dilation larger than the kernel",
+     "Missing padding"
+    ],
+    "a": 1,
+    "w": "The taps land on the same offsets at every level, leaving positions in between unread. Varying the rate so the sampling patterns interlock is the fix."
+   },
+   {
+    "t": "Why is dilation preferred over pooling in segmentation?",
+    "o": [
+     "It is faster",
+     "It grows the receptive field without reducing resolution, and the output must match the input size",
+     "It uses fewer weights than pooling",
+     "Pooling cannot be backpropagated"
+    ],
+    "a": 1,
+    "w": "Detail destroyed by pooling has to be reconstructed by something. Dilation buys reach while the feature map stays full size - at the cost of memory."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/erosion_and_dilation.html",
   "title": "Erosion and Dilation",
   "cat": "Computer Vision",
@@ -2004,6 +2124,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/global_average_pooling.html",
+  "title": "Global Average Pooling against Flatten",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "How many times fewer weights does GAP need than flatten, for a 7x7 feature map?",
+    "o": [
+     "7",
+     "49",
+     "512",
+     "It depends on the number of classes"
+    ],
+    "a": 1,
+    "w": "The ratio is exactly the spatial area of the map. The number of channels and classes appear in both counts and cancel."
+   },
+   {
+    "t": "Why can a GAP network accept any input size?",
+    "o": [
+     "It resizes the input",
+     "The mean of a channel is one number whatever the spatial dimensions were",
+     "It uses adaptive convolutions",
+     "The dense layer is optional"
+    ],
+    "a": 1,
+    "w": "A flattened network's dense layer expects exactly as many inputs as the flatten produced, which fixes the input size. Pooling removes that constraint."
+   },
+   {
+    "t": "What does global average pooling discard?",
+    "o": [
+     "The channel identity",
+     "Where in the feature map each activation occurred",
+     "The magnitude of the activations",
+     "Half the channels"
+    ],
+    "a": 1,
+    "w": "It records that a channel fired, not where. For classification that is usually the right trade, since the convolutional layers already encode structure into which channels fire."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/grad_cam.html",
+  "title": "Grad-CAM",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Where does a feature map's weight come from?",
+    "o": [
+     "The dense layer's coefficients",
+     "The gradient of the class score with respect to that map, averaged over its spatial positions",
+     "The map's mean activation",
+     "A learned attention head"
+    ],
+    "a": 1,
+    "w": "It answers how much raising that map's activations would raise the class score. Getting it from gradients is what freed Grad-CAM from CAM's architectural requirement."
+   },
+   {
+    "t": "What does the final ReLU do?",
+    "o": [
+     "Normalises the heatmap",
+     "Discards evidence against the class, keeping only what supported it",
+     "Removes negative gradients before weighting",
+     "Upsamples the result"
+    ],
+    "a": 1,
+    "w": "Drag all the weights negative and the heatmap is empty rather than inverted. Grad-CAM cannot show what argued against a prediction; run it on the competing class instead."
+   },
+   {
+    "t": "Why is a Grad-CAM heatmap coarse?",
+    "o": [
+     "The gradients are approximated",
+     "It has the spatial size of the last convolutional layer, often 7x7, and is interpolated up",
+     "The ReLU removes detail",
+     "It averages over the batch"
+    ],
+    "a": 1,
+    "w": "The smoothness of the blob is interpolation, not evidence. It can say which seventh of the image mattered, not which pixel."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/grayscale_image_processing.html",
   "title": "Grayscale Image Processing",
   "cat": "Computer Vision",
@@ -2015,6 +2215,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What is meant by “Neighborhood operations” here?",
     "ans": "(like Blur and Edge Detection) calculate a pixel's new value based on its neighbors."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/harris_corners.html",
+  "title": "Harris Corners and Keypoints",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "What distinguishes a corner from an edge in the structure tensor?",
+    "o": [
+     "A larger determinant only",
+     "Both eigenvalues are large, rather than one",
+     "The trace is zero",
+     "The gradients point the same way"
+    ],
+    "a": 1,
+    "w": "An edge has one large eigenvalue and one small one, so the window can slide along it freely. A corner is pinned in both directions."
+   },
+   {
+    "t": "Why does Harris compute det(M) - k*trace(M)^2 instead of the eigenvalues?",
+    "o": [
+     "It is more accurate",
+     "It behaves the same way - large only when both eigenvalues are large - without the cost of an eigendecomposition per pixel",
+     "Eigenvalues can be complex",
+     "It handles scale"
+    ],
+    "a": 1,
+    "w": "The determinant is the product of the eigenvalues, so one small one kills it, and the trace term penalises imbalance. k sets how strictly."
+   },
+   {
+    "t": "What is Harris NOT invariant to?",
+    "o": [
+     "Rotation",
+     "Constant brightness offset",
+     "Scale",
+     "Translation"
+    ],
+    "a": 2,
+    "w": "A corner viewed from twice the distance is a smaller corner, and a fixed window either sees part of it or swamps it. SIFT addressed this by searching over scales."
    }
   ]
  },
@@ -2112,6 +2352,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Non-Max Suppression”?",
     "ans": "NMS turns that overlap score into a cleanup rule. Sort every proposal by confidence, descending. Take the top one, keep it, and discard every remaining box whose IoU with it exceeds a threshold — those are treated as duplicate detections of the same object. Move to the next surviving box by confidence and repeat, until nothing is left to process."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/mean_average_precision.html",
+  "title": "Mean Average Precision",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Why must a matched ground-truth box be excluded from later matches?",
+    "o": [
+     "To save computation",
+     "Otherwise several overlapping predictions on one object would each count as a success",
+     "IoU cannot be computed twice",
+     "The boxes are consumed by NMS"
+    ],
+    "a": 1,
+    "w": "Only the highest-confidence prediction claims a ground-truth box; the rest become false positives. Without that rule a detector could inflate its score by firing repeatedly."
+   },
+   {
+    "t": "Why is a COCO mAP much lower than a VOC mAP on the same predictions?",
+    "o": [
+     "COCO has more classes",
+     "COCO averages over IoU thresholds from 0.50 to 0.95, rewarding precise localisation",
+     "COCO uses a different precision formula",
+     "COCO images are harder"
+    ],
+    "a": 1,
+    "w": "VOC reported at IoU 0.5 alone. Averaging up to 0.95 demands nearly exact boxes, so the two numbers are different measurements and cannot be compared."
+   },
+   {
+    "t": "What does mAP say about which confidence threshold to deploy?",
+    "o": [
+     "It gives the optimal threshold",
+     "Nothing - it integrates over every threshold",
+     "It assumes 0.5",
+     "It uses the threshold that maximises F1"
+    ],
+    "a": 1,
+    "w": "AP summarises the whole ranking. Choosing an operating point is a separate decision, made from the costs of the two kinds of error."
    }
   ]
  },
@@ -2379,6 +2659,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/segmentation_tasks.html",
+  "title": "Semantic, Instance and Panoptic Segmentation",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "What is the difference between semantic and panoptic segmentation?",
+    "o": [
+     "Panoptic labels the background too",
+     "Panoptic also gives countable objects separate instance ids",
+     "Semantic uses boxes",
+     "Panoptic ignores stuff classes"
+    ],
+    "a": 1,
+    "w": "Both label every pixel with a class. Only panoptic additionally distinguishes two adjacent cars as two objects rather than one 'car' region."
+   },
+   {
+    "t": "Why does instance segmentation not label the background?",
+    "o": [
+     "It is too expensive",
+     "It handles only 'things' - countable objects - and stuff like sky has no instances to assign",
+     "The background has no texture",
+     "It is left to a separate model"
+    ],
+    "a": 1,
+    "w": "Asking 'how many skies' is not a question. Instance methods need something countable, which is exactly why panoptic segmentation needed a name of its own."
+   },
+   {
+    "t": "What makes panoptic harder than running a semantic and an instance model together?",
+    "o": [
+     "Two models are slower",
+     "Panoptic requires exactly one label per pixel, and instance masks can overlap",
+     "The metrics are incompatible",
+     "Stuff classes cannot be detected"
+    ],
+    "a": 1,
+    "w": "Mask R-CNN style methods can assign a pixel to two instances. Producing one consistent labelling requires resolving those conflicts, which is what panoptic architectures do directly."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/strides_in_cnn.html",
   "title": "Strides in CNN",
   "cat": "Computer Vision",
@@ -2394,6 +2714,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “How far the filter jumps”?",
     "ans": "Stride is the step size the filter takes as it slides. Stride 1 moves one pixel at a time and looks at every possible position. Stride 2 skips every other position, halving the output in both dimensions."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/template_matching.html",
+  "title": "Template Matching",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Why is normalised cross-correlation preferred over sum of squared differences?",
+    "o": [
+     "It is faster",
+     "Standardising both sides removes brightness and contrast changes, so it measures pattern rather than pixel values",
+     "It handles rotation",
+     "It produces integer scores"
+    ],
+    "a": 1,
+    "w": "Brightening the image by a constant grows every squared difference even where the shapes match perfectly. Subtracting means and dividing by standard deviations removes that."
+   },
+   {
+    "t": "Why is the peak in a response map a blob rather than a point?",
+    "o": [
+     "The image is blurred",
+     "A template shifted by one pixel still overlaps almost entirely and still scores well",
+     "The correlation is normalised",
+     "The template is too large"
+    ],
+    "a": 1,
+    "w": "That is why non-maximum suppression is needed: several nearby positions score highly and would otherwise be returned as separate detections of the same thing."
+   },
+   {
+    "t": "Which of these does template matching handle natively?",
+    "o": [
+     "Rotation",
+     "Scale change",
+     "Translation",
+     "Deformation"
+    ],
+    "a": 2,
+    "w": "Position is the only unknown it searches over. Rotation and scale require searching those dimensions too, and deformation cannot be represented by a rigid patch at all."
    }
   ]
  },
@@ -2453,6 +2813,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “The Three Strategies”?",
     "ans": "We ignore pre-trained weights and initialize the entire network randomly. The network has no prior knowledge. The accuracy climbs very slowly, and on a small dataset, heavy models like VGG-16 will likely overfit and fail to reach high performance."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/vision_transformer_patches.html",
+  "title": "Vision Transformer Patches",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "What does the projection step applied to each patch amount to?",
+    "o": [
+     "A small CNN",
+     "A single linear layer, equivalently a convolution with kernel and stride both equal to the patch size",
+     "An attention block",
+     "A pooling operation"
+    ],
+    "a": 1,
+    "w": "It is the only learned part of the patching step and it has no non-linearity - which is why it is usually implemented as a strided convolution."
+   },
+   {
+    "t": "Halving the patch size multiplies attention cost by roughly how much?",
+    "o": [
+     "2",
+     "4",
+     "16",
+     "8"
+    ],
+    "a": 2,
+    "w": "Token count quadruples because the grid doubles in each dimension, and attention is quadratic in token count, so cost rises sixteenfold."
+   },
+   {
+    "t": "Why did the original ViT underperform a ResNet on ImageNet alone?",
+    "o": [
+     "It had fewer parameters",
+     "It has no built-in locality, so relationships convolution assumes must be learned from data",
+     "Attention cannot represent edges",
+     "The patches were too large"
+    ],
+    "a": 1,
+    "w": "Pre-trained on 300 million images it overtook the ResNet. With enough data it learns the structure convolution assumes, and gains flexibility convolution lacks."
    }
   ]
  },

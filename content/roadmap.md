@@ -16,13 +16,14 @@ gives the current ones.
 `tools/python_topics.py`. Adding a 35th topic is one entry there plus a line
 in `tools/sequence.py`.
 
-**Computer Vision: 20 -> 30.** Tier 1 is complete, generated from
+**Computer Vision: 20 -> 40.** Tiers 1 and 2 are complete, generated from
 `tools/cv_topics.py` with the arithmetic in `assets/vizlearn-cv.js`. Eight are
 image operations driven by the pixel harness; receptive field and 1x1
 convolutions are SVG diagrams driven by the same controls, because neither has
-an image to show. Adding an eleventh is one entry in `cv_topics.py`, a line in
-`tools/sequence.py`, and - if the harness lacks the operation - one function in
-`OPS` or `DIAGRAMS`.
+an image to show. Tier 2 added four more image operations (template matching, Harris, ViT
+patching, the segmentation taxonomy) and six diagrams. Adding a twenty-first is
+one entry in `cv_topics.py`, a line in `tools/sequence.py`, and - if the harness
+lacks the operation - one function in `OPS` or `DIAGRAMS`.
 
 ---
 
@@ -63,6 +64,8 @@ the layer above, modern architectures.
 All ten are built.
 
 ### Tier 2 - architectures and detection
+
+All ten are built.
 
 - Depthwise separable convolution (parameter saving, counted live)
 - Dilated / atrous convolution

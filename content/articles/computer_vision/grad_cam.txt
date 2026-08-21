@@ -1,0 +1,99 @@
+title: Grad-CAM
+intro: A heatmap of which regions a network used, built from gradients it already computes.
+
+## The question
+
+A network says "cat". Which part of the image made it say that?
+
+Grad-CAM answers with a heatmap, and it does so using quantities the network
+produces anyway during backpropagation, which is why it works on any
+convolutional architecture without retraining or modification.
+
+## The recipe
+
+Take the feature maps from the last convolutional layer &mdash; typically 512 or
+2048 of them, each perhaps 7&#215;7. Then:
+
+1. Compute the gradient of the class score with respect to each feature map.
+2. Average each gradient over its spatial positions. That number is the map's
+   **weight**.
+3. Sum the feature maps, weighted by those numbers.
+4. Apply a ReLU.
+5. Upsample the result to the image size.
+
+Steps 3 and 4 are what the visualisation shows. Three synthetic feature maps sit
+on the left, each with its own weight slider, and the combined heatmap is on the
+right. The maps are made up; the weighting arithmetic is exactly Grad-CAM's.
+
+## What a weight means
+
+The gradient of the score with respect to a feature map answers: if this map's
+activations rose slightly, how much would the class score rise?
+
+A **large positive weight** means the class depends heavily on that map, so
+wherever it is active is evidence for the class.
+
+A **negative weight** means the opposite &mdash; that feature argues *against*
+this class. Set one of the sliders negative and watch what happens to the
+heatmap: the region belonging to that map does not go dark, it simply stops
+contributing, because of the ReLU.
+
+## Why the ReLU is there
+
+This is the step people skip and then misread the output.
+
+Without the ReLU the heatmap would contain negative regions, meaning "this area
+argued against the class". Grad-CAM discards them deliberately, because the
+question being asked is *what supported this prediction* &mdash; and a
+visualisation mixing support and opposition in one colour scale is very easy to
+misread.
+
+The consequence is that **Grad-CAM never shows you evidence against a class**.
+Drag all three sliders negative: the heatmap is empty, not inverted. If you want
+to know what argued against a prediction, this is the wrong tool, and running it
+on the competing class is usually the practical answer.
+
+## Its limits
+
+**Resolution.** The heatmap has the spatial size of the last convolutional layer,
+often 7&#215;7. Upsampling to 224&#215;224 produces a smooth blob, and that
+smoothness is interpolation rather than evidence. Grad-CAM cannot tell you which
+pixel mattered, only which seventh of the image.
+
+**One layer.** It explains the last convolutional layer. Earlier layers see
+different things, and the choice of layer changes the answer.
+
+**Plausibility is not correctness.** A heatmap over the animal's face looks
+convincing whether or not the model used the face. Grad-CAM shows what the
+gradients say, and there is published work on saliency methods that produce
+sensible-looking maps for randomly initialised networks &mdash; so a
+reasonable-looking heatmap is not evidence the model is reasoning well.
+
+**It does not survive every architecture unchanged.** Transformers have no final
+convolutional layer, so attention rollout or a variant is used instead.
+
+## Relatives
+
+**CAM**, the predecessor, required the architecture to end in [global average
+pooling](global_average_pooling.html) followed by one dense layer, and read the
+weights straight from that layer. Grad-CAM's contribution was getting the same
+weights from gradients instead, which removed the architectural requirement.
+
+**Grad-CAM++** handles several instances of the same class better.
+**Score-CAM** drops gradients entirely, measuring each map's importance by
+occluding with it and seeing what the score does &mdash; slower, and immune to
+gradient saturation.
+
+## Where it goes wrong
+
+**Reading the smooth blob as pixel-level evidence.** It is 7&#215;7,
+interpolated.
+
+**Explaining the wrong class.** Run it on the predicted class *and* on the class
+you expected; the difference is usually the informative part.
+
+**Treating it as proof.** A plausible heatmap is a hypothesis about the model,
+not a verification of it.
+
+**Choosing a layer without saying so.** The layer is a parameter, and the answer
+depends on it.

@@ -1,0 +1,99 @@
+title: Template Matching
+intro: The most direct way to find something in an image, and a clear demonstration of why the field moved on.
+
+## The method
+
+Take a patch &mdash; the **template** &mdash; and place it over every possible
+position in the image. At each position, score how well the template agrees with
+what is underneath. The result is a **response map** with one score per position,
+and the highest score is where the template was found.
+
+The template here is cut from the image itself, using the position controls, so
+a perfect match is guaranteed to exist. The grey square marks where it came from
+and the orange square marks where it was found. Move the controls and they track
+each other, with the correlation in the readout staying at 1.000.
+
+## Scoring: why not just subtract?
+
+The obvious score is the sum of squared differences. It works, and it breaks the
+moment lighting changes: brighten the image by 20 and every difference grows,
+even where the shapes match perfectly.
+
+**Normalised cross-correlation** fixes this by standardising both sides before
+comparing &mdash; subtract the mean, divide by the standard deviation, then take
+the dot product:
+
+```
+NCC = sum( (T - mean_T) * (W - mean_W) ) / ( sd_T * sd_W )
+```
+
+Subtracting the means removes any constant brightness offset. Dividing by the
+standard deviations removes any constant contrast scaling. What is left measures
+**pattern** rather than pixel values, and the result is bounded between
+&minus;1 and 1, which makes scores comparable across positions and images.
+
+That is why NCC is the standard choice, and why the response map here is readable
+as an image: every value is on the same scale.
+
+## Reading the response map
+
+The bright region around the true match is not a single pixel. It is a blob,
+because a template shifted by one pixel still overlaps almost entirely and still
+scores well.
+
+That blob is why picking the maximum is not enough in practice. Several nearby
+positions all score highly, and returning all of them means returning the same
+detection several times. The standard fix is the same one detection uses:
+suppress everything within a radius of a stronger response, which is exactly
+[non-maximum suppression](iou_and_non_max_suppression.html).
+
+Make the template small &mdash; drag the size control down &mdash; and the map
+becomes noisy, with strong responses in places that merely happen to have a
+similar local pattern. A small template does not contain enough structure to be
+distinctive.
+
+## What it cannot do
+
+The limitations are severe and they are the reason the field developed
+alternatives.
+
+**Rotation.** A template rotated by ten degrees no longer aligns, and the
+correlation falls sharply. Handling rotation means searching over angles as well
+as positions.
+
+**Scale.** The same problem in another dimension. Searching over scales too means
+an image pyramid and a much larger search.
+
+**Deformation.** A face is not a rigid patch. Any object that bends, or that
+varies between instances, cannot be represented by one template.
+
+**Cost.** Every position &#215; every scale &#215; every angle, each requiring
+a full patch comparison, is expensive, though correlation via the FFT helps a
+great deal in the translation-only case.
+
+## Where it is still the right tool
+
+Template matching has not disappeared, because when its assumptions hold it is
+exact, needs no training data, and is trivially explainable.
+
+Industrial inspection with a fixed camera and fixed part orientation. Finding a
+known icon on a screen for UI automation. Aligning scanned documents against a
+form. Matching a fixed logo. In all of these, position is the only unknown, which
+is precisely the case the method solves.
+
+Where the assumptions fail, the successors are **keypoint matching** &mdash;
+[Harris corners](harris_corners.html), SIFT, ORB &mdash; which find distinctive
+points and match those, giving rotation and scale invariance for free, and
+learned detectors, which handle deformation and appearance variation as well.
+
+## Where it goes wrong
+
+**Sum of squared differences under changing light.** Use NCC.
+
+**Taking the argmax without suppression.** The peak is a blob, not a point.
+
+**A template that is too small.** Not distinctive; the map fills with false
+peaks.
+
+**Expecting invariance it does not have.** If the object can rotate or change
+size, this is the wrong method, not a method that needs tuning.

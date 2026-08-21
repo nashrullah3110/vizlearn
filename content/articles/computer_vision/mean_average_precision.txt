@@ -1,0 +1,95 @@
+title: Mean Average Precision
+intro: How a list of boxes with confidence scores becomes one number, and what that number is not telling you.
+
+## Deciding what counts as correct
+
+Classification has an obvious notion of right. Detection does not: a box that
+covers most of an object is partly right, and "partly" has to be resolved before
+anything can be counted.
+
+The resolution is a threshold on [IoU](iou_and_non_max_suppression.html). A
+prediction is a **true positive** if its IoU with a ground-truth box of the same
+class is at least the threshold, and if that ground-truth box has not already
+been claimed by a higher-confidence prediction. Otherwise it is a false positive.
+Ground-truth boxes nothing matched are false negatives.
+
+That second condition matters. Without it, ten overlapping predictions on one
+object would count as ten successes.
+
+## Building the curve
+
+Sort all predictions for a class by confidence, highest first, and walk down the
+list. After each one, recompute precision and recall over everything seen so far,
+and plot the point.
+
+The curve in the visualisation is exactly that walk, one dot per prediction. It
+starts high &mdash; the most confident predictions are usually right &mdash; and
+sags as the list goes on, because later predictions are less reliable while the
+recall denominator stays fixed.
+
+**Average precision** is the area under that curve. It summarises the whole
+ranking rather than performance at one operating point, which is what makes it
+useful: a detector that ranks its correct predictions above its incorrect ones
+scores well regardless of how its confidences happen to be calibrated.
+
+The exact area calculation has varied. VOC 2007 sampled precision at eleven
+recall levels; VOC 2010 onward and COCO interpolate more finely. The differences
+are small and the definitions are not interchangeable, which is a reason to
+compare numbers only within one convention.
+
+## From AP to mAP
+
+AP is per class. **mAP** is the mean of AP over all classes &mdash; an unweighted
+mean, so a class with ten instances counts as much as a class with ten thousand.
+
+That is a deliberate choice and worth knowing. It means mAP is dragged down hard
+by rare classes the model handles badly, and a model can improve its mAP more by
+fixing one rare class than by getting slightly better at a common one.
+
+## Why COCO's numbers look worse
+
+Drag the IoU control. At 0.5 a loosely fitting box counts as a hit; at 0.9 the
+box has to be nearly exact.
+
+VOC reported mAP at IoU 0.5 alone. COCO's headline metric averages mAP over ten
+thresholds from 0.50 to 0.95 in steps of 0.05, usually written **mAP@[.5:.95]**.
+It rewards precise localisation rather than approximate detection, and it is much
+harsher: a detector reporting 0.80 under VOC might report 0.45 under COCO on the
+same predictions.
+
+So a COCO mAP and a VOC mAP are different measurements and must never be compared
+directly. COCO also reports mAP@0.5 alongside, partly so that comparison remains
+possible.
+
+COCO breaks the number down further &mdash; by object size (small, medium,
+large) and at fixed detection counts. Those breakdowns are usually more
+informative than the headline: "our detector is bad at small objects" is
+actionable in a way that "our mAP is 0.42" is not.
+
+## What mAP does not tell you
+
+**It has no threshold.** AP integrates over every confidence level, so it says
+nothing about which threshold to deploy. That is a separate decision.
+
+**It ignores the cost of errors.** A missed pedestrian and a spurious traffic
+cone count the same.
+
+**It averages away the failures you care about.** A model that is excellent on
+19 classes and useless on the 20th can outscore one that is decent on all of
+them.
+
+**It says nothing about duplicates before NMS.** mAP is computed on
+post-processed output, so a detector that fires many overlapping boxes can look
+fine as long as suppression cleans up.
+
+## Where it goes wrong
+
+**Comparing across datasets or conventions.** VOC against COCO, or one AP
+interpolation against another, are not comparable.
+
+**Reporting mAP alone.** Report the per-class breakdown; it is where the
+information is.
+
+**Tuning NMS to raise mAP.** Easy to do and often makes the deployed detector
+worse, because the operating point that maximises an integral over all
+thresholds is not the one you ship.

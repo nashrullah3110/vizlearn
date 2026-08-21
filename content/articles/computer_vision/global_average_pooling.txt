@@ -1,0 +1,86 @@
+title: Global Average Pooling against Flatten
+intro: The step between the convolutions and the classifier, and why the obvious version wastes most of the model's parameters.
+
+## Two ways to collapse a block
+
+Convolutional layers output a 3D block: height &#215; width &#215; channels. A
+classifier needs a single vector. Something has to turn one into the other, and
+there are two candidates.
+
+**Flatten** reads every value in the block into one long vector. For a
+7&#215;7&#215;512 map that is 25,088 numbers, and the dense layer that follows
+needs a weight for each of them per class.
+
+**Global average pooling** takes the mean of each channel over its whole spatial
+extent. Every 7&#215;7 slice becomes one number, and the block becomes 512
+numbers.
+
+## Count them
+
+Drag the controls and watch the readout. At the defaults &mdash;
+7&#215;7&#215;512 into 10 classes:
+
+```
+flatten  ->  7 * 7 * 512 * 10  =  250,880 weights
+GAP      ->          512 * 10  =    5,120 weights
+```
+
+Forty-nine times fewer, and 49 is exactly 7&#215;7. The ratio is always the
+spatial area of the feature map, which is why the saving grows as the map gets
+larger.
+
+Set classes to 1000, as in ImageNet, and the flattened version needs 25 million
+weights in a single layer. Early architectures really did this: **VGG-16 keeps
+about 90% of its 138 million parameters in its final dense layers**, and almost
+all of that is the first one immediately after the flatten.
+
+## What pooling gives up, and what it buys
+
+Averaging discards **where** in the map each activation was. If channel 7
+responds to wheels, flatten preserves that the wheels were at the bottom left,
+and GAP records only that there were wheels.
+
+For classification that is usually the right trade. The question is whether a car
+is present, not where the wheels sat, and the convolutional layers underneath
+have already encoded position-sensitive structure into which channels fire.
+
+Three things are bought in exchange.
+
+**Far fewer parameters**, and therefore much less overfitting. A dense layer with
+25 million weights on a dataset of 50,000 images is an invitation to memorise.
+
+**Any input size.** The mean of a channel is one number regardless of the
+spatial dimensions, so a GAP network accepts a 224-pixel image or a 400-pixel one
+without modification. A flattened network cannot: 25,088 weights expect exactly
+25,088 inputs, which is why older models are rigid about input size.
+
+**Interpretability.** With GAP followed by a single dense layer, each class score
+is a weighted sum of channel means. That weighting is exactly what Class
+Activation Mapping uses to produce a heatmap, and [Grad-CAM](grad_cam.html)
+generalises it.
+
+## What replaced the debate
+
+Every modern architecture uses GAP. ResNet, Inception, MobileNet, EfficientNet
+and the convolutional stems of hybrid transformers all end with a global pool and
+one dense layer.
+
+The exception worth knowing is **Vision Transformers**, which typically use a
+dedicated class token instead &mdash; a learned vector that attends to all the
+[patches](vision_transformer_patches.html) and carries the summary. Some ViT
+variants pool the patch tokens instead and report it works about as well.
+
+## Where it goes wrong
+
+**Pooling too early.** GAP belongs after the last convolutional block. Applied
+midway it destroys the spatial structure the remaining layers need.
+
+**Using flatten because a tutorial did.** Most tutorials predate the change.
+Check what the parameter count is doing before accepting it.
+
+**Expecting GAP to fix a small feature map.** With a 1&#215;1 map there is
+nothing to average and the two are identical.
+
+**Forgetting global max pooling exists.** It takes the maximum instead of the
+mean, and for tasks where one strong local response matters more than an average
+&mdash; some detection and audio tasks &mdash; it can be the better choice.

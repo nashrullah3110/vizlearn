@@ -1,0 +1,100 @@
+title: Vision Transformer Patches
+intro: The one step that lets a language architecture read a photograph, and the quadratic cost hiding in it.
+
+## Images are grids; transformers want sequences
+
+A transformer operates on a sequence of vectors and has no built-in notion of
+two dimensions. An image is a grid of pixels. Something has to convert one into
+the other.
+
+The obvious approach &mdash; one token per pixel &mdash; is impossible. A
+224&#215;224 image is 50,176 pixels, and attention costs grow with the square of
+the sequence length, so that is 2.5 billion pairwise interactions per layer.
+
+The Vision Transformer's answer is almost aggressively simple: **cut the image
+into square patches and treat each patch as a token.**
+
+## The whole preprocessing step
+
+Drag the patch control and watch the grid change. That is genuinely all that
+happens to the image before it enters the model:
+
+1. Cut into non-overlapping `P`&#215;`P` patches.
+2. Flatten each patch to a vector of `P * P * 3` numbers.
+3. Multiply by one learned matrix to get the model width.
+4. Add a positional embedding, because otherwise the order is unknown.
+
+At the default of 16 pixels on a 224-pixel image, that is a 14&#215;14 grid,
+196 tokens, each starting as 768 raw numbers. The readout gives the same figures
+for whatever patch size you choose.
+
+Step 3 is the only learned part, and it is a linear projection with no
+non-linearity. Equivalently, it is a convolution with kernel size `P` and stride
+`P` &mdash; which is how it is usually implemented, and a nice reminder that the
+distinction between "convolutional" and "not" is thinner than the naming
+suggests.
+
+## The quadratic cost
+
+Halve the patch size and the token count quadruples, because the grid gains a
+factor of two in each dimension. Attention cost goes with the square of the token
+count, so it rises **sixteenfold**.
+
+| Patch | Tokens (224px) | Attention cost |
+|---|---|---|
+| 32 | 49 | 1&#215; |
+| 16 | 196 | 16&#215; |
+| 8 | 784 | 256&#215; |
+| 4 | 3,136 | 4,096&#215; |
+
+That table is the central constraint on ViT design, and it explains a great deal
+of what followed. Patch size is not a minor hyperparameter; it is the resolution
+at which the model perceives anything, traded directly against compute.
+
+## What is lost inside a patch
+
+A 16&#215;16 patch is compressed to a single vector. Structure within it is not
+attended to at all; whatever the projection preserves is what survives.
+
+This is the ViT's real weakness at small scale. A convolutional network has
+locality built in &mdash; nearby pixels are processed together by construction
+&mdash; and this **inductive bias** matches how images actually work. A ViT has
+none of it. Every relationship, including "these two patches are adjacent", must
+be learned from data through the positional embeddings.
+
+Which is why the original paper's headline finding was about data. On ImageNet
+alone the ViT underperformed a ResNet; pre-trained on 300 million images it
+overtook it. With enough data the model learns the structure that convolution
+assumes, and gains flexibility convolution does not have.
+
+Two responses followed. **DeiT** showed careful augmentation and distillation
+could train a ViT on ImageNet alone. **Swin Transformer** reintroduced locality
+by restricting attention to windows and merging patches hierarchically, which
+gives back the pyramid a CNN has and makes dense prediction practical.
+
+## Positional embeddings
+
+Attention is permutation-invariant: shuffle the tokens and the output is
+shuffled identically, with nothing else changed. Without positional information
+a ViT literally cannot tell a photograph from a jigsaw of itself.
+
+The fix is to add a learned vector per position. It is worth appreciating how
+weak this is compared with convolution: the model is told "this is position 37"
+and must learn from data that position 37 is next to 36 and above 23.
+
+Changing the input resolution changes the number of positions, which is why ViTs
+interpolate their positional embeddings when fine-tuned at a different size.
+
+## Where it goes wrong
+
+**Shrinking the patch to gain resolution.** The attention cost is quadratic in
+tokens, so this gets expensive faster than expected.
+
+**Training a plain ViT on a small dataset.** Without the inductive bias it needs
+either far more data or the DeiT training recipe.
+
+**Forgetting positional embeddings on a resized input.** The count must match,
+and interpolation is required.
+
+**Assuming patches must be square and non-overlapping.** Overlapping patches
+help; several later architectures use them.

@@ -309,10 +309,193 @@
             }
             return { image: out, readout: "determinant " + det.toFixed(2) +
                                           " - area scales by that factor" };
+        },
+
+        /* Template matching: normalised cross-correlation of a patch cut from
+         * the image against every position in it. The response map is the
+         * output, and its brightest point is where the patch was found. */
+        template: function (img, p) {
+            var g = toGrey(img);
+            var ts = p.size | 0;
+            /* Keep the patch wholly inside the image. get() clamps at the
+             * border, so a template hanging off the edge is mostly repeated
+             * pixels - which correlates perfectly with every other flat region
+             * and makes the reported match meaningless. */
+            var tx = Math.max(0, Math.min(g.w - ts, p.tx | 0));
+            var ty = Math.max(0, Math.min(g.h - ts, p.ty | 0));
+            var tpl = [], i, j, tSum = 0, tN = ts * ts;
+            for (j = 0; j < ts; j++)
+                for (i = 0; i < ts; i++) {
+                    var v = g.d[get(g, tx + i, ty + j)];
+                    tpl.push(v); tSum += v;
+                }
+            var tMean = tSum / tN, tVar = 0;
+            for (i = 0; i < tN; i++) tVar += (tpl[i] - tMean) * (tpl[i] - tMean);
+            tVar = Math.sqrt(tVar);
+            /* A template cut from a flat region has no pattern, so normalised
+             * correlation is 0/0 and every position ties. Saying so is more
+             * use than reporting a match at (0, 0) with correlation zero -
+             * it is a real limitation of the method, not a glitch. */
+            if (tVar < 1e-6) {
+                var flat = { w: g.w, h: g.h, d: new Uint8ClampedArray(g.d.length) };
+                for (i = 0; i < flat.d.length; i += 4) {
+                    flat.d[i] = flat.d[i + 1] = flat.d[i + 2] = 128;
+                    flat.d[i + 3] = 255;
+                }
+                frame(flat, tx, ty, ts, [255, 190, 60]);
+                return { image: flat,
+                         readout: "the template is a flat patch - no pattern to " +
+                                  "correlate, so every position ties. Move it onto " +
+                                  "an edge or a corner." };
+            }
+
+            var out = { w: g.w, h: g.h, d: new Uint8ClampedArray(g.d.length) };
+            var bx = 0, by = 0, best = -2;
+            // Only positions where the window is wholly inside the image.
+            for (var y = 0; y <= g.h - ts; y++)
+                for (var x = 0; x <= g.w - ts; x++) {
+                    var wSum = 0, n = 0;
+                    for (j = 0; j < ts; j++)
+                        for (i = 0; i < ts; i++) wSum += g.d[get(g, x + i, y + j)];
+                    var wMean = wSum / tN, sum = 0, wVar = 0;
+                    n = 0;
+                    for (j = 0; j < ts; j++)
+                        for (i = 0; i < ts; i++, n++) {
+                            var wv = g.d[get(g, x + i, y + j)] - wMean;
+                            sum += (tpl[n] - tMean) * wv;
+                            wVar += wv * wv;
+                        }
+                    var ncc = sum / (tVar * (Math.sqrt(wVar) || 1));
+                    if (ncc > best) { best = ncc; bx = x; by = y; }
+                    var o = (y * g.w + x) * 4;
+                    var shade = (ncc + 1) / 2 * 255;
+                    out.d[o] = out.d[o + 1] = out.d[o + 2] = shade;
+                    out.d[o + 3] = 255;
+                }
+            frame(out, tx, ty, ts, [110, 110, 110]);
+            frame(out, bx, by, ts, [255, 190, 60]);
+            return { image: out,
+                     readout: "best match at (" + bx + ", " + by + "), correlation " +
+                              best.toFixed(3) + " - template cut from (" + tx +
+                              ", " + ty + ")" };
+        },
+
+        /* Harris corner response. The structure tensor over a window says
+         * whether the gradient has one dominant direction (an edge) or two
+         * (a corner), and R combines its eigenvalues without computing them. */
+        harris: function (img, p) {
+            var g = toGrey(img), w = g.w, h = g.h;
+            var Ix = new Float32Array(w * h), Iy = new Float32Array(w * h);
+            var x, y, i;
+            for (y = 0; y < h; y++)
+                for (x = 0; x < w; x++) {
+                    i = y * w + x;
+                    Ix[i] = (g.d[get(g, x + 1, y)] - g.d[get(g, x - 1, y)]) / 2;
+                    Iy[i] = (g.d[get(g, x, y + 1)] - g.d[get(g, x, y - 1)]) / 2;
+                }
+            var r = p.window | 0, k = p.k;
+            var out = { w: w, h: h, d: new Uint8ClampedArray(g.d.length) };
+            var resp = new Float32Array(w * h), maxR = 1e-6;
+            for (y = 0; y < h; y++)
+                for (x = 0; x < w; x++) {
+                    var a = 0, b = 0, c = 0;
+                    for (var dy = -r; dy <= r; dy++)
+                        for (var dx = -r; dx <= r; dx++) {
+                            var xx = Math.min(w - 1, Math.max(0, x + dx));
+                            var yy = Math.min(h - 1, Math.max(0, y + dy));
+                            var jj = yy * w + xx;
+                            a += Ix[jj] * Ix[jj]; b += Ix[jj] * Iy[jj]; c += Iy[jj] * Iy[jj];
+                        }
+                    var det = a * c - b * b, tr = a + c;
+                    var R = det - k * tr * tr;
+                    resp[y * w + x] = R;
+                    if (R > maxR) maxR = R;
+                }
+            var corners = 0;
+            for (y = 0; y < h; y++)
+                for (x = 0; x < w; x++) {
+                    i = y * w + x;
+                    var o = i * 4;
+                    var base = g.d[o] * 0.45;
+                    var hit = resp[i] > maxR * p.threshold;
+                    if (hit) corners++;
+                    out.d[o] = hit ? 255 : base;
+                    out.d[o + 1] = hit ? 185 : base;
+                    out.d[o + 2] = hit ? 55 : base;
+                    out.d[o + 3] = 255;
+                }
+            return { image: out,
+                     readout: corners + " pixels above threshold - window " +
+                              (2 * r + 1) + "x" + (2 * r + 1) + ", k = " + k.toFixed(2) };
+        },
+
+        /* Vision Transformer patching: cut the image into a grid, which is the
+         * whole of what a ViT does to an image before it is a sequence. */
+        patches: function (img, p) {
+            var n = p.patch | 0;
+            var out = { w: img.w, h: img.h, d: new Uint8ClampedArray(img.d.length) };
+            out.d.set(img.d);
+            var x, y;
+            for (y = 0; y < img.h; y++)
+                for (x = 0; x < img.w; x++)
+                    if (x % n === 0 || y % n === 0) set(out, x, y, 24, 24, 24);
+            var across = Math.ceil(img.w / n), down = Math.ceil(img.h / n);
+            return { image: out,
+                     readout: n + "x" + n + " patches - " + across + "x" + down + " = " +
+                              (across * down) + " tokens, each a vector of " +
+                              (n * n * 3) + " numbers before projection" };
+        },
+
+        /* The three segmentation tasks over one known scene. Nothing is
+         * predicted: the regions are given, and the point is what each task is
+         * asked to say about them. */
+        segmentation: function (img, p) {
+            var out = { w: img.w, h: img.h, d: new Uint8ClampedArray(img.d.length) };
+            var THING = [[236, 152, 47], [120, 190, 235], [150, 220, 150]];
+            var STUFF = [70, 78, 84];
+            var discs = [{ cx: 58, cy: 62, r: 26 }, { cx: 130, cy: 96, r: 22 }];
+            var x, y, i, k;
+            for (y = 0; y < img.h; y++)
+                for (x = 0; x < img.w; x++) {
+                    var cls = null, inst = -1;
+                    if (x >= 104 && x < 150 && y >= 34 && y < 74) { cls = 1; inst = 2; }
+                    for (k = 0; k < discs.length; k++) {
+                        var dx = x - discs[k].cx, dy = y - discs[k].cy;
+                        if (dx * dx + dy * dy <= discs[k].r * discs[k].r) { cls = 0; inst = k; }
+                    }
+                    var c;
+                    if (cls === null) c = (p.task === "instance") ? [26, 28, 30] : STUFF;
+                    else if (p.task === "semantic") c = THING[cls === 1 ? 1 : 0];
+                    else c = THING[inst % THING.length];
+                    i = (y * img.w + x) * 4;
+                    out.d[i] = c[0]; out.d[i + 1] = c[1]; out.d[i + 2] = c[2];
+                    out.d[i + 3] = 255;
+                }
+            var says = {
+                semantic: "every pixel gets a class, and the two discs share one - " +
+                          "they are a single region",
+                instance: "each object gets its own id, and the background is not " +
+                          "labelled at all",
+                panoptic: "every pixel gets a class and the two discs keep separate " +
+                          "ids - both at once"
+            };
+            return { image: out, readout: p.task + ": " + says[p.task] };
         }
     };
 
     // --------------------------------------------------------------- helpers
+
+    /* A one-pixel border, used to mark where a template came from and where it
+     * was found. Drawn into the response map rather than the source, because
+     * the response map is what the reader is being asked to read. */
+    function frame(img, x0, y0, size, col) {
+        for (var i = 0; i < size; i++) {
+            set(img, x0 + i, y0, col[0], col[1], col[2]);
+            set(img, x0 + i, y0 + size - 1, col[0], col[1], col[2]);
+            set(img, x0, y0 + i, col[0], col[1], col[2]);
+            set(img, x0 + size - 1, y0 + i, col[0], col[1], col[2]);
+        }
+    }
 
     function otsu(h, total) {
         var sum = 0, i;
@@ -602,6 +785,276 @@
                 readout: one + " weights as 1x1, " + three + " as 3x3 - " +
                          "a factor of 9, and no spatial mixing either way"
             };
+        },
+
+        /* Depthwise separable convolution against the full one, counted. The
+         * saving is the whole argument for MobileNet, and it is arithmetic. */
+        separable: function (p) {
+            var cin = p.cin, cout = p.cout, k = p.kernel;
+            var full = k * k * cin * cout;
+            var depth = k * k * cin, point = cin * cout;
+            var sep = depth + point;
+            var W = 620, H = 250, svg = svgRoot(W, H);
+            var bar = function (x, label, value, max, colour) {
+                var wpx = Math.max(2, (W - 200) * value / max);
+                svg.appendChild(el("rect", { x: 170, y: x, width: wpx, height: 34, rx: 4,
+                                             fill: colour, "fill-opacity": 0.55,
+                                             stroke: "var(--border-subtle)", "stroke-width": 1 }));
+                var t = el("text", { x: 160, y: x + 22, fill: "var(--text-muted)",
+                                     "font-size": 12, "font-family": "var(--vz-mono)",
+                                     "text-anchor": "end" });
+                t.textContent = label;
+                svg.appendChild(t);
+                var n = el("text", { x: 178 + wpx, y: x + 22, fill: "var(--text-main)",
+                                     "font-size": 12, "font-family": "var(--vz-mono)" });
+                n.textContent = value.toLocaleString();
+                svg.appendChild(n);
+            };
+            bar(30, "full " + k + "x" + k, full, full, "var(--accent-fill)");
+            bar(88, "depthwise", depth, full, "var(--accent-primary)");
+            bar(146, "pointwise 1x1", point, full, "var(--accent-primary)");
+            bar(204, "separable total", sep, full, "var(--accent-fill)");
+            return {
+                svg: svg,
+                readout: full.toLocaleString() + " weights against " + sep.toLocaleString() +
+                         " - " + (full / sep).toFixed(1) + "x fewer, for the same input " +
+                         "and output shape"
+            };
+        },
+
+        /* Dilated convolution: the same nine weights, spread out. */
+        dilated: function (p) {
+            var d = p.dilation, k = 3, layers = p.layers;
+            var cells = 33, cell = 17, x0 = 20;
+            var W = 620, H = 60 + layers * 78, svg = svgRoot(W, H);
+            var r = 1, jump = 1, i;
+            // With dilation the effective kernel is k + (k-1)(d-1) wide.
+            var eff = k + (k - 1) * (d - 1);
+            for (i = 0; i < layers; i++) r = r + (eff - 1);
+            var lit = [];
+            for (i = 0; i < layers; i++) {
+                var y = 34 + i * 78;
+                var size = 1 + (eff - 1) * (i + 1);
+                var lo = Math.round((cells - size) / 2), hi = lo + size - 1;
+                var g = el("g", {});
+                for (var c = 0; c < cells; c++) {
+                    var inSpan = c >= lo && c <= hi;
+                    // Which cells the dilated kernel actually reads at this level.
+                    var touched = inSpan && ((c - lo) % d === 0 || i > 0);
+                    g.appendChild(el("rect", {
+                        x: x0 + c * cell, y: y, width: cell - 2, height: cell - 2, rx: 2,
+                        fill: touched ? "var(--accent-fill)" : "var(--bg-surface)",
+                        "fill-opacity": touched ? (inSpan ? 0.6 : 1) : 1,
+                        stroke: "var(--border-subtle)", "stroke-width": 1
+                    }));
+                }
+                var t = el("text", { x: x0, y: y - 6, fill: "var(--text-muted)",
+                                     "font-size": 11, "font-family": "var(--vz-mono)" });
+                t.textContent = "after layer " + (i + 1) + " - " + size + " positions wide";
+                g.appendChild(t);
+                svg.appendChild(g);
+                lit.push(size);
+            }
+            return {
+                svg: svg,
+                readout: "dilation " + d + ": three weights spanning " + eff +
+                         " positions.  " + layers + " layers reach " +
+                         lit[lit.length - 1] + " input positions, with " +
+                         (9 * layers) + " weights per channel pair"
+            };
+        },
+
+        /* Global average pooling against flatten, in parameters. */
+        gap: function (p) {
+            var side = p.side, ch = p.channels, classes = p.classes;
+            var flat = side * side * ch * classes;
+            var pooled = ch * classes;
+            var W = 620, H = 230, svg = svgRoot(W, H);
+            var box = function (x, y, w, h, label, sub) {
+                svg.appendChild(el("rect", { x: x, y: y, width: w, height: h, rx: 5,
+                                             fill: "var(--bg-surface)",
+                                             stroke: "var(--border-subtle)", "stroke-width": 1 }));
+                var t = el("text", { x: x + w / 2, y: y + h / 2 - 2, fill: "var(--text-main)",
+                                     "font-size": 12, "font-family": "var(--vz-mono)",
+                                     "text-anchor": "middle" });
+                t.textContent = label;
+                svg.appendChild(t);
+                var u = el("text", { x: x + w / 2, y: y + h / 2 + 16, fill: "var(--text-muted)",
+                                     "font-size": 11, "font-family": "var(--vz-mono)",
+                                     "text-anchor": "middle" });
+                u.textContent = sub;
+                svg.appendChild(u);
+            };
+            box(24, 30, 150, 60, side + "x" + side + "x" + ch, "feature map");
+            box(24, 130, 150, 60, side + "x" + side + "x" + ch, "feature map");
+            box(240, 30, 150, 60, "flatten", side * side * ch + " values");
+            box(240, 130, 150, 60, "global avg pool", ch + " values");
+            box(440, 30, 155, 60, "dense -> " + classes, flat.toLocaleString() + " weights");
+            box(440, 130, 155, 60, "dense -> " + classes, pooled.toLocaleString() + " weights");
+            [[174, 60, 240], [174, 160, 240], [390, 60, 440], [390, 160, 440]].forEach(function (a) {
+                svg.appendChild(el("line", { x1: a[0], y1: a[1], x2: a[2], y2: a[1],
+                                             stroke: "var(--accent-primary)", "stroke-width": 1.4 }));
+            });
+            return {
+                svg: svg,
+                readout: flat.toLocaleString() + " weights against " + pooled.toLocaleString() +
+                         " - " + Math.round(flat / pooled) + "x fewer, and the pooled " +
+                         "version works at any input size"
+            };
+        },
+
+        /* Anchor boxes over a grid, with IoU against one ground-truth box. */
+        anchors: function (p) {
+            var W = 620, H = 320, svg = svgRoot(W, H);
+            var sx = 3.2, gx = 30, gy = 20;
+            var cellsX = 6, cellsY = 4, cw = 90, ch = 68;
+            var gt = { x: 150, y: 90, w: 190, h: 130 };
+            var i, j;
+            for (j = 0; j < cellsY; j++)
+                for (i = 0; i < cellsX; i++)
+                    svg.appendChild(el("rect", {
+                        x: gx + i * cw, y: gy + j * ch, width: cw, height: ch,
+                        fill: "none", stroke: "var(--border-subtle)",
+                        "stroke-width": 0.7, "stroke-dasharray": "3 3" }));
+
+            var cx = gx + (p.cell % cellsX) * cw + cw / 2;
+            var cy = gy + Math.floor(p.cell / cellsX) * ch + ch / 2;
+            var base = p.scale, ratios = [0.5, 1, 2];
+            var best = 0, bestR = 1;
+            ratios.forEach(function (ar) {
+                var w = base * Math.sqrt(1 / ar), h = base * Math.sqrt(ar);
+                var bx = cx - w / 2, by = cy - h / 2;
+                var ix = Math.max(0, Math.min(bx + w, gt.x + gt.w) - Math.max(bx, gt.x));
+                var iy = Math.max(0, Math.min(by + h, gt.y + gt.h) - Math.max(by, gt.y));
+                var inter = ix * iy;
+                var iou = inter / (w * h + gt.w * gt.h - inter);
+                if (iou > best) { best = iou; bestR = ar; }
+                svg.appendChild(el("rect", {
+                    x: bx, y: by, width: w, height: h, fill: "none",
+                    stroke: "var(--accent-primary)", "stroke-width": iou === best ? 2 : 1,
+                    "stroke-opacity": 0.35 + iou }));
+            });
+            svg.appendChild(el("rect", { x: gt.x, y: gt.y, width: gt.w, height: gt.h,
+                                         fill: "var(--accent-fill)", "fill-opacity": 0.16,
+                                         stroke: "var(--accent-fill)", "stroke-width": 2.2 }));
+            svg.appendChild(el("circle", { cx: cx, cy: cy, r: 3.5, fill: "var(--accent-primary)" }));
+            var t = el("text", { x: gt.x + 6, y: gt.y - 6, fill: "var(--accent-fill)",
+                                 "font-size": 11, "font-family": "var(--vz-mono)" });
+            t.textContent = "ground truth";
+            svg.appendChild(t);
+            var label = best >= 0.5 ? "positive (>= 0.5)"
+                      : (best < 0.3 ? "negative (< 0.3)" : "ignored (between)");
+            return {
+                svg: svg,
+                readout: "best IoU " + best.toFixed(2) + " at aspect ratio " +
+                         (bestR === 1 ? "1:1" : (bestR < 1 ? "2:1 wide" : "1:2 tall")) +
+                         " - this anchor is " + label
+            };
+        },
+
+        /* Average precision: one PR curve, and the area under it. */
+        map: function (p) {
+            var W = 620, H = 300, svg = svgRoot(W, H);
+            var pad = { l: 54, r: 20, t: 18, b: 40 };
+            var px = function (v) { return pad.l + v * (W - pad.l - pad.r); };
+            var py = function (v) { return H - pad.b - v * (H - pad.t - pad.b); };
+            svg.appendChild(el("path", {
+                d: "M" + pad.l + " " + pad.t + " L" + pad.l + " " + (H - pad.b) +
+                   " L" + (W - pad.r) + " " + (H - pad.b),
+                fill: "none", stroke: "var(--border-subtle)", "stroke-width": 1 }));
+
+            // A detector's ranked list: high-confidence hits first, then a
+            // tail that gets steadily worse. The threshold controls how much
+            // of the tail is kept.
+            var n = 24, hits = [], i;
+            for (i = 0; i < n; i++) hits.push(i < 5 ? 1 : (((i * 7) % 5) < 2 ? 1 : 0));
+            var total = hits.reduce(function (a, b) { return a + b; }, 0);
+            var tp = 0, pts = [], ap = 0, prevR = 0;
+            for (i = 0; i < n; i++) {
+                if (hits[i]) tp++;
+                var prec = tp / (i + 1), rec = tp / total;
+                pts.push([rec, prec]);
+                ap += (rec - prevR) * prec;
+                prevR = rec;
+            }
+            var d = pts.map(function (q, k) {
+                return (k ? "L" : "M") + px(q[0]) + " " + py(q[1]);
+            }).join(" ");
+            svg.appendChild(el("path", { d: d, fill: "none",
+                                         stroke: "var(--accent-primary)", "stroke-width": 2 }));
+            pts.forEach(function (q) {
+                svg.appendChild(el("circle", { cx: px(q[0]), cy: py(q[1]), r: 2.6,
+                                               fill: "var(--accent-fill)" }));
+            });
+            [["recall", W / 2, H - 10], ["precision", 0, 0]].forEach(function (a, k) {
+                var t = el("text", { fill: "var(--text-muted)", "font-size": 11,
+                                     "font-family": "var(--vz-mono)", "text-anchor": "middle" });
+                t.textContent = a[0];
+                if (k === 0) { t.setAttribute("x", a[1]); t.setAttribute("y", a[2]); }
+                else { t.setAttribute("transform", "translate(16," + (H / 2) + ") rotate(-90)"); }
+                svg.appendChild(t);
+            });
+            return {
+                svg: svg,
+                readout: "AP " + ap.toFixed(3) + " over " + total + " ground-truth boxes.  " +
+                         "mAP is this, averaged over every class - and at IoU " +
+                         p.iou.toFixed(2) + " a different set of detections would count as hits"
+            };
+        },
+
+        /* Grad-CAM: weight each feature map by how much the score responds to
+         * it, sum, keep the positive part. The maps here are synthetic, and
+         * the weighting is the real arithmetic. */
+        gradcam: function (p) {
+            var W = 620, H = 260, svg = svgRoot(W, H);
+            var maps = [
+                { cx: 0.28, cy: 0.42, label: "map 1" },
+                { cx: 0.62, cy: 0.30, label: "map 2" },
+                { cx: 0.48, cy: 0.72, label: "map 3" }
+            ];
+            var w = [p.w1, p.w2, p.w3];
+            var cellW = 130, cellH = 92, gx = 24, gy = 26;
+            maps.forEach(function (m, i) {
+                var x = gx, y = gy + i * (cellH - 10);
+                for (var a = 0; a < 13; a++)
+                    for (var b = 0; b < 8; b++) {
+                        var dx = a / 12 - m.cx, dy = b / 7 - m.cy;
+                        var v = Math.exp(-(dx * dx + dy * dy) / 0.05);
+                        svg.appendChild(el("rect", {
+                            x: x + a * 9, y: y + b * 8, width: 8, height: 7,
+                            fill: "var(--accent-fill)", "fill-opacity": (v * 0.85).toFixed(3) }));
+                    }
+                var t = el("text", { x: x + 130, y: y + 34, fill: "var(--text-muted)",
+                                     "font-size": 11, "font-family": "var(--vz-mono)" });
+                t.textContent = m.label + "  x  " + w[i].toFixed(1);
+                svg.appendChild(t);
+            });
+            var ox = 330, oy = 46;
+            for (var a = 0; a < 26; a++)
+                for (var b = 0; b < 17; b++) {
+                    var acc = 0;
+                    maps.forEach(function (m, i) {
+                        var dx = a / 25 - m.cx, dy = b / 16 - m.cy;
+                        acc += w[i] * Math.exp(-(dx * dx + dy * dy) / 0.05);
+                    });
+                    acc = Math.max(0, acc);      // the ReLU in Grad-CAM
+                    svg.appendChild(el("rect", {
+                        x: ox + a * 10, y: oy + b * 9, width: 9, height: 8,
+                        fill: "var(--accent-fill)",
+                        "fill-opacity": Math.min(1, acc / 2.2).toFixed(3) }));
+                }
+            var lbl = el("text", { x: ox, y: oy - 8, fill: "var(--text-muted)",
+                                   "font-size": 11, "font-family": "var(--vz-mono)" });
+            lbl.textContent = "weighted sum, then ReLU";
+            svg.appendChild(lbl);
+            var neg = w.filter(function (v) { return v < 0; }).length;
+            return {
+                svg: svg,
+                readout: "weights " + w.map(function (v) { return v.toFixed(1); }).join(", ") +
+                         (neg ? "  -  " + neg + " negative, and the ReLU discards what they " +
+                                "contribute: Grad-CAM shows evidence for the class, not against it"
+                              : "  -  all positive, so every map contributes to the heatmap")
+            };
         }
     };
 
@@ -716,6 +1169,10 @@
         render();
         root.dataset.vzCvReady = "1";
     }
+
+    // Exposed for tooling; the page itself never reads it.
+    window.VizCVDiagrams = DIAGRAMS;
+    window.VizCVOps = OPS;
 
     function mount(root) {
         var cfgEl = root.querySelector(".cv-config");

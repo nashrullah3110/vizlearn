@@ -1,0 +1,87 @@
+title: Dilated Convolutions
+intro: How to see further without downsampling, and the gridding artefact that comes with it.
+
+## The problem it solves
+
+A network has two ways to grow its [receptive
+field](receptive_field.html): stack more layers, which is slow because growth is
+linear, or downsample, which is fast but throws away resolution.
+
+For classification, throwing away resolution is fine &mdash; the answer is one
+label. For **segmentation** it is not, because the output has to be the same size
+as the input, and detail destroyed by pooling has to be reconstructed by
+something.
+
+Dilated convolution is the third way. It grows the receptive field
+geometrically, adds no parameters, and does not reduce resolution at all.
+
+## What dilation does
+
+Take a 3&#215;3 kernel. Instead of reading nine adjacent pixels, read nine
+pixels spaced `d` apart, leaving gaps between them. The weights are unchanged;
+only where they are sampled from moves.
+
+The effective size of a `k`&#215;`k` kernel at dilation `d` is:
+
+```
+effective = k + (k - 1) * (d - 1)
+```
+
+So a 3&#215;3 at dilation 1 spans 3, at dilation 2 spans 5, at dilation 4 spans
+9. Drag the dilation control and the readout confirms it: nine weights, spanning
+whatever you asked for.
+
+That is the whole trick, and its appeal is that everything about the layer's cost
+is unchanged. Same weights, same number of multiplications, wider view.
+
+## Stacking
+
+Drag the layers control up. Two dilated layers reach further than two ordinary
+ones, and the growth compounds, because each layer's reach is measured in the
+already-expanded units of the layer beneath it.
+
+The standard arrangement uses a rising sequence &mdash; dilation 1, then 2, then
+4, then 8 &mdash; which gives exponential receptive-field growth at constant
+resolution. A stack of four such layers sees a 33&#215;33 region using 36
+weights per channel pair and no pooling at all.
+
+## The gridding problem
+
+There is a defect, and it follows directly from the gaps.
+
+Stack several layers all at dilation 2, and some input positions are never
+sampled by any of them. The kernel taps land on even offsets at every level, so
+odd positions in between are simply not read. The output develops a
+checkerboard-like inconsistency, and the network is blind to fine detail that
+happens to fall in the gaps.
+
+The fix is to vary the rate so that the gaps of one layer are covered by another.
+Rates like 1, 2, 5 or 1, 2, 3 are chosen so their sampling patterns interlock,
+and the *hybrid dilated convolution* literature is about picking such sequences.
+The simple version of the rule: do not repeat the same dilation rate several
+times in a row.
+
+## Where it is used
+
+**DeepLab** made dilated convolution central to semantic segmentation, and its
+ASPP module runs several rates in parallel and concatenates them, giving the
+network several scales at once from one feature map.
+
+**WaveNet** used dilation in one dimension over audio, where the receptive field
+has to span thousands of samples and downsampling would destroy the waveform.
+
+**Dense prediction generally** &mdash; depth estimation, optical flow, anything
+whose output is an image &mdash; uses it for the same reason segmentation does.
+
+## Where it goes wrong
+
+**Repeating one rate.** Gridding artefacts, and detail that falls in the gaps is
+never seen.
+
+**Using it where pooling would do.** For classification, downsampling is cheaper
+and reduces computation. Dilation keeps the feature map large, and large feature
+maps cost memory at every layer.
+
+**Assuming it is free.** The parameters are free; the memory is not. A network
+that never downsamples holds full-resolution activations throughout, which is
+often the binding constraint on segmentation models.

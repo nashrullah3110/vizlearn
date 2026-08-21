@@ -1,0 +1,113 @@
+title: Harris Corners and Keypoints
+intro: What makes a point in an image worth remembering, and the determinant that measures it.
+
+## The question behind the detector
+
+To match two photographs of the same scene, you need points you can recognise in
+both. Which points are those?
+
+The Harris insight is to ask what happens when you shift a small window slightly
+in every direction.
+
+**Flat region.** Shift it anywhere and the contents barely change. There is
+nothing to lock onto: this window could be almost anywhere.
+
+**Edge.** Shift it along the edge and nothing changes; shift it across and
+everything does. It is locatable in one direction and free to slide in the other
+&mdash; the aperture problem.
+
+**Corner.** Shift it in any direction at all and the contents change. Its
+position is pinned in both directions, and that is exactly what a landmark needs
+to be.
+
+## Making it arithmetic
+
+The change under a small shift is captured by how the image gradient behaves
+across the window. Collect the gradients into the **structure tensor**:
+
+```
+M  =  [ sum(Ix*Ix)   sum(Ix*Iy) ]
+      [ sum(Ix*Iy)   sum(Iy*Iy) ]
+```
+
+Its two eigenvalues say how strongly the intensity varies along the two principal
+directions:
+
+| &lambda;1 | &lambda;2 | Meaning |
+|---|---|---|
+| small | small | flat |
+| large | small | edge |
+| large | large | **corner** |
+
+Computing eigenvalues at every pixel would be slow, so Harris uses a combination
+that behaves the same way without them:
+
+```
+R  =  det(M) - k * trace(M)^2
+     =  (l1*l2) - k*(l1+l2)^2
+```
+
+`R` is large and positive only when both eigenvalues are large, strongly negative
+at an edge, and near zero on flat ground. The determinant multiplies the
+eigenvalues, so one small eigenvalue kills it; the trace term subtracts a penalty
+that grows when the two are unbalanced.
+
+`k` sets how strictly that balance is enforced &mdash; conventionally between
+0.04 and 0.06. Drag it high in the visualisation and detections thin out to the
+sharpest corners; drag it low and edges start to survive.
+
+## Reading the visualisation
+
+Highlighted pixels are those whose response clears the threshold.
+
+Set the threshold low and whole edges light up, which is the failure mode `R` is
+designed to avoid, appearing because the threshold is admitting weakly negative
+and near-zero responses. Raise it and only the rectangle's four corners and the
+triangle's points remain &mdash; the genuinely distinctive positions.
+
+The window radius controls how much context each decision uses. A small window is
+sensitive to noise and finds many tiny corners. A large one is stable but blurs
+nearby corners into a single response and misses fine structure.
+
+## What it is and is not invariant to
+
+**Rotation: yes.** The eigenvalues of the structure tensor do not depend on the
+coordinate frame, so a rotated corner is still a corner with the same response.
+This is the property that makes Harris useful for matching.
+
+**Illumination: mostly.** A constant brightness offset does not change gradients
+at all. A contrast scaling multiplies them, which scales `R`, so a relative
+threshold is needed rather than an absolute one.
+
+**Scale: no.** This is the significant gap. A corner viewed from twice as far is
+a smaller corner, and a fixed window either sees only part of it or swamps it
+with context.
+
+That gap is what **SIFT** addressed, by searching over scales as well as
+positions and recording the scale at which each keypoint is most distinctive,
+then describing the local gradient pattern so keypoints can be matched rather
+than merely found. **ORB** does something similar much faster using FAST corners
+and binary descriptors, which is why it turns up in real-time systems.
+
+## Where corners are used
+
+Panorama stitching, structure from motion, visual SLAM, camera calibration and
+image registration all rest on finding the same physical points in several images
+and solving for the transform between them. Detection is the first step;
+[template matching](template_matching.html) is the alternative that does not
+survive rotation.
+
+## Where it goes wrong
+
+**An absolute threshold.** Response scales with contrast, so a threshold tuned on
+one image fails on a darker one. Threshold relative to the maximum, as this page
+does.
+
+**No non-maximum suppression.** A corner produces a cluster of high responses,
+not one pixel.
+
+**Expecting scale invariance.** If the camera distance varies, use a
+scale-invariant detector.
+
+**Corners on a blurred image.** Blur destroys the gradients the whole method
+depends on, so denoise gently or not at all before detecting.
