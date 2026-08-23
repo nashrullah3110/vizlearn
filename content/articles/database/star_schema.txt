@@ -1,0 +1,107 @@
+title: Star Schema: Facts and Dimensions
+intro: The one schema design that analytical databases are actually optimised for.
+
+## Two kinds of table
+
+A star schema splits everything into facts and dimensions, and the split is
+sharper than it first sounds.
+
+A **fact** is a measurement of something that happened. One row per sale, per
+click, per sensor reading. It contains numbers you want to aggregate &mdash;
+quantity, amount, duration &mdash; and foreign keys pointing at the dimensions.
+Almost nothing else. Fact tables are enormous and narrow.
+
+A **dimension** describes the context of a fact. The product dimension holds the
+name, category, brand, supplier; the date dimension holds the day, month,
+quarter, day of week, whether it was a holiday. Dimension tables are small and
+wide, and mostly text.
+
+Drawn out, the fact table sits in the middle with dimensions radiating from it,
+which is where the name comes from.
+
+## Why it is shaped that way
+
+Every analytical question has the same form: *aggregate some measure, sliced by
+some attributes, filtered by others*. Revenue by category by month for one
+region. Units sold by store by weekday.
+
+In a star schema every such query is the same join: fact table to the dimensions
+the question mentions, group by their attributes, aggregate the fact's measures.
+Run the variants above and they are all that shape.
+
+That uniformity has three consequences worth having.
+
+**Query planners handle it well.** The pattern is recognisable enough that
+analytical engines have a dedicated *star join* optimisation: filter the small
+dimensions first, use the result to restrict the fact-table scan, and never
+materialise a large intermediate.
+
+**Analysts can write the queries.** Adding a slice means adding a join and a
+group-by column. No investigation of a normalised graph is required.
+
+**BI tools generate them.** Tableau, Looker and Power BI all assume this model,
+and produce good SQL against it and poor SQL against anything else.
+
+## The date dimension
+
+A table of dates looks redundant &mdash; a database has date functions. It earns
+its place anyway, because it holds things no function knows: your fiscal
+calendar, public holidays in the markets you sell in, which weeks were promotion
+periods, whether a day was a weekday in the local sense.
+
+`WHERE d.is_holiday` and `GROUP BY d.fiscal_quarter` are then ordinary joins
+rather than a growing pile of `CASE` expressions.
+
+## Grain
+
+The most consequential decision is the **grain**: what exactly one fact row
+represents.
+
+"One row per order line" and "one row per order" are different grains, and mixing
+them corrupts every aggregate &mdash; sum a per-order total across order lines
+and you have multiplied the revenue by the number of lines. This is the most
+common defect in real warehouses, and it is silent.
+
+State the grain in one sentence before creating the table, and make every measure
+consistent with it.
+
+## Slowly changing dimensions
+
+A product moves category. Do historical facts belong to the old category or the
+new one?
+
+**Type 1**: overwrite. Simple, and history is rewritten &mdash; last year's
+report changes.
+
+**Type 2**: add a new dimension row with validity dates and point new facts at
+it. History is preserved and the dimension grows. This is the usual choice, and
+it is why dimension tables have surrogate keys rather than using the natural
+business key.
+
+**Type 3**: keep a `previous_category` column. Enough for one level of history,
+rarely enough in practice.
+
+## Star against snowflake
+
+Normalising the dimensions &mdash; splitting `product` into product, category and
+supplier tables &mdash; gives a **snowflake schema**. It removes redundancy and
+adds joins.
+
+For warehouses the star is usually preferred, because dimensions are small
+enough that the redundancy costs little, the extra joins cost real query time,
+and the denormalised version is far easier to read. The exception is a genuinely
+large dimension &mdash; tens of millions of customers &mdash; where the
+duplication starts to matter.
+
+## Where it goes wrong
+
+**Mixed grain.** Silent, and it inflates every total.
+
+**Text in the fact table.** It belongs in a dimension; it makes the largest table
+wider for no benefit.
+
+**No date dimension.** Fiscal calendars and holidays end up as `CASE`
+expressions copied between queries.
+
+**Type 1 everywhere.** History quietly rewrites itself, and last quarter's report
+no longer reproduces.

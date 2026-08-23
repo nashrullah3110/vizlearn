@@ -1,0 +1,115 @@
+title: OLTP, OLAP and Columnar Storage
+intro: Why the database that runs your application is the wrong one for your dashboards.
+
+## Two workloads
+
+**OLTP** &mdash; online transaction processing &mdash; is the application
+database. Many concurrent connections, each doing something small: fetch this
+order, insert this payment, update this status. Queries touch few rows and
+usually want all of a row's columns. Latency per query matters enormously.
+
+**OLAP** &mdash; online analytical processing &mdash; is the reporting workload.
+Few concurrent users, each asking something enormous: revenue by region by month
+for three years. Queries touch millions of rows and usually want three or four
+columns out of fifty. Throughput matters; a query taking two seconds instead of
+two hundred milliseconds is fine.
+
+These want opposite things, and the disagreement is about physical layout.
+
+## How rows are stored
+
+A **row store** keeps each row's fields contiguously:
+
+```
+[1|Ada|Leeds|2026-08-01|120.00][2|Bo|Bristol|2026-08-03|64.50]...
+```
+
+Fetching order 2 is a single page read, and everything needed is there. Perfect
+for OLTP.
+
+Now compute the average of `total` over ten million orders. Every page has to be
+read, because the totals are scattered one per row, separated by all the other
+columns. To read 8 bytes of interest you read a 200-byte row, and 96% of the I/O
+is waste.
+
+## How columns are stored
+
+A **column store** keeps each column contiguously:
+
+```
+ids:     [1][2][3][4]...
+names:   [Ada][Bo][Cy][Di]...
+totals:  [120.00][64.50][45.00][220.00]...
+```
+
+That average now reads only the `totals` region. Reading a fiftieth of the data
+is roughly a fiftieth of the time, and the advantage grows with the width of the
+table.
+
+Two further wins follow from the layout rather than being added to it.
+
+**Compression.** A column holds one type, and often few distinct values. A
+`country` column across ten million rows compresses to almost nothing with
+dictionary encoding; a sorted date column run-length encodes brilliantly. Mixed
+row data does none of this. Ten-times ratios are ordinary, and the speed-up is
+mostly the reduced I/O.
+
+**Vectorised execution.** Values of one type packed contiguously can be processed
+in batches with SIMD instructions, instead of one row at a time through a tuple
+interface.
+
+The cost is the mirror image: fetching one whole row means one read per column
+and reassembly, and inserting a row means writing into fifty places. Columnar
+stores are therefore usually append-oriented and batch-loaded, not
+update-in-place.
+
+## Choosing
+
+| | Row store | Column store |
+|---|---|---|
+| Fetch a whole row | fast | slow |
+| Aggregate one column | slow | fast |
+| Insert or update one row | fast | slow |
+| Bulk load | fine | ideal |
+| Compression | poor | excellent |
+| Examples | PostgreSQL, MySQL | ClickHouse, BigQuery, DuckDB, Snowflake |
+
+## Do not run both on one database
+
+The usual mistake is analytics against the production OLTP database. A report
+scanning ten million rows evicts the working set from the buffer cache, and every
+application query afterwards goes to disk. The dashboard is slow *and* the
+checkout is slow.
+
+The standard arrangement separates them: OLTP handles the application, data is
+copied into an analytical store on a schedule or a stream, and reports run there
+with a [star schema](star_schema.html) shaped for them. The copy is stale by
+minutes or hours, which is almost always acceptable for reporting and is the
+price of not having the two workloads fight.
+
+The variants above make the difference concrete: the same table queried the OLTP
+way and the OLAP way, with a note on how much of each row each one actually
+needs.
+
+## Where the line has blurred
+
+**DuckDB** is columnar, embedded and single-file &mdash; analytical power with no
+cluster. **Postgres** has columnar extensions and can query Parquet through
+foreign data wrappers. **Parquet** itself has made columnar a file format rather
+than a database, so the same data can be read by many engines.
+
+The result is that "we need a data warehouse" is a much bigger claim than it was.
+For datasets under a few hundred gigabytes, DuckDB over Parquet on one machine
+frequently outperforms a cluster.
+
+## Where it goes wrong
+
+**Reporting off the primary.** Cache eviction makes the application slow, and the
+cause is not obvious from the application's own metrics.
+
+**Row-by-row inserts into a columnar store.** They are built for batches; single
+inserts are pathologically slow.
+
+**`SELECT *` on a column store.** It gives up the entire advantage.
+
+**Assuming you need a cluster.** Measure on one machine first.

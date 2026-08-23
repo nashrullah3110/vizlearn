@@ -1,0 +1,126 @@
+title: SQL Injection and Parameterised Queries
+intro: The oldest widespread vulnerability in web software, why it happens, and the single correct fix.
+
+## The mechanism
+
+Build a query by pasting user input into a string:
+
+```
+"SELECT * FROM users WHERE name = '" + name + "'"
+```
+
+With `name = "Ada"` this produces a sensible query. With
+`name = "' OR '1'='1"` it produces:
+
+```
+SELECT * FROM users WHERE name = '' OR '1'='1'
+```
+
+The quote closed the string early, and everything after it became **syntax**
+rather than data. The database is not confused or exploited &mdash; it is
+correctly executing the query it was given. The bug happened before it arrived.
+
+Run the variants above to see it: the same lookup, safe and unsafe, with a normal
+value and then a crafted one.
+
+## What can be done through it
+
+A closed quote gives an attacker the whole language.
+
+**Authentication bypass.** `' OR '1'='1` as a password makes the `WHERE` clause
+true for every row.
+
+**Reading other tables.** A `UNION SELECT` appends results from anywhere the
+database user can read.
+
+**Writing.** If the driver allows multiple statements, a semicolon starts a new
+one.
+
+**Blind extraction.** Even with no output at all, a condition that changes
+whether the page errors, or how long it takes, leaks one bit per request &mdash;
+and one bit per request is enough to read a password hash.
+
+## The fix
+
+Send the query and the values separately:
+
+```
+cursor.execute("SELECT * FROM users WHERE name = ?", (name,))
+```
+
+The `?` is a **placeholder**. The database receives the query text and the value
+through different channels, parses the statement first, and then binds the value
+into an already-parsed plan.
+
+The value therefore cannot alter the structure of the query, because parsing has
+already finished by the time it arrives. `' OR '1'='1` becomes a search for a
+user whose name is literally `' OR '1'='1`, which finds nothing.
+
+This is not a filter that might miss something. It is a structural guarantee:
+there is no input for which a bound parameter becomes syntax.
+
+## Why escaping is not the fix
+
+Escaping tries to neutralise dangerous characters in the input. It fails for
+reasons that are not obvious in advance:
+
+**Numeric contexts have no quotes.** `WHERE id = " + id` needs no quote to
+escape, and `1 OR 1=1` needs no special characters at all.
+
+**Character sets.** Multi-byte encodings have historically allowed a byte
+sequence that becomes a quote after the escaping function has run.
+
+**It is a blacklist.** Every blacklist is a claim to have thought of everything.
+
+**It is per-engine.** Rules differ between MySQL, PostgreSQL and SQLite, and code
+that moves between them silently stops being correct.
+
+Parameterisation avoids all of this by never putting the value in the query text
+at all.
+
+## Identifiers cannot be parameterised
+
+This is the real limitation. A placeholder can stand for a *value*, not for a
+table or column name:
+
+```
+"ORDER BY " + column      -- cannot be parameterised
+```
+
+The correct approach is an **allowlist**: map the user's input to a known-good
+identifier and reject anything unrecognised.
+
+```
+allowed = {"name": "name", "date": "created_at"}
+column = allowed.get(user_input)
+if column is None: reject()
+```
+
+Never sanitise an identifier by escaping. Choose it from a fixed set.
+
+## The other layers
+
+Parameterise everywhere, and then:
+
+**Least privilege.** The application's database user should not own the schema or
+be able to `DROP`. It limits the damage of any bug, not just this one.
+
+**Do not show database errors.** Error text is how blind extraction is made
+fast.
+
+**ORMs help but do not immunise.** Their query builders parameterise by default,
+and every one of them has a raw-SQL escape hatch that does not. The escape hatch
+is where the vulnerabilities are.
+
+## Where it goes wrong
+
+**"It is an internal tool."** Internal input is still input, and internal tools
+get exposed.
+
+**Parameterising most of a query.** One concatenated fragment is enough.
+
+**Trusting a value because it came from a dropdown.** The dropdown is in the
+client. The request is not.
+
+**Escaping instead of binding.** Even when correct today, it is one encoding
+change from not being.

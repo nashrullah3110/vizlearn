@@ -1,0 +1,95 @@
+title: The CAP Theorem
+intro: The most quoted and most misquoted result in distributed data, and what it actually constrains.
+
+## What the three letters mean
+
+**Consistency** here means *linearisability*: every read sees the most recent
+write, as if there were one copy. It is not the C in ACID, which is about
+constraints being satisfied. Two different ideas, one letter, endless confusion.
+
+**Availability** means every request to a non-failed node gets a non-error
+response. Not "mostly up" &mdash; every request, every working node.
+
+**Partition tolerance** means the system keeps operating when the network drops
+or delays messages between nodes.
+
+## The theorem, stated properly
+
+The popular phrasing &mdash; "pick two of three" &mdash; is memorable and wrong
+in a way that matters.
+
+Partitions are not a design choice. Networks fail: cables are cut, switches
+reboot, a cloud availability zone becomes unreachable. Any system spanning more
+than one machine will be partitioned eventually, so **P is not optional**.
+
+What the theorem actually says is narrower and more useful:
+
+> When a partition occurs, you must choose between consistency and availability.
+
+That is it. When the network is healthy, a system can be both consistent and
+available, and most are. The theorem constrains behaviour during a specific,
+temporary failure.
+
+## The choice, concretely
+
+Two nodes can no longer talk. A write arrives at one of them.
+
+**CP &mdash; refuse.** Return an error, because acknowledging a write the other
+side cannot see risks two different answers to the same question. Correct, and
+temporarily unavailable to whoever cannot reach a quorum.
+
+Choose this when a wrong answer is worse than no answer: account balances,
+inventory that must not oversell, anything involving money or safety.
+
+**AP &mdash; accept.** Take the write locally, serve reads from local state, and
+reconcile when the partition heals. Always answering, and during the partition
+two clients can see different values.
+
+Choose this when an answer now is worth more than a perfectly current one: a
+shopping cart, a social feed, a view counter, a DNS record. Amazon's original
+Dynamo paper made this argument for carts explicitly &mdash; a cart that
+occasionally resurrects a deleted item is better business than a cart that is
+sometimes unavailable.
+
+Step the timeline above through both settings and the difference is one decision
+made at one moment.
+
+## Reconciling afterwards
+
+An AP system must resolve conflicting versions once the network returns.
+**Last-write-wins** is simple and silently discards data when clocks disagree.
+**Vector clocks** detect concurrent writes and hand the conflict to the
+application. **CRDTs** are data types designed so concurrent updates merge
+deterministically &mdash; which is why counters, sets and collaborative text
+editors are the AP success stories.
+
+## PACELC, which is the more useful version
+
+CAP only describes partitions, and partitions are rare. Daniel Abadi's extension
+covers the rest of the time:
+
+> **if P**artition then **A**vailability or **C**onsistency, **E**lse
+> **L**atency or **C**onsistency.
+
+The second half is the one engineers meet daily. With the network healthy, a
+system can still choose to confirm every write with remote replicas &mdash;
+consistent and slower &mdash; or acknowledge locally and replicate afterwards
+&mdash; faster and briefly stale.
+
+That is exactly the [synchronous versus asynchronous replication
+choice](replication_and_lag.html), and unlike CAP's trade it is live on every
+request.
+
+## Where it goes wrong
+
+**"We chose AP, so we gave up consistency."** You gave up linearisability during
+partitions. Most of the time the system is consistent.
+
+**Confusing CAP's C with ACID's C.** Different properties.
+
+**Calling a single-node database CP.** With one node there is no partition and
+the theorem does not apply.
+
+**Treating the labels as fixed.** Many systems are tunable per query &mdash;
+Cassandra's consistency levels, DynamoDB's strongly consistent reads &mdash; so
+the choice belongs to the operation, not the product.

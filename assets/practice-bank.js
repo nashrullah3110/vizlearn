@@ -3278,6 +3278,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "database/key_value_and_graph_models.html",
+  "title": "Key-Value and Graph Models",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "Why is a key-value store fast?",
+    "o": [
+     "It keeps everything in memory",
+     "It has no query planner, joins or secondary indexes to maintain, so a lookup is a hash and a read",
+     "It compresses values",
+     "It skips durability"
+    ],
+    "a": 1,
+    "w": "The narrow interface is the feature. The cost is that every access path must be designed in advance and encoded in the key."
+   },
+   {
+    "t": "How does a graph edge differ from a SQL foreign key?",
+    "o": [
+     "It is faster to write",
+     "It is a stored object followed like a pointer, rather than a value matched at query time",
+     "It can only connect two node types",
+     "It cannot carry properties"
+    ],
+    "a": 1,
+    "w": "This is why traversal cost scales with edges visited rather than table size, and why the gap against joins widens with depth."
+   },
+   {
+    "t": "What is a graph database usually worse at than a relational one?",
+    "o": [
+     "Variable-depth traversal",
+     "Aggregating over millions of rows, such as total revenue by month",
+     "Storing properties on relationships",
+     "Finding shortest paths"
+    ],
+    "a": 1,
+    "w": "The test for reaching for a graph model is whether your interesting questions are about connections rather than about attributes."
+   }
+  ]
+ },
+ {
   "path": "database/limit_and_offset_in_sql.html",
   "title": "Limit and Offset in SQL",
   "cat": "Database",
@@ -3293,6 +3333,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What is meant by “Cache it” here?",
     "ans": "Store the count and refresh it periodically, or maintain it with a trigger if it must be exact."
+   }
+  ]
+ },
+ {
+  "path": "database/mvcc_in_databases.html",
+  "title": "MVCC: How Readers Avoid Blocking Writers",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "What does a write do under MVCC?",
+    "o": [
+     "Overwrites the row in place and takes a lock",
+     "Creates a new version, leaving the old one for transactions still reading it",
+     "Blocks all readers until it commits",
+     "Copies the whole table"
+    ],
+    "a": 1,
+    "w": "Nothing is destroyed while a live snapshot might still need it, which is exactly why a reader that began earlier never has to wait."
+   },
+   {
+    "t": "Which conflict does MVCC NOT remove?",
+    "o": [
+     "Reader against writer",
+     "Writer against reader",
+     "Two writers updating the same row",
+     "Two readers"
+    ],
+    "a": 2,
+    "w": "Both would produce a new version from the same old one and one update would be lost. The second waits, or fails at commit with a serialisation error."
+   },
+   {
+    "t": "Why does an idle-in-transaction connection cause table bloat?",
+    "o": [
+     "It holds an exclusive lock",
+     "Its snapshot pins every version created since it began, so cleanup cannot reclaim them",
+     "It writes new versions continuously",
+     "It disables autovacuum"
+    ],
+    "a": 1,
+    "w": "Vacuum can only reclaim a version no live snapshot can still see. One old open transaction holds back cleanup for the whole database."
    }
   ]
  },
@@ -3335,6 +3415,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "database/oltp_vs_olap_columnar.html",
+  "title": "OLTP, OLAP and Columnar Storage",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "Why is a row store slow at averaging one column over ten million rows?",
+    "o": [
+     "It cannot use indexes",
+     "The values are scattered one per row, so every page must be read to collect a small fraction of each",
+     "Averages require a full sort",
+     "Row stores do not compress"
+    ],
+    "a": 1,
+    "w": "To read 8 bytes of interest you read the whole 200-byte row. A column store reads only the region holding that column."
+   },
+   {
+    "t": "Why do column stores compress so much better?",
+    "o": [
+     "They use a stronger algorithm",
+     "A column holds one type and often few distinct values, so dictionary and run-length encoding work extremely well",
+     "They discard nulls",
+     "They store less data"
+    ],
+    "a": 1,
+    "w": "Ten-times ratios are ordinary, and since the bottleneck is I/O, less data read is most of the speed-up."
+   },
+   {
+    "t": "What goes wrong when reports run against the production OLTP database?",
+    "o": [
+     "The reports return stale data",
+     "A large scan evicts the working set from the buffer cache, so application queries afterwards go to disk",
+     "The reports lock the tables",
+     "Transactions fail"
+    ],
+    "a": 1,
+    "w": "The dashboard is slow and the checkout is slow, and the cause is not visible in the application's own metrics."
+   }
+  ]
+ },
+ {
   "path": "database/order_by_in_sql.html",
   "title": "ORDER BY in SQL",
   "cat": "Database",
@@ -3350,6 +3470,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Ties, and why a second key is not optional”?",
     "ans": "Sorting by a column with duplicate values leaves the tied rows in an undefined order relative to each other. Combined with LIMIT , this produces one of the most confusing bugs in SQL:"
+   }
+  ]
+ },
+ {
+  "path": "database/partitioning_in_databases.html",
+  "title": "Partitioning by Range and Hash",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "What is partition pruning?",
+    "o": [
+     "Deleting old partitions automatically",
+     "The planner proving a query cannot match certain partitions and skipping them",
+     "Compressing partitions that are rarely read",
+     "Merging small partitions"
+    ],
+    "a": 1,
+    "w": "It requires the partition key in the WHERE clause. Without it every partition is read, and the scheme costs more than it saves."
+   },
+   {
+    "t": "Why can hash partitioning not prune a range query?",
+    "o": [
+     "Hashes are too slow",
+     "Hashing destroys order, so adjacent key values land in unrelated partitions",
+     "Ranges are not supported",
+     "It has too few partitions"
+    ],
+    "a": 1,
+    "w": "That is the trade for even distribution. Range partitioning prunes ranges well but can leave one partition hot when recent data gets all the traffic."
+   },
+   {
+    "t": "Why is time-series data almost always range-partitioned?",
+    "o": [
+     "Timestamps hash badly",
+     "Dropping an old partition is instant, while deleting the equivalent rows writes a version each and bloats the table",
+     "Range partitions compress better",
+     "Hash partitioning cannot use timestamps"
+    ],
+    "a": 1,
+    "w": "Retention is usually the bigger win over pruning. DROP TABLE unlinks a file; DELETE generates enormous WAL traffic and leaves bloat behind."
    }
   ]
  },
@@ -3480,6 +3640,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "database/replication_and_lag.html",
+  "title": "Replication, Read Replicas and Lag",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "Why does a user sometimes not see their own change after saving?",
+    "o": [
+     "The write failed silently",
+     "The read went to a replica that has not yet applied the change",
+     "The cache was stale",
+     "The transaction rolled back"
+    ],
+    "a": 1,
+    "w": "Nothing errored. Read-your-writes routing - sending that user's reads to the primary briefly after a write - is the usual fix."
+   },
+   {
+    "t": "What does synchronous replication cost?",
+    "o": [
+     "Extra disk on the replica",
+     "A network round trip on every commit, so writes get slower and stall if the replica is unreachable",
+     "The ability to add more replicas",
+     "Read capacity"
+    ],
+    "a": 1,
+    "w": "It is a direct instance of the CAP trade: consistency across replicas costs availability and latency, and no configuration escapes it."
+   },
+   {
+    "t": "What happens if a primary fails while a replica is 200ms behind?",
+    "o": [
+     "The replica catches up first",
+     "Promoting it loses 200ms of writes that were already acknowledged to clients",
+     "Writes are replayed from the client",
+     "The failover is rejected"
+    ],
+    "a": 1,
+    "w": "Those writes were confirmed and are gone. Durability requirements and replication mode are therefore the same decision."
+   }
+  ]
+ },
+ {
   "path": "database/groupby_in_sql.html",
   "title": "SQL GroupBy Visualizer",
   "cat": "Database",
@@ -3495,6 +3695,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “The Core Idea: Collapse and Calculate”?",
     "ans": "Imagine you have a table of sales data. You don't want to see every single sale; you want to know the total sales for each department. GROUP BY is how you do this. It performs two main steps:"
+   }
+  ]
+ },
+ {
+  "path": "database/sql_injection_and_parameters.html",
+  "title": "SQL Injection and Parameterised Queries",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "Why does a parameterised query prevent injection?",
+    "o": [
+     "It escapes dangerous characters",
+     "The statement is parsed before the value arrives, so the value can never become syntax",
+     "It validates input types",
+     "It runs with fewer privileges"
+    ],
+    "a": 1,
+    "w": "It is a structural guarantee rather than a filter: there is no input for which a bound parameter turns into query structure."
+   },
+   {
+    "t": "Why is escaping an inadequate defence?",
+    "o": [
+     "It is slow",
+     "Numeric contexts have no quotes to escape, character sets can defeat it, and it is a per-engine blacklist",
+     "It breaks Unicode",
+     "It only works on SELECT"
+    ],
+    "a": 1,
+    "w": "WHERE id = 1 OR 1=1 contains no special characters at all. Parameterisation avoids the whole class by never putting the value in the query text."
+   },
+   {
+    "t": "How should a user-supplied ORDER BY column be handled?",
+    "o": [
+     "Parameterise it with a placeholder",
+     "Map it through an allowlist of known-good identifiers and reject anything else",
+     "Escape it",
+     "Wrap it in quotes"
+    ],
+    "a": 1,
+    "w": "Placeholders stand for values, not identifiers. Identifiers must be chosen from a fixed set rather than sanitised."
    }
   ]
  },
@@ -3598,6 +3838,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "database/sharding_in_databases.html",
+  "title": "Sharding",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "What is the difference between partitioning and sharding?",
+    "o": [
+     "Sharding uses hashing, partitioning uses ranges",
+     "Partitions live in one database; shards live on separate servers that share no planner, lock table or transaction manager",
+     "Sharding is for reads only",
+     "Partitioning requires a shard key"
+    ],
+    "a": 1,
+    "w": "The machine boundary is the whole difficulty. Anything that needed a global view - joins, unique constraints, transactions - has to be rebuilt or given up."
+   },
+   {
+    "t": "What happens to a query that does not name the shard key?",
+    "o": [
+     "It fails",
+     "It is sent to every shard and the results merged, with latency set by the slowest one",
+     "It is routed to shard 0",
+     "It runs on a replica"
+    ],
+    "a": 1,
+    "w": "Scatter-gather. This is why the shard key is a decision about which queries stay cheap forever, not a schema detail."
+   },
+   {
+    "t": "Why do virtual buckets make rebalancing easier?",
+    "o": [
+     "They compress the data",
+     "Keys hash to a fixed large number of buckets, so adding a shard moves a few buckets rather than changing the hash rule for every row",
+     "They remove the need for a shard key",
+     "They allow cross-shard joins"
+    ],
+    "a": 1,
+    "w": "With a plain hash(key) % N rule, adding a shard changes almost every row's destination. Consistent hashing solves the same problem by moving only one arc of the ring."
+   }
+  ]
+ },
+ {
+  "path": "database/star_schema.html",
+  "title": "Star Schema: Facts and Dimensions",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "What does a fact table contain?",
+    "o": [
+     "Descriptive attributes like product names and categories",
+     "One row per event: numeric measures plus foreign keys to the dimensions",
+     "One row per customer",
+     "Aggregated totals"
+    ],
+    "a": 1,
+    "w": "Long and narrow. The descriptive text lives in the dimensions, which are short and wide - putting it in the fact table widens the largest table for nothing."
+   },
+   {
+    "t": "Why is mixing grain in a fact table so dangerous?",
+    "o": [
+     "It breaks foreign keys",
+     "Summing a per-order total across order lines multiplies revenue by the number of lines, and nothing errors",
+     "It prevents indexing",
+     "It makes joins ambiguous"
+    ],
+    "a": 1,
+    "w": "It is the most common defect in real warehouses precisely because it is silent. State the grain in one sentence before creating the table."
+   },
+   {
+    "t": "Why do star schemas usually beat snowflake schemas in a warehouse?",
+    "o": [
+     "They use less storage",
+     "Dimensions are small enough that the redundancy costs little, while the extra joins cost real query time",
+     "Snowflake schemas cannot be indexed",
+     "BI tools cannot read snowflakes"
+    ],
+    "a": 1,
+    "w": "The exception is a genuinely large dimension - tens of millions of customers - where duplication starts to matter more than the joins."
+   }
+  ]
+ },
+ {
   "path": "database/subqueries_in_sql.html",
   "title": "Subqueries in SQL",
   "cat": "Database",
@@ -3617,6 +3937,86 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What is meant by “Correlated subqueries in SELECT” here?",
     "ans": "SELECT name, (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) FROM customers c runs one count per customer. A LEFT JOIN with GROUP BY , or a window function, does it in one pass."
+   }
+  ]
+ },
+ {
+  "path": "database/cap_theorem.html",
+  "title": "The CAP Theorem",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "What is wrong with 'pick two of three'?",
+    "o": [
+     "There are actually four properties",
+     "Partitions are not optional, so the real choice is between C and A when one occurs",
+     "Consistency and availability are the same thing",
+     "It only applies to SQL databases"
+    ],
+    "a": 1,
+    "w": "Networks fail eventually, so P must be tolerated. The theorem constrains behaviour during that specific temporary failure, not design in general."
+   },
+   {
+    "t": "A CP system during a partition will:",
+    "o": [
+     "Answer from local state and reconcile later",
+     "Return an error rather than risk two different answers to the same question",
+     "Elect a new primary",
+     "Queue writes indefinitely"
+    ],
+    "a": 1,
+    "w": "Correct, and temporarily unavailable to anyone who cannot reach a quorum. The right choice when a wrong answer is worse than no answer."
+   },
+   {
+    "t": "What does the 'ELC' half of PACELC describe?",
+    "o": [
+     "Error handling during partitions",
+     "The latency-against-consistency trade when the network is healthy, which is live on every request",
+     "Eventual consistency guarantees",
+     "Leader election"
+    ],
+    "a": 1,
+    "w": "Confirm every write with remote replicas and be slower, or acknowledge locally and be briefly stale. It is the synchronous-versus-asynchronous replication choice."
+   }
+  ]
+ },
+ {
+  "path": "database/document_model_vs_rows.html",
+  "title": "The Document Model against Rows",
+  "cat": "Database",
+  "q": [
+   {
+    "t": "When does the document model genuinely beat normalised rows?",
+    "o": [
+     "Always, for reads",
+     "When the access pattern is fetching one whole object, since it is a single read with no joins",
+     "When data must be strongly consistent",
+     "When the same fact appears in many places"
+    ],
+    "a": 1,
+    "w": "The data is contiguous and deserialises straight into an object. The gap widens as the object gains parts - and closes when queries come from other directions."
+   },
+   {
+    "t": "What is the real cost of copying a customer's address into every order document?",
+    "o": [
+     "Disk space",
+     "Every change means finding and rewriting every copy, and any missed copy diverges",
+     "Slower reads",
+     "It breaks JSON indexing"
+    ],
+    "a": 1,
+    "w": "The question is whether the copies must agree. On an invoice the address arguably should be a historical fact, in which case it is not duplication at all."
+   },
+   {
+    "t": "Why has the relational/document distinction largely dissolved?",
+    "o": [
+     "Document stores added SQL",
+     "PostgreSQL, MySQL and SQLite all have indexable, queryable, transactional JSON columns, so the choice is per-column",
+     "Documents turned out to be slower",
+     "Normalisation was abandoned"
+    ],
+    "a": 1,
+    "w": "Tables for entities queried from several directions, a JSON column for genuinely variable parts read only alongside their parent - in one database, in one transaction."
    }
   ]
  },

@@ -1,0 +1,102 @@
+title: Key-Value and Graph Models
+intro: The simplest data model and the most relationship-centred one, and when each is worth leaving SQL for.
+
+## Key-value: doing less on purpose
+
+The interface is three operations:
+
+```
+get(key)  ->  value
+put(key, value)
+delete(key)
+```
+
+The value is opaque &mdash; a blob the store does not interpret. You cannot query
+by its contents, sort by it, or join on it. There is no schema and no query
+language.
+
+That poverty is the point. With no query planner, no join algorithms and no
+secondary indexes to maintain, a lookup is a hash and a read. Redis, Memcached,
+DynamoDB in its simplest mode and etcd all live here, and they are fast in a way
+a general-purpose database cannot match, because they have far less to do.
+
+The cost is that every access path must be designed in advance, encoded in the
+key. Fetching a user by id means `user:1234`. Fetching them by email means
+maintaining a second key, `email:ada@example.com -> 1234`, and keeping the two in
+step yourself &mdash; there is no unique constraint and no transaction spanning
+them.
+
+The first variant above shows the shape: a two-column table used as nothing but a
+key lookup.
+
+**Where it fits.** Caches, sessions, feature flags, rate limiters, leaderboards,
+service discovery. Anything with one obvious access path and a strong preference
+for speed.
+
+**Where it does not.** Anything needing an ad-hoc question. "How many active
+sessions are from Leeds" is not answerable without scanning every key, which the
+model is not built for.
+
+## Graph: relationships as the primary thing
+
+A graph model stores **nodes** and **edges**, and both can carry properties. The
+edges are not derived from matching values, as a foreign key is; they are stored
+objects, and traversing one is following a pointer.
+
+The difference shows up in queries about *paths*. "Who reports to Ada, directly
+or indirectly, to any depth" is one traversal in a graph and a recursive CTE in
+SQL &mdash; run the variant and compare it against the ordinary join beside it.
+
+The gap widens with depth. Each level of a relational traversal is another join,
+and the planner's estimates degrade as they compound; a graph engine follows
+edges directly, and cost scales with the number of edges actually visited rather
+than with the size of the tables.
+
+**Where it fits.** Social networks, org charts, fraud rings, dependency graphs,
+recommendation paths, network topology, knowledge graphs. The test is whether
+your interesting questions are about connections rather than about attributes.
+
+**Where it does not.** Aggregating over millions of rows. A graph engine is
+usually worse at "total revenue by month" than any relational database.
+
+## The honest comparison
+
+| | Key-value | Relational | Graph |
+|---|---|---|---|
+| Lookup by id | fastest | fast | fast |
+| Ad-hoc queries | no | yes | limited |
+| Joins | no | yes | native, as traversal |
+| Variable-depth paths | no | recursive CTE | native |
+| Aggregation | no | yes | weak |
+| Schema enforcement | none | strong | usually light |
+
+## Do you need to leave SQL?
+
+Frequently not, and the variants above are the argument.
+
+A key-value table in Postgres &mdash; a primary key and a `jsonb` column &mdash;
+gets you most of the model with transactions and the option of querying the
+value later. Redis wins on raw latency; if that is not the binding constraint,
+the simpler operational story usually is.
+
+Recursive CTEs handle graph traversal, and for a few hundred thousand edges at
+modest depth they are perfectly good. Dedicated graph engines start winning at
+deep traversals over large graphs, and at query *expressibility* &mdash; Cypher
+and Gremlin say in one line what a recursive CTE says in fifteen.
+
+The strong argument for a separate store is when the workload is
+overwhelmingly of one shape. The weak argument is that the model is fashionable.
+
+## Where it goes wrong
+
+**Using a key-value store as the system of record without a plan for secondary
+access.** The second access path is your problem, forever.
+
+**Assuming a graph database is faster at everything.** It is faster at
+traversals and often slower at aggregates.
+
+**Recursive CTEs without a depth limit.** A cycle in the data is an infinite
+loop; the variant here carries a guard for exactly that reason.
+
+**Modelling everything as a graph.** If the questions are about attributes rather
+than connections, a table is the better graph.

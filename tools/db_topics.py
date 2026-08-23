@@ -54,6 +54,22 @@ def _line(x1, y1, x2, y2, stroke=A, sw=1.4, dash=None):
             % (x1, y1, x2, y2, stroke, sw, d))
 
 
+def _grid_rows(x, y, w, h, n, accent=A):
+    """Stacked horizontal bands - a row store, where a row is contiguous."""
+    return "".join(_box(x, y + i * (h + 3), w, h,
+                        fill=(S if i else "none"),
+                        stroke=(accent if i == 0 else B), sw=1.4, rx=2)
+                   for i in range(n))
+
+
+def _grid_cols(x, y, w, h, n, accent=A):
+    """Side-by-side vertical bands - a column store, where a column is."""
+    return "".join(_box(x + i * (w + 3), y, w, h,
+                        fill=(S if i else "none"),
+                        stroke=(accent if i == 0 else B), sw=1.4, rx=2)
+                   for i in range(n))
+
+
 def _table_icon(x, y, w=44, rows=3):
     out = [_box(x, y, w, 10 + rows * 9, fill=S)]
     out.append(_box(x, y, w, 10, fill=A, stroke=B, sw=1))
@@ -2067,6 +2083,2031 @@ system's design. Log it.
                      "The connection"],
          "answer": 1,
          "why": "The victim's transaction was rolled back entirely, so re-running one statement starts from a state that no longer exists."},
+    ],
+)
+
+# ---------------------------------------------------------------------------
+# 11. MVCC
+# ---------------------------------------------------------------------------
+topic(
+    "mvcc_in_databases",
+    "MVCC: How Readers Avoid Blocking Writers",
+    "Concurrency",
+    "Keep the old version of a row alongside the new one, and a reader never "
+    "has to wait for a writer.",
+    _svg(_box(14, 22, 44, 20, fill=S) + _txt(36, 36, "v1", M, 8)
+         + _box(14, 48, 44, 20, fill=S, stroke=A) + _txt(36, 62, "v2", A, 8)
+         + _line(64, 44, 88, 44, B, 1.2)
+         + _txt(112, 34, "reader sees v1", M, 7)
+         + _txt(112, 54, "writer made v2", M, 7)),
+    [
+        "A write does not overwrite. It writes a new version of the row and "
+        "leaves the old one for whoever is still reading it.",
+        "Each transaction gets a snapshot: a rule for which versions it is "
+        "allowed to see, fixed at the moment it started.",
+        "Readers never block writers and writers never block readers. Two "
+        "writers to the <em>same row</em> still conflict.",
+        "The cost is garbage: dead versions accumulate and something has to "
+        "clean them up. In PostgreSQL that is <code class='mono-font'>VACUUM</code>.",
+    ],
+    """
+title: MVCC: How Readers Avoid Blocking Writers
+intro: The idea that lets a long report run while the database keeps taking writes.
+
+## The problem with locks
+
+The simple way to keep transactions from interfering is locking: a reader takes
+a shared lock, a writer takes an exclusive one, and the two cannot be held at
+once.
+
+It is correct, and on a busy system it is miserable. A report that scans a large
+table holds read locks for its whole run, so every write to that table waits.
+Meanwhile a long write transaction blocks every reader. The database spends its
+time queueing rather than working, and the symptom is an application that is fast
+until it is inexplicably not.
+
+## Versions instead of locks
+
+**Multi-version concurrency control** removes the conflict by refusing to destroy
+anything. A write does not overwrite a row; it creates a *new version* of it, and
+the old version stays until nobody can still need it.
+
+Every transaction is given a **snapshot** &mdash; effectively a rule saying which
+versions count as visible &mdash; fixed at the moment it starts, or at the moment
+each statement starts, depending on the
+[isolation level](isolation_levels.html).
+
+A reader that began before a write simply continues to see the older version.
+Nothing waits.
+
+## What each version carries
+
+Conceptually each row version records which transaction created it and which
+transaction deleted it:
+
+```
+id  | balance | created_by | deleted_by
+----+---------+------------+-----------
+7   |   1000  |    100     |    142
+7   |    850  |    142     |    NULL
+```
+
+Transaction 142 changed the balance. It did not edit the first line; it marked it
+deleted and appended the second. A transaction with a snapshot older than 142 is
+shown the first version, a newer one the second. Visibility becomes an arithmetic
+comparison of transaction ids rather than a queue.
+
+## What MVCC does not solve
+
+This is the part that gets missed. MVCC eliminates reader/writer conflicts. It
+does **not** eliminate writer/writer conflicts.
+
+Two transactions updating the same row still contend: the second must wait for
+the first to commit or roll back, because they would otherwise both produce a new
+version from the same old one and one update would vanish. That is the
+[lost update](isolation_levels.html) problem, and MVCC's answer to it is either a
+lock on that row or a serialisation failure at commit.
+
+So the rule is: **readers never wait, writers to the same row still do.**
+
+## The cost: garbage
+
+Old versions accumulate. Something has to decide when a version can no longer be
+seen by any live snapshot and reclaim the space.
+
+In PostgreSQL that job is `VACUUM`, usually run by autovacuum. When it cannot
+keep up &mdash; typically because a very old transaction is still open and
+pinning every version created since &mdash; tables **bloat**: the row count is
+unchanged while the file grows, and every scan reads more pages for the same
+data.
+
+The practical consequence is worth stating plainly: **a transaction left open
+does damage even when it is doing nothing**, because it holds back cleanup for
+the whole database. An idle-in-transaction connection is a bug, not a small
+inefficiency.
+
+Different engines pay this differently. PostgreSQL keeps old versions in the
+table itself and vacuums them. MySQL's InnoDB keeps them in a separate undo log
+and purges it. Oracle uses undo segments, and the same open-transaction problem
+appears as `ORA-01555 snapshot too old` &mdash; the old version needed was
+already discarded.
+
+## Where it goes wrong
+
+**Long-running transactions.** They pin versions across the entire database.
+Keep them short, and never leave one open across a user interaction.
+
+**Assuming no waiting at all.** Writers to the same row still contend, and the
+error surfaces as a lock wait or a serialisation failure.
+
+**Treating table bloat as a disk problem.** It is a symptom of vacuum not
+keeping up, and adding disk hides it rather than fixing it.
+
+**Counting rows to check for bloat.** The row count is right; the file size is
+the thing that grew.
+""",
+    [
+        {"q": "What does a write do under MVCC?",
+         "options": ["Overwrites the row in place and takes a lock",
+                     "Creates a new version, leaving the old one for transactions still reading it",
+                     "Blocks all readers until it commits",
+                     "Copies the whole table"],
+         "answer": 1,
+         "why": "Nothing is destroyed while a live snapshot might still need it, which is exactly why a reader that began earlier never has to wait."},
+        {"q": "Which conflict does MVCC NOT remove?",
+         "options": ["Reader against writer", "Writer against reader",
+                     "Two writers updating the same row", "Two readers"],
+         "answer": 2,
+         "why": "Both would produce a new version from the same old one and one update would be lost. The second waits, or fails at commit with a serialisation error."},
+        {"q": "Why does an idle-in-transaction connection cause table bloat?",
+         "options": ["It holds an exclusive lock",
+                     "Its snapshot pins every version created since it began, so cleanup cannot reclaim them",
+                     "It writes new versions continuously",
+                     "It disables autovacuum"],
+         "answer": 1,
+         "why": "Vacuum can only reclaim a version no live snapshot can still see. One old open transaction holds back cleanup for the whole database."},
+    ],
+    timeline={
+        "a": "Transaction A (a long report)",
+        "b": "Transaction B (a payment)",
+        "intro": "Step through and watch what A sees. Under MVCC it never waits, "
+                 "and it never sees B's change - because A's snapshot predates it.",
+        "levels": [
+            {"value": "mvcc", "label": "MVCC (snapshot)"},
+            {"value": "lock", "label": "Two-phase locking"},
+        ],
+        "steps": [
+            {"who": "a", "sql": "BEGIN;",
+             "says": {"mvcc": "A takes a snapshot. Everything committed before this instant is visible to A for its whole run.",
+                      "lock": "A opens a transaction. No locks held yet."}},
+            {"who": "a", "sql": "SELECT balance FROM accounts WHERE id = 7;  -- 1000",
+             "says": {"mvcc": "A reads 1000. No lock is taken - MVCC reads do not lock.",
+                      "lock": "A reads 1000 and takes a shared lock on row 7, which it will hold until commit."}},
+            {"who": "b", "sql": "BEGIN;",
+             "says": {"*": "B opens its own transaction."}},
+            {"who": "b", "sql": "UPDATE accounts SET balance = 850 WHERE id = 7;",
+             "says": {"mvcc": "B writes a NEW version of row 7. The old version stays, because A's snapshot still needs it. B does not wait.",
+                      "lock": "B needs an exclusive lock, but A holds a shared lock on row 7. B BLOCKS here until A commits."}},
+            {"who": "b", "sql": "COMMIT;",
+             "says": {"mvcc": "B commits. The new version is now the current one for anyone starting after this point.",
+                      "lock": "Still blocked. B cannot reach its COMMIT until A releases."}},
+            {"who": "a", "sql": "SELECT balance FROM accounts WHERE id = 7;  -- ?",
+             "says": {"mvcc": "A reads 1000 again - the old version. Its snapshot predates B's commit, so B's write is invisible to it. A is consistent with itself.",
+                      "lock": "A reads 1000, because B has been waiting this whole time and has not written anything yet."}},
+            {"who": "a", "sql": "COMMIT;",
+             "says": {"mvcc": "A finishes. Now that no snapshot needs the old version of row 7, cleanup can reclaim it - VACUUM in PostgreSQL, purge in InnoDB.",
+                      "lock": "A releases its locks. Only now can B proceed - it has been idle for the entire length of A's report."}},
+        ],
+    },
+)
+
+
+# ---------------------------------------------------------------------------
+# 12. Partitioning
+# ---------------------------------------------------------------------------
+topic(
+    "partitioning_in_databases",
+    "Partitioning by Range and Hash",
+    "Scale",
+    "One logical table, several physical pieces. The query planner skips the "
+    "pieces it can prove are irrelevant.",
+    _svg(_box(12, 24, 40, 42, fill=S, stroke=A) + _txt(32, 78, "2024", M, 7)
+         + _box(60, 24, 40, 42, fill=S) + _txt(80, 78, "2025", M, 7)
+         + _box(108, 24, 40, 42, fill=S) + _txt(128, 78, "2026", M, 7)
+         + _txt(80, 16, "one table, three files", M, 7)),
+    [
+        "Partitioning splits one table into pieces by a rule on a column. The "
+        "table still looks like one table.",
+        "<strong>Range</strong> partitions by an ordered value, usually a date. "
+        "<strong>Hash</strong> spreads rows evenly by hashing a key.",
+        "The win is <strong>partition pruning</strong>: a query with a predicate "
+        "on the partition key touches only the partitions that can match.",
+        "Dropping a partition is instant. Deleting the equivalent rows is not, "
+        "which is why time-series data is almost always range-partitioned.",
+    ],
+    """
+title: Partitioning by Range and Hash
+intro: Cutting one table into pieces the planner can skip, and the choice of where to cut.
+
+## One table, several files
+
+Partitioning splits a table into physical pieces by a rule on one or more
+columns. Applications keep querying the single logical table; the engine decides
+which pieces are involved.
+
+This is **not** sharding. Every partition lives in the same database on the same
+server. [Sharding](sharding_in_databases.html) spreads data across separate
+machines and is a much larger commitment.
+
+The query above builds three range partitions and a view that unions them, which
+is the shape a partitioned table has underneath. Run the variants to see what
+each strategy costs.
+
+## Range partitioning
+
+Pick an ordered column &mdash; almost always a timestamp &mdash; and give each
+partition a bounded interval.
+
+```
+orders_2024  :  order_date >= '2024-01-01' AND < '2025-01-01'
+orders_2025  :  order_date >= '2025-01-01' AND < '2026-01-01'
+orders_2026  :  order_date >= '2026-01-01' AND < '2027-01-01'
+```
+
+A query with `WHERE order_date >= '2026-01-01'` can be proved to need only the
+last partition, so the engine reads one file instead of three. That proof is
+**partition pruning**, and it is where nearly all the benefit is.
+
+The second benefit is administrative and, for time-series data, often the bigger
+one. Deleting a year of orders with `DELETE` writes a row version per deleted
+row, generates enormous WAL traffic, and leaves the table bloated. `DROP TABLE
+orders_2024` unlinks a file. Retention policies are the standard reason to
+partition.
+
+## Hash partitioning
+
+Hash the key, take the remainder modulo the partition count, and store the row
+there. Rows spread evenly regardless of what the values look like.
+
+This is the right choice when there is no natural ordering to exploit and the
+goal is to spread contention &mdash; many concurrent writers hitting one hot
+page, for instance.
+
+The trade-off is that **hash partitioning prunes only on equality**. A query for
+one `customer_id` reaches one partition; a query for a *range* of customer ids
+reaches all of them, because hashing destroys order. Range partitioning is the
+opposite: it prunes ranges beautifully and can leave you with one very hot
+partition if recent data is where all the traffic goes.
+
+| | Range | Hash |
+|---|---|---|
+| Prunes equality | yes | yes |
+| Prunes ranges | yes | **no** |
+| Even distribution | no | yes |
+| Drop old data instantly | yes | no |
+| Typical key | timestamp | id |
+
+## Choosing the key
+
+The partition key must appear in the `WHERE` clause of the queries you care
+about. This is the whole game, and it is where partitioning schemes go wrong.
+
+Partition by `order_date` and then run reports by `customer_id`, and every report
+reads every partition &mdash; you have added complexity and gained nothing. Worse
+than nothing: each partition has its own indexes, so a query that scans them all
+does more index work than it would have on a single table.
+
+A second constraint follows: a unique constraint has to include the partition
+key, because the engine cannot cheaply enforce uniqueness across pieces it is
+trying not to read.
+
+## Sizing
+
+Too few partitions and pruning barely helps. Too many and planning cost grows,
+because the planner considers each one. Somewhere between a few dozen and a few
+hundred is the usual advice, with monthly partitions over a couple of years
+landing naturally in that band.
+
+Partitions can also be **subpartitioned** &mdash; range by month, then hash by
+customer within each month &mdash; when both access patterns matter.
+
+## Where it goes wrong
+
+**Partitioning a small table.** Under a few million rows, a good index is
+simpler and usually faster.
+
+**A partition key the queries do not filter on.** No pruning, more index
+overhead.
+
+**Hash partitioning then querying ranges.** Every partition, every time.
+
+**Forgetting the default partition.** A row that matches no partition is an error
+unless a catch-all exists, and a data-loading job that fails at midnight on New
+Year's Day is the classic version of this.
+""",
+    [
+        {"q": "What is partition pruning?",
+         "options": ["Deleting old partitions automatically",
+                     "The planner proving a query cannot match certain partitions and skipping them",
+                     "Compressing partitions that are rarely read",
+                     "Merging small partitions"],
+         "answer": 1,
+         "why": "It requires the partition key in the WHERE clause. Without it every partition is read, and the scheme costs more than it saves."},
+        {"q": "Why can hash partitioning not prune a range query?",
+         "options": ["Hashes are too slow",
+                     "Hashing destroys order, so adjacent key values land in unrelated partitions",
+                     "Ranges are not supported",
+                     "It has too few partitions"],
+         "answer": 1,
+         "why": "That is the trade for even distribution. Range partitioning prunes ranges well but can leave one partition hot when recent data gets all the traffic."},
+        {"q": "Why is time-series data almost always range-partitioned?",
+         "options": ["Timestamps hash badly",
+                     "Dropping an old partition is instant, while deleting the equivalent rows writes a version each and bloats the table",
+                     "Range partitions compress better",
+                     "Hash partitioning cannot use timestamps"],
+         "answer": 1,
+         "why": "Retention is usually the bigger win over pruning. DROP TABLE unlinks a file; DELETE generates enormous WAL traffic and leaves bloat behind."},
+    ],
+    seed="""CREATE TABLE orders_2024 (id INTEGER, order_date TEXT, customer_id INTEGER, total REAL);
+CREATE TABLE orders_2025 (id INTEGER, order_date TEXT, customer_id INTEGER, total REAL);
+CREATE TABLE orders_2026 (id INTEGER, order_date TEXT, customer_id INTEGER, total REAL);
+
+INSERT INTO orders_2024 VALUES
+  (1,'2024-03-11',101,120.0),(2,'2024-07-02',102,64.5),(3,'2024-11-19',101,310.0);
+INSERT INTO orders_2025 VALUES
+  (4,'2025-01-08',103,45.0),(5,'2025-06-23',101,220.0),(6,'2025-12-30',104,99.9);
+INSERT INTO orders_2026 VALUES
+  (7,'2026-02-14',102,150.0),(8,'2026-05-05',103,72.4),(9,'2026-08-01',101,410.0);
+
+CREATE VIEW orders AS
+  SELECT * FROM orders_2024
+  UNION ALL SELECT * FROM orders_2025
+  UNION ALL SELECT * FROM orders_2026;
+""",
+    starter="""-- The view is the logical table. Underneath are three partitions.
+-- This query has a predicate on the partition key, so only one
+-- partition can possibly match.
+SELECT * FROM orders WHERE order_date >= '2026-01-01';
+""",
+    variants_label="Compare the access patterns",
+    variants=[
+        {"label": "Prunes to one partition",
+         "sql": "-- order_date is the partition key, so 2024 and 2025 can be\n"
+                "-- proved irrelevant. A real partitioned table reads one file.\n"
+                "SELECT * FROM orders WHERE order_date >= '2026-01-01';"},
+        {"label": "Prunes nothing",
+         "sql": "-- customer_id is NOT the partition key. Every partition has to\n"
+                "-- be read, and each has its own indexes to work through.\n"
+                "SELECT * FROM orders WHERE customer_id = 101;"},
+        {"label": "Reading one partition directly",
+         "sql": "-- What pruning amounts to: touch one piece, ignore the rest.\n"
+                "SELECT COUNT(*), SUM(total) FROM orders_2026;"},
+        {"label": "Dropping a year",
+         "sql": "-- Retention on a partitioned table. Instant, and it leaves no\n"
+                "-- bloat behind. Compare with DELETE FROM orders WHERE ...\n"
+                "DROP TABLE orders_2024;\n"
+                "SELECT COUNT(*) AS rows_left FROM orders_2025;"},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 13. Sharding
+# ---------------------------------------------------------------------------
+topic(
+    "sharding_in_databases",
+    "Sharding",
+    "Scale",
+    "Splitting one dataset across separate machines, and the queries that stop "
+    "being possible once you do.",
+    _svg(_box(10, 30, 34, 34, fill=S, stroke=A) + _txt(27, 76, "node 1", M, 7)
+         + _box(58, 30, 34, 34, fill=S, stroke=A) + _txt(75, 76, "node 2", M, 7)
+         + _box(106, 30, 34, 34, fill=S, stroke=A) + _txt(123, 76, "node 3", M, 7)
+         + _txt(80, 20, "one dataset, three servers", M, 7)),
+    [
+        "Partitioning splits a table across files on one server. Sharding "
+        "splits it across <em>servers</em>, each with its own copy of the engine.",
+        "A <strong>shard key</strong> decides which server holds a row. Every "
+        "query that names it goes to one node; every query that does not fans out.",
+        "Joins across shards, global unique constraints and cross-shard "
+        "transactions all become hard or impossible.",
+        "Shard last. Indexes, read replicas, caching and partitioning are all "
+        "cheaper and reversible; sharding is neither.",
+    ],
+    """
+title: Sharding
+intro: The last resort of scaling, what it buys, and the four things it takes away.
+
+## What it is
+
+Sharding splits a dataset across independent database servers. Each **shard**
+holds a subset of the rows and knows nothing about the others.
+
+The distinction from [partitioning](partitioning_in_databases.html) is the
+machine boundary, and it is the whole difficulty. Partitions share a query
+planner, a transaction manager and a lock table. Shards share nothing, so
+anything that needed a global view has to be rebuilt in the application or given
+up.
+
+## The shard key
+
+One column decides where a row lives. Usually the key is hashed and the remainder
+taken modulo the shard count, so a routing rule might be
+`shard = hash(customer_id) % 4`.
+
+The query above computes exactly that for a set of customers, and the variants
+show what different access patterns cost.
+
+The consequence is stark and worth stating as a rule:
+
+**A query that names the shard key touches one node. A query that does not
+touches all of them.**
+
+A lookup by `customer_id` is a single-node request and stays fast as the fleet
+grows. A report grouped by `product_id` has to be sent to every shard and the
+partial results merged &mdash; a *scatter-gather*, whose latency is the slowest
+shard's, not the average.
+
+So the shard key is not a schema detail. It is a decision about which queries
+stay cheap forever and which never will, and it is extremely expensive to change
+afterwards.
+
+## What you give up
+
+**Cross-shard joins.** Customers on shard 1, orders on shard 3, and no engine can
+join them. Either the join moves into the application, or related data is
+deliberately placed together &mdash; sharding orders by `customer_id` so a
+customer's orders live beside them.
+
+**Global uniqueness.** `UNIQUE(email)` cannot be enforced across independent
+servers. The usual answers are a separate lookup service that owns emails, or
+generating ids that are unique by construction &mdash; UUIDs, or Snowflake-style
+ids with a shard number embedded.
+
+**Cross-shard transactions.** ACID stops at the shard boundary. Spanning shards
+means two-phase commit, which is slow and introduces a coordinator that can fail
+mid-protocol, or sagas, which are eventually consistent with explicit
+compensation. Most teams design so that transactions never span shards.
+
+**`AUTO_INCREMENT`.** Every shard would start at 1. Ids must come from elsewhere.
+
+## Rebalancing
+
+Adding a shard when the rule is `hash(key) % 4` changes it to `% 5`, and almost
+every row's destination moves. Migrating the whole dataset while serving traffic
+is the single worst part of operating a sharded system.
+
+Two designs avoid it. **Consistent hashing** places shards on a ring so adding
+one moves only the keys in its arc, rather than reshuffling everything.
+**Virtual buckets** hash keys into a fixed large number of buckets &mdash; say
+1024 &mdash; and map buckets to physical shards; adding a shard moves a few
+buckets and the hash rule never changes. The bucket approach is what most modern
+systems use, because moving is then a matter of copying a bucket and updating a
+map.
+
+## Do the cheaper things first
+
+Sharding is close to irreversible and touches every part of the application.
+Before it:
+
+1. **Index properly.** A great many "we need to shard" conversations end at a
+   missing [composite index](composite_and_covering_indexes.html).
+2. **Read replicas**, if reads dominate. Cheap, and reversible.
+3. **Caching**, for the hot small set.
+4. **Partitioning**, if one table is the problem.
+5. **A bigger machine.** Unglamorous, and modern hardware goes a very long way.
+
+Shard when writes exceed what one machine can take, or the working set no longer
+fits in memory anywhere, and not before.
+
+## Where it goes wrong
+
+**A shard key with skew.** Sharding by country puts most of the traffic on one
+node. Check the distribution of real values.
+
+**Sharding by a key the queries do not use.** Every query becomes
+scatter-gather, and you have bought distributed-systems problems for no
+throughput.
+
+**Assuming transactions still work.** They work within a shard. Across shards
+they do not, and code written before sharding usually assumes otherwise.
+
+**Forgetting the slowest shard sets the latency.** One degraded node makes every
+fan-out query slow.
+""",
+    [
+        {"q": "What is the difference between partitioning and sharding?",
+         "options": ["Sharding uses hashing, partitioning uses ranges",
+                     "Partitions live in one database; shards live on separate servers that share no planner, lock table or transaction manager",
+                     "Sharding is for reads only",
+                     "Partitioning requires a shard key"],
+         "answer": 1,
+         "why": "The machine boundary is the whole difficulty. Anything that needed a global view - joins, unique constraints, transactions - has to be rebuilt or given up."},
+        {"q": "What happens to a query that does not name the shard key?",
+         "options": ["It fails",
+                     "It is sent to every shard and the results merged, with latency set by the slowest one",
+                     "It is routed to shard 0",
+                     "It runs on a replica"],
+         "answer": 1,
+         "why": "Scatter-gather. This is why the shard key is a decision about which queries stay cheap forever, not a schema detail."},
+        {"q": "Why do virtual buckets make rebalancing easier?",
+         "options": ["They compress the data",
+                     "Keys hash to a fixed large number of buckets, so adding a shard moves a few buckets rather than changing the hash rule for every row",
+                     "They remove the need for a shard key",
+                     "They allow cross-shard joins"],
+         "answer": 1,
+         "why": "With a plain hash(key) % N rule, adding a shard changes almost every row's destination. Consistent hashing solves the same problem by moving only one arc of the ring."},
+    ],
+    seed="""CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT, country TEXT);
+CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, product_id INTEGER, total REAL);
+
+INSERT INTO customers VALUES
+  (101,'Ada','UK'),(102,'Bo','US'),(103,'Cy','US'),(104,'Di','IN'),
+  (105,'Ed','US'),(106,'Fi','UK'),(107,'Gu','US'),(108,'Hal','DE');
+
+INSERT INTO orders VALUES
+  (1,101,900,120.0),(2,102,901,64.5),(3,101,902,310.0),(4,103,900,45.0),
+  (5,105,901,220.0),(6,104,900,99.9),(7,102,903,150.0),(8,107,902,72.4),
+  (9,101,900,410.0),(10,108,901,58.0),(11,106,903,131.0),(12,103,900,26.5);
+""",
+    starter="""-- The routing rule, made visible. In a real sharded system this
+-- arithmetic happens in the application or a proxy, and decides which
+-- SERVER the query is sent to.
+SELECT id, name, country, id % 4 AS shard
+FROM   customers
+ORDER  BY shard, id;
+""",
+    variants_label="What each access pattern costs",
+    variants=[
+        {"label": "Single-shard lookup",
+         "sql": "-- The query names the shard key, so the router knows the answer\n"
+                "-- lives on one node. This stays fast however many shards exist.\n"
+                "SELECT id % 4 AS shard, id, name FROM customers WHERE id = 103;"},
+        {"label": "Scatter-gather",
+         "sql": "-- No shard key. Every node has to be asked and the partial\n"
+                "-- results merged. Latency is the SLOWEST shard's, not the mean.\n"
+                "SELECT product_id, COUNT(*) AS orders, SUM(total) AS revenue\n"
+                "FROM   orders\n"
+                "GROUP  BY product_id\n"
+                "ORDER  BY revenue DESC;"},
+        {"label": "Co-located join",
+         "sql": "-- Sharding orders by customer_id puts a customer's orders on the\n"
+                "-- same node as the customer, so this join never crosses a shard.\n"
+                "SELECT c.id % 4 AS shard, c.name, COUNT(o.id) AS orders\n"
+                "FROM   customers c JOIN orders o ON o.customer_id = c.id\n"
+                "GROUP  BY c.id\n"
+                "ORDER  BY shard, c.id;"},
+        {"label": "A skewed shard key",
+         "sql": "-- Sharding by country looks reasonable and is not: the load\n"
+                "-- follows the data, and the data is not evenly spread.\n"
+                "SELECT country, COUNT(*) AS customers\n"
+                "FROM   customers GROUP BY country ORDER BY customers DESC;"},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 14. Replication and replication lag
+# ---------------------------------------------------------------------------
+topic(
+    "replication_and_lag",
+    "Replication, Read Replicas and Lag",
+    "Scale",
+    "Copies of the database that serve reads, and the window in which they are "
+    "wrong.",
+    _svg(_box(16, 20, 42, 22, fill=S, stroke=A) + _txt(37, 34, "primary", A, 7)
+         + _line(58, 31, 96, 31, B, 1.2) + _line(58, 31, 96, 58, B, 1.2)
+         + _box(100, 20, 42, 22, fill=S) + _txt(121, 34, "replica", M, 7)
+         + _box(100, 48, 42, 22, fill=S) + _txt(121, 62, "replica", M, 7)
+         + _txt(80, 82, "reads scale, freshness does not", M, 7)),
+    [
+        "One primary takes the writes and streams its log to replicas, which "
+        "apply it and serve reads.",
+        "<strong>Replication lag</strong> is the delay between a commit on the "
+        "primary and its arrival on a replica. It is never zero.",
+        "The classic bug: write, redirect, read from a replica, and the user "
+        "does not see their own change.",
+        "Synchronous replication removes the lag and adds a network round trip "
+        "to every commit. That is the trade, and it cannot be avoided.",
+    ],
+    """
+title: Replication, Read Replicas and Lag
+intro: How to serve more reads than one machine can, and the staleness that comes with it.
+
+## The arrangement
+
+One server &mdash; the **primary** &mdash; accepts every write. It records each
+change in a log, and streams that log to one or more **replicas**, which apply
+the changes to their own copies and serve read queries.
+
+The appeal is that most workloads are overwhelmingly reads. Adding replicas
+multiplies read capacity without any change to the data model, and unlike
+[sharding](sharding_in_databases.html) it is reversible: a replica that is not
+helping can simply be removed.
+
+Replicas also serve as warm standbys. If the primary fails, one is promoted.
+
+## Lag
+
+A change committed on the primary is not instantly present on a replica. It has
+to be written to the log, sent over a network, received, and applied. The gap is
+**replication lag**, and it is never zero.
+
+Under normal conditions it is milliseconds. Under load it is not, and the reasons
+matter:
+
+**A large write.** A single statement updating a million rows produces a great
+deal of log to ship and apply.
+
+**Single-threaded apply.** Some engines apply the log serially even though the
+primary generated it with many concurrent connections. The replica simply cannot
+keep up with a busy primary.
+
+**A long query on the replica.** Applying a change that conflicts with a running
+read forces a choice between cancelling the query and pausing replication. Both
+happen, depending on configuration.
+
+**Network.** A cross-region replica has a floor set by the speed of light.
+
+## The bug this causes
+
+The failure mode is specific and extremely common:
+
+```
+1. User updates their profile        -> primary
+2. Application redirects to profile  ->
+3. Profile page reads                -> replica, 200ms behind
+4. User sees their OLD profile
+```
+
+Nothing errored. The user changed something, was shown the previous value, and
+reasonably concluded the save failed.
+
+The standard fixes, in rough order of preference:
+
+**Read-your-writes routing.** After a write, send that user's reads to the
+primary for a short window. Simple and effective.
+
+**Route by criticality.** Anything the user just affected reads from the primary;
+dashboards and search read from replicas.
+
+**Wait for the log position.** Record the primary's log position at commit and
+have the replica wait until it has applied at least that far. Correct, and
+requires engine support.
+
+**Do not redirect to a read.** Render the result from what was just written.
+
+## Synchronous replication
+
+The lag can be removed. `synchronous_commit` in PostgreSQL, semi-sync in MySQL:
+the primary does not acknowledge a commit until at least one replica confirms it
+has the change.
+
+The cost is unavoidable and appears on every write: a commit now includes a
+network round trip. Throughput falls, and latency rises by the distance to the
+replica. If the synchronous replica becomes unreachable, writes stall entirely
+unless a fallback is configured.
+
+This is a direct instance of the [CAP](cap_theorem.html) trade: consistency
+across replicas costs availability and latency, and no configuration escapes it.
+The usual compromise is one synchronous replica nearby for durability, and
+asynchronous replicas further away for read capacity.
+
+## Failover and lost writes
+
+If the primary fails while a replica is 200ms behind, promoting that replica
+loses 200ms of committed writes. They were acknowledged to clients and are gone.
+
+Which is why durability requirements and replication mode are the same decision.
+Asynchronous replication means accepting that a failover can lose the most recent
+writes.
+
+## Where it goes wrong
+
+**Assuming replicas are current.** They are not, and the window is where the bugs
+live.
+
+**Sending a write to a replica.** It is read-only; the error is confusing when
+routing is implicit.
+
+**Monitoring lag in bytes only.** Bytes behind does not translate to seconds
+behind. Track both.
+
+**Using replicas for locking or counters.** Anything read-then-write must go to
+the primary, or two clients read the same stale value.
+""",
+    [
+        {"q": "Why does a user sometimes not see their own change after saving?",
+         "options": ["The write failed silently",
+                     "The read went to a replica that has not yet applied the change",
+                     "The cache was stale",
+                     "The transaction rolled back"],
+         "answer": 1,
+         "why": "Nothing errored. Read-your-writes routing - sending that user's reads to the primary briefly after a write - is the usual fix."},
+        {"q": "What does synchronous replication cost?",
+         "options": ["Extra disk on the replica",
+                     "A network round trip on every commit, so writes get slower and stall if the replica is unreachable",
+                     "The ability to add more replicas",
+                     "Read capacity"],
+         "answer": 1,
+         "why": "It is a direct instance of the CAP trade: consistency across replicas costs availability and latency, and no configuration escapes it."},
+        {"q": "What happens if a primary fails while a replica is 200ms behind?",
+         "options": ["The replica catches up first",
+                     "Promoting it loses 200ms of writes that were already acknowledged to clients",
+                     "Writes are replayed from the client",
+                     "The failover is rejected"],
+         "answer": 1,
+         "why": "Those writes were confirmed and are gone. Durability requirements and replication mode are therefore the same decision."},
+    ],
+    timeline={
+        "a": "Primary (takes the write)",
+        "b": "Replica (serves the read)",
+        "intro": "Step through a save-then-view. Choose the routing strategy and "
+                 "watch whether the user sees their own change.",
+        "levels": [
+            {"value": "async", "label": "Async replica, read from replica"},
+            {"value": "sticky", "label": "Async replica, read-your-writes"},
+            {"value": "sync", "label": "Synchronous replication"},
+        ],
+        "steps": [
+            {"who": "a", "sql": "UPDATE profiles SET bio = 'new bio' WHERE id = 7;",
+             "says": {"*": "The write lands on the primary. Replicas know nothing about it yet."}},
+            {"who": "a", "sql": "COMMIT;",
+             "says": {"async": "The primary acknowledges immediately. The change is queued for shipping to the replica.",
+                      "sticky": "The primary acknowledges immediately, and the application notes that this user just wrote.",
+                      "sync": "The primary does NOT acknowledge yet. It waits for a replica to confirm - this is the round trip synchronous commit adds to every write."}},
+            {"who": "b", "sql": "-- replication stream in flight --",
+             "says": {"async": "The change is travelling. The replica is currently behind by however long this takes.",
+                      "sticky": "The change is travelling, and the replica is behind - but the application is not going to ask it yet.",
+                      "sync": "The replica applies the change and confirms. Only now does the primary tell the client the commit succeeded."}},
+            {"who": "b", "sql": "SELECT bio FROM profiles WHERE id = 7;",
+             "says": {"async": "The read goes to the replica, which has not applied the change yet. It returns the OLD bio. The user thinks the save failed.",
+                      "sticky": "The application routes this read to the PRIMARY, because this user wrote recently. The new bio comes back. The replica is still behind - it just is not being asked.",
+                      "sync": "The replica already has the change, because the commit did not complete until it did. The new bio comes back."}},
+            {"who": "b", "sql": "-- a few hundred milliseconds later --",
+             "says": {"async": "The replica catches up. A refresh now shows the new bio - which is why this bug is so often dismissed as unreproducible.",
+                      "sticky": "The replica catches up, and the sticky window expires. Reads for this user go back to the replica safely.",
+                      "sync": "Nothing to catch up on. The cost was paid at commit time instead, on every write whether it mattered or not."}},
+        ],
+    },
+)
+
+
+# ---------------------------------------------------------------------------
+# 15. CAP theorem
+# ---------------------------------------------------------------------------
+topic(
+    "cap_theorem",
+    "The CAP Theorem",
+    "Distributed",
+    "When the network splits, a distributed store can stay correct or stay "
+    "answering. It cannot do both.",
+    _svg('<circle cx="52" cy="40" r="24" fill="none" stroke="%s" stroke-width="1.6"/>' % B
+         + '<circle cx="84" cy="40" r="24" fill="none" stroke="%s" stroke-width="1.6"/>' % B
+         + '<circle cx="68" cy="62" r="24" fill="none" stroke="%s" stroke-width="1.6"/>' % A
+         + _txt(38, 32, "C", M, 9) + _txt(100, 32, "A", M, 9) + _txt(68, 80, "P", A, 9)
+         + _txt(130, 44, "pick 2", M, 8)),
+    [
+        "The theorem is about what happens <em>during a network partition</em>. "
+        "With no partition there is no trade to make.",
+        "<strong>CP</strong>: refuse to answer rather than answer wrongly. "
+        "<strong>AP</strong>: answer from what this node knows and reconcile later.",
+        "'Pick two of three' is the famous phrasing and a misleading one. "
+        "Partitions are not optional, so the real choice is C or A.",
+        "PACELC extends it: <em>else</em>, when there is no partition, the trade "
+        "is latency against consistency &mdash; and that one is always live.",
+    ],
+    """
+title: The CAP Theorem
+intro: The most quoted and most misquoted result in distributed data, and what it actually constrains.
+
+## What the three letters mean
+
+**Consistency** here means *linearisability*: every read sees the most recent
+write, as if there were one copy. It is not the C in ACID, which is about
+constraints being satisfied. Two different ideas, one letter, endless confusion.
+
+**Availability** means every request to a non-failed node gets a non-error
+response. Not "mostly up" &mdash; every request, every working node.
+
+**Partition tolerance** means the system keeps operating when the network drops
+or delays messages between nodes.
+
+## The theorem, stated properly
+
+The popular phrasing &mdash; "pick two of three" &mdash; is memorable and wrong
+in a way that matters.
+
+Partitions are not a design choice. Networks fail: cables are cut, switches
+reboot, a cloud availability zone becomes unreachable. Any system spanning more
+than one machine will be partitioned eventually, so **P is not optional**.
+
+What the theorem actually says is narrower and more useful:
+
+> When a partition occurs, you must choose between consistency and availability.
+
+That is it. When the network is healthy, a system can be both consistent and
+available, and most are. The theorem constrains behaviour during a specific,
+temporary failure.
+
+## The choice, concretely
+
+Two nodes can no longer talk. A write arrives at one of them.
+
+**CP &mdash; refuse.** Return an error, because acknowledging a write the other
+side cannot see risks two different answers to the same question. Correct, and
+temporarily unavailable to whoever cannot reach a quorum.
+
+Choose this when a wrong answer is worse than no answer: account balances,
+inventory that must not oversell, anything involving money or safety.
+
+**AP &mdash; accept.** Take the write locally, serve reads from local state, and
+reconcile when the partition heals. Always answering, and during the partition
+two clients can see different values.
+
+Choose this when an answer now is worth more than a perfectly current one: a
+shopping cart, a social feed, a view counter, a DNS record. Amazon's original
+Dynamo paper made this argument for carts explicitly &mdash; a cart that
+occasionally resurrects a deleted item is better business than a cart that is
+sometimes unavailable.
+
+Step the timeline above through both settings and the difference is one decision
+made at one moment.
+
+## Reconciling afterwards
+
+An AP system must resolve conflicting versions once the network returns.
+**Last-write-wins** is simple and silently discards data when clocks disagree.
+**Vector clocks** detect concurrent writes and hand the conflict to the
+application. **CRDTs** are data types designed so concurrent updates merge
+deterministically &mdash; which is why counters, sets and collaborative text
+editors are the AP success stories.
+
+## PACELC, which is the more useful version
+
+CAP only describes partitions, and partitions are rare. Daniel Abadi's extension
+covers the rest of the time:
+
+> **if P**artition then **A**vailability or **C**onsistency, **E**lse
+> **L**atency or **C**onsistency.
+
+The second half is the one engineers meet daily. With the network healthy, a
+system can still choose to confirm every write with remote replicas &mdash;
+consistent and slower &mdash; or acknowledge locally and replicate afterwards
+&mdash; faster and briefly stale.
+
+That is exactly the [synchronous versus asynchronous replication
+choice](replication_and_lag.html), and unlike CAP's trade it is live on every
+request.
+
+## Where it goes wrong
+
+**"We chose AP, so we gave up consistency."** You gave up linearisability during
+partitions. Most of the time the system is consistent.
+
+**Confusing CAP's C with ACID's C.** Different properties.
+
+**Calling a single-node database CP.** With one node there is no partition and
+the theorem does not apply.
+
+**Treating the labels as fixed.** Many systems are tunable per query &mdash;
+Cassandra's consistency levels, DynamoDB's strongly consistent reads &mdash; so
+the choice belongs to the operation, not the product.
+""",
+    [
+        {"q": "What is wrong with 'pick two of three'?",
+         "options": ["There are actually four properties",
+                     "Partitions are not optional, so the real choice is between C and A when one occurs",
+                     "Consistency and availability are the same thing",
+                     "It only applies to SQL databases"],
+         "answer": 1,
+         "why": "Networks fail eventually, so P must be tolerated. The theorem constrains behaviour during that specific temporary failure, not design in general."},
+        {"q": "A CP system during a partition will:",
+         "options": ["Answer from local state and reconcile later",
+                     "Return an error rather than risk two different answers to the same question",
+                     "Elect a new primary",
+                     "Queue writes indefinitely"],
+         "answer": 1,
+         "why": "Correct, and temporarily unavailable to anyone who cannot reach a quorum. The right choice when a wrong answer is worse than no answer."},
+        {"q": "What does the 'ELC' half of PACELC describe?",
+         "options": ["Error handling during partitions",
+                     "The latency-against-consistency trade when the network is healthy, which is live on every request",
+                     "Eventual consistency guarantees",
+                     "Leader election"],
+         "answer": 1,
+         "why": "Confirm every write with remote replicas and be slower, or acknowledge locally and be briefly stale. It is the synchronous-versus-asynchronous replication choice."},
+    ],
+    timeline={
+        "a": "Node A (client 1 writes here)",
+        "b": "Node B (client 2 reads here)",
+        "intro": "The network between the two nodes is about to fail. Pick a "
+                 "strategy and step through to see what each client experiences.",
+        "levels": [
+            {"value": "cp", "label": "CP - refuse rather than diverge"},
+            {"value": "ap", "label": "AP - answer and reconcile later"},
+        ],
+        "steps": [
+            {"who": "a", "sql": "SELECT stock FROM items WHERE id = 1;  -- 5",
+             "says": {"*": "Network healthy. Both nodes agree: 5 in stock. With no partition, the system is consistent AND available."}},
+            {"who": "b", "sql": "-- network partition begins --",
+             "says": {"*": "A and B can no longer reach each other. Neither has failed; they simply cannot talk. Every message between them is lost."}},
+            {"who": "a", "sql": "UPDATE items SET stock = 4 WHERE id = 1;",
+             "says": {"cp": "Node A cannot reach a quorum, so it REFUSES the write and returns an error. The client is told the system is unavailable - which is true, and better than a lie.",
+                      "ap": "Node A accepts the write locally. Its stock is now 4. It has no way to tell B, and it proceeds anyway."}},
+            {"who": "b", "sql": "SELECT stock FROM items WHERE id = 1;",
+             "says": {"cp": "Node B also cannot reach a quorum. It refuses the read too. Nobody gets a wrong answer, and nobody gets an answer.",
+                      "ap": "Node B answers from what it knows: 5. This is now WRONG - A has it at 4 - and B has no way to find that out. Two clients, two truths."}},
+            {"who": "b", "sql": "-- partition heals --",
+             "says": {"cp": "The nodes reconnect. There is nothing to reconcile, because nothing was written during the split. The system becomes available again, still correct.",
+                      "ap": "The nodes reconnect and discover they disagree. Something must resolve it: last-write-wins (which can silently discard data), vector clocks, or a CRDT designed to merge deterministically."}},
+            {"who": "a", "sql": "SELECT stock FROM items WHERE id = 1;",
+             "says": {"cp": "5 - and the update never happened, so the client must retry. Consistency was preserved by refusing service for the duration.",
+                      "ap": "4, once reconciliation picks a winner. The system never stopped answering; it was briefly wrong instead. For a shopping cart that is the right trade. For a bank balance it is not."}},
+        ],
+    },
+)
+
+
+# ---------------------------------------------------------------------------
+# 16. Document model
+# ---------------------------------------------------------------------------
+topic(
+    "document_model_vs_rows",
+    "The Document Model against Rows",
+    "Data Models",
+    "The same data as normalised tables and as nested documents, and what each "
+    "shape makes easy.",
+    _svg(_table_icon(12, 24, 42) + _txt(33, 76, "rows", M, 7)
+         + _txt(66, 46, "vs", M, 8)
+         + _box(84, 22, 58, 46, fill=S, stroke=A)
+         + _txt(113, 36, "{ order:", A, 7) + _txt(113, 48, "  items:[..]", M, 7)
+         + _txt(113, 60, "}", A, 7)),
+    [
+        "A document stores related data together, nested. A relational schema "
+        "stores it apart and joins on demand.",
+        "Documents win when the access pattern is 'give me this whole thing' "
+        "&mdash; one read, no joins.",
+        "Rows win when the data is queried from several directions, or when the "
+        "same fact appears in many documents and has to stay consistent.",
+        "SQLite, PostgreSQL and MySQL all have JSON columns, so the choice is "
+        "per-column now rather than per-database.",
+    ],
+    """
+title: The Document Model against Rows
+intro: One order, stored two ways, and an honest account of which questions each shape answers well.
+
+## The same order, two shapes
+
+Run the query above and then the variants. The identical order is stored as
+normalised rows and as a single JSON document, and both are queried in the same
+session &mdash; because modern SQL engines support both.
+
+**Relational**: an `orders` row, several `order_items` rows referring back to it,
+a `customers` row. Each fact recorded once, joined when needed.
+
+**Document**: one record containing the order, its items nested inside it, and
+the customer details copied in.
+
+## What documents make easy
+
+**One read for one thing.** Fetching an order means retrieving one document.
+No joins, no round trips, and the data is contiguous on disk. For a
+read-this-whole-object access pattern, this is genuinely faster and the gap
+widens as the object gets more parts.
+
+**A shape that matches the code.** The document deserialises straight into an
+object. No object-relational mapping layer reassembling a graph from five result
+sets.
+
+**Schema flexibility.** Adding a field to some documents and not others requires
+no migration. For genuinely heterogeneous data &mdash; product catalogues where
+a book and a fridge share almost no attributes &mdash; this is a real advantage
+rather than laziness.
+
+## What rows make easy
+
+**Querying from any direction.** "Which customers bought product 902" is
+straightforward relationally and awkward in a document store, because the data
+is organised around orders, not products. Documents optimise one access path and
+make the others harder.
+
+**Updating a shared fact once.** If the customer's address is copied into every
+order document, changing it means finding and rewriting every one. Relationally
+it is a single `UPDATE`. This is the classic normalisation argument and it has
+not stopped being true.
+
+**Integrity the database enforces.** Foreign keys, uniqueness and check
+constraints are declared once and cannot be bypassed. In a document store these
+usually become application code, which means they hold until some other code
+path forgets.
+
+**Ad-hoc analysis.** Aggregating across documents means either a scan or a
+purpose-built index, and the queries are harder to write.
+
+## Denormalisation is the actual trade
+
+Nesting the items inside the order is fine &mdash; an order item belongs to
+exactly one order and is never queried independently. That is not duplication,
+just co-location.
+
+Copying the customer's name and address into every order is duplication, and it
+buys read speed at the cost of update cost and the risk of divergence. Sometimes
+that is right: an invoice arguably *should* record the address as it was at the
+time, in which case it is not duplication at all but a historical fact.
+
+The question is always whether the copies must agree. If they must, storing them
+separately means keeping them in sync forever.
+
+## The distinction has mostly dissolved
+
+PostgreSQL's `jsonb` is indexable, queryable and transactional. MySQL and SQLite
+have JSON functions &mdash; the queries on this page use SQLite's, in the same
+session as ordinary tables.
+
+So the modern answer is usually neither purely one nor the other: relational
+tables for the entities that are queried from several directions and must stay
+consistent, and a JSON column for the parts that are genuinely variable and only
+ever read alongside their parent.
+
+What a dedicated document database still offers is horizontal scaling and
+operational tooling built around that model from the start. What it gives up is
+joins and multi-document transactions &mdash; though MongoDB has had the latter
+since 4.0, which narrowed the gap considerably.
+
+## Where it goes wrong
+
+**Choosing documents to avoid schema design.** The schema still exists; it has
+moved into the application, where nothing enforces it.
+
+**Unbounded arrays.** A document that grows without limit &mdash; every event
+appended to one record &mdash; eventually exceeds the size limit and rewrites
+the whole thing on every append.
+
+**Duplicating a fact that must stay consistent.** Fine for a historical snapshot,
+a slow disaster for live data.
+
+**Using JSON columns for well-structured data.** If every row has the same
+fields, they are columns. Putting them in JSON gives up type checking and
+constraints for nothing.
+""",
+    [
+        {"q": "When does the document model genuinely beat normalised rows?",
+         "options": ["Always, for reads",
+                     "When the access pattern is fetching one whole object, since it is a single read with no joins",
+                     "When data must be strongly consistent",
+                     "When the same fact appears in many places"],
+         "answer": 1,
+         "why": "The data is contiguous and deserialises straight into an object. The gap widens as the object gains parts - and closes when queries come from other directions."},
+        {"q": "What is the real cost of copying a customer's address into every order document?",
+         "options": ["Disk space",
+                     "Every change means finding and rewriting every copy, and any missed copy diverges",
+                     "Slower reads",
+                     "It breaks JSON indexing"],
+         "answer": 1,
+         "why": "The question is whether the copies must agree. On an invoice the address arguably should be a historical fact, in which case it is not duplication at all."},
+        {"q": "Why has the relational/document distinction largely dissolved?",
+         "options": ["Document stores added SQL",
+                     "PostgreSQL, MySQL and SQLite all have indexable, queryable, transactional JSON columns, so the choice is per-column",
+                     "Documents turned out to be slower",
+                     "Normalisation was abandoned"],
+         "answer": 1,
+         "why": "Tables for entities queried from several directions, a JSON column for genuinely variable parts read only alongside their parent - in one database, in one transaction."},
+    ],
+    seed="""CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT, city TEXT);
+CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, placed TEXT);
+CREATE TABLE order_items (order_id INTEGER, product TEXT, qty INTEGER, price REAL);
+
+INSERT INTO customers VALUES (101,'Ada','Leeds'),(102,'Bo','Bristol');
+INSERT INTO orders VALUES (1,101,'2026-08-01'),(2,102,'2026-08-03');
+INSERT INTO order_items VALUES
+  (1,'keyboard',1,45.0),(1,'cable',2,6.5),(1,'mouse',1,22.0),
+  (2,'monitor',1,180.0),(2,'cable',1,6.5);
+
+CREATE TABLE order_docs (id INTEGER PRIMARY KEY, doc TEXT);
+INSERT INTO order_docs VALUES
+ (1,'{"id":1,"placed":"2026-08-01","customer":{"id":101,"name":"Ada","city":"Leeds"},"items":[{"product":"keyboard","qty":1,"price":45.0},{"product":"cable","qty":2,"price":6.5},{"product":"mouse","qty":1,"price":22.0}]}'),
+ (2,'{"id":2,"placed":"2026-08-03","customer":{"id":102,"name":"Bo","city":"Bristol"},"items":[{"product":"monitor","qty":1,"price":180.0},{"product":"cable","qty":1,"price":6.5}]}');
+""",
+    starter="""-- The relational shape: three tables, joined on demand.
+SELECT c.name, o.id AS order_id, i.product, i.qty, i.price
+FROM   orders o
+JOIN   customers   c ON c.id = o.customer_id
+JOIN   order_items i ON i.order_id = o.id
+ORDER  BY o.id, i.product;
+""",
+    variants_label="The same data, both ways",
+    variants=[
+        {"label": "Relational: join three tables",
+         "sql": "-- Each fact stored once. Reassembled at query time.\n"
+                "SELECT c.name, o.id AS order_id, i.product, i.qty, i.price\n"
+                "FROM   orders o\n"
+                "JOIN   customers   c ON c.id = o.customer_id\n"
+                "JOIN   order_items i ON i.order_id = o.id\n"
+                "ORDER  BY o.id, i.product;"},
+        {"label": "Document: one read, no joins",
+         "sql": "-- The whole order in one row. This is the access pattern\n"
+                "-- documents are good at.\n"
+                "SELECT json_extract(doc,'$.customer.name') AS customer,\n"
+                "       json_extract(doc,'$.id')            AS order_id,\n"
+                "       json_extract(value,'$.product')     AS product,\n"
+                "       json_extract(value,'$.qty')         AS qty\n"
+                "FROM   order_docs, json_each(order_docs.doc,'$.items')\n"
+                "ORDER  BY order_id, product;"},
+        {"label": "Querying the other way round",
+         "sql": "-- 'Who bought a cable?' is natural relationally...\n"
+                "SELECT c.name, i.qty\n"
+                "FROM   order_items i\n"
+                "JOIN   orders o    ON o.id = i.order_id\n"
+                "JOIN   customers c ON c.id = o.customer_id\n"
+                "WHERE  i.product = 'cable';"},
+        {"label": "...and awkward as documents",
+         "sql": "-- ...but the documents are organised around orders, so this has\n"
+                "-- to unnest every one of them to find the same answer.\n"
+                "SELECT json_extract(d.doc,'$.customer.name') AS name,\n"
+                "       json_extract(value,'$.qty')           AS qty\n"
+                "FROM   order_docs d, json_each(d.doc,'$.items')\n"
+                "WHERE  json_extract(value,'$.product') = 'cable';"},
+        {"label": "The duplicated fact",
+         "sql": "-- Ada moves to York. Relationally that is one row. In the\n"
+                "-- documents her city is copied into every order she ever placed.\n"
+                "UPDATE customers SET city = 'York' WHERE id = 101;\n"
+                "SELECT (SELECT city FROM customers WHERE id=101)          AS relational,\n"
+                "       json_extract(doc,'$.customer.city')                AS in_document\n"
+                "FROM   order_docs WHERE id = 1;"},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 17. Key-value and graph models
+# ---------------------------------------------------------------------------
+topic(
+    "key_value_and_graph_models",
+    "Key-Value and Graph Models",
+    "Data Models",
+    "Two models at opposite ends: one that does almost nothing very fast, and "
+    "one built entirely around following relationships.",
+    _svg(_box(10, 28, 46, 18, fill=S) + _txt(33, 40, "key &#8594; value", M, 7)
+         + _txt(33, 60, "no queries", M, 7)
+         + '<circle cx="92" cy="30" r="6" fill="none" stroke="%s" stroke-width="1.4"/>' % A
+         + '<circle cx="122" cy="46" r="6" fill="none" stroke="%s" stroke-width="1.4"/>' % A
+         + '<circle cx="92" cy="62" r="6" fill="none" stroke="%s" stroke-width="1.4"/>' % A
+         + _line(98, 33, 116, 43, B, 1) + _line(98, 59, 116, 50, B, 1)
+         + _txt(107, 80, "edges are the point", M, 7)),
+    [
+        "A key-value store supports get, put and delete on an opaque value. "
+        "That is the entire interface.",
+        "The narrowness is the feature: no query planner, no joins, and a "
+        "lookup that is a hash away.",
+        "A graph model makes relationships first-class. Traversing them costs "
+        "the same whether the graph is small or huge.",
+        "In SQL, a graph traversal is a recursive CTE &mdash; possible, and "
+        "verbose enough to show why a dedicated model exists.",
+    ],
+    """
+title: Key-Value and Graph Models
+intro: The simplest data model and the most relationship-centred one, and when each is worth leaving SQL for.
+
+## Key-value: doing less on purpose
+
+The interface is three operations:
+
+```
+get(key)  ->  value
+put(key, value)
+delete(key)
+```
+
+The value is opaque &mdash; a blob the store does not interpret. You cannot query
+by its contents, sort by it, or join on it. There is no schema and no query
+language.
+
+That poverty is the point. With no query planner, no join algorithms and no
+secondary indexes to maintain, a lookup is a hash and a read. Redis, Memcached,
+DynamoDB in its simplest mode and etcd all live here, and they are fast in a way
+a general-purpose database cannot match, because they have far less to do.
+
+The cost is that every access path must be designed in advance, encoded in the
+key. Fetching a user by id means `user:1234`. Fetching them by email means
+maintaining a second key, `email:ada@example.com -> 1234`, and keeping the two in
+step yourself &mdash; there is no unique constraint and no transaction spanning
+them.
+
+The first variant above shows the shape: a two-column table used as nothing but a
+key lookup.
+
+**Where it fits.** Caches, sessions, feature flags, rate limiters, leaderboards,
+service discovery. Anything with one obvious access path and a strong preference
+for speed.
+
+**Where it does not.** Anything needing an ad-hoc question. "How many active
+sessions are from Leeds" is not answerable without scanning every key, which the
+model is not built for.
+
+## Graph: relationships as the primary thing
+
+A graph model stores **nodes** and **edges**, and both can carry properties. The
+edges are not derived from matching values, as a foreign key is; they are stored
+objects, and traversing one is following a pointer.
+
+The difference shows up in queries about *paths*. "Who reports to Ada, directly
+or indirectly, to any depth" is one traversal in a graph and a recursive CTE in
+SQL &mdash; run the variant and compare it against the ordinary join beside it.
+
+The gap widens with depth. Each level of a relational traversal is another join,
+and the planner's estimates degrade as they compound; a graph engine follows
+edges directly, and cost scales with the number of edges actually visited rather
+than with the size of the tables.
+
+**Where it fits.** Social networks, org charts, fraud rings, dependency graphs,
+recommendation paths, network topology, knowledge graphs. The test is whether
+your interesting questions are about connections rather than about attributes.
+
+**Where it does not.** Aggregating over millions of rows. A graph engine is
+usually worse at "total revenue by month" than any relational database.
+
+## The honest comparison
+
+| | Key-value | Relational | Graph |
+|---|---|---|---|
+| Lookup by id | fastest | fast | fast |
+| Ad-hoc queries | no | yes | limited |
+| Joins | no | yes | native, as traversal |
+| Variable-depth paths | no | recursive CTE | native |
+| Aggregation | no | yes | weak |
+| Schema enforcement | none | strong | usually light |
+
+## Do you need to leave SQL?
+
+Frequently not, and the variants above are the argument.
+
+A key-value table in Postgres &mdash; a primary key and a `jsonb` column &mdash;
+gets you most of the model with transactions and the option of querying the
+value later. Redis wins on raw latency; if that is not the binding constraint,
+the simpler operational story usually is.
+
+Recursive CTEs handle graph traversal, and for a few hundred thousand edges at
+modest depth they are perfectly good. Dedicated graph engines start winning at
+deep traversals over large graphs, and at query *expressibility* &mdash; Cypher
+and Gremlin say in one line what a recursive CTE says in fifteen.
+
+The strong argument for a separate store is when the workload is
+overwhelmingly of one shape. The weak argument is that the model is fashionable.
+
+## Where it goes wrong
+
+**Using a key-value store as the system of record without a plan for secondary
+access.** The second access path is your problem, forever.
+
+**Assuming a graph database is faster at everything.** It is faster at
+traversals and often slower at aggregates.
+
+**Recursive CTEs without a depth limit.** A cycle in the data is an infinite
+loop; the variant here carries a guard for exactly that reason.
+
+**Modelling everything as a graph.** If the questions are about attributes rather
+than connections, a table is the better graph.
+""",
+    [
+        {"q": "Why is a key-value store fast?",
+         "options": ["It keeps everything in memory",
+                     "It has no query planner, joins or secondary indexes to maintain, so a lookup is a hash and a read",
+                     "It compresses values",
+                     "It skips durability"],
+         "answer": 1,
+         "why": "The narrow interface is the feature. The cost is that every access path must be designed in advance and encoded in the key."},
+        {"q": "How does a graph edge differ from a SQL foreign key?",
+         "options": ["It is faster to write",
+                     "It is a stored object followed like a pointer, rather than a value matched at query time",
+                     "It can only connect two node types",
+                     "It cannot carry properties"],
+         "answer": 1,
+         "why": "This is why traversal cost scales with edges visited rather than table size, and why the gap against joins widens with depth."},
+        {"q": "What is a graph database usually worse at than a relational one?",
+         "options": ["Variable-depth traversal",
+                     "Aggregating over millions of rows, such as total revenue by month",
+                     "Storing properties on relationships",
+                     "Finding shortest paths"],
+         "answer": 1,
+         "why": "The test for reaching for a graph model is whether your interesting questions are about connections rather than about attributes."},
+    ],
+    seed="""CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT);
+INSERT INTO kv VALUES
+  ('user:1234','{"name":"Ada","email":"ada@example.com"}'),
+  ('user:1235','{"name":"Bo","email":"bo@example.com"}'),
+  ('email:ada@example.com','1234'),
+  ('email:bo@example.com','1235'),
+  ('session:abc','{"user":1234,"expires":"2026-08-25T10:00:00"}');
+
+CREATE TABLE people (id INTEGER PRIMARY KEY, name TEXT, role TEXT);
+CREATE TABLE reports_to (person INTEGER, manager INTEGER);
+
+INSERT INTO people VALUES
+  (1,'Ada','CTO'),(2,'Bo','Eng Manager'),(3,'Cy','Eng Manager'),
+  (4,'Di','Engineer'),(5,'Ed','Engineer'),(6,'Fi','Engineer'),
+  (7,'Gu','Intern'),(8,'Hal','Engineer');
+
+INSERT INTO reports_to VALUES
+  (2,1),(3,1),(4,2),(5,2),(6,3),(7,4),(8,3);
+""",
+    starter="""-- The key-value model, in its entirety: get by key.
+-- No query language, no joins, no way to ask about the value.
+SELECT value FROM kv WHERE key = 'user:1234';
+""",
+    variants_label="Both models, and the SQL equivalents",
+    variants=[
+        {"label": "Key-value: get",
+         "sql": "-- The whole interface. Fast because there is nothing to plan.\n"
+                "SELECT value FROM kv WHERE key = 'user:1234';"},
+        {"label": "Key-value: the second access path",
+         "sql": "-- Wanting users by email means maintaining a SECOND key yourself,\n"
+                "-- and keeping the two in step without a constraint to help.\n"
+                "SELECT k2.value AS user_json\n"
+                "FROM   kv k1\n"
+                "JOIN   kv k2 ON k2.key = 'user:' || k1.value\n"
+                "WHERE  k1.key = 'email:ada@example.com';"},
+        {"label": "Graph: one hop",
+         "sql": "-- Direct reports. A single join - relational SQL is fine here.\n"
+                "SELECT m.name AS manager, p.name AS reports\n"
+                "FROM   reports_to r\n"
+                "JOIN   people p ON p.id = r.person\n"
+                "JOIN   people m ON m.id = r.manager\n"
+                "WHERE  m.name = 'Ada';"},
+        {"label": "Graph: any depth",
+         "sql": "-- Everyone under Ada, however deep. In Cypher this is one line.\n"
+                "-- The depth guard is not decoration: a cycle in the data would\n"
+                "-- otherwise loop forever.\n"
+                "WITH RECURSIVE chain(id, name, depth) AS (\n"
+                "    SELECT id, name, 0 FROM people WHERE name = 'Ada'\n"
+                "  UNION ALL\n"
+                "    SELECT p.id, p.name, c.depth + 1\n"
+                "    FROM   chain c\n"
+                "    JOIN   reports_to r ON r.manager = c.id\n"
+                "    JOIN   people p     ON p.id = r.person\n"
+                "    WHERE  c.depth < 10\n"
+                ")\n"
+                "SELECT depth, name FROM chain WHERE depth > 0 ORDER BY depth, name;"},
+        {"label": "Graph: path to the top",
+         "sql": "-- The other direction: the chain of command above one person.\n"
+                "WITH RECURSIVE up(id, name, depth) AS (\n"
+                "    SELECT id, name, 0 FROM people WHERE name = 'Gu'\n"
+                "  UNION ALL\n"
+                "    SELECT m.id, m.name, u.depth + 1\n"
+                "    FROM   up u\n"
+                "    JOIN   reports_to r ON r.person = u.id\n"
+                "    JOIN   people m     ON m.id = r.manager\n"
+                "    WHERE  u.depth < 10\n"
+                ")\n"
+                "SELECT depth, name FROM up ORDER BY depth;"},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 18. OLTP vs OLAP and columnar storage
+# ---------------------------------------------------------------------------
+topic(
+    "oltp_vs_olap_columnar",
+    "OLTP, OLAP and Columnar Storage",
+    "Analytics",
+    "Two workloads that want opposite things from disk, and the storage layout "
+    "that serves each.",
+    _svg(_grid_rows(12, 24, 44, 12, 3, A) + _txt(34, 78, "row store", M, 7)
+         + _grid_cols(94, 24, 12, 36, 3, A) + _txt(116, 78, "column store", M, 7)),
+    [
+        "<strong>OLTP</strong>: many small transactions touching whole rows. "
+        "<strong>OLAP</strong>: few huge queries touching a few columns.",
+        "A row store keeps a row's fields together, so reading one row is one "
+        "page read. Reading one column reads every page.",
+        "A column store keeps each column together, so an aggregate reads only "
+        "the columns it names.",
+        "Columns of one type compress far better than mixed rows &mdash; often "
+        "ten times &mdash; and less data read is the actual speed-up.",
+    ],
+    """
+title: OLTP, OLAP and Columnar Storage
+intro: Why the database that runs your application is the wrong one for your dashboards.
+
+## Two workloads
+
+**OLTP** &mdash; online transaction processing &mdash; is the application
+database. Many concurrent connections, each doing something small: fetch this
+order, insert this payment, update this status. Queries touch few rows and
+usually want all of a row's columns. Latency per query matters enormously.
+
+**OLAP** &mdash; online analytical processing &mdash; is the reporting workload.
+Few concurrent users, each asking something enormous: revenue by region by month
+for three years. Queries touch millions of rows and usually want three or four
+columns out of fifty. Throughput matters; a query taking two seconds instead of
+two hundred milliseconds is fine.
+
+These want opposite things, and the disagreement is about physical layout.
+
+## How rows are stored
+
+A **row store** keeps each row's fields contiguously:
+
+```
+[1|Ada|Leeds|2026-08-01|120.00][2|Bo|Bristol|2026-08-03|64.50]...
+```
+
+Fetching order 2 is a single page read, and everything needed is there. Perfect
+for OLTP.
+
+Now compute the average of `total` over ten million orders. Every page has to be
+read, because the totals are scattered one per row, separated by all the other
+columns. To read 8 bytes of interest you read a 200-byte row, and 96% of the I/O
+is waste.
+
+## How columns are stored
+
+A **column store** keeps each column contiguously:
+
+```
+ids:     [1][2][3][4]...
+names:   [Ada][Bo][Cy][Di]...
+totals:  [120.00][64.50][45.00][220.00]...
+```
+
+That average now reads only the `totals` region. Reading a fiftieth of the data
+is roughly a fiftieth of the time, and the advantage grows with the width of the
+table.
+
+Two further wins follow from the layout rather than being added to it.
+
+**Compression.** A column holds one type, and often few distinct values. A
+`country` column across ten million rows compresses to almost nothing with
+dictionary encoding; a sorted date column run-length encodes brilliantly. Mixed
+row data does none of this. Ten-times ratios are ordinary, and the speed-up is
+mostly the reduced I/O.
+
+**Vectorised execution.** Values of one type packed contiguously can be processed
+in batches with SIMD instructions, instead of one row at a time through a tuple
+interface.
+
+The cost is the mirror image: fetching one whole row means one read per column
+and reassembly, and inserting a row means writing into fifty places. Columnar
+stores are therefore usually append-oriented and batch-loaded, not
+update-in-place.
+
+## Choosing
+
+| | Row store | Column store |
+|---|---|---|
+| Fetch a whole row | fast | slow |
+| Aggregate one column | slow | fast |
+| Insert or update one row | fast | slow |
+| Bulk load | fine | ideal |
+| Compression | poor | excellent |
+| Examples | PostgreSQL, MySQL | ClickHouse, BigQuery, DuckDB, Snowflake |
+
+## Do not run both on one database
+
+The usual mistake is analytics against the production OLTP database. A report
+scanning ten million rows evicts the working set from the buffer cache, and every
+application query afterwards goes to disk. The dashboard is slow *and* the
+checkout is slow.
+
+The standard arrangement separates them: OLTP handles the application, data is
+copied into an analytical store on a schedule or a stream, and reports run there
+with a [star schema](star_schema.html) shaped for them. The copy is stale by
+minutes or hours, which is almost always acceptable for reporting and is the
+price of not having the two workloads fight.
+
+The variants above make the difference concrete: the same table queried the OLTP
+way and the OLAP way, with a note on how much of each row each one actually
+needs.
+
+## Where the line has blurred
+
+**DuckDB** is columnar, embedded and single-file &mdash; analytical power with no
+cluster. **Postgres** has columnar extensions and can query Parquet through
+foreign data wrappers. **Parquet** itself has made columnar a file format rather
+than a database, so the same data can be read by many engines.
+
+The result is that "we need a data warehouse" is a much bigger claim than it was.
+For datasets under a few hundred gigabytes, DuckDB over Parquet on one machine
+frequently outperforms a cluster.
+
+## Where it goes wrong
+
+**Reporting off the primary.** Cache eviction makes the application slow, and the
+cause is not obvious from the application's own metrics.
+
+**Row-by-row inserts into a columnar store.** They are built for batches; single
+inserts are pathologically slow.
+
+**`SELECT *` on a column store.** It gives up the entire advantage.
+
+**Assuming you need a cluster.** Measure on one machine first.
+""",
+    [
+        {"q": "Why is a row store slow at averaging one column over ten million rows?",
+         "options": ["It cannot use indexes",
+                     "The values are scattered one per row, so every page must be read to collect a small fraction of each",
+                     "Averages require a full sort",
+                     "Row stores do not compress"],
+         "answer": 1,
+         "why": "To read 8 bytes of interest you read the whole 200-byte row. A column store reads only the region holding that column."},
+        {"q": "Why do column stores compress so much better?",
+         "options": ["They use a stronger algorithm",
+                     "A column holds one type and often few distinct values, so dictionary and run-length encoding work extremely well",
+                     "They discard nulls",
+                     "They store less data"],
+         "answer": 1,
+         "why": "Ten-times ratios are ordinary, and since the bottleneck is I/O, less data read is most of the speed-up."},
+        {"q": "What goes wrong when reports run against the production OLTP database?",
+         "options": ["The reports return stale data",
+                     "A large scan evicts the working set from the buffer cache, so application queries afterwards go to disk",
+                     "The reports lock the tables",
+                     "Transactions fail"],
+         "answer": 1,
+         "why": "The dashboard is slow and the checkout is slow, and the cause is not visible in the application's own metrics."},
+    ],
+    seed="""CREATE TABLE orders (
+  id INTEGER PRIMARY KEY, customer TEXT, country TEXT, region TEXT,
+  placed TEXT, channel TEXT, status TEXT, total REAL, tax REAL, shipping REAL);
+
+INSERT INTO orders VALUES
+ (1,'Ada','UK','EMEA','2026-01-14','web','shipped',120.0,24.0,4.5),
+ (2,'Bo','US','AMER','2026-01-22','app','shipped',64.5,5.2,3.0),
+ (3,'Cy','US','AMER','2026-02-03','web','shipped',45.0,3.6,3.0),
+ (4,'Di','IN','APAC','2026-02-18','app','returned',220.0,39.6,6.0),
+ (5,'Ed','US','AMER','2026-03-07','web','shipped',99.9,8.0,3.0),
+ (6,'Fi','UK','EMEA','2026-03-29','web','shipped',150.0,30.0,4.5),
+ (7,'Gu','DE','EMEA','2026-04-11','app','shipped',72.4,13.8,4.5),
+ (8,'Hal','US','AMER','2026-05-02','web','cancelled',410.0,32.8,3.0),
+ (9,'Ada','UK','EMEA','2026-06-19','app','shipped',58.0,11.6,4.5),
+ (10,'Bo','US','AMER','2026-07-25','web','shipped',131.0,10.5,3.0);
+""",
+    starter="""-- OLTP: fetch one whole order. A row store has every field of this
+-- row on one page, so this is a single read.
+SELECT * FROM orders WHERE id = 4;
+""",
+    variants_label="The two workloads on one table",
+    variants=[
+        {"label": "OLTP: one row, all columns",
+         "sql": "-- What the application does thousands of times a second.\n"
+                "-- Row storage is exactly right for this.\n"
+                "SELECT * FROM orders WHERE id = 4;"},
+        {"label": "OLAP: all rows, three columns",
+         "sql": "-- What a dashboard does. Ten of the table's columns are\n"
+                "-- irrelevant, and a row store reads them anyway.\n"
+                "SELECT region, COUNT(*) AS orders, ROUND(SUM(total),2) AS revenue\n"
+                "FROM   orders\n"
+                "WHERE  status = 'shipped'\n"
+                "GROUP  BY region\n"
+                "ORDER  BY revenue DESC;"},
+        {"label": "How much of each row is wasted",
+         "sql": "-- The aggregate above names 3 of 10 columns. On a row store the\n"
+                "-- other 7 are read from disk regardless; a column store skips them.\n"
+                "SELECT 10 AS columns_in_table,\n"
+                "        3 AS columns_the_query_needs,\n"
+                "       '70%' AS io_a_row_store_wastes;"},
+        {"label": "Why a column compresses",
+         "sql": "-- One column, one type, few distinct values. This is what\n"
+                "-- dictionary encoding exploits, and why columnar files are small.\n"
+                "SELECT COUNT(*) AS rows,\n"
+                "       COUNT(DISTINCT region)  AS distinct_regions,\n"
+                "       COUNT(DISTINCT channel) AS distinct_channels,\n"
+                "       COUNT(DISTINCT total)   AS distinct_totals\n"
+                "FROM   orders;"},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 19. Star schema
+# ---------------------------------------------------------------------------
+topic(
+    "star_schema",
+    "Star Schema: Facts and Dimensions",
+    "Analytics",
+    "One narrow table of things that happened, surrounded by wide tables "
+    "describing them. The shape warehouses are built in.",
+    _svg(_box(58, 34, 44, 22, fill=S, stroke=A) + _txt(80, 48, "facts", A, 8)
+         + _box(10, 12, 34, 16, fill=S) + _txt(27, 23, "date", M, 7)
+         + _box(116, 12, 34, 16, fill=S) + _txt(133, 23, "product", M, 7)
+         + _box(10, 62, 34, 16, fill=S) + _txt(27, 73, "store", M, 7)
+         + _box(116, 62, 34, 16, fill=S) + _txt(133, 73, "customer", M, 7)
+         + _line(44, 24, 62, 36, B, 1) + _line(116, 24, 98, 36, B, 1)
+         + _line(44, 66, 62, 54, B, 1) + _line(116, 66, 98, 54, B, 1)),
+    [
+        "The <strong>fact</strong> table holds measurements &mdash; one row per "
+        "event, mostly numbers and foreign keys. It is long and narrow.",
+        "<strong>Dimension</strong> tables describe the context &mdash; dates, "
+        "products, stores. Short and wide, full of text.",
+        "Every query is the same shape: join the fact table to whichever "
+        "dimensions the question mentions, group, aggregate.",
+        "It is deliberately denormalised. A snowflake schema normalises the "
+        "dimensions and trades query simplicity for tidiness.",
+    ],
+    """
+title: Star Schema: Facts and Dimensions
+intro: The one schema design that analytical databases are actually optimised for.
+
+## Two kinds of table
+
+A star schema splits everything into facts and dimensions, and the split is
+sharper than it first sounds.
+
+A **fact** is a measurement of something that happened. One row per sale, per
+click, per sensor reading. It contains numbers you want to aggregate &mdash;
+quantity, amount, duration &mdash; and foreign keys pointing at the dimensions.
+Almost nothing else. Fact tables are enormous and narrow.
+
+A **dimension** describes the context of a fact. The product dimension holds the
+name, category, brand, supplier; the date dimension holds the day, month,
+quarter, day of week, whether it was a holiday. Dimension tables are small and
+wide, and mostly text.
+
+Drawn out, the fact table sits in the middle with dimensions radiating from it,
+which is where the name comes from.
+
+## Why it is shaped that way
+
+Every analytical question has the same form: *aggregate some measure, sliced by
+some attributes, filtered by others*. Revenue by category by month for one
+region. Units sold by store by weekday.
+
+In a star schema every such query is the same join: fact table to the dimensions
+the question mentions, group by their attributes, aggregate the fact's measures.
+Run the variants above and they are all that shape.
+
+That uniformity has three consequences worth having.
+
+**Query planners handle it well.** The pattern is recognisable enough that
+analytical engines have a dedicated *star join* optimisation: filter the small
+dimensions first, use the result to restrict the fact-table scan, and never
+materialise a large intermediate.
+
+**Analysts can write the queries.** Adding a slice means adding a join and a
+group-by column. No investigation of a normalised graph is required.
+
+**BI tools generate them.** Tableau, Looker and Power BI all assume this model,
+and produce good SQL against it and poor SQL against anything else.
+
+## The date dimension
+
+A table of dates looks redundant &mdash; a database has date functions. It earns
+its place anyway, because it holds things no function knows: your fiscal
+calendar, public holidays in the markets you sell in, which weeks were promotion
+periods, whether a day was a weekday in the local sense.
+
+`WHERE d.is_holiday` and `GROUP BY d.fiscal_quarter` are then ordinary joins
+rather than a growing pile of `CASE` expressions.
+
+## Grain
+
+The most consequential decision is the **grain**: what exactly one fact row
+represents.
+
+"One row per order line" and "one row per order" are different grains, and mixing
+them corrupts every aggregate &mdash; sum a per-order total across order lines
+and you have multiplied the revenue by the number of lines. This is the most
+common defect in real warehouses, and it is silent.
+
+State the grain in one sentence before creating the table, and make every measure
+consistent with it.
+
+## Slowly changing dimensions
+
+A product moves category. Do historical facts belong to the old category or the
+new one?
+
+**Type 1**: overwrite. Simple, and history is rewritten &mdash; last year's
+report changes.
+
+**Type 2**: add a new dimension row with validity dates and point new facts at
+it. History is preserved and the dimension grows. This is the usual choice, and
+it is why dimension tables have surrogate keys rather than using the natural
+business key.
+
+**Type 3**: keep a `previous_category` column. Enough for one level of history,
+rarely enough in practice.
+
+## Star against snowflake
+
+Normalising the dimensions &mdash; splitting `product` into product, category and
+supplier tables &mdash; gives a **snowflake schema**. It removes redundancy and
+adds joins.
+
+For warehouses the star is usually preferred, because dimensions are small
+enough that the redundancy costs little, the extra joins cost real query time,
+and the denormalised version is far easier to read. The exception is a genuinely
+large dimension &mdash; tens of millions of customers &mdash; where the
+duplication starts to matter.
+
+## Where it goes wrong
+
+**Mixed grain.** Silent, and it inflates every total.
+
+**Text in the fact table.** It belongs in a dimension; it makes the largest table
+wider for no benefit.
+
+**No date dimension.** Fiscal calendars and holidays end up as `CASE`
+expressions copied between queries.
+
+**Type 1 everywhere.** History quietly rewrites itself, and last quarter's report
+no longer reproduces.
+""",
+    [
+        {"q": "What does a fact table contain?",
+         "options": ["Descriptive attributes like product names and categories",
+                     "One row per event: numeric measures plus foreign keys to the dimensions",
+                     "One row per customer",
+                     "Aggregated totals"],
+         "answer": 1,
+         "why": "Long and narrow. The descriptive text lives in the dimensions, which are short and wide - putting it in the fact table widens the largest table for nothing."},
+        {"q": "Why is mixing grain in a fact table so dangerous?",
+         "options": ["It breaks foreign keys",
+                     "Summing a per-order total across order lines multiplies revenue by the number of lines, and nothing errors",
+                     "It prevents indexing",
+                     "It makes joins ambiguous"],
+         "answer": 1,
+         "why": "It is the most common defect in real warehouses precisely because it is silent. State the grain in one sentence before creating the table."},
+        {"q": "Why do star schemas usually beat snowflake schemas in a warehouse?",
+         "options": ["They use less storage",
+                     "Dimensions are small enough that the redundancy costs little, while the extra joins cost real query time",
+                     "Snowflake schemas cannot be indexed",
+                     "BI tools cannot read snowflakes"],
+         "answer": 1,
+         "why": "The exception is a genuinely large dimension - tens of millions of customers - where duplication starts to matter more than the joins."},
+    ],
+    seed="""CREATE TABLE dim_date (date_key INTEGER PRIMARY KEY, day TEXT, month TEXT,
+                       quarter TEXT, weekday TEXT, is_holiday INTEGER);
+CREATE TABLE dim_product (product_key INTEGER PRIMARY KEY, name TEXT,
+                          category TEXT, brand TEXT);
+CREATE TABLE dim_store (store_key INTEGER PRIMARY KEY, store TEXT,
+                        city TEXT, region TEXT);
+CREATE TABLE fact_sales (date_key INTEGER, product_key INTEGER, store_key INTEGER,
+                         units INTEGER, revenue REAL);
+
+INSERT INTO dim_date VALUES
+ (1,'2026-01-05','January','Q1','Monday',0),(2,'2026-01-06','January','Q1','Tuesday',0),
+ (3,'2026-02-16','February','Q1','Monday',1),(4,'2026-04-09','April','Q2','Thursday',0),
+ (5,'2026-04-10','April','Q2','Friday',0),(6,'2026-07-20','July','Q3','Monday',0);
+
+INSERT INTO dim_product VALUES
+ (1,'Keyboard','Peripherals','Acme'),(2,'Monitor','Displays','Acme'),
+ (3,'Cable','Peripherals','Genco'),(4,'Laptop','Computers','Genco');
+
+INSERT INTO dim_store VALUES
+ (1,'Leeds Central','Leeds','North'),(2,'Bristol Quay','Bristol','South'),
+ (3,'Online','-','Online');
+
+INSERT INTO fact_sales VALUES
+ (1,1,1,3,135.0),(1,3,1,10,65.0),(2,2,3,2,360.0),(2,1,2,1,45.0),
+ (3,4,3,1,899.0),(3,3,2,4,26.0),(4,2,1,1,180.0),(4,1,3,5,225.0),
+ (5,4,2,2,1798.0),(5,3,3,20,130.0),(6,2,2,3,540.0),(6,1,1,2,90.0);
+""",
+    starter="""-- Every analytical query is this shape: the fact table joined to
+-- whichever dimensions the question mentions, grouped by their
+-- attributes, aggregating the fact's measures.
+SELECT p.category, SUM(f.units) AS units, ROUND(SUM(f.revenue),2) AS revenue
+FROM   fact_sales f
+JOIN   dim_product p ON p.product_key = f.product_key
+GROUP  BY p.category
+ORDER  BY revenue DESC;
+""",
+    variants_label="Same shape, different slices",
+    variants=[
+        {"label": "Slice by one dimension",
+         "sql": "SELECT p.category, SUM(f.units) AS units,\n"
+                "       ROUND(SUM(f.revenue),2) AS revenue\n"
+                "FROM   fact_sales f\n"
+                "JOIN   dim_product p ON p.product_key = f.product_key\n"
+                "GROUP  BY p.category\n"
+                "ORDER  BY revenue DESC;"},
+        {"label": "Add a second dimension",
+         "sql": "-- Adding a slice is adding a join and a group-by column.\n"
+                "-- Nothing else about the query changes.\n"
+                "SELECT d.quarter, s.region, ROUND(SUM(f.revenue),2) AS revenue\n"
+                "FROM   fact_sales f\n"
+                "JOIN   dim_date  d ON d.date_key  = f.date_key\n"
+                "JOIN   dim_store s ON s.store_key = f.store_key\n"
+                "GROUP  BY d.quarter, s.region\n"
+                "ORDER  BY d.quarter, revenue DESC;"},
+        {"label": "What the date dimension is for",
+         "sql": "-- No date function knows your holidays or your fiscal calendar.\n"
+                "-- A dimension does, and the filter is an ordinary join.\n"
+                "SELECT d.day, d.weekday, ROUND(SUM(f.revenue),2) AS revenue\n"
+                "FROM   fact_sales f\n"
+                "JOIN   dim_date d ON d.date_key = f.date_key\n"
+                "WHERE  d.is_holiday = 1\n"
+                "GROUP  BY d.day, d.weekday;"},
+        {"label": "Three dimensions at once",
+         "sql": "-- The star join: filter the small dimensions, use the result to\n"
+                "-- restrict the large fact scan.\n"
+                "SELECT d.month, p.brand, s.region,\n"
+                "       SUM(f.units) AS units, ROUND(SUM(f.revenue),2) AS revenue\n"
+                "FROM   fact_sales f\n"
+                "JOIN   dim_date    d ON d.date_key    = f.date_key\n"
+                "JOIN   dim_product p ON p.product_key = f.product_key\n"
+                "JOIN   dim_store   s ON s.store_key   = f.store_key\n"
+                "WHERE  p.brand = 'Acme'\n"
+                "GROUP  BY d.month, p.brand, s.region\n"
+                "ORDER  BY revenue DESC;"},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 20. SQL injection and parameterised queries
+# ---------------------------------------------------------------------------
+topic(
+    "sql_injection_and_parameters",
+    "SQL Injection and Parameterised Queries",
+    "Safety",
+    "What goes wrong when data is pasted into a query string, and the one fix "
+    "that actually works.",
+    _svg(_box(12, 26, 62, 20, fill=S) + _txt(43, 39, "' OR 1=1 --", A, 7)
+         + _txt(43, 60, "input", M, 7)
+         + _line(78, 36, 96, 36, B, 1.2)
+         + _box(100, 26, 48, 20, fill="none", stroke=A) + _txt(124, 39, "query", A, 7)
+         + _txt(124, 60, "now different", M, 7)),
+    [
+        "Injection happens when input is <em>concatenated</em> into SQL, so the "
+        "database cannot tell data from instructions.",
+        "A parameterised query sends the SQL and the values separately. The "
+        "value can never become syntax, whatever it contains.",
+        "Escaping is not the fix. It is a blacklist, it varies by engine and "
+        "charset, and it fails on numeric contexts entirely.",
+        "Identifiers &mdash; table and column names &mdash; cannot be "
+        "parameterised. Those need an allowlist.",
+    ],
+    """
+title: SQL Injection and Parameterised Queries
+intro: The oldest widespread vulnerability in web software, why it happens, and the single correct fix.
+
+## The mechanism
+
+Build a query by pasting user input into a string:
+
+```
+"SELECT * FROM users WHERE name = '" + name + "'"
+```
+
+With `name = "Ada"` this produces a sensible query. With
+`name = "' OR '1'='1"` it produces:
+
+```
+SELECT * FROM users WHERE name = '' OR '1'='1'
+```
+
+The quote closed the string early, and everything after it became **syntax**
+rather than data. The database is not confused or exploited &mdash; it is
+correctly executing the query it was given. The bug happened before it arrived.
+
+Run the variants above to see it: the same lookup, safe and unsafe, with a normal
+value and then a crafted one.
+
+## What can be done through it
+
+A closed quote gives an attacker the whole language.
+
+**Authentication bypass.** `' OR '1'='1` as a password makes the `WHERE` clause
+true for every row.
+
+**Reading other tables.** A `UNION SELECT` appends results from anywhere the
+database user can read.
+
+**Writing.** If the driver allows multiple statements, a semicolon starts a new
+one.
+
+**Blind extraction.** Even with no output at all, a condition that changes
+whether the page errors, or how long it takes, leaks one bit per request &mdash;
+and one bit per request is enough to read a password hash.
+
+## The fix
+
+Send the query and the values separately:
+
+```
+cursor.execute("SELECT * FROM users WHERE name = ?", (name,))
+```
+
+The `?` is a **placeholder**. The database receives the query text and the value
+through different channels, parses the statement first, and then binds the value
+into an already-parsed plan.
+
+The value therefore cannot alter the structure of the query, because parsing has
+already finished by the time it arrives. `' OR '1'='1` becomes a search for a
+user whose name is literally `' OR '1'='1`, which finds nothing.
+
+This is not a filter that might miss something. It is a structural guarantee:
+there is no input for which a bound parameter becomes syntax.
+
+## Why escaping is not the fix
+
+Escaping tries to neutralise dangerous characters in the input. It fails for
+reasons that are not obvious in advance:
+
+**Numeric contexts have no quotes.** `WHERE id = " + id` needs no quote to
+escape, and `1 OR 1=1` needs no special characters at all.
+
+**Character sets.** Multi-byte encodings have historically allowed a byte
+sequence that becomes a quote after the escaping function has run.
+
+**It is a blacklist.** Every blacklist is a claim to have thought of everything.
+
+**It is per-engine.** Rules differ between MySQL, PostgreSQL and SQLite, and code
+that moves between them silently stops being correct.
+
+Parameterisation avoids all of this by never putting the value in the query text
+at all.
+
+## Identifiers cannot be parameterised
+
+This is the real limitation. A placeholder can stand for a *value*, not for a
+table or column name:
+
+```
+"ORDER BY " + column      -- cannot be parameterised
+```
+
+The correct approach is an **allowlist**: map the user's input to a known-good
+identifier and reject anything unrecognised.
+
+```
+allowed = {"name": "name", "date": "created_at"}
+column = allowed.get(user_input)
+if column is None: reject()
+```
+
+Never sanitise an identifier by escaping. Choose it from a fixed set.
+
+## The other layers
+
+Parameterise everywhere, and then:
+
+**Least privilege.** The application's database user should not own the schema or
+be able to `DROP`. It limits the damage of any bug, not just this one.
+
+**Do not show database errors.** Error text is how blind extraction is made
+fast.
+
+**ORMs help but do not immunise.** Their query builders parameterise by default,
+and every one of them has a raw-SQL escape hatch that does not. The escape hatch
+is where the vulnerabilities are.
+
+## Where it goes wrong
+
+**"It is an internal tool."** Internal input is still input, and internal tools
+get exposed.
+
+**Parameterising most of a query.** One concatenated fragment is enough.
+
+**Trusting a value because it came from a dropdown.** The dropdown is in the
+client. The request is not.
+
+**Escaping instead of binding.** Even when correct today, it is one encoding
+change from not being.
+""",
+    [
+        {"q": "Why does a parameterised query prevent injection?",
+         "options": ["It escapes dangerous characters",
+                     "The statement is parsed before the value arrives, so the value can never become syntax",
+                     "It validates input types",
+                     "It runs with fewer privileges"],
+         "answer": 1,
+         "why": "It is a structural guarantee rather than a filter: there is no input for which a bound parameter turns into query structure."},
+        {"q": "Why is escaping an inadequate defence?",
+         "options": ["It is slow",
+                     "Numeric contexts have no quotes to escape, character sets can defeat it, and it is a per-engine blacklist",
+                     "It breaks Unicode",
+                     "It only works on SELECT"],
+         "answer": 1,
+         "why": "WHERE id = 1 OR 1=1 contains no special characters at all. Parameterisation avoids the whole class by never putting the value in the query text."},
+        {"q": "How should a user-supplied ORDER BY column be handled?",
+         "options": ["Parameterise it with a placeholder",
+                     "Map it through an allowlist of known-good identifiers and reject anything else",
+                     "Escape it",
+                     "Wrap it in quotes"],
+         "answer": 1,
+         "why": "Placeholders stand for values, not identifiers. Identifiers must be chosen from a fixed set rather than sanitised."},
+    ],
+    seed="""CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT, role TEXT);
+INSERT INTO users VALUES
+  (1,'Ada','ada@example.com','admin'),
+  (2,'Bo','bo@example.com','user'),
+  (3,'Cy','cy@example.com','user'),
+  (4,'Di','di@example.com','user');
+
+CREATE TABLE password_resets (user_id INTEGER, token TEXT);
+INSERT INTO password_resets VALUES (1,'a1b2-secret-token'),(2,'c3d4-secret-token');
+""",
+    starter="""-- The intended query, with an ordinary value concatenated in.
+-- Nothing looks wrong yet.
+SELECT id, name, role FROM users WHERE name = 'Ada';
+""",
+    variants_label="The same lookup, four ways",
+    variants=[
+        {"label": "Normal input, concatenated",
+         "sql": "-- name = \"Ada\". Looks fine, and the bug is already present.\n"
+                "SELECT id, name, role FROM users WHERE name = 'Ada';"},
+        {"label": "Crafted input: bypass",
+         "sql": "-- name = \"' OR '1'='1\". The quote closed the string early and\n"
+                "-- the rest became syntax. Every row comes back.\n"
+                "SELECT id, name, role FROM users WHERE name = '' OR '1'='1';"},
+        {"label": "Crafted input: read another table",
+         "sql": "-- A UNION appends results from anywhere this database user can\n"
+                "-- read. Nothing about the original query intended this.\n"
+                "SELECT id, name, role FROM users WHERE name = ''\n"
+                "UNION SELECT user_id, token, 'leaked' FROM password_resets;"},
+        {"label": "Parameterised: the fix",
+         "sql": "-- In application code this is  WHERE name = ?  with the value\n"
+                "-- passed separately. The lab has no driver to bind through, so\n"
+                "-- this is what binding AMOUNTS to: the crafted string arriving\n"
+                "-- as a VALUE rather than as syntax. The statement is parsed\n"
+                "-- first, so this searches for a user literally named\n"
+                "--     ' OR '1'='1\n"
+                "-- and nobody is. Zero rows - the payload is inert.\n"
+                "SELECT id, name, role FROM users WHERE name = ''' OR ''1''=''1';"},
+        {"label": "Why escaping is not enough",
+         "sql": "-- A numeric context has no quotes to escape, and this payload\n"
+                "-- contains no special characters for an escaper to catch.\n"
+                "SELECT id, name, role FROM users WHERE id = 1 OR 1=1;"},
     ],
 )
 

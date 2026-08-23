@@ -16,6 +16,12 @@ gives the current ones.
 `tools/python_topics.py`. Adding a 35th topic is one entry there plus a line
 in `tools/sequence.py`.
 
+**Database: 22 -> 42.** Tiers 1 and 2 are complete, generated from
+`tools/db_topics.py`. Tier 2 added three concurrency timelines (MVCC,
+replication lag, CAP) and seven SQL-backed modules; the document, key-value and
+graph modules lean on SQLite's JSON1 functions and recursive CTEs, which the
+in-page engine has.
+
 **Computer Vision: 20 -> 40.** Tiers 1 and 2 are complete, generated from
 `tools/cv_topics.py` with the arithmetic in `assets/vizlearn-cv.js`. Eight are
 image operations driven by the pixel harness; receptive field and 1x1
@@ -104,6 +110,8 @@ intro page.
 All ten are built.
 
 ### Tier 2 - scale, NoSQL, safety
+
+All ten are built.
 
 - MVCC: how readers avoid blocking writers
 - Partitioning by range or hash

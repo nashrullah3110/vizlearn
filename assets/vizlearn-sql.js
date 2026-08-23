@@ -120,6 +120,45 @@
         [].forEach.call(panels, function (el) { el.innerHTML = out; });
     }
 
+
+    /* Does the last statement in this script read rather than write?
+     *
+     * Comments and string literals both contain semicolons and keywords, so
+     * they are skipped rather than matched against - a comment reading
+     * "-- then DELETE the row" must not make this look like a write.
+     */
+    var QUERY_HEAD = /^(SELECT|WITH|VALUES|PRAGMA|EXPLAIN)\b/i;
+
+    function lastIsQuery(sql) {
+        var out = '', i = 0, ch, next;
+        while (i < sql.length) {
+            ch = sql[i]; next = sql[i + 1];
+            if (ch === '-' && next === '-') {
+                while (i < sql.length && sql[i] !== '\n') i++;
+            } else if (ch === '/' && next === '*') {
+                i += 2;
+                while (i < sql.length && !(sql[i] === '*' && sql[i + 1] === '/')) i++;
+                i += 2;
+            } else if (ch === "'" || ch === '"') {
+                var quote = ch;
+                out += ' ';
+                i++;
+                while (i < sql.length) {
+                    if (sql[i] === quote && sql[i + 1] === quote) { i += 2; continue; }
+                    if (sql[i] === quote) { i++; break; }
+                    i++;
+                }
+            } else {
+                out += ch;
+                i++;
+            }
+        }
+        var parts = out.split(';').map(function (x) { return x.trim(); })
+                       .filter(function (x) { return x.length; });
+        if (!parts.length) return false;
+        return QUERY_HEAD.test(parts[parts.length - 1]);
+    }
+
     // ----------------------------------------------------------- one block
 
     function attach(root) {
@@ -142,10 +181,21 @@
                 try {
                     var sets = db.exec(sql);
                     if (!sets.length) {
-                        var n = db.getRowsModified();
-                        out = '<p class="sql-ok">Statement ran. ' +
-                              (n ? n + (n === 1 ? ' row' : ' rows') + ' affected.' : 'No rows returned.') +
-                              '</p>';
+                        /* exec() returns no result sets both for a statement
+                         * that changed rows and for a SELECT that matched
+                         * none. getRowsModified() is sqlite3_changes, which
+                         * reports the last MODIFYING statement - so on a
+                         * no-match SELECT it happily reported rows affected
+                         * by an INSERT from the seed script. A query that
+                         * finds nothing has to say so. */
+                        if (lastIsQuery(sql)) {
+                            out = '<p class="sql-ok">0 rows.</p>';
+                        } else {
+                            var n = db.getRowsModified();
+                            out = '<p class="sql-ok">Statement ran. ' +
+                                  (n ? n + (n === 1 ? ' row' : ' rows') + ' affected.' : 'No rows returned.') +
+                                  '</p>';
+                        }
                     } else {
                         out = sets.map(function (r) {
                             return table(r.columns, r.values) +

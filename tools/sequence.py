@@ -308,6 +308,21 @@ SEQUENCE = {
         # transactions_and_acid introduces much earlier.
         "database/isolation_levels.html",
         "database/deadlocks_in_sql.html",
+        # Tier 2. MVCC answers the locking problem the two modules above
+        # leave the reader with, so it goes first; scale follows concurrency,
+        # and CAP only means anything once replication has shown why nodes
+        # disagree. The data models and the analytics pair are independent of
+        # both, and injection closes the track because it needs nothing else.
+        "database/mvcc_in_databases.html",
+        "database/partitioning_in_databases.html",
+        "database/sharding_in_databases.html",
+        "database/replication_and_lag.html",
+        "database/cap_theorem.html",
+        "database/document_model_vs_rows.html",
+        "database/key_value_and_graph_models.html",
+        "database/oltp_vs_olap_columnar.html",
+        "database/star_schema.html",
+        "database/sql_injection_and_parameters.html",
     ],
 
     # How an LLM reads -> how it predicts -> how it is trained -> how it is shrunk.

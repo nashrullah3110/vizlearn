@@ -1,0 +1,99 @@
+title: Sharding
+intro: The last resort of scaling, what it buys, and the four things it takes away.
+
+## What it is
+
+Sharding splits a dataset across independent database servers. Each **shard**
+holds a subset of the rows and knows nothing about the others.
+
+The distinction from [partitioning](partitioning_in_databases.html) is the
+machine boundary, and it is the whole difficulty. Partitions share a query
+planner, a transaction manager and a lock table. Shards share nothing, so
+anything that needed a global view has to be rebuilt in the application or given
+up.
+
+## The shard key
+
+One column decides where a row lives. Usually the key is hashed and the remainder
+taken modulo the shard count, so a routing rule might be
+`shard = hash(customer_id) % 4`.
+
+The query above computes exactly that for a set of customers, and the variants
+show what different access patterns cost.
+
+The consequence is stark and worth stating as a rule:
+
+**A query that names the shard key touches one node. A query that does not
+touches all of them.**
+
+A lookup by `customer_id` is a single-node request and stays fast as the fleet
+grows. A report grouped by `product_id` has to be sent to every shard and the
+partial results merged &mdash; a *scatter-gather*, whose latency is the slowest
+shard's, not the average.
+
+So the shard key is not a schema detail. It is a decision about which queries
+stay cheap forever and which never will, and it is extremely expensive to change
+afterwards.
+
+## What you give up
+
+**Cross-shard joins.** Customers on shard 1, orders on shard 3, and no engine can
+join them. Either the join moves into the application, or related data is
+deliberately placed together &mdash; sharding orders by `customer_id` so a
+customer's orders live beside them.
+
+**Global uniqueness.** `UNIQUE(email)` cannot be enforced across independent
+servers. The usual answers are a separate lookup service that owns emails, or
+generating ids that are unique by construction &mdash; UUIDs, or Snowflake-style
+ids with a shard number embedded.
+
+**Cross-shard transactions.** ACID stops at the shard boundary. Spanning shards
+means two-phase commit, which is slow and introduces a coordinator that can fail
+mid-protocol, or sagas, which are eventually consistent with explicit
+compensation. Most teams design so that transactions never span shards.
+
+**`AUTO_INCREMENT`.** Every shard would start at 1. Ids must come from elsewhere.
+
+## Rebalancing
+
+Adding a shard when the rule is `hash(key) % 4` changes it to `% 5`, and almost
+every row's destination moves. Migrating the whole dataset while serving traffic
+is the single worst part of operating a sharded system.
+
+Two designs avoid it. **Consistent hashing** places shards on a ring so adding
+one moves only the keys in its arc, rather than reshuffling everything.
+**Virtual buckets** hash keys into a fixed large number of buckets &mdash; say
+1024 &mdash; and map buckets to physical shards; adding a shard moves a few
+buckets and the hash rule never changes. The bucket approach is what most modern
+systems use, because moving is then a matter of copying a bucket and updating a
+map.
+
+## Do the cheaper things first
+
+Sharding is close to irreversible and touches every part of the application.
+Before it:
+
+1. **Index properly.** A great many "we need to shard" conversations end at a
+   missing [composite index](composite_and_covering_indexes.html).
+2. **Read replicas**, if reads dominate. Cheap, and reversible.
+3. **Caching**, for the hot small set.
+4. **Partitioning**, if one table is the problem.
+5. **A bigger machine.** Unglamorous, and modern hardware goes a very long way.
+
+Shard when writes exceed what one machine can take, or the working set no longer
+fits in memory anywhere, and not before.
+
+## Where it goes wrong
+
+**A shard key with skew.** Sharding by country puts most of the traffic on one
+node. Check the distribution of real values.
+
+**Sharding by a key the queries do not use.** Every query becomes
+scatter-gather, and you have bought distributed-systems problems for no
+throughput.
+
+**Assuming transactions still work.** They work within a shard. Across shards
+they do not, and code written before sharding usually assumes otherwise.
+
+**Forgetting the slowest shard sets the latency.** One degraded node makes every
+fan-out query slow.

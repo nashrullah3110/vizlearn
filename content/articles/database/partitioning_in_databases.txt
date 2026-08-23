@@ -1,0 +1,98 @@
+title: Partitioning by Range and Hash
+intro: Cutting one table into pieces the planner can skip, and the choice of where to cut.
+
+## One table, several files
+
+Partitioning splits a table into physical pieces by a rule on one or more
+columns. Applications keep querying the single logical table; the engine decides
+which pieces are involved.
+
+This is **not** sharding. Every partition lives in the same database on the same
+server. [Sharding](sharding_in_databases.html) spreads data across separate
+machines and is a much larger commitment.
+
+The query above builds three range partitions and a view that unions them, which
+is the shape a partitioned table has underneath. Run the variants to see what
+each strategy costs.
+
+## Range partitioning
+
+Pick an ordered column &mdash; almost always a timestamp &mdash; and give each
+partition a bounded interval.
+
+```
+orders_2024  :  order_date >= '2024-01-01' AND < '2025-01-01'
+orders_2025  :  order_date >= '2025-01-01' AND < '2026-01-01'
+orders_2026  :  order_date >= '2026-01-01' AND < '2027-01-01'
+```
+
+A query with `WHERE order_date >= '2026-01-01'` can be proved to need only the
+last partition, so the engine reads one file instead of three. That proof is
+**partition pruning**, and it is where nearly all the benefit is.
+
+The second benefit is administrative and, for time-series data, often the bigger
+one. Deleting a year of orders with `DELETE` writes a row version per deleted
+row, generates enormous WAL traffic, and leaves the table bloated. `DROP TABLE
+orders_2024` unlinks a file. Retention policies are the standard reason to
+partition.
+
+## Hash partitioning
+
+Hash the key, take the remainder modulo the partition count, and store the row
+there. Rows spread evenly regardless of what the values look like.
+
+This is the right choice when there is no natural ordering to exploit and the
+goal is to spread contention &mdash; many concurrent writers hitting one hot
+page, for instance.
+
+The trade-off is that **hash partitioning prunes only on equality**. A query for
+one `customer_id` reaches one partition; a query for a *range* of customer ids
+reaches all of them, because hashing destroys order. Range partitioning is the
+opposite: it prunes ranges beautifully and can leave you with one very hot
+partition if recent data is where all the traffic goes.
+
+| | Range | Hash |
+|---|---|---|
+| Prunes equality | yes | yes |
+| Prunes ranges | yes | **no** |
+| Even distribution | no | yes |
+| Drop old data instantly | yes | no |
+| Typical key | timestamp | id |
+
+## Choosing the key
+
+The partition key must appear in the `WHERE` clause of the queries you care
+about. This is the whole game, and it is where partitioning schemes go wrong.
+
+Partition by `order_date` and then run reports by `customer_id`, and every report
+reads every partition &mdash; you have added complexity and gained nothing. Worse
+than nothing: each partition has its own indexes, so a query that scans them all
+does more index work than it would have on a single table.
+
+A second constraint follows: a unique constraint has to include the partition
+key, because the engine cannot cheaply enforce uniqueness across pieces it is
+trying not to read.
+
+## Sizing
+
+Too few partitions and pruning barely helps. Too many and planning cost grows,
+because the planner considers each one. Somewhere between a few dozen and a few
+hundred is the usual advice, with monthly partitions over a couple of years
+landing naturally in that band.
+
+Partitions can also be **subpartitioned** &mdash; range by month, then hash by
+customer within each month &mdash; when both access patterns matter.
+
+## Where it goes wrong
+
+**Partitioning a small table.** Under a few million rows, a good index is
+simpler and usually faster.
+
+**A partition key the queries do not filter on.** No pruning, more index
+overhead.
+
+**Hash partitioning then querying ranges.** Every partition, every time.
+
+**Forgetting the default partition.** A row that matches no partition is an error
+unless a catch-all exists, and a data-loading job that fails at midnight on New
+Year's Day is the classic version of this.

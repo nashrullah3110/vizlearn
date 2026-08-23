@@ -1,0 +1,104 @@
+title: Replication, Read Replicas and Lag
+intro: How to serve more reads than one machine can, and the staleness that comes with it.
+
+## The arrangement
+
+One server &mdash; the **primary** &mdash; accepts every write. It records each
+change in a log, and streams that log to one or more **replicas**, which apply
+the changes to their own copies and serve read queries.
+
+The appeal is that most workloads are overwhelmingly reads. Adding replicas
+multiplies read capacity without any change to the data model, and unlike
+[sharding](sharding_in_databases.html) it is reversible: a replica that is not
+helping can simply be removed.
+
+Replicas also serve as warm standbys. If the primary fails, one is promoted.
+
+## Lag
+
+A change committed on the primary is not instantly present on a replica. It has
+to be written to the log, sent over a network, received, and applied. The gap is
+**replication lag**, and it is never zero.
+
+Under normal conditions it is milliseconds. Under load it is not, and the reasons
+matter:
+
+**A large write.** A single statement updating a million rows produces a great
+deal of log to ship and apply.
+
+**Single-threaded apply.** Some engines apply the log serially even though the
+primary generated it with many concurrent connections. The replica simply cannot
+keep up with a busy primary.
+
+**A long query on the replica.** Applying a change that conflicts with a running
+read forces a choice between cancelling the query and pausing replication. Both
+happen, depending on configuration.
+
+**Network.** A cross-region replica has a floor set by the speed of light.
+
+## The bug this causes
+
+The failure mode is specific and extremely common:
+
+```
+1. User updates their profile        -> primary
+2. Application redirects to profile  ->
+3. Profile page reads                -> replica, 200ms behind
+4. User sees their OLD profile
+```
+
+Nothing errored. The user changed something, was shown the previous value, and
+reasonably concluded the save failed.
+
+The standard fixes, in rough order of preference:
+
+**Read-your-writes routing.** After a write, send that user's reads to the
+primary for a short window. Simple and effective.
+
+**Route by criticality.** Anything the user just affected reads from the primary;
+dashboards and search read from replicas.
+
+**Wait for the log position.** Record the primary's log position at commit and
+have the replica wait until it has applied at least that far. Correct, and
+requires engine support.
+
+**Do not redirect to a read.** Render the result from what was just written.
+
+## Synchronous replication
+
+The lag can be removed. `synchronous_commit` in PostgreSQL, semi-sync in MySQL:
+the primary does not acknowledge a commit until at least one replica confirms it
+has the change.
+
+The cost is unavoidable and appears on every write: a commit now includes a
+network round trip. Throughput falls, and latency rises by the distance to the
+replica. If the synchronous replica becomes unreachable, writes stall entirely
+unless a fallback is configured.
+
+This is a direct instance of the [CAP](cap_theorem.html) trade: consistency
+across replicas costs availability and latency, and no configuration escapes it.
+The usual compromise is one synchronous replica nearby for durability, and
+asynchronous replicas further away for read capacity.
+
+## Failover and lost writes
+
+If the primary fails while a replica is 200ms behind, promoting that replica
+loses 200ms of committed writes. They were acknowledged to clients and are gone.
+
+Which is why durability requirements and replication mode are the same decision.
+Asynchronous replication means accepting that a failover can lose the most recent
+writes.
+
+## Where it goes wrong
+
+**Assuming replicas are current.** They are not, and the window is where the bugs
+live.
+
+**Sending a write to a replica.** It is read-only; the error is confusing when
+routing is implicit.
+
+**Monitoring lag in bytes only.** Bytes behind does not translate to seconds
+behind. Track both.
+
+**Using replicas for locking or counters.** Anything read-then-write must go to
+the primary, or two clients read the same stale value.

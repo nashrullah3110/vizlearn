@@ -764,12 +764,28 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Key-Value and Graph Models",
+  "path": "database/key_value_and_graph_models.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
+ },
+ {
   "title": "Limit and Offset in SQL",
   "path": "database/limit_and_offset_in_sql.html",
   "category": "Database",
   "topic": "db",
   "icon": "database",
   "desc": "Interactive SQL LIMIT and OFFSET lab - page through results, see why ORDER BY is mandatory, and understand the cost of deep offsets."
+ },
+ {
+  "title": "MVCC: How Readers Avoid Blocking Writers",
+  "path": "database/mvcc_in_databases.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
  },
  {
   "title": "NULL Handling and COALESCE in SQL",
@@ -788,12 +804,28 @@ window.VIZLEARN_MODULES = [
   "desc": "One table with a multi-valued column, split step by step into 1NF, 2NF and 3NF. Watch the redundant cells that cause update anomalies drop to zero."
  },
  {
+  "title": "OLTP, OLAP and Columnar Storage",
+  "path": "database/oltp_vs_olap_columnar.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
+ },
+ {
   "title": "ORDER BY in SQL",
   "path": "database/order_by_in_sql.html",
   "category": "Database",
   "topic": "db",
   "icon": "database",
   "desc": "Watch rows slide into their new order as you change the sort key, direction, tie-breaker and NULLS placement, with the query building live."
+ },
+ {
+  "title": "Partitioning by Range and Hash",
+  "path": "database/partitioning_in_databases.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
  },
  {
   "title": "Primary and Foreign Keys",
@@ -828,12 +860,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive SQL regular expression lab - test REGEXP patterns live against table rows and compare them with LIKE pattern matching."
  },
  {
+  "title": "Replication, Read Replicas and Lag",
+  "path": "database/replication_and_lag.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
+ },
+ {
   "title": "SQL GroupBy Visualizer",
   "path": "database/groupby_in_sql.html",
   "category": "Database",
   "topic": "db",
   "icon": "database",
   "desc": "Group rows by a column and watch COUNT, SUM and AVG collapse many rows into one row per group, live against a sample table."
+ },
+ {
+  "title": "SQL Injection and Parameterised Queries",
+  "path": "database/sql_injection_and_parameters.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
  },
  {
   "title": "SQL Joins Visualizer",
@@ -860,12 +908,44 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Sharding",
+  "path": "database/sharding_in_databases.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
+ },
+ {
+  "title": "Star Schema: Facts and Dimensions",
+  "path": "database/star_schema.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
+ },
+ {
   "title": "Subqueries in SQL",
   "path": "database/subqueries_in_sql.html",
   "category": "Database",
   "topic": "db",
   "icon": "database",
   "desc": "The inner query runs first and hands its answer to the outer one. Scalar, IN-list, derived table, and a correlated subquery re-running once per row."
+ },
+ {
+  "title": "The CAP Theorem",
+  "path": "database/cap_theorem.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
+ },
+ {
+  "title": "The Document Model against Rows",
+  "path": "database/document_model_vs_rows.html",
+  "category": "Database",
+  "topic": "db",
+  "icon": "database",
+  "desc": ""
  },
  {
   "title": "Transactions and ACID in SQL",
