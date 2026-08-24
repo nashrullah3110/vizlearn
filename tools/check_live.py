@@ -30,6 +30,7 @@ import html
 import os
 import re
 import sys
+import time
 import urllib.request
 import urllib.error
 import xml.etree.ElementTree as ET
@@ -51,15 +52,29 @@ STRIP = re.compile(r"<(script|style|svg|nav|footer|template)\b[^>]*>.*?</\1>",
 TAG = re.compile(r"<[^>]+>")
 
 
+# GitHub Pages rate-limits a burst of parallel requests with a 503 and serves
+# the same URL fine a second later. Reporting that as a broken page sends you
+# looking for a fault in the site, so a failure is retried before it counts.
+RETRY_STATUS = {0, 429, 500, 502, 503, 504}
+RETRIES = 2
+
+
 def get(url):
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-            return r.status, r.geturl(), r.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        return e.code, url, ""
-    except Exception as e:                                   # noqa: BLE001
-        return 0, url, "<!-- %s -->" % e
+    status, final, body = 0, url, ""
+    for attempt in range(RETRIES + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+                return r.status, r.geturl(), r.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            status, final, body = e.code, url, ""
+        except Exception as e:                               # noqa: BLE001
+            status, final, body = 0, url, "<!-- %s -->" % e
+        if status not in RETRY_STATUS:
+            break
+        if attempt < RETRIES:
+            time.sleep(1.5 * (attempt + 1))
+    return status, final, body
 
 
 def words(src):
