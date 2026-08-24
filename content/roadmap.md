@@ -40,7 +40,7 @@ the error messages are the database's own. Isolation levels and deadlocks step
 through a scripted two-transaction schedule instead, because one connection
 cannot demonstrate two.
 
-**Machine Learning: 25 -> 35.** Tier 1 is complete, generated from
+**Machine Learning: 25 -> 45.** Tiers 1 and 2 are complete, generated from
 `tools/ml_topics.py` with the simulations in `assets/vizlearn-ml.js`. Every
 score is computed in the browser from data generated in the browser, so the
 leakage module genuinely selects features with the labels in hand and genuinely
@@ -150,6 +150,8 @@ interpretation - which is where real projects fail.
 All ten are built.
 
 ### Tier 2 - models and interpretation
+
+All ten are built.
 
 - DBSCAN: density clustering, shapes k-means cannot find
 - Hierarchical clustering and dendrograms

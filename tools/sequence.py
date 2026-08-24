@@ -85,6 +85,22 @@ SEQUENCE = {
         "machine_learning/cross_validation.html",
         "machine_learning/bias_vs_variance.html",
         "machine_learning/learning_curves.html",
+        # Tier 2. The clustering group runs first and in dependency order:
+        # DBSCAN answers what k-means cannot do, hierarchical shows k chosen
+        # last, choosing_k is the metric discussion both provoke, and GMMs
+        # generalise the lot. Dimensionality reduction follows because the
+        # embedding module is read against those clusters. Interpretation and
+        # calibration come next, and the two ensemble-adjacent modules close.
+        "machine_learning/dbscan_clustering.html",
+        "machine_learning/hierarchical_clustering.html",
+        "machine_learning/choosing_k.html",
+        "machine_learning/gaussian_mixture_models.html",
+        "machine_learning/tsne_and_umap.html",
+        "machine_learning/permutation_importance.html",
+        "machine_learning/partial_dependence_and_shap.html",
+        "machine_learning/probability_calibration.html",
+        "machine_learning/isolation_forest.html",
+        "machine_learning/stacking_and_voting.html",
         "machine_learning/grid_vs_random_search.html",
         "machine_learning/ridge_and_lasso_regression.html",
         "machine_learning/label_imbalance_problem.html",

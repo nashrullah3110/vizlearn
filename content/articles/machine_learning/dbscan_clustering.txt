@@ -1,0 +1,95 @@
+title: DBSCAN: Density-Based Clustering
+intro: Clustering by crowding rather than by distance to a centre, and the two parameters that decide everything.
+
+## What k-means cannot do
+
+Set the data control above to **Two crescents**. K-means, which assigns each
+point to the nearest of *k* centres, cannot separate these: the boundary it
+draws is always a straight line between two centroids, and no straight line
+separates two interleaved crescents.
+
+DBSCAN separates them immediately, and does it without being told there are two.
+
+## The definitions
+
+Everything follows from two parameters &mdash; `eps`, a radius, and `minPts`, a
+count &mdash; and three definitions:
+
+**Core point.** Has at least `minPts` points within `eps` of it, including
+itself. It sits in a crowded place.
+
+**Border point.** Within `eps` of a core point, but not crowded enough to be one
+itself. It is on the edge of a cluster.
+
+**Noise.** Neither. It belongs to no cluster, and DBSCAN says so rather than
+forcing it somewhere.
+
+A cluster is then a maximal set of points connected through core points. Start at
+a core point, take everything within `eps`, and for each of those that is also a
+core point, take *its* neighbourhood too, repeating until nothing new arrives.
+
+This is why clusters can be any shape. The cluster spreads wherever the data is
+dense, following the crescent around its curve, because at no point does it ask
+how far anything is from a centre.
+
+## The two parameters
+
+Drag `eps` in the visualisation and watch the count.
+
+**Too small**, and no point has `minPts` neighbours. Everything is noise, or the
+data shatters into many small clusters.
+
+**Too large**, and everything is within reach of everything else. The two
+crescents merge into one cluster, which happens above about 0.26 on this data.
+
+The band in between is where DBSCAN works, and on the crescents it is genuinely
+narrow. That sensitivity is the honest weakness of the method.
+
+`minPts` is less delicate. Larger values demand denser cores, producing fewer,
+tighter clusters and more noise. A common starting rule is `minPts = 2 * number
+of dimensions`, and at least 3.
+
+For `eps`, the standard technique is a **k-distance plot**: for every point,
+measure the distance to its `minPts`-th nearest neighbour, sort those distances
+and plot them. The curve has a knee where distances start rising sharply, and
+that knee is a reasonable `eps` &mdash; it is the point at which you leave the
+dense region and start crossing gaps.
+
+## What it gives you that k-means does not
+
+**No k.** The number of clusters is discovered, not supplied.
+
+**Arbitrary shapes.** Crescents, rings, spirals, anything connected and dense.
+
+**An explicit noise label.** K-means assigns every point to some cluster, so an
+outlier is silently absorbed and drags a centroid with it. DBSCAN sets it aside.
+Switch the data to blobs and the scattered points stay hollow.
+
+## Where it fails
+
+**Varying density.** This is the real limitation. One `eps` applies everywhere,
+so a dataset with one dense cluster and one sparse cluster cannot be handled: the
+`eps` that finds the sparse one merges the dense one into its surroundings.
+**HDBSCAN** exists precisely for this, building a hierarchy over `eps` values and
+selecting per cluster.
+
+**High dimensions.** Distances concentrate as dimensionality grows, so
+"neighbourhood" stops meaning much. Reduce dimensions first.
+
+**Scale sensitivity.** `eps` is an absolute distance, so a feature measured in
+thousands dominates one measured in units. [Scale
+first](feature_scaling.html) &mdash; this is not optional.
+
+**Cost.** Naively O(n&sup2;) because of the neighbourhood queries. A spatial
+index brings it to about O(n log n) in low dimensions.
+
+## Where it goes wrong
+
+**Not scaling the features.** `eps` becomes meaningless.
+
+**Tuning eps by trying numbers.** Use a k-distance plot; it takes a minute and
+gives a defensible value.
+
+**Expecting it to work on varying density.** Reach for HDBSCAN instead.
+
+**Reading noise as failure.** Labelling outliers as noise is the feature.

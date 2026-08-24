@@ -1,0 +1,104 @@
+title: Partial Dependence, ICE and SHAP
+intro: Three ways to ask what a model is doing, and the trap in the most popular one.
+
+## Partial dependence
+
+A partial dependence plot answers: as this feature moves across its range, what
+happens to the prediction on average?
+
+The procedure is mechanical. Take the dataset. Set the feature to some value for
+*every* row, leaving all other columns untouched. Predict, and average. Repeat
+across the feature's range, and plot.
+
+It is model-agnostic and easy to read, which is why it is everywhere.
+
+## The trap
+
+Leave the interaction control **on** and look at the thick line. It is nearly
+flat, and the readout gives its slope as close to zero. Read on its own, it says
+this feature does not matter.
+
+Now the ICE curves underneath tell a completely different story. Every individual
+curve has a steep slope &mdash; the feature matters enormously to every single
+row. It is just that it slopes **up** for one group and **down** for the other,
+and averaging them cancels.
+
+This is not a contrived case. Any feature whose effect reverses by subgroup
+behaves like this: a treatment that helps one population and harms another, a
+price change that attracts some customers and repels others.
+
+**A flat partial dependence curve does not mean the feature is unimportant.** It
+means the average effect is zero, which is a much weaker statement.
+
+Switch the interaction off and the curves stack into a single shape. Now the
+average describes each individual well, and the partial dependence line is
+trustworthy.
+
+## ICE curves
+
+**Individual Conditional Expectation** curves are partial dependence without the
+averaging: one line per row, showing what the model predicts for *that* row as
+the feature sweeps.
+
+They cost nothing extra, since partial dependence computes them and then throws
+them away. Plotting them is the standard defence against the trap above, and the
+diagnostic is simple: if the ICE curves are parallel, the partial dependence line
+is a fair summary. If they fan out or cross, it is not, and there is an
+interaction worth finding.
+
+## The other assumption
+
+Partial dependence sets a feature to a value for every row regardless of whether
+that combination is possible. Sweeping `age` from 18 to 80 across a dataset
+creates rows with age 18 and forty years of work experience.
+
+The model is asked to predict for combinations that never occur, and its answer
+there is extrapolation with nothing to anchor it. When features are strongly
+correlated, part of a partial dependence curve is describing regions of input
+space the model has never seen.
+
+**Accumulated Local Effects** plots address this by only varying a feature within
+the range of values that actually co-occur with the other features' values.
+
+## SHAP
+
+SHAP answers a different question. Partial dependence and ICE describe the model
+across a range; SHAP explains **one prediction**.
+
+For a given row, it assigns each feature a number saying how much that feature
+pushed the prediction away from the base value &mdash; the average prediction
+over the dataset. The numbers sum exactly to the difference:
+
+```
+prediction  =  base value  +  sum of every feature's SHAP value
+```
+
+That additivity is what makes it useful for an individual explanation: it
+accounts for the whole prediction, with nothing unattributed.
+
+The values come from Shapley values in cooperative game theory, which distribute
+credit for a joint outcome fairly among contributors. Computing them exactly
+requires evaluating every subset of features, which is exponential, so
+implementations approximate &mdash; `TreeSHAP` exactly and quickly for trees,
+`KernelSHAP` by sampling for anything else.
+
+| | Answers | Scope |
+|---|---|---|
+| Partial dependence | how the prediction moves with a feature, on average | global |
+| ICE | the same, per row | per row |
+| SHAP | how much each feature contributed here | one prediction |
+| [Permutation importance](permutation_importance.html) | how much accuracy depends on a feature | global |
+
+## Where it goes wrong
+
+**Reading a flat PD curve as "unimportant".** Plot the ICE curves.
+
+**Ignoring correlated features.** Part of the curve may be extrapolation.
+
+**Treating SHAP as causal.** It attributes a prediction, not an outcome. A model
+that uses postcode as a proxy for income will show postcode contributing, and
+that is a fact about the model.
+
+**Averaging SHAP values into a global importance and stopping there.** The mean
+absolute SHAP value is a reasonable global summary, and it discards the direction
+and the interactions that made SHAP worth computing.

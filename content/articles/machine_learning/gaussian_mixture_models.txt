@@ -1,0 +1,85 @@
+title: Gaussian Mixture Models
+intro: What clustering looks like when a point is allowed to belong partly to two groups.
+
+## Hard labels throw information away
+
+K-means gives every point exactly one cluster. For a point sitting squarely
+inside a group that is fine. For a point in the overlap between two groups it is
+a fabrication: the algorithm had almost no reason to prefer one over the other,
+and the output records none of that doubt.
+
+A Gaussian mixture keeps the doubt. It models the data as having come from
+several Gaussian distributions mixed together, and reports, for each point, the
+probability that it came from each one.
+
+Raise the overlap control above and watch the readout. As the two groups merge,
+the number of points assigned with less than 90% confidence climbs &mdash; and
+every one of those is a point k-means would have labelled without hesitation.
+
+## The model
+
+Three parameters per component: a mean, a width, and a **mixing weight** saying
+what fraction of the data that component accounts for. The density is their
+weighted sum, and the two curves in the chart are the fitted components.
+
+Fitting is a chicken-and-egg problem. Knowing which points belong to which
+component would make estimating the parameters easy, and knowing the parameters
+would make assigning points easy. Neither is known.
+
+## Expectation-Maximisation
+
+EM resolves it by alternating, starting from a guess:
+
+**E step.** With the current parameters, compute each point's
+**responsibility** &mdash; the probability that each component produced it.
+
+**M step.** With those responsibilities, re-estimate each component's mean, width
+and weight, weighting every point by how much it belongs.
+
+Repeat. Each iteration provably does not decrease the likelihood, so the process
+converges.
+
+Drag the iterations control from 1 upward and watch the curves settle. The early
+steps move a great deal; the last twenty barely move at all, which is what
+convergence looks like.
+
+The guarantee is only about *local* optima. EM converges to a local maximum that
+depends on the starting point, which is why implementations run it several times
+from different initialisations and keep the best. Scikit-learn's `n_init` exists
+for this.
+
+## Why it beats k-means, when it does
+
+**Elliptical clusters.** With a full covariance matrix per component, a GMM fits
+stretched and tilted clusters. K-means implicitly assumes spheres, so an
+elongated cluster gets cut in half.
+
+**Different sizes.** Mixing weights let one component account for 80% of the data
+and another for 20%. K-means has no such notion and tends toward equal-sized
+clusters.
+
+**Soft assignment.** Useful in itself when the output feeds something downstream
+that can use a probability.
+
+**A likelihood.** Being a proper probabilistic model, a GMM can score how well it
+explains the data, which makes **BIC** and **AIC** available for choosing the
+number of components &mdash; a principled alternative to
+[the elbow](choosing_k.html).
+
+K-means is exactly the limiting case: spherical components of equal weight, with
+responsibilities forced to 0 or 1.
+
+## Where it goes wrong
+
+**Assuming Gaussian.** If the clusters are crescents, a mixture of Gaussians is
+the wrong model, and it will fit two Gaussians to them anyway.
+
+**Singularities.** A component can collapse onto a single point, driving its
+width to zero and the likelihood to infinity. Regularisation &mdash; a small
+constant added to the covariance &mdash; prevents it, and is on by default in
+most libraries.
+
+**One run from one start.** Local optima are real. Use several initialisations.
+
+**Too many components.** With enough Gaussians you can fit anything, including
+the noise. BIC penalises parameter count for this reason.

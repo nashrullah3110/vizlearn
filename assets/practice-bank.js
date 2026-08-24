@@ -7844,6 +7844,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "machine_learning/choosing_k.html",
+  "title": "Choosing k: Elbow and Silhouette",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Why can inertia alone never choose k?",
+    "o": [
+     "It is too slow to compute",
+     "It falls at every increase in k and reaches zero when every point is its own cluster",
+     "It requires spherical clusters",
+     "It ignores cluster separation"
+    ],
+    "a": 1,
+    "w": "Minimising it always answers 'as many clusters as possible'. It measures tightness around centres, not whether the grouping is good."
+   },
+   {
+    "t": "What does a negative silhouette score for a point mean?",
+    "o": [
+     "The point is an outlier",
+     "It is closer on average to a different cluster than to its own, so it is probably misassigned",
+     "The clusters overlap",
+     "k is too small"
+    ],
+    "a": 1,
+    "w": "s = (b - a) / max(a, b), so s goes negative when the mean distance to the nearest other cluster is smaller than the mean distance within its own."
+   },
+   {
+    "t": "Why does the silhouette have a genuine maximum while inertia does not?",
+    "o": [
+     "It is normalised between -1 and 1",
+     "Adding clusters eventually pushes points close to a neighbouring cluster, which lowers the score",
+     "It uses squared distances",
+     "It is computed per cluster"
+    ],
+    "a": 1,
+    "w": "It measures separation relative to tightness. Splitting a coherent group hurts the separation term, so the score falls rather than improving automatically."
+   }
+  ]
+ },
+ {
   "path": "machine_learning/confusion_matrix.html",
   "title": "Confusion Matrix Analysis",
   "cat": "Machine Learning",
@@ -7899,6 +7939,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Why angle rather than distance”?",
     "ans": "Here is the situation cosine similarity was invented for. Take two documents about football. One is a 200-word match report; the other is a 4,000-word essay on the same match. Count the words in each and you get two vectors: the essay's numbers are all roughly twenty times bigger."
+   }
+  ]
+ },
+ {
+  "path": "machine_learning/dbscan_clustering.html",
+  "title": "DBSCAN: Density-Based Clustering",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Why can DBSCAN separate two interleaved crescents when k-means cannot?",
+    "o": [
+     "It uses more iterations",
+     "Clusters spread through connected dense regions, so they can be any shape, while k-means draws straight boundaries between centres",
+     "It scales the features first",
+     "It knows the number of clusters"
+    ],
+    "a": 1,
+    "w": "K-means assigns each point to the nearest centroid, so the boundary is always a straight line. DBSCAN never asks how far anything is from a centre."
+   },
+   {
+    "t": "What is a border point?",
+    "o": [
+     "A point at the edge of the dataset",
+     "A point within eps of a core point but without enough neighbours to be core itself",
+     "A point equidistant from two clusters",
+     "A point labelled noise"
+    ],
+    "a": 1,
+    "w": "Core points have at least minPts neighbours within eps and drive the expansion; border points get swept in by them; everything else is noise."
+   },
+   {
+    "t": "What is DBSCAN's main structural weakness?",
+    "o": [
+     "It needs k in advance",
+     "One eps applies everywhere, so clusters of differing density cannot both be found",
+     "It cannot label outliers",
+     "It only works in two dimensions"
+    ],
+    "a": 1,
+    "w": "The eps that finds a sparse cluster merges a dense one into its surroundings. HDBSCAN builds a hierarchy over eps values to handle exactly this."
    }
   ]
  },
@@ -8021,6 +8101,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "machine_learning/permutation_importance.html",
+  "title": "Feature and Permutation Importance",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Why shuffle a column rather than delete it?",
+    "o": [
+     "Deleting is slower",
+     "Deleting requires retraining, which gives a different model and answers a different question",
+     "Shuffling preserves the correlation with other features",
+     "Deleting breaks the input shape"
+    ],
+    "a": 1,
+    "w": "Shuffling keeps the same fitted model and the same distribution, so the only thing that changed is whether that column still carries signal."
+   },
+   {
+    "t": "Two near-identical informative features both show low importance. Why?",
+    "o": [
+     "They cancel each other out",
+     "Shuffling one leaves the other intact, so the model uses the twin and loses almost no accuracy",
+     "The model ignored both",
+     "Their importance was divided between them"
+    ],
+    "a": 1,
+    "w": "The metric is measured one column at a time. The honest reading is 'either one suffices', which this method cannot express - permute correlated groups together instead."
+   },
+   {
+    "t": "What bias does a tree's built-in impurity importance have?",
+    "o": [
+     "It favours features used early in the tree",
+     "It favours high-cardinality features, because more distinct values mean more split points to be chosen at",
+     "It favours binary features",
+     "It ignores correlated features"
+    ],
+    "a": 1,
+    "w": "A random ID column can score above a useful binary flag. Permutation importance does not have this bias, at the cost of a re-scoring pass per feature."
+   }
+  ]
+ },
+ {
+  "path": "machine_learning/gaussian_mixture_models.html",
+  "title": "Gaussian Mixture Models",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "What does a GMM report for each point?",
+    "o": [
+     "A single cluster label",
+     "A probability of belonging to each component",
+     "A distance to the nearest centroid",
+     "An outlier score"
+    ],
+    "a": 1,
+    "w": "That is the point: a point in the overlap between two groups records its doubt, where k-means would label it without hesitation."
+   },
+   {
+    "t": "What do the two steps of EM do?",
+    "o": [
+     "Split and merge clusters",
+     "E computes responsibilities from the current parameters; M re-estimates parameters from those responsibilities",
+     "Estimate then maximise the number of components",
+     "Initialise then converge"
+    ],
+    "a": 1,
+    "w": "It resolves a chicken-and-egg problem by alternating, and each iteration provably does not decrease the likelihood - though only to a local maximum."
+   },
+   {
+    "t": "K-means is the special case of a GMM where:",
+    "o": [
+     "There is only one component",
+     "Components are spherical and equally weighted, and responsibilities are forced to 0 or 1",
+     "The covariance is full",
+     "EM is run once"
+    ],
+    "a": 1,
+    "w": "Which is why a GMM handles elliptical and unequally sized clusters that k-means cuts in half or splits evenly."
+   }
+  ]
+ },
+ {
   "path": "machine_learning/gradient_boosting.html",
   "title": "Gradient Boosting",
   "cat": "Machine Learning",
@@ -8135,6 +8295,86 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Hard Labelling (One-Hot Encoding)”?",
     "ans": "This is the most common approach. You are 100% certain about the class. The correct class gets a value of 1, and all other classes get a 0. It's a \"winner-takes-all\" method. Example Vector: For a 'Positive' tweet, the hard label is [0, 0, 1] . This tells the model, \"This tweet is positive, and nothing else.\" Soft Labelling (Probabilistic)"
+   }
+  ]
+ },
+ {
+  "path": "machine_learning/hierarchical_clustering.html",
+  "title": "Hierarchical Clustering and Dendrograms",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "What is the advantage of building the whole tree?",
+    "o": [
+     "It is faster than k-means",
+     "k is chosen after seeing the merge distances, rather than decided in advance",
+     "It handles more data",
+     "It labels outliers"
+    ],
+    "a": 1,
+    "w": "One tree, and a horizontal cut at any height gives a clustering. Cutting just below a large jump in merge distance is the dendrogram's version of the elbow."
+   },
+   {
+    "t": "What is chaining, and which linkage causes it?",
+    "o": [
+     "Complete linkage merging outliers",
+     "Single linkage joining two separate blobs through a thin bridge of points, because any short hop is enough",
+     "Average linkage producing equal-sized clusters",
+     "Ward linkage minimising variance"
+    ],
+    "a": 1,
+    "w": "Single linkage uses the nearest pair, so a bridge provides a cheap merge at every step. Complete linkage has the opposite failure: it breaks up genuinely elongated clusters."
+   },
+   {
+    "t": "Why is hierarchical clustering impractical for large datasets?",
+    "o": [
+     "It needs too many iterations",
+     "It requires an n-by-n distance matrix, so memory grows with the square of the point count",
+     "Linkage cannot be computed at scale",
+     "The dendrogram cannot be drawn"
+    ],
+    "a": 1,
+    "w": "100,000 points is ten billion distances. Time is O(n^2 log n) at best, but memory is usually what stops you first."
+   }
+  ]
+ },
+ {
+  "path": "machine_learning/isolation_forest.html",
+  "title": "Isolation Forest",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Why does a short average path length mean a point is anomalous?",
+    "o": [
+     "It is close to the root of the tree by chance",
+     "A point far from the rest is separated by a random split quickly, while a point in a dense region needs many splits",
+     "Short paths indicate low variance",
+     "The tree is pruned around outliers"
+    ],
+    "a": 1,
+    "w": "Path length is the effort required to isolate the point. No model of normality is ever built - the score falls out of how easy separation is."
+   },
+   {
+    "t": "Why is each tree built from a small subsample?",
+    "o": [
+     "Only for speed",
+     "It also reduces masking - in the full data a cluster of anomalies can shield its own members and look normal",
+     "To avoid overfitting the threshold",
+     "Because trees cannot handle large inputs"
+    ],
+    "a": 1,
+    "w": "In a small sample those anomalies are usually alone and isolated immediately. It reduces swamping too - normal points looking anomalous because the data is crowded."
+   },
+   {
+    "t": "Which anomaly does Isolation Forest tend to miss?",
+    "o": [
+     "A point far outside the whole dataset",
+     "A point in a low-density gap between two dense clusters, which is normal globally but anomalous locally",
+     "A duplicate row",
+     "A point with an extreme value in one feature"
+    ],
+    "a": 1,
+    "w": "It finds points that are globally easy to separate. Local Outlier Factor compares each point's density with its neighbours' and catches these instead."
    }
   ]
  },
@@ -8493,6 +8733,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "machine_learning/partial_dependence_and_shap.html",
+  "title": "Partial Dependence, ICE and SHAP",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "A partial dependence curve is flat. What can you conclude?",
+    "o": [
+     "The feature does not matter",
+     "Only that the average effect is near zero - it may matter enormously in opposite directions by subgroup",
+     "The model is underfitted",
+     "The feature is correlated with another"
+    ],
+    "a": 1,
+    "w": "Plotting ICE curves settles it: if they are parallel the average is a fair summary; if they fan out or cross, there is an interaction the average cancels."
+   },
+   {
+    "t": "What does the additivity of SHAP values give you?",
+    "o": [
+     "Faster computation",
+     "The values sum exactly to the gap between the base value and this prediction, so nothing is unattributed",
+     "Independence from the model type",
+     "Causal interpretation"
+    ],
+    "a": 1,
+    "w": "That is what makes it usable as an explanation of a single prediction. Exact computation is exponential, so TreeSHAP and KernelSHAP approximate it."
+   },
+   {
+    "t": "Why can part of a partial dependence curve be untrustworthy when features are correlated?",
+    "o": [
+     "The averaging is biased",
+     "It sets the feature to values that never co-occur with the other columns, so the model is extrapolating",
+     "The curve becomes non-monotonic",
+     "ICE curves cannot be computed"
+    ],
+    "a": 1,
+    "w": "Sweeping age across every row creates people aged 18 with forty years of experience. ALE plots avoid this by varying a feature only within ranges that actually occur."
+   }
+  ]
+ },
+ {
   "path": "machine_learning/ml_pipelines.html",
   "title": "Pipelines",
   "cat": "Machine Learning",
@@ -8653,6 +8933,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "machine_learning/probability_calibration.html",
+  "title": "Probability Calibration",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Why is AUC unchanged as the temperature slider moves?",
+    "o": [
+     "AUC is insensitive to class imbalance",
+     "Temperature scaling is monotonic, so it never changes the order of any two predictions",
+     "The model is retrained each time",
+     "AUC uses only the top predictions"
+    ],
+    "a": 1,
+    "w": "Every ranking metric is identical at every setting, while calibration swings from badly over-confident to badly under-confident. Looking only at AUC tells you nothing about calibration."
+   },
+   {
+    "t": "A reliability curve sits below the diagonal. The model is:",
+    "o": [
+     "Under-confident",
+     "Over-confident",
+     "Well calibrated",
+     "Poorly ranked"
+    ],
+    "a": 1,
+    "w": "It says 0.9 and is right 70% of the time. This is the common failure mode for modern neural networks, and the damaging one when probabilities feed decisions."
+   },
+   {
+    "t": "When does calibration not matter?",
+    "o": [
+     "When the model is a neural network",
+     "When the output is only used to rank - showing the top 100 results, say",
+     "When the classes are balanced",
+     "When AUC is high"
+    ],
+    "a": 1,
+    "w": "It matters whenever a probability feeds a decision with costs, because expected value is probability times payoff, so a wrong probability is a wrong decision."
+   }
+  ]
+ },
+ {
   "path": "machine_learning/roc_curve_and_auc.html",
   "title": "ROC Curve and AUC",
   "cat": "Machine Learning",
@@ -8725,6 +9045,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Window size and stride”?",
     "ans": "Window size (W) is how much history the model sees per prediction, and it is a real modelling assumption: it asserts that nothing older than W steps matters. Too small and the model cannot see the pattern — a weekly cycle needs at least seven daily steps. Too large and each example carries mostly irrelevant history, the input dimension grows, and the number of examples shrinks."
+   }
+  ]
+ },
+ {
+  "path": "machine_learning/stacking_and_voting.html",
+  "title": "Stacking and Voting Ensembles",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Why can a majority vote score worse than its best member?",
+    "o": [
+     "The vote discards probabilities",
+     "Every member counts equally, so two weak learners can outvote a strong one whenever they agree",
+     "Voting requires an odd number of models",
+     "The members were not calibrated"
+    ],
+    "a": 1,
+    "w": "It is what happens whenever an ensemble is assembled without checking the members are comparable in quality - which is why 'just ensemble it' is bad advice."
+   },
+   {
+    "t": "Why must the meta-learner be trained on cross-validated predictions?",
+    "o": [
+     "To save computation",
+     "In-sample predictions look suspiciously good for an overfitted base model, so the meta-learner learns to trust it",
+     "To balance the classes",
+     "Because base models need to be retrained anyway"
+    ],
+    "a": 1,
+    "w": "Every prediction the meta-learner sees has to be out-of-sample. It is why stacking costs roughly k times the training of its members."
+   },
+   {
+    "t": "What condition must hold for an ensemble to help at all?",
+    "o": [
+     "The members must be the same type of model",
+     "The members must make different mistakes",
+     "There must be an odd number of members",
+     "The members must be calibrated"
+    ],
+    "a": 1,
+    "w": "Three models that fail on the same rows combine into one model that fails on those rows. Checking the correlation of their errors is the diagnostic to run first."
    }
   ]
  },
@@ -8843,6 +9203,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Start by changing nothing about the data”?",
     "ans": "The instinct on seeing an imbalanced dataset is to resample it immediately. That is usually the third-best move. Two cheaper things come first, and often one of them is enough."
+   }
+  ]
+ },
+ {
+  "path": "machine_learning/tsne_and_umap.html",
+  "title": "t-SNE and UMAP beside PCA",
+  "cat": "Machine Learning",
+  "q": [
+   {
+    "t": "Why can you not read the distance between two clusters in a t-SNE plot?",
+    "o": [
+     "The axes are unlabelled",
+     "The layout only optimises for keeping near neighbours near; nothing constrains the gaps between groups",
+     "The plot is rotated arbitrarily",
+     "Distances are logarithmic"
+    ],
+    "a": 1,
+    "w": "Two clusters at opposite ends of the plot may be more similar than two adjacent ones. PCA, being a linear projection, does preserve global distances."
+   },
+   {
+    "t": "What can UMAP do that t-SNE cannot?",
+    "o": [
+     "Preserve local structure",
+     "Transform data it did not see during fitting",
+     "Run deterministically",
+     "Handle more than three dimensions"
+    ],
+    "a": 1,
+    "w": "t-SNE has no mapping from the original space to the layout, so adding a point means re-running everything. This matters when the embedding is part of a pipeline."
+   },
+   {
+    "t": "Why is PCA the safer choice for dimensionality reduction inside a pipeline?",
+    "o": [
+     "It separates clusters better",
+     "It is a stable, invertible linear mapping that applies to new data, whereas t-SNE coordinates have no meaning outside the plot",
+     "It is stochastic",
+     "It preserves cluster density"
+    ],
+    "a": 1,
+    "w": "t-SNE and UMAP are visualisation tools. They answer 'does my data separate at all' well, and make poor preprocessing steps."
    }
   ]
  },

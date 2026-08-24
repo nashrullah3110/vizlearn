@@ -1,0 +1,107 @@
+title: t-SNE and UMAP beside PCA
+intro: Why neighbour-preserving plots look so much better than PCA, and which parts of them you are not allowed to read.
+
+## A note on what this page runs
+
+The layout here is a **simplified neighbour-preserving optimisation** &mdash;
+attract each point toward its nearest neighbours in the original space, repel
+everything else. It is not t-SNE: there is no perplexity, no
+Student-t kernel, no KL divergence being minimised.
+
+What it reproduces faithfully is the behaviour that matters: local structure is
+preserved, and the distances between groups stop meaning anything. The
+[PCA module](pca.html) covers the linear method properly.
+
+## Two different jobs
+
+**PCA** finds the directions along which the data varies most and projects onto
+them. It is linear, deterministic, invertible, and fast &mdash; and because it is
+a projection, distances survive it in a predictable way. Points far apart in the
+original space are far apart in the plot, up to the variance the discarded
+dimensions held.
+
+**t-SNE and UMAP** do something else entirely. They ask which points are near
+each other in the original space, and then *construct* a two-dimensional
+arrangement in which those same points are near each other. There is no
+projection and no formula mapping one space to the other &mdash; the coordinates
+are the output of an optimisation.
+
+## What the readout is checking
+
+The data behind this page has three clusters arranged on a line, with the third
+exactly twice as far from the first as the second is. A ratio of 2.00, by
+construction.
+
+Switch between the methods and watch the measured ratio.
+
+**PCA** reproduces it closely. It is a linear projection, so the global
+arrangement is preserved.
+
+**The neighbour-preserving layout** does not, and the number wanders as you
+change the attraction strength. The three groups are cleanly separated &mdash;
+visibly better than PCA &mdash; and the distances between them are an artefact of
+the optimisation.
+
+That is the whole lesson, and it is the thing most often got wrong when reading
+these plots.
+
+## What you may not read from a t-SNE plot
+
+**Distance between clusters.** Two clusters at opposite ends may be more similar
+than two that are adjacent. The layout only tried to keep neighbours together.
+
+**Cluster size.** t-SNE expands dense regions and contracts sparse ones, so the
+area a cluster occupies says nothing about how many points it has or how spread
+out they were.
+
+**Density within a cluster.** Same reason.
+
+**Anything from one run.** t-SNE is stochastic and its result depends on the
+random seed and on perplexity. Run it three times and you get three pictures.
+Structure that survives all three is real; structure that does not, is not.
+
+## Perplexity and n_neighbors
+
+Both algorithms have a parameter controlling how much neighbourhood to consider
+&mdash; **perplexity** in t-SNE, **n_neighbors** in UMAP. Low values emphasise
+very local structure and can shatter a genuine cluster into fragments. High
+values emphasise broader structure and can merge distinct clusters.
+
+There is no correct value, and the standard advice is to look at several. A
+finding that only appears at one setting is a finding about the parameter.
+
+## t-SNE against UMAP
+
+**Speed.** UMAP is substantially faster and scales to larger datasets.
+
+**Global structure.** UMAP claims to preserve more of it, and generally does,
+though the caution above still applies &mdash; less meaningless is not
+meaningful.
+
+**New points.** UMAP can transform data it did not see during fitting. t-SNE
+cannot: adding a point means re-running everything. This matters if the embedding
+is part of a pipeline rather than a picture.
+
+**Reproducibility.** Both are stochastic; both take a seed.
+
+## What they are for
+
+Looking. These are visualisation tools, and they are very good at answering "does
+my data separate at all", "are my labels consistent", "is there a group I did not
+expect".
+
+They are a poor choice as a preprocessing step for a model. The output
+coordinates have no meaning outside the plot, the mapping is not stable, and for
+t-SNE it cannot be applied to new data at all. If you want dimensionality
+reduction inside a pipeline, PCA is the safe default.
+
+## Where it goes wrong
+
+**Measuring distance between clusters.** The single most common error.
+
+**Reading cluster sizes.** Artefacts of the optimisation.
+
+**Running once and believing it.** Vary the seed and the perplexity.
+
+**Feeding t-SNE coordinates into a classifier.** No stable mapping; no way to
+transform new data.

@@ -1,0 +1,112 @@
+title: Probability Calibration
+intro: Whether a model's confidence means anything, and why every ranking metric is blind to it.
+
+## Two different questions
+
+**Discrimination** asks whether the model ranks positives above negatives. AUC
+and [ROC](precision_recall_vs_roc.html) measure this.
+
+**Calibration** asks whether the numbers mean what they say. Of all the cases
+where the model said 0.8, were about 80% actually positive?
+
+A model can be excellent at one and terrible at the other, and this is not an
+edge case &mdash; it is the normal situation.
+
+## The slider proves it
+
+Drag the temperature control and watch the curve deform. That control performs
+**temperature scaling**: it divides the logit by a constant before the sigmoid.
+Dividing by a number less than one sharpens every score toward 0 or 1; dividing
+by a number greater than one flattens them toward 0.5.
+
+Crucially, this is a **monotonic** transformation. It never changes the order of
+any two predictions. Every ranking metric &mdash; AUC, average precision,
+anything based on ordering &mdash; is **identical at every setting of that
+slider**, while the reliability curve swings from badly over-confident to badly
+under-confident.
+
+Which is the point. If you only ever look at AUC, you have no information about
+calibration at all.
+
+## Reading the diagram
+
+Predictions are binned by confidence, and each bin plots mean confidence against
+observed frequency.
+
+**On the diagonal**: calibrated.
+
+**Below the diagonal**: over-confident. The model says 0.9 and is right 70% of
+the time. This is the common failure, and the damaging one.
+
+**Above the diagonal**: under-confident. The model hedges when it should not.
+
+**ECE** &mdash; expected calibration error &mdash; is the average vertical
+distance, weighted by how many points fall in each bin. It is the number in the
+readout, and it is a summary that can hide compensating errors: a curve that is
+above the diagonal in one region and below in another can report a small ECE.
+Look at the curve, not only the number.
+
+## Why models come out miscalibrated
+
+**Modern neural networks are over-confident**, and increasingly so as they get
+larger. Training to minimise cross-entropy on data it can fit perfectly pushes
+outputs toward 0 and 1 long after the accuracy has stopped improving.
+
+**Support vector machines** produce distances from a hyperplane, not
+probabilities, and passing them through a sigmoid does not make them
+probabilities.
+
+**Naive Bayes** is famously over-confident because its independence assumption
+multiplies correlated evidence as though it were independent.
+
+**Random forests** tend to be under-confident at the extremes, because averaging
+many trees pulls predictions toward the middle.
+
+Logistic regression, fitted on well-specified features, is usually close to
+calibrated &mdash; it optimises exactly this.
+
+## Fixing it
+
+All three methods fit a correction on a **held-out** set, never on the training
+data.
+
+**Platt scaling.** Fit a logistic regression to map scores to probabilities. One
+or two parameters, works on small validation sets, assumes the distortion is
+sigmoid-shaped.
+
+**Temperature scaling.** The single-parameter version, and the standard for
+neural networks. Because it changes no rankings, accuracy and AUC are guaranteed
+untouched &mdash; a rare free lunch.
+
+**Isotonic regression.** Fits any monotonic mapping. More flexible, and needs
+considerably more data or it overfits the validation set.
+
+## When it matters
+
+**Whenever a probability feeds a decision with costs.** Expected value is
+probability times payoff, so a wrong probability is a wrong decision even when
+the ranking is perfect.
+
+**Medical and risk contexts**, where "30% chance" is communicated to a person.
+
+**When scores are combined** across models or over time.
+
+**When a threshold is set from a target rate.** [Choosing a
+threshold](threshold_tuning.html) from calibrated probabilities gives the rate
+you asked for; from uncalibrated scores it does not.
+
+If all you do is rank &mdash; show the top 100 results &mdash; calibration is
+irrelevant.
+
+## Where it goes wrong
+
+**Calibrating on the training set.** It will look perfect and generalise
+nothing.
+
+**Isotonic regression on a small validation set.** It overfits.
+
+**Assuming a good AUC implies good probabilities.** The slider on this page
+exists to disprove exactly that.
+
+**Recalibrating without re-checking after data drift.** A calibration fitted last
+year describes last year's distribution.

@@ -1710,4 +1710,1626 @@ falling. A converged gap means variance you cannot fix with volume.
     ],
 )
 
+# ---------------------------------------------------------------------------
+# 11. DBSCAN
+# ---------------------------------------------------------------------------
+topic(
+    "dbscan_clustering",
+    "DBSCAN: Density-Based Clustering",
+    "Clustering",
+    "Clusters defined by crowding rather than by distance to a centre, which "
+    "is why it finds shapes k-means cannot.",
+    _svg(_axes()
+         + "".join(_dot(28 + i * 5, 58 - (i % 3) * 4, A) for i in range(9))
+         + "".join(_dot(84 + i * 5, 34 + (i % 3) * 4, A) for i in range(9))
+         + _dot(70, 20, M) + _dot(126, 62, M)
+         + _txt(80, 82, "two shapes, two outliers", M, 7)),
+    {
+        "sim": "dbscan",
+        "controls": [
+            {"key": "shape", "label": "Data", "type": "select", "value": "moons",
+             "options": [{"value": "moons", "label": "Two crescents"},
+                         {"value": "blobs", "label": "Three blobs and some noise"}]},
+            {"key": "eps", "label": "eps (neighbourhood radius)", "type": "range",
+             "min": 0.10, "max": 0.60, "step": 0.01, "value": 0.22},
+            {"key": "minPts", "label": "minPts", "type": "range",
+             "min": 2, "max": 12, "step": 1, "value": 5},
+        ],
+    },
+    [
+        "A <strong>core point</strong> has at least <code class='mono-font'>minPts</code> "
+        "neighbours within <code class='mono-font'>eps</code>. Clusters grow outward from core points.",
+        "Points reachable from a core point but not core themselves are "
+        "<strong>border</strong> points. Everything else is <strong>noise</strong>.",
+        "You never say how many clusters to find. The density parameters decide, "
+        "and the count falls out.",
+        "Because clusters spread through connected dense regions, they can be any "
+        "shape at all &mdash; which is what k-means cannot do.",
+    ],
+    """
+title: DBSCAN: Density-Based Clustering
+intro: Clustering by crowding rather than by distance to a centre, and the two parameters that decide everything.
+
+## What k-means cannot do
+
+Set the data control above to **Two crescents**. K-means, which assigns each
+point to the nearest of *k* centres, cannot separate these: the boundary it
+draws is always a straight line between two centroids, and no straight line
+separates two interleaved crescents.
+
+DBSCAN separates them immediately, and does it without being told there are two.
+
+## The definitions
+
+Everything follows from two parameters &mdash; `eps`, a radius, and `minPts`, a
+count &mdash; and three definitions:
+
+**Core point.** Has at least `minPts` points within `eps` of it, including
+itself. It sits in a crowded place.
+
+**Border point.** Within `eps` of a core point, but not crowded enough to be one
+itself. It is on the edge of a cluster.
+
+**Noise.** Neither. It belongs to no cluster, and DBSCAN says so rather than
+forcing it somewhere.
+
+A cluster is then a maximal set of points connected through core points. Start at
+a core point, take everything within `eps`, and for each of those that is also a
+core point, take *its* neighbourhood too, repeating until nothing new arrives.
+
+This is why clusters can be any shape. The cluster spreads wherever the data is
+dense, following the crescent around its curve, because at no point does it ask
+how far anything is from a centre.
+
+## The two parameters
+
+Drag `eps` in the visualisation and watch the count.
+
+**Too small**, and no point has `minPts` neighbours. Everything is noise, or the
+data shatters into many small clusters.
+
+**Too large**, and everything is within reach of everything else. The two
+crescents merge into one cluster, which happens above about 0.26 on this data.
+
+The band in between is where DBSCAN works, and on the crescents it is genuinely
+narrow. That sensitivity is the honest weakness of the method.
+
+`minPts` is less delicate. Larger values demand denser cores, producing fewer,
+tighter clusters and more noise. A common starting rule is `minPts = 2 * number
+of dimensions`, and at least 3.
+
+For `eps`, the standard technique is a **k-distance plot**: for every point,
+measure the distance to its `minPts`-th nearest neighbour, sort those distances
+and plot them. The curve has a knee where distances start rising sharply, and
+that knee is a reasonable `eps` &mdash; it is the point at which you leave the
+dense region and start crossing gaps.
+
+## What it gives you that k-means does not
+
+**No k.** The number of clusters is discovered, not supplied.
+
+**Arbitrary shapes.** Crescents, rings, spirals, anything connected and dense.
+
+**An explicit noise label.** K-means assigns every point to some cluster, so an
+outlier is silently absorbed and drags a centroid with it. DBSCAN sets it aside.
+Switch the data to blobs and the scattered points stay hollow.
+
+## Where it fails
+
+**Varying density.** This is the real limitation. One `eps` applies everywhere,
+so a dataset with one dense cluster and one sparse cluster cannot be handled: the
+`eps` that finds the sparse one merges the dense one into its surroundings.
+**HDBSCAN** exists precisely for this, building a hierarchy over `eps` values and
+selecting per cluster.
+
+**High dimensions.** Distances concentrate as dimensionality grows, so
+"neighbourhood" stops meaning much. Reduce dimensions first.
+
+**Scale sensitivity.** `eps` is an absolute distance, so a feature measured in
+thousands dominates one measured in units. [Scale
+first](feature_scaling.html) &mdash; this is not optional.
+
+**Cost.** Naively O(n&sup2;) because of the neighbourhood queries. A spatial
+index brings it to about O(n log n) in low dimensions.
+
+## Where it goes wrong
+
+**Not scaling the features.** `eps` becomes meaningless.
+
+**Tuning eps by trying numbers.** Use a k-distance plot; it takes a minute and
+gives a defensible value.
+
+**Expecting it to work on varying density.** Reach for HDBSCAN instead.
+
+**Reading noise as failure.** Labelling outliers as noise is the feature.
+""",
+    [
+        {"q": "Why can DBSCAN separate two interleaved crescents when k-means cannot?",
+         "options": ["It uses more iterations",
+                     "Clusters spread through connected dense regions, so they can be any shape, while k-means draws straight boundaries between centres",
+                     "It scales the features first",
+                     "It knows the number of clusters"],
+         "answer": 1,
+         "why": "K-means assigns each point to the nearest centroid, so the boundary is always a straight line. DBSCAN never asks how far anything is from a centre."},
+        {"q": "What is a border point?",
+         "options": ["A point at the edge of the dataset",
+                     "A point within eps of a core point but without enough neighbours to be core itself",
+                     "A point equidistant from two clusters",
+                     "A point labelled noise"],
+         "answer": 1,
+         "why": "Core points have at least minPts neighbours within eps and drive the expansion; border points get swept in by them; everything else is noise."},
+        {"q": "What is DBSCAN's main structural weakness?",
+         "options": ["It needs k in advance",
+                     "One eps applies everywhere, so clusters of differing density cannot both be found",
+                     "It cannot label outliers",
+                     "It only works in two dimensions"],
+         "answer": 1,
+         "why": "The eps that finds a sparse cluster merges a dense one into its surroundings. HDBSCAN builds a hierarchy over eps values to handle exactly this."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 12. Hierarchical clustering
+# ---------------------------------------------------------------------------
+topic(
+    "hierarchical_clustering",
+    "Hierarchical Clustering and Dendrograms",
+    "Clustering",
+    "Merge the two closest clusters, repeat, and keep the whole tree. Choose "
+    "how many clusters you want afterwards.",
+    _svg(_line(24, 70, 24, 46, B, 1.2) + _line(44, 70, 44, 46, B, 1.2)
+         + _line(24, 46, 44, 46, A, 1.4) + _line(34, 46, 34, 28, A, 1.4)
+         + _line(74, 70, 74, 36, B, 1.2) + _line(104, 70, 104, 36, B, 1.2)
+         + _line(74, 36, 104, 36, A, 1.4) + _line(89, 36, 89, 28, A, 1.4)
+         + _line(34, 28, 89, 28, A, 1.6)
+         + _txt(80, 82, "one tree, every k at once", M, 7)),
+    {
+        "sim": "hierarchical",
+        "controls": [
+            {"key": "linkage", "label": "Linkage", "type": "select", "value": "average",
+             "options": [{"value": "single", "label": "Single (nearest pair)"},
+                         {"value": "complete", "label": "Complete (furthest pair)"},
+                         {"value": "average", "label": "Average"}]},
+            {"key": "cut", "label": "Cut height", "type": "range",
+             "min": 0.10, "max": 1.40, "step": 0.02, "value": 0.60},
+        ],
+    },
+    [
+        "Start with every point as its own cluster. Repeatedly merge the two "
+        "closest, until one remains.",
+        "The result is a tree. Cutting it at a height gives a clustering &mdash; "
+        "and every height gives a different k.",
+        "<strong>Linkage</strong> defines the distance between two clusters, and "
+        "changes the answer more than any other choice.",
+        "Single linkage chains through bridges; complete linkage insists on tight "
+        "clusters; average sits between them.",
+    ],
+    """
+title: Hierarchical Clustering and Dendrograms
+intro: Building the whole tree once, and choosing how many clusters you want after seeing it.
+
+## The algorithm
+
+Agglomerative clustering is almost trivially simple:
+
+1. Every point starts as its own cluster.
+2. Find the two closest clusters and merge them.
+3. Repeat until one cluster remains.
+
+Recording the distance at each merge gives a **dendrogram** &mdash; the chart
+above plots exactly that: merge number against the distance at which it
+happened.
+
+## The point: k comes last
+
+K-means and DBSCAN both need a decision before they run &mdash; how many
+clusters, or how dense. Hierarchical clustering needs neither. It builds one
+tree, and a horizontal cut through it produces a clustering.
+
+Drag the cut height and watch the count change. A cut low down leaves many small
+clusters, a cut high up leaves few, and the tree itself never changed. That is
+genuinely useful when you do not know what structure to expect, because you can
+look at the merge distances before committing.
+
+Large jumps in the curve are informative: a merge that costs much more than the
+one before it joined two things that were not really close. Cutting just below a
+big jump is the dendrogram equivalent of the [elbow](choosing_k.html).
+
+## Linkage changes everything
+
+The algorithm needs a distance between two *clusters*, not two points, and there
+is no single right answer. Switch the control and the shape of the curve changes
+substantially.
+
+**Single linkage** &mdash; distance between the nearest pair. Merges cheaply
+whenever any two members are close, so it can follow elongated shapes. Its
+failure mode is **chaining**: two well-separated blobs joined by a thin bridge of
+points merge into one, because the bridge provides a short hop at every step.
+
+**Complete linkage** &mdash; distance between the furthest pair. A merge is only
+cheap if *every* member of one cluster is close to every member of the other, so
+clusters come out compact and roughly equal in diameter. It breaks up elongated
+structures that genuinely belong together, and is sensitive to outliers, since
+one distant member sets the whole distance.
+
+**Average linkage** &mdash; the mean over all cross-pairs. Between the two, and
+the usual default.
+
+**Ward linkage**, not offered here, merges the pair that increases within-cluster
+variance least. It behaves much like k-means and is the most common choice for
+roughly spherical clusters.
+
+| Linkage | Produces | Fails at |
+|---|---|---|
+| Single | elongated, chain-following | bridges between clusters |
+| Complete | compact, similar sized | genuinely elongated clusters |
+| Average | a compromise | nothing dramatic |
+| Ward | spherical, balanced | non-convex shapes |
+
+## Reading a real dendrogram
+
+A conventional dendrogram draws each merge as a bracket at its height, with the
+leaves at the bottom. Two things are worth knowing about reading one.
+
+**Height is meaningful; horizontal position is not.** The left-to-right order is
+chosen to keep the drawing untangled and carries no information. Two adjacent
+leaves are not necessarily similar.
+
+**The tree is greedy and permanent.** Once two clusters merge they never
+separate, so an early mistake &mdash; two points joined because of noise &mdash;
+propagates all the way up. Hierarchical clustering does not revisit decisions.
+
+## Cost
+
+The naive algorithm is O(n&sup3;), and careful implementations reach O(n&sup2;
+log n) with O(n&sup2;) memory for the distance matrix. That memory is usually the
+binding constraint: 100,000 points is a matrix of ten billion distances.
+
+This is why hierarchical clustering is a small-to-medium-data method. Above a few
+tens of thousands of points, k-means or a sampled variant is the practical
+choice.
+
+## Where it goes wrong
+
+**Not scaling the features.** As with every distance-based method.
+
+**Using single linkage on data with any bridge between clusters.** Chaining will
+merge them.
+
+**Reading meaning into leaf order.** It is a drawing convention.
+
+**Trying it on a large dataset.** The distance matrix will not fit.
+""",
+    [
+        {"q": "What is the advantage of building the whole tree?",
+         "options": ["It is faster than k-means",
+                     "k is chosen after seeing the merge distances, rather than decided in advance",
+                     "It handles more data",
+                     "It labels outliers"],
+         "answer": 1,
+         "why": "One tree, and a horizontal cut at any height gives a clustering. Cutting just below a large jump in merge distance is the dendrogram's version of the elbow."},
+        {"q": "What is chaining, and which linkage causes it?",
+         "options": ["Complete linkage merging outliers",
+                     "Single linkage joining two separate blobs through a thin bridge of points, because any short hop is enough",
+                     "Average linkage producing equal-sized clusters",
+                     "Ward linkage minimising variance"],
+         "answer": 1,
+         "why": "Single linkage uses the nearest pair, so a bridge provides a cheap merge at every step. Complete linkage has the opposite failure: it breaks up genuinely elongated clusters."},
+        {"q": "Why is hierarchical clustering impractical for large datasets?",
+         "options": ["It needs too many iterations",
+                     "It requires an n-by-n distance matrix, so memory grows with the square of the point count",
+                     "Linkage cannot be computed at scale",
+                     "The dendrogram cannot be drawn"],
+         "answer": 1,
+         "why": "100,000 points is ten billion distances. Time is O(n^2 log n) at best, but memory is usually what stops you first."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 13. Choosing k
+# ---------------------------------------------------------------------------
+topic(
+    "choosing_k",
+    "Choosing k: Elbow and Silhouette",
+    "Clustering",
+    "Inertia always falls as k rises, so it cannot pick one. The silhouette "
+    "can, and the two often disagree.",
+    _svg(_axes()
+         + '<path d="M22 22 C 40 52, 70 62, 140 66" fill="none" stroke="%s" stroke-width="1.8"/>' % A
+         + _dot(58, 56, M, 3) + _txt(88, 30, "elbow?", M, 8)),
+    {
+        "sim": "choosek",
+        "canvases": 2,
+        "captions": ["Inertia (the elbow method)", "Mean silhouette"],
+        "controls": [
+            {"key": "shape", "label": "Data", "type": "select", "value": "blobs",
+             "options": [{"value": "blobs", "label": "Three blobs"},
+                         {"value": "moons", "label": "Two crescents"}]},
+            {"key": "spread", "label": "Blob spread", "type": "range",
+             "min": 0.15, "max": 0.90, "step": 0.05, "value": 0.34},
+        ],
+    },
+    [
+        "<strong>Inertia</strong> is the total squared distance from each point "
+        "to its centroid. It falls at every k and reaches zero at k = n.",
+        "The <strong>elbow</strong> is where the fall stops being steep. It is "
+        "judged by eye, and frequently there is no clear bend.",
+        "The <strong>silhouette</strong> compares each point's distance to its "
+        "own cluster against the nearest other one. It has a genuine maximum.",
+        "Neither is a substitute for knowing what the clusters are for. k is "
+        "often decided by the application, not the data.",
+    ],
+    """
+title: Choosing k: Elbow and Silhouette
+intro: Two ways of picking the number of clusters, what each actually measures, and why they disagree.
+
+## Why inertia cannot answer the question
+
+**Inertia** is the sum of squared distances from every point to the centroid of
+its cluster. K-means minimises it directly, so it is the obvious thing to look at.
+
+It is also useless on its own, and the reason is structural: inertia falls at
+every increase in k, always. With k equal to the number of points, every point is
+its own centroid and inertia is exactly zero. Watch the left chart as the spread
+control moves &mdash; the curve descends monotonically no matter what the data
+looks like.
+
+So "choose the k with the lowest inertia" always answers "as many as possible".
+The metric measures how tightly points sit around their centres, not whether the
+grouping is any good.
+
+## The elbow
+
+The elbow method looks for the k where the curve stops falling steeply &mdash;
+where extra clusters stop buying much. On well-separated blobs there is a genuine
+bend at the true number, because up to that point each new cluster splits a real
+group, and after it each new cluster splits a group that was already coherent.
+
+The problems are practical. The bend is judged by eye and different people pick
+different points. Very often, on real data, there simply is no bend &mdash; the
+curve is smooth, and reading an elbow into it is wishful. Raise the spread
+control until the blobs overlap and the bend disappears in front of you.
+
+There is a formalisation, the **kneedle** algorithm, which finds the point of
+maximum curvature. It is better than eyeballing, and it still assumes a knee
+exists.
+
+## The silhouette
+
+The silhouette measures something different: not tightness, but **separation
+relative to tightness**.
+
+For each point, let *a* be its mean distance to the other members of its own
+cluster, and *b* its mean distance to the members of the nearest other cluster.
+The silhouette is:
+
+```
+s = (b - a) / max(a, b)
+```
+
+Near **+1** the point is much closer to its own cluster than to any other. Near
+**0** it sits on a boundary. **Negative** means it is closer to a different
+cluster than to its own &mdash; it is probably misassigned.
+
+Averaging over all points gives one number per k, and unlike inertia it does not
+improve automatically as k grows. Adding clusters eventually forces points close
+to a neighbouring cluster, which drives *b* down and the score with it. So the
+silhouette has a real maximum, and that maximum is a defensible choice.
+
+The right-hand chart shows this. The peak is at the true number of blobs, and it
+is a peak rather than a slope.
+
+The cost is computation: it needs pairwise distances, so O(n&sup2;), against
+inertia's O(n).
+
+## When they disagree
+
+They frequently do, and the disagreement is informative rather than a problem to
+resolve.
+
+Inertia asks *are the clusters tight*. The silhouette asks *are they separated*.
+A dataset can have tight clusters that sit right next to each other, and the two
+metrics will point in different directions.
+
+Switch the data to **Two crescents** and watch both. The silhouette does not
+recover the two crescents either &mdash; because it is still built on distances
+to cluster members, and k-means has not produced the crescents in the first
+place. That is the honest limit of both metrics: they evaluate the clustering
+you gave them, and cannot tell you the algorithm was wrong.
+
+## The answer that is usually right
+
+Neither metric knows what the clusters are for.
+
+If you are segmenting customers so a marketing team can write one message per
+segment, k is roughly how many messages they can write. If you are compressing
+colours, k is the palette size you can afford. If clusters feed a downstream
+model, the number that makes that model best is the number.
+
+Both metrics are worth computing, and the application usually decides.
+
+## Where it goes wrong
+
+**Choosing k by inertia alone.** It will always say "more".
+
+**Seeing an elbow in a smooth curve.** Check whether the bend survives a change
+of scale on the axis.
+
+**Trusting a silhouette on non-spherical clusters.** It is distance-based and
+inherits the same assumption k-means makes.
+
+**Forgetting to scale.** Both metrics are distances.
+""",
+    [
+        {"q": "Why can inertia alone never choose k?",
+         "options": ["It is too slow to compute",
+                     "It falls at every increase in k and reaches zero when every point is its own cluster",
+                     "It requires spherical clusters",
+                     "It ignores cluster separation"],
+         "answer": 1,
+         "why": "Minimising it always answers 'as many clusters as possible'. It measures tightness around centres, not whether the grouping is good."},
+        {"q": "What does a negative silhouette score for a point mean?",
+         "options": ["The point is an outlier",
+                     "It is closer on average to a different cluster than to its own, so it is probably misassigned",
+                     "The clusters overlap",
+                     "k is too small"],
+         "answer": 1,
+         "why": "s = (b - a) / max(a, b), so s goes negative when the mean distance to the nearest other cluster is smaller than the mean distance within its own."},
+        {"q": "Why does the silhouette have a genuine maximum while inertia does not?",
+         "options": ["It is normalised between -1 and 1",
+                     "Adding clusters eventually pushes points close to a neighbouring cluster, which lowers the score",
+                     "It uses squared distances",
+                     "It is computed per cluster"],
+         "answer": 1,
+         "why": "It measures separation relative to tightness. Splitting a coherent group hurts the separation term, so the score falls rather than improving automatically."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 14. Gaussian mixture models
+# ---------------------------------------------------------------------------
+topic(
+    "gaussian_mixture_models",
+    "Gaussian Mixture Models",
+    "Clustering",
+    "Clusters as overlapping distributions rather than hard groups, fitted by "
+    "alternating between guessing and re-estimating.",
+    _svg(_axes()
+         + '<path d="M20 66 C 40 66, 44 26, 62 26 C 80 26, 82 66, 96 66" fill="none" stroke="%s" stroke-width="1.6"/>' % A
+         + '<path d="M70 66 C 88 66, 94 34, 112 34 C 128 34, 132 66, 146 66" fill="none" stroke="%s" stroke-width="1.6"/>' % M
+         + _txt(80, 82, "soft membership, not hard", M, 7)),
+    {
+        "sim": "gmm",
+        "controls": [
+            {"key": "iters", "label": "EM iterations", "type": "range",
+             "min": 1, "max": 60, "step": 1, "value": 30},
+            {"key": "spread", "label": "Overlap of the two groups", "type": "range",
+             "min": 0.35, "max": 1.60, "step": 0.05, "value": 0.55},
+        ],
+    },
+    [
+        "A GMM assumes the data came from several Gaussians mixed together, and "
+        "fits their means, widths and weights.",
+        "Each point gets a <strong>probability</strong> of belonging to each "
+        "component, not a single label.",
+        "<strong>EM</strong> alternates: given the current parameters, compute "
+        "responsibilities; given responsibilities, re-estimate the parameters.",
+        "K-means is the special case where every component is spherical, equally "
+        "sized, and every responsibility is 0 or 1.",
+    ],
+    """
+title: Gaussian Mixture Models
+intro: What clustering looks like when a point is allowed to belong partly to two groups.
+
+## Hard labels throw information away
+
+K-means gives every point exactly one cluster. For a point sitting squarely
+inside a group that is fine. For a point in the overlap between two groups it is
+a fabrication: the algorithm had almost no reason to prefer one over the other,
+and the output records none of that doubt.
+
+A Gaussian mixture keeps the doubt. It models the data as having come from
+several Gaussian distributions mixed together, and reports, for each point, the
+probability that it came from each one.
+
+Raise the overlap control above and watch the readout. As the two groups merge,
+the number of points assigned with less than 90% confidence climbs &mdash; and
+every one of those is a point k-means would have labelled without hesitation.
+
+## The model
+
+Three parameters per component: a mean, a width, and a **mixing weight** saying
+what fraction of the data that component accounts for. The density is their
+weighted sum, and the two curves in the chart are the fitted components.
+
+Fitting is a chicken-and-egg problem. Knowing which points belong to which
+component would make estimating the parameters easy, and knowing the parameters
+would make assigning points easy. Neither is known.
+
+## Expectation-Maximisation
+
+EM resolves it by alternating, starting from a guess:
+
+**E step.** With the current parameters, compute each point's
+**responsibility** &mdash; the probability that each component produced it.
+
+**M step.** With those responsibilities, re-estimate each component's mean, width
+and weight, weighting every point by how much it belongs.
+
+Repeat. Each iteration provably does not decrease the likelihood, so the process
+converges.
+
+Drag the iterations control from 1 upward and watch the curves settle. The early
+steps move a great deal; the last twenty barely move at all, which is what
+convergence looks like.
+
+The guarantee is only about *local* optima. EM converges to a local maximum that
+depends on the starting point, which is why implementations run it several times
+from different initialisations and keep the best. Scikit-learn's `n_init` exists
+for this.
+
+## Why it beats k-means, when it does
+
+**Elliptical clusters.** With a full covariance matrix per component, a GMM fits
+stretched and tilted clusters. K-means implicitly assumes spheres, so an
+elongated cluster gets cut in half.
+
+**Different sizes.** Mixing weights let one component account for 80% of the data
+and another for 20%. K-means has no such notion and tends toward equal-sized
+clusters.
+
+**Soft assignment.** Useful in itself when the output feeds something downstream
+that can use a probability.
+
+**A likelihood.** Being a proper probabilistic model, a GMM can score how well it
+explains the data, which makes **BIC** and **AIC** available for choosing the
+number of components &mdash; a principled alternative to
+[the elbow](choosing_k.html).
+
+K-means is exactly the limiting case: spherical components of equal weight, with
+responsibilities forced to 0 or 1.
+
+## Where it goes wrong
+
+**Assuming Gaussian.** If the clusters are crescents, a mixture of Gaussians is
+the wrong model, and it will fit two Gaussians to them anyway.
+
+**Singularities.** A component can collapse onto a single point, driving its
+width to zero and the likelihood to infinity. Regularisation &mdash; a small
+constant added to the covariance &mdash; prevents it, and is on by default in
+most libraries.
+
+**One run from one start.** Local optima are real. Use several initialisations.
+
+**Too many components.** With enough Gaussians you can fit anything, including
+the noise. BIC penalises parameter count for this reason.
+""",
+    [
+        {"q": "What does a GMM report for each point?",
+         "options": ["A single cluster label",
+                     "A probability of belonging to each component",
+                     "A distance to the nearest centroid",
+                     "An outlier score"],
+         "answer": 1,
+         "why": "That is the point: a point in the overlap between two groups records its doubt, where k-means would label it without hesitation."},
+        {"q": "What do the two steps of EM do?",
+         "options": ["Split and merge clusters",
+                     "E computes responsibilities from the current parameters; M re-estimates parameters from those responsibilities",
+                     "Estimate then maximise the number of components",
+                     "Initialise then converge"],
+         "answer": 1,
+         "why": "It resolves a chicken-and-egg problem by alternating, and each iteration provably does not decrease the likelihood - though only to a local maximum."},
+        {"q": "K-means is the special case of a GMM where:",
+         "options": ["There is only one component",
+                     "Components are spherical and equally weighted, and responsibilities are forced to 0 or 1",
+                     "The covariance is full",
+                     "EM is run once"],
+         "answer": 1,
+         "why": "Which is why a GMM handles elliptical and unequally sized clusters that k-means cuts in half or splits evenly."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 15. t-SNE and UMAP beside PCA
+# ---------------------------------------------------------------------------
+topic(
+    "tsne_and_umap",
+    "t-SNE and UMAP beside PCA",
+    "Dimensionality",
+    "Layouts that preserve who is near whom, at the cost of making the distance "
+    "between clusters meaningless.",
+    _svg(_axes()
+         + "".join(_dot(28 + (i % 4) * 5, 30 + (i // 4) * 5, A) for i in range(12))
+         + "".join(_dot(74 + (i % 4) * 5, 52 + (i // 4) * 5, M) for i in range(12))
+         + "".join(_dot(116 + (i % 4) * 5, 26 + (i // 4) * 5, A) for i in range(12))
+         + _txt(80, 82, "tight groups, arbitrary gaps", M, 7)),
+    {
+        "sim": "embedding",
+        "controls": [
+            {"key": "method", "label": "Method", "type": "select", "value": "pca",
+             "options": [{"value": "pca", "label": "PCA (linear projection)"},
+                         {"value": "neighbour", "label": "Neighbour-preserving layout"}]},
+            {"key": "attract", "label": "Attraction strength", "type": "range",
+             "min": 0.4, "max": 2.4, "step": 0.1, "value": 1.0},
+        ],
+    },
+    [
+        "PCA is a linear projection: it keeps the directions of greatest "
+        "variance, so global distances survive.",
+        "t-SNE and UMAP optimise a layout so that near neighbours stay near. "
+        "Nothing constrains anything else.",
+        "The distance <em>between</em> clusters in a t-SNE plot carries no "
+        "information. Neither does cluster size.",
+        "The layout on this page is a simplified neighbour-preserving "
+        "optimisation, not t-SNE itself &mdash; it shows the behaviour, not the algorithm.",
+    ],
+    """
+title: t-SNE and UMAP beside PCA
+intro: Why neighbour-preserving plots look so much better than PCA, and which parts of them you are not allowed to read.
+
+## A note on what this page runs
+
+The layout here is a **simplified neighbour-preserving optimisation** &mdash;
+attract each point toward its nearest neighbours in the original space, repel
+everything else. It is not t-SNE: there is no perplexity, no
+Student-t kernel, no KL divergence being minimised.
+
+What it reproduces faithfully is the behaviour that matters: local structure is
+preserved, and the distances between groups stop meaning anything. The
+[PCA module](pca.html) covers the linear method properly.
+
+## Two different jobs
+
+**PCA** finds the directions along which the data varies most and projects onto
+them. It is linear, deterministic, invertible, and fast &mdash; and because it is
+a projection, distances survive it in a predictable way. Points far apart in the
+original space are far apart in the plot, up to the variance the discarded
+dimensions held.
+
+**t-SNE and UMAP** do something else entirely. They ask which points are near
+each other in the original space, and then *construct* a two-dimensional
+arrangement in which those same points are near each other. There is no
+projection and no formula mapping one space to the other &mdash; the coordinates
+are the output of an optimisation.
+
+## What the readout is checking
+
+The data behind this page has three clusters arranged on a line, with the third
+exactly twice as far from the first as the second is. A ratio of 2.00, by
+construction.
+
+Switch between the methods and watch the measured ratio.
+
+**PCA** reproduces it closely. It is a linear projection, so the global
+arrangement is preserved.
+
+**The neighbour-preserving layout** does not, and the number wanders as you
+change the attraction strength. The three groups are cleanly separated &mdash;
+visibly better than PCA &mdash; and the distances between them are an artefact of
+the optimisation.
+
+That is the whole lesson, and it is the thing most often got wrong when reading
+these plots.
+
+## What you may not read from a t-SNE plot
+
+**Distance between clusters.** Two clusters at opposite ends may be more similar
+than two that are adjacent. The layout only tried to keep neighbours together.
+
+**Cluster size.** t-SNE expands dense regions and contracts sparse ones, so the
+area a cluster occupies says nothing about how many points it has or how spread
+out they were.
+
+**Density within a cluster.** Same reason.
+
+**Anything from one run.** t-SNE is stochastic and its result depends on the
+random seed and on perplexity. Run it three times and you get three pictures.
+Structure that survives all three is real; structure that does not, is not.
+
+## Perplexity and n_neighbors
+
+Both algorithms have a parameter controlling how much neighbourhood to consider
+&mdash; **perplexity** in t-SNE, **n_neighbors** in UMAP. Low values emphasise
+very local structure and can shatter a genuine cluster into fragments. High
+values emphasise broader structure and can merge distinct clusters.
+
+There is no correct value, and the standard advice is to look at several. A
+finding that only appears at one setting is a finding about the parameter.
+
+## t-SNE against UMAP
+
+**Speed.** UMAP is substantially faster and scales to larger datasets.
+
+**Global structure.** UMAP claims to preserve more of it, and generally does,
+though the caution above still applies &mdash; less meaningless is not
+meaningful.
+
+**New points.** UMAP can transform data it did not see during fitting. t-SNE
+cannot: adding a point means re-running everything. This matters if the embedding
+is part of a pipeline rather than a picture.
+
+**Reproducibility.** Both are stochastic; both take a seed.
+
+## What they are for
+
+Looking. These are visualisation tools, and they are very good at answering "does
+my data separate at all", "are my labels consistent", "is there a group I did not
+expect".
+
+They are a poor choice as a preprocessing step for a model. The output
+coordinates have no meaning outside the plot, the mapping is not stable, and for
+t-SNE it cannot be applied to new data at all. If you want dimensionality
+reduction inside a pipeline, PCA is the safe default.
+
+## Where it goes wrong
+
+**Measuring distance between clusters.** The single most common error.
+
+**Reading cluster sizes.** Artefacts of the optimisation.
+
+**Running once and believing it.** Vary the seed and the perplexity.
+
+**Feeding t-SNE coordinates into a classifier.** No stable mapping; no way to
+transform new data.
+""",
+    [
+        {"q": "Why can you not read the distance between two clusters in a t-SNE plot?",
+         "options": ["The axes are unlabelled",
+                     "The layout only optimises for keeping near neighbours near; nothing constrains the gaps between groups",
+                     "The plot is rotated arbitrarily",
+                     "Distances are logarithmic"],
+         "answer": 1,
+         "why": "Two clusters at opposite ends of the plot may be more similar than two adjacent ones. PCA, being a linear projection, does preserve global distances."},
+        {"q": "What can UMAP do that t-SNE cannot?",
+         "options": ["Preserve local structure",
+                     "Transform data it did not see during fitting",
+                     "Run deterministically",
+                     "Handle more than three dimensions"],
+         "answer": 1,
+         "why": "t-SNE has no mapping from the original space to the layout, so adding a point means re-running everything. This matters when the embedding is part of a pipeline."},
+        {"q": "Why is PCA the safer choice for dimensionality reduction inside a pipeline?",
+         "options": ["It separates clusters better",
+                     "It is a stable, invertible linear mapping that applies to new data, whereas t-SNE coordinates have no meaning outside the plot",
+                     "It is stochastic",
+                     "It preserves cluster density"],
+         "answer": 1,
+         "why": "t-SNE and UMAP are visualisation tools. They answer 'does my data separate at all' well, and make poor preprocessing steps."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 16. Feature and permutation importance
+# ---------------------------------------------------------------------------
+topic(
+    "permutation_importance",
+    "Feature and Permutation Importance",
+    "Interpretation",
+    "Shuffle one column, re-score the model, and see how much it mattered. "
+    "Simple, model-agnostic, and easy to misread.",
+    _svg(_axes()
+         + _box(26, 30, 14, 36, fill=S, stroke=A, sw=1.4)
+         + _box(50, 42, 14, 24, fill=S, stroke=A, sw=1.4)
+         + _box(74, 58, 14, 8, fill=S, stroke=B, sw=1.4)
+         + _box(98, 56, 14, 10, fill=S, stroke=B, sw=1.4)
+         + _txt(80, 82, "how much each column is worth", M, 7)),
+    {
+        "sim": "importance",
+        "controls": [
+            {"key": "repeats", "label": "Shuffles per feature", "type": "range",
+             "min": 1, "max": 12, "step": 1, "value": 5},
+            {"key": "seed", "label": "Shuffle seed", "type": "range",
+             "min": 1, "max": 40, "step": 1, "value": 12},
+        ],
+    },
+    [
+        "Permutation importance breaks the link between one column and the "
+        "target by shuffling it, then measures the damage.",
+        "It works on any fitted model, because it only needs predictions.",
+        "Measure it on <strong>held-out</strong> data. On training data it "
+        "reports what the model memorised.",
+        "Correlated features hide each other: shuffle one and the model leans on "
+        "its twin, so the measured drop is far below what that column is worth.",
+    ],
+    """
+title: Feature and Permutation Importance
+intro: The most useful model-agnostic importance measure, and the specific way it lies to you.
+
+## The idea
+
+If a feature matters, destroying the information in it should hurt the model. So:
+
+1. Score the model on a dataset.
+2. Shuffle one column, breaking its relationship with the target while leaving
+   its distribution untouched.
+3. Score again.
+4. The drop is that feature's importance.
+5. Repeat for every column.
+
+Shuffling rather than deleting is the important detail. Deleting a column means
+retraining, which gives a different model and answers a different question.
+Shuffling keeps the same fitted model and the same input shape, so the only thing
+that changed is whether that column carries signal.
+
+Because it needs nothing but predictions, it works on any model at all &mdash;
+linear, forest, gradient-boosted, neural network.
+
+## Reading the chart
+
+Four features are fed to a logistic model: a strong signal, a weak one, pure
+noise, and a **near-duplicate copy of the strong signal**.
+
+`noise` scores about zero, which is correct and reassuring.
+
+Now compare `signal` with `copy of signal`. They carry the same information
+&mdash; either would serve the model about equally well on its own &mdash; and
+`copy of signal` scores roughly half what `signal` does, landing at about the
+level of `weak`, a feature that is genuinely much less informative.
+
+## Why: correlated features hide each other
+
+The reason is exactly the procedure. The model here is a small random forest,
+and each split considers a random subset of the features, so some trees split on
+`signal` and others on its copy. Shuffling the copy leaves all the trees that
+used `signal` working perfectly, so the measured drop is much smaller than the
+column's actual worth.
+
+The metric is measured **one column at a time**, and with correlated features
+that is the wrong unit of analysis. The honest reading is not "the copy does not
+matter" but "either one largely substitutes for the other, and this method cannot
+say that".
+
+The size of the effect depends on the model. A linear model given two duplicate
+columns splits its weight between them, so shuffling one still destroys half the
+contribution and both score moderately high. A forest can substitute one for the
+other outright, which is why the discount is so visible here &mdash; and why the
+trap is worst on exactly the tree models where importance charts are most often
+drawn.
+
+This is the single most important thing to know about permutation importance,
+because the failure is silent and the chart looks perfectly reasonable.
+
+What to do about it:
+
+**Cluster correlated features first** and permute whole groups together. The
+group's importance is then meaningful even though its members' are not.
+
+**Check the correlation matrix** before reading any importance chart.
+
+**Use conditional permutation**, which shuffles within strata of the correlated
+features rather than globally.
+
+## Held-out data, not training data
+
+Permutation importance computed on the training set measures what the model
+*used to fit*, including what it memorised. A feature the model overfitted to
+will look highly important because shuffling it destroys memorised training
+performance.
+
+On held-out data the same procedure measures what the feature contributes to
+performance that generalises. That is almost always the question, and it is why
+scikit-learn's documentation is emphatic about it.
+
+Comparing the two is diagnostic in itself: a feature that is very important on
+training data and unimportant on validation data is one the model overfitted.
+
+## Against a tree's built-in importance
+
+Random forests and gradient-boosted trees expose `feature_importances_`, usually
+mean decrease in impurity. It is free, since it is accumulated during training,
+and it has a known bias: it **favours high-cardinality features**. A column with
+many distinct values offers more possible split points, so it is chosen more
+often and accumulates more credit &mdash; even a random ID column will score
+above a useful binary flag.
+
+Permutation importance does not have that bias, costs a re-scoring pass per
+feature, and applies to models that have no built-in measure at all.
+
+## Repeats
+
+Shuffling is random, so a single shuffle is a noisy estimate. The repeats control
+above averages several, and the wobble as you change the seed at one repeat
+shrinks visibly as you raise it. Five to ten is typical.
+
+## Where it goes wrong
+
+**Reading it on correlated features.** The central trap.
+
+**Computing it on training data.** Measures memorisation.
+
+**Treating it as causal.** It says the model used a feature, not that the feature
+causes the outcome.
+
+**Comparing across models.** Importance is relative to one fitted model. A
+different model can rank the same features differently and both be right about
+themselves.
+""",
+    [
+        {"q": "Why shuffle a column rather than delete it?",
+         "options": ["Deleting is slower",
+                     "Deleting requires retraining, which gives a different model and answers a different question",
+                     "Shuffling preserves the correlation with other features",
+                     "Deleting breaks the input shape"],
+         "answer": 1,
+         "why": "Shuffling keeps the same fitted model and the same distribution, so the only thing that changed is whether that column still carries signal."},
+        {"q": "Two near-identical informative features both show low importance. Why?",
+         "options": ["They cancel each other out",
+                     "Shuffling one leaves the other intact, so the model uses the twin and loses almost no accuracy",
+                     "The model ignored both",
+                     "Their importance was divided between them"],
+         "answer": 1,
+         "why": "The metric is measured one column at a time. The honest reading is 'either one suffices', which this method cannot express - permute correlated groups together instead."},
+        {"q": "What bias does a tree's built-in impurity importance have?",
+         "options": ["It favours features used early in the tree",
+                     "It favours high-cardinality features, because more distinct values mean more split points to be chosen at",
+                     "It favours binary features",
+                     "It ignores correlated features"],
+         "answer": 1,
+         "why": "A random ID column can score above a useful binary flag. Permutation importance does not have this bias, at the cost of a re-scoring pass per feature."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 17. Partial dependence and SHAP
+# ---------------------------------------------------------------------------
+topic(
+    "partial_dependence_and_shap",
+    "Partial Dependence, ICE and SHAP",
+    "Interpretation",
+    "What the model does as one feature moves, and why the average of many "
+    "individuals can describe none of them.",
+    _svg(_axes()
+         + _line(24, 62, 140, 30, M, 1) + _line(24, 34, 140, 62, M, 1)
+         + _line(24, 48, 140, 46, A, 2.2)
+         + _txt(80, 82, "the average of two opposites", M, 7)),
+    {
+        "sim": "pdp",
+        "controls": [
+            {"key": "interaction", "label": "Interaction between x and the group",
+             "type": "select", "value": "on",
+             "options": [{"value": "on", "label": "On - effect reverses by group"},
+                         {"value": "", "label": "Off - same effect for everyone"}]},
+            {"key": "showIce", "label": "Show individual curves",
+             "type": "select", "value": "yes",
+             "options": [{"value": "yes", "label": "Show ICE curves"},
+                         {"value": "", "label": "Partial dependence only"}]},
+        ],
+    },
+    [
+        "A <strong>partial dependence</strong> curve sweeps one feature across "
+        "its range, holding the others as they are, and averages the predictions.",
+        "An <strong>ICE</strong> curve does the same for a single row, without "
+        "averaging. One line per individual.",
+        "When the effect of a feature differs by subgroup, the average can be "
+        "flat while no individual is.",
+        "<strong>SHAP</strong> answers a different question: how much did each "
+        "feature contribute to <em>this one</em> prediction.",
+    ],
+    """
+title: Partial Dependence, ICE and SHAP
+intro: Three ways to ask what a model is doing, and the trap in the most popular one.
+
+## Partial dependence
+
+A partial dependence plot answers: as this feature moves across its range, what
+happens to the prediction on average?
+
+The procedure is mechanical. Take the dataset. Set the feature to some value for
+*every* row, leaving all other columns untouched. Predict, and average. Repeat
+across the feature's range, and plot.
+
+It is model-agnostic and easy to read, which is why it is everywhere.
+
+## The trap
+
+Leave the interaction control **on** and look at the thick line. It is nearly
+flat, and the readout gives its slope as close to zero. Read on its own, it says
+this feature does not matter.
+
+Now the ICE curves underneath tell a completely different story. Every individual
+curve has a steep slope &mdash; the feature matters enormously to every single
+row. It is just that it slopes **up** for one group and **down** for the other,
+and averaging them cancels.
+
+This is not a contrived case. Any feature whose effect reverses by subgroup
+behaves like this: a treatment that helps one population and harms another, a
+price change that attracts some customers and repels others.
+
+**A flat partial dependence curve does not mean the feature is unimportant.** It
+means the average effect is zero, which is a much weaker statement.
+
+Switch the interaction off and the curves stack into a single shape. Now the
+average describes each individual well, and the partial dependence line is
+trustworthy.
+
+## ICE curves
+
+**Individual Conditional Expectation** curves are partial dependence without the
+averaging: one line per row, showing what the model predicts for *that* row as
+the feature sweeps.
+
+They cost nothing extra, since partial dependence computes them and then throws
+them away. Plotting them is the standard defence against the trap above, and the
+diagnostic is simple: if the ICE curves are parallel, the partial dependence line
+is a fair summary. If they fan out or cross, it is not, and there is an
+interaction worth finding.
+
+## The other assumption
+
+Partial dependence sets a feature to a value for every row regardless of whether
+that combination is possible. Sweeping `age` from 18 to 80 across a dataset
+creates rows with age 18 and forty years of work experience.
+
+The model is asked to predict for combinations that never occur, and its answer
+there is extrapolation with nothing to anchor it. When features are strongly
+correlated, part of a partial dependence curve is describing regions of input
+space the model has never seen.
+
+**Accumulated Local Effects** plots address this by only varying a feature within
+the range of values that actually co-occur with the other features' values.
+
+## SHAP
+
+SHAP answers a different question. Partial dependence and ICE describe the model
+across a range; SHAP explains **one prediction**.
+
+For a given row, it assigns each feature a number saying how much that feature
+pushed the prediction away from the base value &mdash; the average prediction
+over the dataset. The numbers sum exactly to the difference:
+
+```
+prediction  =  base value  +  sum of every feature's SHAP value
+```
+
+That additivity is what makes it useful for an individual explanation: it
+accounts for the whole prediction, with nothing unattributed.
+
+The values come from Shapley values in cooperative game theory, which distribute
+credit for a joint outcome fairly among contributors. Computing them exactly
+requires evaluating every subset of features, which is exponential, so
+implementations approximate &mdash; `TreeSHAP` exactly and quickly for trees,
+`KernelSHAP` by sampling for anything else.
+
+| | Answers | Scope |
+|---|---|---|
+| Partial dependence | how the prediction moves with a feature, on average | global |
+| ICE | the same, per row | per row |
+| SHAP | how much each feature contributed here | one prediction |
+| [Permutation importance](permutation_importance.html) | how much accuracy depends on a feature | global |
+
+## Where it goes wrong
+
+**Reading a flat PD curve as "unimportant".** Plot the ICE curves.
+
+**Ignoring correlated features.** Part of the curve may be extrapolation.
+
+**Treating SHAP as causal.** It attributes a prediction, not an outcome. A model
+that uses postcode as a proxy for income will show postcode contributing, and
+that is a fact about the model.
+
+**Averaging SHAP values into a global importance and stopping there.** The mean
+absolute SHAP value is a reasonable global summary, and it discards the direction
+and the interactions that made SHAP worth computing.
+""",
+    [
+        {"q": "A partial dependence curve is flat. What can you conclude?",
+         "options": ["The feature does not matter",
+                     "Only that the average effect is near zero - it may matter enormously in opposite directions by subgroup",
+                     "The model is underfitted",
+                     "The feature is correlated with another"],
+         "answer": 1,
+         "why": "Plotting ICE curves settles it: if they are parallel the average is a fair summary; if they fan out or cross, there is an interaction the average cancels."},
+        {"q": "What does the additivity of SHAP values give you?",
+         "options": ["Faster computation",
+                     "The values sum exactly to the gap between the base value and this prediction, so nothing is unattributed",
+                     "Independence from the model type",
+                     "Causal interpretation"],
+         "answer": 1,
+         "why": "That is what makes it usable as an explanation of a single prediction. Exact computation is exponential, so TreeSHAP and KernelSHAP approximate it."},
+        {"q": "Why can part of a partial dependence curve be untrustworthy when features are correlated?",
+         "options": ["The averaging is biased",
+                     "It sets the feature to values that never co-occur with the other columns, so the model is extrapolating",
+                     "The curve becomes non-monotonic",
+                     "ICE curves cannot be computed"],
+         "answer": 1,
+         "why": "Sweeping age across every row creates people aged 18 with forty years of experience. ALE plots avoid this by varying a feature only within ranges that actually occur."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 18. Probability calibration
+# ---------------------------------------------------------------------------
+topic(
+    "probability_calibration",
+    "Probability Calibration",
+    "Evaluation",
+    "A model that says 0.8 should be right 80% of the time. Most are not, and "
+    "AUC will never tell you.",
+    _svg(_axes() + _line(22, 66, 142, 22, B, 1.2, "4 3")
+         + '<path d="M22 66 C 60 60, 78 34, 142 22" fill="none" stroke="%s" stroke-width="2"/>' % A
+         + _txt(96, 58, "over-confident", M, 7)),
+    {
+        "sim": "calibration",
+        "controls": [
+            {"key": "temperature", "label": "Temperature", "type": "range",
+             "min": 0.4, "max": 2.2, "step": 0.05, "value": 0.6},
+        ],
+    },
+    [
+        "A <strong>reliability diagram</strong> bins predictions by confidence "
+        "and plots the observed frequency in each bin.",
+        "Perfect calibration is the diagonal. Below it means over-confident; "
+        "above it means under-confident.",
+        "<strong>ECE</strong> is the average gap between confidence and observed "
+        "frequency, weighted by bin size.",
+        "Calibration and ranking are independent. The slider changes calibration "
+        "dramatically and leaves AUC untouched.",
+    ],
+    """
+title: Probability Calibration
+intro: Whether a model's confidence means anything, and why every ranking metric is blind to it.
+
+## Two different questions
+
+**Discrimination** asks whether the model ranks positives above negatives. AUC
+and [ROC](precision_recall_vs_roc.html) measure this.
+
+**Calibration** asks whether the numbers mean what they say. Of all the cases
+where the model said 0.8, were about 80% actually positive?
+
+A model can be excellent at one and terrible at the other, and this is not an
+edge case &mdash; it is the normal situation.
+
+## The slider proves it
+
+Drag the temperature control and watch the curve deform. That control performs
+**temperature scaling**: it divides the logit by a constant before the sigmoid.
+Dividing by a number less than one sharpens every score toward 0 or 1; dividing
+by a number greater than one flattens them toward 0.5.
+
+Crucially, this is a **monotonic** transformation. It never changes the order of
+any two predictions. Every ranking metric &mdash; AUC, average precision,
+anything based on ordering &mdash; is **identical at every setting of that
+slider**, while the reliability curve swings from badly over-confident to badly
+under-confident.
+
+Which is the point. If you only ever look at AUC, you have no information about
+calibration at all.
+
+## Reading the diagram
+
+Predictions are binned by confidence, and each bin plots mean confidence against
+observed frequency.
+
+**On the diagonal**: calibrated.
+
+**Below the diagonal**: over-confident. The model says 0.9 and is right 70% of
+the time. This is the common failure, and the damaging one.
+
+**Above the diagonal**: under-confident. The model hedges when it should not.
+
+**ECE** &mdash; expected calibration error &mdash; is the average vertical
+distance, weighted by how many points fall in each bin. It is the number in the
+readout, and it is a summary that can hide compensating errors: a curve that is
+above the diagonal in one region and below in another can report a small ECE.
+Look at the curve, not only the number.
+
+## Why models come out miscalibrated
+
+**Modern neural networks are over-confident**, and increasingly so as they get
+larger. Training to minimise cross-entropy on data it can fit perfectly pushes
+outputs toward 0 and 1 long after the accuracy has stopped improving.
+
+**Support vector machines** produce distances from a hyperplane, not
+probabilities, and passing them through a sigmoid does not make them
+probabilities.
+
+**Naive Bayes** is famously over-confident because its independence assumption
+multiplies correlated evidence as though it were independent.
+
+**Random forests** tend to be under-confident at the extremes, because averaging
+many trees pulls predictions toward the middle.
+
+Logistic regression, fitted on well-specified features, is usually close to
+calibrated &mdash; it optimises exactly this.
+
+## Fixing it
+
+All three methods fit a correction on a **held-out** set, never on the training
+data.
+
+**Platt scaling.** Fit a logistic regression to map scores to probabilities. One
+or two parameters, works on small validation sets, assumes the distortion is
+sigmoid-shaped.
+
+**Temperature scaling.** The single-parameter version, and the standard for
+neural networks. Because it changes no rankings, accuracy and AUC are guaranteed
+untouched &mdash; a rare free lunch.
+
+**Isotonic regression.** Fits any monotonic mapping. More flexible, and needs
+considerably more data or it overfits the validation set.
+
+## When it matters
+
+**Whenever a probability feeds a decision with costs.** Expected value is
+probability times payoff, so a wrong probability is a wrong decision even when
+the ranking is perfect.
+
+**Medical and risk contexts**, where "30% chance" is communicated to a person.
+
+**When scores are combined** across models or over time.
+
+**When a threshold is set from a target rate.** [Choosing a
+threshold](threshold_tuning.html) from calibrated probabilities gives the rate
+you asked for; from uncalibrated scores it does not.
+
+If all you do is rank &mdash; show the top 100 results &mdash; calibration is
+irrelevant.
+
+## Where it goes wrong
+
+**Calibrating on the training set.** It will look perfect and generalise
+nothing.
+
+**Isotonic regression on a small validation set.** It overfits.
+
+**Assuming a good AUC implies good probabilities.** The slider on this page
+exists to disprove exactly that.
+
+**Recalibrating without re-checking after data drift.** A calibration fitted last
+year describes last year's distribution.
+""",
+    [
+        {"q": "Why is AUC unchanged as the temperature slider moves?",
+         "options": ["AUC is insensitive to class imbalance",
+                     "Temperature scaling is monotonic, so it never changes the order of any two predictions",
+                     "The model is retrained each time",
+                     "AUC uses only the top predictions"],
+         "answer": 1,
+         "why": "Every ranking metric is identical at every setting, while calibration swings from badly over-confident to badly under-confident. Looking only at AUC tells you nothing about calibration."},
+        {"q": "A reliability curve sits below the diagonal. The model is:",
+         "options": ["Under-confident", "Over-confident", "Well calibrated", "Poorly ranked"],
+         "answer": 1,
+         "why": "It says 0.9 and is right 70% of the time. This is the common failure mode for modern neural networks, and the damaging one when probabilities feed decisions."},
+        {"q": "When does calibration not matter?",
+         "options": ["When the model is a neural network",
+                     "When the output is only used to rank - showing the top 100 results, say",
+                     "When the classes are balanced",
+                     "When AUC is high"],
+         "answer": 1,
+         "why": "It matters whenever a probability feeds a decision with costs, because expected value is probability times payoff, so a wrong probability is a wrong decision."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 19. Isolation Forest
+# ---------------------------------------------------------------------------
+topic(
+    "isolation_forest",
+    "Isolation Forest",
+    "Anomaly Detection",
+    "Anomalies are easy to cut off from everything else. Count the cuts, and "
+    "you have an anomaly score without ever modelling normal.",
+    _svg(_axes()
+         + "".join(_dot(66 + (i % 5) * 6, 34 + (i // 5) * 6, M) for i in range(20))
+         + _dot(32, 26, A, 4) + _dot(134, 62, A, 4)
+         + _line(50, 18, 50, 70, B, 1, "3 3") + _line(20, 44, 148, 44, B, 1, "3 3")
+         + _txt(80, 82, "few cuts to isolate", M, 7)),
+    {
+        "sim": "isoforest",
+        "controls": [
+            {"key": "trees", "label": "Trees", "type": "range",
+             "min": 5, "max": 120, "step": 5, "value": 60},
+            {"key": "sample", "label": "Points sampled per tree", "type": "range",
+             "min": 16, "max": 128, "step": 8, "value": 64},
+            {"key": "threshold", "label": "Score threshold", "type": "range",
+             "min": 0.40, "max": 0.72, "step": 0.01, "value": 0.62},
+            {"key": "seed", "label": "Forest seed", "type": "range",
+             "min": 1, "max": 40, "step": 1, "value": 3},
+        ],
+    },
+    [
+        "Split the data on a random feature at a random value, repeatedly, until "
+        "each point is alone.",
+        "Points in sparse regions get cut off in a few splits. Points in dense "
+        "regions need many.",
+        "The score is the average path length across many trees, normalised. "
+        "<strong>Short path, high score.</strong>",
+        "It never learns what normal looks like &mdash; only what is easy to "
+        "separate, which is why it needs no labels.",
+    ],
+    """
+title: Isolation Forest
+intro: Anomaly detection that looks for what is easy to cut off, rather than modelling what is normal.
+
+## Inverting the usual approach
+
+Most anomaly detection builds a model of normal &mdash; fit a distribution,
+estimate a density, learn a boundary &mdash; and flags whatever falls outside.
+That is hard work, and in high dimensions density estimation is very hard work.
+
+Isolation Forest asks a different question: **how much effort does it take to
+separate this point from everything else?**
+
+Pick a random feature, pick a random split value between its minimum and maximum,
+and divide the data. Repeat on each half until every point sits alone.
+
+A point far from the rest gets cut off almost immediately &mdash; a single random
+split has a good chance of landing between it and the crowd. A point in the
+middle of a dense cluster survives many splits, because every cut has to be
+placed among tightly packed neighbours.
+
+**Path length is the anomaly measure**, and no model of normality was ever built.
+
+## The score
+
+The raw quantity is the average path length across the forest. It is normalised
+against the expected path length in a random binary tree of the same size,
+because deeper trees naturally have longer paths:
+
+```
+score = 2 ^ ( -avg_path / c(n) )
+```
+
+The direction catches people out. A **short** path means easy to isolate, which
+means **anomalous**, which means a **high** score. Around 0.5 is unremarkable;
+above about 0.6 on this page is worth a look.
+
+Drag the threshold and watch the count. The readout gives the range of scores
+present, so you can see where the population actually sits rather than guessing.
+
+## Subsampling, and why it helps
+
+Each tree is built from a small random subsample &mdash; 256 points by default in
+most libraries &mdash; and this is not only for speed.
+
+With the full dataset, a cluster of anomalies can be dense enough to look normal
+locally: its members shield each other and need several splits to separate. Take
+a small sample and those anomalies are usually alone in it, so they are isolated
+immediately. Subsampling reduces *swamping* (normal points looking anomalous
+because the data is crowded) and *masking* (anomalies hiding one another).
+
+The trees control shows the other half of the picture. At five trees the flagged
+set jitters as you change the seed; at sixty it is stable. Path length from one
+random tree is nearly meaningless, and the average over many is not.
+
+**Each tree is built from a sample and then used to score every point.** Building
+and scoring on the same subsample is a mistake worth naming: a point missing from
+a tree contributes nothing that round, its average path comes out short, and it
+looks like an outlier. Everything ends up flagged.
+
+## What it is good at
+
+**Speed.** Linear in the number of points, and the trees are shallow. It is one
+of the few anomaly detectors that is genuinely cheap on large data.
+
+**High dimensions.** No distance metric, so it avoids the concentration problem
+that undoes k-nearest-neighbour approaches.
+
+**No labels.** Entirely unsupervised.
+
+**No distributional assumption.** Unlike a Gaussian-based detector, it does not
+care what shape normal is.
+
+## What it is bad at
+
+**Local anomalies.** It finds points that are globally easy to separate. A point
+sitting in a *low-density gap between two dense clusters* may be perfectly normal
+globally and clearly anomalous locally. **Local Outlier Factor** compares each
+point's density to its neighbours' and catches these.
+
+**Axis-aligned splits.** Cuts are perpendicular to the axes, which produces
+artefacts along diagonals in correlated data. **Extended Isolation Forest** uses
+random hyperplanes instead.
+
+**Irrelevant features.** Random feature selection wastes splits on columns that
+carry nothing.
+
+**The contamination parameter.** Libraries ask what fraction of the data is
+anomalous in order to place a threshold, and if you knew that you would be much
+further along. Prefer to look at the score distribution and choose a cut, which
+is what the slider here makes you do.
+
+## Where it goes wrong
+
+**Reading the score backwards.** High means anomalous.
+
+**Too few trees.** The estimate is noisy; check by changing the seed.
+
+**Trusting `contamination`.** It is a guess presented as a parameter.
+
+**Expecting it to find local anomalies.** Use LOF for those.
+""",
+    [
+        {"q": "Why does a short average path length mean a point is anomalous?",
+         "options": ["It is close to the root of the tree by chance",
+                     "A point far from the rest is separated by a random split quickly, while a point in a dense region needs many splits",
+                     "Short paths indicate low variance",
+                     "The tree is pruned around outliers"],
+         "answer": 1,
+         "why": "Path length is the effort required to isolate the point. No model of normality is ever built - the score falls out of how easy separation is."},
+        {"q": "Why is each tree built from a small subsample?",
+         "options": ["Only for speed",
+                     "It also reduces masking - in the full data a cluster of anomalies can shield its own members and look normal",
+                     "To avoid overfitting the threshold",
+                     "Because trees cannot handle large inputs"],
+         "answer": 1,
+         "why": "In a small sample those anomalies are usually alone and isolated immediately. It reduces swamping too - normal points looking anomalous because the data is crowded."},
+        {"q": "Which anomaly does Isolation Forest tend to miss?",
+         "options": ["A point far outside the whole dataset",
+                     "A point in a low-density gap between two dense clusters, which is normal globally but anomalous locally",
+                     "A duplicate row",
+                     "A point with an extreme value in one feature"],
+         "answer": 1,
+         "why": "It finds points that are globally easy to separate. Local Outlier Factor compares each point's density with its neighbours' and catches these instead."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 20. Stacking and voting
+# ---------------------------------------------------------------------------
+topic(
+    "stacking_and_voting",
+    "Stacking and Voting Ensembles",
+    "Ensembles",
+    "Combining different models rather than many copies of one, and the case "
+    "where a majority vote makes things worse.",
+    _svg(_box(12, 22, 34, 16, fill=S) + _box(12, 44, 34, 16, fill=S)
+         + _box(12, 66, 34, 12, fill=S)
+         + _line(46, 30, 74, 46, B, 1) + _line(46, 52, 74, 48, B, 1)
+         + _line(46, 72, 74, 52, B, 1)
+         + _box(78, 38, 40, 22, fill=S, stroke=A) + _txt(98, 52, "combiner", A, 7)
+         + _txt(80, 88, "weights, not votes", M, 7)),
+    {
+        "sim": "ensembles",
+        "controls": [
+            {"key": "t1", "label": "Stump on a: threshold", "type": "range",
+             "min": -1.5, "max": 1.5, "step": 0.1, "value": 0.9},
+            {"key": "t2", "label": "Stump on b: threshold", "type": "range",
+             "min": -1.5, "max": 1.5, "step": 0.1, "value": 0.9},
+            {"key": "t3", "label": "Radius rule: threshold", "type": "range",
+             "min": 0.6, "max": 3.0, "step": 0.1, "value": 1.6},
+        ],
+    },
+    [
+        "<strong>Voting</strong> combines predictions by majority, or by "
+        "averaging probabilities. Every model counts equally.",
+        "<strong>Stacking</strong> trains a second model &mdash; the "
+        "meta-learner &mdash; on the base models' predictions, so it can weight them.",
+        "Bagging and boosting combine many copies of <em>one</em> model. Voting "
+        "and stacking combine <em>different</em> models.",
+        "An ensemble helps when the members make <strong>different mistakes</strong>. "
+        "Three models that fail on the same rows gain nothing.",
+    ],
+    """
+title: Stacking and Voting Ensembles
+intro: Combining unlike models, when it helps, and a live demonstration of it hurting.
+
+## Different from bagging and boosting
+
+[Bagging](random_forest.html) and [boosting](gradient_boosting.html) build many
+copies of one kind of model &mdash; hundreds of trees &mdash; and combine them.
+
+Voting and stacking combine models of *different* kinds: a logistic regression, a
+gradient-boosted tree and a neural network, say. The hope is that models with
+different inductive biases fail on different rows, so their errors partly cancel.
+
+That hope is a condition, not a guarantee, and this page is largely about the
+condition failing.
+
+## Voting
+
+**Hard voting** takes the majority label. **Soft voting** averages predicted
+probabilities and thresholds the mean, which is generally better because it uses
+confidence rather than discarding it &mdash; and which requires
+[calibrated](probability_calibration.html) probabilities to be meaningful.
+
+Every member counts equally. That is the strength when the members are comparable
+and the weakness when they are not.
+
+Look at the readout with the default settings. Three learners score roughly
+62%, 66% and 90%, and the **majority vote scores about 77% &mdash; worse than the
+best member alone.** Two weak learners outvote a strong one whenever they agree,
+and they agree often enough to drag the result down.
+
+This is not a contrived arrangement. It is what happens whenever an ensemble is
+assembled without checking whether the members are of comparable quality, and it
+is the reason "just ensemble it" is bad advice.
+
+## Stacking
+
+Stacking replaces the fixed rule with a learned one. Train the base models, take
+their predictions as features, and fit a second model &mdash; the **meta-learner**
+&mdash; on those.
+
+The meta-learner discovers what a vote cannot: which model to trust, and when.
+The learned weights are in the readout, and the strong learner attracts most of
+the weight while a weak one can go slightly negative &mdash; meaning the
+meta-learner has found that model to be worse than uninformative in some regions.
+
+With the defaults, stacking matches the best single learner rather than beating
+it. That is an honest and common outcome, and it is still a gain over the vote:
+stacking recovered the best model automatically, where voting destroyed it.
+
+Move the thresholds so that the three learners are closer in quality, and the
+picture changes &mdash; the vote catches up, because its assumption is finally
+true.
+
+## Getting stacking right
+
+The essential detail is how the meta-learner's training data is produced.
+
+Training the base models and then feeding their predictions **on the same data**
+to the meta-learner leaks badly. A model that overfits its training set produces
+suspiciously good predictions there, so the meta-learner learns to trust the most
+overfitted member.
+
+The fix is **cross-validated predictions**: split the data into folds, and for
+each fold predict with base models trained on the other folds. Every prediction
+the meta-learner sees is then out-of-sample. This is what scikit-learn's
+`StackingClassifier` does, and it is why stacking costs roughly *k* times the
+training of its members.
+
+A second convention: keep the meta-learner **simple**. Logistic regression is the
+standard choice. It has few base predictions to work with, and a flexible
+meta-learner overfits them readily.
+
+## When an ensemble is worth it
+
+**Members must be comparable in quality.** Otherwise voting hurts, as above.
+
+**Members must make different mistakes.** Three models that fail on the same rows
+combine into one model that fails on those rows. Checking the correlation of
+their errors is the diagnostic, and it is worth doing before building anything.
+
+**The gain must justify the cost.** An ensemble multiplies training time,
+inference time, memory and the number of things that can break in production. A
+one-point gain on a leaderboard is worth it; a one-point gain in a service
+usually is not.
+
+## Where it goes wrong
+
+**Ensembling a strong model with weak ones by vote.** Demonstrated above.
+
+**Fitting the meta-learner on in-sample predictions.** It learns to trust the
+most overfitted base model.
+
+**A complex meta-learner.** Few features, plenty of opportunity to overfit.
+
+**Assuming diversity.** Two gradient-boosted models with different seeds are not
+diverse; check whether their errors actually differ.
+""",
+    [
+        {"q": "Why can a majority vote score worse than its best member?",
+         "options": ["The vote discards probabilities",
+                     "Every member counts equally, so two weak learners can outvote a strong one whenever they agree",
+                     "Voting requires an odd number of models",
+                     "The members were not calibrated"],
+         "answer": 1,
+         "why": "It is what happens whenever an ensemble is assembled without checking the members are comparable in quality - which is why 'just ensemble it' is bad advice."},
+        {"q": "Why must the meta-learner be trained on cross-validated predictions?",
+         "options": ["To save computation",
+                     "In-sample predictions look suspiciously good for an overfitted base model, so the meta-learner learns to trust it",
+                     "To balance the classes",
+                     "Because base models need to be retrained anyway"],
+         "answer": 1,
+         "why": "Every prediction the meta-learner sees has to be out-of-sample. It is why stacking costs roughly k times the training of its members."},
+        {"q": "What condition must hold for an ensemble to help at all?",
+         "options": ["The members must be the same type of model",
+                     "The members must make different mistakes",
+                     "There must be an odd number of members",
+                     "The members must be calibrated"],
+         "answer": 1,
+         "why": "Three models that fail on the same rows combine into one model that fails on those rows. Checking the correlation of their errors is the diagnostic to run first."},
+    ],
+)
+
 CHECKS = {"machine_learning/%s.html" % t["slug"]: {"check": t["check"]} for t in TOPICS}

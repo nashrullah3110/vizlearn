@@ -1996,6 +1996,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Dial bias and variance up and down, resample the data, and watch a stable underfit turn into an unstable overfit."
  },
  {
+  "title": "Choosing k: Elbow and Silhouette",
+  "path": "machine_learning/choosing_k.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
+ },
+ {
   "title": "Confusion Matrix Analysis",
   "path": "machine_learning/confusion_matrix.html",
   "category": "Machine Learning",
@@ -2010,6 +2018,14 @@ window.VIZLEARN_MODULES = [
   "topic": "ml",
   "icon": "brain",
   "desc": "Measure similarity by angle instead of distance. Drag two vectors apart and watch the cosine similarity score respond in real time."
+ },
+ {
+  "title": "DBSCAN: Density-Based Clustering",
+  "path": "machine_learning/dbscan_clustering.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
  },
  {
   "title": "Data Leakage",
@@ -2038,6 +2054,22 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Feature Scaling",
   "path": "machine_learning/feature_scaling.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
+ },
+ {
+  "title": "Feature and Permutation Importance",
+  "path": "machine_learning/permutation_importance.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
+ },
+ {
+  "title": "Gaussian Mixture Models",
+  "path": "machine_learning/gaussian_mixture_models.html",
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
@@ -2074,6 +2106,22 @@ window.VIZLEARN_MODULES = [
   "topic": "ml",
   "icon": "brain",
   "desc": "Compare a single hard label against a probability distribution, and see what a model loses when forced to pick one winner."
+ },
+ {
+  "title": "Hierarchical Clustering and Dendrograms",
+  "path": "machine_learning/hierarchical_clustering.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
+ },
+ {
+  "title": "Isolation Forest",
+  "path": "machine_learning/isolation_forest.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
  },
  {
   "title": "K-Fold Cross Validation",
@@ -2172,6 +2220,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Partial Dependence, ICE and SHAP",
+  "path": "machine_learning/partial_dependence_and_shap.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
+ },
+ {
   "title": "Pipelines",
   "path": "machine_learning/ml_pipelines.html",
   "category": "Machine Learning",
@@ -2202,6 +2258,14 @@ window.VIZLEARN_MODULES = [
   "topic": "ml",
   "icon": "brain",
   "desc": "Rotate a line through a point cloud and watch the variance it captures peak on exactly one angle. That angle is PC1, and the rest is what you lose."
+ },
+ {
+  "title": "Probability Calibration",
+  "path": "machine_learning/probability_calibration.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
  },
  {
   "title": "ROC Curve and AUC",
@@ -2236,6 +2300,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Slide a window across a time series to turn a raw sequence into supervised training rows of features and targets."
  },
  {
+  "title": "Stacking and Voting Ensembles",
+  "path": "machine_learning/stacking_and_voting.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
+ },
+ {
   "title": "Support Vector Machines",
   "path": "machine_learning/svm.html",
   "category": "Machine Learning",
@@ -2266,6 +2338,14 @@ window.VIZLEARN_MODULES = [
   "topic": "ml",
   "icon": "brain",
   "desc": "Try resampling, class weights and threshold tuning on an imbalanced dataset and watch minority-class recall respond."
+ },
+ {
+  "title": "t-SNE and UMAP beside PCA",
+  "path": "machine_learning/tsne_and_umap.html",
+  "category": "Machine Learning",
+  "topic": "ml",
+  "icon": "brain",
+  "desc": ""
  },
  {
   "title": "A Matrix is a Transformation",

@@ -1,0 +1,100 @@
+title: Isolation Forest
+intro: Anomaly detection that looks for what is easy to cut off, rather than modelling what is normal.
+
+## Inverting the usual approach
+
+Most anomaly detection builds a model of normal &mdash; fit a distribution,
+estimate a density, learn a boundary &mdash; and flags whatever falls outside.
+That is hard work, and in high dimensions density estimation is very hard work.
+
+Isolation Forest asks a different question: **how much effort does it take to
+separate this point from everything else?**
+
+Pick a random feature, pick a random split value between its minimum and maximum,
+and divide the data. Repeat on each half until every point sits alone.
+
+A point far from the rest gets cut off almost immediately &mdash; a single random
+split has a good chance of landing between it and the crowd. A point in the
+middle of a dense cluster survives many splits, because every cut has to be
+placed among tightly packed neighbours.
+
+**Path length is the anomaly measure**, and no model of normality was ever built.
+
+## The score
+
+The raw quantity is the average path length across the forest. It is normalised
+against the expected path length in a random binary tree of the same size,
+because deeper trees naturally have longer paths:
+
+```
+score = 2 ^ ( -avg_path / c(n) )
+```
+
+The direction catches people out. A **short** path means easy to isolate, which
+means **anomalous**, which means a **high** score. Around 0.5 is unremarkable;
+above about 0.6 on this page is worth a look.
+
+Drag the threshold and watch the count. The readout gives the range of scores
+present, so you can see where the population actually sits rather than guessing.
+
+## Subsampling, and why it helps
+
+Each tree is built from a small random subsample &mdash; 256 points by default in
+most libraries &mdash; and this is not only for speed.
+
+With the full dataset, a cluster of anomalies can be dense enough to look normal
+locally: its members shield each other and need several splits to separate. Take
+a small sample and those anomalies are usually alone in it, so they are isolated
+immediately. Subsampling reduces *swamping* (normal points looking anomalous
+because the data is crowded) and *masking* (anomalies hiding one another).
+
+The trees control shows the other half of the picture. At five trees the flagged
+set jitters as you change the seed; at sixty it is stable. Path length from one
+random tree is nearly meaningless, and the average over many is not.
+
+**Each tree is built from a sample and then used to score every point.** Building
+and scoring on the same subsample is a mistake worth naming: a point missing from
+a tree contributes nothing that round, its average path comes out short, and it
+looks like an outlier. Everything ends up flagged.
+
+## What it is good at
+
+**Speed.** Linear in the number of points, and the trees are shallow. It is one
+of the few anomaly detectors that is genuinely cheap on large data.
+
+**High dimensions.** No distance metric, so it avoids the concentration problem
+that undoes k-nearest-neighbour approaches.
+
+**No labels.** Entirely unsupervised.
+
+**No distributional assumption.** Unlike a Gaussian-based detector, it does not
+care what shape normal is.
+
+## What it is bad at
+
+**Local anomalies.** It finds points that are globally easy to separate. A point
+sitting in a *low-density gap between two dense clusters* may be perfectly normal
+globally and clearly anomalous locally. **Local Outlier Factor** compares each
+point's density to its neighbours' and catches these.
+
+**Axis-aligned splits.** Cuts are perpendicular to the axes, which produces
+artefacts along diagonals in correlated data. **Extended Isolation Forest** uses
+random hyperplanes instead.
+
+**Irrelevant features.** Random feature selection wastes splits on columns that
+carry nothing.
+
+**The contamination parameter.** Libraries ask what fraction of the data is
+anomalous in order to place a threshold, and if you knew that you would be much
+further along. Prefer to look at the score distribution and choose a cut, which
+is what the slider here makes you do.
+
+## Where it goes wrong
+
+**Reading the score backwards.** High means anomalous.
+
+**Too few trees.** The estimate is noisy; check by changing the seed.
+
+**Trusting `contamination`.** It is a guess presented as a parameter.
+
+**Expecting it to find local anomalies.** Use LOF for those.

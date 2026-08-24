@@ -1,0 +1,99 @@
+title: Choosing k: Elbow and Silhouette
+intro: Two ways of picking the number of clusters, what each actually measures, and why they disagree.
+
+## Why inertia cannot answer the question
+
+**Inertia** is the sum of squared distances from every point to the centroid of
+its cluster. K-means minimises it directly, so it is the obvious thing to look at.
+
+It is also useless on its own, and the reason is structural: inertia falls at
+every increase in k, always. With k equal to the number of points, every point is
+its own centroid and inertia is exactly zero. Watch the left chart as the spread
+control moves &mdash; the curve descends monotonically no matter what the data
+looks like.
+
+So "choose the k with the lowest inertia" always answers "as many as possible".
+The metric measures how tightly points sit around their centres, not whether the
+grouping is any good.
+
+## The elbow
+
+The elbow method looks for the k where the curve stops falling steeply &mdash;
+where extra clusters stop buying much. On well-separated blobs there is a genuine
+bend at the true number, because up to that point each new cluster splits a real
+group, and after it each new cluster splits a group that was already coherent.
+
+The problems are practical. The bend is judged by eye and different people pick
+different points. Very often, on real data, there simply is no bend &mdash; the
+curve is smooth, and reading an elbow into it is wishful. Raise the spread
+control until the blobs overlap and the bend disappears in front of you.
+
+There is a formalisation, the **kneedle** algorithm, which finds the point of
+maximum curvature. It is better than eyeballing, and it still assumes a knee
+exists.
+
+## The silhouette
+
+The silhouette measures something different: not tightness, but **separation
+relative to tightness**.
+
+For each point, let *a* be its mean distance to the other members of its own
+cluster, and *b* its mean distance to the members of the nearest other cluster.
+The silhouette is:
+
+```
+s = (b - a) / max(a, b)
+```
+
+Near **+1** the point is much closer to its own cluster than to any other. Near
+**0** it sits on a boundary. **Negative** means it is closer to a different
+cluster than to its own &mdash; it is probably misassigned.
+
+Averaging over all points gives one number per k, and unlike inertia it does not
+improve automatically as k grows. Adding clusters eventually forces points close
+to a neighbouring cluster, which drives *b* down and the score with it. So the
+silhouette has a real maximum, and that maximum is a defensible choice.
+
+The right-hand chart shows this. The peak is at the true number of blobs, and it
+is a peak rather than a slope.
+
+The cost is computation: it needs pairwise distances, so O(n&sup2;), against
+inertia's O(n).
+
+## When they disagree
+
+They frequently do, and the disagreement is informative rather than a problem to
+resolve.
+
+Inertia asks *are the clusters tight*. The silhouette asks *are they separated*.
+A dataset can have tight clusters that sit right next to each other, and the two
+metrics will point in different directions.
+
+Switch the data to **Two crescents** and watch both. The silhouette does not
+recover the two crescents either &mdash; because it is still built on distances
+to cluster members, and k-means has not produced the crescents in the first
+place. That is the honest limit of both metrics: they evaluate the clustering
+you gave them, and cannot tell you the algorithm was wrong.
+
+## The answer that is usually right
+
+Neither metric knows what the clusters are for.
+
+If you are segmenting customers so a marketing team can write one message per
+segment, k is roughly how many messages they can write. If you are compressing
+colours, k is the palette size you can afford. If clusters feed a downstream
+model, the number that makes that model best is the number.
+
+Both metrics are worth computing, and the application usually decides.
+
+## Where it goes wrong
+
+**Choosing k by inertia alone.** It will always say "more".
+
+**Seeing an elbow in a smooth curve.** Check whether the bend survives a change
+of scale on the axis.
+
+**Trusting a silhouette on non-spherical clusters.** It is distance-based and
+inherits the same assumption k-means makes.
+
+**Forgetting to scale.** Both metrics are distances.
