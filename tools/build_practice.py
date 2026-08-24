@@ -199,8 +199,8 @@ BODY = """
 
     </main>
 
-    <script src="%(p)sassets/practice-bank.js"></script>
-    <script src="%(p)sassets/practice.js"></script>
+    <script defer src="%(p)sassets/practice-bank.js"></script>
+    <script defer src="%(p)sassets/practice.js"></script>
 """
 
 

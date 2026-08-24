@@ -47,6 +47,7 @@ SHELL = [
     "./assets/vizlearn-cv.js",
     "./assets/vizlearn-dbq.js",
     "./assets/vizlearn-ml.js",
+    "./assets/vizlearn-copy.js",
     "./assets/practice-bank.js",
     "./assets/practice.js",
     "./assets/icons.js",

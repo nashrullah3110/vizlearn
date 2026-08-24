@@ -8,7 +8,7 @@ import re
 import sys
 from collections import Counter
 
-from build_seo import NOINDEX
+from build_seo import NOINDEX, SHARED_SCRIPTS, scripts_for
 from lib_catalog import ROOT, SITE, modules
 from lib_pages import (STATIC_PAGES, TOOL_ORDER, TOOL_PAGES, TOPIC_ORDER,
                        is_static_page, is_topic_page, page_url, topic_rel)
@@ -141,13 +141,25 @@ def main():
             target = os.path.normpath(os.path.join(os.path.dirname(f), href))
             check(os.path.exists(target), "%s: broken asset reference %s" % (rel, href))
 
-        # --- shared runtime wiring (every page, hub included) ---
-        for script in ("assets/modules.js", "assets/search.js", "assets/vizlearn.js",
-                       "assets/vizlearn-lab.js", "assets/vizlearn-state.js",
-                       "assets/vizlearn-pwa.js", "assets/vizlearn-keys.js",
-                       "assets/vizlearn-python.js", "assets/vizlearn-rails.js"):
-            check(s.count('src="%s%s"' % (prefix, script)) == 1,
-                  "%s: expected exactly one <script src> for %s" % (rel, script))
+        # --- shared runtime wiring ---
+        #
+        # This used to assert that every page carried every script. It cannot
+        # any more: build_seo only sends a script to a page whose markup has
+        # the hook it binds to, so a maths article no longer ships the
+        # machine-learning harness. The stronger check is that the page holds
+        # exactly the set build_seo would choose - present when needed, absent
+        # when not, and never twice.
+        for name in [n for n, _ in SHARED_SCRIPTS]:
+            want = 1 if name in scripts_for(s) else 0
+            got = s.count('src="%sassets/%s"' % (prefix, name))
+            check(got == want,
+                  "%s: %s appears %d time(s), expected %d"
+                  % (rel, name, got, want))
+        # Whatever it does load must not block the parser.
+        undeferred = re.findall(
+            r'<script (?!defer)(?![^>]*\basync\b)src="(?:\.\./)*assets/[^"]+"', s)
+        check(not undeferred,
+              "%s: %d shared script(s) load without defer" % (rel, len(undeferred)))
         check("const allCourses" not in s, "%s: still inlines its own catalog" % rel)
         check("appSearchInput" in s or "searchInput" in s, "%s: no search input" % rel)
 

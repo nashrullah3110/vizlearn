@@ -96,35 +96,82 @@ SCRIPTS_BEGIN = "<!-- VIZLEARN:SCRIPTS:BEGIN -->"
 SCRIPTS_END = "<!-- VIZLEARN:SCRIPTS:END -->"
 SCRIPTS_BLOCK = re.compile(
     re.escape(SCRIPTS_BEGIN) + r".*?" + re.escape(SCRIPTS_END) + r"\n?", re.S)
-SHARED_SCRIPTS = ("modules.js", "search.js", "vizlearn.js", "vizlearn-lab.js",
-                  "vizlearn-state.js", "vizlearn-pwa.js",
-                  "vizlearn-keys.js", "glossary.js", "vizlearn-glossary.js",
-                  "vizlearn-python.js", "vizlearn-rails.js",
-                  "vizlearn-js.js", "vizlearn-html.js",
-                  # Highlights any .vz-code block. Shared rather than per-page:
-                  # the python/ modules carry editors too, not just the labs.
-                  "vizlearn-code.js",
-                  # The /interview/ step player. Shared for the same reason: it
-                  # binds only to .vz-iv blocks, so it costs nothing on a page
-                  # that has none, and shipping it per-page would put a second
-                  # copy of the script list in the build.
-                  "vizlearn-interview.js",
-                  # The interactive widget on the generated gen_ai/ pages.
-                  "vizlearn-ragviz.js",
-                  # The labs' resizable split. Binds only to [data-vz-ide], so
-                  # it costs nothing on the pages that have no editor.
-                  "vizlearn-ide.js",
-                  # The image-processing harness on the generated
-                  # computer_vision/ modules. Binds only to [data-vz-cv].
-                  "vizlearn-cv.js",
-                  # Query variants and the two-transaction timelines on the
-                  # generated database/ modules. The SQL engine itself is
-                  # vizlearn-sql.js, which is loaded per page because it pulls
-                  # a wasm payload; this only wires buttons.
-                  "vizlearn-dbq.js",
-                  # The workflow simulations on the generated machine_learning/
-                  # modules. Binds only to [data-vz-ml].
-                  "vizlearn-ml.js")
+# (filename, hook) for every script the build puts at the end of a page.
+#
+# A hook of None means "always" - the shell, the search index, the theme
+# switch, the things every page uses. Anything else is a substring the page's
+# own markup must contain before the script is worth sending, taken from the
+# selector the script binds to.
+#
+# The list used to be flat, and every page loaded all of it. That put
+# vizlearn-ml.js and vizlearn-cv.js - 78 KB and 58 KB - on all 427 pages, of
+# which about forty each actually use them, and a maths article was fetching
+# and parsing eleven scripts that could never find anything to bind to.
+# Shipping a script to a page that cannot use it is not free just because the
+# script exits early: it is still downloaded, parsed and executed.
+#
+# Every script is deferred. They all bind on DOMContentLoaded already, so
+# nothing changes about when they run - but an undeferred <script src> blocks
+# the parser while it fetches, and twenty of them in a row is the lag.
+SHARED_SCRIPTS = (
+    # The 139 KB catalog is NOT listed here. search.js fetches it on the first
+    # focus of the search box, so a reader who never searches never pays for
+    # it. The one page that needs it synchronously is /saved/, whose own
+    # saved.js reads window.VIZLEARN_MODULES at load.
+    ("modules.js", "assets/saved.js"),
+    ("search.js", None),
+    ("vizlearn.js", None),         # theme, nav, the shell
+    ("vizlearn-state.js", None),   # progress and bookmarks, on every page
+    ("vizlearn-pwa.js", None),
+    ("vizlearn-keys.js", None),    # keyboard shortcuts
+    ("glossary.js", None),         # term data for the definition cards
+    ("vizlearn-glossary.js", None),
+
+    # The quiz and step players read a JSON island the build emits.
+    ("vizlearn-lab.js", "vz-lab-data"),
+    # The home page rails.
+    ("vizlearn-rails.js", "carousel-wrapper"),
+
+    # Runnable editors, one per language.
+    ("vizlearn-python.js", "vz-py"),
+    ("vizlearn-js.js", "vz-js"),
+    ("vizlearn-html.js", "vz-html"),
+    # Highlights any editor block, whichever language it holds.
+    ("vizlearn-code.js", "data-vz-code"),
+    # The labs' resizable split.
+    ("vizlearn-ide.js", "data-vz-ide"),
+
+    # The /interview/ step player.
+    ("vizlearn-interview.js", "data-vz-iv"),
+    # The retrieval widgets on the generated gen_ai/ pages.
+    ("vizlearn-ragviz.js", "data-vz-rv"),
+    # The image-processing harness on the generated computer_vision/ modules.
+    ("vizlearn-cv.js", "data-vz-cv"),
+    # Query variants and two-transaction timelines on the database/ modules.
+    # The SQL engine itself is vizlearn-sql.js, loaded per page because it
+    # pulls a wasm payload; this only wires buttons.
+    ("vizlearn-dbq.js", "data-vz-dbq"),
+    # The workflow simulations on the generated machine_learning/ modules.
+    ("vizlearn-ml.js", "data-vz-ml"),
+    # Copy buttons. Wanted wherever there is a code block of either kind.
+    ("vizlearn-copy.js", ("<pre", "data-vz-code")),
+)
+
+
+def scripts_for(src):
+    """The scripts this page can actually use, in load order."""
+    out = []
+    for name, hook in SHARED_SCRIPTS:
+        if hook is None:
+            out.append(name)
+        elif isinstance(hook, tuple):
+            if any(h in src for h in hook):
+                out.append(name)
+        elif hook in src:
+            out.append(name)
+    return out
+
+
 # The one-time migration wrote these directly; drop the loose copies.
 LOOSE_SCRIPT = re.compile(
     r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa|vizlearn-keys|glossary|vizlearn-glossary|vizlearn-python|vizlearn-rails|vizlearn-js|vizlearn-html|vizlearn-code|vizlearn-interview|vizlearn-ragviz)\.js"></script>\n?')
@@ -318,7 +365,7 @@ def build_block(rel, title, desc, prefix, mod, needs_icons=False):
     ] + ([
         "",
         "    <!-- runtime icon lookup, for icons this page picks in JS -->",
-        '    <script src="%sassets/icons.js"></script>' % prefix,
+        '    <script defer src="%sassets/icons.js"></script>' % prefix,
     ] if needs_icons else []) + [
         "",
         '    <meta name="author" content="%s">' % e(AUTHOR),
@@ -483,12 +530,13 @@ def main():
         i = src.rfind("\n", 0, i) + 1
         src = src[:i] + block + src[i:]
 
-        # Shared scripts, just before </body>, on every page.
+        # Scripts, just before </body>. Deferred, and only the ones this
+        # page has the markup to use.
         src = SCRIPTS_BLOCK.sub("", src)
         src = LOOSE_SCRIPT.sub("", src)
         tags = SCRIPTS_BEGIN + "\n" + "".join(
-            '    <script src="%sassets/%s"></script>\n' % (prefix, name)
-            for name in SHARED_SCRIPTS
+            '    <script defer src="%sassets/%s"></script>\n' % (prefix, name)
+            for name in scripts_for(src)
         ) + SCRIPTS_END + "\n"
         b = src.rindex("</body>")
         src = src[:b] + tags + src[b:]

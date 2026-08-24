@@ -173,12 +173,47 @@
     return (start ? '…' : '') + desc.slice(start, end).trim() + (end < desc.length ? '…' : '');
   }
 
+  /* The catalog is 139 KB and every page was downloading it whether or not
+   * the reader ever opened the search box. It is fetched on the first focus
+   * or keystroke instead, and the index built from it then.
+   *
+   * Nothing about search changes: by the time a query can exist the index
+   * exists, because a keystroke cannot precede the focus that loads it. The
+   * only visible difference is on a very slow connection, where the first
+   * keystroke may wait for a 139 KB file that used to be paid for on every
+   * page view including the ones that never search. */
+  var catalogPromise = null;
+
+  function loadCatalog() {
+    if (window.VIZLEARN_MODULES) return Promise.resolve(window.VIZLEARN_MODULES);
+    if (catalogPromise) return catalogPromise;
+    catalogPromise = new Promise(function (resolve) {
+      var tag = document.createElement('script');
+      tag.src = ROOT + 'assets/modules.js';
+      tag.onload = function () { resolve(window.VIZLEARN_MODULES || []); };
+      tag.onerror = function () { resolve([]); };
+      document.head.appendChild(tag);
+    });
+    return catalogPromise;
+  }
+
   function init() {
     var input = document.getElementById('appSearchInput') || document.getElementById('searchInput');
     var dropdown = document.getElementById('searchDropdown');
     if (!input || !dropdown) return;
 
-    var modules = (window.VIZLEARN_MODULES || []).map(function (m) {
+    var modules = [];
+
+    function buildIndex(raw) {
+      modules = indexOf(raw);
+    }
+
+    function ready() {
+      return modules.length ? Promise.resolve() : loadCatalog().then(buildIndex);
+    }
+
+    function indexOf(raw) {
+      return (raw || []).map(function (m) {
       var title = normalise(m.title);
       var cat = normalise(m.category);
       var desc = normalise(m.desc || '');
@@ -197,7 +232,8 @@
         _descWords: desc.split(' '),
         _descJoined: desc.replace(/ /g, '')
       };
-    });
+      });
+    }
 
     var results = [];
     var tokens = [];
@@ -261,12 +297,22 @@
     input.setAttribute('aria-expanded', 'false');
     dropdown.setAttribute('role', 'listbox');
 
+    /* Start fetching the moment the box is touched, so the catalog is
+     * usually already there by the time a first character is typed. */
+    input.addEventListener('focus', ready);
+    input.addEventListener('pointerdown', ready);
+
     input.addEventListener('input', function (e) {
-      if (!e.target.value.trim()) { close(); return; }
-      results = search(e.target.value);
-      active = -1;
-      render();
-      open();
+      var value = e.target.value;
+      if (!value.trim()) { close(); return; }
+      ready().then(function () {
+        // The box may have been cleared or retyped while the catalog loaded.
+        if (input.value !== value) return;
+        results = search(value);
+        active = -1;
+        render();
+        open();
+      });
     });
 
     // Full keyboard control of the result list.

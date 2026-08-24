@@ -81,7 +81,7 @@ BODY = """
             only &mdash; there is no account and nothing is uploaded. Clearing your
             browser storage clears them.</p>
 
-    <script src="%(p)sassets/saved.js"></script>
+    <script defer src="%(p)sassets/saved.js"></script>
 """
 
 

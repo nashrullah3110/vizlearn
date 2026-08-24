@@ -128,8 +128,8 @@ BODY = """
             device, the same record the hub and <a href="%(p)spractice/">Practice</a>
             read. Nothing is uploaded.</p>
 
-    <script src="%(p)sassets/map-data.js"></script>
-    <script src="%(p)sassets/vizlearn-map.js"></script>
+    <script defer src="%(p)sassets/map-data.js"></script>
+    <script defer src="%(p)sassets/vizlearn-map.js"></script>
 """
 
 

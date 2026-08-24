@@ -203,7 +203,7 @@ def page(t):
         # the 350-odd pages that have no editor on them.
         out = out.replace(
             "</body>",
-            '    <script src="%sassets/vizlearn-sql.js" defer></script>\n</body>'
+            '    <script defer src="%sassets/vizlearn-sql.js"></script>\n</body>'
             % PREFIX, 1)
     return out
 
