@@ -17,10 +17,13 @@ gives the current ones.
 in `tools/sequence.py`.
 
 **Database: 22 -> 42.** Tiers 1 and 2 are complete, generated from
-`tools/db_topics.py`. Tier 2 added three concurrency timelines (MVCC,
-replication lag, CAP) and seven SQL-backed modules; the document, key-value and
-graph modules lean on SQLite's JSON1 functions and recursive CTEs, which the
-in-page engine has.
+`tools/db_topics.py`. Most modules run real SQLite in the page through
+`assets/vizlearn-sql.js` - the same engine as /sql-lab/, seeded per module, so
+the error messages are the database's own. Isolation levels, deadlocks, MVCC,
+replication lag and CAP step through a scripted two-transaction schedule
+instead, because one connection cannot demonstrate two. The document,
+key-value and graph modules lean on SQLite's JSON1 functions and recursive
+CTEs, which the in-page engine has.
 
 **Computer Vision: 20 -> 40.** Tiers 1 and 2 are complete, generated from
 `tools/cv_topics.py` with the arithmetic in `assets/vizlearn-cv.js`. Eight are
@@ -30,15 +33,6 @@ an image to show. Tier 2 added four more image operations (template matching, Ha
 patching, the segmentation taxonomy) and six diagrams. Adding a twenty-first is
 one entry in `cv_topics.py`, a line in `tools/sequence.py`, and - if the harness
 lacks the operation - one function in `OPS` or `DIAGRAMS`.
-
----
-
-**Database: 22 -> 32.** Tier 1 is complete, generated from
-`tools/db_topics.py`. Eight run real SQLite in the page through
-`assets/vizlearn-sql.js` - the same engine as /sql-lab/, seeded per module, so
-the error messages are the database's own. Isolation levels and deadlocks step
-through a scripted two-transaction schedule instead, because one connection
-cannot demonstrate two.
 
 **Machine Learning: 25 -> 45.** Tiers 1 and 2 are complete, generated from
 `tools/ml_topics.py` with the simulations in `assets/vizlearn-ml.js`. Every

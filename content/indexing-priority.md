@@ -6,17 +6,27 @@ by hand in the Search Console UI at
 does not require account credentials, and Google retired the sitemap ping
 endpoint in 2023.
 
-Written 21 August 2026, against the 364-URL sitemap.
+Written 21 August 2026 against a 364-URL sitemap; revised 24 August 2026, after the CV, Database and ML tiers took it to **424**.
 
-## Pre-flight (already verified, 21 August 2026)
+## What changed since this was written
+
+The sitemap has grown from 364 URLs to 424. Sixty of those are modules Google
+has never seen, because they were committed after the last crawl. That does not
+change the running order below - it makes the hubs-first rule matter more, since
+each track hub is now the only route to a larger set of new pages.
+
+Re-run `npm run checklive` before submitting; it verifies the deployed site
+against the published sitemap in one command.
+
+## Pre-flight (verified 21 August 2026, re-verify with npm run checklive)
 
 All of this was checked against the live site, not the local build:
 
 | Check | Result |
 |---|---|
-| Sitemap URLs | 364, valid XML, served as `application/xml` |
-| HTTP status | 364/364 return **200** — no 404s, no redirects |
-| Canonical | matches the sitemap URL exactly on all 364 |
+| Sitemap URLs | 424, valid XML, served as `application/xml` |
+| HTTP status | all return **200** — no 404s, no redirects |
+| Canonical | matches the sitemap URL exactly on every one |
 | `noindex` inside the sitemap | **0** |
 | `robots.txt` | allows everything except `/tools/` and `/node_modules/`, and points at the sitemap |
 | `lastmod` | 159 URLs at 2026-08-21, 205 at 2026-08-19 — derived from git, not blanket-stamped |
@@ -38,7 +48,7 @@ Pages report → write down three numbers:
 - **Crawled – currently not indexed**
 
 This baseline is the whole point of stage 2. Stage 3's gate is a *majority of
-364 indexed*, and that is unreadable without knowing where it started.
+424 indexed*, and that is unreadable without knowing where it started.
 
 The distinction matters more than the total. *Discovered – not indexed* means
 Google knows the URL exists and has not bothered to fetch it, which is a
@@ -73,14 +83,18 @@ until stage 1.
 
 ### Day 2 — the remaining track hubs
 
+The first three lead: Computer Vision, Databases and machine learning each
+gained twenty modules that have never been crawled, and their hub is the only
+internal route to them.
+
 ```
-https://vizlearn.in/maths/
+https://vizlearn.in/computer_vision/
+https://vizlearn.in/database/
 https://vizlearn.in/machine_learning/
+https://vizlearn.in/maths/
 https://vizlearn.in/deep_learning/
 https://vizlearn.in/dsa/
 https://vizlearn.in/natural_language_processing/
-https://vizlearn.in/computer_vision/
-https://vizlearn.in/database/
 https://vizlearn.in/gen_ai/
 ```
 
@@ -96,16 +110,16 @@ https://vizlearn.in/js-lab/
 https://vizlearn.in/html-lab/
 ```
 
-Then a handful of the most-expanded articles, as a spot check that the new
-content is what gets picked up:
+Then a sample of the brand-new modules, as a spot check that the recent work is
+being picked up at all:
 
 ```
-https://vizlearn.in/python/input_and_output.html
-https://vizlearn.in/python/inheritance.html
-https://vizlearn.in/python/generators_and_yield.html
-https://vizlearn.in/python/mutability_and_aliasing.html
-https://vizlearn.in/interview/design-an-lru-cache.html
-https://vizlearn.in/interview/trapping-rain-water.html
+https://vizlearn.in/computer_vision/convolution_kernels.html
+https://vizlearn.in/computer_vision/grad_cam.html
+https://vizlearn.in/database/isolation_levels.html
+https://vizlearn.in/database/sql_injection_and_parameters.html
+https://vizlearn.in/machine_learning/data_leakage.html
+https://vizlearn.in/machine_learning/probability_calibration.html
 ```
 
 ## Step 4 — Set a reminder, then stop
@@ -115,7 +129,9 @@ the index count, not the calendar. Come back in two weeks, re-read the Pages
 report, and compare against the baseline from step 2.
 
 The spot check that actually matters: search
-`site:vizlearn.in/python/generators_and_yield.html` and confirm the snippet
-reflects the **expanded** article. If Google is still showing the old short
+`site:vizlearn.in/machine_learning/probability_calibration.html` and confirm it
+appears at all — that page did not exist at the last crawl. For a page that did,
+`site:vizlearn.in/python/generators_and_yield.html` should show the **expanded**
+article rather than the old short one. If Google is still showing the old short
 version, the index has not caught up and reapplying would be judged against
 content that no longer exists.

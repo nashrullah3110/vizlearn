@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check every theme palette against WCAG contrast, in both modes.
+"""Check the live theme against WCAG contrast, in both modes.
 
 A theme meant to be lived in for years is a readability claim, and a
 readability claim should be measured rather than asserted. This computes the
@@ -17,12 +17,18 @@ It also flags the two things that make a dark theme uncomfortable regardless
 of ratio: a background at or near pure black, which makes bright text halate,
 and a light background at pure white.
 
-    python3 tools/check_terminal_contrast.py
+This used to iterate over the candidate palettes from the theme exploration.
+Those palettes were superseded when the site moved to Ash, so the check was
+passing on colours nothing shipped - a test that could stay green while the
+real theme regressed. It reads tools/theme.py now, which is the single source
+the whole site is generated from.
+
+    python3 tools/check_theme_contrast.py
 """
 
 import sys
 
-from phosphor_variants import VARIANTS
+import theme
 
 
 def _srgb(c):
@@ -43,21 +49,29 @@ def ratio(a, b):
 
 
 # (label, foreground key, background key, minimum)
+#
+# The accent is split into two roles and each is checked against the rule that
+# applies to it. --accent-primary carries text and links, so it needs 4.5;
+# --accent-fill is a background for dark inverse text, so what needs 4.5 is
+# on_fill against fill. Checking one rule against both roles is what forced
+# the split in the first place: no single colour cleared 4.5 as text on a
+# light background while still being bright enough to read as a button.
 CHECKS = [
-    ("body text",       "text",    "body",    4.5),
-    ("body on surface", "text",    "surface", 4.5),
-    ("muted text",      "muted",   "body",    4.5),
-    ("muted on surface", "muted",  "surface", 4.5),
-    ("accent on bg",    "accent",  "body",    4.5),
-    ("accent on surface", "accent", "surface", 4.5),
-    ("inverse on accent", "inverse", "accent", 4.5),
+    ("body text",         "text",    "body",    4.5),
+    ("body on surface",   "text",    "surface", 4.5),
+    ("body on raise",     "text",    "raise",   4.5),
+    ("muted text",        "muted",   "body",    4.5),
+    ("muted on surface",  "muted",   "surface", 4.5),
+    ("accent on bg",      "accent",  "body",    4.5),
+    ("accent on surface", "accent",  "surface", 4.5),
+    ("on_fill on fill",   "on_fill", "fill",    4.5),
 ]
 
 
 def main():
     failures = []
     print("WCAG contrast, both modes. AA needs 4.5 for body text.\n")
-    for v in VARIANTS:
+    for v in [{"name": "Ash (live)", "dark": theme.DARK, "light": theme.LIGHT}]:
         print("%s" % v["name"])
         for mode in ("dark", "light"):
             p = v[mode]
@@ -84,7 +98,7 @@ def main():
         for name, mode, label, got, need in failures:
             print("   %-12s %-6s %-32s %.3f (needs %.2f)" % (name, mode, label, got, need))
         return 1
-    print("all palettes pass AA for body text in both modes,")
+    print("the live palette passes AA for body text in both modes,")
     print("and no background sits at pure black or pure white.")
     return 0
 
