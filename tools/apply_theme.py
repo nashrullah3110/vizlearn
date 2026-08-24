@@ -118,6 +118,7 @@ def process(path):
     # it. Generated pages get the link from lib_shell, which was fixed
     # too; this catches the hand-written ones on every build.
     src = src.replace("family=Space+Grotesk:wght@300;500;700&", "")
+    src = normalise_fonts(src)
 
     for old, new in GREEN_MAP:
         src = src.replace(old, new)
@@ -128,11 +129,42 @@ def process(path):
     return False
 
 
+
+# One font request for the whole site, and a warm connection to serve it.
+#
+# There were three variants of this link in circulation - two differing only in
+# whether mono 700 was asked for, and one on a page nothing had swept that
+# still requested a typeface the site dropped. Three URLs are three separate
+# cache entries, so moving between pages refetched a stylesheet the browser
+# already had. This is the one URL, and it is a superset: Google Fonts splits
+# each weight into its own file behind unicode-range, so asking for mono 700 on
+# a page that never renders bold mono downloads nothing extra.
+FONT_HREF = ("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600"
+             "&family=JetBrains+Mono:wght@400;700&display=swap")
+FONT_LINK = re.compile(r'<link href="https://fonts\.googleapis\.com/[^"]*" rel="stylesheet">')
+PRECONNECT = ('<link rel="preconnect" href="https://fonts.googleapis.com">\n'
+              '    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
+              '    ')
+
+
+def normalise_fonts(src):
+    if "fonts.googleapis.com" not in src:
+        return src
+    src = FONT_LINK.sub('<link href="%s" rel="stylesheet">' % FONT_HREF, src, count=1)
+    if 'rel="preconnect" href="https://fonts.gstatic.com"' not in src:
+        src = src.replace('<link href="%s"' % FONT_HREF,
+                          PRECONNECT + '<link href="%s"' % FONT_HREF, 1)
+    return src
+
+
 def main():
     check = "--check" in sys.argv
-    pages = [os.path.join(ROOT, "index.html")]
+    # Root-level pages were missing from this list, so nothing ever swept
+    # them: 404.html was still requesting Space Grotesk months after the site
+    # stopped using it. Every .html at the root is included now.
+    pages = sorted(glob.glob(os.path.join(ROOT, "*.html")))
     pages += sorted(glob.glob(os.path.join(ROOT, "*", "*.html")))
-    pages = [p for p in pages if "/node_modules/" not in p]
+    pages = [p for p in pages if "/node_modules/" not in p and "/.venv/" not in p]
 
     if check:
         stale = []

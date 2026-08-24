@@ -23,23 +23,50 @@ MANIFEST = os.path.join(ROOT, "manifest.webmanifest")
 SW = os.path.join(ROOT, "sw.js")
 OFFLINE = os.path.join(ROOT, "offline.html")
 
-# The app shell: what has to be present for the site to work at all, plus the
-# two pages worth having available cold - the hub and practice.
-SHELL = [
-    "./",
-    "./index.html",
-    "./practice/",
+# What install has to fetch before the service worker is any use offline.
+#
+# This list used to hold everything - 2.7 MB, fetched on the first visit to
+# any page, competing for bandwidth with the page the reader was actually
+# looking at. Two of those megabytes were avoidable: "./" and "./index.html"
+# are the same 710 KB document requested twice, and practice-bank.js is 482 KB
+# for a page most readers never open.
+#
+# CORE is now the genuine minimum - the shell every page needs, and the
+# offline fallback. Small, and worth blocking install for.
+CORE = [
     "./offline.html",
     "./assets/vizlearn.css",
-    "./assets/modules.js",
     "./assets/search.js",
     "./assets/vizlearn.js",
-    "./assets/vizlearn-lab.js",
     "./assets/vizlearn-state.js",
     "./assets/vizlearn-pwa.js",
     "./assets/vizlearn-keys.js",
+    "./assets/vizlearn-copy.js",
+    "./assets/icons.js",
+    "./assets/favicon.svg",
+    "./favicon.ico",
+]
+
+# Warmed in the background once the worker is active, so nothing here delays
+# the first page view. Losing the race costs nothing: the fetch handler
+# caches every same-origin asset as it is used, so anything skipped here is
+# stored the first time the reader needs it.
+EXTRA = [
+    # The hub is 710 KB of markup - the largest single document on the site,
+    # and the last thing that should be blocking a service worker install.
+    # Anyone who gets far enough to install the PWA has almost certainly
+    # navigated to it already, and the fetch handler caches navigations.
+    "./",
+    "./practice/",
+    "./assets/modules.js",
+    "./assets/practice-bank.js",
+    "./assets/practice.js",
+    "./assets/vizlearn-lab.js",
+    "./assets/vizlearn-glossary.js",
+    "./assets/glossary.js",
     "./assets/vizlearn-python.js",
     "./assets/vizlearn-ide.js",
+    "./assets/vizlearn-code.js",
     "./assets/vizlearn-js.js",
     "./assets/vizlearn-html.js",
     "./assets/vizlearn-interview.js",
@@ -47,16 +74,15 @@ SHELL = [
     "./assets/vizlearn-cv.js",
     "./assets/vizlearn-dbq.js",
     "./assets/vizlearn-ml.js",
-    "./assets/vizlearn-copy.js",
-    "./assets/practice-bank.js",
-    "./assets/practice.js",
-    "./assets/icons.js",
-    "./assets/favicon.svg",
+    "./assets/vizlearn-rails.js",
     "./assets/apple-touch-icon.png",
     "./assets/icon-192.png",
     "./assets/icon-512.png",
-    "./favicon.ico",
 ]
+
+# The cache name still has to change when anything cached changes, so the
+# hash covers both lists.
+SHELL = CORE + EXTRA
 
 # Files whose contents decide the cache version: the ones a deploy actually
 # changes. offline.html is excluded on purpose - this script writes it, so
@@ -126,7 +152,8 @@ SW_TEMPLATE = """/* GENERATED FILE - do not edit by hand.
  * Third-party requests - analytics, ads, fonts - are not touched at all.
  */
 const CACHE = 'vizlearn-%(version)s';
-const SHELL = %(shell)s;
+const CORE = %(core)s;
+const EXTRA = %(extra)s;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -134,11 +161,23 @@ self.addEventListener('install', (event) => {
       // addAll fails the whole install if any single entry 404s, which would
       // leave the site with no service worker at all; add them individually.
       .then((cache) => Promise.all(
-        SHELL.map((url) => cache.add(url).catch(() => null))
+        CORE.map((url) => cache.add(url).catch(() => null))
       ))
       .then(() => self.skipWaiting())
   );
 });
+
+// The optional half, fetched once the worker is running and out of the way of
+// whatever page the reader opened. Deliberately not inside waitUntil: if the
+// browser stops the worker before this finishes, the fetch handler caches
+// each of these the first time it is actually asked for.
+function warmExtras() {
+  caches.open(CACHE).then((cache) => EXTRA.reduce(
+    (chain, url) => chain.then(() => cache.match(url)
+      .then((hit) => hit || cache.add(url).catch(() => null))),
+    Promise.resolve()
+  ));
+}
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
@@ -148,6 +187,7 @@ self.addEventListener('activate', (event) => {
             .map((k) => caches.delete(k))
       ))
       .then(() => self.clients.claim())
+      .then(warmExtras)
   );
 });
 
@@ -253,7 +293,8 @@ def main():
     with open(SW, "w", encoding="utf-8") as fh:
         fh.write(SW_TEMPLATE % {
             "version": v,
-            "shell": json.dumps(SHELL, indent=2),
+            "core": json.dumps(CORE, indent=2),
+            "extra": json.dumps(EXTRA, indent=2),
         })
 
     with open(OFFLINE, "w", encoding="utf-8") as fh:

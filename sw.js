@@ -19,22 +19,32 @@
  *
  * Third-party requests - analytics, ads, fonts - are not touched at all.
  */
-const CACHE = 'vizlearn-e98f453cc3';
-const SHELL = [
-  "./",
-  "./index.html",
-  "./practice/",
+const CACHE = 'vizlearn-402275e154';
+const CORE = [
   "./offline.html",
   "./assets/vizlearn.css",
-  "./assets/modules.js",
   "./assets/search.js",
   "./assets/vizlearn.js",
-  "./assets/vizlearn-lab.js",
   "./assets/vizlearn-state.js",
   "./assets/vizlearn-pwa.js",
   "./assets/vizlearn-keys.js",
+  "./assets/vizlearn-copy.js",
+  "./assets/icons.js",
+  "./assets/favicon.svg",
+  "./favicon.ico"
+];
+const EXTRA = [
+  "./",
+  "./practice/",
+  "./assets/modules.js",
+  "./assets/practice-bank.js",
+  "./assets/practice.js",
+  "./assets/vizlearn-lab.js",
+  "./assets/vizlearn-glossary.js",
+  "./assets/glossary.js",
   "./assets/vizlearn-python.js",
   "./assets/vizlearn-ide.js",
+  "./assets/vizlearn-code.js",
   "./assets/vizlearn-js.js",
   "./assets/vizlearn-html.js",
   "./assets/vizlearn-interview.js",
@@ -42,15 +52,10 @@ const SHELL = [
   "./assets/vizlearn-cv.js",
   "./assets/vizlearn-dbq.js",
   "./assets/vizlearn-ml.js",
-  "./assets/vizlearn-copy.js",
-  "./assets/practice-bank.js",
-  "./assets/practice.js",
-  "./assets/icons.js",
-  "./assets/favicon.svg",
+  "./assets/vizlearn-rails.js",
   "./assets/apple-touch-icon.png",
   "./assets/icon-192.png",
-  "./assets/icon-512.png",
-  "./favicon.ico"
+  "./assets/icon-512.png"
 ];
 
 self.addEventListener('install', (event) => {
@@ -59,11 +64,23 @@ self.addEventListener('install', (event) => {
       // addAll fails the whole install if any single entry 404s, which would
       // leave the site with no service worker at all; add them individually.
       .then((cache) => Promise.all(
-        SHELL.map((url) => cache.add(url).catch(() => null))
+        CORE.map((url) => cache.add(url).catch(() => null))
       ))
       .then(() => self.skipWaiting())
   );
 });
+
+// The optional half, fetched once the worker is running and out of the way of
+// whatever page the reader opened. Deliberately not inside waitUntil: if the
+// browser stops the worker before this finishes, the fetch handler caches
+// each of these the first time it is actually asked for.
+function warmExtras() {
+  caches.open(CACHE).then((cache) => EXTRA.reduce(
+    (chain, url) => chain.then(() => cache.match(url)
+      .then((hit) => hit || cache.add(url).catch(() => null))),
+    Promise.resolve()
+  ));
+}
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
@@ -73,6 +90,7 @@ self.addEventListener('activate', (event) => {
             .map((k) => caches.delete(k))
       ))
       .then(() => self.clients.claim())
+      .then(warmExtras)
   );
 });
 
