@@ -1,0 +1,107 @@
+title: The Jacobian and the Hessian
+intro: The two matrices of derivatives every optimiser is built on, and why one of them is almost never computed.
+
+## From one derivative to a table of them
+
+For a function of one variable the derivative is one number: the slope. The
+[chain rule](the_chain_rule.html) and
+[partial derivatives](partial_derivatives_and_gradient.html) modules cover
+that ground.
+
+Real functions have many inputs and often many outputs, and the derivatives
+have to be organised.
+
+**The gradient** applies when there are many inputs and one output &mdash; a
+loss function. It is a vector holding one partial derivative per input, and it
+points in the direction of steepest increase.
+
+**The Jacobian** applies when there are many outputs too. It is a matrix with
+one row per output and one column per input, entry (i, j) being how much output
+*i* changes when input *j* moves. A gradient is a Jacobian with one row.
+
+**The Hessian** is the matrix of second derivatives of a single-output
+function: entry (i, j) is the derivative of the *i*-th partial derivative with
+respect to input *j*. It describes how the gradient changes as you move.
+
+## What curvature buys you
+
+The visualisation is one-dimensional, where the gradient and the Hessian are
+each a single number, so the relationship is visible without any matrix
+notation.
+
+The dashed line is the tangent &mdash; the first derivative. It says which way
+is downhill and how steeply, and it says nothing at all about how long that
+remains true.
+
+The second derivative is the missing piece. Drag the curvature control:
+
+**Large positive curvature** is a tight valley. The gradient changes quickly, so
+a big step overshoots and lands on the far wall.
+
+**Small positive curvature** is a shallow bowl. The gradient stays roughly
+constant, so a big step is safe and a small one wastes time.
+
+That is exactly the information a step size wants, and it is why an optimiser
+that knows the curvature can choose its own step instead of being handed a
+learning rate.
+
+**Negative curvature** is a maximum in that direction. Descent will accelerate
+away from it, which is usually what you want and is why saddle points are less
+dangerous in practice than they sound.
+
+For a multivariable function the Hessian's eigenvalues carry the same
+information per direction: all positive is a minimum, all negative a maximum,
+mixed signs a saddle.
+
+## Newton's method, and why nobody runs it on a network
+
+Knowing the curvature suggests an obvious improvement over gradient descent:
+step by the gradient scaled by the inverse Hessian rather than by a fixed
+learning rate. That is **Newton's method**, and near a minimum it converges
+quadratically &mdash; roughly doubling the correct digits each iteration, where
+gradient descent plods.
+
+It is not used for neural networks, for a reason that is pure arithmetic.
+
+A model with *n* parameters has a Hessian with *n*&sup2; entries. At a million
+parameters that is 10&sup1;&sup2; numbers to store, and inverting it costs
+about *n*&sup3;. For a model with a billion parameters the Hessian does not fit
+in the observable universe, let alone in memory.
+
+So the field uses approximations. **L-BFGS** keeps a low-rank estimate built
+from recent gradients. **Adam** and its relatives keep a diagonal estimate
+&mdash; one number per parameter rather than a full matrix &mdash; which is why
+they adapt a per-parameter step size and why they work at scale. Adam is
+sometimes described as a diagonal approximation to second-order optimisation,
+and that is a fair reading of what it does.
+
+## Backpropagation is Jacobians
+
+Every layer of a network is a function with many inputs and many outputs, so
+each has a Jacobian. The chain rule says the derivative of the whole network is
+the product of them all.
+
+The order of that multiplication is the whole trick. Multiplying left to right
+&mdash; forward mode &mdash; keeps a full matrix at every step. Multiplying
+right to left &mdash; reverse mode, which is backpropagation &mdash; starts
+from the scalar loss, so every intermediate stays a **vector**.
+
+That is why training is affordable. The cost of a backward pass is a small
+multiple of a forward pass, regardless of how many parameters there are,
+because no Jacobian is ever formed in full.
+
+## Where it goes wrong
+
+**Trying to compute a Hessian for a large model.** It does not fit. Use a
+diagonal or low-rank approximation.
+
+**Assuming a zero gradient means a minimum.** It means a stationary point. The
+Hessian's eigenvalues tell you which kind.
+
+**Confusing the Jacobian with the gradient.** The gradient is the special case
+of one output. Frameworks expose `jacobian` and `grad` separately for exactly
+this reason.
+
+**Expecting second-order methods to be a drop-in win.** They shine on small,
+well-conditioned problems and on batch objectives, not on stochastic
+mini-batch training where the curvature estimate is noise.

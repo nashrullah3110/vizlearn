@@ -2159,3 +2159,10 @@ LABS.update(_DB_CHECKS)
 from ml_topics import CHECKS as _ML_CHECKS  # noqa: E402
 
 LABS.update(_ML_CHECKS)
+
+# The generated maths modules keep their questions beside the demonstration
+# they are about (tools/math_topics.py), for the same reason every other
+# generated track does.
+from math_topics import CHECKS as _MATH_CHECKS  # noqa: E402
+
+LABS.update(_MATH_CHECKS)

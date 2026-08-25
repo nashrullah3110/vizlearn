@@ -19,7 +19,7 @@
  *
  * Third-party requests - analytics, ads, fonts - are not touched at all.
  */
-const CACHE = 'vizlearn-402275e154';
+const CACHE = 'vizlearn-c3f74d4d04';
 const CORE = [
   "./offline.html",
   "./assets/vizlearn.css",
@@ -51,7 +51,9 @@ const EXTRA = [
   "./assets/vizlearn-ragviz.js",
   "./assets/vizlearn-cv.js",
   "./assets/vizlearn-dbq.js",
+  "./assets/vizlearn-plot.js",
   "./assets/vizlearn-ml.js",
+  "./assets/vizlearn-math.js",
   "./assets/vizlearn-rails.js",
   "./assets/apple-touch-icon.png",
   "./assets/icon-192.png",

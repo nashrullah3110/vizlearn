@@ -2356,6 +2356,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Drag four numbers and watch space rotate, stretch and shear. The columns are where the basis vectors land, and the determinant is the area they span."
  },
  {
+  "title": "Basis, Span and Orthogonality",
+  "path": "maths/basis_span_and_orthogonality.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "Bayes' Theorem",
   "path": "maths/bayes_theorem.html",
   "category": "Maths",
@@ -2364,12 +2372,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive Bayes theorem lesson - the medical test paradox shown as a natural frequency grid, with adjustable base rate, sensitivity and specificity."
  },
  {
+  "title": "Bernoulli, Binomial and Poisson",
+  "path": "maths/bernoulli_binomial_poisson.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "Conditional Probability",
   "path": "maths/conditional_probability.html",
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
   "desc": "Conditioning does not change the outcomes, it discards them. Watch the sample space shrink, and see why P(A given B) is not P(B given A)."
+ },
+ {
+  "title": "Convexity and Optimisation Landscapes",
+  "path": "maths/convexity_and_optimisation.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
  },
  {
   "title": "Covariance and Correlation",
@@ -2434,6 +2458,14 @@ window.VIZLEARN_MODULES = [
   "topic": "maths",
   "icon": "sigma",
   "desc": "Learn the equation of a line using an interactive 2D and 3D visualizer. Understand slope and intercept with real examples, live calculations, and guided practice."
+ },
+ {
+  "title": "Expectation and Variance",
+  "path": "maths/expectation_and_variance.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
  },
  {
   "title": "Exponentials",
@@ -2524,6 +2556,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Drag one vector onto another and watch its shadow, plus the perpendicular residual left behind. The geometric root of least squares."
  },
  {
+  "title": "Quantiles and Percentiles",
+  "path": "maths/quantiles_and_percentiles.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "Rank and Linear Independence",
   "path": "maths/rank_and_linear_independence.html",
   "category": "Maths",
@@ -2532,12 +2572,52 @@ window.VIZLEARN_MODULES = [
   "desc": "Drag two columns until one is a multiple of the other and watch the reachable plane collapse onto a line. That collapse is what rank counts."
  },
  {
+  "title": "Sampling Distributions and Standard Error",
+  "path": "maths/sampling_distributions.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Singular Value Decomposition",
+  "path": "maths/singular_value_decomposition.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Taylor Series",
+  "path": "maths/taylor_series.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "The Central Limit Theorem",
+  "path": "maths/central_limit_theorem.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "The Chain Rule",
   "path": "maths/the_chain_rule.html",
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
   "desc": "Interactive chain rule lesson - see how derivatives multiply through composed functions, and why this is exactly what backpropagation computes."
+ },
+ {
+  "title": "The Jacobian and the Hessian",
+  "path": "maths/jacobian_and_hessian.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
  },
  {
   "title": "The Normal Distribution",

@@ -50,6 +50,20 @@ SEQUENCE = {
         "maths/entropy_and_information.html",
         "maths/cross_entropy_and_kl_divergence.html",
         "maths/information_gain.html",
+        # Tier 1 of the maths expansion, in dependency order: the linear-algebra
+        # pair first (basis before SVD, which uses it), then the calculus that
+        # optimisation rests on, then probability from the definition of an
+        # expectation up to the sampling distribution every later track cites.
+        "maths/basis_span_and_orthogonality.html",
+        "maths/singular_value_decomposition.html",
+        "maths/jacobian_and_hessian.html",
+        "maths/convexity_and_optimisation.html",
+        "maths/taylor_series.html",
+        "maths/expectation_and_variance.html",
+        "maths/bernoulli_binomial_poisson.html",
+        "maths/central_limit_theorem.html",
+        "maths/quantiles_and_percentiles.html",
+        "maths/sampling_distributions.html",
     ],
 
     # Prepare data -> fit a first model -> measure it -> more models -> pitfalls.

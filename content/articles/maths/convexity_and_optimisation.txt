@@ -1,0 +1,96 @@
+title: Convexity and Optimisation Landscapes
+intro: The property that makes optimisation easy, what happens without it, and why deep learning works regardless.
+
+## The definition
+
+A function is **convex** if, for any two points on it, the straight line
+joining them lies on or above the curve. A bowl is convex. A mountain range is
+not.
+
+The equivalent statement in calculus: the second derivative is non-negative
+everywhere. In many dimensions, the [Hessian](jacobian_and_hessian.html) is
+positive semi-definite &mdash; all its eigenvalues at least zero.
+
+## Why it matters so much
+
+One consequence carries the entire subject: **in a convex function, every local
+minimum is the global minimum.**
+
+If you find a point where the gradient is zero and the curvature is positive,
+you are done. Not "probably done" &mdash; done, with a proof.
+
+Set the bumpiness control to zero and try every starting point on the slider.
+Every one converges to the same place. The initialisation does not matter, the
+run is reproducible, and there is a guarantee at the end of it.
+
+Now raise bumpiness. The curve grows local minima, and the starting point
+starts deciding the answer. Move the start slider at a fixed bumpiness and
+watch the final position jump between basins &mdash; same function, same
+algorithm, same learning rate, different answer.
+
+## What convexity buys, concretely
+
+**Guaranteed convergence** to the global optimum, with known rates.
+
+**Reproducibility.** No dependence on initialisation or on the order the data
+arrived in.
+
+**Certificates.** You can prove a solution is optimal rather than hoping.
+
+**Reliable stopping.** A small gradient really does mean you have arrived.
+
+This is why linear regression, logistic regression, SVMs with convex loss,
+ridge and lasso are all so well behaved. Their objectives are convex, and the
+solvers come with theory rather than folklore.
+
+## And yet deep learning works
+
+Neural network losses are about as non-convex as functions get: millions of
+dimensions, vast numbers of stationary points, no guarantees at all. By the
+argument above, training should be a lottery.
+
+It is not, and the explanation that emerged is worth knowing.
+
+**Saddle points, not local minima, dominate.** In high dimensions, a stationary
+point needs *every* eigenvalue of the Hessian to be positive to be a local
+minimum. With millions of dimensions that is vanishingly unlikely; almost every
+stationary point has some negative direction, making it a saddle. Saddles are
+escapable &mdash; the gradient points away along the negative direction, and
+noise from mini-batching helps you find it.
+
+**The minima that exist are mostly similar.** Empirically, the many minima of a
+large network reach comparable loss. Which one you land in matters less than
+the fact that you landed.
+
+**Overparameterisation flattens the landscape.** Wider networks have more paths
+down, and the loss surface becomes easier rather than harder as capacity grows
+&mdash; which is the opposite of the intuition.
+
+## The learning rate
+
+The third control demonstrates a separate failure that is often blamed on
+non-convexity.
+
+Turn the learning rate up with bumpiness at zero &mdash; a perfectly convex
+bowl &mdash; and descent still misbehaves, bouncing between the walls or
+diverging entirely. Convexity guarantees a unique minimum exists; it does not
+guarantee your step size will find it.
+
+The safe step depends on curvature, which is what
+[the Hessian](jacobian_and_hessian.html) measures and what adaptive optimisers
+estimate.
+
+## Where it goes wrong
+
+**Assuming a convex loss makes the whole problem convex.** Squared error is
+convex in the predictions and non-convex in the weights of a network. What
+matters is convexity in the parameters being optimised.
+
+**Blaming non-convexity for a divergent run.** Check the learning rate first;
+it is usually that.
+
+**Running once and trusting the result on a non-convex problem.** Several
+starts, or a schedule with restarts, is the minimum diligence.
+
+**Expecting convex theory to transfer.** Convergence rates for convex problems
+say nothing about a deep network.

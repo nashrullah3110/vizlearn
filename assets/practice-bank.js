@@ -9266,6 +9266,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "maths/basis_span_and_orthogonality.html",
+  "title": "Basis, Span and Orthogonality",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "Two vectors in the plane have determinant zero. What do they span?",
+    "o": [
+     "The whole plane",
+     "A line through the origin",
+     "A single point",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "The parallelogram has collapsed, so one vector is a multiple of the other and adds no new direction. Every combination lands on one line."
+   },
+   {
+    "t": "What does an orthonormal basis buy you?",
+    "o": [
+     "A larger span",
+     "The matrix of those vectors has its transpose as its inverse",
+     "A non-zero determinant",
+     "Fewer vectors are needed"
+    ],
+    "a": 1,
+    "w": "Undoing the transformation becomes free, which is why orthonormal bases turn up wherever numerical stability matters."
+   },
+   {
+    "t": "Why is a determinant of 0.001 a problem even though it is not zero?",
+    "o": [
+     "It makes the span smaller",
+     "The basis is nearly dependent, so anything computed in it is numerically unstable",
+     "It cannot be inverted",
+     "It means the vectors are orthogonal"
+    ],
+    "a": 1,
+    "w": "Exact zero is easy to catch. Nearly zero is the same problem in disguise, and the condition number is how it is measured."
+   }
+  ]
+ },
+ {
   "path": "maths/bayes_theorem.html",
   "title": "Bayes' Theorem",
   "cat": "Maths",
@@ -9285,6 +9325,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "maths/bernoulli_binomial_poisson.html",
+  "title": "Bernoulli, Binomial and Poisson",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "Why is a Bernoulli variance largest at p = 0.5?",
+    "o": [
+     "Because the mean is largest there",
+     "An event that always or never happens is not random, so spread must fall to zero at either end",
+     "Because the distribution is symmetric there",
+     "It is not - variance is constant"
+    ],
+    "a": 1,
+    "w": "p(1-p) peaks at 0.5 and collapses at both extremes, which is the arithmetic saying something obvious about certainty."
+   },
+   {
+    "t": "What survives when a binomial becomes a Poisson?",
+    "o": [
+     "n only",
+     "p only",
+     "Their product np",
+     "Neither"
+    ],
+    "a": 2,
+    "w": "n grows and p shrinks with np fixed, and only lambda = np appears in the result. That is what makes Poisson usable when you know the rate but not the number of opportunities."
+   },
+   {
+    "t": "Your count data has mean 4 and variance 12. What does that suggest?",
+    "o": [
+     "A Poisson fits well",
+     "Overdispersion - events are clustering, violating the constant-rate assumption",
+     "The mean is miscalculated",
+     "The window is too small"
+    ],
+    "a": 1,
+    "w": "A Poisson forces mean and variance to be equal. Variance well above the mean is a finding: something is varying that the model treats as fixed. A negative binomial adds that second parameter."
+   }
+  ]
+ },
+ {
   "path": "maths/conditional_probability.html",
   "title": "Conditional Probability",
   "cat": "Maths",
@@ -9300,6 +9380,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Probability, once you know something”?",
     "ans": "Conditional probability is the probability of one event given that another has happened."
+   }
+  ]
+ },
+ {
+  "path": "maths/convexity_and_optimisation.html",
+  "title": "Convexity and Optimisation Landscapes",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "What is the defining consequence of convexity for optimisation?",
+    "o": [
+     "The gradient is always positive",
+     "Every local minimum is the global minimum",
+     "The function has one input",
+     "Gradient descent converges in one step"
+    ],
+    "a": 1,
+    "w": "Find a stationary point with positive curvature and you are done, with a proof. That is why linear and logistic regression are so well behaved."
+   },
+   {
+    "t": "Why are saddle points more common than local minima in high dimensions?",
+    "o": [
+     "Gradients are larger there",
+     "A local minimum needs every Hessian eigenvalue positive, which is vanishingly unlikely across millions of dimensions",
+     "Saddle points attract gradient descent",
+     "Local minima require convexity"
+    ],
+    "a": 1,
+    "w": "Almost every stationary point has some negative direction, making it escapable - and mini-batch noise helps find that direction."
+   },
+   {
+    "t": "Descent diverges on a perfectly convex bowl. What is the likely cause?",
+    "o": [
+     "The function is secretly non-convex",
+     "The learning rate is too large for the curvature",
+     "The starting point is wrong",
+     "There are several minima"
+    ],
+    "a": 1,
+    "w": "Convexity guarantees a unique minimum exists; it says nothing about whether your step size will find it. The safe step depends on curvature."
    }
   ]
  },
@@ -9498,6 +9618,46 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "w·x + b is y = mx + c with more inputs. Weights play the role of slopes and the bias plays the role of the intercept, which is why a perceptron can only ever draw a straight boundary."
+   }
+  ]
+ },
+ {
+  "path": "maths/expectation_and_variance.html",
+  "title": "Expectation and Variance",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "A fair die has E[X] = 3.5. What does that tell you?",
+    "o": [
+     "3.5 is the most likely roll",
+     "It is the balance point of the distribution, and need not be attainable",
+     "Half the rolls are below 3.5",
+     "The variance is 3.5"
+    ],
+    "a": 1,
+    "w": "No die has ever rolled a 3.5. The expectation is where the distribution would balance on a pin, not a prediction of any single outcome."
+   },
+   {
+    "t": "When does Var(X + Y) = Var(X) + Var(Y)?",
+    "o": [
+     "Always",
+     "Only when X and Y are independent",
+     "Only when both are normal",
+     "Only when the means are equal"
+    ],
+    "a": 1,
+    "w": "Expectation adds unconditionally; variance does not. Otherwise a covariance term appears - which is why diversification and bagging both depend on decorrelation."
+   },
+   {
+    "t": "Why is Var(X) = E[X^2] - (E[X])^2 numerically dangerous?",
+    "o": [
+     "It needs two passes over the data",
+     "With large values and small variance the two terms nearly cancel, destroying precision",
+     "It can return a negative number in exact arithmetic",
+     "It assumes independence"
+    ],
+    "a": 1,
+    "w": "It is the one-pass formula, and the subtraction of two nearly equal large numbers is what Welford's algorithm exists to avoid."
    }
   ]
  },
@@ -9753,6 +9913,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "maths/quantiles_and_percentiles.html",
+  "title": "Quantiles and Percentiles",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "Why is the median unaffected by adding one enormous value?",
+    "o": [
+     "It is recomputed from the mean",
+     "It depends only on order, so a new extreme value is just 'one more above the middle'",
+     "Outliers are removed first",
+     "It uses the IQR"
+    ],
+    "a": 1,
+    "w": "A mean is a balance point and moves when anything moves. That robustness is why median income is reported rather than mean income."
+   },
+   {
+    "t": "What do the whiskers on a box plot reach?",
+    "o": [
+     "The minimum and maximum",
+     "The furthest points within 1.5 times the IQR of the box",
+     "Two standard deviations",
+     "The 5th and 95th percentiles"
+    ],
+    "a": 1,
+    "w": "The 1.5 is a Tukey convention, not a test. For a normal distribution it flags about 0.7% of points, and a skewed distribution produces them by construction."
+   },
+   {
+    "t": "Why can you not average the p99 of two servers?",
+    "o": [
+     "The samples are different sizes",
+     "Percentiles are not linear - aggregating them needs the underlying distributions",
+     "p99 is not a percentile",
+     "The servers are not independent"
+    ],
+    "a": 1,
+    "w": "It is the commonest error in latency reporting and it always understates the tail. Structures like t-digest exist to aggregate quantiles properly."
+   }
+  ]
+ },
+ {
   "path": "maths/rank_and_linear_independence.html",
   "title": "Rank and Linear Independence",
   "cat": "Maths",
@@ -9776,6 +9976,166 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "maths/sampling_distributions.html",
+  "title": "Sampling Distributions and Standard Error",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "What is a sampling distribution?",
+    "o": [
+     "The distribution of the data in one sample",
+     "The distribution of a statistic across all the samples you could have drawn",
+     "The distribution of the population",
+     "The distribution of the residuals"
+    ],
+    "a": 1,
+    "w": "You only ever draw one sample, so you reason about what would happen across the samples you did not take. It is the object a confidence interval describes."
+   },
+   {
+    "t": "Which shrinks as you collect more data?",
+    "o": [
+     "The standard deviation of the population",
+     "The standard error of the estimate",
+     "Both",
+     "Neither"
+    ],
+    "a": 1,
+    "w": "SD describes the data and is a property of the population. SE describes an estimate. If the number would change when you collect more data of the same kind, it is a standard error."
+   },
+   {
+    "t": "Why do national polls settle around 1,000 respondents?",
+    "o": [
+     "It is a legal requirement",
+     "The sqrt(n) curve flattens, so further precision costs four times the data and bias dominates anyway",
+     "Larger samples become biased",
+     "The central limit theorem requires it"
+    ],
+    "a": 1,
+    "w": "Every halving of uncertainty costs four times the data. Past that point the remaining error is dominated by sampling bias, which more data cannot fix."
+   }
+  ]
+ },
+ {
+  "path": "maths/singular_value_decomposition.html",
+  "title": "Singular Value Decomposition",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "What shape does the unit circle become under any 2x2 matrix?",
+    "o": [
+     "Another circle",
+     "An ellipse",
+     "A parallelogram",
+     "It depends on the matrix"
+    ],
+    "a": 1,
+    "w": "Always an ellipse - that is what the SVD asserts. Rotate, stretch along the axes, rotate again, and stage 3 is an axis-aligned ellipse for every matrix."
+   },
+   {
+    "t": "What does a large condition number tell you?",
+    "o": [
+     "The matrix is large",
+     "The matrix nearly flattens some direction, so solving with it amplifies error",
+     "The determinant is negative",
+     "The singular values are complex"
+    ],
+    "a": 1,
+    "w": "It is the largest singular value over the smallest. Near 1 means all directions are treated alike; large means the ellipse is a sliver."
+   },
+   {
+    "t": "Why is the SVD preferred over an eigendecomposition?",
+    "o": [
+     "It is faster",
+     "It exists for every matrix of every shape, and its bases are orthonormal",
+     "Its values can be complex",
+     "It does not require centring"
+    ],
+    "a": 1,
+    "w": "Eigendecomposition needs a square matrix and does not always exist even then; eigenvectors need not be perpendicular. Singular values are always real and non-negative."
+   }
+  ]
+ },
+ {
+  "path": "maths/taylor_series.html",
+  "title": "Taylor Series",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "What does the second term of a Taylor series give you?",
+    "o": [
+     "The value at the point",
+     "The tangent line",
+     "The curvature",
+     "The radius of convergence"
+    ],
+    "a": 1,
+    "w": "One term is a constant at the right height; two is the tangent; three is the quadratic that also has the right bend - which is what Newton's method optimises."
+   },
+   {
+    "t": "Why does the series for 1/(1+x^2) stop improving beyond x = 1?",
+    "o": [
+     "The function is not smooth there",
+     "It has complex poles at distance 1 from the origin, which sets the radius of convergence",
+     "Floating point runs out of precision",
+     "The derivatives become zero"
+    ],
+    "a": 1,
+    "w": "The function is perfectly smooth on the real line. The radius is the distance to the nearest singularity wherever it sits, including off the real line."
+   },
+   {
+    "t": "A Taylor series is a statement about:",
+    "o": [
+     "The whole function",
+     "A neighbourhood of the expansion point",
+     "The function's maximum",
+     "Its integral"
+    ],
+    "a": 1,
+    "w": "It is built entirely from derivatives at one point, so it cannot know anything about elsewhere. Move the expansion point and the region of agreement moves with it."
+   }
+  ]
+ },
+ {
+  "path": "maths/central_limit_theorem.html",
+  "title": "The Central Limit Theorem",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "What exactly becomes normal?",
+    "o": [
+     "The population",
+     "The sample",
+     "The distribution of the sample mean across repeated samples",
+     "The variance"
+    ],
+    "a": 2,
+    "w": "The sample looks like the population, because that is what it is drawn from. It is the mean that goes normal, and the population's shape does not appear in the statement."
+   },
+   {
+    "t": "You want to halve your uncertainty about a mean. What must you do?",
+    "o": [
+     "Double the sample",
+     "Quadruple the sample",
+     "Halve the sample",
+     "Nothing - it is fixed by the population"
+    ],
+    "a": 1,
+    "w": "The standard error is sigma over root n. That square root is why precision gets expensive and why polls stubbornly report margins of about three percent."
+   },
+   {
+    "t": "For which population does the theorem fail entirely?",
+    "o": [
+     "A bimodal one",
+     "A skewed one",
+     "A Cauchy distribution, which has no finite variance",
+     "A discrete one"
+    ],
+    "a": 2,
+    "w": "Average n Cauchy draws and you get another Cauchy with the same spread as one draw. Bimodal and skewed populations converge - just more slowly."
+   }
+  ]
+ },
+ {
   "path": "maths/the_chain_rule.html",
   "title": "The Chain Rule",
   "cat": "Maths",
@@ -9791,6 +10151,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Reading the Diagram”?",
     "ans": "The chain strip shows x → u → y with each link's local derivative underneath. The app also computes a numeric check — the slope measured by actually nudging x by a tiny amount — and it always matches the product. The rule is not an approximation."
+   }
+  ]
+ },
+ {
+  "path": "maths/jacobian_and_hessian.html",
+  "title": "The Jacobian and the Hessian",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "What does the Hessian tell you that the gradient does not?",
+    "o": [
+     "Which direction is downhill",
+     "How quickly the gradient changes, and therefore how far a step can safely go",
+     "The value of the function",
+     "Whether the function is continuous"
+    ],
+    "a": 1,
+    "w": "The tangent says which way and how steeply; it says nothing about how long that remains true. Curvature is exactly what a step size wants to know."
+   },
+   {
+    "t": "Why is Newton's method not used to train large neural networks?",
+    "o": [
+     "It converges too slowly",
+     "The Hessian has n^2 entries and costs about n^3 to invert, which is impossible at a million parameters",
+     "It requires a convex loss",
+     "It cannot handle mini-batches"
+    ],
+    "a": 1,
+    "w": "Near a minimum it converges quadratically, which is far better than gradient descent - it is purely the arithmetic that rules it out. Adam keeps a diagonal approximation instead."
+   },
+   {
+    "t": "Why does backpropagation multiply Jacobians right to left?",
+    "o": [
+     "It is more numerically stable",
+     "Starting from the scalar loss keeps every intermediate a vector rather than a full matrix",
+     "The chain rule requires that order",
+     "It allows parallelism"
+    ],
+    "a": 1,
+    "w": "Left to right would carry a full matrix at every step. Reverse mode is why a backward pass costs a small multiple of a forward pass at any parameter count."
    }
   ]
  },

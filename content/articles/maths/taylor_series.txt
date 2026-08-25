@@ -1,0 +1,85 @@
+title: Taylor Series
+intro: Replacing a hard function with a polynomial, and being precise about where that is allowed.
+
+## The construction
+
+Pick a point. Build a polynomial that agrees with the function there, then also
+agrees with its slope, then its curvature, then the next derivative, and so on.
+
+```
+f(x)  ~  f(a) + f'(a)(x-a) + f''(a)(x-a)^2/2! + f'''(a)(x-a)^3/3! + ...
+```
+
+Each term pins down one more derivative at `a`. The factorials are there
+because differentiating `(x-a)^k` repeatedly produces `k!`, and dividing by it
+cancels exactly.
+
+Set the terms control to 0 and step it upward. At 0 you have a horizontal line
+at the right height. At 1, the tangent. At 2, a parabola that also has the
+right bend. Each step hugs the curve a little further out.
+
+## Local, and only local
+
+The readout gives how far the approximation stays within 0.1 of the truth, and
+this is the number worth watching.
+
+More terms extend the range. They do not make it infinite, and the extension
+gets slower. The polynomial agrees perfectly at the expansion point and gets
+worse with distance, always &mdash; the whole construction is built from
+information at a single point, so it cannot know anything about elsewhere.
+
+Move the expansion point and the region of agreement moves with it. That is the
+right mental model: a Taylor series is a statement about a neighbourhood.
+
+## Where it earns its keep
+
+**Second-order optimisation.** Newton's method is exactly the two-term
+expansion of the loss: approximate it as a quadratic near the current point,
+jump to that quadratic's minimum, repeat. Everything in
+[the Hessian module](jacobian_and_hessian.html) is this idea.
+
+**Small-angle approximations.** `sin(x) ~ x` for small `x` is the one-term
+expansion, and it is why pendulum equations are solvable at all.
+
+**Backpropagation's justification.** The chain rule is exact, but the argument
+that a small weight change produces a proportional loss change is a first-order
+expansion.
+
+**Numerical methods.** Finite differences, Runge-Kutta integrators and most
+error bounds are derived by expanding and discarding.
+
+**exp, log, sin in a standard library.** Not looked up in a table; evaluated
+from a truncated series with a range reduction in front of it.
+
+## Where it fails
+
+Switch the function control to `1 / (1 + x squared)`.
+
+This function is smooth everywhere on the real line &mdash; no kinks, no
+asymptotes, differentiable as many times as you like. Yet expand it about 0 and
+add terms, and beyond about x = 1 the approximation does not merely fail to
+improve; it gets **worse** with every term added.
+
+The reason is invisible from the real line. Viewed over the complex numbers the
+function has poles at *i* and *&minus;i*, distance 1 from the origin, and the
+radius of convergence is the distance to the nearest singularity wherever it
+sits. That radius is 1, and no number of real terms escapes it.
+
+This is the Runge phenomenon, and its lesson is practical: **smooth on the reals
+does not mean a Taylor series converges everywhere.** Adding terms is not
+always progress.
+
+## Where it goes wrong
+
+**Extrapolating far from the expansion point.** The error grows with distance,
+and past the radius of convergence it grows without bound.
+
+**Assuming more terms is always better.** Not past the radius, and not
+numerically &mdash; high-order terms involve large factorials and cancelling
+quantities, which loses precision in floating point.
+
+**Expanding about the wrong point.** Expand about where you will evaluate. A
+series about 0 is the wrong tool for estimating at x = 5.
+
+**Forgetting smoothness is required.** The function needs derivatives of every
+order at the expansion point. `|x|` has none at 0, so there is no series there.
