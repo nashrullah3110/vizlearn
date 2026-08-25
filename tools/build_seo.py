@@ -154,11 +154,13 @@ SHARED_SCRIPTS = (
     # The plotter and numeric helpers, shared by the two harnesses below.
     # Listed before them: deferred scripts run in document order, so this
     # defines window.VizML before either reads it.
-    ("vizlearn-plot.js", ("data-vz-ml", "data-vz-math")),
+    ("vizlearn-plot.js", ("data-vz-ml", "data-vz-math", "data-vz-dl")),
     # The workflow simulations on the generated machine_learning/ modules.
     ("vizlearn-ml.js", "data-vz-ml"),
     # The demonstrations on the generated maths/ modules.
     ("vizlearn-math.js", "data-vz-math"),
+    # The demonstrations on the generated deep_learning/ modules.
+    ("vizlearn-dl.js", "data-vz-dl"),
     # Copy buttons. Wanted wherever there is a code block of either kind.
     ("vizlearn-copy.js", ("<pre", "data-vz-code")),
 )

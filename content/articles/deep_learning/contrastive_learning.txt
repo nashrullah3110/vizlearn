@@ -1,0 +1,107 @@
+title: Contrastive and Self-Supervised Learning
+intro: Getting a useful representation out of unlabelled data by turning the data into its own supervision.
+
+## The pretext
+
+Labels are expensive and unlabelled data is not. Self-supervised learning
+invents a task from the data itself, so that solving it requires understanding
+the content.
+
+The contrastive version is stark: take an image, produce two augmented views,
+and require their representations to be close. Require every other image's views
+to be far away.
+
+If a model can recognise that a crop and a colour-jittered version of the same
+photograph belong together, while distinguishing them from a thousand other
+photographs, it has had to learn what the photograph is *of*.
+
+## InfoNCE
+
+The loss is a softmax over similarities:
+
+```
+loss  =  -log[  exp(sim(a, p) / tau)
+              / ( exp(sim(a, p) / tau) + sum over negatives exp(sim(a, n) / tau) ) ]
+```
+
+It is exactly cross-entropy, where the classes are "which of these candidates is
+the match" and the correct answer is the positive. That framing is worth
+keeping: everything you know about cross-entropy applies here.
+
+The visualisation puts the anchor and its positive on the unit circle with the
+negatives scattered around, and computes the real loss. Move the jitter control
+and the positive drifts from the anchor &mdash; more aggressive augmentation
+makes the task harder, and the loss rises.
+
+## Temperature
+
+`tau` is small and it matters more than anything else in the loss.
+
+**Low temperature** sharpens the softmax, so the sum is dominated by the single
+most similar negative. The gradient concentrates on the hardest case, which
+learns fine distinctions quickly and is unstable.
+
+**High temperature** flattens everything until all negatives count about the
+same, and the loss stops discriminating.
+
+Drag it across its range and watch the loss move by an order of magnitude with
+no change to the geometry at all.
+
+## Negatives, and doing without them
+
+More negatives generally means better representations &mdash; the task is
+harder, so the answer is more informative. The readout shows the loss rising
+with the count for exactly that reason.
+
+That created an engineering problem, since negatives usually come from the
+batch and batches have limits. **SimCLR** used very large batches. **MoCo** kept
+a queue of representations from previous batches with a slowly-updated encoder.
+
+Then a second family showed negatives were not required at all. **BYOL** and
+**SimSiam** use only positive pairs, avoiding the collapse everyone expected
+&mdash; where the encoder maps everything to one point and scores perfectly
+&mdash; through an asymmetry: a predictor head on one branch and a stop-gradient
+on the other. **Barlow Twins** and **VICReg** instead add a term that decorrelates
+the representation's dimensions.
+
+That negatives turned out to be optional was a genuine surprise, and why it
+works is still argued over.
+
+## Augmentation is the design
+
+The augmentations decide what the model learns to ignore, and therefore what it
+learns.
+
+Colour jitter teaches colour invariance &mdash; excellent for object recognition
+and wrong for a task where colour is the label. Random cropping teaches that
+parts imply the whole, which is most of what makes contrastive learning work on
+images and is also why it can learn to match textures rather than objects.
+
+SimCLR's ablations found the augmentation choice mattered more than the
+architecture, which is an unusual finding and a durable one.
+
+## Where it is used
+
+**Pretraining** on unlabelled data, then fine-tuning on a small labelled set.
+This is the main use, and it is why the field cared.
+
+**CLIP** contrasts images against their captions rather than against other
+views, which is what produced a model that can be prompted in language.
+
+**Sentence embeddings.** SimCSE contrasts a sentence against itself under
+dropout.
+
+**Recommendation and retrieval**, where "these two things go together" is the
+native form of the data.
+
+## Where it goes wrong
+
+**Augmentations that destroy the label.** Colour jitter on a task about colour.
+
+**Temperature left at a default.** Tune it; it does more than the architecture.
+
+**Too few negatives** without one of the methods designed to work that way.
+
+**False negatives.** Two different images of the same class are pushed apart by
+the loss, which is a real cost of not having labels, and what supervised
+contrastive learning fixes when labels are available.

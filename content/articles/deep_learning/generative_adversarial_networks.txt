@@ -1,0 +1,96 @@
+title: Generative Adversarial Networks
+intro: A generator and a critic pushed against each other, and the specific way that arrangement fails.
+
+## The setup
+
+Two networks, one loss.
+
+The **generator** maps random noise to samples, trying to make them
+indistinguishable from real data. The **discriminator** takes a sample and
+estimates whether it is real, trying to be right.
+
+They optimise the same objective in opposite directions. That makes it a
+**minimax game**, and it is why GAN training is unlike anything else: there is
+no loss that decreases, and a falling generator loss might mean the generator is
+improving or the discriminator is losing.
+
+## The second panel is not learned
+
+For fixed real and generated distributions, the optimal discriminator has a
+closed form:
+
+```
+D*(x)  =  p_real(x) / ( p_real(x) + p_fake(x) )
+```
+
+The lower panel plots exactly that. It is not a trained network; it is what
+training drives towards, and its shape is what makes the failure mode legible.
+
+## Where the gradient goes
+
+Drag the generator's mean far from the real distribution. The overlap in the
+readout collapses toward zero, and the discriminator's curve becomes flat
+&mdash; near 1 where the real data lives, near 0 where the fakes are, with a
+steep cliff between.
+
+**Flat means no gradient.** The generator improves by following the slope of the
+discriminator's opinion, and if that opinion is constant everywhere the fakes
+live, there is nothing to follow. The better the discriminator, the worse this
+gets, which is a genuinely awkward property: your generator's learning signal
+degrades as its opponent improves.
+
+Now bring the mean back. Where the distributions overlap the curve slopes, and
+that slope is the generator's gradient.
+
+At full overlap the discriminator sits at 0.5 everywhere &mdash; it cannot tell
+them apart, which is the equilibrium the whole arrangement targets.
+
+## The failures
+
+**Vanishing gradients**, as above. The non-saturating loss helps; the deeper fix
+was **Wasserstein GAN**, which replaces the classifier with a critic estimating
+earth-mover distance. That distance is informative even for disjoint
+distributions, so the gradient survives.
+
+**Mode collapse.** The generator finds a narrow region that fools the
+discriminator and stays there. Shrink the generator's spread until it is a
+spike inside the real distribution: it is fooling the discriminator locally
+while representing almost none of the data. Nothing in the objective directly
+punishes this, because the discriminator judges samples one at a time and never
+sees the lack of variety.
+
+**Non-convergence.** The two can cycle indefinitely, each undoing the other.
+Two-timescale learning rates, spectral normalisation and gradient penalties are
+all responses to it.
+
+**No usable progress metric.** The loss does not say whether samples are
+improving. FID and Inception Score exist because of this, and both are proxies.
+
+## Against the alternatives
+
+**Sharp samples.** GANs produce them where
+[VAEs](variational_autoencoders.html) blur, because nothing rewards averaging
+&mdash; a hedged sample is exactly what the discriminator catches.
+
+**No likelihood.** A GAN cannot say how probable a given sample is, which rules
+out several uses.
+
+**Hard to train**, as above.
+
+[Diffusion models](diffusion_models.html) have largely displaced GANs for image
+generation, trading sampling speed for training stability. GANs remain
+competitive where inference must be a single forward pass, and the adversarial
+idea itself survives everywhere &mdash; in domain adaptation, in perceptual
+losses, in super-resolution.
+
+## Where it goes wrong
+
+**Reading the loss curves.** They mostly say who is winning, not whether the
+samples are good. Look at samples.
+
+**Letting the discriminator win.** A perfect discriminator gives no gradient.
+
+**Ignoring mode collapse** because the samples look fine individually. Check the
+variety, not the quality.
+
+**Expecting a likelihood.** There is not one.

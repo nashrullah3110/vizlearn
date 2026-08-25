@@ -76,6 +76,7 @@ EXTRA = [
     "./assets/vizlearn-plot.js",
     "./assets/vizlearn-ml.js",
     "./assets/vizlearn-math.js",
+    "./assets/vizlearn-dl.js",
     "./assets/vizlearn-rails.js",
     "./assets/apple-touch-icon.png",
     "./assets/icon-192.png",

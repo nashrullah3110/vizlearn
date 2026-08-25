@@ -173,6 +173,21 @@ SEQUENCE = {
         "deep_learning/neural_network_for_unsupervised_learning.html",
         "deep_learning/reproducibility_of_model.html",
         "deep_learning/model_training_on_cpu_vs_gpu.html",
+        # Tier 1 of the deep learning expansion. The three engineering pages
+        # sit beside the training material they extend; the representation and
+        # generative pages run in dependency order, with the autoencoder before
+        # the VAE that fixes it and the GAN before the diffusion models that
+        # replaced it.
+        "deep_learning/mixed_precision_training.html",
+        "deep_learning/gradient_accumulation.html",
+        "deep_learning/label_smoothing.html",
+        "deep_learning/embedding_layers.html",
+        "deep_learning/autoencoders.html",
+        "deep_learning/variational_autoencoders.html",
+        "deep_learning/generative_adversarial_networks.html",
+        "deep_learning/diffusion_models.html",
+        "deep_learning/contrastive_learning.html",
+        "deep_learning/seq2seq_and_beam_search.html",
     ],
 
     # Cost -> built-in types -> search -> sort -> recursion -> structures ->

@@ -996,6 +996,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Compare ReLU, sigmoid, tanh and others on the same input, and see how each one bends the signal passing through a layer."
  },
  {
+  "title": "Autoencoders",
+  "path": "deep_learning/autoencoders.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": ""
+ },
+ {
   "title": "Backpropagation and the Computational Graph",
   "path": "deep_learning/backpropagation.html",
   "category": "Deep Learning",
@@ -1020,12 +1028,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Compare stochastic, mini-batch and full-batch training, and see how batch size trades gradient noise against speed."
  },
  {
+  "title": "Contrastive and Self-Supervised Learning",
+  "path": "deep_learning/contrastive_learning.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": ""
+ },
+ {
   "title": "Data Sparsity",
   "path": "deep_learning/data_sparsity.html",
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
   "desc": "Feed mostly-zero inputs through a network and watch entire pathways go dormant, because anything multiplied by zero stays zero."
+ },
+ {
+  "title": "Diffusion Models",
+  "path": "deep_learning/diffusion_models.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": ""
  },
  {
   "title": "Dropout Regularization",
@@ -1044,12 +1068,36 @@ window.VIZLEARN_MODULES = [
   "desc": "Watch validation loss bottom out then start climbing, and see early stopping halt training at the moment generalisation peaks."
  },
  {
+  "title": "Embedding Layers",
+  "path": "deep_learning/embedding_layers.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": ""
+ },
+ {
   "title": "Feature Scaling & Weight Bias",
   "path": "deep_learning/feature_scaling_in_neural_networks.html",
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
   "desc": "See what happens when one feature is measured in thousands and another in decimals, and how scaling rebalances the gradients."
+ },
+ {
+  "title": "Generative Adversarial Networks",
+  "path": "deep_learning/generative_adversarial_networks.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": ""
+ },
+ {
+  "title": "Gradient Accumulation",
+  "path": "deep_learning/gradient_accumulation.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": ""
  },
  {
   "title": "Gradient Clipping",
@@ -1092,6 +1140,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Run grid search and random search side by side on the same model and see which finds strong hyperparameters in fewer trials."
  },
  {
+  "title": "Label Smoothing",
+  "path": "deep_learning/label_smoothing.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": ""
+ },
+ {
   "title": "Layer Normalization",
   "path": "deep_learning/layer_normalization.html",
   "category": "Deep Learning",
@@ -1114,6 +1170,14 @@ window.VIZLEARN_MODULES = [
   "topic": "dl",
   "icon": "network",
   "desc": "Take gradient descent one step at a time and watch the best-fit line and its mean squared error converge together."
+ },
+ {
+  "title": "Mixed Precision and Loss Scaling",
+  "path": "deep_learning/mixed_precision_training.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": ""
  },
  {
   "title": "Model Reproducibility",
@@ -1212,6 +1276,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Chain the same shrinking layer N times and watch the gradient vanish before it reaches the input. Add a skip connection to each layer and watch it stop vanishing."
  },
  {
+  "title": "Seq2seq and Beam Search",
+  "path": "deep_learning/seq2seq_and_beam_search.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": ""
+ },
+ {
   "title": "Softmax and Cross-Entropy",
   "path": "deep_learning/softmax_and_cross_entropy.html",
   "category": "Deep Learning",
@@ -1226,6 +1298,14 @@ window.VIZLEARN_MODULES = [
   "topic": "dl",
   "icon": "network",
   "desc": "Watch gradients shrink to nothing or blow up as they multiply back through layers, and see what keeps them in range."
+ },
+ {
+  "title": "Variational Autoencoders",
+  "path": "deep_learning/variational_autoencoders.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": ""
  },
  {
   "title": "Weight Initialization Methods",

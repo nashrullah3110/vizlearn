@@ -1,0 +1,95 @@
+title: Diffusion Models
+intro: Learning to reverse a process that is trivial to run forwards, and why that turned out to work so much better than the alternatives.
+
+## Forwards is free
+
+Take data and add a little Gaussian noise. Repeat. After enough steps nothing of
+the original remains and you have pure noise.
+
+This **forward process** has no parameters and nothing to learn. Better still, it
+has a closed form: you can jump straight to any step without simulating the ones
+before it.
+
+```
+x_t  =  sqrt(abar_t) * x_0  +  sqrt(1 - abar_t) * epsilon
+```
+
+`abar_t` is the fraction of the original signal still present, and it decreases
+along a fixed **schedule**. The second panel plots the cosine schedule used
+here, and the readout gives the signal and noise proportions at whatever step
+you select.
+
+That closed form is why training is cheap: pick a random `t`, jump there
+directly, and train on that one step. No simulation.
+
+## Backwards is the model
+
+The generative process runs the other way: start from pure noise and undo one
+step at a time until an image appears.
+
+Each reverse step needs to know what noise was added, and that is the entire
+learned component. The network takes `x_t` and `t` and predicts `epsilon`.
+
+Given the noise, recovering the original is rearranging the equation above:
+
+```
+x_0  =  ( x_t  -  sqrt(1 - abar_t) * epsilon )  /  sqrt(abar_t)
+```
+
+The demonstration does exactly this with the *true* noise &mdash; the target the
+model is trained on &mdash; and the readout gives the recovery error, which is
+essentially zero at every step. **The forward process is exactly invertible if
+you know the noise.** Predicting it is the whole job, and it is why the loss is
+a plain squared error on a noise vector rather than anything adversarial.
+
+## Why this beats what came before
+
+**A stable objective.** Predicting noise is ordinary supervised regression. No
+minimax game, no [discriminator to balance](generative_adversarial_networks.html),
+no mode collapse. Training a diffusion model is boring in a way GAN training
+never was, and that is the point.
+
+**Coverage.** GANs can ignore parts of the distribution. A diffusion model is
+trained to denoise every example, so it cannot quietly drop a mode.
+
+**Sharpness.** Unlike a [VAE](variational_autoencoders.html), there is no
+pixel-averaging term rewarding a blurred hedge.
+
+The cost is **sampling speed**. Generation is many sequential passes &mdash;
+originally a thousand, now often ten to fifty with a better sampler &mdash;
+where a GAN needs one. DDIM and distillation methods have shortened this
+considerably, and it remains the main disadvantage.
+
+## The schedule matters
+
+Drag `t` from 0 to 60 and watch how quickly the signal disappears. The original
+DDPM used a linear schedule, which destroys the signal too fast at the end
+&mdash; the last steps are all noise and contribute nothing to learning. The
+cosine schedule shown here keeps more signal for longer and trains better.
+
+Schedule design is a real part of the field, and so is the choice of what the
+model predicts: the noise, the original, or a mixture called `v`, all of which
+are algebraically equivalent and behave differently in practice.
+
+## In practice
+
+**Latent diffusion** runs the whole process in a
+[VAE's](variational_autoencoders.html) latent space rather than in pixels,
+cutting the cost enormously. Stable Diffusion is this.
+
+**Classifier-free guidance** trains the model both with and without a text
+condition, then extrapolates away from the unconditioned prediction at sampling
+time. It is what makes prompts actually steer the output, and turning it up
+trades diversity for prompt adherence.
+
+## Where it goes wrong
+
+**Expecting fast sampling.** It is the known weakness.
+
+**A schedule that destroys the signal too early.** Wasted steps.
+
+**Guidance turned up too high.** Saturated, oversimplified images and collapsed
+diversity.
+
+**Assuming the model predicts the image.** Most predict the noise, and confusing
+the two makes the sampling code nonsense.

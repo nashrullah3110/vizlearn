@@ -1,0 +1,109 @@
+title: Variational Autoencoders
+intro: Turning an autoencoder into something you can sample from, and the two forces that have to be balanced to do it.
+
+## The problem with a plain autoencoder
+
+An [autoencoder](autoencoders.html) maps each input to a single point in the
+latent space, and nothing organises those points. Nearby codes need not decode
+to similar things, and the space between clusters is undefined territory.
+
+So you cannot generate. Pick a random latent vector and decode it, and you
+almost certainly land somewhere the decoder was never trained, and the output is
+noise.
+
+A VAE fixes this by making the latent space **continuous and bounded** &mdash;
+by construction, not by hope.
+
+## Encoding to a distribution
+
+The encoder outputs a mean and a standard deviation rather than a point, and the
+code is *sampled* from that distribution during training.
+
+That single change does the work. Because the same input produces different
+codes on different passes, the decoder must handle a whole neighbourhood, not a
+point. Neighbourhoods overlap and the space fills in.
+
+Drag the sigma control and watch the clusters spread. At small sigma you have a
+plain autoencoder again, with tight clumps and gaps between them. At large sigma
+the neighbourhoods swallow each other.
+
+## The reparameterisation trick
+
+There is an obstacle: you cannot backpropagate through a sampling operation.
+Sampling is not a differentiable function of the parameters that produced the
+distribution.
+
+The trick is to move the randomness out of the path:
+
+```
+z  =  mu  +  sigma * epsilon        with epsilon ~ N(0, 1)
+```
+
+Now the random part, `epsilon`, is an input rather than an operation. The
+gradient flows to `mu` and `sigma` normally, because with `epsilon` fixed the
+expression is an ordinary differentiable function of them.
+
+That is the whole trick, it is two lines of code, and VAEs were not trainable
+without it. It reappears in other places where a sample must be differentiated
+through &mdash; the Gumbel-softmax does the same job for discrete variables.
+
+## Two terms in tension
+
+```
+loss  =  reconstruction error  +  KL( encoder distribution || prior )
+```
+
+The **reconstruction** term wants tight, well-separated codes: the easiest thing
+to decode accurately.
+
+The **KL** term wants every encoded distribution to look like the prior &mdash;
+the dashed circle. It is what makes the space samplable, because if every code
+looks like a draw from the prior then a draw from the prior looks like a code.
+
+They pull against each other, and the readout names which is winning.
+
+**KL winning** is *posterior collapse*: the encoder outputs the prior regardless
+of input, the clusters merge, and the decoder ignores the latent entirely.
+Raise sigma or lower the separation to see it.
+
+**Reconstruction winning** gives tight clusters with empty space between them
+&mdash; excellent reconstruction, and sampling lands in the gaps.
+
+The usual control is **beta-VAE**, which weights the KL term explicitly. High
+beta pushes towards disentangled but blurry; low beta towards sharp but not
+samplable. Many implementations also *anneal* beta from zero, letting
+reconstruction establish itself before the KL pressure arrives.
+
+## Jensen, and where the loss comes from
+
+That loss is not arbitrary. The quantity you actually want to maximise is
+`log p(x)`, which contains an intractable integral over the latent.
+
+[Jensen's inequality](../maths/jensens_inequality.html) converts it into a lower
+bound &mdash; the **ELBO** &mdash; which decomposes into exactly the two terms
+above. Maximising the bound cannot decrease the true likelihood, and the gap
+between them is a KL divergence.
+
+## Against GANs
+
+VAEs give a principled objective, a meaningful latent space, stable training and
+a likelihood bound. Their samples are **blurry**, because the pixel-wise
+reconstruction term rewards hedging: when uncertain, the average of the
+possibilities scores better than any single one.
+
+[GANs](generative_adversarial_networks.html) produce sharp samples and are far
+harder to train. Diffusion models have largely displaced both for image
+generation, and the VAE survives inside them &mdash; latent diffusion runs the
+diffusion process in a VAE's latent space rather than in pixels.
+
+## Where it goes wrong
+
+**Posterior collapse**, especially with a powerful decoder that can do well
+without the latent. Anneal the KL, or weaken the decoder.
+
+**Expecting sharp samples.** The blur is structural.
+
+**Forgetting the reparameterisation trick.** Without it there is no gradient.
+
+**Reading latent dimensions as meaningful.** A plain VAE is not disentangled;
+beta-VAE encourages it and does not guarantee it.

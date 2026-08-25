@@ -1,0 +1,95 @@
+title: Label Smoothing
+intro: A one-line change to the target that improves calibration, and the reason the loss no longer reaches zero.
+
+## The problem with a hard target
+
+Cross-entropy with a one-hot target asks the model to put probability 1 on the
+correct class and 0 on everything else.
+
+Softmax cannot produce exactly 1. It approaches it as the correct logit runs
+away from the others, and reaches it only in the limit. So the target is
+unattainable, the gradient never vanishes, and training keeps pushing the logit
+gap wider for as long as you let it.
+
+The consequences are familiar. The model becomes **overconfident**, reporting
+0.99 on cases it gets wrong. It **overfits**, because widening logits on training
+examples is always an available way to reduce the loss. And it is **badly
+calibrated**, in exactly the way
+[the calibration module](../machine_learning/probability_calibration.html)
+measures.
+
+## The change
+
+Move a little probability off the correct class and spread it over the others:
+
+```
+target[correct]  =  1 - eps + eps/K
+target[others]   =  eps/K
+```
+
+Drag epsilon and watch the bars. At 0 you have the one-hot target. At 0.1 the
+true class asks for 0.91 and each of nine others asks for about 0.011.
+
+That is the entire technique.
+
+## Why it fixes the problem
+
+The readout gives the **optimal logit gap**: how far apart the logits have to be
+to match the target exactly.
+
+At epsilon 0 it is infinite, which is the problem restated. At epsilon 0.1 it is
+a specific finite number, and once the model reaches it the gradient is zero.
+The model now has a reason to *stop*.
+
+That is the mechanism. Not noise, not regularisation in the weight-decay sense
+&mdash; a reachable target where before there was none.
+
+## The loss will not reach zero
+
+The readout also gives the minimum achievable loss, which is the entropy of the
+smoothed target.
+
+A model matching the smoothed target perfectly still reports a loss around 0.5
+at typical settings. This surprises people who expect training loss to approach
+zero, and it is not a bug: you changed what perfect means.
+
+It also means training and validation losses are no longer comparable with runs
+that did not use smoothing. Compare accuracy, or compare like with like.
+
+## What it buys, and what it costs
+
+**Better calibration.** The headline benefit. Confidences become closer to
+observed accuracies.
+
+**Better generalisation.** Consistent small gains across image classification
+and translation. It was in the Inception-v3 paper and in the original
+Transformer, at 0.1 in both, and 0.1 has been the default ever since.
+
+**Tighter class clusters.** Representations of a class group more tightly, with
+more even distances between classes.
+
+That last one has a cost. **Label smoothing hurts distillation.** A student
+learns from the teacher's full output distribution, and the informative part is
+the relative sizes of the *wrong* classes &mdash; that this dog was slightly cat
+and not at all lorry. Smoothing deliberately flattens exactly that, erasing what
+the student was supposed to learn. If a model is going to be a distillation
+teacher, train it without.
+
+## Where it goes wrong
+
+**Epsilon too large.** Past about 0.2 you are actively teaching the model that
+wrong answers are plausible, and accuracy falls. Drag it up and watch the target
+flatten.
+
+**Comparing losses across runs.** The floor moved.
+
+**Using it on a teacher model.** It removes the dark knowledge distillation
+depends on.
+
+**Applying it to regression.** It is a change to a categorical target and has no
+meaning without one.
+
+**Expecting it to fix a badly calibrated model on its own.** It helps; explicit
+[temperature
+scaling](../machine_learning/probability_calibration.html) on a validation set
+helps more, and the two combine.

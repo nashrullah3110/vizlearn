@@ -1,0 +1,85 @@
+title: Seq2seq and Beam Search
+intro: How a model that emits one token at a time chooses a whole sequence, and why the obvious method is not the best one.
+
+## The architecture
+
+Encoder-decoder handles the case where input and output are both sequences and
+their lengths differ &mdash; translation, summarisation, speech to text.
+
+The **encoder** reads the input and produces a representation. The **decoder**
+emits output tokens one at a time, each conditioned on the representation and on
+everything it has emitted so far.
+
+The original version compressed the whole input into a single fixed vector,
+which became the bottleneck that motivated
+[attention](../natural_language_processing/attention_mechanism.html): let the
+decoder look back at every input position rather than at one summary. That is
+the change the field turned on, and the transformer is its conclusion.
+
+Autoregressive decoding is not specific to that architecture. Any model that
+emits one token at a time faces the same question: at each step you have a
+probability over the vocabulary, and you have to choose.
+
+## Greedy decoding, and its regret
+
+Take the most probable token each time.
+
+Fast, simple, and it optimises the wrong thing. You want the most probable
+*sequence*, and the highest-probability first token can lead into a region where
+everything that follows is bad.
+
+The chart shows the cumulative log probability of the beam's paths. With the
+width at 1 you get greedy decoding, and the readout compares it against the best
+sequence a wider beam found. It is frequently worse, and the reason is always
+the same: it committed early to something that looked good and did not pay off.
+
+## Beam search
+
+Keep the `k` best partial sequences. At each step, expand all of them, score
+every continuation, keep the best `k` overall, and continue. At the end, take
+the best complete sequence.
+
+Drag the width from 1 upward and watch the best score improve.
+
+It is still a heuristic. It does **not** find the globally best sequence &mdash;
+that would require searching an exponentially large tree &mdash; and a path
+discarded early because it looked weak can never come back, even if it led
+somewhere excellent. Beam search only reduces how often that happens.
+
+## The length problem
+
+Sequence probability is a product of per-token probabilities, so every extra
+token multiplies by something less than 1. Longer sequences have lower
+probability, always, and unnormalised beam search therefore has a systematic
+bias toward stopping early.
+
+The standard fix divides the log probability by the length, sometimes raised to
+a tunable power. It is a correction with no principled derivation, it is
+necessary, and every production decoder has one.
+
+## Wider is not always better
+
+Raise the width past about 5 and translation quality often *falls*. This is
+called the **beam search curse**, and it is well documented.
+
+The explanation is that a wider beam finds sequences the model genuinely
+considers more probable, and the model's notion of probable is not the same as
+good. Very high-probability text is bland: it is the safe, generic continuation.
+A wider search is a more faithful search of a flawed objective.
+
+That is also why open-ended generation abandons beam search entirely. Sampling
+methods &mdash; temperature, top-k, nucleus &mdash; deliberately do not take the
+most probable path, because for creative text the most probable path is the
+boring one. Beam search survives where there is a right answer: translation,
+speech recognition, constrained generation.
+
+## Where it goes wrong
+
+**No length normalisation.** Everything comes out truncated.
+
+**A very wide beam on open-ended text.** Blander, not better.
+
+**Using beam search for creative generation.** Use sampling.
+
+**Forgetting the cost.** Width `k` multiplies both computation and memory by
+`k`, and for a large model that is the binding constraint.

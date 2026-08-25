@@ -2166,3 +2166,8 @@ LABS.update(_ML_CHECKS)
 from math_topics import CHECKS as _MATH_CHECKS  # noqa: E402
 
 LABS.update(_MATH_CHECKS)
+
+# The generated deep learning modules, same arrangement as the rest.
+from dl_topics import CHECKS as _DL_CHECKS  # noqa: E402
+
+LABS.update(_DL_CHECKS)

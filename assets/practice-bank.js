@@ -4164,6 +4164,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "deep_learning/autoencoders.html",
+  "title": "Autoencoders",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "Why is training a network to copy its input not a null task?",
+    "o": [
+     "The network is too small to copy",
+     "The representation in the middle is smaller than the input, so information must be discarded - and the loss decides what",
+     "The output has a different shape",
+     "Noise is always added"
+    ],
+    "a": 1,
+    "w": "What survives the bottleneck is what the data was mostly made of. The copying is the mechanism; the constraint is the point."
+   },
+   {
+    "t": "What does a linear autoencoder with squared error find?",
+    "o": [
+     "An arbitrary subspace",
+     "The same subspace as PCA",
+     "The identity function",
+     "A sparse code"
+    ],
+    "a": 1,
+    "w": "Provably the same span, though not necessarily the principal components in order. Non-linearity is what makes an autoencoder more than PCA with extra steps."
+   },
+   {
+    "t": "Why does a bottleneck remove noise?",
+    "o": [
+     "Noise is filtered before encoding",
+     "Noise has no structure to compress, so a narrow code cannot afford to store it",
+     "The decoder smooths the output",
+     "The loss ignores noise"
+    ],
+    "a": 1,
+    "w": "Denoising autoencoders make this the training procedure - corrupt the input, ask for the clean version - which also prevents a wide code from learning the identity."
+   }
+  ]
+ },
+ {
   "path": "deep_learning/backpropagation.html",
   "title": "Backpropagation and the Computational Graph",
   "cat": "Deep Learning",
@@ -4225,6 +4265,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "deep_learning/contrastive_learning.html",
+  "title": "Contrastive and Self-Supervised Learning",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "What is a positive pair in contrastive learning?",
+    "o": [
+     "Two images of the same class",
+     "Two augmented views of the same image",
+     "An image and its label",
+     "Two images that score highly"
+    ],
+    "a": 1,
+    "w": "No labels are involved, which is the point. Two images of the same class are treated as negatives - a real cost that supervised contrastive learning fixes when labels exist."
+   },
+   {
+    "t": "What does a low temperature do to InfoNCE?",
+    "o": [
+     "Flattens the comparison",
+     "Sharpens the softmax so the hardest negative dominates the gradient",
+     "Reduces the number of negatives needed",
+     "Prevents collapse"
+    ],
+    "a": 1,
+    "w": "It learns fine distinctions quickly and is unstable. High temperature flattens everything until the loss stops discriminating at all."
+   },
+   {
+    "t": "How do BYOL and SimSiam avoid collapse without negatives?",
+    "o": [
+     "They use very large batches",
+     "An asymmetry - a predictor head on one branch and a stop-gradient on the other",
+     "They add noise to the representations",
+     "They keep a queue of past representations"
+    ],
+    "a": 1,
+    "w": "The large-batch and queue approaches are SimCLR and MoCo, which do use negatives. That negatives turned out to be optional was a genuine surprise."
+   }
+  ]
+ },
+ {
   "path": "deep_learning/data_sparsity.html",
   "title": "Data Sparsity",
   "cat": "Deep Learning",
@@ -4244,6 +4324,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What is meant by “Pseudo-labelling” here?",
     "ans": "— label the confident predictions on unlabelled data and train on them, carefully, since errors compound."
+   }
+  ]
+ },
+ {
+  "path": "deep_learning/diffusion_models.html",
+  "title": "Diffusion Models",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "What does the network in a diffusion model predict?",
+    "o": [
+     "The clean image",
+     "The noise that was added",
+     "The next step's schedule",
+     "A latent code"
+    ],
+    "a": 1,
+    "w": "Given the noise, recovering the original is just rearranging the forward equation. That makes the loss a plain squared error rather than anything adversarial."
+   },
+   {
+    "t": "Why can training sample a random step t rather than simulating up to it?",
+    "o": [
+     "The steps are independent",
+     "The forward process has a closed form, so you can jump to any t in one shot",
+     "The schedule is linear",
+     "Early steps do not matter"
+    ],
+    "a": 1,
+    "w": "x_t = sqrt(abar)x0 + sqrt(1-abar)eps needs no simulation, which is what makes training cheap."
+   },
+   {
+    "t": "What is the main disadvantage against a GAN?",
+    "o": [
+     "Blurrier samples",
+     "Mode collapse",
+     "Sampling needs many sequential passes where a GAN needs one",
+     "No stable objective"
+    ],
+    "a": 2,
+    "w": "The stable objective and full coverage are diffusion's advantages. DDIM and distillation have shortened sampling considerably, but it remains the trade."
    }
   ]
  },
@@ -4328,6 +4448,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "deep_learning/embedding_layers.html",
+  "title": "Embedding Layers",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "Why is an embedding layer implemented as a lookup rather than a matmul?",
+    "o": [
+     "Lookups are more accurate",
+     "The one-hot product touches every weight in the table to retrieve a single row",
+     "Matmuls cannot be differentiated",
+     "The table is too large to store"
+    ],
+    "a": 1,
+    "w": "At 50,000 tokens and 512 dimensions that is 25.6 million numbers touched to get 512. The definitions are identical; only the implementation differs."
+   },
+   {
+    "t": "Which rows of an embedding table receive a gradient on a given step?",
+    "o": [
+     "All of them",
+     "Only the rows for tokens that appeared in the batch",
+     "The most frequent rows",
+     "None - they are frozen"
+    ],
+    "a": 1,
+    "w": "The backward pass scatters gradients to the rows that were used, which means a very large parameter tensor sits almost entirely idle on any step."
+   },
+   {
+    "t": "What does weight tying do?",
+    "o": [
+     "Freezes the embedding table",
+     "Shares the input embedding with the output layer, halving the cost and usually improving quality",
+     "Reduces the embedding dimension",
+     "Ties embeddings to positions"
+    ],
+    "a": 1,
+    "w": "Both layers have one row per token and both are learning what tokens mean, so sharing them is natural as well as cheaper."
+   }
+  ]
+ },
+ {
   "path": "deep_learning/feature_scaling_in_neural_networks.html",
   "title": "Feature Scaling & Weight Bias",
   "cat": "Deep Learning",
@@ -4343,6 +4503,86 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Work the numbers”?",
     "ans": "Take age 30 and salary 60,000 with weights of 0.5 each. The salary term contributes 30,000 to the weighted sum and the age term contributes 15 — the age feature is invisible, and it would take a weight around 1000× larger to compete."
+   }
+  ]
+ },
+ {
+  "path": "deep_learning/generative_adversarial_networks.html",
+  "title": "Generative Adversarial Networks",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "Why does a very good discriminator stop the generator learning?",
+    "o": [
+     "It overfits the real data",
+     "Where the distributions barely overlap its output is flat, and a flat function has no gradient to follow",
+     "It slows training down",
+     "It causes mode collapse"
+    ],
+    "a": 1,
+    "w": "The generator improves by following the slope of the discriminator's opinion. Wasserstein GAN replaces the classifier with a critic whose distance stays informative even for disjoint distributions."
+   },
+   {
+    "t": "What is mode collapse?",
+    "o": [
+     "The discriminator stops improving",
+     "The generator finds a narrow region that fools the discriminator and stays there, representing little of the data",
+     "Training diverges",
+     "The latent space collapses to a point"
+    ],
+    "a": 1,
+    "w": "Nothing in the objective punishes it directly, because the discriminator judges samples one at a time and never sees the lack of variety."
+   },
+   {
+    "t": "Why are GAN samples sharper than a VAE's?",
+    "o": [
+     "GANs use larger networks",
+     "Nothing rewards averaging - a hedged sample is exactly what the discriminator catches",
+     "GANs have no latent space",
+     "The discriminator sharpens them"
+    ],
+    "a": 1,
+    "w": "A VAE's pixel-wise reconstruction term rewards hedging: when uncertain, the average of the possibilities scores better than any single one."
+   }
+  ]
+ },
+ {
+  "path": "deep_learning/gradient_accumulation.html",
+  "title": "Gradient Accumulation",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "Why is the accumulated update identical to a large-batch update?",
+    "o": [
+     "It is an approximation that converges",
+     "The gradient of a mean loss is the mean of the per-example gradients, and differentiation is linear",
+     "The optimiser corrects for it",
+     "The learning rate is adjusted"
+    ],
+    "a": 1,
+    "w": "Identical up to floating-point ordering, not merely similar. That linearity is the whole justification."
+   },
+   {
+    "t": "Which part of training memory does accumulation reduce?",
+    "o": [
+     "The optimiser state",
+     "The activations kept for the backward pass",
+     "The weights",
+     "The gradients"
+    ],
+    "a": 1,
+    "w": "Activations scale with batch size; weights, gradients and optimiser state do not. When the weights alone do not fit, accumulation is not the answer."
+   },
+   {
+    "t": "Which layer type does gradient accumulation genuinely change?",
+    "o": [
+     "Layer normalisation",
+     "Batch normalisation",
+     "Dropout",
+     "Convolution"
+    ],
+    "a": 1,
+    "w": "Its statistics come from whatever is in the forward pass - the micro-batch. Layer norm normalises per example and is indifferent to the batch, which is one reason transformers use it."
    }
   ]
  },
@@ -4484,6 +4724,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "deep_learning/label_smoothing.html",
+  "title": "Label Smoothing",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "Why does a one-hot target make a model overconfident?",
+    "o": [
+     "It has too few classes",
+     "Softmax reaches probability 1 only in the limit, so the optimal logit gap is infinite and training never stops pushing",
+     "The gradient is too large",
+     "It has no regularisation"
+    ],
+    "a": 1,
+    "w": "The target is unattainable, so widening logits is always an available way to reduce the loss. Smoothing makes the optimal gap finite and reachable."
+   },
+   {
+    "t": "Why does the training loss no longer approach zero?",
+    "o": [
+     "The model is underfitting",
+     "The minimum achievable loss is the entropy of the smoothed target, which is not zero",
+     "The learning rate is too low",
+     "Label smoothing adds noise"
+    ],
+    "a": 1,
+    "w": "You changed what perfect means. It also means losses are no longer comparable with runs that did not use smoothing."
+   },
+   {
+    "t": "Why should a distillation teacher be trained without label smoothing?",
+    "o": [
+     "It makes the teacher less accurate",
+     "The student learns from the relative sizes of the wrong-class probabilities, and smoothing flattens exactly that",
+     "The student cannot handle smoothed targets",
+     "It slows distillation down"
+    ],
+    "a": 1,
+    "w": "The informative part is that this dog was slightly cat and not at all lorry. Smoothing erases the dark knowledge distillation depends on."
+   }
+  ]
+ },
+ {
   "path": "deep_learning/layer_normalization.html",
   "title": "Layer Normalization",
   "cat": "Deep Learning",
@@ -4537,6 +4817,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “One step, worked out”?",
     "ans": "Three points: (1, 2), (2, 4), (3, 6). The answer is obviously m = 2, c = 0, but start from m = 0, c = 0 and let the maths find it."
+   }
+  ]
+ },
+ {
+  "path": "deep_learning/mixed_precision_training.html",
+  "title": "Mixed Precision and Loss Scaling",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "What does loss scaling change about the parameter update?",
+    "o": [
+     "It makes updates larger",
+     "Nothing - the optimiser unscales first; the scaling only keeps the numbers inside fp16's range",
+     "It clips large gradients",
+     "It skips small gradients"
+    ],
+    "a": 1,
+    "w": "It is a change of units, not a change of algorithm. Multiply the loss, every gradient scales by the chain rule, divide before stepping."
+   },
+   {
+    "t": "What does dynamic loss scaling do when a gradient overflows?",
+    "o": [
+     "Clips it to the maximum",
+     "Halves the scale and skips the step entirely",
+     "Falls back to fp32 for that step",
+     "Raises the scale"
+    ],
+    "a": 1,
+    "w": "There is no way to recover what an overflowed gradient should have been, so it is discarded rather than repaired. A few skipped steps early cost nothing."
+   },
+   {
+    "t": "Why does bfloat16 not need loss scaling?",
+    "o": [
+     "It has more mantissa bits",
+     "It has the same exponent range as fp32, and range was the problem",
+     "It is computed in software",
+     "It rounds differently"
+    ],
+    "a": 1,
+    "w": "bfloat16 trades mantissa bits for exponent bits - less precision, same range. For gradients, precision mostly was not the issue."
    }
   ]
  },
@@ -4853,6 +5173,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "deep_learning/seq2seq_and_beam_search.html",
+  "title": "Seq2seq and Beam Search",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "Why can greedy decoding produce a worse sequence than beam search?",
+    "o": [
+     "It is faster",
+     "It maximises the next token, not the whole sequence, and cannot reconsider an early commitment",
+     "It ignores the encoder",
+     "It has no length normalisation"
+    ],
+    "a": 1,
+    "w": "The highest-probability first token can lead into a region where everything that follows is bad, and greedy decoding has no way back."
+   },
+   {
+    "t": "Why does beam search need length normalisation?",
+    "o": [
+     "To speed it up",
+     "Sequence probability is a product, so every extra token lowers it and short sequences win by default",
+     "To handle the beam width",
+     "To avoid repeated tokens"
+    ],
+    "a": 1,
+    "w": "Unnormalised beam search has a systematic bias toward stopping early. The fix has no principled derivation and every production decoder has one."
+   },
+   {
+    "t": "Why does a very wide beam often make translation worse?",
+    "o": [
+     "It overfits",
+     "It searches the model's objective more faithfully, and very high-probability text is bland",
+     "It runs out of memory",
+     "It discards the correct path"
+    ],
+    "a": 1,
+    "w": "The beam search curse. It is also why open-ended generation uses sampling instead - for creative text the most probable path is the boring one."
+   }
+  ]
+ },
+ {
   "path": "deep_learning/softmax_and_cross_entropy.html",
   "title": "Softmax and Cross-Entropy",
   "cat": "Deep Learning",
@@ -4887,6 +5247,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Why sigmoid made it worse”?",
     "ans": "The derivative of the sigmoid is σ(x)(1 − σ(x)) , which peaks at 0.25 when x = 0 and falls toward zero for inputs of large magnitude."
+   }
+  ]
+ },
+ {
+  "path": "deep_learning/variational_autoencoders.html",
+  "title": "Variational Autoencoders",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "What does the encoder of a VAE output?",
+    "o": [
+     "A single point",
+     "A mean and a standard deviation",
+     "A probability per class",
+     "A reconstruction"
+    ],
+    "a": 1,
+    "w": "The code is sampled from that distribution, so the same input gives different codes on different passes and the decoder must handle a neighbourhood rather than a point."
+   },
+   {
+    "t": "What problem does the reparameterisation trick solve?",
+    "o": [
+     "The latent space is too large",
+     "You cannot backpropagate through a sampling operation, so the randomness is moved into an input instead",
+     "The KL term is intractable",
+     "The decoder is too weak"
+    ],
+    "a": 1,
+    "w": "z = mu + sigma*epsilon makes the expression an ordinary differentiable function of mu and sigma with epsilon fixed. VAEs were not trainable without it."
+   },
+   {
+    "t": "What is posterior collapse?",
+    "o": [
+     "The decoder stops training",
+     "The KL term wins, the encoder outputs the prior regardless of input, and the decoder ignores the latent",
+     "The latent space develops gaps",
+     "The reconstruction error diverges"
+    ],
+    "a": 1,
+    "w": "The opposite failure - reconstruction winning - gives tight clusters with empty space between them, where sampling lands in the gaps."
    }
   ]
  },

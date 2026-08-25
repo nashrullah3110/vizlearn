@@ -1,0 +1,93 @@
+title: Embedding Layers
+intro: The layer that turns discrete symbols into vectors, and the optimisation that makes it practical.
+
+## The problem
+
+Neural networks consume numbers. A word, a user id or a product code is a
+symbol, and there is no meaningful number to assign it &mdash; encoding "cat" as
+7 and "dog" as 8 would tell the network they are adjacent, which is a claim
+nobody made.
+
+**One-hot encoding** avoids that: a vector of zeros with a single 1 at the
+token's index. No false ordering, and no useful structure either. Every pair of
+tokens is equally distant, and the vector is as long as the vocabulary.
+
+An **embedding layer** maps each token to a dense learned vector instead. The
+vector has a few hundred dimensions rather than fifty thousand, and its contents
+are parameters, so training can put similar tokens near each other.
+
+## The matmul that is a lookup
+
+The formal definition is a one-hot vector multiplied by a weight matrix. Write it
+out and the reason nobody does it becomes obvious: multiplying a vector that is
+all zeros except one position by a matrix selects a single row and multiplies
+everything else by zero.
+
+The readout does the arithmetic. At a 50,000-token vocabulary and 512
+dimensions, the honest matmul touches **25.6 million** numbers to retrieve
+**512** of them.
+
+So every framework implements the layer as an indexing operation. `nn.Embedding`
+in PyTorch and `tf.keras.layers.Embedding` are table lookups with a backward
+pass that scatters gradients to the rows that were used.
+
+That is also why only the rows appearing in a batch receive a gradient. An
+embedding table is a very large parameter tensor that is almost entirely idle on
+any given step, which has consequences for optimisers keeping per-parameter
+state and for anyone writing distributed training.
+
+## The table is the model, mostly
+
+Drag the vocabulary and dimension controls and watch the count. The table alone
+is `vocab * dim` parameters, and for large vocabularies that is a substantial
+fraction of the entire model &mdash; often more than any other single layer.
+
+Two standard responses:
+
+**Weight tying.** In a language model the output layer also has one row per
+token. Sharing it with the input embedding halves the cost and usually improves
+quality, since both are learning what tokens mean.
+
+**Subword tokenisation.** [Byte-pair
+encoding](../gen_ai/byte_pair_encoding_tokenizer.html) keeps the vocabulary in
+the tens of thousands rather than the millions a word-level vocabulary would
+need, and removes the out-of-vocabulary problem entirely.
+
+## What the vectors learn
+
+Nothing is imposed on the geometry. The rows start random and become whatever
+minimises the loss, and the useful structure is a consequence rather than a
+design.
+
+Word2vec's famous arithmetic &mdash; king minus man plus woman &mdash; is that
+consequence showing. Nobody built the analogy in; it fell out of a training
+objective about predicting neighbouring words.
+
+Which also means the structure reflects the training data, including its biases.
+Embeddings trained on a corpus inherit that corpus's associations, and a great
+deal of fairness work in NLP is about that fact.
+
+## Beyond words
+
+**Categorical features** in tabular models. A user id, a postcode, a product
+category &mdash; all embed, and this is why neural networks became competitive on
+tabular data with high-cardinality categories.
+
+**Positional embeddings** in transformers, which embed a position rather than a
+symbol.
+
+**Recommendation.** Users and items each get a table, and their dot product is a
+predicted affinity. Matrix factorisation is exactly this.
+
+## Where it goes wrong
+
+**Implementing the one-hot matmul literally.** Correct, and enormously wasteful.
+
+**Choosing the dimension by feel.** A rule of thumb is the fourth root of the
+vocabulary size, and it is worth tuning.
+
+**Forgetting an out-of-vocabulary row.** Something has to handle unseen tokens;
+subword tokenisation avoids the question.
+
+**Reading similarity as meaning.** Embedding proximity reflects co-occurrence in
+the training data, which is not the same thing.

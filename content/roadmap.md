@@ -34,6 +34,14 @@ patching, the segmentation taxonomy) and six diagrams. Adding a twenty-first is
 one entry in `cv_topics.py`, a line in `tools/sequence.py`, and - if the harness
 lacks the operation - one function in `OPS` or `DIAGRAMS`.
 
+**Deep Learning: 32 -> 42.** Tier 1 is complete, generated from
+`tools/dl_topics.py` with the demonstrations in `assets/vizlearn-dl.js`. The
+track was thorough on training mechanics and stopped at a dense network;
+autoencoders, VAEs, GANs, diffusion, contrastive learning and beam search had
+no page anywhere on the site. Attention, transfer learning, distillation and
+augmentation are deliberately absent - NLP, Computer Vision and Gen AI already
+own those.
+
 **Maths: 27 -> 47.** Tiers 1 and 2 are complete, generated from `tools/math_topics.py`
 with the demonstrations in `assets/vizlearn-math.js`. These are demonstrations
 rather than simulations - nothing is fitted, and the arithmetic is the subject:
@@ -172,6 +180,12 @@ All ten are built.
 - Stacking and voting ensembles (bagging and boosting already exist)
 
 ---
+
+## What is left
+
+Every tier in this file is built. The tracks now run from 37 (NLP) to 49
+(Interview), and the next expansion should start from a fresh gap analysis
+rather than from this document.
 
 ## Overlaps to respect
 
