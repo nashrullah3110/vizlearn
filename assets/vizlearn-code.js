@@ -333,4 +333,28 @@
     }
 
     document.querySelectorAll('[data-vz-code]').forEach(attach);
+
+    /* Article code blocks.
+     *
+     * tools/prose.py writes fenced source as <pre><code class="language-x">,
+     * and until now nothing ever painted it - the highlighters here only ever
+     * ran on the editors. So 747 Python blocks and 87 SQL ones across the site
+     * were plain grey text while the runnable editor two paragraphs away was
+     * coloured, which read as an oversight because it was one.
+     *
+     * These are static, so they are painted once. The escaped source has to be
+     * recovered from textContent first: the highlighter escapes as it goes,
+     * and running it over already-escaped markup would double the entities.
+     */
+    function paintStatic(code) {
+        var m = /(?:^|\s)language-([a-z]+)/.exec(code.className || '');
+        if (!m) return;
+        var paint = HIGHLIGHT[m[1]];
+        if (!paint) return;
+        if (code.dataset.vzPainted === '1') return;
+        code.innerHTML = paint(code.textContent);
+        code.dataset.vzPainted = '1';
+    }
+
+    document.querySelectorAll('pre > code[class*="language-"]').forEach(paintStatic);
 })();

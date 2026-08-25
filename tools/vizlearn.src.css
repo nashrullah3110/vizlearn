@@ -52,6 +52,22 @@
     --vignette-color: transparent;
     --canvas-bg: #1c1e1f;
     --code-bg: #2c3031;
+    /* Syntax colours for dark mode. These did not exist: only the light-mode
+       block defined them, so on the default dark theme every var(--code-*)
+       was invalid, every token span fell back to the inherited text colour,
+       and 834 highlighted code blocks rendered as flat grey. The highlighter
+       had been working the whole time and nothing showed it.
+
+       All seven clear 4.5:1 against --code-bg, and none of them is the amber
+       accent - an amber string literal on an amber site reads as chrome
+       rather than as code. */
+    --code-comment: #949ea6;
+    --code-string:  #7ec699;
+    --code-number:  #c3a6ff;
+    --code-keyword: #84b6ff;
+    --code-builtin: #7fd1e8;
+    --code-func:    #67d6b5;
+    --code-type:    #7fd1e8;
     --stat-bg: #2c3031;
     --stat-border: color-mix(in srgb, #eaa94a 26%, transparent);
 }
@@ -104,14 +120,16 @@ body.light-mode {
     --code-border: rgba(27, 31, 36, 0.15);
     /* Deliberately none of these is the accent: on an amber site an amber
        string literal reads as chrome rather than as code. Green is free now
-       that it is not the brand, and it is the conventional string colour. */
-    --code-comment: #6b7280;
-    --code-string:  #2f7d55;
-    --code-number:  #7c3aed;
+       that it is not the brand, and it is the conventional string colour.
+       Comment, string and func were measured at 4.07, 4.23 and 4.61 against
+       --code-bg and have been darkened to clear 4.5. */
+    --code-comment: #5b6470;
+    --code-string:  #1f6b45;
+    --code-number:  #6d28d9;
     --code-keyword: #1d4ed8;
-    --code-builtin: #0369a1;
-    --code-func:    #0f766e;
-    --code-type:    #0369a1;
+    --code-builtin: #03608f;
+    --code-func:    #0b5f59;
+    --code-type:    #03608f;
 
     --accent-primary: #8f5410; /* readable amber - text only, see theme.py */
     --accent-glow: transparent;
@@ -3802,12 +3820,18 @@ main.prose > * {
  * So: the <pre> is the block, and the <code> inside it goes back to being
  * nothing but text.
  * ------------------------------------------------------------------------ */
-.vz-article pre {
+.vz-article pre,
+.vz-lede-body pre {
   background: var(--vz-raise);
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   padding: 1rem 1.1rem;
-  margin: 0;
+  /* Was margin: 0, which put a bordered block flush against the paragraph
+     above and below it - measured at 0px against the 12px between two
+     paragraphs. A code block is a separate object and needs more air than a
+     paragraph break, not less. Kept in step with .vz-copy-wrap, which is what
+     actually carries the spacing once the copy button wraps the block. */
+  margin: 2.2rem 0;
   overflow-x: auto;
   /* Code is read line by line, not as prose; the article's 1.75 leading is
      wrong here and makes a function twice as tall as it needs to be. */
@@ -3815,7 +3839,8 @@ main.prose > * {
   font-size: 0.86rem;
   -webkit-overflow-scrolling: touch;
 }
-.vz-article pre code {
+.vz-article pre code,
+.vz-lede-body pre code {
   background: none;
   border: 0;
   border-radius: 0;
@@ -4233,7 +4258,33 @@ input[type="range"].ml-input { accent-color: var(--accent-fill); }
 .vz-copy-wrap {
     position: relative;
     display: block;
+    /* The wrapper is the element in flow once the copy button is added, so it
+       carries the block's spacing; the <pre> inside gives its own back to
+       avoid doubling it.
+
+       1.45rem measured at 23px against a 12px paragraph gap, which sounds
+       generous and does not read that way: a bordered, filled slab needs
+       materially more air than a paragraph break or it looks crammed against
+       the sentence introducing it. Roughly three times the paragraph gap is
+       what stops it. */
+    margin: 2.2rem 0;
 }
+.vz-copy-wrap > pre { margin: 0; }
+/* Two blocks in a row - a query and its result, say - should read as two
+   things rather than one tall one. */
+.vz-copy-wrap + .vz-copy-wrap { margin-top: 2.6rem; }
+/* Directly under a heading, the heading IS the introduction, so the full gap
+   only pushes the two apart. */
+.vz-article h2 + .vz-copy-wrap,
+.vz-article h3 + .vz-copy-wrap,
+.vz-article h4 + .vz-copy-wrap { margin-top: 1.35rem; }
+
+/* The overview card renders the same fenced blocks through a different
+   wrapper, and the article rules never reached it - so a code block in the
+   lede came out as bare text with no card, no padding and no border while the
+   identical block further down the page had all three. The lede column is
+   narrower, so it gets slightly less vertical room. */
+.vz-lede-body .vz-copy-wrap { margin: 1.6rem 0; }
 .vz-copy {
     position: absolute;
     top: 0.5rem;

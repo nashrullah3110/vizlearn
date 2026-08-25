@@ -136,8 +136,10 @@ SHARED_SCRIPTS = (
     ("vizlearn-python.js", "vz-py"),
     ("vizlearn-js.js", "vz-js"),
     ("vizlearn-html.js", "vz-html"),
-    # Highlights any editor block, whichever language it holds.
-    ("vizlearn-code.js", "data-vz-code"),
+    # Highlights editor blocks and the static <pre><code class="language-x">
+    # blocks prose.py writes into articles. The second hook was missing, which
+    # is why article code was never coloured while the editor beside it was.
+    ("vizlearn-code.js", ("data-vz-code", 'class="language-')),
     # The labs' resizable split.
     ("vizlearn-ide.js", "data-vz-ide"),
 
