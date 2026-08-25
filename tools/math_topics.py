@@ -1717,4 +1717,1598 @@ question, and bias does not shrink with `n`.
     ],
 )
 
+# ---------------------------------------------------------------------------
+# 11. Confidence intervals
+# ---------------------------------------------------------------------------
+topic(
+    "confidence_intervals",
+    "Confidence Intervals",
+    "Inference",
+    "Draw a thousand intervals from a known population and count how many "
+    "contain the answer. The confidence is a property of the procedure.",
+    _svg("".join(_line(28 + (i % 3) * 6, 22 + i * 6, 96 + (i % 4) * 8, 22 + i * 6,
+                       A if i == 4 else M, 1.6) for i in range(8))
+         + _line(72, 16, 72, 74, A, 1.4, "3 3")
+         + _txt(80, 86, "most of them cover it", M, 7)),
+    {
+        "demo": "confidence",
+        "controls": [
+            {"key": "n", "label": "Sample size", "type": "range",
+             "min": 4, "max": 200, "step": 2, "value": 30},
+            {"key": "conf", "label": "Confidence level", "type": "select", "value": "0.95",
+             "options": [{"value": "0.80", "label": "80%"},
+                         {"value": "0.90", "label": "90%"},
+                         {"value": "0.95", "label": "95%"},
+                         {"value": "0.99", "label": "99%"}]},
+            {"key": "seed", "label": "Redraw", "type": "range",
+             "min": 1, "max": 40, "step": 1, "value": 7},
+        ],
+        "fixed": {},
+    },
+    [
+        "A 95% interval does not mean the parameter is 95% likely to be inside "
+        "<em>your</em> interval. It is inside or it is not.",
+        "It means the <strong>procedure</strong> produces intervals that "
+        "contain the parameter 95% of the time.",
+        "The width is <code class='mono-font'>z &middot; SE</code>, so it "
+        "shrinks like <a href='sampling_distributions.html'>&radic;n</a>.",
+        "Higher confidence buys a wider interval and nothing else. A 99% "
+        "interval says less about where the answer is, not more.",
+    ],
+    """
+title: Confidence Intervals
+intro: What the ninety-five percent actually refers to, demonstrated by drawing a thousand of them.
+
+## The construction
+
+Take a sample, compute its mean, and put an interval around it:
+
+```
+mean  +/-  z * (sample SD / sqrt(n))
+```
+
+The `z` depends on the confidence level &mdash; 1.96 for 95%. The rest is the
+[standard error](sampling_distributions.html).
+
+## What the confidence refers to
+
+Here is the statement people usually give: *there is a 95% probability the true
+mean lies in this interval.*
+
+That is wrong, and the visualisation shows why. The population mean is fixed at
+10 &mdash; the dashed line. It is not random. Your interval is either side of it
+or it is not; there is no probability left once both are determined.
+
+What is random is the **interval**, because it is computed from a random sample.
+Draw again and you get a different one. The 95% describes how often that
+procedure lands on the truth.
+
+The panel draws forty intervals, from a thousand generated. Most cross the
+dashed line; the highlighted few do not. Nothing distinguishes a missing
+interval from a covering one when you can only see it from the inside &mdash;
+and in practice you have exactly one, and no idea which kind you have.
+
+## The count is real
+
+The readout gives the actual coverage of all thousand. At n = 30 with a 95%
+level it lands near 94%, and every part of that gap is instructive.
+
+Drag `n` down to 5 and coverage falls to about 89%. That is not sampling noise.
+This page uses a `z` critical value with the sample's *estimated* standard
+deviation, and at small `n` that estimate is unreliable enough that the interval
+comes out too narrow.
+
+**That is exactly why the t-distribution exists.** Gosset's correction widens
+the interval to account for having estimated the SD, and the correction is large
+at small `n` and negligible past about 30. Drag `n` upward and watch the gap
+close on its own &mdash; the page is demonstrating the problem the t-distribution
+solves, rather than quietly using t and hiding it.
+
+## Width and what buys it
+
+Two things set the width.
+
+**The confidence level.** Switch from 95% to 99% and the intervals lengthen
+noticeably. A higher level does not locate the parameter better; it hedges more.
+A 100% interval would be "somewhere between minus infinity and infinity" &mdash;
+perfectly reliable and perfectly useless.
+
+**The sample size**, through `sqrt(n)`. Quadrupling the sample halves the width.
+
+## Reading one properly
+
+**"Between 42% and 48%"** means the procedure that produced it covers the truth
+95% of the time.
+
+**A wide interval is a result.** It says the data does not pin the answer down,
+which is genuine information rather than a failed experiment.
+
+**Overlapping intervals do not imply no difference.** Two 95% intervals can
+overlap while a direct test of their difference is significant. Test the
+difference; do not eyeball the bars.
+
+**An interval containing zero** corresponds to a two-sided test not rejecting at
+that level. That correspondence is exact, and it is why many people prefer
+reporting intervals to reporting
+[p-values](hypothesis_testing_and_p_values.html): the interval carries the
+effect size and the uncertainty together, where a p-value carries neither.
+
+## Where it goes wrong
+
+**Saying "95% chance the mean is in here."** The parameter is fixed; the
+interval is random.
+
+**Using z at small n.** Use t, and this page shows you the cost of not.
+
+**Assuming independence.** Clustered or time-series data has a smaller effective
+sample size, and the interval will be too narrow.
+
+**Reporting an interval for a biased estimator.** Coverage is about sampling
+variability. A systematically wrong measurement produces a tight interval around
+the wrong answer.
+""",
+    [
+        {"q": "What does the 95% in a 95% confidence interval describe?",
+         "options": ["The probability the parameter is in your interval",
+                     "How often the procedure produces intervals that contain the parameter",
+                     "The proportion of data inside the interval",
+                     "The confidence of the analyst"],
+         "answer": 1,
+         "why": "The parameter is fixed - it is inside or it is not. What is random is the interval, because it is computed from a random sample."},
+        {"q": "Why does a nominal 95% interval cover only about 89% at n = 5 here?",
+         "options": ["The random number generator is biased",
+                     "It uses a z value with an estimated SD, which is unreliable at small n - the problem the t-distribution fixes",
+                     "The population is not normal",
+                     "1000 draws is not enough"],
+         "answer": 1,
+         "why": "The correction is large at small n and negligible past about 30. Dragging n upward closes the gap on its own."},
+        {"q": "Two 95% intervals overlap. What follows?",
+         "options": ["The difference is not significant",
+                     "Nothing directly - a test of the difference can still be significant",
+                     "The samples are the same size",
+                     "Both contain the true mean"],
+         "answer": 1,
+         "why": "Overlap of separate intervals is not a test of their difference. Test the difference directly rather than eyeballing the bars."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 12. Hypothesis testing and p-values
+# ---------------------------------------------------------------------------
+topic(
+    "hypothesis_testing_and_p_values",
+    "Hypothesis Testing and p-values",
+    "Inference",
+    "The p-value is a shaded area under an assumption. Move the observation "
+    "and watch the area, and the assumption, stay exactly where they were.",
+    _svg('<path d="M20 70 C 46 70, 50 22, 72 22 C 94 22, 98 70, 130 70" fill="none" stroke="%s" stroke-width="2"/>' % A
+         + '<path d="M104 70 C 114 66, 120 52, 130 70 Z" fill="%s" fill-opacity="0.4" stroke="none"/>' % A
+         + _line(104, 18, 104, 74, A, 1.4, "3 3")
+         + _txt(80, 86, "the tail, not the truth", M, 7)),
+    {
+        "demo": "pvalue",
+        "controls": [
+            {"key": "observed", "label": "Observed statistic", "type": "range",
+             "min": -3.5, "max": 3.5, "step": 0.05, "value": 2.10},
+            {"key": "tail", "label": "Alternative", "type": "select", "value": "two",
+             "options": [{"value": "two", "label": "Two-tailed"},
+                         {"value": "one", "label": "One-tailed (greater)"}]},
+        ],
+    },
+    [
+        "The curve is the distribution of the test statistic <em>assuming the "
+        "null hypothesis is true</em>. Everything else follows from that.",
+        "The <strong>p-value</strong> is the shaded area: the probability of a "
+        "result at least this extreme, if the null held.",
+        "It is not the probability the null is true, and it is not the "
+        "probability your result was a fluke.",
+        "0.05 is a convention Fisher suggested as a rule of thumb, not a "
+        "property of nature.",
+    ],
+    """
+title: Hypothesis Testing and p-values
+intro: The most used and most misread number in statistics, defined precisely enough to stop misreading it.
+
+## The machinery
+
+**The null hypothesis** is a specific, boring claim: no effect, no difference,
+nothing happening. It is specific on purpose, because a specific claim implies a
+distribution for the test statistic.
+
+That distribution is the curve. It is what the statistic would look like across
+repeated samples **if the null were true**. Every use of a p-value inherits that
+conditional.
+
+**The p-value** is the shaded tail: the probability of a statistic at least as
+extreme as the one observed, under the null.
+
+Drag the observed statistic and watch the area shrink as it moves outward. A
+large statistic is unusual under the null, so its tail is small &mdash; and a
+small tail is what "unlikely, if the null were true" means.
+
+## What it is not
+
+Three misreadings, all common enough to have names.
+
+**Not the probability that the null is true.** The p-value is computed *assuming*
+the null. It cannot then tell you how likely the assumption was. Getting from
+`P(data | null)` to `P(null | data)` needs [Bayes'
+theorem](bayes_theorem.html) and a prior, and the two quantities can differ by
+orders of magnitude.
+
+**Not the probability the result was chance.** Same error, differently worded.
+
+**Not a measure of effect size.** With enough data, a difference of no practical
+consequence produces a tiny p-value. The p-value answers "is there evidence of
+*any* effect", never "is the effect large enough to matter". This is why
+[confidence intervals](confidence_intervals.html) are increasingly preferred:
+they carry the size and the uncertainty in one object.
+
+## Failing to reject is not accepting
+
+Set the observed statistic near zero. The p-value is large, and the conclusion is
+that the data is consistent with the null.
+
+It is **not** that the null is true. A large p-value is produced both by a real
+absence of effect and by a study too small to detect one. Distinguishing those
+requires [power](type_i_and_type_ii_errors.html), and it is why "no significant
+difference" in an underpowered study means almost nothing.
+
+## One tail or two
+
+Switch the alternative. The two-tailed p-value is exactly double the one-tailed
+one for the same statistic, because the same area is being counted on both sides.
+
+The choice must be made **before** seeing the data. Deciding afterwards that you
+only cared about one direction halves your p-value for free, and that is a
+recognised form of cheating rather than a modelling choice.
+
+## Why 0.05 is under attack
+
+The threshold is a convention. Fisher suggested it as a rough guide and
+explicitly did not intend it as a decision rule.
+
+The problems are structural.
+
+**p-hacking.** Test enough hypotheses and something crosses 0.05 by chance. At
+0.05, one test in twenty does so with no effect present at all.
+
+**Publication bias.** Significant results get published, so the literature
+over-represents them, and the effect sizes it reports are inflated.
+
+**The cliff.** p = 0.049 and p = 0.051 are indistinguishable as evidence and are
+treated as opposites.
+
+The responses in circulation: report exact p-values rather than thresholds,
+report effect sizes and intervals alongside, pre-register the analysis, and
+correct for multiple comparisons. Some fields have moved the threshold to 0.005;
+others argue for abandoning the dichotomy entirely.
+
+## Where it goes wrong
+
+**Reading p as the probability the null is true.** The central error.
+
+**Treating "not significant" as "no effect."** Check the power.
+
+**Choosing the tail after seeing the data.**
+
+**Running many tests without correction.** Bonferroni is crude and better than
+nothing; false discovery rate control is usually the better tool.
+""",
+    [
+        {"q": "A p-value is the probability of:",
+         "options": ["The null hypothesis being true",
+                     "A result at least this extreme, assuming the null is true",
+                     "The alternative hypothesis being true",
+                     "Making a Type I error"],
+         "answer": 1,
+         "why": "It is computed assuming the null, so it cannot tell you how likely that assumption was. Going the other way needs Bayes' theorem and a prior."},
+        {"q": "A study reports p = 0.4. What can you conclude?",
+         "options": ["The null hypothesis is true",
+                     "The data is consistent with the null - which is also what an underpowered study looks like",
+                     "There is no effect",
+                     "The sample was too large"],
+         "answer": 1,
+         "why": "A large p-value is produced both by a real absence of effect and by a study too small to detect one. Distinguishing them requires power."},
+        {"q": "Why must the choice of one or two tails be made before seeing the data?",
+         "options": ["It changes the test statistic",
+                     "Choosing afterwards halves the p-value for free, which is cheating rather than a modelling choice",
+                     "Two-tailed tests need more data",
+                     "The null hypothesis changes"],
+         "answer": 1,
+         "why": "The two-tailed p-value is exactly double the one-tailed one for the same statistic, so the decision has to precede the observation."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 13. Type I and Type II errors, and power
+# ---------------------------------------------------------------------------
+topic(
+    "type_i_and_type_ii_errors",
+    "Type I and Type II Errors",
+    "Inference",
+    "Two overlapping distributions and one threshold between them. Every "
+    "choice you make trades one error for the other.",
+    _svg('<path d="M16 70 C 38 70, 40 30, 58 30 C 76 30, 78 70, 100 70" fill="none" stroke="%s" stroke-width="1.8"/>' % M
+         + '<path d="M60 70 C 82 70, 84 34, 102 34 C 120 34, 122 70, 144 70" fill="none" stroke="%s" stroke-width="1.8"/>' % A
+         + _line(80, 22, 80, 74, A, 1.6, "3 3")
+         + _txt(80, 86, "move it either way, pay either way", M, 7)),
+    {
+        "demo": "power",
+        "controls": [
+            {"key": "effect", "label": "True effect size", "type": "range",
+             "min": 0.0, "max": 1.5, "step": 0.05, "value": 0.50},
+            {"key": "n", "label": "Sample size", "type": "range",
+             "min": 5, "max": 200, "step": 5, "value": 40},
+            {"key": "alpha", "label": "Alpha (Type I rate)", "type": "select", "value": "0.05",
+             "options": [{"value": "0.10", "label": "0.10"},
+                         {"value": "0.05", "label": "0.05"},
+                         {"value": "0.01", "label": "0.01"}]},
+        ],
+    },
+    [
+        "<strong>Type I</strong> is a false positive: rejecting a null that was "
+        "true. Its rate is &alpha;, and you choose it.",
+        "<strong>Type II</strong> is a false negative: failing to reject a null "
+        "that was false. Its rate is &beta;, and you mostly do not.",
+        "<strong>Power</strong> is 1 &minus; &beta;: the chance of detecting an "
+        "effect that is really there.",
+        "Moving the threshold trades one for the other. Only more data, or a "
+        "larger true effect, improves both.",
+    ],
+    """
+title: Type I and Type II Errors
+intro: The two ways a test can be wrong, why you cannot minimise both, and what power actually buys.
+
+## Two curves, one line
+
+The grey curve is the test statistic when the null is true. The orange curve is
+the same statistic when the effect is real. They overlap, and the overlap is the
+entire problem.
+
+The dashed line is the threshold: above it you reject the null, below it you do
+not.
+
+**Type I error** &mdash; the grey area to the right of the line. The null was
+true and you rejected it. A false positive.
+
+**Type II error** &mdash; the orange area to the left. The effect was real and
+you missed it. A false negative.
+
+**Power** is what is left of the orange curve: `1 - beta`, the probability of
+catching a real effect.
+
+## The trade
+
+Change alpha from 0.05 to 0.01. The threshold moves right, the grey tail
+shrinks &mdash; and the orange tail grows. Beta rises, power falls.
+
+Move it the other way and the reverse happens.
+
+**You cannot reduce both by moving the line.** That is not a limitation of the
+method; it is what "the distributions overlap" means. Any threshold is a
+statement about which error you would rather make.
+
+## What actually helps
+
+Two things, and only two.
+
+**More data.** Drag `n` upward. Both curves narrow, because their spread is the
+[standard error](sampling_distributions.html) and that falls like `sqrt(n)`. The
+overlap shrinks, and both error rates can fall at once. This is the only lever
+that improves both without assuming anything.
+
+**A larger true effect.** Drag the effect control. The curves separate. You do
+not usually control this, but it is why detecting a large effect needs so much
+less data than detecting a small one.
+
+## Choosing alpha honestly
+
+The convention is 0.05, and treating it as fixed is the mistake. The right value
+depends on which error costs more.
+
+**A screening test for a treatable disease.** A false negative means missing a
+case; a false positive means an unnecessary follow-up. Loosen alpha, gain power.
+
+**A criminal conviction.** The system explicitly prefers false negatives, which
+is what "beyond reasonable doubt" encodes.
+
+**Particle physics.** The five-sigma standard is alpha near 3 in 10 million,
+because the field has been burned by fluctuations and there is enough data to
+afford it.
+
+**A/B testing a button colour.** A wrong call is cheap. Standard thresholds are
+generous, and the real risk is running many tests and picking winners.
+
+## Power, before the experiment
+
+Power analysis is the calculation nobody enjoys and everybody should do: given a
+target power &mdash; usually 80% &mdash; an alpha, and the smallest effect worth
+detecting, how large a sample is required?
+
+Set the effect to 0.2 and watch what `n` has to be before power reaches 80%. The
+required sample grows roughly with the inverse square of the effect size, which
+is why detecting small effects is so expensive and why so much published work is
+underpowered.
+
+An underpowered study is worse than no study. It usually fails to find a real
+effect &mdash; and when it does find one, the estimate is inflated, because only
+an unusually large sample fluctuation could have crossed the threshold at that
+sample size. That is the **winner's curse**, and it is a substantial part of why
+published effects shrink on replication.
+
+## Where it goes wrong
+
+**Interpreting a non-significant result as no effect.** Report the power, or the
+interval.
+
+**Running the power analysis afterwards.** Post-hoc power computed from the
+observed effect is a restatement of the p-value and carries no new information.
+
+**Fixing alpha at 0.05 regardless of costs.** It is a convention.
+
+**Peeking at results and stopping when significant.** This inflates the true
+Type I rate far above the nominal one. Sequential testing methods exist and
+correct for it.
+""",
+    [
+        {"q": "You tighten alpha from 0.05 to 0.01. What happens to power?",
+         "options": ["It rises", "It falls", "It is unchanged", "It depends on the sample size"],
+         "answer": 1,
+         "why": "The threshold moves right, shrinking the false-positive tail and growing the false-negative one. Moving the line always trades one error for the other."},
+        {"q": "What improves both error rates at once?",
+         "options": ["Moving the threshold", "A larger sample, because both curves narrow",
+                     "A smaller alpha", "A one-tailed test"],
+         "answer": 1,
+         "why": "Their spread is the standard error, which falls like root n, so the overlap shrinks. A larger true effect also works, but you rarely control that."},
+        {"q": "Why are effects from underpowered studies often inflated?",
+         "options": ["The analysis is biased",
+                     "Only an unusually large sample fluctuation could cross the threshold at that sample size",
+                     "Small samples have larger true effects",
+                     "The alpha was too strict"],
+         "answer": 1,
+         "why": "The winner's curse - and a substantial part of why published effects shrink on replication."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 14. QR decomposition
+# ---------------------------------------------------------------------------
+topic(
+    "qr_decomposition",
+    "QR Decomposition and Gram-Schmidt",
+    "Linear Algebra",
+    "Turn any basis into an orthonormal one by subtracting the part that "
+    "already points the wrong way. Watch the subtraction happen.",
+    _svg(_line(30, 68, 96, 34, M, 1.8, "4 3") + _line(30, 68, 78, 74, M, 1.8, "4 3")
+         + _line(30, 68, 88, 38, A, 2.6) + _line(30, 68, 46, 40, A, 2.6)
+         + _line(88, 38, 78, 74, M, 1.4, "2 2")
+         + _txt(80, 88, "subtract the overlap, keep the rest", M, 7)),
+    {
+        "demo": "gramschmidt",
+        "controls": [
+            {"key": "x1", "label": "a1 x", "type": "range",
+             "min": -3, "max": 3, "step": 0.1, "value": 2.0},
+            {"key": "y1", "label": "a1 y", "type": "range",
+             "min": -2.4, "max": 2.4, "step": 0.1, "value": 0.5},
+            {"key": "x2", "label": "a2 x", "type": "range",
+             "min": -3, "max": 3, "step": 0.1, "value": 1.0},
+            {"key": "y2", "label": "a2 y", "type": "range",
+             "min": -2.4, "max": 2.4, "step": 0.1, "value": 1.6},
+        ],
+    },
+    [
+        "<code class='mono-font'>A = QR</code>: Q holds an orthonormal basis "
+        "for the columns of A, R holds the coefficients that rebuild them.",
+        "Gram-Schmidt: normalise the first vector, then subtract from the second "
+        "everything that points along the first.",
+        "The solid orange line is the <a href='projections.html'>projection</a> "
+        "being removed. What remains is perpendicular by construction.",
+        "R is upper triangular because the k-th original vector is built only "
+        "from the first k orthonormal ones.",
+    ],
+    """
+title: QR Decomposition and Gram-Schmidt
+intro: Manufacturing an orthonormal basis, and the factorisation that makes least squares numerically respectable.
+
+## The procedure
+
+Start with vectors that span what you want but are not perpendicular. Gram-
+Schmidt makes them perpendicular without changing what they span.
+
+**First vector**: divide by its length. That is `q1` &mdash; same direction,
+length 1.
+
+**Second vector**: it points partly along `q1` and partly perpendicular to it.
+[Project](projections.html) it onto `q1`, subtract that projection, and what is
+left is perpendicular by construction. Normalise it to get `q2`.
+
+The visualisation draws each step. The dashed grey lines are the originals. The
+solid orange segment is the projection being removed, and the short dashed line
+is the remainder that becomes `q2`. The readout gives `q1 . q2` &mdash; zero to
+six decimal places, because it cannot be anything else.
+
+For more vectors the pattern repeats: subtract the components along everything
+already fixed, normalise what survives.
+
+## Where R comes from
+
+The projections you subtract are not discarded. Collect them and you have `R`,
+and together:
+
+```
+A  =  Q R
+```
+
+`Q` has the orthonormal vectors as columns; `R` is upper triangular.
+
+`R` is triangular for a structural reason worth seeing: the first original
+vector is built from `q1` alone, the second from `q1` and `q2`, the third from
+the first three. Nothing is ever built from a `q` that comes later, so
+everything below the diagonal is zero.
+
+Drag until the two input vectors nearly align. The remainder shrinks toward zero
+and `R` becomes nearly singular &mdash; which is the same near-dependence
+[the basis module](basis_span_and_orthogonality.html) warns about, showing up as
+a small number on the diagonal.
+
+## Why least squares uses it
+
+The textbook solution to least squares is the normal equations:
+
+```
+x  =  (A'A)^-1 A' b
+```
+
+Correct, and numerically poor. Forming `A'A` **squares the condition number**.
+A matrix with condition number 10&#8310; &mdash; unremarkable for real data
+&mdash; becomes 10&#185;&#178;, and in double precision that has consumed most
+of the available accuracy before the solve begins.
+
+QR avoids it. Substituting `A = QR` and using `Q'Q = I`:
+
+```
+R x  =  Q' b
+```
+
+`R` is triangular, so this is solved by back-substitution in one pass, and the
+condition number is never squared. That is why `numpy.linalg.lstsq`, R's `lm`
+and essentially every serious least-squares routine uses QR or an
+[SVD](singular_value_decomposition.html) rather than the formula in the
+textbook.
+
+## Classical against modified Gram-Schmidt
+
+The version described above is *classical* Gram-Schmidt, and it is unstable in
+floating point: rounding errors mean the later vectors drift away from
+orthogonality.
+
+*Modified* Gram-Schmidt subtracts each projection immediately rather than all at
+once at the end. Algebraically identical, numerically much better behaved.
+
+Serious implementations use neither, preferring **Householder reflections**,
+which build `Q` from a sequence of reflections and are stable regardless of the
+input. Gram-Schmidt survives because it is the version you can see, which is why
+it is the version on this page.
+
+## Where else it turns up
+
+**The QR algorithm** for eigenvalues repeatedly factors and re-multiplies in the
+other order, and the result converges to a triangular matrix whose diagonal
+holds the eigenvalues. It is one of the most important numerical algorithms
+there is, and it is this decomposition in a loop.
+
+**Orthogonalising features** before regression, to remove collinearity.
+
+**Kalman filters** in square-root form, for the same conditioning reason as
+least squares.
+
+## Where it goes wrong
+
+**Classical Gram-Schmidt on ill-conditioned input.** Use the modified version,
+or a library.
+
+**Forming A'A because the formula is shorter.** It squares the conditioning.
+
+**Assuming Q is square.** For a tall thin `A`, the economy QR gives a `Q` with
+the same shape as `A`, not a full orthogonal matrix.
+""",
+    [
+        {"q": "Why is R upper triangular?",
+         "options": ["By convention",
+                     "The k-th original vector is built only from the first k orthonormal vectors, never a later one",
+                     "Because Q is orthogonal",
+                     "To make back-substitution possible"],
+         "answer": 1,
+         "why": "Nothing is ever built from a q that comes later, so everything below the diagonal is zero - which then makes back-substitution possible as a consequence."},
+        {"q": "Why do least-squares solvers avoid the normal equations?",
+         "options": ["They are slower",
+                     "Forming A'A squares the condition number, consuming most of the available precision",
+                     "They require a square matrix",
+                     "They cannot handle collinearity"],
+         "answer": 1,
+         "why": "A condition number of 10^6 becomes 10^12. QR gives Rx = Q'b, solved by back-substitution, with the conditioning never squared."},
+        {"q": "What does modified Gram-Schmidt change?",
+         "options": ["The resulting Q and R",
+                     "Nothing algebraically - it subtracts each projection immediately, which is far more stable in floating point",
+                     "The order of the input vectors",
+                     "It produces a square Q"],
+         "answer": 1,
+         "why": "Algebraically identical, numerically much better. Serious implementations use Householder reflections instead, which are stable regardless of input."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 15. Cholesky and positive-definiteness
+# ---------------------------------------------------------------------------
+topic(
+    "cholesky_and_positive_definiteness",
+    "Cholesky and Positive-Definiteness",
+    "Linear Algebra",
+    "The square root of a matrix, when one exists. Push the correlation too "
+    "far and the factorisation fails &mdash; which is the test.",
+    _svg(_box(20, 28, 40, 40, fill=S, stroke=B, sw=1.6) + _txt(40, 52, "C", A, 11)
+         + _txt(70, 52, "=", M, 10)
+         + '<path d="M84 28 L84 68 L124 68 Z" fill="%s" fill-opacity="0.2" stroke="%s" stroke-width="1.6"/>' % (A, A)
+         + _txt(97, 60, "L", A, 10) + _txt(136, 52, "L'", A, 10)
+         + _txt(80, 84, "a matrix square root", M, 7)),
+    {
+        "demo": "cholesky",
+        "controls": [
+            {"key": "s1", "label": "SD of x", "type": "range",
+             "min": 0.3, "max": 2.5, "step": 0.1, "value": 1.4},
+            {"key": "s2", "label": "SD of y", "type": "range",
+             "min": 0.3, "max": 2.5, "step": 0.1, "value": 0.9},
+            {"key": "rho", "label": "Correlation", "type": "range",
+             "min": -1.05, "max": 1.05, "step": 0.05, "value": 0.60},
+            {"key": "seed", "label": "Resample", "type": "range",
+             "min": 1, "max": 40, "step": 1, "value": 5},
+        ],
+    },
+    [
+        "<code class='mono-font'>C = L L'</code> with L lower triangular. It is "
+        "the closest thing a matrix has to a square root.",
+        "It exists exactly when the matrix is <strong>positive definite</strong> "
+        "&mdash; every eigenvalue strictly greater than zero.",
+        "Multiply independent standard normals by L and they come out with "
+        "covariance exactly C. That is how correlated noise is generated.",
+        "Push the correlation past &plusmn;1 and the factorisation fails. The "
+        "failure is the diagnosis, and it is cheap.",
+    ],
+    """
+title: Cholesky and Positive-Definiteness
+intro: A matrix square root, what it needs to exist, and why its failure is more useful than its success.
+
+## The factorisation
+
+For a symmetric positive-definite matrix `C` there is a lower triangular `L`
+with:
+
+```
+C  =  L L'
+```
+
+`L` is unique if its diagonal is taken positive, and it is the nearest thing a
+matrix has to a square root. For a 2&times;2 it is short enough to write out
+whole:
+
+```
+L11 = sqrt(C11)
+L21 = C21 / L11
+L22 = sqrt(C22 - L21^2)
+```
+
+That last line carries the whole story. If `C22 - L21^2` is negative there is no
+real square root, and the algorithm stops.
+
+## Positive-definite
+
+A symmetric matrix is **positive definite** when `x' C x > 0` for every non-zero
+`x`, which is equivalent to all its eigenvalues being strictly positive.
+
+For a covariance matrix this is not a technicality. `x' C x` is the variance of
+the combination `x` of your variables, and a variance cannot be negative. A
+matrix that fails the test is not describing any distribution that exists.
+
+Drag the correlation control toward &plusmn;1. Past the boundary the readout
+reports failure, and the reason is that a correlation of 1.2 is not a thing: no
+pair of random variables can be more than perfectly correlated.
+
+**The factorisation failing is the test.** Cholesky costs about `n^3 / 3`
+operations, roughly half a general LU factorisation, and about a tenth of what
+computing the eigenvalues costs. When a routine needs to know whether a matrix
+is positive definite, it attempts a Cholesky and watches for the negative square
+root.
+
+## Generating correlated randomness
+
+This is where the factor earns its keep. Take independent standard normals `z`
+and compute `L z`. The result has covariance:
+
+```
+Cov(Lz)  =  L Cov(z) L'  =  L I L'  =  L L'  =  C
+```
+
+Exactly the covariance you asked for. The scatter in the visualisation is
+generated this way, and the two orange segments are the columns of `L` &mdash;
+the axes the independent noise gets mapped onto.
+
+That single trick underlies Monte Carlo simulation of correlated risk factors,
+sampling from a multivariate normal, and the reparameterisation trick in
+variational autoencoders.
+
+## Where else it appears
+
+**Gaussian processes.** Fitting one requires solving a system with the kernel
+matrix and computing its log-determinant. Cholesky gives both: the solve by
+triangular substitution, and the log-determinant as twice the sum of the logs of
+`L`'s diagonal. It is the computational core of GP regression.
+
+**Linear systems** with a symmetric positive-definite matrix &mdash; twice as
+fast as LU and numerically stable without pivoting.
+
+**Optimisation.** Newton steps need to solve with the
+[Hessian](jacobian_and_hessian.html), and a successful Cholesky confirms the
+Hessian is positive definite, which confirms the step direction is a descent
+direction. A failure signals a saddle, and modified Newton methods react to
+exactly that signal.
+
+**Whitening.** `L^-1 x` transforms correlated data into uncorrelated data with
+unit variance.
+
+## When it fails on data that should be fine
+
+An estimated covariance matrix can come out not-quite-positive-definite for
+reasons that are arithmetic rather than conceptual.
+
+**More variables than observations.** The estimate is singular by construction:
+with 100 variables and 50 samples the matrix has rank at most 50.
+
+**Perfectly collinear columns.** One variable is a combination of others, so
+some direction has genuinely zero variance.
+
+**Floating point.** A matrix that is positive definite in exact arithmetic can
+have a tiny negative eigenvalue after rounding.
+
+The standard repairs: add a small multiple of the identity to the diagonal
+&mdash; *jitter*, or *ridge*, and the same idea as
+[ridge regression](ridge_and_lasso_regression.html); use a shrinkage estimator
+such as Ledoit-Wolf; or clip the negative eigenvalues to zero and reassemble.
+
+## Where it goes wrong
+
+**Passing a non-symmetric matrix.** Most implementations read only one triangle
+and will silently return nonsense.
+
+**Treating failure as a bug.** It is usually the data telling you something.
+
+**Adding jitter without recording it.** You have changed the model. Say by how
+much.
+
+**Using it on a matrix that is only positive semi-definite.** A zero eigenvalue
+gives a zero on `L`'s diagonal, and anything that then divides by it fails.
+""",
+    [
+        {"q": "When does a Cholesky factorisation exist?",
+         "options": ["For every square matrix",
+                     "For a symmetric matrix with every eigenvalue strictly positive",
+                     "For every symmetric matrix",
+                     "For every invertible matrix"],
+         "answer": 1,
+         "why": "Positive definite means x'Cx > 0 for all non-zero x. For a covariance matrix that quantity is a variance, so a matrix failing the test describes no distribution that exists."},
+        {"q": "How do you generate samples with a given covariance C?",
+         "options": ["Multiply independent standard normals by L, where C = LL'",
+                     "Multiply them by C",
+                     "Add C to independent normals",
+                     "Take the eigenvalues of C"],
+         "answer": 0,
+         "why": "Cov(Lz) = L I L' = LL' = C. It underlies Monte Carlo simulation of correlated risk, multivariate normal sampling, and the VAE reparameterisation trick."},
+        {"q": "Why is attempting a Cholesky the standard positive-definiteness test?",
+         "options": ["It is the only test",
+                     "It costs about a third of n^3 - far cheaper than computing eigenvalues - and fails exactly when the property does not hold",
+                     "It works on non-symmetric matrices",
+                     "It never fails"],
+         "answer": 1,
+         "why": "About half of an LU and roughly a tenth of an eigendecomposition. Routines that need the answer attempt the factorisation and watch for the negative square root."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 16. Lagrange multipliers
+# ---------------------------------------------------------------------------
+topic(
+    "lagrange_multipliers",
+    "Lagrange Multipliers",
+    "Calculus",
+    "Optimise something while a constraint holds. The answer is where the "
+    "level lines just graze the constraint, and lambda is what that costs.",
+    _svg('<circle cx="80" cy="46" r="26" fill="none" stroke="%s" stroke-width="2"/>' % A
+         + "".join(_line(20, 74 - i * 12, 140, 50 - i * 12, M, 0.9) for i in range(5))
+         + _dot(99, 30, A, 4.5)
+         + _txt(80, 86, "tangency, not crossing", M, 7)),
+    {
+        "demo": "lagrange",
+        "controls": [
+            {"key": "ax", "label": "Objective: weight on x", "type": "range",
+             "min": -2, "max": 2, "step": 0.1, "value": 1.2},
+            {"key": "ay", "label": "Objective: weight on y", "type": "range",
+             "min": -2, "max": 2, "step": 0.1, "value": 0.8},
+            {"key": "r", "label": "Constraint radius", "type": "range",
+             "min": 0.5, "max": 2.6, "step": 0.1, "value": 1.6},
+        ],
+    },
+    [
+        "At an unconstrained optimum the gradient is zero. At a constrained one "
+        "it need not be &mdash; it only has to point <em>along</em> the constraint's gradient.",
+        "<code class='mono-font'>&nabla;f = &lambda; &nabla;g</code>. That "
+        "proportionality is the whole method.",
+        "Geometrically: the level line of the objective is tangent to the "
+        "constraint. If it crossed, you could slide along and do better.",
+        "&lambda; is the <strong>shadow price</strong> &mdash; how much the "
+        "optimum improves per unit of loosened constraint.",
+    ],
+    """
+title: Lagrange Multipliers
+intro: Optimising under a constraint, and the multiplier that turns out to be worth as much as the answer.
+
+## Why the usual rule stops working
+
+Unconstrained: find where the gradient is zero.
+
+Constrained: that rule fails immediately, because the unconstrained optimum is
+usually somewhere the constraint forbids. On the circle above, the objective
+increases forever in one direction and its gradient is never zero anywhere.
+
+## The condition
+
+Look at where the level lines meet the circle.
+
+At most points they **cross**. Crossing means you can slide along the circle and
+move to a better level line, so you are not at the optimum.
+
+At the optimum they are **tangent** &mdash; touching without crossing. Sliding
+either way makes things worse.
+
+Tangency means the two gradients are parallel:
+
+```
+grad f  =  lambda * grad g
+```
+
+That is the method entire. Solve it together with the constraint itself and you
+have the candidate points.
+
+Drag the objective weights and watch the marked point travel around the circle,
+staying exactly where the family of parallel lines grazes it.
+
+## The multiplier is the interesting part
+
+`lambda` looks like bookkeeping. It is not: it is the **shadow price** of the
+constraint &mdash; the rate at which the optimal value improves as the
+constraint is relaxed.
+
+Drag the radius control. The optimum's value rises, and the readout's `lambda`
+says how fast per unit of radius.
+
+In economics that is literally a price: how much more profit one more unit of
+capacity is worth, and therefore what you should be willing to pay for it. In
+machine learning it is the same quantity under different names &mdash; the
+regularisation strength in ridge regression, and the dual variables in an SVM
+that identify exactly which points are support vectors.
+
+A `lambda` of zero says the constraint is not binding: you would have chosen
+that point anyway, and loosening it buys nothing.
+
+## Where it shows up
+
+**Ridge regression.** "Minimise error subject to the coefficients being small"
+is a constrained problem; the penalised form everyone actually writes is its
+Lagrangian, and the penalty weight is `lambda`.
+
+**Support vector machines.** The dual formulation is Lagrangian, the multipliers
+are per-training-point, and the ones that come out non-zero *are* the support
+vectors.
+
+**Maximum entropy.** Finding the distribution with the most entropy subject to
+matching known moments produces the exponential family, and the multipliers
+become its natural parameters.
+
+**PCA.** Maximising variance subject to unit-length direction gives
+`Cv = lambda v` &mdash; the multiplier turns out to be the
+[eigenvalue](eigenvalues_and_eigenvectors.html).
+
+**Physics and economics** throughout, wherever something is optimised under a
+budget.
+
+## Inequalities
+
+Real constraints are often `g(x) <= c` rather than `g(x) = c`, and the extension
+is the **KKT conditions**. The addition worth remembering is *complementary
+slackness*: for each constraint, either it is tight and its multiplier may be
+non-zero, or it is slack and its multiplier is zero.
+
+That is what makes SVMs sparse. Points comfortably on the correct side of the
+margin have slack constraints, so their multipliers are zero, so they contribute
+nothing to the solution. Only the points pressed against the margin survive.
+
+## Where it goes wrong
+
+**Forgetting it finds stationary points, not maxima.** The condition holds at
+constrained minima and saddles too. Check which you have.
+
+**Assuming a solution exists.** An unbounded objective on an unbounded
+constraint set has none.
+
+**Reading lambda's sign carelessly.** It depends on how the Lagrangian was
+written, and the sign convention differs between texts.
+
+**Skipping the constraint qualification.** The method assumes the constraint
+gradients are well behaved at the solution; at a cusp or where constraints are
+degenerate it can fail.
+""",
+    [
+        {"q": "At a constrained optimum, what is true of the level line and the constraint?",
+         "options": ["They cross at right angles", "They are tangent",
+                     "The level line is horizontal", "The gradient is zero"],
+         "answer": 1,
+         "why": "If they crossed you could slide along the constraint onto a better level line. Tangency means the gradients are parallel, which is the condition."},
+        {"q": "What does the multiplier lambda measure?",
+         "options": ["The size of the constraint",
+                     "How much the optimal value improves per unit of loosened constraint",
+                     "The distance to the optimum",
+                     "The curvature of the objective"],
+         "answer": 1,
+         "why": "The shadow price. In economics it is literally what an extra unit of capacity is worth; in ridge regression it is the regularisation strength."},
+        {"q": "Why are SVMs sparse?",
+         "options": ["The kernel is sparse",
+                     "Complementary slackness makes the multiplier zero for every point whose constraint is slack",
+                     "Only a few points are stored",
+                     "The objective is convex"],
+         "answer": 1,
+         "why": "Points comfortably on the correct side contribute nothing to the solution. Only the ones pressed against the margin have non-zero multipliers - those are the support vectors."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 17. Jensen's inequality
+# ---------------------------------------------------------------------------
+topic(
+    "jensens_inequality",
+    "Jensen's Inequality",
+    "Probability",
+    "The average of a curve is not the curve of the average. The gap has a "
+    "direction, a size, and a great many consequences.",
+    _svg('<path d="M20 72 C 52 72, 66 26, 96 20" fill="none" stroke="%s" stroke-width="2"/>' % A
+         + _line(30, 68, 96, 20, M, 1.8, "4 3")
+         + _dot(63, 44, M, 4) + _dot(63, 54, A, 4)
+         + _line(63, 44, 63, 54, A, 1.4)
+         + _txt(80, 86, "chord above curve", M, 7)),
+    {
+        "demo": "jensen",
+        "controls": [
+            {"key": "curve", "label": "Curvature (negative = concave)", "type": "range",
+             "min": -1.0, "max": 1.2, "step": 0.05, "value": 0.80},
+            {"key": "spread", "label": "Spread of the distribution", "type": "range",
+             "min": 0.0, "max": 1.5, "step": 0.05, "value": 1.10},
+        ],
+    },
+    [
+        "For a <strong>convex</strong> f: "
+        "<code class='mono-font'>E[f(X)] &ge; f(E[X])</code>. For concave, the "
+        "inequality reverses.",
+        "Geometrically it is the chord lying above the curve &mdash; the same "
+        "picture as <a href='convexity_and_optimisation.html'>convexity</a> itself.",
+        "The gap grows with the spread of X and with the curvature of f. It is "
+        "zero only if one of them is zero.",
+        "It is the reason a log-likelihood can be bounded from below, which is "
+        "the reason EM and variational inference work at all.",
+    ],
+    """
+title: Jensen's Inequality
+intro: Why averaging before and after a curve gives different answers, and what that difference is used for.
+
+## The statement
+
+For a convex function `f` and a random variable `X`:
+
+```
+E[f(X)]  >=  f(E[X])
+```
+
+Transform first and average, and you get at least as much as averaging first
+and transforming. For a concave function the inequality reverses.
+
+## Why it is obvious once seen
+
+Take a distribution that puts half its weight at each of two points &mdash; the
+two grey dots in the visualisation.
+
+`f(E[X])` is the curve evaluated at the midpoint: the orange dot **on** the
+curve.
+
+`E[f(X)]` is the average of the two heights: the midpoint of the **chord**, the
+lighter dot above.
+
+Convex means the chord lies above the curve. So the chord's midpoint is above
+the curve's point, which is the inequality, drawn.
+
+Two controls change the gap. **Curvature**: flatten the function toward a
+straight line and the chord lies on the curve, so the gap vanishes &mdash; for a
+linear `f`, expectation passes straight through. **Spread**: shrink the
+distribution to a point and the two dots merge, and the gap vanishes again.
+
+The gap is zero exactly when the function is linear or the variable is constant,
+and grows with both.
+
+## Consequences worth having
+
+**The mean of ratios is not the ratio of means.** `1/x` is convex on the
+positives, so `E[1/X] >= 1/E[X]`. Averaging speeds in miles per hour to get
+average pace is wrong in a specific, predictable direction, and the same trap
+appears in averaging rates, ratios and per-unit costs throughout applied work.
+
+**AM-GM.** Applying Jensen to the concave logarithm gives that the arithmetic
+mean is at least the geometric mean, immediately.
+
+**Log-loss and calibration.** `-log` is convex, so averaging log-losses
+penalises confident mistakes far more than the raw error rate does. That is a
+design choice, and Jensen is why it works.
+
+**Portfolio returns.** Compounding is multiplicative, so the geometric mean is
+what you keep and the arithmetic mean is what gets advertised. Volatility drag
+is Jensen's gap.
+
+## The one that matters most
+
+Jensen is why **EM** and **variational inference** exist.
+
+Both want to maximise a log-likelihood containing a sum inside a logarithm
+&mdash; `log sum_z p(x, z)` &mdash; which does not decompose and cannot be
+optimised directly.
+
+The move is to write that sum as an expectation, then use Jensen on the concave
+`log` in the other direction:
+
+```
+log E[ ... ]  >=  E[ log ... ]
+```
+
+The right-hand side is a **lower bound** on the thing you wanted, it decomposes
+into terms you can differentiate, and maximising it cannot decrease the true
+objective.
+
+That bound is the ELBO &mdash; the evidence lower bound &mdash; and it is the
+objective a variational autoencoder trains on. EM alternates between tightening
+the bound and maximising it, which is exactly the two steps in
+[the Gaussian mixture module](gaussian_mixture_models.html).
+
+The gap between the bound and the truth is the KL divergence between the
+approximate posterior and the real one, which ties Jensen directly to
+[cross-entropy and KL](cross_entropy_and_kl_divergence.html): non-negativity of
+KL *is* Jensen applied to the log.
+
+## Where it goes wrong
+
+**Averaging a transformed quantity and reporting it as the transform of the
+average.** Log-scale averages, rates and ratios all bite here.
+
+**Getting the direction wrong.** Convex up, concave down. `log` and `sqrt` are
+concave; `exp`, `x^2` and `1/x` (on positives) are convex.
+
+**Assuming the bound is tight.** The ELBO can sit far below the true likelihood,
+and a rising ELBO does not prove the likelihood rose by as much.
+
+**Forgetting that equality needs linearity or a constant.** Nothing else gives
+it.
+""",
+    [
+        {"q": "For a convex f, which is larger?",
+         "options": ["f(E[X])", "E[f(X)]", "They are equal", "It depends on the distribution"],
+         "answer": 1,
+         "why": "Convex means the chord lies above the curve, so the average of the heights sits above the height at the average. Concave reverses it."},
+        {"q": "When is the gap exactly zero?",
+         "options": ["When X is normal",
+                     "When f is linear, or X is constant",
+                     "When the variance is small",
+                     "Never"],
+         "answer": 1,
+         "why": "Flatten the curve to a line and the chord lies on it; shrink the distribution to a point and the two dots merge. Nothing else gives equality."},
+        {"q": "How does Jensen make variational inference possible?",
+         "options": ["It bounds the variance",
+                     "It turns log of an expectation into a tractable lower bound - the ELBO - that decomposes and can be maximised",
+                     "It proves convergence of EM",
+                     "It removes the latent variables"],
+         "answer": 1,
+         "why": "log sum_z p(x,z) cannot be optimised directly. Jensen on the concave log gives a bound that does decompose, and maximising it cannot decrease the true objective."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 18. Markov chains
+# ---------------------------------------------------------------------------
+topic(
+    "markov_chains",
+    "Markov Chains",
+    "Probability",
+    "A system that forgets everything except where it is now. Start it "
+    "anywhere and it settles in the same place.",
+    _svg('<circle cx="34" cy="52" r="13" fill="none" stroke="%s" stroke-width="1.8"/>' % A
+         + '<circle cx="80" cy="26" r="13" fill="none" stroke="%s" stroke-width="1.8"/>' % A
+         + '<circle cx="126" cy="52" r="13" fill="none" stroke="%s" stroke-width="1.8"/>' % A
+         + _line(45, 46, 68, 32, M, 1.2) + _line(92, 32, 115, 46, M, 1.2)
+         + _line(47, 56, 113, 56, M, 1.2)
+         + _txt(80, 84, "only where you are now", M, 7)),
+    {
+        "demo": "markov",
+        "controls": [
+            {"key": "start", "label": "Starting state", "type": "select", "value": "0",
+             "options": [{"value": "0", "label": "Start in state A"},
+                         {"value": "1", "label": "Start in state B"},
+                         {"value": "2", "label": "Start in state C"}]},
+            {"key": "a", "label": "Leave A with probability", "type": "range",
+             "min": 0.05, "max": 0.95, "step": 0.05, "value": 0.30},
+            {"key": "b", "label": "Leave B with probability", "type": "range",
+             "min": 0.05, "max": 0.95, "step": 0.05, "value": 0.25},
+            {"key": "c", "label": "Leave C with probability", "type": "range",
+             "min": 0.05, "max": 0.95, "step": 0.05, "value": 0.40},
+        ],
+    },
+    [
+        "The <strong>Markov property</strong>: the next state depends only on "
+        "the current one, not on how you arrived.",
+        "A <strong>transition matrix</strong> holds the probabilities. Each row "
+        "sums to 1, because you must go somewhere.",
+        "Iterating it converges to a <strong>stationary distribution</strong> "
+        "&mdash; the eigenvector of P' with eigenvalue 1.",
+        "Change the starting state and the curves start in different places and "
+        "arrive at the same one. That is the point.",
+    ],
+    """
+title: Markov Chains
+intro: Memoryless processes, the distribution they settle into, and why so many algorithms are one.
+
+## The property
+
+A process is **Markov** when the next state depends only on the current state,
+not on the path that led there. The present screens off the past.
+
+That is a strong assumption and a liberating one. Instead of a history of
+arbitrary length you carry one thing &mdash; where you are &mdash; and
+everything about the future follows from it.
+
+## The transition matrix
+
+Collect the probabilities into a matrix `P`, where `P[i][j]` is the chance of
+moving from state `i` to state `j`. Every row sums to 1, because from any state
+you go somewhere, possibly back to where you were.
+
+If the current distribution over states is a row vector `d`, then after one step
+it is `d P`. After `k` steps, `d P^k`. That is all the arithmetic there is, and
+the visualisation is doing exactly it, forty steps at a time.
+
+## Convergence
+
+Watch the three curves. They start apart &mdash; all the probability on one
+state &mdash; and within a few steps they flatten out and stop moving. The
+readout shows the last step changing things by around 10&#8315;&#185;&#8304;.
+
+Now change the starting state. The curves begin somewhere completely different
+and **arrive at the same values**.
+
+That limit is the **stationary distribution**: the `pi` with `pi P = pi`. Read
+as an eigenvector problem, it is the left eigenvector of `P` with eigenvalue 1,
+and the [eigenvalue module](eigenvalues_and_eigenvectors.html) is the same
+mathematics in another costume.
+
+The convergence is not automatic. It needs the chain to be **irreducible** &mdash;
+every state reachable from every other &mdash; and **aperiodic**, not trapped in
+a fixed cycle. Drag a transition probability to its minimum and convergence
+slows visibly; a chain that could not leave a state at all would never mix.
+
+The speed is governed by the second-largest eigenvalue: the closer it is to 1,
+the slower the mixing. That number has a name, the *spectral gap*, and it is
+what people mean by a chain mixing slowly.
+
+## Where they appear
+
+**PageRank** is the stationary distribution of a random surfer following links.
+The damping factor exists to make the chain irreducible, so a page with no
+outbound links cannot swallow all the probability.
+
+**MCMC** &mdash; Metropolis-Hastings, Gibbs sampling, Hamiltonian Monte Carlo
+&mdash; runs the idea backwards: construct a chain whose stationary distribution
+*is* the posterior you want, run it, and treat the states it visits as samples.
+Nearly all Bayesian computation is this.
+
+**Hidden Markov models** put a Markov chain behind observations you can see, and
+were the backbone of speech recognition for decades.
+
+**Reinforcement learning.** A Markov decision process is a Markov chain with
+actions and rewards attached. The "Markov" in MDP is this property, and it is
+what makes value functions of the state alone sufficient.
+
+**n-gram language models** are Markov chains over words &mdash; and their
+limitation is precisely the property: a bigram model cannot remember anything
+beyond the previous word, which is why long-range coherence needed something
+else.
+
+## Where it goes wrong
+
+**Assuming the property holds.** Most real processes have memory. Widening the
+state to include recent history restores the property at the cost of a much
+larger state space.
+
+**Assuming convergence.** Check irreducibility and aperiodicity.
+
+**Stopping an MCMC run too early.** Samples before the chain has mixed reflect
+where you started, which is what burn-in discards and why convergence
+diagnostics exist.
+
+**Confusing the stationary distribution with the most likely state.** It is the
+long-run fraction of time spent in each state, not a prediction of where the
+chain is now.
+""",
+    [
+        {"q": "What does the Markov property say?",
+         "options": ["Every state is equally likely",
+                     "The next state depends only on the current one, not on the path that led there",
+                     "The chain always converges",
+                     "Transitions are symmetric"],
+         "answer": 1,
+         "why": "The present screens off the past, so you carry one thing - where you are - instead of a history of arbitrary length."},
+        {"q": "What is the stationary distribution?",
+         "options": ["The starting distribution",
+                     "The pi satisfying pi P = pi - the left eigenvector of P with eigenvalue 1",
+                     "The most likely state",
+                     "The uniform distribution"],
+         "answer": 1,
+         "why": "It is where the chain settles regardless of where it started, provided the chain is irreducible and aperiodic."},
+        {"q": "What does MCMC do with this idea?",
+         "options": ["Runs it forwards to predict states",
+                     "Constructs a chain whose stationary distribution is the posterior it wants, then treats the visited states as samples",
+                     "Estimates the transition matrix from data",
+                     "Finds the second-largest eigenvalue"],
+         "answer": 1,
+         "why": "Nearly all Bayesian computation is this, which is also why burn-in and convergence diagnostics matter: early samples reflect the starting point, not the target."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 19. Matrix calculus
+# ---------------------------------------------------------------------------
+topic(
+    "matrix_calculus",
+    "Matrix Calculus",
+    "Calculus",
+    "The handful of derivative identities every gradient in machine learning "
+    "is assembled from, and the shape rule that catches the mistakes.",
+    _svg(_box(18, 30, 30, 34, fill=S, stroke=B, sw=1.5) + _txt(33, 51, "W", A, 10)
+         + _txt(58, 50, "&#8594;", M, 11)
+         + _box(72, 30, 30, 34, fill=S, stroke=A, sw=1.5) + _txt(87, 51, "dL", A, 9)
+         + _txt(112, 50, "same", M, 7) + _txt(112, 60, "shape", M, 7)
+         + _txt(80, 84, "the check that catches everything", M, 7)),
+    {
+        "demo": "curvature",
+        "controls": [
+            {"key": "curve", "label": "Quadratic term", "type": "range",
+             "min": -1.0, "max": 1.5, "step": 0.05, "value": 0.5},
+            {"key": "slope", "label": "Linear term", "type": "range",
+             "min": -3, "max": 3, "step": 0.1, "value": 1.0},
+            {"key": "at", "label": "Evaluate at x", "type": "range",
+             "min": -2.5, "max": 2.5, "step": 0.1, "value": -0.6},
+        ],
+    },
+    [
+        "The gradient of a scalar with respect to a matrix has the "
+        "<strong>same shape as that matrix</strong>. That single rule catches "
+        "most errors.",
+        "<code class='mono-font'>d(a'x)/dx = a</code> and "
+        "<code class='mono-font'>d(x'Ax)/dx = (A + A')x</code> are the two "
+        "identities almost everything else is built from.",
+        "For a linear layer <code class='mono-font'>y = Wx</code>, the weight "
+        "gradient is <code class='mono-font'>dL/dW = (dL/dy) x'</code> &mdash; an outer product.",
+        "The demonstration is the scalar case, because the shapes are the only "
+        "thing that changes and the calculus underneath does not.",
+    ],
+    """
+title: Matrix Calculus
+intro: The short list of identities behind every gradient you will write, and the dimension check that makes them safe.
+
+## Why it needs its own name
+
+Nothing here is new calculus. Differentiating `x'Ax` is the
+[product rule](the_chain_rule.html) and
+[partial derivatives](partial_derivatives_and_gradient.html) applied to a sum,
+and you could always expand into indices and grind it out.
+
+What matrix calculus adds is **notation that stays compact** as the objects grow,
+plus a small collection of identities worth memorising so you never expand
+anything.
+
+The demonstration on this page is deliberately one-dimensional. The calculus
+underneath is the same in any number of dimensions; it is only the shapes that
+change, and the shapes are the part you have to be careful about.
+
+## The shape rule
+
+The single most useful fact, and the one that catches almost every mistake:
+
+**The gradient of a scalar with respect to something has the same shape as that
+something.**
+
+A loss is a scalar. Differentiate it by a 784&times;128 weight matrix and the
+result is 784&times;128. By a length-128 bias vector, and it is length 128.
+
+This is why gradient descent can write `W -= lr * dW` at all: the update has to
+have the same shape as the thing it updates. It is also the fastest debugging
+tool available. If a hand-derived gradient comes out the wrong shape, the
+derivation is wrong, and you know before running anything.
+
+Two conventions exist for laying out derivatives &mdash; numerator layout and
+denominator layout &mdash; and they differ by a transpose. Papers rarely say
+which they use. The shape rule resolves it every time: whichever orientation
+matches the parameter is the one meant.
+
+## The identities
+
+Almost everything reduces to these:
+
+| Expression | Derivative with respect to x |
+|---|---|
+| `a'x` | `a` |
+| `x'a` | `a` |
+| `x'x` | `2x` |
+| `x'Ax` | `(A + A')x`, which is `2Ax` when A is symmetric |
+| `Ax` (Jacobian) | `A` |
+
+And two more, with respect to a matrix:
+
+| Expression | Derivative with respect to W |
+|---|---|
+| `a'Wb` | `ab'` |
+| `tr(W'A)` | `A` |
+
+The pattern in the first table is worth noticing: they are the matrix versions
+of `d(ax)/dx = a` and `d(ax^2)/dx = 2ax`. The `(A + A')` appears because both
+copies of `x` in `x'Ax` contribute, and when `A` is symmetric they contribute
+identically.
+
+## Working an example
+
+Least squares, from the identities alone.
+
+```
+L = ||Ax - b||^2 = (Ax - b)'(Ax - b)
+  = x'A'Ax - 2b'Ax + b'b
+```
+
+Differentiate term by term. The first is `x'Mx` with `M = A'A`, which is
+symmetric, giving `2A'Ax`. The second is linear in `x`, giving `-2A'b`. The
+third has no `x`.
+
+```
+dL/dx = 2A'Ax - 2A'b
+```
+
+Set it to zero and you have the normal equations, `A'Ax = A'b` &mdash; the
+formula [the QR module](qr_decomposition.html) then explains why you should not
+solve directly.
+
+## The layer everyone needs
+
+For a linear layer `y = Wx + b` with loss `L`:
+
+```
+dL/dW  =  (dL/dy) x'        an outer product
+dL/db  =  dL/dy
+dL/dx  =  W' (dL/dy)        passed back to the previous layer
+```
+
+Three lines, and they are the whole of backpropagation through a dense layer.
+
+Check them against the shape rule. If `dL/dy` is `m`-long and `x` is `n`-long,
+the outer product is `m`&times;`n` &mdash; the shape of `W`. And `W'` is
+`n`&times;`m`, so `W'(dL/dy)` is `n`-long, matching `x`. Every term lands where
+it should, and if it does not, something is transposed.
+
+The transpose in that last line is why the backward pass is sometimes described
+as running the network in reverse: the same weights, applied the other way
+round.
+
+## Where it goes wrong
+
+**Mixing layout conventions mid-derivation.** Pick one, and use the shape rule
+to check.
+
+**Forgetting that `x'Ax` gives `(A + A')x`.** The shortcut `2Ax` is only valid
+for symmetric `A`.
+
+**Deriving without checking shapes.** It costs seconds and catches most errors.
+
+**Trusting a hand derivative without a numerical check.** Compare against a
+finite difference on a small random input. Every framework ships a gradient
+checker for this, and it is worth using when writing a custom operation.
+""",
+    [
+        {"q": "What shape is the gradient of a scalar loss with respect to a 784x128 weight matrix?",
+         "options": ["128x784", "784x128", "A scalar", "784x1"],
+         "answer": 1,
+         "why": "The same shape as the thing differentiated by - which is why W -= lr * dW type-checks, and the fastest way to catch a wrong derivation."},
+        {"q": "What is d(x'Ax)/dx?",
+         "options": ["Ax", "(A + A')x", "2A", "A'x"],
+         "answer": 1,
+         "why": "Both copies of x contribute. The familiar 2Ax is the special case where A is symmetric, which is why it works for A'A in least squares."},
+        {"q": "For a linear layer y = Wx, what is dL/dW?",
+         "options": ["W' times dL/dy", "The outer product (dL/dy) x'",
+                     "dL/dy", "x times dL/dy"],
+         "answer": 1,
+         "why": "An m-long upstream gradient times an n-long input gives an m-by-n outer product - exactly W's shape. The shape rule confirms it immediately."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 20. Combinatorics
+# ---------------------------------------------------------------------------
+topic(
+    "combinatorics",
+    "Combinatorics: Permutations and Combinations",
+    "Probability",
+    "Counting arrangements, counting selections, and the factorial that "
+    "separates them.",
+    _svg("".join(_box(20 + i * 15, 66 - h, 11, h, fill=S, stroke=B, sw=1)
+                 for i, h in enumerate([3, 9, 20, 32, 38, 32, 20, 9, 3]))
+         + _txt(80, 84, "how many ways", M, 7)),
+    {
+        "demo": "counting",
+        "controls": [
+            {"key": "n", "label": "n (things to choose from)", "type": "range",
+             "min": 2, "max": 24, "step": 1, "value": 12},
+            {"key": "k", "label": "k (things chosen)", "type": "range",
+             "min": 0, "max": 24, "step": 1, "value": 5},
+        ],
+    },
+    [
+        "<strong>Permutations</strong> count arrangements &mdash; order "
+        "matters. <code class='mono-font'>n! / (n&minus;k)!</code>",
+        "<strong>Combinations</strong> count selections &mdash; order does not. "
+        "<code class='mono-font'>n! / (k!(n&minus;k)!)</code>",
+        "The two differ by exactly <code class='mono-font'>k!</code>: the number "
+        "of orders each selection could have arrived in.",
+        "The bars are C(n, k) for every k. Symmetric, because choosing k to "
+        "keep is choosing n&minus;k to leave.",
+    ],
+    """
+title: Combinatorics: Permutations and Combinations
+intro: The counting that probability is built on, and the one question that decides which formula to use.
+
+## The question to ask first
+
+**Does order matter?**
+
+Three medals from eight runners: gold, silver and bronze are different outcomes
+depending on who gets which, so order matters. That is a **permutation**.
+
+Three people for a committee from eight: the same three people are the same
+committee however you list them. Order does not matter. That is a
+**combination**.
+
+Everything else follows from answering that.
+
+## The formulas
+
+**Permutations** of `k` from `n`:
+
+```
+P(n, k)  =  n! / (n - k)!
+```
+
+There are `n` choices for the first position, `n - 1` for the second, and so on
+for `k` positions. The factorial ratio is just that product written compactly.
+
+**Combinations** of `k` from `n`:
+
+```
+C(n, k)  =  n! / ( k! (n - k)! )
+```
+
+Count the ordered arrangements, then divide by `k!` because each unordered
+selection was counted once for every order its members could have appeared in.
+
+The readout makes the relationship concrete: at n = 12, k = 5 the ordered count
+is 95,040 and the unordered is 792, and 95,040 / 792 is exactly 120 = 5!.
+
+## Reading the shape
+
+The bars are `C(n, k)` for every `k` from 0 to n.
+
+**Symmetric.** `C(n, k) = C(n, n-k)`, because choosing which `k` to keep is the
+same act as choosing which `n - k` to leave.
+
+**Largest in the middle.** There are far more ways to pick half of something
+than to pick almost none or almost all.
+
+**Enormous quickly.** Drag `n` to 24 and the middle bar passes two and a half
+million. This growth is why brute force over subsets is hopeless past small `n`,
+and why the readout switches to scientific notation.
+
+That row of numbers is a row of Pascal's triangle, and the recurrence
+`C(n,k) = C(n-1,k-1) + C(n-1,k)` &mdash; either the last item is in your
+selection or it is not &mdash; is the standard dynamic-programming way to
+compute them without factorials.
+
+## With repetition
+
+A third case, easy to miss. If the same item can be chosen more than once and
+order matters &mdash; a 4-digit PIN, where digits may repeat &mdash; the count
+is simply `n^k`. The readout gives this alongside.
+
+At n = 10, k = 4 that is 10,000 PINs, against `P(10, 4) = 5,040` if no digit
+could repeat.
+
+## Why it matters here
+
+**Binomial probabilities.** The `C(n, k)` in
+[the binomial](bernoulli_binomial_poisson.html) is exactly this count &mdash;
+the number of orders in which `k` successes could have arrived.
+
+**Hypothesis testing.** Permutation tests build a null distribution by
+enumerating or sampling rearrangements of the labels, and the count above says
+whether enumeration is feasible.
+
+**Cross-validation.** The number of ways to split data into folds.
+
+**Feature selection.** Choosing `k` features from `n` is `C(n, k)`, which is why
+exhaustive search is abandoned almost immediately and greedy or regularised
+methods are used instead.
+
+**Complexity arguments.** A great deal of "this is exponential" is this table
+growing.
+
+## Where it goes wrong
+
+**Not asking whether order matters.** The commonest error, and it is a factor of
+`k!`.
+
+**Computing factorials directly.** `21!` overflows a 64-bit integer, and
+`C(n, k)` is usually far smaller than the factorials used to define it. Work in
+logarithms, or use the multiplicative recurrence, which is what this page does.
+
+**Forgetting repetition is allowed.** Passwords, dice and sampling with
+replacement all permit it.
+
+**Double counting.** When the objects are not all distinguishable the plain
+formulas over-count, and the multiset versions are needed instead.
+""",
+    [
+        {"q": "What separates a permutation count from a combination count?",
+         "options": ["A factor of n", "A factor of k! - the number of orders each selection could arrive in",
+                     "A factor of (n-k)!", "Nothing; they are the same"],
+         "answer": 1,
+         "why": "At n = 12, k = 5 the ordered count is 95,040 and the unordered is 792, and the ratio is exactly 120 = 5!."},
+        {"q": "Why is C(n, k) symmetric in k?",
+         "options": ["Because factorials are symmetric",
+                     "Choosing which k to keep is the same act as choosing which n-k to leave",
+                     "Because the distribution is normal",
+                     "It is not symmetric"],
+         "answer": 1,
+         "why": "The same partition of the set, described from either side - which is why the bars mirror around the middle."},
+        {"q": "Why should you not compute C(n, k) from factorials directly?",
+         "options": ["The formula is wrong",
+                     "21! overflows a 64-bit integer, while C(n, k) is usually far smaller than the factorials defining it",
+                     "It is slower",
+                     "It only works for small k"],
+         "answer": 1,
+         "why": "Work in logarithms or use the multiplicative recurrence. Pascal's identity C(n,k) = C(n-1,k-1) + C(n-1,k) is the standard dynamic-programming route."},
+    ],
+)
+
 CHECKS = {"maths/%s.html" % t["slug"]: {"check": t["check"]} for t in TOPICS}

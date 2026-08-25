@@ -41,10 +41,17 @@
      * redraw different, so a slider would look like it was changing the noise
      * rather than the filter. */
     function rng(seed) {
-        var s = seed || 1;
+        /* Mulberry32. The LCG this used to be overflowed 2^53 on the
+         * multiply, so it was not the generator it looked like - harmless for
+         * image noise, but it is the same broken line that was corrupting the
+         * statistics pages, and there is no reason to keep a second copy. */
+        var s = (seed || 1) >>> 0;
         return function () {
-            s = (s * 1103515245 + 12345) & 0x7fffffff;
-            return s / 0x7fffffff;
+            s = (s + 0x6D2B79F5) >>> 0;
+            var t = s;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
         };
     }
 

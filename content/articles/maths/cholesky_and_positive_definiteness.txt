@@ -1,0 +1,111 @@
+title: Cholesky and Positive-Definiteness
+intro: A matrix square root, what it needs to exist, and why its failure is more useful than its success.
+
+## The factorisation
+
+For a symmetric positive-definite matrix `C` there is a lower triangular `L`
+with:
+
+```
+C  =  L L'
+```
+
+`L` is unique if its diagonal is taken positive, and it is the nearest thing a
+matrix has to a square root. For a 2&times;2 it is short enough to write out
+whole:
+
+```
+L11 = sqrt(C11)
+L21 = C21 / L11
+L22 = sqrt(C22 - L21^2)
+```
+
+That last line carries the whole story. If `C22 - L21^2` is negative there is no
+real square root, and the algorithm stops.
+
+## Positive-definite
+
+A symmetric matrix is **positive definite** when `x' C x > 0` for every non-zero
+`x`, which is equivalent to all its eigenvalues being strictly positive.
+
+For a covariance matrix this is not a technicality. `x' C x` is the variance of
+the combination `x` of your variables, and a variance cannot be negative. A
+matrix that fails the test is not describing any distribution that exists.
+
+Drag the correlation control toward &plusmn;1. Past the boundary the readout
+reports failure, and the reason is that a correlation of 1.2 is not a thing: no
+pair of random variables can be more than perfectly correlated.
+
+**The factorisation failing is the test.** Cholesky costs about `n^3 / 3`
+operations, roughly half a general LU factorisation, and about a tenth of what
+computing the eigenvalues costs. When a routine needs to know whether a matrix
+is positive definite, it attempts a Cholesky and watches for the negative square
+root.
+
+## Generating correlated randomness
+
+This is where the factor earns its keep. Take independent standard normals `z`
+and compute `L z`. The result has covariance:
+
+```
+Cov(Lz)  =  L Cov(z) L'  =  L I L'  =  L L'  =  C
+```
+
+Exactly the covariance you asked for. The scatter in the visualisation is
+generated this way, and the two orange segments are the columns of `L` &mdash;
+the axes the independent noise gets mapped onto.
+
+That single trick underlies Monte Carlo simulation of correlated risk factors,
+sampling from a multivariate normal, and the reparameterisation trick in
+variational autoencoders.
+
+## Where else it appears
+
+**Gaussian processes.** Fitting one requires solving a system with the kernel
+matrix and computing its log-determinant. Cholesky gives both: the solve by
+triangular substitution, and the log-determinant as twice the sum of the logs of
+`L`'s diagonal. It is the computational core of GP regression.
+
+**Linear systems** with a symmetric positive-definite matrix &mdash; twice as
+fast as LU and numerically stable without pivoting.
+
+**Optimisation.** Newton steps need to solve with the
+[Hessian](jacobian_and_hessian.html), and a successful Cholesky confirms the
+Hessian is positive definite, which confirms the step direction is a descent
+direction. A failure signals a saddle, and modified Newton methods react to
+exactly that signal.
+
+**Whitening.** `L^-1 x` transforms correlated data into uncorrelated data with
+unit variance.
+
+## When it fails on data that should be fine
+
+An estimated covariance matrix can come out not-quite-positive-definite for
+reasons that are arithmetic rather than conceptual.
+
+**More variables than observations.** The estimate is singular by construction:
+with 100 variables and 50 samples the matrix has rank at most 50.
+
+**Perfectly collinear columns.** One variable is a combination of others, so
+some direction has genuinely zero variance.
+
+**Floating point.** A matrix that is positive definite in exact arithmetic can
+have a tiny negative eigenvalue after rounding.
+
+The standard repairs: add a small multiple of the identity to the diagonal
+&mdash; *jitter*, or *ridge*, and the same idea as
+[ridge regression](ridge_and_lasso_regression.html); use a shrinkage estimator
+such as Ledoit-Wolf; or clip the negative eigenvalues to zero and reassemble.
+
+## Where it goes wrong
+
+**Passing a non-symmetric matrix.** Most implementations read only one triangle
+and will silently return nonsense.
+
+**Treating failure as a bug.** It is usually the data telling you something.
+
+**Adding jitter without recording it.** You have changed the model. Say by how
+much.
+
+**Using it on a matrix that is only positive semi-definite.** A zero eigenvalue
+gives a zero on `L`'s diagonal, and anything that then divides by it fails.

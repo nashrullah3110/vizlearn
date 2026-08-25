@@ -1731,7 +1731,7 @@ topic(
              "options": [{"value": "moons", "label": "Two crescents"},
                          {"value": "blobs", "label": "Three blobs and some noise"}]},
             {"key": "eps", "label": "eps (neighbourhood radius)", "type": "range",
-             "min": 0.10, "max": 0.60, "step": 0.01, "value": 0.22},
+             "min": 0.10, "max": 0.60, "step": 0.01, "value": 0.24},
             {"key": "minPts", "label": "minPts", "type": "range",
              "min": 2, "max": 12, "step": 1, "value": 5},
         ],
@@ -1789,7 +1789,7 @@ Drag `eps` in the visualisation and watch the count.
 data shatters into many small clusters.
 
 **Too large**, and everything is within reach of everything else. The two
-crescents merge into one cluster, which happens above about 0.26 on this data.
+crescents merge into one cluster, which happens just above 0.25 on this data.
 
 The band in between is where DBSCAN works, and on the crescents it is genuinely
 narrow. That sensitivity is the honest weakness of the method.

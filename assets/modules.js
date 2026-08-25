@@ -2380,12 +2380,36 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Cholesky and Positive-Definiteness",
+  "path": "maths/cholesky_and_positive_definiteness.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Combinatorics: Permutations and Combinations",
+  "path": "maths/combinatorics.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "Conditional Probability",
   "path": "maths/conditional_probability.html",
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
   "desc": "Conditioning does not change the outcomes, it discards them. Watch the sample space shrink, and see why P(A given B) is not P(B given A)."
+ },
+ {
+  "title": "Confidence Intervals",
+  "path": "maths/confidence_intervals.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
  },
  {
   "title": "Convexity and Optimisation Landscapes",
@@ -2476,6 +2500,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive exponentials lesson - growth versus decay, the number e, doubling time, and why exponential always beats polynomial eventually."
  },
  {
+  "title": "Hypothesis Testing and p-values",
+  "path": "maths/hypothesis_testing_and_p_values.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "Identity, Inverse and Transpose",
   "path": "maths/identity_inverse_transpose.html",
   "category": "Maths",
@@ -2492,12 +2524,44 @@ window.VIZLEARN_MODULES = [
   "desc": "Move a split through a dataset and watch entropy fall. The threshold that drops it most is exactly the question a decision tree decides to ask."
  },
  {
+  "title": "Jensen's Inequality",
+  "path": "maths/jensens_inequality.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Lagrange Multipliers",
+  "path": "maths/lagrange_multipliers.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "Logarithms",
   "path": "maths/logarithms.html",
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
   "desc": "Interactive logarithms lesson - explore log curves for any base, the product-to-sum rule, and why log scales tame huge ranges."
+ },
+ {
+  "title": "Markov Chains",
+  "path": "maths/markov_chains.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Matrix Calculus",
+  "path": "maths/matrix_calculus.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
  },
  {
   "title": "Matrix Multiplication",
@@ -2554,6 +2618,14 @@ window.VIZLEARN_MODULES = [
   "topic": "maths",
   "icon": "sigma",
   "desc": "Drag one vector onto another and watch its shadow, plus the perpendicular residual left behind. The geometric root of least squares."
+ },
+ {
+  "title": "QR Decomposition and Gram-Schmidt",
+  "path": "maths/qr_decomposition.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
  },
  {
   "title": "Quantiles and Percentiles",
@@ -2626,6 +2698,14 @@ window.VIZLEARN_MODULES = [
   "topic": "maths",
   "icon": "sigma",
   "desc": "Interactive normal distribution lesson - adjust mean and standard deviation, see the 68-95-99.7 rule, z-scores, and the central limit theorem by sampling."
+ },
+ {
+  "title": "Type I and Type II Errors",
+  "path": "maths/type_i_and_type_ii_errors.html",
+  "category": "Maths",
+  "topic": "maths",
+  "icon": "sigma",
+  "desc": ""
  },
  {
   "title": "Vector Norms",

@@ -15,11 +15,25 @@
 
     // ------------------------------------------------------------ utilities
 
+    /* Mulberry32. The obvious textbook LCG - s = (s * 1103515245 + 12345) &
+     * 0x7fffffff - is broken in JavaScript: that multiplication overflows 2^53
+     * and loses precision BEFORE the mask, so the sequence is not the LCG it
+     * looks like. It passed unnoticed for a long time because a scatter plot
+     * of bad random numbers still looks like a scatter plot. It surfaced on
+     * the confidence-interval page, where a nominal 95% interval covered 84%
+     * at n = 200 and got worse as the sample grew - the opposite of what has
+     * to happen.
+     *
+     * Mulberry32 keeps everything inside 32-bit integer operations, which are
+     * exact in a double, and passes the usual small-state test suites. */
     function rng(seed) {
-        var s = seed || 1;
+        var s = (seed || 1) >>> 0;
         return function () {
-            s = (s * 1103515245 + 12345) & 0x7fffffff;
-            return s / 0x7fffffff;
+            s = (s + 0x6D2B79F5) >>> 0;
+            var t = s;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
         };
     }
 

@@ -64,6 +64,21 @@ SEQUENCE = {
         "maths/central_limit_theorem.html",
         "maths/quantiles_and_percentiles.html",
         "maths/sampling_distributions.html",
+        # Tier 2. Inference first, because it continues directly from the
+        # sampling distribution above: intervals, then tests, then the two
+        # error rates a test trades between. Then the linear algebra that
+        # least squares and covariance rest on, then the three probability
+        # pages, with matrix calculus beside the calculus it generalises.
+        "maths/confidence_intervals.html",
+        "maths/hypothesis_testing_and_p_values.html",
+        "maths/type_i_and_type_ii_errors.html",
+        "maths/qr_decomposition.html",
+        "maths/cholesky_and_positive_definiteness.html",
+        "maths/matrix_calculus.html",
+        "maths/lagrange_multipliers.html",
+        "maths/jensens_inequality.html",
+        "maths/markov_chains.html",
+        "maths/combinatorics.html",
     ],
 
     # Prepare data -> fit a first model -> measure it -> more models -> pitfalls.

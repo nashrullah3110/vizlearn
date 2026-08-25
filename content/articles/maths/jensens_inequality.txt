@@ -1,0 +1,96 @@
+title: Jensen's Inequality
+intro: Why averaging before and after a curve gives different answers, and what that difference is used for.
+
+## The statement
+
+For a convex function `f` and a random variable `X`:
+
+```
+E[f(X)]  >=  f(E[X])
+```
+
+Transform first and average, and you get at least as much as averaging first
+and transforming. For a concave function the inequality reverses.
+
+## Why it is obvious once seen
+
+Take a distribution that puts half its weight at each of two points &mdash; the
+two grey dots in the visualisation.
+
+`f(E[X])` is the curve evaluated at the midpoint: the orange dot **on** the
+curve.
+
+`E[f(X)]` is the average of the two heights: the midpoint of the **chord**, the
+lighter dot above.
+
+Convex means the chord lies above the curve. So the chord's midpoint is above
+the curve's point, which is the inequality, drawn.
+
+Two controls change the gap. **Curvature**: flatten the function toward a
+straight line and the chord lies on the curve, so the gap vanishes &mdash; for a
+linear `f`, expectation passes straight through. **Spread**: shrink the
+distribution to a point and the two dots merge, and the gap vanishes again.
+
+The gap is zero exactly when the function is linear or the variable is constant,
+and grows with both.
+
+## Consequences worth having
+
+**The mean of ratios is not the ratio of means.** `1/x` is convex on the
+positives, so `E[1/X] >= 1/E[X]`. Averaging speeds in miles per hour to get
+average pace is wrong in a specific, predictable direction, and the same trap
+appears in averaging rates, ratios and per-unit costs throughout applied work.
+
+**AM-GM.** Applying Jensen to the concave logarithm gives that the arithmetic
+mean is at least the geometric mean, immediately.
+
+**Log-loss and calibration.** `-log` is convex, so averaging log-losses
+penalises confident mistakes far more than the raw error rate does. That is a
+design choice, and Jensen is why it works.
+
+**Portfolio returns.** Compounding is multiplicative, so the geometric mean is
+what you keep and the arithmetic mean is what gets advertised. Volatility drag
+is Jensen's gap.
+
+## The one that matters most
+
+Jensen is why **EM** and **variational inference** exist.
+
+Both want to maximise a log-likelihood containing a sum inside a logarithm
+&mdash; `log sum_z p(x, z)` &mdash; which does not decompose and cannot be
+optimised directly.
+
+The move is to write that sum as an expectation, then use Jensen on the concave
+`log` in the other direction:
+
+```
+log E[ ... ]  >=  E[ log ... ]
+```
+
+The right-hand side is a **lower bound** on the thing you wanted, it decomposes
+into terms you can differentiate, and maximising it cannot decrease the true
+objective.
+
+That bound is the ELBO &mdash; the evidence lower bound &mdash; and it is the
+objective a variational autoencoder trains on. EM alternates between tightening
+the bound and maximising it, which is exactly the two steps in
+[the Gaussian mixture module](gaussian_mixture_models.html).
+
+The gap between the bound and the truth is the KL divergence between the
+approximate posterior and the real one, which ties Jensen directly to
+[cross-entropy and KL](cross_entropy_and_kl_divergence.html): non-negativity of
+KL *is* Jensen applied to the log.
+
+## Where it goes wrong
+
+**Averaging a transformed quantity and reporting it as the transform of the
+average.** Log-scale averages, rates and ratios all bite here.
+
+**Getting the direction wrong.** Convex up, concave down. `log` and `sqrt` are
+concave; `exp`, `x^2` and `1/x` (on positives) are convex.
+
+**Assuming the bound is tight.** The ELBO can sit far below the true likelihood,
+and a rising ELBO does not prove the likelihood rose by as much.
+
+**Forgetting that equality needs linearity or a constant.** Nothing else gives
+it.

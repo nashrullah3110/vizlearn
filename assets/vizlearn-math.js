@@ -529,9 +529,433 @@
     };
 })();
 
-/* Mount: controls, canvases, readout, and the draggable vectors on the basis
- * module. Deliberately the same shape as the machine learning harness, so a
- * reader moving between the two tracks meets one set of habits. */
+
+/* Tier 2: inference, the rest of the linear algebra, and two counting pages.
+ *
+ * Same rule as tier 1 - the arithmetic is the subject, so it runs here. The
+ * confidence-interval page really draws a thousand intervals and really counts
+ * how many contain the mean; the Markov page really iterates the transition
+ * matrix; Gram-Schmidt really orthogonalises the vectors on screen.
+ */
+(function () {
+    "use strict";
+    var V = window.VizML, DEMOS = window.VizMathDemos;
+    var Plot = V.Plot, rng = V.rng, normal = V.normal, css = V.css;
+    var mean = V.mean, sd = V.sd;
+
+    var A = function () { return css("--accent-primary", "#b06d10"); };
+    var F = function () { return css("--accent-fill", "#e0982f"); };
+    var M = function () { return css("--text-muted", "#8a9096"); };
+
+    /* Normal CDF via an Abramowitz-Stegun rational approximation. Accurate to
+     * about 1e-7, which is well past what any readout here shows. */
+    function phi(z) {
+        var s = z < 0 ? -1 : 1;
+        z = Math.abs(z) / Math.SQRT2;
+        var t = 1 / (1 + 0.3275911 * z);
+        var y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t
+                      - 0.284496736) * t + 0.254829592) * t * Math.exp(-z * z);
+        return 0.5 * (1 + s * y);
+    }
+
+    function gauss(x, mu, sg) {
+        return Math.exp(-(x - mu) * (x - mu) / (2 * sg * sg)) / (sg * Math.sqrt(2 * Math.PI));
+    }
+
+    /* Look a critical value up by number, not by object key.
+     *
+     * { 0.80: 1.2816 }[(0.8).toFixed(2)] misses, because JavaScript normalises
+     * the literal key 0.80 to the string "0.8" while toFixed produces "0.80".
+     * That silently fell back to the 95% value, so the 80% intervals and the
+     * alpha = 0.10 threshold were both quietly using the wrong number while
+     * looking entirely plausible. Matching numerically cannot do that.
+     */
+    function lookup(table, value, fallback) {
+        for (var i = 0; i < table.length; i++)
+            if (Math.abs(table[i][0] - value) < 1e-9) return table[i][1];
+        return fallback;
+    }
+
+    /* Confidence intervals, by construction: draw many samples, build an
+     * interval from each, and count how many cover the true mean. */
+    DEMOS.confidence = function (p, view) {
+        var mu = 10, sigma = 3, n = p.n | 0, conf = parseFloat(p.conf);
+        var z = lookup([[0.80, 1.2816], [0.90, 1.6449], [0.95, 1.9600], [0.99, 2.5758]],
+                       conf, 1.96);
+        var r = rng(p.seed || 307), shown = 40, total = 1000;
+        var covered = 0, bars = [], i, j;
+        for (i = 0; i < total; i++) {
+            /* Two passes, not the one-pass E[X^2] - E[X]^2 identity. That
+             * identity subtracts two nearly equal large numbers here - values
+             * around 10, variance 9 - and the cancellation was corrupting the
+             * sample SD badly enough to push coverage the wrong way as n grew.
+             * The expectation module warns about exactly this; it was worth
+             * taking its own advice. */
+            var draws = [], m = 0;
+            for (j = 0; j < n; j++) { var x = mu + normal(r) * sigma; draws.push(x); m += x; }
+            m /= n;
+            var ss = 0;
+            for (j = 0; j < n; j++) ss += (draws[j] - m) * (draws[j] - m);
+            var sampleSd = Math.sqrt(ss / Math.max(1, n - 1));
+            var half = z * sampleSd / Math.sqrt(n);
+            var ok = (m - half) <= mu && mu <= (m + half);
+            if (ok) covered++;
+            if (i < shown) bars.push([m - half, m + half, ok]);
+        }
+        var plot = Plot(view.canvas(0), { xr: [mu - 4, mu + 4], yr: [0, shown + 1],
+                                          height: 300, pad: { l: 44, r: 12, t: 12, b: 32 } });
+        plot.axes("value", "interval", 4);
+        var ctx = plot.ctx;
+        bars.forEach(function (b, i) {
+            ctx.strokeStyle = b[2] ? M() : A();
+            ctx.lineWidth = b[2] ? 1.4 : 2.4;
+            ctx.beginPath();
+            ctx.moveTo(plot.px(b[0]), plot.py(i + 1));
+            ctx.lineTo(plot.px(b[1]), plot.py(i + 1));
+            ctx.stroke();
+        });
+        plot.vline(mu, F(), "true mean");
+        /* The coverage comes out below nominal at small n, and that is not a
+         * bug to hide: this uses a z critical value with an estimated standard
+         * deviation, which is exactly the under-coverage the t-distribution
+         * was invented to fix. Naming it is more use than quietly using t. */
+        var rate = 100 * covered / total;
+        var shortfall = conf * 100 - rate;
+        return {
+            readout: Math.round(conf * 100) + "% intervals, n = " + n + ".  Of 1000 drawn, " +
+                     covered + " contained the true mean - " + rate.toFixed(1) + "%.  " +
+                     (shortfall > 1.2
+                        ? "Short of the nominal rate, because this uses a z value with an " +
+                          "estimated SD; that is what the t-distribution corrects, and the " +
+                          "gap shrinks as n grows."
+                        : "Close to nominal.") +
+                     "  The " + bars.filter(function (b) { return !b[2]; }).length +
+                     " highlighted above missed, and nothing about them looks wrong from the inside."
+        };
+    };
+
+    /* A null distribution, an observed statistic, and the tail area that is
+     * the p-value - shaded rather than asserted. */
+    DEMOS.pvalue = function (p, view) {
+        var obs = p.observed, tail = p.tail;
+        var plot = Plot(view.canvas(0), { xr: [-4, 4], yr: [0, 0.45], height: 280,
+                                          pad: { l: 54, r: 12, t: 12, b: 32 } });
+        plot.axes("test statistic under the null", "density");
+        var curve = [], x;
+        for (x = -4; x <= 4; x += 0.02) curve.push([x, gauss(x, 0, 1)]);
+
+        var ctx = plot.ctx;
+        var shade = function (from, to) {
+            ctx.fillStyle = F();
+            ctx.globalAlpha = 0.30;
+            ctx.beginPath();
+            ctx.moveTo(plot.px(from), plot.py(0));
+            for (var t = from; t <= to; t += 0.02) ctx.lineTo(plot.px(t), plot.py(gauss(t, 0, 1)));
+            ctx.lineTo(plot.px(to), plot.py(0));
+            ctx.closePath();
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        };
+        var pv;
+        if (tail === "two") {
+            var a = Math.abs(obs);
+            shade(a, 4); shade(-4, -a);
+            pv = 2 * (1 - phi(a));
+        } else {
+            shade(obs, 4);
+            pv = 1 - phi(obs);
+        }
+        plot.line(curve, A(), 2.2);
+        plot.vline(obs, A(), "observed " + obs.toFixed(2));
+
+        var verdict = pv < 0.01 ? "strong evidence against the null"
+                    : (pv < 0.05 ? "conventionally significant, and 0.05 is a convention"
+                                 : "not significant at 0.05 - which is not evidence the null is true");
+        return {
+            readout: "p = " + pv.toFixed(4) + " (" + (tail === "two" ? "two-tailed" : "one-tailed") +
+                     ").  That is the shaded area: the chance of a statistic this extreme " +
+                     "IF the null were true.  " + verdict + "."
+        };
+    };
+
+    /* Two hypotheses, the threshold between them, and the two error rates that
+     * trade off across it. */
+    DEMOS.power = function (p, view) {
+        /* A <select> hands back a string, always. Everything numeric that can
+         * arrive from one is parsed here rather than trusted - alpha.toFixed
+         * threw on this page for exactly that reason. */
+        var effect = p.effect, n = p.n | 0, alpha = parseFloat(p.alpha);
+        var se = 1 / Math.sqrt(n);
+        var crit = 0;
+        // one-sided critical value on the null's scale
+        var zAlpha = lookup([[0.01, 2.3263], [0.05, 1.6449], [0.10, 1.2816]], alpha, 1.6449);
+        crit = zAlpha * se;
+        var power = 1 - phi((crit - effect) / se);
+        var beta = 1 - power;
+
+        var lo = -4 * se, hi = effect + 4 * se;
+        var top = Math.max(gauss(0, 0, se), gauss(effect, effect, se));
+        var plot = Plot(view.canvas(0), { xr: [lo, hi], yr: [0, top * 1.1], height: 280,
+                                          pad: { l: 54, r: 12, t: 12, b: 32 } });
+        plot.axes("observed effect", "density");
+        var ctx = plot.ctx;
+        var shade = function (from, to, mu, colour, alphaVal) {
+            ctx.fillStyle = colour;
+            ctx.globalAlpha = alphaVal;
+            ctx.beginPath();
+            ctx.moveTo(plot.px(from), plot.py(0));
+            for (var t = from; t <= to; t += (hi - lo) / 400)
+                ctx.lineTo(plot.px(t), plot.py(gauss(t, mu, se)));
+            ctx.lineTo(plot.px(to), plot.py(0));
+            ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+        };
+        shade(crit, hi, 0, A(), 0.35);          // Type I
+        shade(lo, crit, effect, M(), 0.45);     // Type II
+        var c1 = [], c2 = [], x;
+        for (x = lo; x <= hi; x += (hi - lo) / 400) {
+            c1.push([x, gauss(x, 0, se)]);
+            c2.push([x, gauss(x, effect, se)]);
+        }
+        plot.line(c1, M(), 2);
+        plot.line(c2, F(), 2);
+        plot.vline(crit, A(), "threshold");
+
+        return {
+            readout: "n = " + n + ", true effect " + effect.toFixed(2) +
+                     ".  Type I rate (alpha) " + alpha.toFixed(2) +
+                     ", Type II rate (beta) " + beta.toFixed(3) +
+                     ", power " + (100 * power).toFixed(1) +
+                     "%.  Lowering alpha moves the threshold right and raises beta - " +
+                     "the only way to improve both at once is more data."
+        };
+    };
+
+    /* Gram-Schmidt, performed: take the second vector, remove its component
+     * along the first, and normalise what is left. */
+    DEMOS.gramschmidt = function (p, view) {
+        var a = [p.x1, p.y1], b = [p.x2, p.y2];
+        var na = Math.hypot(a[0], a[1]) || 1;
+        var q1 = [a[0] / na, a[1] / na];
+        var proj = b[0] * q1[0] + b[1] * q1[1];
+        var perp = [b[0] - proj * q1[0], b[1] - proj * q1[1]];
+        var np = Math.hypot(perp[0], perp[1]);
+        var q2 = np > 1e-9 ? [perp[0] / np, perp[1] / np] : [0, 0];
+
+        var plot = Plot(view.canvas(0), { xr: [-3.5, 3.5], yr: [-2.6, 2.6], height: 300 });
+        plot.axes("x", "y");
+        plot.line([[0, 0], a], M(), 2, [5, 4]);
+        plot.line([[0, 0], b], M(), 2, [5, 4]);
+        // the projection of b onto q1, and the perpendicular remainder
+        plot.line([[0, 0], [proj * q1[0], proj * q1[1]]], F(), 2.4);
+        plot.line([[proj * q1[0], proj * q1[1]], b], A(), 2, [3, 3]);
+        plot.line([[0, 0], q1], F(), 3);
+        plot.line([[0, 0], q2], A(), 3);
+        plot.dot(q1[0], q1[1], F(), 4.5);
+        plot.dot(q2[0], q2[1], A(), 4.5);
+
+        var dot = q1[0] * q2[0] + q1[1] * q2[1];
+        return {
+            readout: "b projected onto q1 has length " + proj.toFixed(2) +
+                     "; what is left over has length " + np.toFixed(3) +
+                     " and becomes q2.  q1 . q2 = " + dot.toFixed(6) +
+                     " - orthogonal by construction, and R holds the projections " +
+                     "that were subtracted."
+        };
+    };
+
+    /* A 2x2 covariance matrix, its Cholesky factor, and samples generated by
+     * multiplying that factor by independent noise. */
+    DEMOS.cholesky = function (p, view) {
+        var s1 = p.s1, s2 = p.s2, rho = p.rho;
+        var c11 = s1 * s1, c22 = s2 * s2, c12 = rho * s1 * s2;
+        // L L' = C, lower triangular
+        var l11 = Math.sqrt(c11);
+        var l21 = c12 / (l11 || 1);
+        var inner = c22 - l21 * l21;
+        var ok = inner > 1e-9 && c11 > 0;
+        var l22 = ok ? Math.sqrt(inner) : 0;
+
+        var r = rng(p.seed || 311), pts = [], i;
+        for (i = 0; i < 420; i++) {
+            var z1 = normal(r), z2 = normal(r);
+            pts.push([l11 * z1, l21 * z1 + l22 * z2]);
+        }
+        var lim = Math.max(3.2, s1 * 3, s2 * 3);
+        var plot = Plot(view.canvas(0), { xr: [-lim, lim], yr: [-lim * 0.75, lim * 0.75],
+                                          height: 300 });
+        plot.axes("x", "y");
+        pts.forEach(function (q) { plot.dot(q[0], q[1], M(), 2.4); });
+        plot.line([[0, 0], [l11, l21]], F(), 2.6);
+        plot.line([[0, 0], [0, l22]], A(), 2.6);
+
+        return ok ? {
+            readout: "L = [[" + l11.toFixed(2) + ", 0], [" + l21.toFixed(2) + ", " +
+                     l22.toFixed(2) + "]].  Multiply independent standard normals by L " +
+                     "and they come out with exactly this covariance - that is what a " +
+                     "Cholesky factor is for."
+        } : {
+            readout: "Not positive definite: with correlation " + rho.toFixed(2) +
+                     " at these scales the matrix has no real Cholesky factor, because " +
+                     "no distribution has that covariance. The factorisation failing " +
+                     "IS the test."
+        };
+    };
+
+    /* A constrained optimum: level sets of an objective, a circular
+     * constraint, and the point where they are tangent. */
+    DEMOS.lagrange = function (p, view) {
+        var ax = p.ax, ay = p.ay, rad = p.r;
+        // maximise ax*x + ay*y subject to x^2 + y^2 = r^2
+        var na = Math.hypot(ax, ay) || 1;
+        var sx = rad * ax / na, sy = rad * ay / na;
+        var lam = na / (2 * rad);
+
+        var plot = Plot(view.canvas(0), { xr: [-3.2, 3.2], yr: [-2.4, 2.4], height: 300 });
+        plot.axes("x", "y");
+        // level sets of the linear objective
+        var k;
+        for (k = -6; k <= 6; k++) {
+            var c = k * 0.8;
+            // ax*x + ay*y = c  ->  a line
+            var pts = [];
+            if (Math.abs(ay) > 1e-6) {
+                pts = [[-3.2, (c - ax * -3.2) / ay], [3.2, (c - ax * 3.2) / ay]];
+            } else {
+                pts = [[c / ax, -2.4], [c / ax, 2.4]];
+            }
+            plot.line(pts, M(), 0.8);
+        }
+        var circle = [];
+        for (k = 0; k <= 90; k++) {
+            var t = k / 90 * 2 * Math.PI;
+            circle.push([rad * Math.cos(t), rad * Math.sin(t)]);
+        }
+        plot.line(circle, A(), 2.4);
+        plot.line([[0, 0], [ax / na * 1.2, ay / na * 1.2]], F(), 2);
+        plot.dot(sx, sy, F(), 5.5);
+        plot.ring(sx, sy, F(), 9);
+
+        return {
+            readout: "optimum at (" + sx.toFixed(2) + ", " + sy.toFixed(2) +
+                     "), objective value " + (ax * sx + ay * sy).toFixed(2) +
+                     ", lambda = " + lam.toFixed(2) +
+                     ".  It is where a level line just touches the circle - " +
+                     "the two gradients are parallel, which is the whole condition."
+        };
+    };
+
+    /* Jensen: a convex function, a chord, and the gap between the mean of the
+     * outputs and the output of the mean. */
+    DEMOS.jensen = function (p, view) {
+        var spread = p.spread, curve = p.curve, mu = 1.6;
+        var f = function (x) { return curve >= 0 ? Math.exp(curve * x) : Math.log(Math.max(0.05, x)) * -curve * 4; };
+        var lo = Math.max(0.1, mu - spread), hi = mu + spread;
+        var pts = [], x;
+        for (x = 0.1; x <= 4; x += 0.02) pts.push([x, f(x)]);
+        var top = Math.max.apply(null, pts.map(function (q) { return q[1]; }));
+        var plot = Plot(view.canvas(0), { xr: [0, 4], yr: [Math.min(0, Math.min.apply(null, pts.map(function (q) { return q[1]; }))) - 0.4, top * 1.05],
+                                          height: 290, pad: { l: 54, r: 12, t: 12, b: 32 } });
+        plot.axes("x", "f(x)");
+        plot.line(pts, A(), 2.2);
+        // A two-point distribution at lo and hi, each with probability 1/2.
+        var efx = (f(lo) + f(hi)) / 2, fex = f(mu);
+        plot.line([[lo, f(lo)], [hi, f(hi)]], F(), 2, [5, 4]);
+        plot.dot(lo, f(lo), M(), 4.5);
+        plot.dot(hi, f(hi), M(), 4.5);
+        plot.dot(mu, fex, A(), 5.5);
+        plot.dot(mu, efx, F(), 5.5);
+
+        var gap = efx - fex;
+        return {
+            readout: "E[f(X)] = " + efx.toFixed(3) + ", f(E[X]) = " + fex.toFixed(3) +
+                     ", gap " + gap.toFixed(3) + ".  " +
+                     (curve >= 0
+                        ? "Convex, so the chord sits above the curve and E[f(X)] >= f(E[X])."
+                        : "Concave, so the inequality reverses.") +
+                     "  Shrink the spread and the gap closes; it is zero only for a constant."
+        };
+    };
+
+    /* A Markov chain, iterated. The distribution converges to the stationary
+     * one regardless of where it starts. */
+    DEMOS.markov = function (p, view) {
+        // three states; row i is where you go from state i
+        var P = [
+            [1 - p.a, p.a * 0.6, p.a * 0.4],
+            [p.b * 0.5, 1 - p.b, p.b * 0.5],
+            [p.c * 0.3, p.c * 0.7, 1 - p.c]
+        ];
+        var dist = [p.start === "0" ? 1 : 0, p.start === "1" ? 1 : 0, p.start === "2" ? 1 : 0];
+        var history = [dist.slice()], i, j, k;
+        for (i = 0; i < 40; i++) {
+            var next = [0, 0, 0];
+            for (j = 0; j < 3; j++)
+                for (k = 0; k < 3; k++) next[k] += dist[j] * P[j][k];
+            dist = next;
+            history.push(dist.slice());
+        }
+        var plot = Plot(view.canvas(0), { xr: [0, 40], yr: [0, 1], height: 280,
+                                          pad: { l: 52, r: 12, t: 12, b: 34 } });
+        plot.axes("step", "probability");
+        var cols = [A(), F(), M()];
+        for (k = 0; k < 3; k++)
+            plot.line(history.map(function (h, i) { return [i, h[k]]; }), cols[k], 2.2);
+
+        var last = history[history.length - 1];
+        var prev = history[history.length - 2];
+        var moved = Math.max.apply(null, last.map(function (v, i) { return Math.abs(v - prev[i]); }));
+        return {
+            readout: "after 40 steps: " + last.map(function (v) { return v.toFixed(3); }).join(", ") +
+                     ".  The last step moved it by " + moved.toExponential(1) +
+                     " - this is the stationary distribution, and every starting state " +
+                     "reaches the same one."
+        };
+    };
+
+    /* Counting: permutations against combinations, and the factor between. */
+    DEMOS.counting = function (p, view) {
+        var n = p.n | 0, k = p.k | 0;
+        if (k > n) k = n;
+        var logFact = function (m) { var s = 0, i; for (i = 2; i <= m; i++) s += Math.log(i); return s; };
+        var perm = Math.exp(logFact(n) - logFact(n - k));
+        var comb = Math.exp(logFact(n) - logFact(k) - logFact(n - k));
+        var withRep = Math.pow(n, k);
+
+        var rows = [];
+        for (var kk = 0; kk <= n; kk++)
+            rows.push([kk, Math.exp(logFact(n) - logFact(kk) - logFact(n - kk))]);
+        var top = Math.max.apply(null, rows.map(function (r) { return r[1]; }));
+        var plot = Plot(view.canvas(0), { xr: [-0.6, n + 0.6], yr: [0, top * 1.12],
+                                          height: 270, pad: { l: 64, r: 12, t: 12, b: 34 } });
+        plot.axes("k", "C(n, k)");
+        rows.forEach(function (r) {
+            plot.bar(r[0] - 0.36, r[0] + 0.36, r[1], r[0] === k ? A() : F());
+        });
+
+        var fmt = function (v) {
+            return v >= 1e6 ? v.toExponential(2) : Math.round(v).toLocaleString();
+        };
+        return {
+            readout: "n = " + n + ", k = " + k + ".  Ordered without repetition: " + fmt(perm) +
+                     ".  Unordered: " + fmt(comb) + " - smaller by exactly k! = " +
+                     fmt(Math.exp(logFact(k))) + ", the number of orders each selection " +
+                     "could have arrived in.  With repetition allowed: " + fmt(withRep) + "."
+        };
+    };
+})();
+
+/* Mount, and it has to be last in this file.
+ *
+ * These scripts are deferred, so by the time any of this runs the document is
+ * already "interactive" - which means init() fires immediately rather than
+ * waiting for DOMContentLoaded. When this block sat in the middle of the file
+ * it therefore mounted every page BEFORE the tier 2 demonstrations below it
+ * had registered themselves, and nine of the ten came up blank while the one
+ * that reused a tier 1 demo worked fine.
+ *
+ * Keeping the mount at the end means every demo is registered before anything
+ * looks for one.
+ */
 (function () {
     "use strict";
     var DEMOS = window.VizMathDemos;

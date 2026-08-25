@@ -566,191 +566,6 @@
     window.VizMLSims = SIMS;
 })();
 
-(function () {
-    "use strict";
-    var SIMS = window.VizMLSims;
-
-    function control(spec, onChange) {
-        var wrap = document.createElement("label");
-        wrap.className = "ml-control";
-        var name = document.createElement("span");
-        name.className = "ml-control-name";
-        name.textContent = spec.label;
-        var value = document.createElement("span");
-        value.className = "ml-control-value";
-        wrap.appendChild(name);
-        wrap.appendChild(value);
-
-        var input;
-        if (spec.type === "select") {
-            input = document.createElement("select");
-            spec.options.forEach(function (o) {
-                var op = document.createElement("option");
-                op.value = o.value;
-                op.textContent = o.label;
-                input.appendChild(op);
-            });
-            input.value = spec.value;
-        } else {
-            input = document.createElement("input");
-            input.type = "range";
-            input.min = spec.min;
-            input.max = spec.max;
-            input.step = spec.step || 1;
-            input.value = spec.value;
-            value.textContent = input.value;
-        }
-        input.className = "ml-input";
-        wrap.appendChild(input);
-
-        function read() {
-            if (spec.type === "select") return input.value;
-            value.textContent = input.value;
-            return parseFloat(input.value);
-        }
-        input.addEventListener("input", function () { onChange(spec.key, read()); });
-        input.addEventListener("change", function () { onChange(spec.key, read()); });
-        return wrap;
-    }
-
-    function mount(root) {
-        var cfgEl = root.querySelector(".ml-config");
-        if (!cfgEl) return;
-        var cfg;
-        try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
-        var sim = SIMS[cfg.sim];
-        if (!sim) return;
-
-        var params = {};
-        (cfg.controls || []).forEach(function (c) { params[c.key] = c.value; });
-        Object.keys(cfg.fixed || {}).forEach(function (k) { params[k] = cfg.fixed[k]; });
-
-        root.innerHTML = "";
-
-        var stage = document.createElement("div");
-        stage.className = "ml-stage" + ((cfg.canvases || 1) > 1 ? " ml-stage-2" : "");
-        var canvases = [];
-        for (var i = 0; i < (cfg.canvases || 1); i++) {
-            var fig = document.createElement("figure");
-            fig.className = "ml-pane";
-            var c = document.createElement("canvas");
-            c.className = "ml-canvas";
-            fig.appendChild(c);
-            if (cfg.captions && cfg.captions[i]) {
-                var cap = document.createElement("figcaption");
-                cap.textContent = cfg.captions[i];
-                fig.appendChild(cap);
-            }
-            stage.appendChild(fig);
-            canvases.push(c);
-        }
-        root.appendChild(stage);
-
-        var tableWrap = document.createElement("div");
-        tableWrap.className = "ml-table-wrap";
-        root.appendChild(tableWrap);
-
-        var panel = document.createElement("div");
-        panel.className = "ml-controls";
-        (cfg.controls || []).forEach(function (spec) {
-            panel.appendChild(control(spec, function (key, val) {
-                params[key] = val;
-                schedule();
-            }));
-        });
-        root.appendChild(panel);
-
-        var readout = document.createElement("p");
-        readout.className = "ml-readout";
-        readout.setAttribute("aria-live", "polite");
-        root.appendChild(readout);
-
-        var view = {
-            canvas: function (i) { return canvases[i] || canvases[0]; },
-            table: function (rows) {
-                tableWrap.innerHTML = "";
-                var t = document.createElement("table");
-                t.className = "ml-matrix";
-                rows.forEach(function (r, ri) {
-                    var tr = document.createElement("tr");
-                    r.forEach(function (cell, ci) {
-                        var td = document.createElement(ri === 0 || ci === 0 ? "th" : "td");
-                        td.textContent = cell;
-                        tr.appendChild(td);
-                    });
-                    t.appendChild(tr);
-                });
-                tableWrap.appendChild(t);
-            }
-        };
-
-        var queued = false;
-        function schedule() {
-            if (queued) return;
-            queued = true;
-            requestAnimationFrame(function () { queued = false; render(); });
-        }
-        function render() {
-            var res = sim(params, view) || {};
-            readout.textContent = res.readout || "";
-        }
-
-        /* The outlier module is dragged rather than sliddered: the point of it
-         * is that moving one row moves the fit, and a slider labelled "y of the
-         * outlier" hides that it is a data point at all. */
-        if (cfg.drag) {
-            var c0 = canvases[0];
-            var dragging = false;
-            var toData = function (ev) {
-                var r = c0.getBoundingClientRect();
-                var px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
-                var py = (ev.touches ? ev.touches[0].clientY : ev.clientY) - r.top;
-                var pad = { l: 42, r: 12, t: 12, b: 30 };
-                var x = cfg.drag.xr[0] + (px - pad.l) / (r.width - pad.l - pad.r) *
-                        (cfg.drag.xr[1] - cfg.drag.xr[0]);
-                var y = cfg.drag.yr[0] + (r.height - pad.b - py) /
-                        (r.height - pad.t - pad.b) * (cfg.drag.yr[1] - cfg.drag.yr[0]);
-                return [Math.max(cfg.drag.xr[0], Math.min(cfg.drag.xr[1], x)),
-                        Math.max(cfg.drag.yr[0], Math.min(cfg.drag.yr[1], y))];
-            };
-            var move = function (ev) {
-                if (!dragging) return;
-                var d = toData(ev);
-                params[cfg.drag.xKey] = d[0];
-                params[cfg.drag.yKey] = d[1];
-                schedule();
-                ev.preventDefault();
-            };
-            c0.style.touchAction = "none";
-            c0.addEventListener("pointerdown", function (ev) {
-                dragging = true;
-                c0.setPointerCapture(ev.pointerId);
-                move(ev);
-            });
-            c0.addEventListener("pointermove", move);
-            c0.addEventListener("pointerup", function () { dragging = false; });
-            c0.addEventListener("pointercancel", function () { dragging = false; });
-
-            var hint = document.createElement("p");
-            hint.className = "ml-hint";
-            hint.textContent = "Drag anywhere on the chart to move the highlighted point.";
-            root.insertBefore(hint, panel);
-        }
-
-        render();
-        window.addEventListener("resize", schedule);
-        root.dataset.vzMlReady = "1";
-    }
-
-    function init() {
-        Array.prototype.forEach.call(
-            document.querySelectorAll("[data-vz-ml]"), mount);
-    }
-
-    if (document.readyState === "loading")
-        document.addEventListener("DOMContentLoaded", init);
-    else init();
-})();
 
 /* Tier 2: clustering, interpretation and ensembles.
  *
@@ -1588,4 +1403,201 @@
     };
 
     window.VizMLSims = SIMS;
+})();
+
+/* Mount, and it has to be last in this file.
+ *
+ * These scripts are deferred, so by the time any of this runs the document is
+ * already "interactive" and init() fires immediately rather than waiting for
+ * DOMContentLoaded. While this block sat in the middle of the file it mounted
+ * every page BEFORE the tier 2 simulations below it had registered, and
+ * dbscan and the isolation forest came up blank on a deferred load.
+ *
+ * It was fine before the scripts were deferred, which is exactly why it was
+ * missed: nothing about this file changed, only when it runs.
+ */
+(function () {
+    "use strict";
+    var SIMS = window.VizMLSims;
+
+    function control(spec, onChange) {
+        var wrap = document.createElement("label");
+        wrap.className = "ml-control";
+        var name = document.createElement("span");
+        name.className = "ml-control-name";
+        name.textContent = spec.label;
+        var value = document.createElement("span");
+        value.className = "ml-control-value";
+        wrap.appendChild(name);
+        wrap.appendChild(value);
+
+        var input;
+        if (spec.type === "select") {
+            input = document.createElement("select");
+            spec.options.forEach(function (o) {
+                var op = document.createElement("option");
+                op.value = o.value;
+                op.textContent = o.label;
+                input.appendChild(op);
+            });
+            input.value = spec.value;
+        } else {
+            input = document.createElement("input");
+            input.type = "range";
+            input.min = spec.min;
+            input.max = spec.max;
+            input.step = spec.step || 1;
+            input.value = spec.value;
+            value.textContent = input.value;
+        }
+        input.className = "ml-input";
+        wrap.appendChild(input);
+
+        function read() {
+            if (spec.type === "select") return input.value;
+            value.textContent = input.value;
+            return parseFloat(input.value);
+        }
+        input.addEventListener("input", function () { onChange(spec.key, read()); });
+        input.addEventListener("change", function () { onChange(spec.key, read()); });
+        return wrap;
+    }
+
+    function mount(root) {
+        var cfgEl = root.querySelector(".ml-config");
+        if (!cfgEl) return;
+        var cfg;
+        try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
+        var sim = SIMS[cfg.sim];
+        if (!sim) return;
+
+        var params = {};
+        (cfg.controls || []).forEach(function (c) { params[c.key] = c.value; });
+        Object.keys(cfg.fixed || {}).forEach(function (k) { params[k] = cfg.fixed[k]; });
+
+        root.innerHTML = "";
+
+        var stage = document.createElement("div");
+        stage.className = "ml-stage" + ((cfg.canvases || 1) > 1 ? " ml-stage-2" : "");
+        var canvases = [];
+        for (var i = 0; i < (cfg.canvases || 1); i++) {
+            var fig = document.createElement("figure");
+            fig.className = "ml-pane";
+            var c = document.createElement("canvas");
+            c.className = "ml-canvas";
+            fig.appendChild(c);
+            if (cfg.captions && cfg.captions[i]) {
+                var cap = document.createElement("figcaption");
+                cap.textContent = cfg.captions[i];
+                fig.appendChild(cap);
+            }
+            stage.appendChild(fig);
+            canvases.push(c);
+        }
+        root.appendChild(stage);
+
+        var tableWrap = document.createElement("div");
+        tableWrap.className = "ml-table-wrap";
+        root.appendChild(tableWrap);
+
+        var panel = document.createElement("div");
+        panel.className = "ml-controls";
+        (cfg.controls || []).forEach(function (spec) {
+            panel.appendChild(control(spec, function (key, val) {
+                params[key] = val;
+                schedule();
+            }));
+        });
+        root.appendChild(panel);
+
+        var readout = document.createElement("p");
+        readout.className = "ml-readout";
+        readout.setAttribute("aria-live", "polite");
+        root.appendChild(readout);
+
+        var view = {
+            canvas: function (i) { return canvases[i] || canvases[0]; },
+            table: function (rows) {
+                tableWrap.innerHTML = "";
+                var t = document.createElement("table");
+                t.className = "ml-matrix";
+                rows.forEach(function (r, ri) {
+                    var tr = document.createElement("tr");
+                    r.forEach(function (cell, ci) {
+                        var td = document.createElement(ri === 0 || ci === 0 ? "th" : "td");
+                        td.textContent = cell;
+                        tr.appendChild(td);
+                    });
+                    t.appendChild(tr);
+                });
+                tableWrap.appendChild(t);
+            }
+        };
+
+        var queued = false;
+        function schedule() {
+            if (queued) return;
+            queued = true;
+            requestAnimationFrame(function () { queued = false; render(); });
+        }
+        function render() {
+            var res = sim(params, view) || {};
+            readout.textContent = res.readout || "";
+        }
+
+        /* The outlier module is dragged rather than sliddered: the point of it
+         * is that moving one row moves the fit, and a slider labelled "y of the
+         * outlier" hides that it is a data point at all. */
+        if (cfg.drag) {
+            var c0 = canvases[0];
+            var dragging = false;
+            var toData = function (ev) {
+                var r = c0.getBoundingClientRect();
+                var px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+                var py = (ev.touches ? ev.touches[0].clientY : ev.clientY) - r.top;
+                var pad = { l: 42, r: 12, t: 12, b: 30 };
+                var x = cfg.drag.xr[0] + (px - pad.l) / (r.width - pad.l - pad.r) *
+                        (cfg.drag.xr[1] - cfg.drag.xr[0]);
+                var y = cfg.drag.yr[0] + (r.height - pad.b - py) /
+                        (r.height - pad.t - pad.b) * (cfg.drag.yr[1] - cfg.drag.yr[0]);
+                return [Math.max(cfg.drag.xr[0], Math.min(cfg.drag.xr[1], x)),
+                        Math.max(cfg.drag.yr[0], Math.min(cfg.drag.yr[1], y))];
+            };
+            var move = function (ev) {
+                if (!dragging) return;
+                var d = toData(ev);
+                params[cfg.drag.xKey] = d[0];
+                params[cfg.drag.yKey] = d[1];
+                schedule();
+                ev.preventDefault();
+            };
+            c0.style.touchAction = "none";
+            c0.addEventListener("pointerdown", function (ev) {
+                dragging = true;
+                c0.setPointerCapture(ev.pointerId);
+                move(ev);
+            });
+            c0.addEventListener("pointermove", move);
+            c0.addEventListener("pointerup", function () { dragging = false; });
+            c0.addEventListener("pointercancel", function () { dragging = false; });
+
+            var hint = document.createElement("p");
+            hint.className = "ml-hint";
+            hint.textContent = "Drag anywhere on the chart to move the highlighted point.";
+            root.insertBefore(hint, panel);
+        }
+
+        render();
+        window.addEventListener("resize", schedule);
+        root.dataset.vzMlReady = "1";
+    }
+
+    function init() {
+        Array.prototype.forEach.call(
+            document.querySelectorAll("[data-vz-ml]"), mount);
+    }
+
+    if (document.readyState === "loading")
+        document.addEventListener("DOMContentLoaded", init);
+    else init();
 })();

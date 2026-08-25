@@ -1,0 +1,117 @@
+title: Matrix Calculus
+intro: The short list of identities behind every gradient you will write, and the dimension check that makes them safe.
+
+## Why it needs its own name
+
+Nothing here is new calculus. Differentiating `x'Ax` is the
+[product rule](the_chain_rule.html) and
+[partial derivatives](partial_derivatives_and_gradient.html) applied to a sum,
+and you could always expand into indices and grind it out.
+
+What matrix calculus adds is **notation that stays compact** as the objects grow,
+plus a small collection of identities worth memorising so you never expand
+anything.
+
+The demonstration on this page is deliberately one-dimensional. The calculus
+underneath is the same in any number of dimensions; it is only the shapes that
+change, and the shapes are the part you have to be careful about.
+
+## The shape rule
+
+The single most useful fact, and the one that catches almost every mistake:
+
+**The gradient of a scalar with respect to something has the same shape as that
+something.**
+
+A loss is a scalar. Differentiate it by a 784&times;128 weight matrix and the
+result is 784&times;128. By a length-128 bias vector, and it is length 128.
+
+This is why gradient descent can write `W -= lr * dW` at all: the update has to
+have the same shape as the thing it updates. It is also the fastest debugging
+tool available. If a hand-derived gradient comes out the wrong shape, the
+derivation is wrong, and you know before running anything.
+
+Two conventions exist for laying out derivatives &mdash; numerator layout and
+denominator layout &mdash; and they differ by a transpose. Papers rarely say
+which they use. The shape rule resolves it every time: whichever orientation
+matches the parameter is the one meant.
+
+## The identities
+
+Almost everything reduces to these:
+
+| Expression | Derivative with respect to x |
+|---|---|
+| `a'x` | `a` |
+| `x'a` | `a` |
+| `x'x` | `2x` |
+| `x'Ax` | `(A + A')x`, which is `2Ax` when A is symmetric |
+| `Ax` (Jacobian) | `A` |
+
+And two more, with respect to a matrix:
+
+| Expression | Derivative with respect to W |
+|---|---|
+| `a'Wb` | `ab'` |
+| `tr(W'A)` | `A` |
+
+The pattern in the first table is worth noticing: they are the matrix versions
+of `d(ax)/dx = a` and `d(ax^2)/dx = 2ax`. The `(A + A')` appears because both
+copies of `x` in `x'Ax` contribute, and when `A` is symmetric they contribute
+identically.
+
+## Working an example
+
+Least squares, from the identities alone.
+
+```
+L = ||Ax - b||^2 = (Ax - b)'(Ax - b)
+  = x'A'Ax - 2b'Ax + b'b
+```
+
+Differentiate term by term. The first is `x'Mx` with `M = A'A`, which is
+symmetric, giving `2A'Ax`. The second is linear in `x`, giving `-2A'b`. The
+third has no `x`.
+
+```
+dL/dx = 2A'Ax - 2A'b
+```
+
+Set it to zero and you have the normal equations, `A'Ax = A'b` &mdash; the
+formula [the QR module](qr_decomposition.html) then explains why you should not
+solve directly.
+
+## The layer everyone needs
+
+For a linear layer `y = Wx + b` with loss `L`:
+
+```
+dL/dW  =  (dL/dy) x'        an outer product
+dL/db  =  dL/dy
+dL/dx  =  W' (dL/dy)        passed back to the previous layer
+```
+
+Three lines, and they are the whole of backpropagation through a dense layer.
+
+Check them against the shape rule. If `dL/dy` is `m`-long and `x` is `n`-long,
+the outer product is `m`&times;`n` &mdash; the shape of `W`. And `W'` is
+`n`&times;`m`, so `W'(dL/dy)` is `n`-long, matching `x`. Every term lands where
+it should, and if it does not, something is transposed.
+
+The transpose in that last line is why the backward pass is sometimes described
+as running the network in reverse: the same weights, applied the other way
+round.
+
+## Where it goes wrong
+
+**Mixing layout conventions mid-derivation.** Pick one, and use the shape rule
+to check.
+
+**Forgetting that `x'Ax` gives `(A + A')x`.** The shortcut `2Ax` is only valid
+for symmetric `A`.
+
+**Deriving without checking shapes.** It costs seconds and catches most errors.
+
+**Trusting a hand derivative without a numerical check.** Compare against a
+finite difference on a small random input. Every framework ships a gradient
+checker for this, and it is worth using when writing a custom operation.

@@ -9365,6 +9365,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "maths/cholesky_and_positive_definiteness.html",
+  "title": "Cholesky and Positive-Definiteness",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "When does a Cholesky factorisation exist?",
+    "o": [
+     "For every square matrix",
+     "For a symmetric matrix with every eigenvalue strictly positive",
+     "For every symmetric matrix",
+     "For every invertible matrix"
+    ],
+    "a": 1,
+    "w": "Positive definite means x'Cx > 0 for all non-zero x. For a covariance matrix that quantity is a variance, so a matrix failing the test describes no distribution that exists."
+   },
+   {
+    "t": "How do you generate samples with a given covariance C?",
+    "o": [
+     "Multiply independent standard normals by L, where C = LL'",
+     "Multiply them by C",
+     "Add C to independent normals",
+     "Take the eigenvalues of C"
+    ],
+    "a": 0,
+    "w": "Cov(Lz) = L I L' = LL' = C. It underlies Monte Carlo simulation of correlated risk, multivariate normal sampling, and the VAE reparameterisation trick."
+   },
+   {
+    "t": "Why is attempting a Cholesky the standard positive-definiteness test?",
+    "o": [
+     "It is the only test",
+     "It costs about a third of n^3 - far cheaper than computing eigenvalues - and fails exactly when the property does not hold",
+     "It works on non-symmetric matrices",
+     "It never fails"
+    ],
+    "a": 1,
+    "w": "About half of an LU and roughly a tenth of an eigendecomposition. Routines that need the answer attempt the factorisation and watch for the negative square root."
+   }
+  ]
+ },
+ {
+  "path": "maths/combinatorics.html",
+  "title": "Combinatorics: Permutations and Combinations",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "What separates a permutation count from a combination count?",
+    "o": [
+     "A factor of n",
+     "A factor of k! - the number of orders each selection could arrive in",
+     "A factor of (n-k)!",
+     "Nothing; they are the same"
+    ],
+    "a": 1,
+    "w": "At n = 12, k = 5 the ordered count is 95,040 and the unordered is 792, and the ratio is exactly 120 = 5!."
+   },
+   {
+    "t": "Why is C(n, k) symmetric in k?",
+    "o": [
+     "Because factorials are symmetric",
+     "Choosing which k to keep is the same act as choosing which n-k to leave",
+     "Because the distribution is normal",
+     "It is not symmetric"
+    ],
+    "a": 1,
+    "w": "The same partition of the set, described from either side - which is why the bars mirror around the middle."
+   },
+   {
+    "t": "Why should you not compute C(n, k) from factorials directly?",
+    "o": [
+     "The formula is wrong",
+     "21! overflows a 64-bit integer, while C(n, k) is usually far smaller than the factorials defining it",
+     "It is slower",
+     "It only works for small k"
+    ],
+    "a": 1,
+    "w": "Work in logarithms or use the multiplicative recurrence. Pascal's identity C(n,k) = C(n-1,k-1) + C(n-1,k) is the standard dynamic-programming route."
+   }
+  ]
+ },
+ {
   "path": "maths/conditional_probability.html",
   "title": "Conditional Probability",
   "cat": "Maths",
@@ -9380,6 +9460,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Probability, once you know something”?",
     "ans": "Conditional probability is the probability of one event given that another has happened."
+   }
+  ]
+ },
+ {
+  "path": "maths/confidence_intervals.html",
+  "title": "Confidence Intervals",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "What does the 95% in a 95% confidence interval describe?",
+    "o": [
+     "The probability the parameter is in your interval",
+     "How often the procedure produces intervals that contain the parameter",
+     "The proportion of data inside the interval",
+     "The confidence of the analyst"
+    ],
+    "a": 1,
+    "w": "The parameter is fixed - it is inside or it is not. What is random is the interval, because it is computed from a random sample."
+   },
+   {
+    "t": "Why does a nominal 95% interval cover only about 89% at n = 5 here?",
+    "o": [
+     "The random number generator is biased",
+     "It uses a z value with an estimated SD, which is unreliable at small n - the problem the t-distribution fixes",
+     "The population is not normal",
+     "1000 draws is not enough"
+    ],
+    "a": 1,
+    "w": "The correction is large at small n and negligible past about 30. Dragging n upward closes the gap on its own."
+   },
+   {
+    "t": "Two 95% intervals overlap. What follows?",
+    "o": [
+     "The difference is not significant",
+     "Nothing directly - a test of the difference can still be significant",
+     "The samples are the same size",
+     "Both contain the true mean"
+    ],
+    "a": 1,
+    "w": "Overlap of separate intervals is not a test of their difference. Test the difference directly rather than eyeballing the bars."
    }
   ]
  },
@@ -9681,6 +9801,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "maths/hypothesis_testing_and_p_values.html",
+  "title": "Hypothesis Testing and p-values",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "A p-value is the probability of:",
+    "o": [
+     "The null hypothesis being true",
+     "A result at least this extreme, assuming the null is true",
+     "The alternative hypothesis being true",
+     "Making a Type I error"
+    ],
+    "a": 1,
+    "w": "It is computed assuming the null, so it cannot tell you how likely that assumption was. Going the other way needs Bayes' theorem and a prior."
+   },
+   {
+    "t": "A study reports p = 0.4. What can you conclude?",
+    "o": [
+     "The null hypothesis is true",
+     "The data is consistent with the null - which is also what an underpowered study looks like",
+     "There is no effect",
+     "The sample was too large"
+    ],
+    "a": 1,
+    "w": "A large p-value is produced both by a real absence of effect and by a study too small to detect one. Distinguishing them requires power."
+   },
+   {
+    "t": "Why must the choice of one or two tails be made before seeing the data?",
+    "o": [
+     "It changes the test statistic",
+     "Choosing afterwards halves the p-value for free, which is cheating rather than a modelling choice",
+     "Two-tailed tests need more data",
+     "The null hypothesis changes"
+    ],
+    "a": 1,
+    "w": "The two-tailed p-value is exactly double the one-tailed one for the same statistic, so the decision has to precede the observation."
+   }
+  ]
+ },
+ {
   "path": "maths/identity_inverse_transpose.html",
   "title": "Identity, Inverse and Transpose",
   "cat": "Maths",
@@ -9719,6 +9879,86 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "maths/jensens_inequality.html",
+  "title": "Jensen's Inequality",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "For a convex f, which is larger?",
+    "o": [
+     "f(E[X])",
+     "E[f(X)]",
+     "They are equal",
+     "It depends on the distribution"
+    ],
+    "a": 1,
+    "w": "Convex means the chord lies above the curve, so the average of the heights sits above the height at the average. Concave reverses it."
+   },
+   {
+    "t": "When is the gap exactly zero?",
+    "o": [
+     "When X is normal",
+     "When f is linear, or X is constant",
+     "When the variance is small",
+     "Never"
+    ],
+    "a": 1,
+    "w": "Flatten the curve to a line and the chord lies on it; shrink the distribution to a point and the two dots merge. Nothing else gives equality."
+   },
+   {
+    "t": "How does Jensen make variational inference possible?",
+    "o": [
+     "It bounds the variance",
+     "It turns log of an expectation into a tractable lower bound - the ELBO - that decomposes and can be maximised",
+     "It proves convergence of EM",
+     "It removes the latent variables"
+    ],
+    "a": 1,
+    "w": "log sum_z p(x,z) cannot be optimised directly. Jensen on the concave log gives a bound that does decompose, and maximising it cannot decrease the true objective."
+   }
+  ]
+ },
+ {
+  "path": "maths/lagrange_multipliers.html",
+  "title": "Lagrange Multipliers",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "At a constrained optimum, what is true of the level line and the constraint?",
+    "o": [
+     "They cross at right angles",
+     "They are tangent",
+     "The level line is horizontal",
+     "The gradient is zero"
+    ],
+    "a": 1,
+    "w": "If they crossed you could slide along the constraint onto a better level line. Tangency means the gradients are parallel, which is the condition."
+   },
+   {
+    "t": "What does the multiplier lambda measure?",
+    "o": [
+     "The size of the constraint",
+     "How much the optimal value improves per unit of loosened constraint",
+     "The distance to the optimum",
+     "The curvature of the objective"
+    ],
+    "a": 1,
+    "w": "The shadow price. In economics it is literally what an extra unit of capacity is worth; in ridge regression it is the regularisation strength."
+   },
+   {
+    "t": "Why are SVMs sparse?",
+    "o": [
+     "The kernel is sparse",
+     "Complementary slackness makes the multiplier zero for every point whose constraint is slack",
+     "Only a few points are stored",
+     "The objective is convex"
+    ],
+    "a": 1,
+    "w": "Points comfortably on the correct side contribute nothing to the solution. Only the ones pressed against the margin have non-zero multipliers - those are the support vectors."
+   }
+  ]
+ },
+ {
   "path": "maths/logarithms.html",
   "title": "Logarithms",
   "cat": "Maths",
@@ -9734,6 +9974,86 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “The Three Bases You Will Meet”?",
     "ans": "The base only rescales the curve — every log is a constant multiple of every other. Watch the three readouts stay in fixed proportion as you slide x."
+   }
+  ]
+ },
+ {
+  "path": "maths/markov_chains.html",
+  "title": "Markov Chains",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "What does the Markov property say?",
+    "o": [
+     "Every state is equally likely",
+     "The next state depends only on the current one, not on the path that led there",
+     "The chain always converges",
+     "Transitions are symmetric"
+    ],
+    "a": 1,
+    "w": "The present screens off the past, so you carry one thing - where you are - instead of a history of arbitrary length."
+   },
+   {
+    "t": "What is the stationary distribution?",
+    "o": [
+     "The starting distribution",
+     "The pi satisfying pi P = pi - the left eigenvector of P with eigenvalue 1",
+     "The most likely state",
+     "The uniform distribution"
+    ],
+    "a": 1,
+    "w": "It is where the chain settles regardless of where it started, provided the chain is irreducible and aperiodic."
+   },
+   {
+    "t": "What does MCMC do with this idea?",
+    "o": [
+     "Runs it forwards to predict states",
+     "Constructs a chain whose stationary distribution is the posterior it wants, then treats the visited states as samples",
+     "Estimates the transition matrix from data",
+     "Finds the second-largest eigenvalue"
+    ],
+    "a": 1,
+    "w": "Nearly all Bayesian computation is this, which is also why burn-in and convergence diagnostics matter: early samples reflect the starting point, not the target."
+   }
+  ]
+ },
+ {
+  "path": "maths/matrix_calculus.html",
+  "title": "Matrix Calculus",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "What shape is the gradient of a scalar loss with respect to a 784x128 weight matrix?",
+    "o": [
+     "128x784",
+     "784x128",
+     "A scalar",
+     "784x1"
+    ],
+    "a": 1,
+    "w": "The same shape as the thing differentiated by - which is why W -= lr * dW type-checks, and the fastest way to catch a wrong derivation."
+   },
+   {
+    "t": "What is d(x'Ax)/dx?",
+    "o": [
+     "Ax",
+     "(A + A')x",
+     "2A",
+     "A'x"
+    ],
+    "a": 1,
+    "w": "Both copies of x contribute. The familiar 2Ax is the special case where A is symmetric, which is why it works for A'A in least squares."
+   },
+   {
+    "t": "For a linear layer y = Wx, what is dL/dW?",
+    "o": [
+     "W' times dL/dy",
+     "The outer product (dL/dy) x'",
+     "dL/dy",
+     "x times dL/dy"
+    ],
+    "a": 1,
+    "w": "An m-long upstream gradient times an n-long input gives an m-by-n outer product - exactly W's shape. The shape rule confirms it immediately."
    }
   ]
  },
@@ -9909,6 +10229,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Least squares is a projection”?",
     "ans": "Linear regression fits a line by minimising squared residuals. Geometrically it is projecting."
+   }
+  ]
+ },
+ {
+  "path": "maths/qr_decomposition.html",
+  "title": "QR Decomposition and Gram-Schmidt",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "Why is R upper triangular?",
+    "o": [
+     "By convention",
+     "The k-th original vector is built only from the first k orthonormal vectors, never a later one",
+     "Because Q is orthogonal",
+     "To make back-substitution possible"
+    ],
+    "a": 1,
+    "w": "Nothing is ever built from a q that comes later, so everything below the diagonal is zero - which then makes back-substitution possible as a consequence."
+   },
+   {
+    "t": "Why do least-squares solvers avoid the normal equations?",
+    "o": [
+     "They are slower",
+     "Forming A'A squares the condition number, consuming most of the available precision",
+     "They require a square matrix",
+     "They cannot handle collinearity"
+    ],
+    "a": 1,
+    "w": "A condition number of 10^6 becomes 10^12. QR gives Rx = Q'b, solved by back-substitution, with the conditioning never squared."
+   },
+   {
+    "t": "What does modified Gram-Schmidt change?",
+    "o": [
+     "The resulting Q and R",
+     "Nothing algebraically - it subtracts each projection immediately, which is far more stable in floating point",
+     "The order of the input vectors",
+     "It produces a square Q"
+    ],
+    "a": 1,
+    "w": "Algebraically identical, numerically much better. Serious implementations use Householder reflections instead, which are stable regardless of input."
    }
   ]
  },
@@ -10210,6 +10570,46 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “The 68–95–99.7 Rule”?",
     "ans": "These percentages hold for every normal distribution, whatever μ and σ are. Cycle the region selector and watch the shaded area match — the app integrates the curve numerically rather than quoting the constants."
+   }
+  ]
+ },
+ {
+  "path": "maths/type_i_and_type_ii_errors.html",
+  "title": "Type I and Type II Errors",
+  "cat": "Maths",
+  "q": [
+   {
+    "t": "You tighten alpha from 0.05 to 0.01. What happens to power?",
+    "o": [
+     "It rises",
+     "It falls",
+     "It is unchanged",
+     "It depends on the sample size"
+    ],
+    "a": 1,
+    "w": "The threshold moves right, shrinking the false-positive tail and growing the false-negative one. Moving the line always trades one error for the other."
+   },
+   {
+    "t": "What improves both error rates at once?",
+    "o": [
+     "Moving the threshold",
+     "A larger sample, because both curves narrow",
+     "A smaller alpha",
+     "A one-tailed test"
+    ],
+    "a": 1,
+    "w": "Their spread is the standard error, which falls like root n, so the overlap shrinks. A larger true effect also works, but you rarely control that."
+   },
+   {
+    "t": "Why are effects from underpowered studies often inflated?",
+    "o": [
+     "The analysis is biased",
+     "Only an unusually large sample fluctuation could cross the threshold at that sample size",
+     "Small samples have larger true effects",
+     "The alpha was too strict"
+    ],
+    "a": 1,
+    "w": "The winner's curse - and a substantial part of why published effects shrink on replication."
    }
   ]
  },

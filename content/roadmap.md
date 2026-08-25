@@ -34,7 +34,7 @@ patching, the segmentation taxonomy) and six diagrams. Adding a twenty-first is
 one entry in `cv_topics.py`, a line in `tools/sequence.py`, and - if the harness
 lacks the operation - one function in `OPS` or `DIAGRAMS`.
 
-**Maths: 27 -> 37.** Tier 1 is complete, generated from `tools/math_topics.py`
+**Maths: 27 -> 47.** Tiers 1 and 2 are complete, generated from `tools/math_topics.py`
 with the demonstrations in `assets/vizlearn-math.js`. These are demonstrations
 rather than simulations - nothing is fitted, and the arithmetic is the subject:
 the SVD is a real decomposition of the matrix on screen, the central limit page
@@ -43,9 +43,9 @@ gradient descent and really gets stuck in a local minimum.
 
 The plotter, the seeded RNG and the numeric helpers moved out of
 `vizlearn-ml.js` into `assets/vizlearn-plot.js` so both harnesses share one
-copy. Tier 2 - confidence intervals, hypothesis testing, QR, Cholesky, matrix
-calculus, Lagrange multipliers, Jensen, Markov chains, combinatorics - is not
-started.
+copy. Tier 2 added the inference trio (confidence intervals, p-values, the two
+error rates), QR and Cholesky, matrix calculus, Lagrange multipliers, Jensen,
+Markov chains and combinatorics.
 
 **Machine Learning: 25 -> 45.** Tiers 1 and 2 are complete, generated from
 `tools/ml_topics.py` with the simulations in `assets/vizlearn-ml.js`. Every

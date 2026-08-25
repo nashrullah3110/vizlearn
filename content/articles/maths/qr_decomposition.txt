@@ -1,0 +1,104 @@
+title: QR Decomposition and Gram-Schmidt
+intro: Manufacturing an orthonormal basis, and the factorisation that makes least squares numerically respectable.
+
+## The procedure
+
+Start with vectors that span what you want but are not perpendicular. Gram-
+Schmidt makes them perpendicular without changing what they span.
+
+**First vector**: divide by its length. That is `q1` &mdash; same direction,
+length 1.
+
+**Second vector**: it points partly along `q1` and partly perpendicular to it.
+[Project](projections.html) it onto `q1`, subtract that projection, and what is
+left is perpendicular by construction. Normalise it to get `q2`.
+
+The visualisation draws each step. The dashed grey lines are the originals. The
+solid orange segment is the projection being removed, and the short dashed line
+is the remainder that becomes `q2`. The readout gives `q1 . q2` &mdash; zero to
+six decimal places, because it cannot be anything else.
+
+For more vectors the pattern repeats: subtract the components along everything
+already fixed, normalise what survives.
+
+## Where R comes from
+
+The projections you subtract are not discarded. Collect them and you have `R`,
+and together:
+
+```
+A  =  Q R
+```
+
+`Q` has the orthonormal vectors as columns; `R` is upper triangular.
+
+`R` is triangular for a structural reason worth seeing: the first original
+vector is built from `q1` alone, the second from `q1` and `q2`, the third from
+the first three. Nothing is ever built from a `q` that comes later, so
+everything below the diagonal is zero.
+
+Drag until the two input vectors nearly align. The remainder shrinks toward zero
+and `R` becomes nearly singular &mdash; which is the same near-dependence
+[the basis module](basis_span_and_orthogonality.html) warns about, showing up as
+a small number on the diagonal.
+
+## Why least squares uses it
+
+The textbook solution to least squares is the normal equations:
+
+```
+x  =  (A'A)^-1 A' b
+```
+
+Correct, and numerically poor. Forming `A'A` **squares the condition number**.
+A matrix with condition number 10&#8310; &mdash; unremarkable for real data
+&mdash; becomes 10&#185;&#178;, and in double precision that has consumed most
+of the available accuracy before the solve begins.
+
+QR avoids it. Substituting `A = QR` and using `Q'Q = I`:
+
+```
+R x  =  Q' b
+```
+
+`R` is triangular, so this is solved by back-substitution in one pass, and the
+condition number is never squared. That is why `numpy.linalg.lstsq`, R's `lm`
+and essentially every serious least-squares routine uses QR or an
+[SVD](singular_value_decomposition.html) rather than the formula in the
+textbook.
+
+## Classical against modified Gram-Schmidt
+
+The version described above is *classical* Gram-Schmidt, and it is unstable in
+floating point: rounding errors mean the later vectors drift away from
+orthogonality.
+
+*Modified* Gram-Schmidt subtracts each projection immediately rather than all at
+once at the end. Algebraically identical, numerically much better behaved.
+
+Serious implementations use neither, preferring **Householder reflections**,
+which build `Q` from a sequence of reflections and are stable regardless of the
+input. Gram-Schmidt survives because it is the version you can see, which is why
+it is the version on this page.
+
+## Where else it turns up
+
+**The QR algorithm** for eigenvalues repeatedly factors and re-multiplies in the
+other order, and the result converges to a triangular matrix whose diagonal
+holds the eigenvalues. It is one of the most important numerical algorithms
+there is, and it is this decomposition in a loop.
+
+**Orthogonalising features** before regression, to remove collinearity.
+
+**Kalman filters** in square-root form, for the same conditioning reason as
+least squares.
+
+## Where it goes wrong
+
+**Classical Gram-Schmidt on ill-conditioned input.** Use the modified version,
+or a library.
+
+**Forming A'A because the formula is shorter.** It squares the conditioning.
+
+**Assuming Q is square.** For a tall thin `A`, the economy QR gives a `Q` with
+the same shape as `A`, not a full orthogonal matrix.
