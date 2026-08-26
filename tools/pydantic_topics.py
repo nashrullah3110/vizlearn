@@ -5081,3 +5081,4773 @@ Set it per field rather than per model in most cases. Strict still permits lossl
          "why": "An id arriving as text usually means something upstream lost a type, and a Decimal accepting a float accepts an already-inexact value. Both are cases where silence hides a real problem."},
     ],
 )
+
+
+# ---------------------------------------------------------------------------
+# 14. field_validator
+# ---------------------------------------------------------------------------
+topic(
+    "field_validator",
+    "field_validator",
+    "Control",
+    "Rules a type cannot express, and normalisation applied before the value is "
+    "ever stored.",
+    _svg(_txt(30, 30, '" Ada "', M, 8) + _arrow(56, 26, 76, 26) +
+         _box(80, 16, 66, 20, S, A) + _txt(113, 30, "validator", A, 8) +
+         _arrow(113, 42, 113, 56) + _txt(113, 70, '"Ada"', A, 9)),
+    [
+        ("A rule the annotation cannot hold",
+         "Anything that is not a type, a bound or a pattern needs code. A validator "
+         "receives the value after coercion and either returns it or raises.",
+         '''from pydantic import BaseModel, field_validator, ValidationError
+
+TRACKS = {"maths", "python", "dsa", "ml"}
+
+class Module(BaseModel):
+    title: str
+    track: str
+
+    @field_validator("track")
+    @classmethod
+    def known_track(cls, v: str) -> str:
+        if v not in TRACKS:
+            raise ValueError("unknown track %r; try one of %s"
+                             % (v, ", ".join(sorted(TRACKS))))
+        return v
+
+print(Module(title="Vectors", track="maths"))
+
+try:
+    Module(title="Vectors", track="astrology")
+except ValidationError as e:
+    err = e.errors()[0]
+    print()
+    print("type :", err["type"])
+    print("said :", err["msg"])'''),
+
+        ("Returning a changed value",
+         "A validator is not only a check. Whatever it returns becomes the field, "
+         "which makes it the right place for normalisation.",
+         '''from pydantic import BaseModel, field_validator
+
+class Module(BaseModel):
+    title: str
+    tags: list
+
+    @field_validator("title")
+    @classmethod
+    def tidy(cls, v: str) -> str:
+        return " ".join(v.split()).title()
+
+    @field_validator("tags")
+    @classmethod
+    def lower_unique(cls, v: list) -> list:
+        seen, out = set(), []
+        for tag in v:
+            t = tag.strip().lower()
+            if t and t not in seen:
+                seen.add(t)
+                out.append(t)
+        return out
+
+m = Module(title="  the   chain    RULE ", tags=[" Maths ", "maths", "CALCULUS", ""])
+print("title:", repr(m.title))
+print("tags :", m.tags)'''),
+
+        ("One validator, several fields",
+         "Pass more than one name, or <code>\"*\"</code> for all of them. The field "
+         "being validated is available through the info argument.",
+         '''from pydantic import BaseModel, field_validator, ValidationInfo, ValidationError
+
+class Module(BaseModel):
+    title: str
+    summary: str
+    track: str
+
+    @field_validator("title", "summary")
+    @classmethod
+    def not_blank(cls, v: str, info: ValidationInfo) -> str:
+        if not v.strip():
+            raise ValueError("%s cannot be blank" % info.field_name)
+        return v.strip()
+
+    @field_validator("*")
+    @classmethod
+    def no_control_chars(cls, v):
+        if isinstance(v, str) and any(ord(c) < 32 for c in v):
+            raise ValueError("contains a control character")
+        return v
+
+print(Module(title=" Vectors ", summary=" What they are ", track="maths"))
+
+try:
+    Module(title="   ", summary="x", track="maths")
+except ValidationError as e:
+    print()
+    print("blank:", e.errors()[0]["msg"])'''),
+
+        ("Seeing fields already validated",
+         "<code>info.data</code> holds the fields validated <em>before</em> this one. "
+         "Declaration order therefore decides what is visible.",
+         '''from pydantic import BaseModel, field_validator, ValidationInfo, ValidationError
+
+class Module(BaseModel):
+    minutes: int
+    lessons: int
+
+    @field_validator("lessons")
+    @classmethod
+    def enough_time(cls, v: int, info: ValidationInfo) -> int:
+        minutes = info.data.get("minutes")       # declared above, so present
+        if minutes is not None and v > minutes:
+            raise ValueError("%d lessons cannot fit in %d minutes" % (v, minutes))
+        return v
+
+print(Module(minutes=30, lessons=5))
+
+try:
+    Module(minutes=3, lessons=5)
+except ValidationError as e:
+    print("refused:", e.errors()[0]["msg"])
+
+# If an earlier field failed, it is simply absent from info.data:
+try:
+    Module(minutes="ages", lessons=5)
+except ValidationError as e:
+    print()
+    print("earlier failure:", [x["loc"][0] for x in e.errors()])'''),
+
+        ("Before and after coercion",
+         "<code>mode=\"after\"</code> is the default and sees the converted value. "
+         "<code>mode=\"before\"</code> sees the raw input, which is where you fix a "
+         "shape rather than a value.",
+         '''from pydantic import BaseModel, field_validator
+
+class Module(BaseModel):
+    tags: list
+
+    # The wire sometimes sends "a,b,c" instead of a list. Fix the shape
+    # BEFORE Pydantic tries to validate it as a list.
+    @field_validator("tags", mode="before")
+    @classmethod
+    def split_csv(cls, v):
+        if isinstance(v, str):
+            return [part.strip() for part in v.split(",") if part.strip()]
+        return v
+
+    @field_validator("tags")            # mode="after" is the default
+    @classmethod
+    def lowercase(cls, v: list) -> list:
+        return [t.lower() for t in v]
+
+print("from a list  :", Module(tags=["Maths", "Vectors"]).tags)
+print("from a string:", Module(tags="Maths, Vectors, Norms").tags)'''),
+
+        ("Where a validator is the wrong tool",
+         "If a constraint can express the rule, use the constraint &mdash; it appears "
+         "in the schema and a validator does not.",
+         '''from pydantic import BaseModel, Field, field_validator
+
+class ByValidator(BaseModel):
+    minutes: int
+
+    @field_validator("minutes")
+    @classmethod
+    def positive(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("must be positive")
+        return v
+
+class ByConstraint(BaseModel):
+    minutes: int = Field(gt=0)
+
+for cls in (ByValidator, ByConstraint):
+    spec = cls.model_json_schema()["properties"]["minutes"]
+    print("%-13s schema: %s" % (cls.__name__, spec))
+
+print()
+print("Both reject -1. Only one told the documentation, the generated")
+print("client and the form builder that zero is the floor.")'''),
+    ],
+    [
+        "A validator runs after coercion by default, so the value it receives is already the annotated type.",
+        "Whatever it <strong>returns</strong> becomes the field. Forgetting the <code>return</code> silently sets the field to <code>None</code>.",
+        "Raise <code>ValueError</code>. Pydantic wraps it with the field's location and gives it the type <code>value_error</code>.",
+        "<code>@classmethod</code> is required and goes <em>below</em> <code>@field_validator</code>. The wrong order is a common and confusing error.",
+        "<code>info.data</code> exposes fields validated earlier, so declaration order decides what a validator can see. For a rule that needs everything, use <code>model_validator</code>.",
+        "Prefer a <code>Field</code> constraint when one can express the rule: constraints reach the JSON Schema, validators do not.",
+    ],
+    '''
+title: field_validator: Rules an Annotation Cannot Express
+intro: Custom checks and normalisation, and exactly where in the pipeline they run.
+
+## What is left after types and constraints
+
+Annotations describe the kind of value. Constraints narrow it to a range, a length or a pattern. Between them they cover a great deal, and then they stop.
+
+They cannot check membership of a set that lives in a database. They cannot normalise whitespace before checking a length. They cannot say "if this looks like a legacy identifier, convert it". They cannot express any rule whose logic is longer than a comparison.
+
+`field_validator` is where those live. It is a classmethod that receives one field's value, and either returns a value or raises.
+
+## The shape
+
+```python
+@field_validator("track")
+@classmethod
+def known_track(cls, v: str) -> str:
+    if v not in TRACKS:
+        raise ValueError("unknown track %r" % v)
+    return v
+```
+
+Four things about that are load-bearing.
+
+**`@classmethod` is required**, and it must sit *below* `@field_validator`. Decorators apply bottom-up, so this order gives `field_validator` a classmethod to register. Reversed, you get an error that does not obviously say what is wrong, and it is one of the most common mistakes people make with this API.
+
+**Raise `ValueError`**, not `ValidationError`. Pydantic catches it, attaches the field's location, gives it the type `value_error`, and folds it into the same report as every built-in failure. Constructing a `ValidationError` yourself is awkward and unnecessary. `AssertionError` also works but is a poor choice, because `python -O` removes assertions and your validation would silently stop running.
+
+**Return the value.** This is the mistake that bites hardest, because it fails quietly: a validator that checks and forgets to return sets the field to `None`. If a field mysteriously becomes `None` after you add a validator, this is why.
+
+**Name the failure usefully.** The message goes to whoever sent the data. `"unknown track 'astrology'; try one of dsa, maths, ml, python"` is worth the extra few characters over `"invalid"`.
+
+## Validation is also normalisation
+
+Because the returned value becomes the field, a validator is the natural place to clean data.
+
+Stripping whitespace, collapsing runs of spaces, lowercasing an identifier, deduplicating a list, normalising a phone number &mdash; all of these belong here, and doing them here means every consumer downstream gets the clean version. The alternative is normalising at each use site, where one place will forget.
+
+There is a small config-level shortcut for the most common case: `str_strip_whitespace=True` in `model_config` strips every string field, which removes a lot of trivial validators in one line.
+
+Be careful about how much you transform. A validator that substantially rewrites its input is doing work a reader will not expect from the annotation, and a caller may be surprised that what they sent is not what came back. Normalising whitespace is uncontroversial; silently correcting a misspelt category is not, and probably deserves to be an error instead.
+
+## Several fields at once
+
+The decorator takes multiple names:
+
+```python
+@field_validator("title", "summary")
+```
+
+And `"*"` applies to every field, which is occasionally useful for a cross-cutting concern &mdash; rejecting control characters, say &mdash; though a validator that runs on every field has to be careful, because it will receive values of every type.
+
+`ValidationInfo`, the optional second argument, carries `field_name`, which is what lets one validator produce a message naming the specific field it was applied to.
+
+## Seeing other fields, and the limit of that
+
+`info.data` is a dict of the fields validated *before* this one:
+
+```python
+@field_validator("lessons")
+@classmethod
+def enough_time(cls, v, info):
+    minutes = info.data.get("minutes")
+```
+
+Fields are validated in declaration order, so `minutes` is visible to `lessons` only because it is declared above it. Reorder the class and the validator silently stops seeing it.
+
+That fragility is the reason to treat `info.data` as a convenience rather than the tool for cross-field rules. Use `.get()` rather than indexing, because a field that failed its own validation is simply absent, and a `KeyError` inside a validator is a much worse error than the one it was trying to report.
+
+For any rule that genuinely depends on more than one field, `model_validator(mode="after")` is the correct tool. It runs once, after everything is populated, and it does not care what order the class was written in. That is the next module.
+
+## Before and after
+
+By default a validator runs in `mode="after"` &mdash; after coercion, so the value is already the annotated type. That is what you want for almost every rule, because you are checking a real `int` rather than something that might be a string.
+
+`mode="before"` runs on the raw input, before Pydantic has tried anything. Its use is fixing the *shape* of data rather than the value:
+
+```python
+@field_validator("tags", mode="before")
+@classmethod
+def split_csv(cls, v):
+    if isinstance(v, str):
+        return [p.strip() for p in v.split(",")]
+    return v
+```
+
+A caller sends `"maths,vectors"` where a list was wanted. In `after` mode you would never see it &mdash; validation would already have failed, because a string is not a list. In `before` mode you can convert it and let normal validation proceed.
+
+Two rules for `before` validators. Accept whatever might arrive, since the value has not been checked and could be anything, so guard with `isinstance` rather than assuming. And pass through anything you do not handle, unchanged, so the normal path still runs.
+
+## Validators and inheritance
+
+Validators are inherited like any other classmethod, so a base model's rules apply to every subclass. That makes a base a good home for cross-cutting normalisation.
+
+A subclass can override a validator by defining one with the same name, which replaces it entirely rather than adding to it. If you want both, give them different names &mdash; several validators can target the same field and they run in definition order.
+
+## When not to reach for one
+
+Three cases where a validator is the wrong answer.
+
+**When a constraint would do.** `Field(gt=0)` and a validator that checks `v > 0` both reject the same values, but only the constraint appears in the JSON Schema. That means the documentation says the minimum, the generated client knows it, and a form can enforce it before a request is sent. A validator is invisible to all of that.
+
+**When it needs I/O.** A validator that queries a database to check a foreign key turns validation into a network call, makes the model untestable without a database, and turns a validation error into a timeout. Keep models pure: they check data using only data. Existence checks belong in the layer that owns the storage.
+
+**When it is really a type.** A validator enforcing membership of four strings should be a `Literal`. A validator checking a value is one of a set with behaviour should be an `Enum`. Both produce better errors and both appear in the schema.
+
+## Several validators on one field
+
+More than one validator can target the same field, and they run in definition order:
+
+```python
+@field_validator("slug")
+@classmethod
+def strip(cls, v): return v.strip()
+
+@field_validator("slug")
+@classmethod
+def lower(cls, v): return v.lower()
+```
+
+Splitting rules like this is usually clearer than one function doing four things, and each has a name that says what it enforces. The name matters more than it looks &mdash; it appears in tracebacks and it is what a reader scans for when asking "where is the rule about slugs?".
+
+The counter-argument is that a chain of tiny validators can obscure the order dependency between them. If step two only makes sense after step one, saying so in one function with two comments is honest; splitting them and hoping nobody reorders is not.
+
+## What info carries
+
+The optional second parameter is a `ValidationInfo`, and beyond `field_name` and `data` it has two more things.
+
+`config` exposes the model's configuration, which lets a validator behave differently depending on, say, whether the model is strict.
+
+`context` is arbitrary data you pass in at validation time:
+
+```python
+Module.model_validate(payload, context={"tenant": "acme"})
+```
+
+Inside a validator, `info.context` holds that dict. This is the supported way to give validation access to something external without reaching for a global &mdash; a tenant, a feature flag, a set of permitted values loaded once per request.
+
+It is genuinely useful and easy to overuse. A model whose rules depend heavily on context is a model that cannot be understood on its own, and the checks may belong in a service instead.
+
+## Reusing a rule across models
+
+If two models need the same validator, do not copy it. There are two clean options.
+
+Put it on a shared base model, so every subclass inherits it. Good when the models are genuinely related.
+
+Or make it part of a type with `AfterValidator`, so the rule travels with the annotation rather than with the class. That is the `Annotated` module's subject, and it is usually the better answer when the models are unrelated but the field means the same thing in both.
+
+Copying the same `@field_validator` into four classes is the thing both of those exist to prevent.
+
+## Errors worth writing well
+
+The message you raise is seen by whoever sent the data, and it is worth a moment's thought.
+
+Include what was wrong and what would be right. `"unknown track 'astrology'; try one of dsa, maths, ml, python"` costs a few characters and saves a support message.
+
+Do not include the value if it might be sensitive. The error report already carries `input`, and a message that also embeds a token puts it in a second place.
+
+And keep the message about the data, not the code. `"validation failed in known_track"` tells the caller nothing they can act on.
+
+## Summary
+
+`field_validator` handles what annotations and constraints cannot: logic. It runs after coercion by default, receives one field, and whatever it returns becomes that field &mdash; which makes it as much a normalisation hook as a check.
+
+Remember the four mechanics: `@classmethod` underneath, raise `ValueError`, always return, and use `mode="before"` only when you are fixing shape rather than value.
+
+And reach for it second. Types first, constraints next, validators for what is left.
+
+## A worked example
+
+A tag list arriving from a form, needing three things done to it.
+
+```python
+@field_validator("tags", mode="before")
+@classmethod
+def accept_csv(cls, v):
+    return [p for p in v.split(",")] if isinstance(v, str) else v
+
+@field_validator("tags")
+@classmethod
+def clean(cls, v: List[str]) -> List[str]:
+    seen, out = set(), []
+    for tag in v:
+        t = tag.strip().lower()
+        if t and t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
+```
+
+Two validators, two jobs, two modes. The first repairs the shape when a caller sends a string. The second normalises and deduplicates once the value really is a list.
+
+Splitting them this way is deliberate. Doing both in a single `before` validator would mean the cleaning logic runs on unvalidated input and has to defend itself; doing both in `after` would mean the string never arrives. Each piece runs where its assumptions hold.
+
+The result is a field that accepts `"Maths, maths, VECTORS "` or `["Maths", "maths", "VECTORS "]` and produces `["maths", "vectors"]` either way &mdash; and every consumer downstream gets the clean version without knowing any of this happened.
+
+## The order to reach for things
+
+Types, then constraints, then validators. Working down that list rather than up produces models where most rules are visible in the annotations and only the genuinely complex ones are in code &mdash; which is also the order of how much each rule tells your schema, your documentation and your consumers.
+
+## Validators and the schema
+
+Worth restating once more, because it is the trade this whole module sits inside.
+
+A validator enforces a rule perfectly and tells nobody. The value is rejected, the caller gets an error, and every tool that reads your schema &mdash; documentation, generated clients, form builders, contract tests &mdash; remains unaware that the rule exists.
+
+That is not an argument against validators. It is an argument for using them for what genuinely needs them, and for reaching first for the annotations and constraints that can say the same thing in a form other tools can read.
+
+When a rule can only be a validator, consider describing it in the model's docstring, which becomes the schema's description. The rule still will not be machine-readable, but a human reading your documentation will at least know it is there rather than discovering it through a rejection.
+''',
+    [
+        {"q": "What happens if a validator checks a value but forgets to return it?",
+         "options": ["The original value is kept", "The field becomes None", "It raises", "Validation is skipped"],
+         "answer": 1,
+         "why": "Whatever the validator returns becomes the field, and a function with no return returns None. This fails silently, which is what makes it the most costly mistake with this API."},
+        {"q": "Why must `@classmethod` sit below `@field_validator`?",
+         "options": ["Style only", "Decorators apply bottom-up, so field_validator needs a classmethod to register", "It does not matter", "classmethod is optional"],
+         "answer": 1,
+         "why": "The inner decorator runs first. Reversed, field_validator receives a plain function and the resulting error does not obviously explain the cause."},
+        {"q": "When is `mode=\"before\"` the right choice?",
+         "options": ["Always", "When fixing the shape of raw input, such as a CSV string that should be a list", "For performance", "When raising errors"],
+         "answer": 1,
+         "why": "In after mode the value has already been coerced, so a string where a list was expected has already failed. Before mode is the only place to repair the shape."},
+        {"q": "Why prefer `Field(gt=0)` over a validator that checks `v > 0`?",
+         "options": ["It is faster", "The constraint appears in the JSON Schema; the validator is invisible to docs and clients", "Validators cannot raise", "No difference"],
+         "answer": 1,
+         "why": "Both reject the same values, but only the constraint reaches documentation, generated clients and form builders that read the schema."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 15. model_validator
+# ---------------------------------------------------------------------------
+topic(
+    "model_validator",
+    "model_validator",
+    "Control",
+    "Rules that span fields - the ones a per-field validator structurally cannot "
+    "see.",
+    _svg(_box(16, 20, 52, 22, S) + _txt(42, 34, "starts", M, 8) +
+         _box(92, 20, 52, 22, S) + _txt(118, 34, "ends", M, 8) +
+         _box(16, 52, 128, 22, S, A) + _txt(80, 66, "ends > starts", A, 8)),
+    [
+        ("A rule about two fields",
+         "<code>mode=\"after\"</code> runs once, on the finished model, with every "
+         "field populated and converted. Return <code>self</code>.",
+         '''from datetime import date
+from pydantic import BaseModel, model_validator, ValidationError
+
+class Cohort(BaseModel):
+    starts_on: date
+    ends_on: date
+
+    @model_validator(mode="after")
+    def ends_after_start(self):
+        if self.ends_on <= self.starts_on:
+            raise ValueError("ends_on must be after starts_on")
+        return self
+
+print(Cohort(starts_on="2026-09-01", ends_on="2026-12-01"))
+
+try:
+    Cohort(starts_on="2026-12-01", ends_on="2026-09-01")
+except ValidationError as e:
+    err = e.errors()[0]
+    print()
+    print("loc  :", err["loc"], "<- empty: it belongs to the model, not a field")
+    print("said :", err["msg"])'''),
+
+        ("Order does not matter here",
+         "A field validator can only see fields declared above it. A model validator "
+         "sees all of them, however the class is written.",
+         '''from pydantic import BaseModel, model_validator, ValidationError
+
+class Budget(BaseModel):
+    spent: int
+    total: int          # declared AFTER spent
+
+    @model_validator(mode="after")
+    def within_budget(self):
+        if self.spent > self.total:
+            raise ValueError("spent %d exceeds total %d" % (self.spent, self.total))
+        return self
+
+print(Budget(spent=40, total=100))
+
+try:
+    Budget(spent=140, total=100)
+except ValidationError as e:
+    print("refused:", e.errors()[0]["msg"])
+
+print()
+print("A field_validator on 'spent' could not have done this:")
+print("'total' is declared later, so it is not in info.data yet.")'''),
+
+        ("At least one of these",
+         "The classic cross-field rule. Neither field is individually wrong; the "
+         "combination is.",
+         '''from typing import Optional
+from pydantic import BaseModel, model_validator, ValidationError
+
+class Contact(BaseModel):
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+    @model_validator(mode="after")
+    def one_way_to_reach(self):
+        if not self.email and not self.phone:
+            raise ValueError("provide at least an email or a phone number")
+        return self
+
+print(Contact(email="ada@vizlearn.in"))
+print(Contact(phone="+44 20 7946 0958"))
+
+try:
+    Contact()
+except ValidationError as e:
+    print()
+    print("refused:", e.errors()[0]["msg"])'''),
+
+        ("mode=before: reshaping the whole payload",
+         "A before validator receives the raw input for the entire model. It is where "
+         "you accept a legacy shape and translate it.",
+         '''from pydantic import BaseModel, model_validator
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_old_shape(cls, data):
+        if isinstance(data, dict):
+            data = dict(data)
+            # v1 of our API called these something else.
+            if "name" in data and "title" not in data:
+                data["title"] = data.pop("name")
+            if "duration_seconds" in data and "minutes" not in data:
+                data["minutes"] = round(data.pop("duration_seconds") / 60)
+        return data
+
+print("new shape:", Module(title="Vectors", minutes=8))
+print("old shape:", Module.model_validate({"name": "Vectors",
+                                           "duration_seconds": 480}))'''),
+
+        ("Deriving a field from others",
+         "An after validator can set fields as well as check them &mdash; useful when "
+         "one value should be filled in from the rest.",
+         '''from typing import Optional
+from pydantic import BaseModel, model_validator
+
+class Module(BaseModel):
+    title: str
+    slug: Optional[str] = None
+
+    @model_validator(mode="after")
+    def fill_slug(self):
+        if self.slug is None:
+            object.__setattr__(self, "slug",
+                               self.title.lower().replace(" ", "-"))
+        return self
+
+print(Module(title="The Chain Rule"))
+print(Module(title="The Chain Rule", slug="chain-rule"))
+
+print()
+print("For values that are ALWAYS derived and never supplied,")
+print("a computed_field is the better tool - that is the next module.")'''),
+
+        ("Several rules, and where they report",
+         "Model validators run in definition order, after every field. The first to "
+         "raise stops the rest, so put the cheapest check first.",
+         '''from pydantic import BaseModel, model_validator, ValidationError
+
+class Enrolment(BaseModel):
+    seats: int
+    taken: int
+    waitlist: int
+
+    @model_validator(mode="after")
+    def taken_fits(self):
+        if self.taken > self.seats:
+            raise ValueError("taken cannot exceed seats")
+        return self
+
+    @model_validator(mode="after")
+    def waitlist_only_when_full(self):
+        if self.waitlist and self.taken < self.seats:
+            raise ValueError("no waitlist while seats remain")
+        return self
+
+print(Enrolment(seats=30, taken=30, waitlist=4))
+
+for bad in [{"seats": 10, "taken": 12, "waitlist": 0},
+            {"seats": 10, "taken": 5, "waitlist": 3}]:
+    try:
+        Enrolment.model_validate(bad)
+    except ValidationError as e:
+        print("%-40s %s" % (str(bad), e.errors()[0]["msg"]))'''),
+    ],
+    [
+        "<code>mode=\"after\"</code> receives the finished model as <code>self</code> and must <strong>return self</strong>.",
+        "<code>mode=\"before\"</code> receives the raw input for the whole model, is a <code>@classmethod</code>, and must return the data to validate.",
+        "A model-level error has an empty <code>loc</code>, because it belongs to the object rather than any one field. Code that assumes <code>loc[0]</code> exists will break on it.",
+        "Unlike <code>field_validator</code> with <code>info.data</code>, a model validator does not depend on declaration order &mdash; every field is already present.",
+        "Validators run in definition order and the first raise stops the rest, so put cheap checks before expensive ones.",
+        "Keep them pure. A model validator that queries a database makes validation an I/O operation and the model untestable on its own.",
+    ],
+    '''
+title: model_validator: Rules That Span Fields
+intro: The checks a per-field validator structurally cannot make, and the two modes that make them.
+
+## Why a field validator is not enough
+
+A `field_validator` receives one value. That is the right shape for most rules, and it is structurally incapable of expressing a large and important class of them.
+
+An end date must be after a start date. A discount must not exceed the price. Either an email or a phone number must be present. A waitlist only makes sense when every seat is taken. None of these is a statement about a single field &mdash; each field is individually fine, and it is the combination that is wrong.
+
+`info.data` looks like a way round this, and it half is. It exposes fields validated *earlier*, which means the rule only works if the fields happen to be declared in the right order and silently stops working when somebody reorders the class for tidiness. That is not a foundation to build on.
+
+`model_validator` is the tool built for the job.
+
+## mode="after"
+
+The common case. It runs once, after every field has been validated and converted, and receives the finished model:
+
+```python
+@model_validator(mode="after")
+def ends_after_start(self):
+    if self.ends_on <= self.starts_on:
+        raise ValueError("ends_on must be after starts_on")
+    return self
+```
+
+Three mechanics. It takes `self`, not `cls`, and is not a classmethod &mdash; which is the opposite of `field_validator` and catches people out. It must **return `self`**, and forgetting is the same silent failure as forgetting to return from a field validator. And by the time it runs, the fields are real Python objects, so `self.ends_on` is a `date` and comparing it works.
+
+That last point is worth dwelling on. Because coercion has already happened, an after validator can compare, subtract and sort without any defensive conversion. The rule reads exactly like the sentence you would say out loud.
+
+## The empty location
+
+An error raised here has `loc: ()` &mdash; an empty tuple.
+
+That is correct: the failure belongs to the object, not to any single field. There is no one input to highlight, because the problem is the relationship between two of them.
+
+It is also the thing most likely to break error-handling code written before the first cross-field rule was added. Anything doing `err["loc"][0]` will raise `IndexError`, and it will do so the first time somebody adds a validator like this &mdash; long after the handler was written and tested.
+
+Handle it explicitly. Group under a key like `"_form"`, and give the interface somewhere to display an error that is not attached to an input. Every form library has a concept for this; the model just needs to feed it.
+
+## mode="before"
+
+A before validator receives the raw input for the entire model, before any field has been looked at. It is a classmethod, and it returns the data that will then be validated normally.
+
+Its main use is accepting a shape you did not design:
+
+```python
+@model_validator(mode="before")
+@classmethod
+def accept_old_shape(cls, data):
+    if isinstance(data, dict) and "name" in data:
+        data = dict(data)
+        data["title"] = data.pop("name")
+    return data
+```
+
+This is the translation layer for a legacy payload, a third-party API with different names, or a version of your own format you no longer want in the model. The model stays clean and describes the shape you want; the adapter sits in one visible place.
+
+Two rules, both the same as for field-level before validators. Guard with `isinstance`, because the input has not been checked and may not be a dict at all. And copy before mutating &mdash; `dict(data)` &mdash; because modifying the caller's dictionary in place is a surprise nobody enjoys debugging.
+
+Use `before` sparingly. It runs before everything, so any error it raises is reported without the field context that makes Pydantic errors useful, and complex logic there is hard to follow. For anything that is genuinely per-field, a field validator says more.
+
+## Setting values, not just checking
+
+An after validator can modify the model, which makes it a way to derive one field from others:
+
+```python
+@model_validator(mode="after")
+def fill_slug(self):
+    if self.slug is None:
+        object.__setattr__(self, "slug", self.title.lower().replace(" ", "-"))
+    return self
+```
+
+The `object.__setattr__` is needed on a frozen model and is harmless otherwise; on a mutable model a plain assignment works, though it will re-trigger validation if `validate_assignment` is on.
+
+Before reaching for this, ask whether the value is ever legitimately supplied by the caller. If it is &mdash; a slug that defaults from the title but can be overridden &mdash; this is right. If it never is, and is always derived, then it is not really an input at all and `computed_field` is the better tool. That is the next module.
+
+## Order, and short-circuiting
+
+Several model validators can coexist, and they run in definition order. The first to raise stops the rest.
+
+That has a practical consequence: put the cheap, foundational checks first. If `taken > seats` is nonsense, there is no value in also evaluating a rule about the waitlist that assumes those numbers make sense &mdash; and the second error would only confuse the caller.
+
+It also means model validators do not accumulate errors the way field validation does. Field errors all appear together; model-level errors appear one at a time. If you want a caller to see every cross-field problem at once, you have to collect them yourself in a single validator and raise one error describing all of them.
+
+## Keeping it pure
+
+The strongest advice in this module: a model validator should decide using only the data in front of it.
+
+The temptation is real. "Does this track exist?" is a validation question, and the answer is in a database. Putting the query in a validator makes it run on every construction, makes the model impossible to test without a database, turns a `ValidationError` into a possible timeout, and hides an I/O call somewhere nobody expects one.
+
+The rule that keeps this clean: models check *shape and internal consistency*; the service layer checks *facts about the world*. A date range being backwards is shape. A track existing is a fact. They are different concerns and they fail differently &mdash; one is a 422, the other is arguably a 404.
+
+## Choosing between the three tools
+
+**A constraint** when the rule is a bound, a length or a pattern on one field. It reaches the schema.
+
+**A field validator** when one field needs logic, or normalising.
+
+**A model validator** when the rule involves more than one field, or the shape of the whole payload.
+
+Working down that list rather than up produces models where most rules are visible in the annotations and only the genuinely complex ones are in code.
+
+## Collecting several problems at once
+
+Model validators stop at the first failure, which means a caller fixing cross-field errors discovers them one at a time &mdash; exactly the experience field validation avoids.
+
+If several rules should report together, collect them in one validator:
+
+```python
+@model_validator(mode="after")
+def check_all(self):
+    problems = []
+    if self.ends_on <= self.starts_on:
+        problems.append("ends_on must be after starts_on")
+    if self.seats < self.taken:
+        problems.append("seats cannot be fewer than taken")
+    if problems:
+        raise ValueError("; ".join(problems))
+    return self
+```
+
+It is less tidy than separate validators and it gives the caller everything in one response. Which matters depends on whether a human is fixing a form or a service is failing a request.
+
+## Validators and assignment
+
+With `validate_assignment=True`, after validators run again on every assignment.
+
+That is usually what you want &mdash; a cross-field invariant should hold after a change, not only at construction. It has two consequences worth knowing.
+
+An expensive validator now runs on every assignment, not once.
+
+And an intermediate state may be invalid. Setting `starts_on` to a date after the current `ends_on` raises, even though you were about to fix `ends_on` on the next line. There is no transaction; each assignment is validated alone.
+
+Where that bites, the functional approach is cleaner: build a new model with `model_copy(update={...})` giving both fields at once, or construct a fresh one. It is also a good argument for `frozen=True` on models with cross-field rules &mdash; if it cannot be mutated, it cannot pass through an invalid intermediate state.
+
+## Inheritance
+
+Model validators are inherited, so a base can carry an invariant that every subclass enforces.
+
+A subclass redefining a validator with the same name replaces it. Give it a different name to have both, and remember that the parent's runs first.
+
+This makes a base model a reasonable home for a rule shared across a family &mdash; "no model in this system may have an end before its start" &mdash; while each subclass adds its own.
+
+## What belongs where, once more
+
+The line worth holding, because it is the one people cross first.
+
+A model validator answers: **is this object internally consistent?** Dates in order, totals adding up, at least one contact method present. All answerable from the data in front of it.
+
+A service answers: **is this true of the world?** Does the track exist, is the name taken, does this user have permission. All requiring something the model cannot see.
+
+Keeping that line means models are testable with plain data, validation cannot make a network call, and a `ValidationError` always means the payload was malformed rather than that something external was unavailable. Those are three properties worth protecting.
+
+## Summary
+
+`model_validator(mode="after")` takes `self`, returns `self`, and sees every field already converted &mdash; the right place for any rule about relationships between fields. `mode="before"` is a classmethod taking raw input, for translating a payload shape.
+
+Model-level errors carry an empty `loc`, which your error handling needs to expect. Validators run in definition order and stop at the first failure. And keep them pure, so that validating a model never touches the world.
+
+## A short checklist
+
+Before writing one, three questions.
+
+**Does the rule involve more than one field?** If not, a field validator or a constraint is more specific and gives a better error location.
+
+**Can it be decided from the data alone?** If it needs a lookup, it belongs in the service layer, not here.
+
+**Should the caller see every failure at once?** If so, collect them in a single validator rather than writing several that stop at the first.
+
+## What this buys
+
+A model with cross-field rules is a model that cannot exist in a nonsensical state. A cohort whose end precedes its start is not merely flagged somewhere &mdash; it cannot be constructed.
+
+That is a strong guarantee, and it is what makes the rest of the codebase simpler. Every function receiving that model can stop checking, because the object could not have been built if the check would have failed. The rule exists once, at the boundary, instead of being re-asserted defensively wherever the data travels.
+
+
+## Mistakes people make
+
+**Using `info.data` in a field validator for a cross-field rule.** It only exposes fields declared earlier, so the rule works until somebody reorders the class for readability and then silently stops.
+
+**Forgetting to return `self`.** The same silent failure as everywhere else in this library.
+
+**Doing I/O.** A validator that queries a database makes the model untestable without one, turns a `ValidationError` into a possible timeout, and hides a network call somewhere nobody expects one.
+
+**Writing several validators when the caller needs every failure at once.** Model validators stop at the first raise, so a form with three cross-field problems reveals them one at a time. Collect them into one validator when they should be reported together.
+
+**Assuming `loc[0]` exists.** Model-level errors carry an empty `loc`. Error-handling code written before the first cross-field rule will raise `IndexError` the day one is added.
+
+**Mutating in an after validator on a model with `validate_assignment`.** The assignment re-triggers validation, which re-runs the validator. Use `object.__setattr__`, or set the value in a `before` validator instead.
+
+## Where the errors go
+
+One practical consequence of the empty `loc` deserves a final mention, because it shapes how the front end has to work.
+
+A field error can be rendered beside its input. A model error cannot &mdash; there is no single input it belongs to. Every form needs somewhere to display it: a banner above the fields, a summary at the top, a message near the submit button.
+
+If that place does not exist, cross-field errors are either invisible or attached arbitrarily to whichever field the code happened to pick. Both are worse than a plain sentence in an obvious place.
+
+It is a small piece of interface design that follows directly from a modelling decision, and it is easiest to get right by knowing it is coming.
+''',
+    [
+        {"q": "What must an `after` model validator return?",
+         "options": ["Nothing", "self", "A dict", "True"],
+         "answer": 1,
+         "why": "It receives the finished model and must return it. Forgetting is the same silent failure as forgetting to return from a field validator."},
+        {"q": "What is the `loc` of an error raised by a model validator?",
+         "options": ["The first field", "An empty tuple", "The model name", "It has none"],
+         "answer": 1,
+         "why": "The failure belongs to the object rather than any one field. Handling code that does `loc[0]` will raise IndexError the first time such a rule is added."},
+        {"q": "Why not use `info.data` in a field validator for a cross-field rule?",
+         "options": ["It is slower", "It only exposes fields declared earlier, so reordering the class breaks the rule", "It is deprecated", "It cannot raise"],
+         "answer": 1,
+         "why": "Fields validate in declaration order. A rule depending on that order is invisible to whoever later reorders the class for readability."},
+        {"q": "Where does 'does this track exist in the database?' belong?",
+         "options": ["A model validator", "A field validator", "The service layer, not the model", "A constraint"],
+         "answer": 2,
+         "why": "Models check shape and internal consistency using only the data. A validator doing I/O makes the model untestable, turns validation into a network call, and hides a query where nobody expects one."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 16. Computed fields
+# ---------------------------------------------------------------------------
+topic(
+    "computed_fields",
+    "Computed Fields",
+    "Control",
+    "Values derived from other fields that belong in the output but were never an "
+    "input.",
+    _svg(_box(14, 24, 46, 20, S) + _txt(37, 38, "minutes", M, 8) +
+         _box(14, 50, 46, 20, S) + _txt(37, 64, "lessons", M, 8) +
+         _arrow(64, 34, 84, 47) + _arrow(64, 60, 84, 47) +
+         _box(88, 36, 58, 22, S, A) + _txt(117, 50, "pace", A, 8)),
+    [
+        ("A property is invisible to serialisation",
+         "An ordinary <code>@property</code> works on the object and does not appear "
+         "in <code>model_dump()</code>. Often that is right &mdash; sometimes it is "
+         "not.",
+         '''from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    lessons: int
+
+    @property
+    def pace(self) -> float:
+        return round(self.minutes / self.lessons, 1)
+
+m = Module(title="Vectors", minutes=30, lessons=5)
+
+print("on the object :", m.pace)
+print("in the dump   :", m.model_dump())
+print("in the json   :", m.model_dump_json())'''),
+
+        ("computed_field puts it in the output",
+         "Add the decorator and the value appears in every serialisation, while still "
+         "being a normal property on the object.",
+         '''from pydantic import BaseModel, computed_field
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    lessons: int
+
+    @computed_field
+    @property
+    def pace(self) -> float:
+        return round(self.minutes / self.lessons, 1)
+
+m = Module(title="Vectors", minutes=30, lessons=5)
+
+print("on the object :", m.pace)
+print("in the dump   :", m.model_dump())
+print("in the json   :", m.model_dump_json())'''),
+
+        ("It is output only",
+         "A computed field cannot be supplied. It is not an input, does not appear in "
+         "the constructor, and is recomputed from the fields every time.",
+         '''from pydantic import BaseModel, computed_field, ValidationError
+
+class Module(BaseModel):
+    minutes: int
+    lessons: int
+
+    @computed_field
+    @property
+    def pace(self) -> float:
+        return round(self.minutes / self.lessons, 1)
+
+m = Module(minutes=30, lessons=5)
+print("computed:", m.pace)
+
+# Supplying it is ignored (or rejected, with extra="forbid"):
+m2 = Module(minutes=30, lessons=5, pace=999)
+print("supplied:", m2.pace, "<- ignored; it is derived, not stored")
+
+# It follows the fields:
+m3 = Module(minutes=60, lessons=5)
+print("recomputed:", m3.pace)'''),
+
+        ("Describing it properly",
+         "The return annotation becomes its type in the schema. Add a description and "
+         "it documents itself like any other field.",
+         '''import json
+from pydantic import BaseModel, computed_field
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+    @computed_field(description="Reading time with a 20% margin, in minutes.")
+    @property
+    def estimated_minutes(self) -> int:
+        return round(self.minutes * 1.2)
+
+m = Module(title="Vectors", minutes=10)
+print("value :", m.estimated_minutes)
+print("dump  :", m.model_dump())
+print()
+
+schema = m.model_json_schema(mode="serialization")
+print("in the serialization schema:")
+for name, spec in schema["properties"].items():
+    print("  %-20s %-8s %s" % (name, spec.get("type"), spec.get("description", "")))'''),
+
+        ("Excluding it when you do not want it",
+         "It behaves like a field for <code>include</code> and <code>exclude</code>, "
+         "so an internal calculation can be kept out of a public response.",
+         '''from pydantic import BaseModel, computed_field
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    cost_pence: int
+
+    @computed_field
+    @property
+    def hours(self) -> float:
+        return round(self.minutes / 60, 2)
+
+    @computed_field
+    @property
+    def margin(self) -> int:
+        return self.cost_pence * 3
+
+m = Module(title="Vectors", minutes=90, cost_pence=200)
+
+print("everything :", m.model_dump())
+print("public     :", m.model_dump(exclude={"cost_pence", "margin"}))
+print("just hours :", m.model_dump(include={"title": True, "hours": True}))'''),
+
+        ("Cost, and when not to use it",
+         "It runs on every serialisation. That is fine for arithmetic and wrong for "
+         "anything expensive &mdash; and it must never fail.",
+         '''from pydantic import BaseModel, computed_field
+
+calls = {"n": 0}
+
+class Module(BaseModel):
+    minutes: int
+    lessons: int
+
+    @computed_field
+    @property
+    def pace(self) -> float:
+        calls["n"] += 1
+        return round(self.minutes / self.lessons, 1)
+
+m = Module(minutes=30, lessons=5)
+m.model_dump(); m.model_dump(); m.model_dump_json()
+print("serialisations: 3, property calls:", calls["n"])
+
+# And the trap: a computed field that can raise breaks serialisation.
+class Risky(BaseModel):
+    minutes: int
+    lessons: int
+
+    @computed_field
+    @property
+    def pace(self) -> float:
+        return self.minutes / self.lessons      # lessons could be 0
+
+r = Risky(minutes=30, lessons=0)
+try:
+    r.model_dump()
+except ZeroDivisionError as e:
+    print()
+    print("dump failed:", type(e).__name__, "-", e)
+    print("A model that validated fine can no longer be serialised.")'''),
+    ],
+    [
+        "A plain <code>@property</code> works on the object but never appears in <code>model_dump()</code>. <code>@computed_field</code> is what adds it to the output.",
+        "The decorator goes <em>above</em> <code>@property</code>. The other order does not work.",
+        "It is output-only: it cannot be passed to the constructor, is not validated, and is recalculated from the current field values each time.",
+        "The return annotation is required &mdash; it becomes the field's type in the serialisation schema.",
+        "It runs on <strong>every</strong> serialisation, so keep it cheap. There is no caching.",
+        "A computed field that can raise turns a valid model into one that cannot be serialised. Guard the edge cases or use a plain property instead.",
+    ],
+    '''
+title: Computed Fields: Derived Values in the Output
+intro: Values calculated from other fields that belong in the response but were never an input.
+
+## The gap it fills
+
+Some values are not data you receive; they are consequences of data you receive. A full name from a first and last. A total from a quantity and a price. A reading time from a word count. An `is_expired` flag from an expiry date and the clock.
+
+Storing them as fields is wrong, because they can then disagree with the values they came from. Accepting them from a caller is worse, because the caller can lie.
+
+The obvious answer is a `@property`, and it is half right. A property computes from the current values and cannot drift. But it is invisible to serialisation &mdash; `model_dump()` does not include it, `model_dump_json()` does not include it, and the schema does not know it exists. For a value that exists purely for internal use, that is fine. For one your API consumers need, it is not.
+
+`@computed_field` closes the gap: the value is derived, and it appears in the output.
+
+## The shape
+
+```python
+@computed_field
+@property
+def pace(self) -> float:
+    return round(self.minutes / self.lessons, 1)
+```
+
+Three mechanics.
+
+**Decorator order.** `@computed_field` goes above `@property`. The reverse does not work, and the failure is not self-explanatory.
+
+**The return annotation is required.** It becomes the field's type in the serialisation schema, and Pydantic will complain if it is missing. It is not merely documentation.
+
+**It reads the model.** Because it takes `self`, everything on the model is available &mdash; and validation has already happened, so those values are real converted types.
+
+## Output only, and why that matters
+
+A computed field is not an input. It does not appear in the constructor signature, it is not validated, and passing it is ignored &mdash; or rejected, if you have set `extra="forbid"`.
+
+That asymmetry is the whole point. The value is a function of the model, so allowing it to be supplied would allow it to be supplied *wrongly*, and you would have two sources of truth for one fact.
+
+It also means the value is always current. Change `minutes` and `pace` changes with it, because it is recomputed on access rather than stored. There is no stale-derived-value bug available, which is the class of bug this feature eliminates.
+
+## The schema, and the two modes
+
+A computed field appears in the **serialisation** schema and not the validation one, which is exactly right: it is something you emit, never something you accept.
+
+That distinction surfaces in `model_json_schema(mode=...)`. The default, `mode="validation"`, describes what the model accepts, and computed fields are absent. `mode="serialization"` describes what it produces, and they are present.
+
+For a FastAPI response model this is handled for you: the response schema is the serialisation one, so computed fields appear in the documentation as fields consumers can expect. That is usually the reason to reach for the feature in the first place.
+
+You can pass `description`, `title` and `examples` to the decorator, and they land in the schema like any other field's metadata. A derived value often needs a description more than a stored one does, because the name alone rarely explains the formula.
+
+## Excluding them
+
+Computed fields behave like fields for `include` and `exclude`:
+
+```python
+m.model_dump(exclude={"cost_pence", "margin"})
+```
+
+This is worth knowing because derived values are frequently the ones you do not want in a public response. A margin computed from a cost is a perfectly reasonable internal field and an unfortunate thing to leak, and it is easy to forget that adding a computed field changes what every existing serialisation emits.
+
+That is genuinely a footgun: unlike a normal field, which you had to add to the model deliberately, a computed field can be added for one internal purpose and silently appear in every API response the model feeds.
+
+## The cost
+
+A computed field runs on **every** serialisation. There is no caching.
+
+For arithmetic on a couple of fields that is irrelevant. For anything heavier it is not, and the cost multiplies: serialising a list of a thousand models runs every computed field a thousand times.
+
+If a value is expensive and genuinely needs to be in the output, compute it once and store it in a real field &mdash; accepting that you now own keeping it consistent. `functools.cached_property` is not a substitute here, because it does not participate in serialisation.
+
+The rule: computed fields are for cheap derivations. Arithmetic, string formatting, a comparison, a lookup in a small dict. Anything that touches I/O or loops over data does not belong.
+
+## The failure mode to guard against
+
+This is the sharpest edge in the module, and it is easy to walk into.
+
+A computed field that can raise turns a valid model into one that cannot be serialised.
+
+```python
+@computed_field
+@property
+def pace(self) -> float:
+    return self.minutes / self.lessons     # lessons could be 0
+```
+
+`Module(minutes=30, lessons=0)` validates perfectly. Every field is the right type and within its constraints. And then `model_dump()` raises `ZeroDivisionError` &mdash; not a `ValidationError`, not at the boundary, but at the moment you try to send a response.
+
+The failure is far from the cause and it is not a validation error, so none of the error handling you built for validation catches it.
+
+Two defences. Make the impossible state impossible: `lessons: int = Field(gt=0)` means the divisor cannot be zero and the computed field cannot fail. Or handle the edge inside the property and return something sensible. The first is better, because it fixes the model rather than the symptom.
+
+The general principle: a computed field should be **total** &mdash; defined for every combination of values the model permits. If it is not, either the model is too permissive or the value is not really a computed field.
+
+## Computed field, property, or stored?
+
+**Plain `@property`** when the value is for internal use and should not be serialised. Most helper methods on a model are this.
+
+**`@computed_field`** when the value is derived, cheap, total, and consumers need it in the output.
+
+**A stored field** when the value is expensive, when it must be preserved as it was at a point in time (a price at the moment of sale, not the current price), or when it genuinely is an input.
+
+That middle case &mdash; historical values &mdash; is worth flagging. A computed field always reflects the *current* inputs. If you need what the total was when the order was placed, that is data, not a derivation, and it belongs in a column.
+
+## Naming and the schema
+
+A computed field's name is the method name, and it appears in the output exactly as written. That is worth a moment's care, because renaming it later is a breaking change for every consumer.
+
+The return annotation is not optional, and it does real work: it becomes the field's type in the serialisation schema, so consumers and generated clients know what to expect.
+
+A `description` in the decorator is more valuable here than on ordinary fields. `total` does not explain whether tax is included; `minutes` does not explain the margin applied. The name is a label, and derived values usually need a sentence.
+
+## Serialisation aliases work too
+
+Computed fields accept `alias`, which matters if the rest of your API is camelCase:
+
+```python
+@computed_field(alias="estimatedMinutes")
+@property
+def estimated_minutes(self) -> int:
+    ...
+```
+
+Without it, a model whose ordinary fields are aliased will emit one stubbornly snake_case key among them. An `alias_generator` on the model does not apply to computed fields, so this is one place the whole-model convention needs a per-field top-up.
+
+## Ordering in the output
+
+Computed fields appear after regular fields in the serialised output, in the order they are defined.
+
+That is stable and predictable, and worth knowing if anything downstream cares about key order &mdash; a snapshot test, a diff, a human reading a log. You cannot interleave them with declared fields.
+
+## A pattern: flags derived from state
+
+One of the most useful applications is turning internal state into a flag a consumer can act on:
+
+```python
+@computed_field
+@property
+def is_expired(self) -> bool:
+    return self.expires_at < datetime.now(timezone.utc)
+```
+
+The consumer does not have to know your expiry rules, parse a date, or get the timezone right. They get a boolean.
+
+Two cautions with this specific shape. It depends on the clock, so serialising the same model twice can produce different output &mdash; which breaks snapshot tests and can surprise a cache. And it makes the model's output non-deterministic, which is a property worth being deliberate about rather than discovering.
+
+If determinism matters, pass the reference time in rather than reading the clock, or compute the flag in the layer that is producing the response.
+
+## Summary of the trade
+
+A computed field buys you a derived value in the output that can never disagree with its inputs, described in the schema, with no storage and no synchronisation.
+
+It costs a function call on every serialisation, and it demands that the function be total &mdash; defined for every state the model permits &mdash; because a failure there breaks serialisation of an object that validated perfectly.
+
+Cheap, total, and genuinely derived. Those three conditions are the whole rule.
+
+## Summary
+
+`@computed_field` above `@property`, with a return annotation. The value is derived, output-only, recomputed every time, and appears in the serialisation schema.
+
+Keep them cheap, because they run on every dump. Keep them total, because a computed field that raises breaks serialisation of a model that validated perfectly. And remember that adding one changes the output of every serialisation the model already feeds &mdash; including the public ones.
+
+## One more use worth knowing
+
+A computed field is a good place to expose a value the model stores in a form consumers should not have to understand.
+
+Storage often wants one shape and a consumer wants another: a duration in seconds internally, minutes in the response; a status code internally, a readable label outside; separate first and last names, a display name in the output.
+
+The computed field bridges that without duplicating state. The stored field remains the single source of truth, and the derived view is guaranteed to agree with it because it is computed from it.
+
+This is a better pattern than storing both, which is where the two eventually disagree and nobody can say which is right.
+
+
+## Mistakes people make
+
+**Writing one that can raise.** A division by a field that might be zero turns a perfectly valid model into one that cannot be serialised &mdash; and the failure is not a `ValidationError`, so none of your validation error handling catches it. Constrain the inputs so the impossible state cannot occur.
+
+**Putting expensive work in one.** It runs on every serialisation with no caching, and serialising a thousand models runs it a thousand times. Anything touching I/O or looping over data does not belong.
+
+**Forgetting the return annotation.** It is not documentation; it is the field's type in the serialisation schema, and Pydantic requires it.
+
+**Reading the clock.** A field derived from `datetime.now()` makes serialisation non-deterministic, which breaks snapshot tests and surprises caches. Pass the reference time in, or compute the flag where the response is produced.
+
+**Not aliasing it.** An `alias_generator` on the model does not reach computed fields, so a camelCase API ends up with one stubbornly snake_case key. The decorator takes `alias` for exactly this.
+
+**Adding one without checking what already consumes the model.** Unlike a regular field, which you deliberately added to a schema, a computed field written for one internal purpose immediately appears in every existing serialisation &mdash; including the public ones.
+
+## Deciding, in one line
+
+Cheap, total, and genuinely derived.
+
+Cheap, because it runs on every serialisation and there is no caching. Total, because a failure breaks the output of a model that validated perfectly. Genuinely derived, because if a caller could reasonably supply it, it is an input with a default rather than a computed value.
+
+Fail any of those three and the answer is something else &mdash; a stored field, a plain property, or a value computed in the layer producing the response.
+''',
+    [
+        {"q": "Why does a plain `@property` not appear in `model_dump()`?",
+         "options": ["It is a bug", "Properties are not fields; only `@computed_field` adds one to the output", "It needs an annotation", "It does appear"],
+         "answer": 1,
+         "why": "A property is ordinary Python and Pydantic does not serialise it. `@computed_field` is the opt-in that makes a derived value part of the model's output."},
+        {"q": "What happens if you pass a computed field to the constructor?",
+         "options": ["It overrides the calculation", "It is ignored, or rejected with extra=forbid", "It raises always", "It is stored"],
+         "answer": 1,
+         "why": "Computed fields are output-only. Allowing them as input would create a second source of truth for a value that is a function of the model."},
+        {"q": "A computed field divides by another field that can be zero. When does this fail?",
+         "options": ["At validation, as a ValidationError", "At serialisation, as a ZeroDivisionError", "Never", "At class definition"],
+         "answer": 1,
+         "why": "The model validates fine - every field is the right type. The failure arrives at `model_dump()` and is not a ValidationError, so validation error handling does not catch it."},
+        {"q": "Which schema mode shows computed fields?",
+         "options": ["validation", "serialization", "Both", "Neither"],
+         "answer": 1,
+         "why": "They describe what the model emits, never what it accepts, so they appear in `model_json_schema(mode=\"serialization\")` - which is what a FastAPI response model uses."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 17. model_config
+# ---------------------------------------------------------------------------
+topic(
+    "model_config",
+    "model_config",
+    "Control",
+    "The settings that change how a whole model behaves - extra keys, mutability, "
+    "assignment checking and string handling.",
+    _svg(_box(18, 18, 124, 56, S) + _txt(80, 32, "model_config", A, 9) +
+         _txt(80, 46, "extra  frozen", M, 8) +
+         _txt(80, 60, "validate_assignment", M, 8)),
+    [
+        ("Unknown keys are ignored by default",
+         "Extra keys in the input are silently dropped. That is forgiving and it hides "
+         "typos, which is why <code>extra=\"forbid\"</code> exists.",
+         '''from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Lenient(BaseModel):
+    title: str
+    minutes: int
+
+class Strict(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str
+    minutes: int
+
+payload = {"title": "Vectors", "minutes": 8, "minuets": 99}   # typo
+
+m = Lenient.model_validate(payload)
+print("ignored :", m.model_dump(), "<- the typo vanished silently")
+
+try:
+    Strict.model_validate(payload)
+except ValidationError as e:
+    err = e.errors()[0]
+    print("forbid  :", err["type"], "->", err["loc"], err["msg"])'''),
+
+        ("Or keep them",
+         "<code>extra=\"allow\"</code> stores unknown keys on the model. Useful for a "
+         "passthrough payload; a liability everywhere else.",
+         '''from pydantic import BaseModel, ConfigDict
+
+class Passthrough(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    title: str
+
+m = Passthrough(title="Vectors", source="partner-api", trace_id="abc123")
+
+print("declared :", m.title)
+print("extra    :", m.model_extra)
+print("dumped   :", m.model_dump())
+print()
+print("attribute access works:", m.source)'''),
+
+        ("Assignment is not checked unless you ask",
+         "Validation happens at construction. Assigning afterwards writes whatever you "
+         "give it &mdash; until <code>validate_assignment</code> is on.",
+         '''from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Loose(BaseModel):
+    minutes: int
+
+class Checked(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+    minutes: int
+
+a = Loose(minutes=8)
+a.minutes = "not a number"
+print("loose   :", repr(a.minutes), "<- an int field holding a str")
+
+b = Checked(minutes=8)
+b.minutes = "12"
+print("checked :", repr(b.minutes), "<- coerced on assignment")
+
+try:
+    b.minutes = "ages"
+except ValidationError as e:
+    print("checked :", e.errors()[0]["msg"])'''),
+
+        ("Frozen models are hashable",
+         "<code>frozen=True</code> forbids assignment entirely and lets the model be a "
+         "dict key or set member.",
+         '''from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Point(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    x: int
+    y: int
+
+p = Point(x=1, y=2)
+print("value:", p)
+
+try:
+    p.x = 5
+except ValidationError as e:
+    print("frozen:", e.errors()[0]["type"])
+
+seen = {Point(x=1, y=2), Point(x=1, y=2), Point(x=3, y=4)}
+print()
+print("in a set  :", len(seen), "unique points")
+print("as a key  :", {Point(x=1, y=2): "origin-ish"})'''),
+
+        ("String handling for form data",
+         "Three settings remove a pile of trivial validators when the input comes from "
+         "humans.",
+         '''from pydantic import BaseModel, ConfigDict
+
+class Raw(BaseModel):
+    email: str
+    code: str
+
+class Tidy(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True,
+                              str_to_lower=True)
+    email: str
+    code: str
+
+messy = {"email": "  ADA@VizLearn.IN  ", "code": "  ABC123 "}
+
+print("raw  :", Raw.model_validate(messy).model_dump())
+print("tidy :", Tidy.model_validate(messy).model_dump())
+print()
+print("str_min_length works too, as a model-wide floor:")
+
+class NoBlanks(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, str_min_length=1)
+    title: str
+
+try:
+    NoBlanks(title="   ")
+except Exception as e:
+    print("  blank title:", type(e).__name__)'''),
+
+        ("Reading from objects, not just dicts",
+         "<code>from_attributes</code> lets a model validate anything with matching "
+         "attributes &mdash; which is how a model reads an ORM row.",
+         '''from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Row:                       # pretend this came from a database
+    def __init__(self, title, minutes):
+        self.title = title
+        self.minutes = minutes
+
+class Plain(BaseModel):
+    title: str
+    minutes: int
+
+class FromObj(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    title: str
+    minutes: int
+
+row = Row("Vectors", 8)
+
+try:
+    Plain.model_validate(row)
+except ValidationError as e:
+    print("without :", e.errors()[0]["type"])
+
+print("with    :", FromObj.model_validate(row))
+print()
+print("In Pydantic v1 this setting was called orm_mode.")'''),
+    ],
+    [
+        "<code>extra</code> takes <code>\"ignore\"</code> (the default), <code>\"forbid\"</code> or <code>\"allow\"</code>. Forbid catches typos in keys; the default silently drops them.",
+        "Validation runs at construction only. <code>validate_assignment=True</code> extends it to later assignments.",
+        "<code>frozen=True</code> blocks assignment and makes the model hashable, so it can be a dict key or live in a set.",
+        "<code>str_strip_whitespace</code>, <code>str_to_lower</code> and <code>str_min_length</code> apply to every string field and remove a lot of trivial validators.",
+        "<code>from_attributes=True</code> lets <code>model_validate</code> read attributes off any object &mdash; the setting called <code>orm_mode</code> in v1.",
+        "Config is inherited, so a base model with your house settings gives every subclass the same behaviour.",
+    ],
+    '''
+title: model_config: Settings That Change the Whole Model
+intro: Extra keys, mutability, assignment checking and string handling - the switches worth knowing.
+
+## Where behaviour lives
+
+Everything so far has been per field. `model_config` is per model: a `ConfigDict` assigned in the class body that changes how the whole thing behaves.
+
+```python
+class Module(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    title: str
+```
+
+In Pydantic v1 this was an inner `class Config`. That still works and is deprecated, and it is the clearest signal that a tutorial predates v2.
+
+There are a lot of settings. These are the ones that come up constantly.
+
+## extra: what to do with keys you did not declare
+
+The default is `"ignore"` &mdash; unknown keys are silently dropped.
+
+That is forgiving, and it hides mistakes. A caller sending `minuets` instead of `minutes` gets no error and no field; the model is built with whatever default `minutes` has, and the bug surfaces later as a value that is inexplicably wrong.
+
+`extra="forbid"` rejects them:
+
+```python
+model_config = ConfigDict(extra="forbid")
+```
+
+Now the typo is an error naming the offending key. For an internal API, a config file, or anything where you control both ends, this is almost always the better default. It converts a silent misunderstanding into an immediate one.
+
+The argument for `"ignore"` is forward compatibility on a public API: a client sending fields from a newer version should not break against an older server. That is a real consideration, and it applies to *your* API's request models rather than to every model in your codebase.
+
+`extra="allow"` keeps unknown keys, storing them on the model and exposing them through `model_extra`. It is right for a genuine passthrough &mdash; a webhook body you forward, an envelope whose payload you do not own. Everywhere else it turns your model into a dictionary with extra steps, and loses the guarantee that the fields on the object are the fields you declared.
+
+## Validation happens once
+
+This surprises people, and it is worth being explicit about.
+
+A model is validated when it is constructed. Assigning to an attribute afterwards is a plain Python assignment: no checking, no coercion.
+
+```python
+m = Module(minutes=8)
+m.minutes = "not a number"      # allowed, and now the field is a string
+```
+
+The reasoning is speed &mdash; most models are built, read and discarded, and checking every assignment would be work for a case that rarely arises.
+
+`validate_assignment=True` turns it on. Assignments are then validated and coerced like constructor arguments, so `m.minutes = "12"` gives you `12` and `m.minutes = "ages"` raises.
+
+Turn it on for any model that is genuinely mutated after construction, especially one holding configuration or accumulating state. It costs a little per assignment and removes a class of bug where a model's declared types quietly stop being true.
+
+Note that it also makes any `model_validator(mode="after")` run again on each assignment, which is usually what you want and is worth knowing if those validators are expensive.
+
+## frozen: the other answer to mutation
+
+`frozen=True` forbids assignment altogether. An attempt raises a `ValidationError` with type `frozen_instance`.
+
+It also makes the model **hashable**, so it can be a dictionary key or a set member &mdash; which unlocks a lot of ordinary Python that mutable models cannot do.
+
+For validated data that arrives from outside and is then only read, frozen is the right default and is under-used. It removes the question "did anything change this?" entirely, it makes the object safe to share across threads or pass anywhere without defensive copying, and it makes the intent explicit.
+
+`model_copy(update={...})` still works on a frozen model, so producing a modified version is one line. That is the functional-update pattern, and it is usually clearer than mutation anyway.
+
+Individual fields can be frozen with `Field(frozen=True)` when only part of the model should be fixed &mdash; an id that must never change while the rest of the record can.
+
+## String settings for human input
+
+Three settings that apply to every string field:
+
+`str_strip_whitespace=True` strips leading and trailing whitespace. For form data this is nearly always correct, and it removes a pile of one-line validators.
+
+`str_to_lower=True` and `str_to_upper=True` normalise case. Useful for emails, codes and identifiers; wrong for anything with display text, so apply it to models that are all identifiers rather than reaching for it globally.
+
+`str_min_length=1` sets a floor for every string. Combined with stripping, this is the compact way to say "no blank strings anywhere in this model", which is a rule most form models want and few state.
+
+## from_attributes: reading objects
+
+By default `model_validate` expects a mapping. `from_attributes=True` lets it read attributes off any object:
+
+```python
+class ModuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    title: str
+    minutes: int
+
+ModuleOut.model_validate(orm_row)
+```
+
+This is how a model turns a database row into a response, and it recurses, so a row with related objects becomes nested models without any manual conversion.
+
+It was `orm_mode` in v1, which is the name most existing material uses.
+
+Two cautions. It reads attributes, so a lazy-loading ORM relationship will be *loaded* when the model touches it &mdash; which is how a single serialisation quietly becomes fifty queries. And it will read any attribute matching a field name, so a model with a field called `password_hash` pointed at a user row will faithfully put the hash in your response. Output models should list only what may be seen.
+
+## A few more worth knowing
+
+`populate_by_name=True` lets a field be filled by either its alias or its Python name. It pairs with aliases and gets a module of its own next tier.
+
+`use_enum_values=True` stores the value rather than the enum member. It makes dumps simpler and loses the member's behaviour; usually the `str, Enum` mixin is the better answer.
+
+`validate_default=True` checks default values, which are otherwise trusted.
+
+`arbitrary_types_allowed=True` permits fields of types Pydantic knows nothing about, validated only by `isinstance`. It is an escape hatch for wrapping a third-party object, and a sign you might want a custom type instead.
+
+## Config is inherited
+
+A base model's config applies to every subclass, and a subclass can override individual settings.
+
+That makes a house base model a genuinely good pattern:
+
+```python
+class Base(BaseModel):
+    model_config = ConfigDict(extra="forbid",
+                              str_strip_whitespace=True,
+                              validate_assignment=True)
+```
+
+Every model in the codebase inherits from it and gets the same defaults, decided once. It is much better than the same `ConfigDict` copied into forty classes, four of which will end up different for no reason anybody remembers.
+
+## Suggested defaults
+
+For **request models** on a public API: `extra="ignore"` for forward compatibility, `str_strip_whitespace=True`.
+
+For **internal and config models**: `extra="forbid"`, so a typo is an error rather than a mystery.
+
+For **validated data that is then only read**: `frozen=True`.
+
+For **anything mutated after construction**: `validate_assignment=True`.
+
+## Settings that catch mistakes
+
+Three more worth knowing because each closes a specific hole.
+
+`validate_default=True` checks default values, which are otherwise trusted. A mistyped default sits silently until something downstream does arithmetic on a string. Worth turning on for models whose defaults come from constants defined elsewhere.
+
+`revalidate_instances="always"` re-validates a model instance passed into another model. By default an object that is already the right class is accepted as-is, on the reasonable assumption it was validated when built. If it was mutated afterwards without `validate_assignment`, that assumption is wrong, and this setting closes the gap at the cost of re-running validation.
+
+`ser_json_timedelta` and `ser_json_bytes` control how those two types serialise, which matters when a consumer expects seconds rather than an ISO duration.
+
+## Protected namespaces
+
+By default Pydantic reserves the `model_` prefix and warns if you declare a field starting with it, because that is where its own methods live &mdash; `model_dump`, `model_validate`, `model_fields`.
+
+That is a genuine problem if your domain has fields like `model_name` or `model_version`, which is common in anything ML-adjacent.
+
+`protected_namespaces=()` turns the warning off, and `protected_namespaces=("model_config",)` narrows it. Be aware that a field literally named `model_dump` would shadow the method, so the warning is doing real work &mdash; disable it deliberately rather than to silence noise.
+
+## Where to set config
+
+Three places, in increasing order of scope.
+
+On the class, as `model_config = ConfigDict(...)`. Explicit and local.
+
+On a shared base model, inherited by everything. Best for house conventions.
+
+As a keyword in the class definition &mdash; `class Module(BaseModel, frozen=True)` &mdash; which is compact and less discoverable.
+
+For a codebase of any size, the base model is the answer. One file states the conventions, every model follows them, and changing a convention is one edit rather than forty.
+
+## Config and inheritance
+
+Config merges rather than replaces. A subclass setting one key keeps its parent's other settings, which is what makes the base-model pattern practical.
+
+That also means an inherited setting can be surprising in a subclass that did not ask for it. If a base sets `extra="forbid"` and a subclass genuinely needs passthrough, it must say so explicitly &mdash; which is the right default, since silently permissive is worse than explicitly permissive.
+
+## A worked house base
+
+```python
+class Base(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+        validate_assignment=True,
+        populate_by_name=True,
+        alias_generator=to_camel,
+    )
+```
+
+Five decisions, made once. Typos in keys are errors. Whitespace never reaches a field. Assignments are checked. Fields accept either spelling. The whole API speaks camelCase.
+
+Every model inheriting from that is consistent with every other, and a new developer inherits the conventions without being told them.
+
+The one thing to avoid is a base so opinionated that half the models override half of it. If a setting is wrong for a third of your models, it does not belong in the shared base.
+
+## Summary
+
+`model_config` is where model-wide behaviour is decided. The four that matter most: `extra` for unknown keys, `validate_assignment` for mutation, `frozen` for immutability and hashability, and the `str_*` family for human input.
+
+Set them deliberately rather than by default, put your house settings on a shared base, and remember that the two most common silent bugs in this area &mdash; an ignored typo in a key and an unvalidated assignment &mdash; are both one config entry away from being loud.
+
+## The short version
+
+Four settings account for most of the value.
+
+`extra="forbid"` turns a typo in a key from a silent nothing into a named error. Set it anywhere you control both ends.
+
+`validate_assignment=True` extends validation past construction, so a model's declared types stay true for its whole life.
+
+`frozen=True` makes validated data immutable and hashable, which is the right shape for anything that arrives from outside and is then only read.
+
+`str_strip_whitespace=True` removes a category of trivial validator and a category of trivial bug.
+
+Put them on a shared base, decide them once, and let every model in the codebase inherit the same conventions.
+
+
+## Mistakes people make
+
+**Leaving `extra` at its default where you control both ends.** A typo in a key produces no error, no field and a value that silently falls back to a default. `extra="forbid"` turns a mystery into a message.
+
+**Assuming assignment is validated.** It is not. A model built correctly can hold anything at all a moment later, and the declared types quietly stop being true.
+
+**Copying the same `ConfigDict` into forty classes.** They drift. Four of them end up different for no reason anybody remembers. A shared base makes the convention one edit.
+
+**Using `from_attributes` on an output model without listing fields carefully.** It reads whatever attribute matches a field name, so a model pointed at a user row will faithfully serialise a password hash. It also triggers lazy ORM relationships, which is how one serialisation becomes fifty queries.
+
+**Silencing the protected-namespace warning reflexively.** A field literally named `model_dump` would shadow the method. Disable the warning deliberately for a domain that needs `model_` names, not to quieten noise.
+
+**Building a base so opinionated that half the models override it.** If a setting is wrong for a third of your models, it is not a house convention and does not belong in the shared base.
+
+## What it is really for
+
+Config is where a codebase records the decisions it has made about its own data.
+
+Whether an unexpected key is a mistake or a courtesy. Whether validated objects may change. Whether the wire speaks camelCase. Whether a blank string is a value.
+
+Those are real decisions, and every codebase makes them &mdash; usually implicitly, differently in different files, and rediscovered by each new person. Writing them once, on a shared base, turns a set of accidents into a convention.
+''',
+    [
+        {"q": "What does a model do by default with a key it did not declare?",
+         "options": ["Raises", "Silently ignores it", "Stores it", "Warns"],
+         "answer": 1,
+         "why": "The default is `extra=\"ignore\"`. A typo in a key produces no error and no field, so the bug appears later as a value that is inexplicably a default."},
+        {"q": "Is `m.minutes = \"not a number\"` validated by default?",
+         "options": ["Yes", "No - validation happens at construction only", "Only for ints", "It raises AttributeError"],
+         "answer": 1,
+         "why": "Assignment is plain Python unless `validate_assignment=True` is set. Without it, a model's declared types can quietly stop being true."},
+        {"q": "What does `frozen=True` give you besides blocking assignment?",
+         "options": ["Faster validation", "Hashability, so the model can be a dict key or set member", "Automatic caching", "Stricter types"],
+         "answer": 1,
+         "why": "Immutability makes the model hashable, which unlocks ordinary Python that mutable models cannot do - and `model_copy(update=...)` still produces modified versions."},
+        {"q": "What is the risk of `from_attributes=True` on an output model?",
+         "options": ["None", "It reads any matching attribute, so undeclared-but-named fields like password_hash can reach the response, and lazy relations get loaded", "It is slow", "It breaks nesting"],
+         "answer": 1,
+         "why": "It faithfully reads whatever attribute matches a field name, and touching a lazy ORM relationship triggers queries. Output models should list only what may be seen."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 18. Annotated and custom types
+# ---------------------------------------------------------------------------
+topic(
+    "annotated_and_custom_types",
+    "Annotated and Custom Types",
+    "Control",
+    "Naming a constrained type once and reusing it - the habit that stops the same "
+    "rule being copied into six models.",
+    _svg(_box(20, 20, 120, 22, S, A) + _txt(80, 34, "Minutes = int + gt=0", A, 8) +
+         _arrow(50, 46, 50, 58) + _arrow(110, 46, 110, 58) +
+         _box(20, 60, 52, 18, S) + _txt(46, 73, "Module", M, 8) +
+         _box(88, 60, 52, 18, S) + _txt(114, 73, "Lesson", M, 8)),
+    [
+        ("The same rule, written twice",
+         "Two models needing the same constrained field is where duplication starts. "
+         "It is fine at two and a problem at six.",
+         '''from pydantic import BaseModel, Field
+
+class Module(BaseModel):
+    slug: str = Field(pattern=r"^[a-z0-9_]+$")
+    minutes: int = Field(gt=0, le=180)
+
+class Lesson(BaseModel):
+    slug: str = Field(pattern=r"^[a-z0-9_]+$")     # copied
+    minutes: int = Field(gt=0, le=180)             # copied
+
+print(Module(slug="dot_product", minutes=11))
+print(Lesson(slug="direction", minutes=4))
+print()
+print("Two definitions of one rule. Change it and you must remember both.")'''),
+
+        ("Annotated names the type",
+         "<code>Annotated[T, Field(...)]</code> is a real type. Give it a name and the "
+         "rule exists once.",
+         '''from typing import Annotated
+from pydantic import BaseModel, Field, ValidationError
+
+Slug = Annotated[str, Field(pattern=r"^[a-z0-9_]+$")]
+Minutes = Annotated[int, Field(gt=0, le=180)]
+
+class Module(BaseModel):
+    slug: Slug
+    minutes: Minutes = 10
+
+class Lesson(BaseModel):
+    slug: Slug
+    minutes: Minutes
+
+print(Module(slug="dot_product"))
+print(Lesson(slug="direction", minutes=4))
+
+for cls, bad in [(Module, {"slug": "Dot Product"}), (Lesson, {"slug": "x", "minutes": 0})]:
+    try:
+        cls.model_validate(bad)
+    except ValidationError as e:
+        print("%-7s %s" % (cls.__name__, e.errors()[0]["msg"]))'''),
+
+        ("Defaults read better this way",
+         "With <code>Annotated</code> the constraint lives with the type and the "
+         "default sits where defaults normally sit.",
+         '''from typing import Annotated
+from pydantic import BaseModel, Field
+
+class Tangled(BaseModel):
+    # constraint and default in one call - which part is which?
+    minutes: int = Field(default=10, gt=0, le=180)
+
+class Clear(BaseModel):
+    # the type carries the rule; the default is just a default
+    minutes: Annotated[int, Field(gt=0, le=180)] = 10
+
+print(Tangled())
+print(Clear())
+print()
+print("Same behaviour. The second reads as 'a Minutes, defaulting to 10'.")'''),
+
+        ("AfterValidator: logic inside a type",
+         "A validator can be part of the type itself, so the rule travels with it "
+         "instead of being a method on one model.",
+         '''from typing import Annotated
+from pydantic import BaseModel, AfterValidator, ValidationError
+
+def must_be_known(v: str) -> str:
+    known = {"maths", "python", "dsa", "ml"}
+    if v not in known:
+        raise ValueError("unknown track %r; try %s" % (v, ", ".join(sorted(known))))
+    return v
+
+Track = Annotated[str, AfterValidator(must_be_known)]
+
+class Module(BaseModel):
+    track: Track
+
+class Enrolment(BaseModel):
+    track: Track          # same rule, no duplicated method
+
+print(Module(track="maths"))
+print(Enrolment(track="dsa"))
+
+try:
+    Enrolment(track="astrology")
+except ValidationError as e:
+    print("refused:", e.errors()[0]["msg"])'''),
+
+        ("BeforeValidator normalises inside the type",
+         "Pair a before-validator with a constraint and the type both cleans and "
+         "checks &mdash; every model that uses it gets both.",
+         '''from typing import Annotated
+from pydantic import BaseModel, BeforeValidator, Field, ValidationError
+
+def to_slug(v):
+    if isinstance(v, str):
+        return "_".join(v.strip().lower().split())
+    return v
+
+Slug = Annotated[str, BeforeValidator(to_slug), Field(pattern=r"^[a-z0-9_]+$")]
+
+class Module(BaseModel):
+    slug: Slug
+
+print(Module(slug="  The Chain   RULE "))
+print(Module(slug="dot_product"))
+
+try:
+    Module(slug="chain-rule!")          # normalised, then still invalid
+except ValidationError as e:
+    print("refused:", e.errors()[0]["msg"])'''),
+
+        ("What ships already",
+         "Pydantic includes a set of these. Use them where they fit rather than "
+         "rebuilding the same thing.",
+         '''from pydantic import (BaseModel, PositiveInt, NonNegativeInt, StrictInt,
+                      AwareDatetime, ValidationError)
+
+class Stats(BaseModel):
+    views: NonNegativeInt          # >= 0
+    minutes: PositiveInt           # > 0
+    user_id: StrictInt             # no "42"
+
+print(Stats(views=0, minutes=8, user_id=42))
+
+for bad in [{"views": -1, "minutes": 8, "user_id": 1},
+            {"views": 0, "minutes": 0, "user_id": 1},
+            {"views": 0, "minutes": 8, "user_id": "1"}]:
+    try:
+        Stats.model_validate(bad)
+    except ValidationError as e:
+        print("%-42s %s" % (str(bad), e.errors()[0]["type"]))'''),
+    ],
+    [
+        "<code>Annotated[T, Field(...)]</code> is a type. Bind it to a name and the rule is defined once and reused everywhere.",
+        "With <code>Annotated</code> the default sits outside the type &mdash; <code>Annotated[int, Field(gt=0)] = 10</code> &mdash; which reads better than tangling both into one <code>Field</code> call.",
+        "<code>AfterValidator</code> and <code>BeforeValidator</code> put logic inside the type, so the rule travels with it rather than being a method on one model.",
+        "Metadata composes left to right: a before-validator runs, then coercion, then constraints, then an after-validator.",
+        "Pydantic ships <code>PositiveInt</code>, <code>NonNegativeInt</code>, <code>StrictInt</code>, <code>AwareDatetime</code> and others &mdash; use them rather than rebuilding them.",
+        "A named type is also better documentation: <code>slug: Slug</code> says what the field is; a raw regular expression makes the reader work it out.",
+    ],
+    '''
+title: Annotated and Custom Types: Define the Rule Once
+intro: The habit that stops the same constraint being copied into six models.
+
+## The duplication problem
+
+You write a slug field with a pattern. Then another model needs a slug, so the pattern is copied. Then a third. Six months later the rule changes to permit hyphens, and four of the six get updated.
+
+This is the most ordinary form of drift there is, and it does not need a clever solution &mdash; it needs the rule to exist once.
+
+## Annotated is the mechanism
+
+`Annotated[T, ...]` is standard `typing`. It means "this is a `T`, with extra metadata attached", and static type checkers see straight through to the `T` while libraries can read the metadata.
+
+Pydantic reads it:
+
+```python
+Slug = Annotated[str, Field(pattern=r"^[a-z0-9_]+$")]
+Minutes = Annotated[int, Field(gt=0, le=180)]
+```
+
+`Slug` is now a type. Use it in any model:
+
+```python
+class Module(BaseModel):
+    slug: Slug
+    minutes: Minutes = 10
+```
+
+One definition, every use site consistent, and one place to change it.
+
+## It reads better, too
+
+Beyond reuse, there is a readability argument that applies even to a type used once.
+
+`slug: str = Field(pattern=r"^[a-z0-9_]+$")` tells the reader this is a string and then makes them parse a regular expression to learn anything more. `slug: Slug` tells them what the field *is*. If they need the details, the definition is one jump away and has a name attached.
+
+The default placement is better as well. Compare:
+
+```python
+minutes: int = Field(default=10, gt=0, le=180)
+minutes: Annotated[int, Field(gt=0, le=180)] = 10
+```
+
+Both behave identically. The second separates the two concerns &mdash; what kind of value this is, and what it defaults to &mdash; and reads as a sentence: a `Minutes`, defaulting to 10.
+
+## Putting logic in the type
+
+Constraints are not the only thing that can live in an `Annotated`. Validators can too, which means a rule needing actual code can still be part of a reusable type rather than a method bolted to one model.
+
+```python
+def must_be_known(v: str) -> str:
+    if v not in KNOWN_TRACKS:
+        raise ValueError("unknown track %r" % v)
+    return v
+
+Track = Annotated[str, AfterValidator(must_be_known)]
+```
+
+Every model with a `Track` field now enforces it. Without this, the same `@field_validator` gets copied into each model, which is the original problem with extra steps.
+
+`BeforeValidator` does the same at the other end of the pipeline, which makes it the tool for normalisation:
+
+```python
+Slug = Annotated[str, BeforeValidator(to_slug), Field(pattern=r"^[a-z0-9_]+$")]
+```
+
+That type cleans its input and then checks it. Any model using it gets both behaviours, and neither is written twice.
+
+There is also `WrapValidator`, which wraps the whole validation step and can catch and replace failures. It is the most powerful and least often needed; reach for it when you want to supply a fallback rather than propagate an error.
+
+## The order things run in
+
+With several pieces of metadata, the pipeline is worth knowing:
+
+A `BeforeValidator` runs first, on the raw input. Then coercion to the base type. Then constraints from `Field`. Then an `AfterValidator`, on the final value.
+
+So `Annotated[str, BeforeValidator(to_slug), Field(pattern=...)]` normalises `"  The Chain RULE "` into `the_chain_rule` and *then* checks it against the pattern. Written the other way round, the pattern would reject the original before anything cleaned it.
+
+Multiple validators of the same kind run in the order they appear.
+
+## What ships already
+
+Before building your own, check what exists. Pydantic includes a good set:
+
+`PositiveInt`, `NegativeInt`, `NonNegativeInt`, `NonPositiveInt`, and the `Float` equivalents.
+
+`StrictInt`, `StrictStr`, `StrictBool`, `StrictFloat` for per-field strictness.
+
+`AwareDatetime`, `NaiveDatetime`, `PastDate`, `FutureDate` for time.
+
+`Json` for a field that holds a JSON string and should be parsed and validated as structured data.
+
+`SecretStr` and `SecretBytes`, which are worth knowing: they hide their value in `repr` and logs, so a password or token cannot leak into a traceback by accident. The real value comes from `.get_secret_value()`, which makes every access deliberate and greppable.
+
+## Composing types
+
+Named types compose, which is where this starts paying compound interest:
+
+```python
+Minutes = Annotated[int, Field(gt=0, le=180)]
+Schedule = Dict[str, List[Minutes]]
+```
+
+Every integer in that nested structure is validated as a `Minutes`. The constraint applies at every depth, and the annotation stays readable.
+
+This is also how to keep deep annotations comprehensible. `Dict[str, List[Annotated[int, Field(gt=0, le=180)]]]` is technically the same thing and nobody can read it.
+
+## Where to put them
+
+A `types.py` module beside your models is the usual answer, and it turns out to be a genuinely useful file. Read it and you learn the vocabulary of the domain &mdash; what a slug is, what a duration may be, what an identifier looks like &mdash; without reading a single model.
+
+That is worth more than the deduplication. A named set of domain types is documentation that cannot go stale, because it is the code that runs.
+
+## When not to bother
+
+Do not name a type used once with no rule attached. `Title = Annotated[str, Field()]` is ceremony.
+
+Do not build a custom type where a `Literal` or `Enum` is the honest answer. A pattern matching four values is a worse enumeration than an enumeration.
+
+And do not go so far that a reader cannot tell what a field actually is. `slug: Slug` is clear. `slug: NormalisedConstrainedIdentifier` is a name that has stopped helping.
+
+## Types that carry documentation
+
+Metadata inside `Annotated` reaches the schema exactly as it would from a `Field`, which means a named type can carry its own description:
+
+```python
+Minutes = Annotated[
+    int,
+    Field(gt=0, le=180, description="Reading time in minutes."),
+]
+```
+
+Now every field of that type is documented identically, everywhere, with no repetition. For an API with a dozen models sharing a vocabulary, that consistency is visible in the generated documentation and would be impossible to maintain by hand.
+
+## Composing with unions and containers
+
+Named types combine with everything else:
+
+```python
+Slug = Annotated[str, Field(pattern=r"^[a-z0-9_]+$")]
+OptionalSlug = Optional[Slug]
+SlugList = Annotated[List[Slug], Field(min_length=1)]
+```
+
+The last one is worth reading twice: the outer `Field` constrains the *list*, and each item is still validated as a `Slug`. Constraints at two levels, one line, still legible.
+
+That legibility is the point. The equivalent written inline is a nested `Annotated` that nobody will want to modify.
+
+## Custom types with `__get_pydantic_core_schema__`
+
+For a type Pydantic knows nothing about &mdash; a third-party class, a domain object with its own parsing &mdash; there is a protocol to teach it:
+
+```python
+class Money:
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source, handler):
+        ...
+```
+
+This is the full escape hatch, and it is genuinely the right answer for a library wrapping its own types.
+
+For application code it is almost never necessary. `Annotated` with a `BeforeValidator` that constructs the object, plus `arbitrary_types_allowed` if needed, covers nearly every case with a fraction of the machinery. Reach for the protocol when you are writing a library others will use with Pydantic, not when you have one awkward field.
+
+## Where a named type goes wrong
+
+**Naming the type after the field.** `ModuleTitle` cannot be reused by `Lesson`, which defeats the purpose. Name it after what it is: `Title`, `Slug`, `Minutes`.
+
+**Too many layers.** A type built from three other named types is impressive and unreadable. If a reader has to follow three definitions to learn what a field accepts, the abstraction has stopped paying.
+
+**Hiding a `Literal`.** A custom type validating membership of four strings is worse than the enumeration it is imitating.
+
+**Naming something with no rule.** `Name = Annotated[str, Field()]` is ceremony with no content.
+
+## The file this produces
+
+A `types.py` in a mature project is one of its most useful documents. Ten or twenty lines defining what a slug is, what a duration may be, what an identifier looks like, what money means here.
+
+Read it and you have the domain's vocabulary before opening a single model. That is the real return &mdash; not saved keystrokes, but a single place where the shape of the domain is stated and cannot drift from the code that enforces it.
+
+## Summary
+
+`Annotated[T, Field(...)]` makes a constraint into a named, reusable type. `AfterValidator` and `BeforeValidator` put logic inside that type so rules needing code are reusable too. Metadata runs left to right: before-validators, coercion, constraints, after-validators.
+
+Use the types Pydantic already ships. Collect your own in one module. And reach for this the second time you write the same rule, not the sixth.
+
+## When to start
+
+The rule of thumb is the second occurrence. The first time you write a constraint, write it inline. The second time you need the same one, name it.
+
+That threshold is low on purpose. The cost of naming a type is one line and the cost of not naming it compounds quietly &mdash; six copies of a rule, four of which are updated when it changes, and nobody notices the other two until something invalid gets through.
+
+Naming early also improves the models immediately, before any reuse happens, because `slug: Slug` reads better than a regular expression embedded in a field declaration. The reuse is the payoff; the readability is the down payment.
+
+
+## Mistakes people make
+
+**Naming the type after the field it first appeared on.** `ModuleTitle` is a type no other model can reasonably use, which removes the only reason to have named it. `Title` can be used by `Lesson`, `Track` and everything else.
+
+**Building a type where a `Literal` is the honest answer.** A constrained string validating membership of four values produces a worse error, a worse schema and worse static checking than the enumeration it is imitating.
+
+**Stacking layers until nobody can read it.** A type composed from three other named types is impressive and opaque. If understanding a field means following three definitions, the abstraction has stopped paying for itself.
+
+**Reaching for `__get_pydantic_core_schema__` too early.** The full protocol exists for library authors teaching Pydantic about their own types. Application code almost always wants an `Annotated` with a `BeforeValidator` instead, at a fraction of the complexity.
+
+**Putting the metadata in the wrong order.** `Annotated[str, Field(pattern=p), BeforeValidator(f)]` still runs the normaliser first &mdash; before-validators always precede coercion &mdash; but reading it in that order misleads whoever maintains it next. Write the pipeline in the order it executes.
+
+**Naming a type with no rule in it.** `Annotated[str, Field()]` is ceremony. If there is nothing to say about the type beyond `str`, write `str`.
+
+## The return
+
+A named type is not primarily about saving keystrokes.
+
+It is about there being one place where the shape of a domain idea is stated, and about every model that uses it inheriting that statement rather than a copy of it.
+
+The reuse prevents drift. The name improves every model it appears in. And the file they live in becomes the closest thing a codebase has to a written description of its own vocabulary &mdash; one that cannot go stale, because it is the code doing the work.
+
+## How this changes a codebase
+
+The visible effect is smaller models. The real effect is that decisions stop being scattered.
+
+Before: six models each declare a slug, each with its own copy of a pattern, and the definition of a slug exists only as an emergent property of six places agreeing.
+
+After: one line says what a slug is, and six models refer to it. The definition exists, in one place, with a name.
+
+That shift matters most at the moments codebases usually go wrong &mdash; when a rule changes, when somebody new adds a seventh model, when a bug turns out to be one of the six copies having been updated and the others not.
+
+It also changes how the code reads to somebody arriving. Models built from named domain types describe the domain. Models built from `str` and `int` with regular expressions attached describe a serialisation format, and the domain has to be inferred.
+
+The mechanism is a single line of `typing`. The return is a codebase where the vocabulary is written down.
+
+## A last practical note
+
+Introduce named types gradually rather than in one refactor.
+
+The natural moment is when you next write a rule for the second time. Extract it then, use it in both places, and move on. Repeat that for a few weeks and a `types.py` accumulates on its own, containing exactly the rules that actually repeat &mdash; which is a better selection than any up-front attempt to guess them.
+
+The reverse approach, sitting down to define a full vocabulary before it is needed, tends to produce types nothing uses and abstractions that do not match how the domain turned out.
+''',
+    [
+        {"q": "What is `Annotated[str, Field(pattern=...)]`?",
+         "options": ["A Pydantic-only construct", "A real type you can name and reuse anywhere", "A validator", "A default value"],
+         "answer": 1,
+         "why": "`Annotated` is standard typing. Bound to a name it becomes a reusable type, so a rule is defined once and every use site stays consistent."},
+        {"q": "In `Annotated[str, BeforeValidator(f), Field(pattern=p)]`, what runs first?",
+         "options": ["The pattern", "The before-validator, then coercion, then the pattern", "They run in parallel", "Undefined order"],
+         "answer": 1,
+         "why": "Before-validators see raw input, then coercion happens, then constraints, then after-validators. Written the other way the pattern would reject values the normaliser was meant to fix."},
+        {"q": "Why is `Annotated[int, Field(gt=0)] = 10` preferable to `Field(default=10, gt=0)`?",
+         "options": ["It is faster", "It separates what the type is from what it defaults to, and the type can be named and reused", "The second is invalid", "No difference at all"],
+         "answer": 1,
+         "why": "Behaviour is identical; the Annotated form keeps the constraint with the type and the default where defaults normally sit, and lets the constrained type be reused."},
+        {"q": "What does `SecretStr` protect against?",
+         "options": ["Weak passwords", "The value appearing in repr, logs and tracebacks", "SQL injection", "Short strings"],
+         "answer": 1,
+         "why": "It hides the value in representations so a token cannot leak into a log by accident, and requires `.get_secret_value()` to read it - making every access deliberate."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 19. Validator modes
+# ---------------------------------------------------------------------------
+topic(
+    "validator_modes",
+    "Validator Modes",
+    "Control",
+    "before, after, plain and wrap - what runs when, relative to coercion, and why "
+    "the choice changes what you can do.",
+    _svg(_box(8, 34, 30, 22, S) + _txt(23, 48, "before", M, 7) +
+         _arrow(40, 45, 52, 45) +
+         _box(54, 34, 34, 22, S, A) + _txt(71, 48, "coerce", A, 7) +
+         _arrow(90, 45, 102, 45) +
+         _box(104, 34, 30, 22, S) + _txt(119, 48, "after", M, 7)),
+    [
+        ("Seeing the pipeline",
+         "One field, one validator of each kind, printing what it received. The order "
+         "and the types tell you everything.",
+         '''from typing import Annotated
+from pydantic import BaseModel, BeforeValidator, AfterValidator
+
+def before(v):
+    print("  before : %-8r (%s)" % (v, type(v).__name__))
+    return v
+
+def after(v):
+    print("  after  : %-8r (%s)" % (v, type(v).__name__))
+    return v
+
+class M(BaseModel):
+    n: Annotated[int, BeforeValidator(before), AfterValidator(after)]
+
+print('validating "12":')
+m = M(n="12")
+print("  result :", repr(m.n))
+print()
+print("before saw the string; coercion ran; after saw the int.")'''),
+
+        ("before is for shape, after is for value",
+         "Choosing the wrong mode is the usual reason a validator never runs: in after "
+         "mode a bad shape has already failed.",
+         '''from typing import Annotated, List
+from pydantic import BaseModel, BeforeValidator, AfterValidator, ValidationError
+
+def split_csv(v):
+    return [p.strip() for p in v.split(",")] if isinstance(v, str) else v
+
+def lowercase(v: List[str]) -> List[str]:
+    return [t.lower() for t in v]
+
+class Right(BaseModel):
+    tags: Annotated[List[str], BeforeValidator(split_csv), AfterValidator(lowercase)]
+
+class Wrong(BaseModel):
+    # split_csv in AFTER mode never sees the string - validation failed first
+    tags: Annotated[List[str], AfterValidator(split_csv)]
+
+print("right:", Right(tags="Maths, Vectors").tags)
+
+try:
+    Wrong(tags="Maths, Vectors")
+except ValidationError as e:
+    print("wrong:", e.errors()[0]["type"], "- the string never reached the validator")'''),
+
+        ("plain replaces validation entirely",
+         "A plain validator takes over: no coercion happens at all, and whatever it "
+         "returns is the field.",
+         '''from typing import Annotated, Any
+from pydantic import BaseModel, PlainValidator
+
+def parse_duration(v: Any) -> int:
+    "Accept 90, '90', '1h30m' - and decide the result ourselves."
+    if isinstance(v, int):
+        return v
+    s = str(v).strip()
+    if s.isdigit():
+        return int(s)
+    total, num = 0, ""
+    for ch in s:
+        if ch.isdigit():
+            num += ch
+        elif ch == "h":
+            total += int(num or 0) * 60; num = ""
+        elif ch == "m":
+            total += int(num or 0); num = ""
+    return total + int(num or 0)
+
+class Module(BaseModel):
+    minutes: Annotated[int, PlainValidator(parse_duration)]
+
+for value in [90, "90", "1h30m", "2h", "45m"]:
+    print("%-8r -> %d" % (value, Module(minutes=value).minutes))'''),
+
+        ("wrap sees both sides",
+         "A wrap validator receives the value <em>and</em> the handler that would "
+         "normally validate it, so it can catch a failure and substitute something.",
+         '''from typing import Annotated, Any
+from pydantic import BaseModel, WrapValidator, ValidationError, ValidatorFunctionWrapHandler
+
+def default_on_failure(v: Any, handler: ValidatorFunctionWrapHandler) -> int:
+    try:
+        return handler(v)          # run normal validation
+    except ValidationError:
+        return 0                   # ...and rescue it
+
+class Lenient(BaseModel):
+    views: Annotated[int, WrapValidator(default_on_failure)]
+
+for value in [12, "12", "lots", None]:
+    print("%-8r -> %r" % (value, Lenient(views=value).views))
+
+print()
+print("Use sparingly: swallowing an error is a decision to lose information.")'''),
+
+        ("Order among several",
+         "Validators of the same kind run in the order written. Before-validators run "
+         "outside-in, after-validators inside-out.",
+         '''from typing import Annotated
+from pydantic import BaseModel, BeforeValidator, AfterValidator
+
+def b1(v):
+    print("  before 1"); return v
+def b2(v):
+    print("  before 2"); return v
+def a1(v):
+    print("  after 1"); return v
+def a2(v):
+    print("  after 2"); return v
+
+class M(BaseModel):
+    n: Annotated[int, BeforeValidator(b1), BeforeValidator(b2),
+                 AfterValidator(a1), AfterValidator(a2)]
+
+print("validating:")
+M(n="1")
+print()
+print("Written left to right, before-validators run in that order and")
+print("after-validators run in it too - read top to bottom as the pipeline.")'''),
+
+        ("The same modes on a decorator",
+         "<code>field_validator</code> takes the same <code>mode</code> argument. "
+         "<code>Annotated</code> makes it reusable; the decorator keeps it local.",
+         '''from pydantic import BaseModel, field_validator
+
+class Module(BaseModel):
+    tags: list
+    title: str
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def split_csv(cls, v):
+        return [p.strip() for p in v.split(",")] if isinstance(v, str) else v
+
+    @field_validator("title", mode="after")
+    @classmethod
+    def titlecase(cls, v: str) -> str:
+        return v.strip().title()
+
+m = Module(tags="maths, vectors", title="  the chain rule ")
+print("tags :", m.tags)
+print("title:", repr(m.title))'''),
+    ],
+    [
+        "<strong>before</strong> sees the raw input, unconverted. Use it to fix the <em>shape</em> of a value.",
+        "<strong>after</strong> is the default and sees the coerced value, already the annotated type. Use it to check or normalise the <em>value</em>.",
+        "<strong>plain</strong> replaces validation entirely &mdash; no coercion runs, and whatever it returns is the field.",
+        "<strong>wrap</strong> receives the value and a handler, so it can run normal validation and catch the failure.",
+        "The commonest mistake is putting shape-fixing logic in after mode, where the bad shape has already failed validation and the code never runs.",
+        "Both spellings exist: <code>Annotated[T, BeforeValidator(f)]</code> for a reusable type, <code>@field_validator(\"x\", mode=\"before\")</code> for one model.",
+    ],
+    '''
+title: Validator Modes: before, after, plain and wrap
+intro: What runs when, relative to coercion, and why the choice decides what a validator can do.
+
+## The pipeline
+
+Validating one field is a sequence, and every mode is a slot in it:
+
+1. **before** validators run on the raw input, exactly as it arrived.
+2. **Coercion** converts the value to the annotated type.
+3. **Constraints** from `Field` are checked.
+4. **after** validators run on the final, converted value.
+
+`plain` and `wrap` are different: they replace or surround the whole thing rather than sitting inside it.
+
+Almost every confusion about validators dissolves once this sequence is clear, because the question "why did my validator not run?" nearly always has the answer "it was in after mode and the value failed at step 2".
+
+## after: the default
+
+An after validator receives the value already converted. `n: int` given `"12"` reaches an after validator as the integer `12`.
+
+That is what you want for nearly everything. Checking membership of a set, comparing against a bound that a constraint cannot express, normalising a string, deduplicating a list &mdash; all of these are simpler when the value is known to be the right type, because you can operate on it directly with no defensive `isinstance`.
+
+It is also safer. An after validator cannot receive an arbitrary object, so it cannot fail in surprising ways on input it never anticipated.
+
+## before: fixing the shape
+
+A before validator sees the raw input. Nothing has been checked, so the value could be anything.
+
+Its purpose is repairing the *shape* of data before normal validation gets to it. The canonical case is a field that should be a list, from a caller that sends a comma-separated string:
+
+```python
+def split_csv(v):
+    return [p.strip() for p in v.split(",")] if isinstance(v, str) else v
+```
+
+In after mode this code would never run. A string is not a list, so validation fails at step 2 and step 4 is never reached. This is the single most common validator mistake, and the symptom &mdash; "my validator is not being called" &mdash; sounds like a bug in Pydantic rather than a mode choice.
+
+Two rules for before validators, both consequences of receiving unchecked input. Guard with `isinstance` rather than assuming a type. And return anything you do not handle unchanged, so normal validation still runs on it.
+
+Keep them small. Complex logic operating on unvalidated input is hard to reason about, and errors raised there lack the context that makes Pydantic's messages useful.
+
+## plain: taking over
+
+A plain validator replaces validation for that field. No coercion runs, no constraints are checked, and whatever it returns becomes the value &mdash; unvalidated.
+
+```python
+minutes: Annotated[int, PlainValidator(parse_duration)]
+```
+
+The annotation still says `int`, and that now serves as documentation and as the schema type rather than as something enforced. Your function is entirely responsible for producing an integer.
+
+This is the right tool for a genuinely custom input format: durations like `"1h30m"`, a coordinate string, a domain-specific identifier. Trying to express those with before validators plus normal coercion is more convoluted than simply owning the parse.
+
+The cost is that you have taken on the whole job, including producing sensible errors. Raise `ValueError` for bad input rather than returning something wrong, or you have built a field that silently accepts nonsense.
+
+## wrap: around the outside
+
+A wrap validator receives the value *and* a handler that performs the normal validation. That lets it act before, after, and instead of:
+
+```python
+def default_on_failure(v, handler):
+    try:
+        return handler(v)
+    except ValidationError:
+        return 0
+```
+
+The main uses are supplying a fallback instead of failing, adding context to an error before re-raising, and short-circuiting expensive validation for a known-good sentinel.
+
+Use it sparingly, and be honest about the fallback case. Swallowing a `ValidationError` and substituting a default is a decision to lose information: the caller sent something wrong and will never know. That is occasionally right &mdash; a metrics field where a bad value should not fail the whole request &mdash; and frequently a way to hide a bug for months.
+
+## Order
+
+Several validators of the same kind run in the order written. Read the annotation left to right and you are reading the pipeline top to bottom.
+
+Mixed kinds follow the sequence: all before validators, then coercion and constraints, then all after validators.
+
+That makes a normalise-then-check type read naturally:
+
+```python
+Slug = Annotated[str, BeforeValidator(to_slug), Field(pattern=r"^[a-z0-9_]+$")]
+```
+
+Normalise, then coerce, then check. Swap the order of the metadata and the intent changes.
+
+## Two spellings
+
+Everything here exists in both forms.
+
+`Annotated[T, BeforeValidator(f)]` makes the rule part of a type, so it is reusable across models. This is the better default for anything a second model will ever need.
+
+`@field_validator("x", mode="before")` attaches the rule to one model. Better when the logic is genuinely specific to that model, or when it needs `info.data` to see other fields &mdash; which the `Annotated` form does not provide.
+
+`model_validator` also takes `mode`, with `before` receiving the whole raw payload and `after` receiving the finished model. Same vocabulary, model-wide scope.
+
+## Choosing
+
+Ask what the value looks like when your logic needs to see it.
+
+**Already the right type** &mdash; after. This covers most cases.
+
+**Still in its raw form, wrong shape** &mdash> before.
+
+**A format Pydantic has no idea about** &mdash; plain.
+
+**Need to catch or replace a failure** &mdash; wrap.
+
+And when a validator does not seem to run, check the mode first. It is the answer far more often than anything else.
+
+## A worked example
+
+A duration field accepting `90`, `"90"` and `"1h30m"`, rejecting nonsense, and constrained to a sensible range.
+
+`plain` is the honest choice: the input format is not something coercion can be expected to handle, and taking over the parse is clearer than a chain of before-validators trying to massage `"1h30m"` into something `int()` will accept.
+
+Since a plain validator skips constraints, the range check moves into the function or into a separate after validator. That is the trade: full control over parsing, full responsibility for everything downstream of it.
+
+## Modes on model validators
+
+The same vocabulary applies at model level, with different scope.
+
+`model_validator(mode="before")` receives the raw input for the whole payload &mdash; usually a dict, but it can be anything. It is a classmethod, and it returns the data to be validated. Use it to translate a legacy shape or fill in a derived key before field validation runs.
+
+`model_validator(mode="after")` receives the finished model as `self` and returns it. This is where cross-field rules belong.
+
+There is a `mode="wrap"` at model level too, receiving the payload and a handler, which can catch a whole-model failure and substitute something. It is rare and powerful; the same caution about swallowing errors applies.
+
+## What each mode can and cannot do
+
+Worth a table in your head.
+
+A **before** validator can change the shape, cannot rely on the type, and its errors carry less context because nothing has been located yet.
+
+An **after** validator can rely on the type, cannot repair a shape that already failed, and gets good error locations for free.
+
+A **plain** validator controls everything and inherits nothing &mdash; no coercion, no constraints, so anything you want enforced you must enforce yourself.
+
+A **wrap** validator can do all of the above and is the only one that can observe a failure and decide what to do about it.
+
+## Debugging when a validator misbehaves
+
+Three questions, in order, that resolve nearly every case.
+
+**Is it running at all?** Put a `print` at the top. If nothing appears, the mode is wrong &mdash; almost always an after validator whose input failed coercion first.
+
+**What type is it receiving?** Print `type(v)`. A before validator gets raw input and an after validator gets the coerced value; assuming the wrong one is the second most common mistake.
+
+**Is it returning?** A validator with no `return` sets the field to `None`, silently. If a field becomes `None` after you added a validator, that is the cause.
+
+## Constraints still run in the middle
+
+A detail that is easy to forget: `Field` constraints sit between the two validator slots.
+
+So `Annotated[int, BeforeValidator(f), Field(gt=0), AfterValidator(g)]` runs `f` on raw input, coerces, checks `> 0`, then runs `g`. An after validator never sees a value that failed a constraint, because the constraint raised first.
+
+That is usually convenient &mdash; the after validator can assume the bounds hold &mdash; and occasionally the reason a validator meant to *fix* an out-of-range value never runs. Clamping belongs in `before`, or in the constraint's absence.
+
+## Performance
+
+Validators are Python, and Python is the slow part of an otherwise Rust pipeline.
+
+For a model built a few times per request this is irrelevant. For validating a large collection it is the dominant cost, because each item's validators are a round trip out of the core and back.
+
+If profiling points at validation on a hot path, the questions are: can this rule be a constraint instead, since constraints run in Rust; and is the validator doing work that could be done once outside rather than per item. A validator that rebuilds a set of permitted values on every call is a common and easily fixed version of the second.
+
+## Summary
+
+Four slots around one pipeline: before, coerce, constrain, after. `plain` replaces the pipeline; `wrap` surrounds it.
+
+Choose by asking what the value looks like when your logic needs to see it. When a validator does not run, check the mode before anything else. And remember that constraints sit between the two ordinary slots, so an after validator only ever sees values that already passed them.
+
+## Summary
+
+Four slots. `before` on raw input, for shape. `after` on the converted value, for meaning &mdash; and the default. `plain` replacing validation entirely, for custom formats. `wrap` around it, for fallbacks and context.
+
+The pipeline is before, coerce, constrain, after. Most validator confusion is a mode chosen without that sequence in mind, and most of it is fixed by moving one argument.
+
+## The mental model
+
+One sentence holds most of it: **before sees what arrived, after sees what it became.**
+
+Everything else follows. A validator repairing a shape must run before, because after the shape has already failed. A validator checking meaning should run after, because it can then rely on the type. Constraints sit between them, so an after validator never sees a value that broke one.
+
+`plain` and `wrap` step outside that sequence &mdash; one replacing it, the other surrounding it &mdash; and both are for cases where the standard pipeline is not what you want at all.
+
+Keep the sentence and the rest is derivable.
+
+
+## Mistakes people make
+
+**Shape-fixing logic in after mode.** The single most common, and it presents as "my validator never runs". The value failed coercion at step two and step four was never reached.
+
+**Assuming the type in a before validator.** It receives raw input, which can be anything at all. Guard with `isinstance` and pass through unchanged whatever you do not handle, so the normal path still runs.
+
+**Forgetting to return.** Silent, and it sets the field to `None`. If a field mysteriously becomes `None` after a validator is added, this is why.
+
+**Expecting constraints to run after a plain validator.** `plain` replaces the pipeline entirely: no coercion and no constraints. Anything you want enforced is now yours to enforce.
+
+**Swallowing errors in a wrap validator.** Catching a `ValidationError` and substituting a default is a decision to lose information &mdash; the caller sent something wrong and will never be told. Occasionally correct, frequently a bug hidden for months.
+
+**Rebuilding data inside a validator on every call.** A validator that constructs a set of permitted values each time it runs does that work once per item validated. Hoist it out; on a large collection it is the dominant cost.
+
+## A closing note
+
+Nearly every question about validators reduces to a question about position.
+
+Not "how do I write this rule" but "where in the sequence does it need to sit". Once that is settled the code is usually short and obvious, and when a validator behaves strangely the position is almost always what is wrong.
+
+Before, coerce, constrain, after. Four slots, one order, and everything else follows from knowing which one you are in.
+''',
+    [
+        {"q": "Your validator turns a CSV string into a list, but it never runs. Why?",
+         "options": ["A Pydantic bug", "It is in after mode, and a string already failed list coercion before it", "It needs @classmethod", "The field is optional"],
+         "answer": 1,
+         "why": "After validators run at step 4, and coercion failed at step 2. Shape-fixing logic must be in before mode, where the raw value is still available."},
+        {"q": "What does a `plain` validator skip?",
+         "options": ["Nothing", "Coercion and constraints - it replaces validation entirely", "Only constraints", "Only coercion"],
+         "answer": 1,
+         "why": "It takes over completely. Whatever it returns becomes the field unvalidated, so producing the right type and raising on bad input are both your responsibility."},
+        {"q": "What does a `wrap` validator receive besides the value?",
+         "options": ["The model", "A handler that performs the normal validation", "The field name", "Nothing"],
+         "answer": 1,
+         "why": "Calling the handler runs standard validation, so a wrap validator can catch its failure and substitute a value, or add context and re-raise."},
+        {"q": "In `Annotated[str, BeforeValidator(to_slug), Field(pattern=p)]`, what is the order?",
+         "options": ["Pattern, then normaliser", "Normaliser, then coercion, then pattern", "Both at once", "Pattern only"],
+         "answer": 1,
+         "why": "The pipeline is before, coerce, constrain, after. Written the other way the pattern would reject the messy input the normaliser existed to clean."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 20. model_dump and model_dump_json
+# ---------------------------------------------------------------------------
+topic(
+    "model_dump_and_model_dump_json",
+    "model_dump and model_dump_json",
+    "In and Out",
+    "Getting data back out: the two modes, the arguments that shape the output, "
+    "and the mistake that raises TypeError.",
+    _svg(_box(20, 16, 120, 20, S, A) + _txt(80, 30, "Module", A, 9) +
+         _arrow(50, 40, 50, 52) + _arrow(110, 40, 110, 52) +
+         _box(16, 54, 54, 20, S) + _txt(43, 68, "dict", M, 8) +
+         _box(90, 54, 54, 20, S) + _txt(117, 68, "json", M, 8)),
+    [
+        ("Two methods, two purposes",
+         "<code>model_dump()</code> gives Python objects for use inside your program. "
+         "<code>model_dump_json()</code> gives text for leaving it.",
+         '''from datetime import date
+from decimal import Decimal
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    published_on: date
+    price: Decimal
+
+m = Module(title="Vectors", published_on="2026-08-26", price="12.50")
+
+d = m.model_dump()
+print("dump    :", d)
+for k, v in d.items():
+    print("   %-14s %s" % (k, type(v).__name__))
+
+print()
+print("dump_json:", m.model_dump_json())'''),
+
+        ("The TypeError everybody meets once",
+         "Passing <code>model_dump()</code> to <code>json.dumps</code> fails, because "
+         "the dict still holds real Python objects.",
+         '''import json
+from datetime import date
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    published_on: date
+
+m = Module(title="Vectors", published_on="2026-08-26")
+
+try:
+    json.dumps(m.model_dump())
+except TypeError as e:
+    print("json.dumps(model_dump()) ->", e)
+
+print()
+print("correct  :", m.model_dump_json())
+print("or first :", json.dumps(m.model_dump(mode="json")))'''),
+
+        ("Choosing what comes out",
+         "<code>include</code> and <code>exclude</code> pick fields, and reach into "
+         "nested models with a dict.",
+         '''from pydantic import BaseModel
+
+class Author(BaseModel):
+    name: str
+    email: str
+
+class Module(BaseModel):
+    title: str
+    author: Author
+    internal_notes: str
+
+m = Module(title="Vectors",
+           author={"name": "Ada", "email": "ada@vizlearn.in"},
+           internal_notes="needs a diagram")
+
+print("all      :", m.model_dump())
+print("public   :", m.model_dump(exclude={"internal_notes": True,
+                                          "author": {"email"}}))
+print("minimal  :", m.model_dump(include={"title": True,
+                                          "author": {"name"}}))'''),
+
+        ("Dropping what was never set",
+         "Three filters that matter for updates: <code>exclude_unset</code>, "
+         "<code>exclude_defaults</code> and <code>exclude_none</code>.",
+         '''from typing import Optional
+from pydantic import BaseModel
+
+class Update(BaseModel):
+    title: Optional[str] = None
+    minutes: int = 10
+    summary: Optional[str] = None
+
+m = Update(title="Vectors", summary=None)
+
+print("everything      :", m.model_dump())
+print("exclude_unset   :", m.model_dump(exclude_unset=True))
+print("exclude_defaults:", m.model_dump(exclude_defaults=True))
+print("exclude_none    :", m.model_dump(exclude_none=True))
+print()
+print("exclude_unset keeps summary=None because it WAS sent.")
+print("exclude_none drops it, losing the instruction to clear the field.")'''),
+
+        ("Excluding a field permanently",
+         "<code>Field(exclude=True)</code> keeps a value out of every serialisation, "
+         "which is what you want for anything secret.",
+         '''from pydantic import BaseModel, Field, SecretStr
+
+class User(BaseModel):
+    name: str
+    password_hash: str = Field(exclude=True)
+    api_token: SecretStr
+
+u = User(name="Ada", password_hash="$2b$12$abcdef", api_token="tok_live_123")
+
+print("repr    :", u)
+print("dump    :", u.model_dump())
+print("json    :", u.model_dump_json())
+print()
+print("the value is still there when you ask for it:")
+print("   hash :", u.password_hash)
+print("   token:", u.api_token.get_secret_value())'''),
+
+        ("Round tripping",
+         "A dump is valid input again &mdash; but only if you did not filter it. That "
+         "is worth checking rather than assuming.",
+         '''from pydantic import BaseModel, ValidationError
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+m = Module(title="Vectors", minutes=8)
+
+full = Module.model_validate(m.model_dump())
+print("round trip :", full == m)
+
+try:
+    Module.model_validate(m.model_dump(exclude={"minutes"}))
+except ValidationError as e:
+    print("filtered   :", e.errors()[0]["type"], "- a filtered dump is not valid input")
+
+print()
+print("json round trip:", Module.model_validate_json(m.model_dump_json()) == m)'''),
+    ],
+    [
+        "<code>model_dump()</code> keeps Python objects; <code>model_dump_json()</code> produces JSON text. Use the second for anything leaving the process.",
+        "<code>json.dumps(m.model_dump())</code> raises <code>TypeError</code> on dates and decimals. Use <code>model_dump_json()</code>, or <code>model_dump(mode=\"json\")</code> if you need the dict.",
+        "<code>include</code> and <code>exclude</code> take sets or nested dicts. Once one entry needs to reach inside, every entry becomes a key.",
+        "<code>exclude_unset</code> is the one for PATCH: it emits only what the caller supplied, so an explicit <code>null</code> survives and an omission stays omitted.",
+        "<code>exclude_none</code> is <em>not</em> the same thing &mdash; it drops explicit nulls too, which throws away the instruction to clear a field.",
+        "<code>Field(exclude=True)</code> keeps a value out of every dump permanently. <code>SecretStr</code> additionally hides it from <code>repr</code> and logs.",
+    ],
+    '''
+title: model_dump and model_dump_json: Getting Data Back Out
+intro: Two methods, several filters, and the one mistake that raises TypeError.
+
+## Two methods, and the difference that matters
+
+`model_dump()` returns a dictionary of Python objects. A `date` field is a `date`. A `Decimal` is a `Decimal`. An enum member is the member.
+
+`model_dump_json()` returns a JSON string, converting everything to something JSON can carry.
+
+The rule of thumb: **dump for inside, dump_json for outside**. If the data is going to another function, a template, a test assertion, use `model_dump()`. If it is going into an HTTP response, a queue, or a file, use `model_dump_json()`.
+
+There is a third form worth knowing: `model_dump(mode="json")` gives you a dictionary whose values are already JSON-compatible. That is what you want when something else will do the encoding &mdash; a framework, a JSON logger, an SDK that takes a dict.
+
+In Pydantic v1 these were `.dict()` and `.json()`. They still exist in v2 and warn, and they are all over the internet.
+
+## The TypeError
+
+Everybody meets this once:
+
+```python
+json.dumps(m.model_dump())
+# TypeError: Object of type date is not JSON serializable
+```
+
+It is confusing because the model obviously supports JSON, and the error blames a `date`.
+
+The explanation is that `model_dump()` deliberately did not convert anything. It handed you real Python objects, and `json.dumps` does not know what to do with a `date`.
+
+Three correct forms: `model_dump_json()` if you want the string, `json.dumps(model_dump(mode="json"))` if something else must do the encoding, or `model_dump(mode="json")` alone if you need the dict.
+
+## Shaping the output
+
+`include` and `exclude` select fields. A set names top-level fields; a dict reaches into nested models. The two spellings do not mix in one literal, so once anything needs to reach inside, every entry becomes a key with `True`.
+
+For lists of models there is a special key, `"__all__"`, applying a selection to every item.
+
+Both are useful for removing one obviously-internal field. Beyond that, a separate output model reads better, appears correctly in the schema, and does not require anyone to trace an exclusion expression to work out what an endpoint returns.
+
+## The three exclusions that look similar
+
+These get confused constantly, and the difference is the whole point of the update module.
+
+`exclude_unset=True` omits fields the caller never supplied. Fields explicitly sent, *including explicit nulls*, are kept.
+
+`exclude_defaults=True` omits fields whose value equals their default, whether supplied or not.
+
+`exclude_none=True` omits every field that is `None`, however it got that way.
+
+For a PATCH endpoint, `exclude_unset` is the correct one and the other two are wrong.
+
+Consider a client sending `{"summary": null}` meaning "clear the summary". With `exclude_unset` the output is `{"summary": None}` &mdash; the instruction survives. With `exclude_none` the output is `{}` &mdash; the instruction is gone, and the summary stays as it was. That is a bug users report as "the clear button does not work", and it is one argument away.
+
+`exclude_defaults` has a narrower use: producing a minimal config file, or a payload where anything unspecified should fall back to the receiver's defaults.
+
+## Keeping secrets out
+
+Two mechanisms, for two different exposures.
+
+`Field(exclude=True)` keeps a field out of every serialisation. It is still on the object and still accessible; it simply never appears in a dump. This is right for a password hash, an internal id, or anything the model needs and consumers must not see.
+
+`SecretStr` addresses a different risk: the value appearing in a `repr`, a log line or a traceback. It displays as `**********` and requires `.get_secret_value()` to read, which makes every access deliberate and easy to grep for.
+
+They are complementary. A token that must neither be logged nor serialised wants both.
+
+The safest structure of all is a separate output model that simply does not have the field. You cannot leak what is not there, and no future refactor can accidentally remove a flag.
+
+## Round tripping
+
+A dump is valid input to the same model:
+
+```python
+Module.model_validate(m.model_dump()) == m
+```
+
+That is genuinely useful for copying, for caching, and for tests.
+
+It stops being true the moment you filter. `model_dump(exclude={"minutes"})` produces a dict missing a required field, and validating it raises. Worth remembering when a filtered dump is being stored and later read back &mdash; the filter that made the output tidy also made it un-reloadable.
+
+Round tripping through JSON works too, and is exact for the types Pydantic knows.
+
+## Nested behaviour
+
+Everything recurses. `model_dump()` on a model containing models returns nested plain dicts, and `model_dump_json()` produces nested JSON.
+
+One thing to check when a nested model is a *different* class than you expect: serialisation follows the field's declared type. If you assign a subclass instance to a field annotated with the parent, by default the extra fields are not serialised, because the model serialises according to what it promised rather than what it happens to hold.
+
+That behaviour is deliberate &mdash; it stops a subclass leaking fields through an API that documented the parent &mdash; and it surprises people who expected the subclass's data. `SerializeAsAny` opts out where you genuinely want the richer output.
+
+## Warnings
+
+Pydantic will warn when serialisation encounters something it did not expect &mdash; typically a field holding a value that does not match its annotation, which happens when `validate_assignment` is off and something assigned freely.
+
+Those warnings are worth listening to rather than silencing. They mean the object's real contents have diverged from what the model claims, and the serialised output may not be what the schema promises.
+
+## Rounding trips and warnings
+
+Pydantic emits a warning when serialisation meets a value that does not match its field's annotation. That happens when `validate_assignment` is off and something assigned freely, leaving the object's contents at odds with what the model claims.
+
+Those warnings are worth reading rather than filtering. They mean the serialised output may not match the schema you publish, which is a defect a consumer will find before you do.
+
+If you see them regularly, the fix is upstream: turn on `validate_assignment`, or freeze the model so the divergence cannot happen.
+
+## Subclasses and what gets emitted
+
+If a field is annotated with a parent model and holds a subclass instance, the extra fields are **not** serialised by default. The model emits what it promised, not what it happens to hold.
+
+That is deliberate, and it is a safety property: a subclass carrying internal fields cannot leak them through an endpoint documented as returning the parent.
+
+It also surprises people who expected the richer output. `SerializeAsAny[Parent]` opts out where you genuinely want whatever the object actually is &mdash; and where you have satisfied yourself that everything a subclass might carry is safe to expose.
+
+## Context
+
+Both dump methods accept a `context` dict, and serialisers can read it through their `info` argument.
+
+That is the supported way to make output depend on something external without a global &mdash; a locale, a viewer's permissions, a feature flag:
+
+```python
+m.model_dump(context={"role": "admin"})
+```
+
+Used sparingly it is the clean solution to "this field is only visible to some callers". Used heavily it produces output nobody can predict from the model alone, and separate output models are clearer.
+
+## Choosing between filtering and separate models
+
+The recurring question in this module: `exclude` or a second model?
+
+Use `exclude` for one or two obviously-internal fields, where the shapes are otherwise identical and the intent is plain at the call site.
+
+Use a separate model when the difference is structural, when the same difference is needed in more than one place, or when the output is part of a public contract. A model is checked, appears correctly in the schema, cannot be forgotten at a new call site, and is impossible to get wrong by mistyping a field name in a set.
+
+The exclusion set is the thing that quietly stops matching the model. A field renamed in the model and not in the exclusion set silently starts appearing in your public output, and nothing raises.
+
+## Performance
+
+Serialisation happens in Rust and is fast, but it is not free, and two habits cost more than people expect.
+
+Serialising more than you send. Building a full dump and then picking three keys out of it does the work for every field including nested trees. `include` does the same job without the waste.
+
+Serialising the same object repeatedly. Inside a loop that renders one object per row, hoisting the dump out is the obvious fix and easy to miss.
+
+Neither matters at small scale. Both are visible when a response contains thousands of models.
+
+## Summary
+
+Two methods and a mode: `model_dump()` for Python objects, `model_dump_json()` for text, `model_dump(mode="json")` for a JSON-safe dict.
+
+The classic error is `json.dumps(model_dump())`, and the classic bug is `exclude_none` where `exclude_unset` was meant. Secrets want `Field(exclude=True)` and `SecretStr`, and a separate output model when you want a guarantee rather than a setting.
+
+## Summary
+
+`model_dump()` for Python objects, `model_dump_json()` for text, `model_dump(mode="json")` for a JSON-safe dict.
+
+`json.dumps(model_dump())` is the classic mistake; the dict is full of real objects.
+
+`exclude_unset` for PATCH, and not `exclude_none`, which discards the difference between "not mentioned" and "please clear this".
+
+`Field(exclude=True)` and `SecretStr` for secrets, and a separate output model when you want the guarantee rather than the setting.
+
+## A last habit
+
+Look at what your model actually emits, once, before it goes anywhere public.
+
+One `print(m.model_dump_json(indent=2))` shows you the keys, the casing, the formats, and anything present that should not be. It is the same five-minute review as printing the schema, and it catches a different set of problems &mdash; a secret that was never excluded, a nested field nobody meant to expose, snake_case where the rest of the API is camelCase.
+
+The output of a model is a contract with everyone who consumes it. It is worth having read it.
+
+
+## Mistakes people make
+
+**`json.dumps(model_dump())`.** The classic. The dict holds real `date` and `Decimal` objects, and the standard encoder refuses them. The error blames a date and the cause is the wrong method.
+
+**`exclude_none` where `exclude_unset` was meant.** On an update endpoint this discards a caller's explicit instruction to clear a field. It presents as "the clear button does not work" and is one argument away from correct.
+
+**Filtering a dump that is later reloaded.** An unfiltered dump round-trips; a filtered one is missing required fields and will not validate. This bites when the tidy output is stored and read back later.
+
+**Trusting an exclusion set to stay correct.** Rename a field in the model, forget the exclusion set, and something internal silently begins appearing in your public output. Nothing raises. A separate output model cannot fail this way.
+
+**Serialising more than you need.** Building a full dump of a nested tree to pick three keys out of it does all the work for every field. `include` does the same job without it.
+
+**Ignoring serialisation warnings.** They mean an object's contents no longer match what the model claims, usually because something was assigned without `validate_assignment`. The published schema and the actual output have diverged, and a consumer will find it first.
+
+## The two mistakes
+
+If only two things survive from this module, make them these.
+
+`json.dumps(model_dump())` raises, because the dict is full of real Python objects. Use `model_dump_json()`, or `mode="json"` when something else does the encoding.
+
+`exclude_none` is not `exclude_unset`. The first throws away a caller's explicit instruction to clear a field; the second preserves it. On a PATCH endpoint that difference is a bug users report and nobody can reproduce.
+
+## Output as a contract
+
+The output of a model is a contract, whether or not anybody wrote it down.
+
+Somebody is parsing those keys. Something depends on that date format. A client somewhere assumes a field is present because it always has been. None of that is in a document; it is in the behaviour, and it becomes binding the moment anyone builds against it.
+
+That is why the choices in this module deserve more care than they usually get. Adding a computed field changes every response the model feeds. Renaming a field breaks parsers. Changing an exclusion set alters what leaves your system, silently and without any test failing.
+
+The practical habit is to treat a model that reaches the outside world as a published interface: know what it emits, be deliberate about changing it, and prefer a separate output model whenever the shape you send differs from the shape you hold. A dedicated class makes the contract explicit, checkable and hard to alter by accident &mdash; which is exactly what a contract should be.
+''',
+    [
+        {"q": "Why does `json.dumps(m.model_dump())` raise TypeError on a date field?",
+         "options": ["model_dump is broken", "model_dump returns real Python objects, which json.dumps cannot encode", "Dates are unsupported", "It needs an argument"],
+         "answer": 1,
+         "why": "`model_dump()` deliberately preserves Python types. Use `model_dump_json()`, or `model_dump(mode=\"json\")` when something else does the encoding."},
+        {"q": "A PATCH client sends `{\"summary\": null}` to clear a field. Which filter preserves that?",
+         "options": ["exclude_none", "exclude_unset", "exclude_defaults", "Any of them"],
+         "answer": 1,
+         "why": "`exclude_unset` keeps fields that were supplied, including explicit nulls. `exclude_none` would drop it, silently discarding the instruction to clear the value."},
+        {"q": "What does `Field(exclude=True)` do?",
+         "options": ["Rejects the field on input", "Keeps it out of every serialisation while remaining on the object", "Hides it from repr only", "Makes it optional"],
+         "answer": 1,
+         "why": "The value is still there and still accessible; it just never appears in a dump. `SecretStr` covers the different risk of the value appearing in logs and tracebacks."},
+        {"q": "Is `model_dump(exclude={\"minutes\"})` valid input to the same model?",
+         "options": ["Always", "Not if minutes is required - the field is now missing", "Only in JSON mode", "Yes, defaults fill it"],
+         "answer": 1,
+         "why": "An unfiltered dump round-trips, but filtering removes fields the model requires. This matters when a filtered dump is stored and later read back."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 21. Aliases
+# ---------------------------------------------------------------------------
+topic(
+    "aliases",
+    "Aliases",
+    "In and Out",
+    "When the wire format and your Python names disagree - camelCase, reserved "
+    "words, and fields that arrive under more than one name.",
+    _svg(_box(12, 30, 54, 26, S) + _txt(39, 47, "publishedAt", M, 7) +
+         _arrow(70, 43, 90, 43) +
+         _box(94, 30, 54, 26, S, A) + _txt(121, 47, "published_at", A, 7)),
+    [
+        ("The wire says camelCase",
+         "An alias lets a field be populated from a different key without renaming "
+         "your Python attribute.",
+         '''from pydantic import BaseModel, Field
+
+class Module(BaseModel):
+    title: str
+    published_at: str = Field(alias="publishedAt")
+    reading_minutes: int = Field(alias="readingMinutes")
+
+payload = {"title": "Vectors", "publishedAt": "2026-08-26", "readingMinutes": 8}
+
+m = Module.model_validate(payload)
+print("python side :", m.published_at, "|", m.reading_minutes)
+print("dump        :", m.model_dump())
+print("dump by alias:", m.model_dump(by_alias=True))'''),
+
+        ("By default the alias replaces the name",
+         "Once a field has an alias, the Python name no longer works as input &mdash; "
+         "unless you turn <code>populate_by_name</code> on.",
+         '''from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+class Strict(BaseModel):
+    published_at: str = Field(alias="publishedAt")
+
+class Either(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    published_at: str = Field(alias="publishedAt")
+
+print("alias works  :", Strict(publishedAt="2026-08-26"))
+
+try:
+    Strict(published_at="2026-08-26")
+except ValidationError as e:
+    print("name refused :", e.errors()[0]["type"], e.errors()[0]["loc"])
+
+print()
+print("with populate_by_name, both work:")
+print("  ", Either(publishedAt="2026-08-26"))
+print("  ", Either(published_at="2026-08-26"))'''),
+
+        ("Different names in and out",
+         "<code>validation_alias</code> and <code>serialization_alias</code> separate "
+         "the two directions, which a single <code>alias</code> cannot.",
+         '''from pydantic import BaseModel, Field
+
+class Module(BaseModel):
+    minutes: int = Field(validation_alias="durationMinutes",
+                         serialization_alias="reading_minutes")
+
+m = Module.model_validate({"durationMinutes": 8})
+
+print("python    :", m.minutes)
+print("plain dump:", m.model_dump())
+print("by alias  :", m.model_dump(by_alias=True))
+print()
+print("It reads one name and writes another - useful when translating")
+print("between two systems that disagree about both.")'''),
+
+        ("Accepting several spellings",
+         "<code>AliasChoices</code> takes the first key that is present, which is how "
+         "you support an old and a new name at once.",
+         '''from pydantic import AliasChoices, BaseModel, Field
+
+class Module(BaseModel):
+    minutes: int = Field(
+        validation_alias=AliasChoices("minutes", "readingMinutes", "duration"))
+
+for payload in [{"minutes": 8},
+                {"readingMinutes": 9},
+                {"duration": 10}]:
+    print("%-26s -> %d" % (str(payload), Module.model_validate(payload).minutes))
+
+print()
+print("One field, three accepted spellings, no branching in your code.")'''),
+
+        ("Reaching into a nested payload",
+         "<code>AliasPath</code> pulls a value out of a nested structure, flattening "
+         "someone else's shape into yours.",
+         '''from pydantic import AliasPath, BaseModel, Field
+
+class Module(BaseModel):
+    title: str
+    author_name: str = Field(validation_alias=AliasPath("author", "name"))
+    first_tag: str = Field(validation_alias=AliasPath("tags", 0))
+
+payload = {
+    "title": "Vectors",
+    "author": {"name": "Ada", "email": "ada@vizlearn.in"},
+    "tags": ["maths", "linear-algebra"],
+}
+
+m = Module.model_validate(payload)
+print(m)
+print()
+print("A nested API response became a flat model, with no manual digging.")'''),
+
+        ("Generating aliases for the whole model",
+         "<code>alias_generator</code> applies a rule to every field, which beats "
+         "writing <code>alias=</code> forty times.",
+         '''from pydantic import BaseModel, ConfigDict
+
+def to_camel(name: str) -> str:
+    head, *rest = name.split("_")
+    return head + "".join(word.capitalize() for word in rest)
+
+class ApiModel(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel,
+                              populate_by_name=True)
+
+class Module(ApiModel):
+    title: str
+    published_at: str
+    reading_minutes: int
+
+m = Module.model_validate({"title": "Vectors",
+                           "publishedAt": "2026-08-26",
+                           "readingMinutes": 8})
+
+print("python :", m.reading_minutes)
+print("out    :", m.model_dump(by_alias=True))
+print("by name:", Module(title="X", published_at="Y", reading_minutes=1).reading_minutes)'''),
+    ],
+    [
+        "<code>Field(alias=...)</code> sets one name used for both input and output. By default it <em>replaces</em> the Python name as input.",
+        "<code>populate_by_name=True</code> lets a field be filled by either its alias or its Python name &mdash; almost always what you want.",
+        "<code>validation_alias</code> and <code>serialization_alias</code> control the two directions independently.",
+        "<code>model_dump(by_alias=True)</code> is required to emit aliases. Without it you get Python names, which is a common cause of “my API returns snake_case”.",
+        "<code>AliasChoices</code> accepts several input spellings; <code>AliasPath</code> pulls a value out of a nested payload.",
+        "<code>alias_generator</code> on a shared base applies a naming rule to every field, so a whole API can be camelCase in one line.",
+    ],
+    '''
+title: Aliases: When the Wire and Your Code Disagree
+intro: camelCase payloads, reserved words, legacy names, and nested shapes flattened into yours.
+
+## Four reasons a field needs another name
+
+**The wire is camelCase.** JavaScript clients and a great many APIs use `publishedAt`. Python uses `published_at`. Renaming your attributes to match makes every Python file read badly; renaming their payload is not an option.
+
+**The key is a reserved word.** A payload with `from`, `class`, `import` or `id` cannot map onto an attribute with the same name.
+
+**The name is bad.** A third-party API calls something `dt2`. You do not have to.
+
+**The name changed.** You are renaming a field and both spellings must work through a deprecation window.
+
+## The simple form
+
+```python
+published_at: str = Field(alias="publishedAt")
+```
+
+One alias, used for input and output. There is one behaviour here that catches everyone: **by default the alias replaces the Python name as input**. `Module(published_at="...")` now raises, which is surprising when you have been constructing the model in your own tests.
+
+`populate_by_name=True` fixes it:
+
+```python
+model_config = ConfigDict(populate_by_name=True)
+```
+
+Now either spelling works on the way in. This is almost always what you want, and it is worth setting on a base model so nobody has to rediscover it.
+
+## by_alias on the way out
+
+Aliases are not used for output unless you ask:
+
+```python
+m.model_dump()                 # {"published_at": ...}
+m.model_dump(by_alias=True)    # {"publishedAt": ...}
+```
+
+Forgetting this is the most common alias bug, and the symptom is "my API accepts camelCase but returns snake_case". The aliases were configured correctly; the serialisation call did not ask for them.
+
+In FastAPI, `response_model_by_alias` defaults to `True`, so responses use aliases automatically &mdash; which means a manual `model_dump()` elsewhere in the same codebase behaves differently from the endpoint. Worth knowing before you spend an afternoon on it.
+
+## Separating the directions
+
+A single `alias` uses the same name both ways. When the directions differ, use the two specific settings:
+
+```python
+minutes: int = Field(validation_alias="durationMinutes",
+                     serialization_alias="reading_minutes")
+```
+
+Read one name, write another. That sounds exotic and comes up whenever you sit between two systems that disagree &mdash; consuming a partner API and exposing your own shape, or migrating a field where you must accept the old name and emit the new one.
+
+Where both are set, they win over a plain `alias` in their respective directions.
+
+## Several accepted spellings
+
+`AliasChoices` takes the first key present:
+
+```python
+minutes: int = Field(validation_alias=AliasChoices("minutes", "readingMinutes", "duration"))
+```
+
+This is the clean way to run a rename. Add the new name to the front, keep the old one, ship. Clients migrate at their own pace, and neither your model nor your handlers need a branch for it. Remove the old entry when the traffic stops.
+
+It also handles the ordinary mess of a payload assembled by several teams over several years, where the same value appears under three names depending on which service produced it.
+
+## Reaching into nested data
+
+`AliasPath` pulls a value out of a nested structure:
+
+```python
+author_name: str = Field(validation_alias=AliasPath("author", "name"))
+first_tag: str = Field(validation_alias=AliasPath("tags", 0))
+```
+
+Strings are keys, integers are indices. A deeply nested third-party response becomes a flat model with no manual digging and no intermediate models you did not want.
+
+Use it with judgement. Flattening two or three values from a response is exactly right. Flattening twenty produces a model whose relationship to the payload is impossible to see, and modelling the real structure with nested models is clearer.
+
+Note that `AliasPath` is validation-only. There is no serialisation equivalent, because rebuilding a nested shape from flat fields is not a rename &mdash; if you need that, a custom serialiser or a separate output model is the answer.
+
+## Doing it for the whole model
+
+Writing `alias="..."` on forty fields is tedious and drifts. `alias_generator` applies a rule to every field:
+
+```python
+class ApiModel(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+```
+
+Inherit from that and every model in your API speaks camelCase, with no per-field configuration at all. Pydantic ships `to_camel` and `to_pascal` in `pydantic.alias_generators`, so you usually do not even write the function.
+
+An explicit `alias` on a field overrides the generator, which is what you want for the handful of exceptions every real API has.
+
+This is the right shape for a codebase-wide convention: one base model, one setting, every model consistent, and one place to change it.
+
+## Aliases in the schema
+
+The generated JSON Schema uses aliases, which is correct &mdash; the schema describes the wire format, and the wire format is what the alias names.
+
+So consumers of your OpenAPI document see `publishedAt`, generated clients produce `publishedAt`, and the documentation matches what the endpoint actually accepts. This is one of the places where getting aliases right pays off beyond your own code.
+
+## Things that go wrong
+
+**Forgetting `by_alias=True`** on a manual dump. The most common one.
+
+**Forgetting `populate_by_name`** and then being unable to construct the model in tests using Python names.
+
+**Aliasing to a name that collides** with another field's name, which produces confusing behaviour rather than a clear error.
+
+**Using aliases to paper over a bad model.** If half your fields need aliases to make sense, the model may be describing someone else's payload rather than your domain. A translation layer &mdash; an input model matching their shape, converted to yours &mdash; is sometimes clearer than twenty aliases.
+
+## Aliases and nested models
+
+An alias applies to the field it is declared on, and nesting is unaffected: a nested model's own aliases apply when it is validated, and `by_alias=True` propagates through the whole tree on the way out.
+
+So a camelCase convention applied through a shared base model reaches every level without extra work, which is the main reason to prefer `alias_generator` on a base over per-field aliases.
+
+The one thing to check is consistency. A tree where the parent is aliased and one nested model is not produces output that is camelCase at the top and snake_case two levels down &mdash; valid, confusing, and exactly the kind of thing that survives review.
+
+## What the schema says
+
+Generated schemas use aliases, which is correct: the schema describes the wire, and the alias is the wire name.
+
+That has a practical consequence worth knowing. If you generate a schema for internal purposes and expect Python names, you will not get them. `model_json_schema(by_alias=False)` produces the Python-named version when that is genuinely what you need.
+
+For anything published, the aliased schema is the right one, because it matches what the endpoint accepts and returns.
+
+## Aliases in error messages
+
+An error's `loc` uses the **alias**, not the Python name, when validation failed on an aliased field.
+
+That is the right behaviour &mdash; the caller sent `publishedAt` and should be told about `publishedAt`, not about an attribute name they have never seen. But it means error-handling code cannot assume `loc` matches your attribute names, which occasionally matters when mapping errors back to internal state.
+
+## A migration recipe
+
+Renaming a field in a live API, without breaking anyone:
+
+**Step one.** Add the new name as the primary, keep the old one accepted:
+
+```python
+minutes: int = Field(validation_alias=AliasChoices("minutes", "readingMinutes"))
+```
+
+Both work on the way in. Output uses whichever you set as the serialisation alias &mdash; keep emitting the old name for now.
+
+**Step two.** Switch the serialisation alias to the new name. Clients reading the response see the new one; clients sending either still work.
+
+**Step three.** Once traffic on the old name stops, remove it from `AliasChoices`.
+
+Three small deploys, no coordinated cutover, no broken clients. This is the pattern aliases make possible and it is worth knowing before you need it.
+
+## Deciding whether you need them at all
+
+A model full of aliases is sometimes a sign that the model is describing someone else's payload rather than your domain.
+
+If you consume a third-party API with thirty oddly-named fields, two models can be cleaner than thirty aliases: one matching their shape exactly, with their names, and a conversion into yours. The first model documents their API honestly; the second is your domain, unpolluted.
+
+Aliases are best when the difference is a *convention* &mdash; camelCase versus snake_case, a reserved word, a rename in progress. When the difference is a whole foreign vocabulary, a translation layer says more.
+
+## Summary
+
+`alias` for one name both ways, `validation_alias` and `serialization_alias` when the directions differ, `populate_by_name=True` so Python names still work.
+
+`by_alias=True` to emit them &mdash; the most commonly forgotten step. `AliasChoices` for renames, `AliasPath` for flattening, `alias_generator` on a base for a whole-codebase convention.
+
+And errors report the alias, because that is the name the caller used.
+
+## Summary
+
+`alias` for one name both ways; `validation_alias` and `serialization_alias` when the directions differ. `populate_by_name=True` so Python names still work as input. `by_alias=True` to emit them.
+
+`AliasChoices` for several accepted spellings, which makes renames painless. `AliasPath` for flattening nested payloads. `alias_generator` on a shared base for a whole-API convention.
+
+And the one to remember: aliases are not used on output unless you ask for them.
+
+## The one-line summary
+
+Aliases exist so your Python can read like Python while your API reads like whatever your consumers expect.
+
+Set the convention once on a shared base with `alias_generator` and `populate_by_name`, remember `by_alias=True` when dumping by hand, and reach for `AliasChoices` the moment you need to rename something without breaking anyone.
+
+Everything else in this module is a variation on those three.
+
+
+## Mistakes people make
+
+**Forgetting `by_alias=True`.** Comfortably the most common. Aliases are not used on output unless requested, and the symptom &mdash; an API accepting camelCase and returning snake_case &mdash; looks like a configuration problem rather than a missing argument on one call.
+
+**Forgetting `populate_by_name`.** An alias replaces the Python name as input, so your own tests can no longer construct the model with the names you wrote. The fix is one config entry and it belongs on a shared base.
+
+**Inconsistent nesting.** A parent with an alias generator and a nested model without one produces output that is camelCase at the top and snake_case two levels down. Valid, confusing, and exactly the sort of thing that survives review.
+
+**Assuming `loc` matches your attribute names.** Errors report the alias, because that is the name the caller used. Code mapping errors back to internal state has to account for it.
+
+**Expecting `AliasPath` to work on the way out.** It is validation-only. Rebuilding a nested shape from flat fields is not a rename, and needs a serialiser or a separate output model.
+
+**Aliasing an entire foreign vocabulary.** Thirty aliases usually means the model is describing someone else's payload rather than your domain. Two models &mdash; one matching their shape, one matching yours, with a conversion between &mdash; says more and stays readable.
+
+## The failure mode to expect
+
+If something about aliases is not working, check `by_alias=True` first.
+
+It accounts for most alias problems, it produces no error, and the symptom &mdash; an API that accepts one convention and returns another &mdash; looks like a configuration problem rather than a missing argument on a single call.
+
+The second thing to check is `populate_by_name`, which is what stops your own tests being able to construct the model using the names you wrote.
+
+## The convention decision
+
+Behind the mechanics is one decision worth making deliberately rather than per model.
+
+Does your API speak the wire's convention, or your language's? Both are defensible. Consistency is what matters, because a mixed API is worse than either choice made badly.
+
+If your consumers are browsers and JavaScript clients, camelCase on the wire is what they expect, and an `alias_generator` on a shared base gives it to every model at once with no per-field work.
+
+If your consumers are Python services, snake_case throughout is simpler and needs no aliases at all.
+
+What produces trouble is deciding case by case: some endpoints camelCase, some not, some models aliased and their nested models not. Every consumer then needs to know which is which, and no amount of documentation makes that pleasant.
+
+Make the choice once, express it in a base model, and let the exceptions be genuine exceptions rather than accidents.
+
+## One thing to remember
+
+If exactly one fact survives this module, make it `by_alias=True`.
+
+Aliases configured perfectly still do nothing on output until that argument is passed, the failure is silent, and the symptom looks like a configuration problem rather than a missing keyword on a single call. It is the first thing to check whenever aliases appear not to work.
+''',
+    [
+        {"q": "You set `alias=\"publishedAt\"`. Why does `Module(published_at=...)` now fail?",
+         "options": ["A bug", "By default the alias replaces the Python name as input", "Aliases are output-only", "It needs by_alias"],
+         "answer": 1,
+         "why": "The alias becomes the input name. `populate_by_name=True` restores the Python name as an accepted alternative, which is almost always what you want."},
+        {"q": "Your API accepts camelCase but returns snake_case. What is missing?",
+         "options": ["populate_by_name", "by_alias=True on the dump", "validation_alias", "An alias_generator"],
+         "answer": 1,
+         "why": "Aliases are not used for output unless requested. FastAPI does this for you on response models, which is why a manual dump elsewhere can behave differently."},
+        {"q": "What is `AliasChoices` for?",
+         "options": ["Choosing between models", "Accepting several input spellings, first one present wins", "Output formatting", "Nested paths"],
+         "answer": 1,
+         "why": "It is the clean way to run a rename: add the new name, keep the old, and clients migrate at their own pace with no branching in your code."},
+        {"q": "What does `AliasPath(\"author\", \"name\")` do?",
+         "options": ["Renames the field", "Pulls a value from a nested payload into a flat field", "Creates a nested model", "Sets a serialisation alias"],
+         "answer": 1,
+         "why": "Strings are keys and integers are indices, so a nested response flattens into your model. It is validation-only - there is no serialisation equivalent."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 22. Parsing JSON
+# ---------------------------------------------------------------------------
+topic(
+    "parsing_json",
+    "Parsing JSON",
+    "In and Out",
+    "Why model_validate_json beats json.loads plus model_validate - speed, error "
+    "quality and fidelity.",
+    _svg(_txt(38, 28, "json.loads", M, 8) + _arrow(66, 24, 82, 24) + _txt(112, 28, "dict", M, 8) +
+         _arrow(112, 34, 112, 46) + _txt(112, 60, "model", M, 8) +
+         _box(14, 66, 132, 18, S, A) + _txt(80, 79, "model_validate_json: one step", A, 8)),
+    [
+        ("One call instead of two",
+         "<code>model_validate_json</code> parses and validates together, inside the "
+         "Rust core, without building an intermediate dict.",
+         '''import json
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+payload = '{"title": "Vectors", "minutes": 8}'
+
+two_steps = Module.model_validate(json.loads(payload))
+one_step = Module.model_validate_json(payload)
+
+print("two steps:", two_steps)
+print("one step :", one_step)
+print("equal    :", two_steps == one_step)
+print()
+print("Same result. The second never materialises the dict.")'''),
+
+        ("Malformed JSON is one exception, not two",
+         "Going via <code>json.loads</code> means catching a "
+         "<code>JSONDecodeError</code> separately. The direct call folds it into "
+         "<code>ValidationError</code>.",
+         '''import json
+from pydantic import BaseModel, ValidationError
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+broken = '{"title": "Vectors", "minutes": 8'      # missing brace
+
+try:
+    Module.model_validate(json.loads(broken))
+except json.JSONDecodeError as e:
+    print("via loads :", type(e).__name__, "- a different exception type")
+
+try:
+    Module.model_validate_json(broken)
+except ValidationError as e:
+    err = e.errors()[0]
+    print("direct    :", err["type"])
+    print("            ", err["msg"])
+    print("position  :", err.get("ctx"))'''),
+
+        ("One handler for both failure kinds",
+         "Because syntax errors and validation errors arrive the same way, the code "
+         "that deals with a bad request has one shape.",
+         '''from pydantic import BaseModel, Field, ValidationError
+
+class Module(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0)
+
+def accept(raw: str):
+    try:
+        return Module.model_validate_json(raw), None
+    except ValidationError as e:
+        return None, [(".".join(str(p) for p in err["loc"]) or "_body", err["msg"])
+                      for err in e.errors()]
+
+for raw in ['{"title": "Vectors", "minutes": 8}',
+            '{"title": "Vectors", "minutes": 8',
+            '{"title": "no", "minutes": -1}']:
+    model, problems = accept(raw)
+    print(raw[:38])
+    print("   ->", model if model else problems)'''),
+
+        ("Decimals keep their exact text",
+         "The JSON parser sees the digits as written. Going through Python floats "
+         "loses that before validation ever runs.",
+         '''import json
+from decimal import Decimal
+from pydantic import BaseModel
+
+class Price(BaseModel):
+    amount: Decimal
+
+payload = '{"amount": 0.1}'
+
+via_python = Price.model_validate(json.loads(payload))
+direct = Price.model_validate_json(payload)
+
+print("via json.loads    :", via_python.amount)
+print("model_validate_json:", direct.amount)
+print()
+print("json.loads made a float first, and the float was already inexact.")
+print("The direct parser read the characters 0.1 and kept them.")'''),
+
+        ("Dumping and reloading",
+         "The other direction is symmetric, and a JSON round trip is exact for every "
+         "type Pydantic knows.",
+         '''from datetime import date
+from decimal import Decimal
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    published_on: date
+    price: Decimal
+
+m = Module(title="Vectors", published_on="2026-08-26", price="12.50")
+
+wire = m.model_dump_json()
+print("out :", wire)
+
+back = Module.model_validate_json(wire)
+print("in  :", back)
+print("equal:", back == m)
+print()
+print("date and Decimal both survived the trip intact.")'''),
+
+        ("Bare arrays and other shapes",
+         "<code>TypeAdapter</code> gives the same one-step parsing for anything that "
+         "is not a model.",
+         '''from typing import List, Dict
+from pydantic import BaseModel, TypeAdapter, ValidationError
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+lessons = TypeAdapter(List[Lesson])
+
+payload = '[{"name": "Direction", "minutes": "4"}, {"name": "Magnitude", "minutes": 6}]'
+parsed = lessons.validate_json(payload)
+print("parsed:", parsed)
+print("out   :", lessons.dump_json(parsed).decode())
+
+scores = TypeAdapter(Dict[str, float])
+print("dict  :", scores.validate_json('{"maths": "4.5", "python": 4}'))
+
+try:
+    lessons.validate_json('[{"name": "X", "minutes": "soon"}]')
+except ValidationError as e:
+    print("error :", e.errors()[0]["loc"], e.errors()[0]["type"])'''),
+    ],
+    [
+        "<code>model_validate_json</code> parses and validates in one pass inside the Rust core, without building an intermediate Python dict.",
+        "Malformed JSON becomes a <code>ValidationError</code> with type <code>json_invalid</code>, so syntax and validation failures share one handler.",
+        "The error context includes the position in the document, which matters for a large payload where “invalid JSON” alone is useless.",
+        "<code>Decimal</code> is more faithful this way: the parser reads the digits as written, where <code>json.loads</code> has already produced an inexact float.",
+        "<code>model_dump_json</code> is the matching direction, and a JSON round trip is exact for every type Pydantic knows.",
+        "<code>TypeAdapter(...).validate_json()</code> gives the same benefits for bare arrays, dicts and other non-model shapes.",
+    ],
+    '''
+title: Parsing JSON: One Step Instead of Two
+intro: Why model_validate_json beats json.loads plus model_validate on speed, errors and fidelity.
+
+## The habit worth changing
+
+Most people write this:
+
+```python
+data = json.loads(raw)
+model = Module.model_validate(data)
+```
+
+It works. The better form is:
+
+```python
+model = Module.model_validate_json(raw)
+```
+
+It is not merely shorter. It is faster, produces better errors, and is more faithful with numbers. Three separate reasons, and they compound.
+
+## Speed
+
+The two-step version parses JSON into Python objects &mdash; dicts, lists, strings, floats &mdash; and then validates those objects, converting again into what the model wants.
+
+Every intermediate object is allocated and thrown away. For a large payload that is a lot of garbage created for no purpose.
+
+`model_validate_json` parses and validates in a single pass inside `pydantic-core`, the Rust engine. It reads the JSON text and constructs the final values directly, skipping the intermediate representation entirely.
+
+The saving grows with payload size. For a small request body it is unimportant; for a large document, or a high-throughput endpoint, it is a real difference for a change that makes the code shorter.
+
+## Error quality
+
+This is the argument that matters most day to day.
+
+With `json.loads`, malformed JSON raises `json.JSONDecodeError` &mdash; a different exception, from a different library, that knows nothing about your model. Your handler needs two `except` clauses producing two shapes of error response, and the JSON one has no field information because there are no fields yet.
+
+`model_validate_json` folds it in. Malformed JSON becomes a `ValidationError` with the type `json_invalid`, arriving through exactly the same channel as a missing field or a failed constraint.
+
+That means one handler. The function that turns a `ValidationError` into a 422 response now covers syntax errors too, without a special case.
+
+The error also carries the **position** in the document. For a missing comma four hundred lines into a config file, being told the line and column is the difference between a fix and a search.
+
+## Fidelity with numbers
+
+The subtlest of the three, and the one that costs money.
+
+`json.loads` turns `0.1` into a Python float, because that is what JSON numbers are in Python. The float is already inexact at that moment. Handing it to a `Decimal` field faithfully preserves the wrong value.
+
+`model_validate_json` reads the characters. When the target is a `Decimal`, it can construct it from the exact text, so `0.1` in the document becomes `Decimal("0.1")` rather than the float's approximation.
+
+For anything financial, that is not a micro-optimisation &mdash; it is the difference between correct and quietly wrong. It also means the advice from the types module ("send money as a string") has a companion: even when a partner sends money as a JSON number, parsing directly recovers more of it than going via Python.
+
+## The other direction
+
+`model_dump_json()` is the matching call, and it is symmetric for the same reasons: it serialises from the model's data straight to text, without building an intermediate dict.
+
+A round trip is exact for every type Pydantic knows. A `date` becomes an ISO string and parses back to the same `date`. A `Decimal` becomes a string and returns as the same `Decimal`. A UUID survives. This makes JSON a reasonable format for caching validated objects, and makes equality assertions in tests trustworthy.
+
+## Bytes work too
+
+Both methods accept `bytes` as well as `str`, which is what an HTTP body actually is.
+
+That saves a decode step, and avoids a class of bug where the wrong encoding is assumed. If you are reading a request body or a file, pass the bytes straight in.
+
+## Non-model shapes
+
+Not every payload is an object. `TypeAdapter` provides the same one-step parsing for anything you can annotate:
+
+```python
+TypeAdapter(List[Lesson]).validate_json(payload)
+TypeAdapter(Dict[str, float]).validate_json(payload)
+```
+
+Same speed benefit, same error handling, same fidelity. And `dump_json` in the other direction, which returns `bytes`.
+
+Build the adapter once at module level. Constructing one compiles a schema, and doing that inside a loop is a real and easily-missed performance mistake.
+
+## When to keep the two steps
+
+There are legitimate reasons to parse separately.
+
+**You need the raw structure first.** Inspecting a `type` field to choose a model, logging the payload, or routing on something before validating. Though a discriminated union often removes the first of those.
+
+**The input is not JSON.** YAML, TOML and msgpack all produce Python objects, and `model_validate` is the right entry point for them.
+
+**You already have a dict** from a database driver, another library, or your own code. There is nothing to parse.
+
+The rule is simple: if you are holding JSON text or bytes, use `model_validate_json`. If you are holding Python objects, use `model_validate`. The mistake is converting text to objects yourself purely to hand them to a validator that would rather have had the text.
+
+## In practice with a framework
+
+FastAPI already does this for request bodies, so an endpoint annotated with a model gets the fast path without you asking.
+
+Where it matters in application code is everywhere else: reading a config file, consuming a queue message, calling another service and validating the response, loading a fixture in a test. Those are all places where the two-step habit is common and the one-step version is strictly better.
+
+## Strictness and JSON
+
+The strict-mode module noted that a strict model validating from JSON still accepts the string forms JSON has no alternative to &mdash; a date as text, for instance.
+
+That behaviour depends on Pydantic knowing the input was JSON, which it only does when you use `model_validate_json`. Parse with `json.loads` first and that context is gone: the model sees a Python string where a `date` was wanted, and in strict mode refuses it.
+
+So the two-step form is not merely slower, it can be *stricter in the wrong way*. Another reason to hand the text straight over.
+
+## Large payloads
+
+For very large documents, two things are worth knowing.
+
+Parsing is a single pass and memory-bounded by the result rather than by intermediate objects, so `model_validate_json` uses meaningfully less memory than the two-step form on a big document.
+
+There is no streaming. The whole document is parsed before validation completes, so a hundred-megabyte file is a hundred megabytes in memory. If that matters, the answer is at a different level &mdash; a streaming JSON reader producing records, each validated individually or in batches with a `TypeAdapter`.
+
+## Reading from a file
+
+The natural spelling reads bytes and hands them straight over:
+
+```python
+config = Settings.model_validate_json(Path("config.json").read_bytes())
+```
+
+No decode step, no `json.load`, and a malformed file produces a `ValidationError` naming the position rather than a `JSONDecodeError` from elsewhere.
+
+For a config file that is a genuinely nice pattern: one call, one exception type, and errors that say which key was wrong and where in the file it was.
+
+## Other formats
+
+Only JSON gets the fast path, because only JSON has a parser inside the core.
+
+YAML, TOML and msgpack all go through their own libraries, which produce Python objects, which then go to `model_validate`. That is the correct shape for those formats and there is nothing to optimise &mdash; but it does mean a YAML config gets none of the fidelity benefit for decimals, and a syntax error arrives as that library's exception.
+
+If exactness matters in a YAML config, quoting the number so it arrives as a string is the pragmatic fix.
+
+## What to take away
+
+The habit is small: when you are holding JSON text or bytes, hand it to Pydantic rather than to `json.loads`.
+
+It is faster, because it skips an entire intermediate representation. It produces better errors, because syntax and validation failures arrive through one channel with positions attached. It is more faithful, because decimals keep the digits as written. And it is shorter to write.
+
+Very few changes improve four things at once for one fewer line of code.
+
+## Summary
+
+`model_validate_json` for JSON text or bytes; `model_validate` for Python objects you already have. One pass in Rust instead of two with garbage in between.
+
+Malformed JSON becomes a `ValidationError` with `json_invalid` and a position, so one handler covers everything. Decimals survive. Strict mode behaves correctly, because the parser knows the input was JSON. And `TypeAdapter` gives all of it to shapes that are not models.
+
+## Summary
+
+`model_validate_json` for JSON text or bytes; `model_validate` for Python objects. One pass in Rust rather than two with garbage in between. Malformed JSON becomes a `ValidationError` with a position, so one handler covers syntax and validation alike. And decimals keep the precision that a trip through Python floats would have destroyed.
+
+`model_dump_json` on the way out, `TypeAdapter` for shapes that are not models, and build adapters once rather than per call.
+
+## Where this fits
+
+This is a small change with an unusually good ratio, and it applies in more places than request handling.
+
+Reading a config file. Consuming a queue message. Validating another service's response. Loading a test fixture. Anywhere JSON text or bytes are in hand and a model is about to be built from them.
+
+In each of those the two-step habit is common, and in each of them the one-step form is faster, produces better errors and keeps more precision. It is worth grepping for `json.loads` once and seeing how many of them are immediately followed by a validation call.
+
+
+## Mistakes people make
+
+**Parsing first out of habit.** `json.loads` followed immediately by `model_validate` is the shape to grep for. Every instance of it is slower, produces worse errors and loses decimal precision compared with handing the text over directly.
+
+**Catching two exception types.** Code with an `except JSONDecodeError` beside an `except ValidationError` is code that parsed separately. Validating the text directly collapses both into one channel and one handler.
+
+**Decoding bytes unnecessarily.** An HTTP body is bytes and both methods accept bytes. Decoding to `str` first adds a step and a chance to assume the wrong encoding.
+
+**Expecting streaming.** There is none. The whole document is parsed before validation completes, so a very large file is entirely in memory. Streaming needs a different tool producing records, each validated individually or in batches.
+
+**Assuming the fast path applies to YAML or TOML.** Only JSON has a parser inside the core. Other formats go through their own libraries and produce Python objects, which then take the ordinary route &mdash; including losing decimal exactness on the way.
+
+**Using it when you already have a dict.** There is nothing to parse. The rule is simply which you are holding: text or bytes go to `model_validate_json`, Python objects go to `model_validate`.
+
+## One line, four improvements
+
+Speed, because an entire intermediate representation is skipped. Errors, because syntax and validation failures arrive through one channel with positions attached. Fidelity, because decimals keep the digits as written. Strictness, because the parser knows the input was JSON and applies the right rules.
+
+All of it from handing Pydantic the text instead of parsing it first &mdash; which is also less code than the alternative.
+
+## Why the habit persists
+
+The two-step form is not the result of anyone deciding it was better. It is what you write when you learn `json` before you learn Pydantic, which is the order nearly everybody learns them in.
+
+`json.loads` is the obvious way to turn text into data, and once the data exists, validating it is the obvious next step. Both halves are reasonable and the combination is worse than either author intended.
+
+That is worth naming because it explains why the pattern is everywhere, including in a lot of documentation and answers online, and why changing it is a matter of noticing rather than of understanding.
+
+The check takes a minute: search a codebase for `json.loads` and look at the line after each one. Wherever it is a validation call, the two lines collapse into one that is faster, more precise about numbers, and produces errors that say where in the document the problem was.
+
+There is rarely a reason to keep the two-step version once seen &mdash; unless something genuinely needs the raw structure in between, which is a real case and a small one.
+''',
+    [
+        {"q": "What does `model_validate_json` do with malformed JSON?",
+         "options": ["Raises JSONDecodeError", "Raises ValidationError with type json_invalid, including a position", "Returns None", "Silently ignores it"],
+         "answer": 1,
+         "why": "Syntax failures arrive through the same channel as validation failures, so one handler covers both - and the context names where in the document the problem is."},
+        {"q": "Why is `model_validate_json` more faithful for a `Decimal` field?",
+         "options": ["It rounds better", "json.loads makes a float first, losing precision before validation runs", "Decimals are unsupported otherwise", "It is not"],
+         "answer": 1,
+         "why": "The direct parser reads the digits as written and can build the Decimal from exact text. Going via Python, the value is already an inexact float when Pydantic sees it."},
+        {"q": "You already have a dict from a database driver. Which method?",
+         "options": ["model_validate_json", "model_validate", "Either", "TypeAdapter"],
+         "answer": 1,
+         "why": "There is no JSON text to parse. The rule is: text or bytes go to `model_validate_json`, Python objects go to `model_validate`."},
+        {"q": "Where should a `TypeAdapter` be constructed?",
+         "options": ["Inside the function that uses it", "Once at module level", "Per request", "It does not matter"],
+         "answer": 1,
+         "why": "Constructing one compiles a schema. Doing that inside a loop or per call is a real performance mistake that is easy to miss."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 23. Custom serializers
+# ---------------------------------------------------------------------------
+topic(
+    "custom_serializers",
+    "Custom Serializers",
+    "In and Out",
+    "Changing what comes out without changing what goes in - per field, per model, "
+    "and only when the default is genuinely wrong.",
+    _svg(_box(18, 18, 124, 20, S, A) + _txt(80, 32, "Decimal('12.50')", A, 8) +
+         _arrow(80, 42, 80, 54) +
+         _box(18, 56, 124, 20, S) + _txt(80, 70, '"£12.50"', M, 8)),
+    [
+        ("A field serialiser",
+         "<code>@field_serializer</code> replaces the output for one field. The input "
+         "side is untouched.",
+         '''from decimal import Decimal
+from pydantic import BaseModel, field_serializer
+
+class Price(BaseModel):
+    amount: Decimal
+
+    @field_serializer("amount")
+    def show_money(self, value: Decimal) -> str:
+        return "£%.2f" % value
+
+p = Price(amount="12.5")
+
+print("on the object:", p.amount, "(a", type(p.amount).__name__ + ")")
+print("dumped       :", p.model_dump())
+print("as json      :", p.model_dump_json())'''),
+
+        ("Only the output changes",
+         "Validation still produces the real type, so arithmetic and comparisons keep "
+         "working. Serialisation is the last step, not a conversion.",
+         '''from decimal import Decimal
+from pydantic import BaseModel, field_serializer
+
+class Basket(BaseModel):
+    unit: Decimal
+    quantity: int
+
+    @field_serializer("unit")
+    def money(self, v: Decimal) -> str:
+        return "£%.2f" % v
+
+b = Basket(unit="4.25", quantity=3)
+
+print("still a Decimal:", b.unit * b.quantity)
+print("comparison     :", b.unit > Decimal("4"))
+print("but dumped     :", b.model_dump())'''),
+
+        ("Different output for JSON and Python",
+         "<code>when_used</code> restricts a serialiser to one mode, so internal dumps "
+         "keep the real object.",
+         '''from datetime import date
+from pydantic import BaseModel, field_serializer
+
+class Module(BaseModel):
+    title: str
+    published_on: date
+
+    @field_serializer("published_on", when_used="json")
+    def pretty(self, value: date) -> str:
+        return value.strftime("%d %B %Y")
+
+m = Module(title="Vectors", published_on="2026-08-26")
+
+print("mode=python:", m.model_dump())
+print("mode=json  :", m.model_dump(mode="json"))
+print("json string:", m.model_dump_json())
+print()
+print("The Python dump keeps a real date for code that needs one.")'''),
+
+        ("Serialising a whole model",
+         "<code>@model_serializer</code> replaces the entire output, which is how you "
+         "emit a shape that is not simply your fields.",
+         '''from pydantic import BaseModel, model_serializer
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    track: str
+
+    @model_serializer
+    def as_envelope(self) -> dict:
+        return {
+            "type": "module",
+            "id": self.title.lower().replace(" ", "-"),
+            "attributes": {"title": self.title,
+                           "minutes": self.minutes,
+                           "track": self.track},
+        }
+
+m = Module(title="Dot Product", minutes=11, track="maths")
+print(m.model_dump())
+print()
+print(m.model_dump_json(indent=2))'''),
+
+        ("Hiding a value instead of formatting it",
+         "A serialiser is one way to redact. <code>SecretStr</code> and "
+         "<code>Field(exclude=True)</code> are usually better, and the comparison is "
+         "worth seeing.",
+         '''from pydantic import BaseModel, Field, SecretStr, field_serializer
+
+class User(BaseModel):
+    name: str
+    email: str
+    token_a: str                       # redacted by a serialiser
+    token_b: SecretStr                 # hidden by its type
+    token_c: str = Field(exclude=True)  # never serialised at all
+
+    @field_serializer("token_a")
+    def mask(self, v: str) -> str:
+        return v[:4] + "…" + v[-2:]
+
+u = User(name="Ada", email="ada@vizlearn.in",
+         token_a="tok_live_abcdef", token_b="tok_live_ghijkl",
+         token_c="tok_live_mnopqr")
+
+print("repr :", u)
+print()
+print("dump :", u.model_dump())'''),
+
+        ("When the default was already right",
+         "Most custom serialisers are display formatting in the wrong layer. Compare "
+         "what a consumer can do with each.",
+         '''from datetime import date
+from pydantic import BaseModel, field_serializer
+
+class Pretty(BaseModel):
+    on: date
+
+    @field_serializer("on")
+    def fmt(self, v: date) -> str:
+        return v.strftime("%d %B %Y")
+
+class Plain(BaseModel):
+    on: date
+
+d = date(2026, 8, 26)
+print("pretty:", Pretty(on=d).model_dump_json())
+print("plain :", Plain(on=d).model_dump_json())
+print()
+print("A client can sort, filter and localise the second.")
+print("The first has to be parsed back, and only by an English reader.")'''),
+    ],
+    [
+        "<code>@field_serializer(\"x\")</code> replaces the output for one field. Validation and the in-memory type are unaffected.",
+        "The method takes <code>self</code> and the field's value, and returns whatever should appear in the output.",
+        "<code>when_used=\"json\"</code> limits a serialiser to JSON output, so <code>model_dump()</code> keeps the real Python object.",
+        "<code>@model_serializer</code> replaces the whole output, which is how you emit an envelope or a shape that is not just your fields.",
+        "A serialiser changes the output but <em>not</em> the schema, so the documented type and the actual output can silently disagree unless you set <code>return_type</code>.",
+        "For secrets prefer <code>SecretStr</code> or <code>Field(exclude=True)</code>; a masking serialiser still leaks the value into <code>repr</code> and logs.",
+    ],
+    '''
+title: Custom Serializers: Changing What Comes Out
+intro: Per-field and per-model output control, and the strong argument for not using it.
+
+## What they do
+
+Pydantic's defaults are good: dates become ISO strings, decimals become strings, enums become values, nested models become nested objects. For most fields there is nothing to decide.
+
+When the default is genuinely wrong, `@field_serializer` replaces the output for one field:
+
+```python
+@field_serializer("amount")
+def show_money(self, value: Decimal) -> str:
+    return "£%.2f" % value
+```
+
+The method takes `self` and the value, and returns whatever should appear.
+
+## Only the output changes
+
+This is the important property. A serialiser does not change validation, and does not change what the field holds.
+
+`p.amount` is still a `Decimal`. Arithmetic works, comparisons work, and every rule you attached still ran. The serialiser is the last step on the way out, not a conversion applied to the model.
+
+That separation is what makes the feature safe. You are not weakening the model to satisfy a consumer's format preference.
+
+## Two modes, two outputs
+
+`when_used` restricts a serialiser to one direction:
+
+`"always"` is the default. `"json"` applies only to `model_dump_json()` and `model_dump(mode="json")`. `"unless-none"` skips it for null values.
+
+The `"json"` case is the useful one. It lets `model_dump()` keep a real `date` for code inside your program while JSON output gets whatever format a consumer needs. Without it, a formatting serialiser makes the Python dump useless for anything that wanted the object.
+
+## Serialising the whole model
+
+`@model_serializer` replaces the entire output:
+
+```python
+@model_serializer
+def as_envelope(self) -> dict:
+    return {"type": "module", "attributes": {...}}
+```
+
+This is for shapes that are not simply your fields &mdash; a JSON:API envelope, a legacy format you must emit, a payload where the structure differs from your internal one.
+
+It is powerful and it is a big hammer. Every field is now your responsibility, so a field added to the model does not appear in the output until somebody remembers to add it to the serialiser. That divergence is exactly the drift models exist to prevent.
+
+A `mode="wrap"` variant receives a handler that produces the default output, letting you take that and adjust it rather than rebuilding it. That is much safer, because new fields still flow through:
+
+```python
+@model_serializer(mode="wrap")
+def add_meta(self, handler):
+    data = handler(self)
+    data["_type"] = "module"
+    return data
+```
+
+Prefer the wrap form whenever you are augmenting rather than replacing.
+
+## The schema problem
+
+Here is the sharp edge, and it is easy to miss.
+
+A serialiser changes the output. It does not change the schema. So a `Decimal` field serialised as `"£12.50"` still appears in the generated schema as a decimal, your API documentation says one thing, and the endpoint returns another.
+
+For a public API that is a real defect: generated clients will produce a type that does not match the data they receive.
+
+`return_type` fixes it:
+
+```python
+@field_serializer("amount", return_type=str)
+```
+
+Now the serialisation schema reports a string, and the documentation matches reality. Set it whenever the serialised type differs from the field type, which is most of the time.
+
+## Secrets: a serialiser is the weakest option
+
+Masking a token with a serialiser is a common idea and the worst of the three available.
+
+`@field_serializer` producing `tok_…ef` keeps the value out of dumps and leaves it in `repr`, in logs, in tracebacks, and in any code that reads the attribute.
+
+`SecretStr` hides it from `repr` and requires `.get_secret_value()`, which makes access deliberate and greppable.
+
+`Field(exclude=True)` keeps it out of every serialisation entirely.
+
+For anything genuinely secret, use the type and the exclusion. Reach for a serialiser only when you want a *partial* value in the output on purpose &mdash; showing the last four digits of a card, which is a product decision rather than a security one.
+
+## The argument against most custom serialisers
+
+Most custom serialisers are display formatting that has ended up in the wrong layer.
+
+`"26 August 2026"` is a formatting choice. It assumes English, a date order, and a reader rather than a program. A client receiving it cannot sort by it, cannot filter on it, cannot show it in another language, and has to parse it back to do anything useful.
+
+`"2026-08-26"` is data. Every client can sort it, compare it and format it however that client's user needs.
+
+The same argument applies to currency symbols, thousands separators, relative times ("3 days ago") and rounded numbers. All of them are decisions that belong where the audience is known, which is the presentation layer, not the data model.
+
+So the honest guidance: before writing a serialiser, ask whether the default was wrong or merely unfamiliar. If it is being changed for a human reader, that logic probably belongs closer to the human.
+
+## When they are genuinely right
+
+**Emitting a legacy format** you do not control and cannot change.
+
+**Redacting deliberately**, where a partial value is the intended product behaviour.
+
+**Wrapping in an envelope** required by a specification, best done with `mode="wrap"`.
+
+**Computing a representation** that is expensive to store but cheap to derive, where a computed field would be the alternative.
+
+**Interoperating with something specific** &mdash; a system that wants timestamps in milliseconds, or booleans as `"Y"`/`"N"`.
+
+Each of those is a real constraint from outside, rather than a preference from inside.
+
+## The info argument
+
+Both decorators accept an optional `info` parameter carrying `mode`, `context` and the exclusion settings in force.
+
+`mode` lets one serialiser behave differently for Python and JSON output without needing `when_used`.
+
+`context` is the interesting one. It is a dict passed to the dump call, which makes output dependent on something the model does not know:
+
+```python
+@field_serializer("salary")
+def maybe_hide(self, v, info):
+    if (info.context or {}).get("role") != "hr":
+        return None
+    return v
+```
+
+Used carefully that is a clean answer to field-level visibility rules. Used freely it produces an endpoint whose output cannot be predicted from the model, and separate output models per audience are easier to reason about and to document.
+
+## Serialising unusual types
+
+The other legitimate reason to write a serialiser is a field whose type Pydantic has no opinion about &mdash; a third-party object accepted via `arbitrary_types_allowed`.
+
+Such a field has no default serialisation, so a dump either fails or produces something unhelpful. A serialiser turning it into a dict or a string is not a formatting preference; it is the only way the model can be serialised at all.
+
+If you find yourself doing this for a type used in several models, the better shape is a custom type that knows how to serialise itself, so the knowledge lives with the type rather than being repeated in every model that holds one.
+
+## Testing what you emit
+
+Custom serialisation is worth testing directly, because it is the part of a model that no other test exercises.
+
+Validation tests construct models; they do not check what comes out. A serialiser can be broken for months while every validation test passes.
+
+The test is short &mdash; build a model, dump it, assert on the result &mdash; and it is the only thing standing between a formatting change and a silently altered API response.
+
+Assert on `model_dump()` and `model_dump_json()` separately when `when_used` is involved, since that is precisely the case where they differ.
+
+## The decision, restated
+
+Before writing one, three questions.
+
+**Is the default actually wrong, or just unfamiliar?** ISO dates and decimal strings look odd and are correct.
+
+**Is this for a machine or a person?** Machines want data. People want formatting, and that belongs where the person is.
+
+**Will the schema still be true?** If not, set `return_type`, or you are publishing a document that lies about your own output.
+
+Most proposed serialisers fail one of those, which is the reason this module argues against its own subject as much as for it.
+
+## Summary
+
+`@field_serializer` for one field, `@model_serializer` for the whole output, `mode="wrap"` when augmenting rather than replacing so new fields still flow through.
+
+`when_used="json"` keeps Python dumps useful. `return_type` keeps the schema honest. `info.context` makes output conditional when that is genuinely needed.
+
+For secrets prefer `SecretStr` and `Field(exclude=True)`. And reach for a serialiser when an external constraint demands a shape &mdash; not when a default merely looks unfamiliar.
+
+## Summary
+
+`@field_serializer` for one field, `@model_serializer` for the whole model, `mode="wrap"` when augmenting rather than replacing. `when_used="json"` to keep Python dumps useful. `return_type` so the schema does not lie.
+
+For secrets, prefer `SecretStr` and `Field(exclude=True)`.
+
+And apply the test before writing one: is the default actually wrong for a machine, or merely unformatted for a person? Only the first is a serialiser's job.
+
+## What to remember
+
+Serialisation is the last thing that happens and the first thing a consumer sees.
+
+Pydantic's defaults are chosen so that output is data: sortable, comparable, parseable, unambiguous across locales. Most reasons to override them turn out to be formatting for a human, and humans are downstream of the layer that knows who they are.
+
+Override when something outside genuinely demands a shape. Set `return_type` so the schema keeps telling the truth. And test what you emit, because no other test does.
+
+
+## Mistakes people make
+
+**Formatting for a person in a data layer.** Covered at length, and still the most common. A date rendered as "26 August 2026" cannot be sorted, filtered or localised by anyone receiving it.
+
+**Forgetting `return_type`.** The output changes, the schema does not, and your documentation quietly starts describing something the endpoint no longer returns. Generated clients then produce a type that does not match the data, and the failure surfaces in someone else's codebase.
+
+**Using a plain `@model_serializer` for a small addition.** Replacing the entire output to add one key means every field is now hand-maintained, and a field added to the model six months later never appears. `mode="wrap"` adds the key and lets everything else flow through untouched.
+
+**Masking a secret with a serialiser and stopping there.** The dump is clean and the value is still in `repr`, still in logs, still in tracebacks, still readable by any code holding the model. `SecretStr` and `Field(exclude=True)` address the parts a serialiser cannot.
+
+**Not testing the output.** Validation tests construct models; they never look at what comes out. A serialiser can be broken for months while the suite stays green, and the first person to notice is a consumer.
+
+**Depending on context that is not always passed.** A serialiser reading `info.context` needs a sensible default for every call that does not supply one, including the ones in tests and the ones a framework makes internally. `(info.context or {})` rather than `info.context[...]` is the difference between a graceful default and a `TypeError` during a response.
+
+## The test
+
+Is the default wrong for a machine, or merely unformatted for a person?
+
+Only the first is a serialiser's job. Everything else &mdash; currency symbols, readable dates, relative times, rounded numbers &mdash; is a decision about an audience, and belongs where the audience is known.
+
+Applying that one question honestly removes most proposed serialisers, and makes the remaining ones easy to justify.
+
+## A final framing
+
+It helps to think of serialisation as the boundary in the other direction.
+
+Validation is where you stop trusting the outside world and convert its text into your types. Serialisation is where you stop assuming your types and produce something the outside world can read.
+
+Both are conversions at an edge, and both work best when they convert to something *neutral*. Validation does not try to guess what a caller meant; it accepts unambiguous readings and refuses the rest. Serialisation should be symmetrical: emit data with a single unambiguous reading, and let the consumer decide how to present it.
+
+A custom serialiser that formats for a human breaks that symmetry. It takes a value with one meaning and produces one with a presentation baked in, which the next layer has to undo before it can do anything else.
+
+That is the underlying reason the advice in this module runs against its own subject. The feature is well designed and occasionally essential. It is just that most of the reasons people reach for it are reasons to do the work somewhere else.
+''',
+    [
+        {"q": "Does a `@field_serializer` change what the field holds in memory?",
+         "options": ["Yes", "No - only the output; validation and the stored type are unaffected", "Only in JSON mode", "It replaces the validator"],
+         "answer": 1,
+         "why": "It runs on the way out. The attribute is still the validated type, so arithmetic and comparisons keep working - which is what makes the feature safe."},
+        {"q": "A Decimal field is serialised as \"£12.50\". What does the schema say?",
+         "options": ["string", "Still a decimal, unless you set return_type", "It errors", "Nothing"],
+         "answer": 1,
+         "why": "Serialisers change output but not the schema, so docs and generated clients describe a type the endpoint no longer returns. `return_type` keeps them honest."},
+        {"q": "Why prefer `@model_serializer(mode=\"wrap\")` over the plain form?",
+         "options": ["It is faster", "The handler produces the default output, so newly added fields still flow through", "It is required", "It supports JSON only"],
+         "answer": 1,
+         "why": "The plain form makes every field your responsibility, so a field added later silently never appears. Wrapping augments the default rather than replacing it."},
+        {"q": "What is the argument against serialising a date as \"26 August 2026\"?",
+         "options": ["It is slower", "It is display formatting: a client cannot sort, filter or localise it", "Dates cannot be formatted", "It breaks validation"],
+         "answer": 1,
+         "why": "ISO output is data every client can work with. Formatting assumes a language and a reader, and belongs in the layer that knows who the audience is."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 24. JSON Schema
+# ---------------------------------------------------------------------------
+topic(
+    "json_schema",
+    "JSON Schema",
+    "In and Out",
+    "The document your model generates - and the reason FastAPI can document your "
+    "API without you writing any docs.",
+    _svg(_box(14, 20, 56, 24, S, A) + _txt(42, 36, "model", A, 8) +
+         _arrow(74, 32, 92, 32) +
+         _box(96, 20, 50, 24, S) + _txt(121, 36, "schema", M, 8) +
+         _arrow(121, 48, 121, 60) + _txt(80, 74, "docs / clients / forms", M, 8)),
+    [
+        ("What a model already knows",
+         "<code>model_json_schema()</code> turns the annotations into a JSON Schema "
+         "document. Nothing extra was written to produce it.",
+         '''import json
+from pydantic import BaseModel, Field
+
+class Module(BaseModel):
+    title: str = Field(min_length=3, description="Shown as the page heading.")
+    minutes: int = Field(default=10, gt=0, le=180)
+    published: bool = False
+
+print(json.dumps(Module.model_json_schema(), indent=2))'''),
+
+        ("Constraints become schema keywords",
+         "Every constraint has a standard equivalent, which is why a constraint is "
+         "worth more than an equivalent validator.",
+         '''import json
+from pydantic import BaseModel, Field, field_validator
+
+class ByConstraint(BaseModel):
+    minutes: int = Field(gt=0, le=180)
+    title: str = Field(min_length=3, max_length=60)
+
+class ByValidator(BaseModel):
+    minutes: int
+    title: str
+
+    @field_validator("minutes")
+    @classmethod
+    def positive(cls, v):
+        if not 0 < v <= 180:
+            raise ValueError("out of range")
+        return v
+
+for cls in (ByConstraint, ByValidator):
+    props = cls.model_json_schema()["properties"]
+    print(cls.__name__)
+    print("   minutes:", json.dumps(props["minutes"]))
+    print("   title  :", json.dumps(props["title"]))'''),
+
+        ("Nested models become $defs",
+         "A reused model appears once as a definition and is referenced, which is what "
+         "lets a generated client produce a named type.",
+         '''import json
+from typing import List
+from pydantic import BaseModel
+
+class Author(BaseModel):
+    name: str
+    email: str
+
+class Module(BaseModel):
+    title: str
+    author: Author
+    reviewers: List[Author]
+
+schema = Module.model_json_schema()
+print("properties:")
+for name, spec in schema["properties"].items():
+    print("   %-11s %s" % (name, json.dumps(spec)))
+print()
+print("$defs:", list(schema["$defs"]))
+print()
+print("Author is defined once and referenced twice.")'''),
+
+        ("Two modes: what it takes, what it gives",
+         "Computed fields appear only in the serialisation schema, because they are "
+         "output and never input.",
+         '''import json
+from pydantic import BaseModel, computed_field
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+    @computed_field(description="Reading time with a margin.")
+    @property
+    def estimated(self) -> int:
+        return round(self.minutes * 1.2)
+
+for mode in ("validation", "serialization"):
+    props = Module.model_json_schema(mode=mode)["properties"]
+    print("%-14s %s" % (mode, list(props)))
+
+print()
+print("An input model must not advertise a field callers cannot send.")'''),
+
+        ("Literals and enums become choices",
+         "This is the concrete payoff from the enums module: a client can render a "
+         "dropdown, and a pattern gives it nothing to work with.",
+         '''import json
+from enum import Enum
+from typing import Literal
+from pydantic import BaseModel, Field
+
+class Track(str, Enum):
+    MATHS = "maths"
+    PYTHON = "python"
+
+class M(BaseModel):
+    a: Literal["draft", "published"]
+    b: Track
+    c: str = Field(pattern=r"^(draft|published)$")
+
+schema = M.model_json_schema()
+for name, spec in schema["properties"].items():
+    print("%-3s %s" % (name, json.dumps(spec)))
+print()
+print("$defs:", json.dumps(schema.get("$defs", {})))'''),
+
+        ("Adding what the annotations cannot say",
+         "<code>json_schema_extra</code> attaches anything the schema supports but "
+         "Pydantic has no annotation for.",
+         '''import json
+from pydantic import BaseModel, ConfigDict, Field
+
+class Module(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"title": "Vectors", "minutes": 8}]})
+
+    title: str = Field(
+        min_length=3,
+        description="Shown as the page heading.",
+        examples=["Dot Product", "Eigenvalues"],
+        json_schema_extra={"x-editable": True},
+    )
+    minutes: int = Field(default=10, gt=0)
+
+print(json.dumps(Module.model_json_schema(), indent=2))'''),
+    ],
+    [
+        "<code>model_json_schema()</code> generates a standard JSON Schema document from the annotations, constraints and metadata you already wrote.",
+        "Constraints map to schema keywords: <code>gt</code> to <code>exclusiveMinimum</code>, <code>min_length</code> to <code>minLength</code>, <code>pattern</code> to <code>pattern</code>. A validator maps to nothing.",
+        "Nested models become entries in <code>$defs</code> and are referenced, so a reused model becomes a named type in a generated client.",
+        "<code>mode=\"validation\"</code> describes what the model accepts; <code>mode=\"serialization\"</code> describes what it emits, including computed fields.",
+        "<code>Literal</code> and <code>Enum</code> become <code>enum</code>, which documentation and form builders can render as a set of choices.",
+        "<code>description</code>, <code>examples</code> and <code>json_schema_extra</code> flow straight into the document &mdash; the cheapest API documentation available.",
+    ],
+    '''
+title: JSON Schema: The Document Your Model Already Wrote
+intro: What the generated schema contains, and why it is the reason Pydantic is everywhere.
+
+## The output you did not write
+
+`Module.model_json_schema()` returns a dictionary that is a valid JSON Schema document: types, required fields, defaults, constraints, descriptions, and definitions for nested models.
+
+You wrote none of it. It is derived entirely from the annotations, `Field` arguments and docstrings already in the class.
+
+This is quietly the reason Pydantic became a dependency of half the modern Python ecosystem. Validation is useful; a *machine-readable description of your data that cannot drift from the code* is what other tools can build on.
+
+## What reads it
+
+**FastAPI** turns these schemas into your OpenAPI document, which becomes the interactive docs at `/docs`. The descriptions you wrote on fields appear next to those fields. The examples pre-fill the request form. The constraints show as documented limits.
+
+**Client generators** turn OpenAPI into typed clients in TypeScript, Go, Java and the rest. The quality of that generated client is a direct function of the quality of your schema.
+
+**LLM tooling** uses schemas to constrain structured output: the schema tells the model what shape to answer in, and the same model then validates the answer.
+
+**Form builders and validators** on the other side of the wire read the same document, so a browser can enforce your `minLength` before a request is ever sent.
+
+One class definition feeds all of them.
+
+## Constraints versus validators, concretely
+
+This is the strongest practical argument in the whole track, and the schema is where you can see it.
+
+`Field(gt=0, le=180)` produces `"exclusiveMinimum": 0, "maximum": 180`. A generated client knows the range. The documentation states it. A form can enforce it.
+
+A `field_validator` that checks the same thing produces **nothing**. The schema says `"type": "integer"` and the rule is invisible to every consumer. It is still enforced &mdash; a bad value is still rejected &mdash; but the caller only finds out by being rejected.
+
+Same enforcement, completely different experience for whoever is calling you. That is why the guidance has been: express a rule as a constraint whenever a constraint can express it.
+
+The same holds for `Literal` against a `pattern`. A `Literal` becomes `"enum": ["draft", "published"]` and a client can render a dropdown. A pattern matching the same two values becomes a regular expression the client cannot do anything with.
+
+## Definitions and references
+
+A nested model appears once in `$defs` and is referenced with `$ref` wherever it is used.
+
+That matters for generated clients: a referenced definition typically becomes a named type in the target language. `Author` used in two fields becomes one `Author` type used twice, rather than two anonymous objects that happen to match.
+
+It also keeps the document small when a model is reused heavily, and it is why recursive models produce a schema at all &mdash; a self-reference is just a `$ref` back to the same definition.
+
+## The two modes
+
+`model_json_schema(mode="validation")` is the default and describes what the model **accepts**.
+
+`mode="serialization"` describes what it **emits**.
+
+They differ in real ways. Computed fields appear only in the serialisation schema, because they are output and can never be supplied. A field with `exclude=True` appears in validation and not serialisation. Serialisation aliases apply to one and validation aliases to the other.
+
+Frameworks pick the right one for you: FastAPI uses the validation schema for request bodies and the serialisation schema for response models. Knowing the distinction matters when you generate a schema yourself and wonder why a field is missing.
+
+## Metadata is the cheap win
+
+`description`, `title` and `examples` on a field change no behaviour and flow straight into the document.
+
+For anything with consumers beyond yourself, this is the highest-value writing you can do per character. A field called `weight` needs a description &mdash; of what, in what unit? A field called `title` does not.
+
+`examples` deserve particular attention because they populate the interactive documentation's request form. A developer trying your API for the first time gets a working request they can send, rather than an empty box. That difference shows up in how many of them succeed.
+
+`json_schema_extra` attaches anything else the schema format supports that Pydantic has no dedicated argument for &mdash; vendor extensions like `x-` keys, or keywords from a newer draft. It takes a dict, or a callable that receives and modifies the generated schema.
+
+## What does not translate
+
+Some things simply cannot be expressed in JSON Schema, and knowing which keeps expectations right.
+
+**Validator logic.** Arbitrary Python has no schema equivalent.
+
+**Cross-field rules.** A `model_validator` enforcing "end after start" has no representation. Document it in the model's docstring, which becomes the schema's description, so at least a human reading the docs learns about it.
+
+**Custom serialisation.** As the previous module covered, a serialiser changes output without changing the schema unless you set `return_type`.
+
+Where a rule cannot be expressed, the honest thing is to describe it in prose so the documentation is not silently incomplete.
+
+## A habit worth adopting
+
+Print the schema for a model you have just written. It takes one line, and it shows you what your consumers will actually see.
+
+Constraints you thought you had documented and did not. Fields with no description whose names are not self-explanatory. A `pattern` where a `Literal` would have produced a set of choices. A required field you meant to make optional.
+
+It is the fastest review available for an API model, and it uses information the model already contains.
+
+## Customising the whole document
+
+`model_config` accepts `json_schema_extra`, which can be a dict merged into the model's schema or a callable that receives and edits it:
+
+```python
+model_config = ConfigDict(
+    json_schema_extra={"examples": [{"title": "Vectors", "minutes": 8}]})
+```
+
+Model-level examples appear in documentation as complete sample payloads, which is more useful to a first-time caller than per-field examples: they can copy one and send it.
+
+For deeper control there is `GenerateJsonSchema`, a class you can subclass to change how schemas are produced across a whole application &mdash; renaming definitions, altering how optionals are represented, adding vendor extensions everywhere. It is the right tool for a house style applied to an entire API and considerable overkill for one model.
+
+## Docstrings become descriptions
+
+A model's docstring becomes the schema's `description`. That is worth knowing because it is free documentation for the rules that cannot be expressed structurally.
+
+A cross-field invariant &mdash; "ends_on must be after starts_on" &mdash; has no schema representation. Writing it in the docstring means a consumer reading the documentation learns about it, instead of discovering it through a 422.
+
+`use_attribute_docstrings=True` extends this to fields, taking the string literal beneath an attribute as its description. It keeps the documentation next to what it describes, which is where it stays accurate.
+
+## Reading the schema as a review
+
+The most practical use of this module is as a review tool. One line, and you see what your consumers see:
+
+```python
+print(json.dumps(Module.model_json_schema(), indent=2))
+```
+
+Things it reliably surfaces: fields whose name does not explain them and which have no description; a `pattern` where a `Literal` would have produced a set of choices; a rule you thought was documented that turns out to live in a validator; a field in `required` that you meant to default; a nested model inlined because it is used once, where a named definition would give clients a better type.
+
+None of that requires running the API. It is the highest-value five minutes available on a model that other people will consume.
+
+## Where schemas end up
+
+Worth knowing the chain, because it explains why the small things matter.
+
+Your model generates a schema. FastAPI collects those into an OpenAPI document. That document is read by the interactive docs, by client generators in several languages, by API gateways, by contract-testing tools, and increasingly by LLM tooling deciding what shape to produce.
+
+A description you write once is read by everybody in that chain. So is a missing one.
+
+## What to remember
+
+The schema is generated from what you already wrote, so its quality is a direct function of how specific your annotations are.
+
+Constraints appear; validators do not. `Literal` and `Enum` become choices; patterns become opaque. Nested models become named definitions and therefore named client types. Descriptions and examples cost nothing and are read by every tool downstream.
+
+The habit worth forming is simply printing it. Everything above becomes visible the moment you look at the document your model already produces.
+
+## Summary
+
+`model_json_schema()` generates a standard document from what you already wrote. Constraints become keywords; validators become nothing. Nested models become referenced definitions and therefore named types in generated clients. `Literal` and `Enum` become renderable choices.
+
+Two modes, for input and output. Metadata &mdash; descriptions and examples especially &mdash; is the cheapest documentation you will ever write, and it is read by tools you may never see.
+
+## The habit
+
+Print the schema for the next model you write.
+
+It takes one line and it is the only view of your model that matches what consumers get. Everything this module describes &mdash; a validator that documented nothing, a pattern that should have been a `Literal`, a field with no description, a required field you meant to default &mdash; becomes visible immediately.
+
+The schema was generated from work you had already done. Looking at it is the cheapest quality check available.
+
+
+## Mistakes people make
+
+**Expressing a rule as a validator when a constraint would do.** The rule is enforced and invisible. Documentation, generated clients and browser-side forms all remain unaware of it, so the caller only learns the limit by breaching it.
+
+**Using a `pattern` where a `Literal` belongs.** A regular expression matching four values becomes an opaque string in the schema. The enumeration becomes a set of choices a form can render as a dropdown and a client can turn into a union type.
+
+**Leaving fields undescribed.** `weight` needs a description &mdash; of what, in what unit. Names that are not self-explanatory and have no description produce documentation that technically exists and helps nobody.
+
+**Never looking at it.** The schema is one line away and it is the only view of your model that matches what consumers actually receive. Everything above becomes obvious the moment you print it.
+
+**Expecting cross-field rules to appear.** A `model_validator` has no schema representation at all. Where a rule cannot be expressed structurally, put it in the model's docstring so at least a human reading the documentation learns about it.
+
+**Forgetting the two modes.** Generating a validation schema and wondering why a computed field is missing, or a serialisation schema and wondering why an excluded field is absent, are both the same misunderstanding: one describes what goes in, the other what comes out.
+
+## Why this is the reason
+
+Validation is useful and other libraries do it.
+
+What made Pydantic a dependency of half the modern Python ecosystem is this: a machine-readable description of your data, generated from the code that enforces it, and therefore incapable of drifting from it.
+
+Documentation that cannot go stale. Clients generated from the truth. Forms enforcing the same rules as the server. All from annotations you were going to write anyway.
+
+## What good looks like
+
+A well-specified model produces a schema somebody could implement a client against without asking you a question.
+
+Every field has a type narrow enough to be useful &mdash; `Literal` rather than `str` where the set is closed, `date` rather than `str` where it is a date. Every constraint that exists in your head exists in the document. Every field whose name is not self-explanatory has a description. There is at least one complete example. Nested concepts are named models rather than inline objects, so the generated client has named types.
+
+A poorly-specified model produces a document that is technically valid and useless: everything is a string, nothing has bounds, no field is described, and the real rules live in validators the consumer cannot see.
+
+Both are generated automatically from code that validates identically. The difference is entirely in how specific the annotations were &mdash; which is the argument this whole track has been making, arriving finally at the place where it becomes visible to somebody other than you.
+''',
+    [
+        {"q": "What does a `field_validator` contribute to the generated schema?",
+         "options": ["The rule as a keyword", "Nothing - it is invisible to consumers", "A description", "An example"],
+         "answer": 1,
+         "why": "Arbitrary logic has no schema equivalent. The rule is still enforced, but documentation, generated clients and browser forms know nothing about it - which is why constraints are preferred where they can express the rule."},
+        {"q": "Where do computed fields appear?",
+         "options": ["The validation schema", "The serialization schema only", "Both", "Neither"],
+         "answer": 1,
+         "why": "They are output-only, so advertising them in an input schema would tell callers to send something that cannot be sent."},
+        {"q": "Why does a nested model appear in `$defs` rather than inline?",
+         "options": ["To save bytes only", "So it is referenced once and becomes a named type in generated clients", "It is a bug", "Because of recursion limits"],
+         "answer": 1,
+         "why": "A referenced definition becomes one named type used in several places, rather than several anonymous objects that happen to match. It is also what makes recursive models expressible."},
+        {"q": "What do `examples` on a field do?",
+         "options": ["Change validation", "Populate the interactive docs' request form with a working request", "Set the default", "Nothing"],
+         "answer": 1,
+         "why": "They change no behaviour and flow into the schema, where documentation tools use them to give a first-time caller something that works rather than an empty box."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 25. TypeAdapter
+# ---------------------------------------------------------------------------
+topic(
+    "type_adapter",
+    "TypeAdapter",
+    "In and Out",
+    "Validation, serialisation and schemas for things that are not models - the "
+    "piece most people meet late and wish they had met early.",
+    _svg(_box(14, 24, 52, 22, S) + _txt(40, 38, "List[int]", M, 8) +
+         _arrow(70, 35, 88, 35) +
+         _box(92, 24, 54, 22, S, A) + _txt(119, 38, "validated", A, 8) +
+         _txt(80, 66, "no model required", M, 8)),
+    [
+        ("The wrapper model you do not need",
+         "A bare list has no object around it. The usual workaround is a one-field "
+         "model; <code>TypeAdapter</code> is what that was working around.",
+         '''from typing import List
+from pydantic import BaseModel, TypeAdapter
+
+class Wrapper(BaseModel):        # a box built only to hold a list
+    items: List[int]
+
+print("workaround:", Wrapper(items=["1", "2", "3"]).items)
+
+numbers = TypeAdapter(List[int])
+print("direct    :", numbers.validate_python(["1", "2", "3"]))
+print("from json :", numbers.validate_json("[1, 2, 3]"))'''),
+
+        ("It works on anything you can annotate",
+         "Scalars, containers, unions, models, and combinations of them all go through "
+         "the same machinery.",
+         '''from typing import Dict, List, Optional, Union
+from pydantic import BaseModel, TypeAdapter
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+cases = [
+    (TypeAdapter(int), "42"),
+    (TypeAdapter(Optional[int]), None),
+    (TypeAdapter(List[str]), ("a", "b")),
+    (TypeAdapter(Dict[str, float]), {"maths": "4.5"}),
+    (TypeAdapter(Union[int, str]), "nine"),
+    (TypeAdapter(List[Lesson]), [{"name": "Direction", "minutes": "4"}]),
+]
+
+for adapter, value in cases:
+    print("%-24r -> %r" % (value, adapter.validate_python(value)))'''),
+
+        ("The same errors you already know",
+         "Paths, types and messages are identical to a model's, so one error handler "
+         "covers both.",
+         '''from typing import List
+from pydantic import BaseModel, TypeAdapter, ValidationError
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+lessons = TypeAdapter(List[Lesson])
+
+try:
+    lessons.validate_python([
+        {"name": "Direction", "minutes": 4},
+        {"name": "Magnitude", "minutes": "soon"},
+        {"minutes": 5},
+    ])
+except ValidationError as e:
+    print("problems:", e.error_count())
+    for err in e.errors():
+        print("  %-22s %-16s %s" % (".".join(str(p) for p in err["loc"]),
+                                    err["type"], err["msg"]))'''),
+
+        ("Serialising and schemas too",
+         "It is not only validation. An adapter dumps and generates a schema for the "
+         "same annotation.",
+         '''import json
+from typing import List
+from pydantic import BaseModel, TypeAdapter
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+lessons = TypeAdapter(List[Lesson])
+data = lessons.validate_python([{"name": "Direction", "minutes": 4}])
+
+print("dump      :", lessons.dump_python(data))
+print("dump_json :", lessons.dump_json(data).decode())
+print()
+print("schema    :", json.dumps(lessons.json_schema(), indent=1)[:260], "...")'''),
+
+        ("Build it once",
+         "Constructing an adapter compiles a schema. Doing that inside a loop is a "
+         "real and easily missed cost.",
+         '''import time
+from typing import List
+from pydantic import TypeAdapter
+
+rows = [[1, 2, 3] for _ in range(300)]
+
+t = time.perf_counter()
+for row in rows:
+    TypeAdapter(List[int]).validate_python(row)     # rebuilt every time
+inside = time.perf_counter() - t
+
+adapter = TypeAdapter(List[int])                    # built once
+t = time.perf_counter()
+for row in rows:
+    adapter.validate_python(row)
+outside = time.perf_counter() - t
+
+print("rebuilt each time : %.4f s" % inside)
+print("built once        : %.4f s" % outside)
+print("ratio             : %.1fx" % (inside / outside))
+print()
+print("Module level is where an adapter belongs.")'''),
+
+        ("Validating a whole list in one call",
+         "Letting the core do the looping beats a comprehension that crosses into "
+         "Python for every item.",
+         '''import time
+from typing import List
+from pydantic import BaseModel, TypeAdapter
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+rows = [{"name": "L%d" % i, "minutes": i % 30 + 1} for i in range(2000)]
+adapter = TypeAdapter(List[Lesson])
+
+t = time.perf_counter()
+one = [Lesson.model_validate(r) for r in rows]
+per_item = time.perf_counter() - t
+
+t = time.perf_counter()
+many = adapter.validate_python(rows)
+whole = time.perf_counter() - t
+
+print("per item  : %.4f s" % per_item)
+print("whole list: %.4f s" % whole)
+print("ratio     : %.1fx" % (per_item / whole))
+print("same result:", one == many)'''),
+    ],
+    [
+        "<code>TypeAdapter(T)</code> applies the whole machinery to any annotation &mdash; no model needed.",
+        "It has the same surface as a model: <code>validate_python</code>, <code>validate_json</code>, <code>dump_python</code>, <code>dump_json</code> and <code>json_schema</code>.",
+        "Errors are identical in shape to a model's, so one error handler covers both.",
+        "Build the adapter <strong>once</strong>, at module level. Constructing one compiles a schema, and doing it per call is a genuine cost.",
+        "Validating a whole list in one call lets the Rust core do the looping, which beats a comprehension calling <code>model_validate</code> per item.",
+        "It is the right tool for a bare JSON array, a config dict, a function argument, or anything else without a natural model around it.",
+    ],
+    '''
+title: TypeAdapter: Validation Without a Model
+intro: The same machinery applied to any annotation - and the fastest way to validate a large collection.
+
+## The thing people work around
+
+A model validates a model. But plenty of data is not shaped like one.
+
+An endpoint returns a bare JSON array. A config value is a `Dict[str, float]`. A function takes a `List[UUID]` and you would like to check it. A queue message is a single integer.
+
+The common workaround is a wrapper model:
+
+```python
+class LessonList(BaseModel):
+    items: List[Lesson]
+```
+
+A box built only so that something can be inside it, and every caller has to reach through `.items` to get at the actual data.
+
+`TypeAdapter` is what that was working around:
+
+```python
+lessons = TypeAdapter(List[Lesson])
+lessons.validate_python(rows)
+```
+
+## The same surface as a model
+
+An adapter has the methods you already know, applied to the annotation instead of to a class:
+
+`validate_python` and `validate_json` for input. `dump_python` and `dump_json` for output. `json_schema` for the schema.
+
+So everything from the previous modules applies. Coercion works the same way. Constraints inside `Annotated` are honoured. Errors have the same `loc`, `type`, `msg` and `input`, so the error handler you already wrote covers adapters without modification.
+
+That last point is worth emphasising: this is not a parallel API with its own conventions. It is the same machinery, addressed differently.
+
+## What you can pass it
+
+Anything you can write as an annotation.
+
+Scalars: `TypeAdapter(int)`. Containers: `List`, `Dict`, `Set`, `Tuple`. Optionals and unions, including discriminated ones. Models. Constrained types from `Annotated`. Any nesting of those.
+
+`TypeAdapter(Annotated[int, Field(gt=0)])` validates a bare positive integer, which is occasionally exactly what a function argument needs.
+
+## Build it once
+
+This is the mistake worth naming loudly, because it is invisible and common.
+
+Constructing a `TypeAdapter` **compiles a schema**. That is real work &mdash; the same work that happens once when a model class is defined.
+
+```python
+for row in rows:
+    TypeAdapter(List[int]).validate_python(row)     # recompiles every iteration
+```
+
+The adapter belongs at module level, built once and reused:
+
+```python
+NUMBERS = TypeAdapter(List[int])
+
+for row in rows:
+    NUMBERS.validate_python(row)
+```
+
+The difference is large and it does not look like a performance bug in review, which is exactly why it survives.
+
+## Validating a collection in one call
+
+The second performance point is the more valuable one, and it applies to models too.
+
+Two ways to validate a thousand rows:
+
+```python
+[Lesson.model_validate(r) for r in rows]              # per item
+TypeAdapter(List[Lesson]).validate_python(rows)       # whole list
+```
+
+Both produce the same result. The first crosses from Python into Rust and back a thousand times. The second makes one call, and the loop happens inside the compiled core.
+
+For bulk work &mdash; importing a file, processing a batch, validating a large response &mdash; that is the single most effective optimisation available in this library, and it is one line.
+
+This is also the answer to the concern raised back in the first tier about validation cost on large collections. The cost is real; the way to reduce it is to let the core do the looping rather than to skip validating.
+
+## Where it earns its place
+
+**Bare arrays.** An endpoint that accepts or returns a JSON list.
+
+**Configuration.** A `Dict[str, str]` from environment or a file, validated without inventing a settings model for three values.
+
+**Function arguments.** Checking an argument at a public function's edge without wrapping it.
+
+**Bulk validation.** The performance case above.
+
+**Dynamic types.** Because it takes a type at runtime, you can build one from a type computed at runtime &mdash; useful in generic code and in libraries.
+
+## Schemas without models
+
+`json_schema()` produces a schema document for the annotation, which is how a framework documents an endpoint whose body is a bare array.
+
+That is the piece that makes the wrapper model genuinely unnecessary. Previously you needed the model to get a schema; now the annotation is enough, and your API documentation describes an array as an array rather than as an object with an `items` field nobody sends.
+
+## When a model is still better
+
+`TypeAdapter` is not a replacement for models, and reaching for it everywhere would be a mistake.
+
+A model gives you a **name**. `Lesson` means something; `Dict[str, Any]` does not. Named types are how a codebase stays comprehensible.
+
+A model gives you a place for **validators, config and methods**. An adapter has no class body.
+
+A model gives you **attribute access**. `lesson.minutes` beats `data["minutes"]`, and your editor can help with the first.
+
+So: models for the domain concepts, adapters for the shapes around them. A `List[Lesson]` is an adapter wrapping a model, and that is the usual arrangement &mdash; the model names the thing, the adapter handles the collection.
+
+## A small caution
+
+An adapter validates and hands back plain Python objects. `TypeAdapter(Dict[str, float])` gives you a dict, not something with guarantees attached.
+
+Nothing stops later code putting a string in that dict. Validation happened at a moment; it is not a permanent property of the object, which is the same as everywhere else in Pydantic and worth remembering when the validated thing is a mutable builtin rather than a model with `frozen=True` available.
+
+## Adapters and constrained types
+
+Because an adapter takes any annotation, it takes constrained ones:
+
+```python
+Port = Annotated[int, Field(ge=1, le=65535)]
+PORTS = TypeAdapter(List[Port])
+
+PORTS.validate_python(["80", "443"])     # [80, 443]
+PORTS.validate_python([0])               # ValidationError
+```
+
+That is a compact way to validate a list of values against a domain rule with no model anywhere. Configuration lists, command-line arguments and query parameters are all natural fits.
+
+## Validating function arguments
+
+An adapter at a public function's edge gives you the same guarantees a model would, without wrapping the arguments in an object:
+
+```python
+IDS = TypeAdapter(List[UUID])
+
+def fetch(ids):
+    ids = IDS.validate_python(ids)
+    ...
+```
+
+Pydantic also ships `@validate_call`, which reads a function's own annotations and validates arguments automatically. That is usually the nicer spelling when a whole function should be checked; an adapter is better when only one argument needs it, or when the check is conditional.
+
+## The schema for a bare shape
+
+`json_schema()` is what makes the wrapper model genuinely unnecessary rather than merely inconvenient.
+
+Before adapters, an endpoint accepting a bare JSON array needed a model to produce a schema, and the resulting documentation described an object with an `items` field that no client ever sent. With an adapter the schema describes an array, because an array is what it is.
+
+FastAPI uses this internally, which is why annotating a request body as `List[Item]` produces correct documentation with no wrapper in sight.
+
+## Adapters are cheap to hold, not to build
+
+The distinction that matters for performance: an adapter is expensive to *construct* and cheap to *use*.
+
+Constructing compiles a schema. Using it runs compiled code. So the pattern is always the same &mdash; build at module level, use anywhere:
+
+```python
+LESSONS = TypeAdapter(List[Lesson])
+```
+
+Uppercase by convention, because it is a module-level constant, and putting it at the top makes it obvious it is built once.
+
+If a type is only known at runtime, cache the adapters in a dict keyed by type rather than rebuilding. `functools.lru_cache` on a small factory function is the usual shape.
+
+## A short list of uses
+
+A bare JSON array in or out. A configuration dict. A function argument at a public edge. Bulk validation of a large collection in one call. A shape whose type is computed at runtime. A schema for something that is not a model.
+
+Each of those has a wrapper-model workaround, and each is cleaner without one.
+
+## Summary
+
+`TypeAdapter` applies the whole machinery &mdash; validation, coercion, constraints, serialisation, schemas, errors &mdash; to any annotation, with the same behaviour and the same error shapes as a model.
+
+Build it once at module level. Prefer one call over a Python loop for collections. Use models where a thing deserves a name and a class body; use adapters for the shapes around them.
+
+It is the piece most people find late, and the one that removes the most awkward code when they do.
+
+## Summary
+
+`TypeAdapter` applies validation, serialisation and schema generation to any annotation, with the same methods, the same coercion and the same errors as a model.
+
+Build it once at module level, because constructing one compiles a schema. Use it to validate whole collections in a single call rather than looping in Python. And reach for it whenever the data has no natural model around it &mdash; which turns out to be far more often than the wrapper-model habit suggests.
+
+## Why it is worth learning early
+
+Most people discover `TypeAdapter` after writing several wrapper models, and then go back and delete them.
+
+The habit it replaces is small but pervasive: reaching for a class because validation seemed to require one. Once you know an annotation is enough, a whole category of awkward code stops being written &mdash; the box around the list, the `.items` every caller has to unwrap, the schema that describes an object where the data is an array.
+
+Models for things that deserve names. Adapters for the shapes around them. That division is most of the judgement this module is trying to pass on.
+
+
+## Mistakes people make
+
+**Constructing inside a loop.** The single most costly mistake here, and the one that looks fine in review. Building an adapter compiles a schema; doing it per iteration repeats that work every time. Module level, uppercase, once.
+
+**Looping in Python over a collection.** `[Model.model_validate(r) for r in rows]` crosses between Python and Rust once per row. `TypeAdapter(List[Model]).validate_python(rows)` makes one call and loops inside the compiled core. For bulk work it is the highest-value one-line change available.
+
+**Using an adapter where a model belongs.** A `Dict[str, Any]` passed around a codebase is a shape with no name, no methods, no attribute access and no place to put a rule. If the thing is a domain concept, it deserves a class.
+
+**Assuming validation persists.** An adapter hands back plain Python objects. A validated `Dict[str, float]` is an ordinary dict, and nothing stops later code putting a string in it. Validation happened at a moment; it is not a property the object carries afterwards.
+
+**Forgetting it can serialise and generate schemas.** People discover `validate_python` and stop. `dump_json` and `json_schema` are the other half, and the schema in particular is what makes the wrapper model genuinely unnecessary rather than merely inconvenient.
+
+**Rebuilding adapters for runtime types without caching.** When the type is computed, cache the adapters in a dict keyed by type, or wrap a small factory in `functools.lru_cache`.
+
+## The short version
+
+Any annotation, the whole machinery, no class required.
+
+Build it once at module level, because construction compiles a schema. Validate collections in one call rather than looping in Python. And use it wherever the data has no natural model around it &mdash; which is more often than the wrapper-model habit suggests.
+
+## A note on naming and discovery
+
+One reason `TypeAdapter` is found late is that it does not look like the thing people are searching for. Someone with a bare JSON array searches for how to validate a list, finds examples using models, and builds the wrapper. Nothing in that path mentions adapters.
+
+So it is worth stating the shape plainly: **if you can write it as a type annotation, you can validate it, serialise it, and generate a schema for it, without a class.**
+
+That covers a great deal. A list of models. A dictionary of settings. A single constrained integer. An optional union. Anything nested from those.
+
+The corollary is equally useful: if you are writing a class purely so that something can be validated, stop and check whether an annotation would do. The wrapper model is a real and widespread pattern, and almost every instance of it predates its author discovering this.
+
+Where a class still earns its place is where a class was always the right answer &mdash; a domain concept that deserves a name, somewhere to hang methods, attribute access instead of subscripting, a place for validators and config. Those are properties of a model, not of validation, and adapters were never competing for them.
+
+## Where it sits in the library
+
+It is easy to read this module as being about an optimisation or a convenience. It is really about a boundary in how Pydantic is organised.
+
+`BaseModel` is a way of *declaring* a shape and getting behaviour attached to it. `TypeAdapter` is a way of *using* the same machinery against a shape declared some other way.
+
+Everything the library does &mdash; coercion rules, constraints, error paths, JSON parsing, serialisation, schema generation &mdash; lives underneath both. A model is not a more capable validator; it is a class with that validator bound to it, plus a namespace for methods and configuration.
+
+Seeing it that way makes the choice obvious rather than a matter of taste. Ask whether you need the class. If the answer is yes &mdash; because the thing has a name, needs methods, wants attribute access &mdash; write a model. If the answer is no, an annotation and an adapter give you identical validation with nothing extra to maintain.
+''',
+    [
+        {"q": "Why is `TypeAdapter(List[Lesson])` better than a wrapper model with one list field?",
+         "options": ["It is the only way", "Same validation with no artificial object, and the schema describes an array rather than an object", "It is stricter", "No real difference"],
+         "answer": 1,
+         "why": "The wrapper exists only to hold the list, forces callers through `.items`, and makes the API document an object where the data is an array."},
+        {"q": "Where should a TypeAdapter be constructed?",
+         "options": ["Inside the loop", "Once at module level", "Per request", "It makes no difference"],
+         "answer": 1,
+         "why": "Constructing one compiles a schema. Rebuilding it per call is real repeated work and does not look like a performance bug in review."},
+        {"q": "Which validates a thousand rows faster?",
+         "options": ["A comprehension of model_validate", "TypeAdapter(List[Model]).validate_python(rows)", "They are identical", "Neither validates"],
+         "answer": 1,
+         "why": "One call lets the Rust core do the looping; the comprehension crosses between Python and Rust once per item. It is the most effective single-line optimisation here."},
+        {"q": "When is a model still the better choice than an adapter?",
+         "options": ["Never", "When the thing deserves a name, needs validators or config, or benefits from attribute access", "Only for JSON", "Only for nested data"],
+         "answer": 1,
+         "why": "Adapters have no class body and hand back plain objects. Models name domain concepts and give validators, config and methods somewhere to live."},
+    ],
+)

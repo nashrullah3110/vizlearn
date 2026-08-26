@@ -1,0 +1,200 @@
+title: model_validator: Rules That Span Fields
+intro: The checks a per-field validator structurally cannot make, and the two modes that make them.
+
+## Why a field validator is not enough
+
+A `field_validator` receives one value. That is the right shape for most rules, and it is structurally incapable of expressing a large and important class of them.
+
+An end date must be after a start date. A discount must not exceed the price. Either an email or a phone number must be present. A waitlist only makes sense when every seat is taken. None of these is a statement about a single field &mdash; each field is individually fine, and it is the combination that is wrong.
+
+`info.data` looks like a way round this, and it half is. It exposes fields validated *earlier*, which means the rule only works if the fields happen to be declared in the right order and silently stops working when somebody reorders the class for tidiness. That is not a foundation to build on.
+
+`model_validator` is the tool built for the job.
+
+## mode="after"
+
+The common case. It runs once, after every field has been validated and converted, and receives the finished model:
+
+```python
+@model_validator(mode="after")
+def ends_after_start(self):
+    if self.ends_on <= self.starts_on:
+        raise ValueError("ends_on must be after starts_on")
+    return self
+```
+
+Three mechanics. It takes `self`, not `cls`, and is not a classmethod &mdash; which is the opposite of `field_validator` and catches people out. It must **return `self`**, and forgetting is the same silent failure as forgetting to return from a field validator. And by the time it runs, the fields are real Python objects, so `self.ends_on` is a `date` and comparing it works.
+
+That last point is worth dwelling on. Because coercion has already happened, an after validator can compare, subtract and sort without any defensive conversion. The rule reads exactly like the sentence you would say out loud.
+
+## The empty location
+
+An error raised here has `loc: ()` &mdash; an empty tuple.
+
+That is correct: the failure belongs to the object, not to any single field. There is no one input to highlight, because the problem is the relationship between two of them.
+
+It is also the thing most likely to break error-handling code written before the first cross-field rule was added. Anything doing `err["loc"][0]` will raise `IndexError`, and it will do so the first time somebody adds a validator like this &mdash; long after the handler was written and tested.
+
+Handle it explicitly. Group under a key like `"_form"`, and give the interface somewhere to display an error that is not attached to an input. Every form library has a concept for this; the model just needs to feed it.
+
+## mode="before"
+
+A before validator receives the raw input for the entire model, before any field has been looked at. It is a classmethod, and it returns the data that will then be validated normally.
+
+Its main use is accepting a shape you did not design:
+
+```python
+@model_validator(mode="before")
+@classmethod
+def accept_old_shape(cls, data):
+    if isinstance(data, dict) and "name" in data:
+        data = dict(data)
+        data["title"] = data.pop("name")
+    return data
+```
+
+This is the translation layer for a legacy payload, a third-party API with different names, or a version of your own format you no longer want in the model. The model stays clean and describes the shape you want; the adapter sits in one visible place.
+
+Two rules, both the same as for field-level before validators. Guard with `isinstance`, because the input has not been checked and may not be a dict at all. And copy before mutating &mdash; `dict(data)` &mdash; because modifying the caller's dictionary in place is a surprise nobody enjoys debugging.
+
+Use `before` sparingly. It runs before everything, so any error it raises is reported without the field context that makes Pydantic errors useful, and complex logic there is hard to follow. For anything that is genuinely per-field, a field validator says more.
+
+## Setting values, not just checking
+
+An after validator can modify the model, which makes it a way to derive one field from others:
+
+```python
+@model_validator(mode="after")
+def fill_slug(self):
+    if self.slug is None:
+        object.__setattr__(self, "slug", self.title.lower().replace(" ", "-"))
+    return self
+```
+
+The `object.__setattr__` is needed on a frozen model and is harmless otherwise; on a mutable model a plain assignment works, though it will re-trigger validation if `validate_assignment` is on.
+
+Before reaching for this, ask whether the value is ever legitimately supplied by the caller. If it is &mdash; a slug that defaults from the title but can be overridden &mdash; this is right. If it never is, and is always derived, then it is not really an input at all and `computed_field` is the better tool. That is the next module.
+
+## Order, and short-circuiting
+
+Several model validators can coexist, and they run in definition order. The first to raise stops the rest.
+
+That has a practical consequence: put the cheap, foundational checks first. If `taken > seats` is nonsense, there is no value in also evaluating a rule about the waitlist that assumes those numbers make sense &mdash; and the second error would only confuse the caller.
+
+It also means model validators do not accumulate errors the way field validation does. Field errors all appear together; model-level errors appear one at a time. If you want a caller to see every cross-field problem at once, you have to collect them yourself in a single validator and raise one error describing all of them.
+
+## Keeping it pure
+
+The strongest advice in this module: a model validator should decide using only the data in front of it.
+
+The temptation is real. "Does this track exist?" is a validation question, and the answer is in a database. Putting the query in a validator makes it run on every construction, makes the model impossible to test without a database, turns a `ValidationError` into a possible timeout, and hides an I/O call somewhere nobody expects one.
+
+The rule that keeps this clean: models check *shape and internal consistency*; the service layer checks *facts about the world*. A date range being backwards is shape. A track existing is a fact. They are different concerns and they fail differently &mdash; one is a 422, the other is arguably a 404.
+
+## Choosing between the three tools
+
+**A constraint** when the rule is a bound, a length or a pattern on one field. It reaches the schema.
+
+**A field validator** when one field needs logic, or normalising.
+
+**A model validator** when the rule involves more than one field, or the shape of the whole payload.
+
+Working down that list rather than up produces models where most rules are visible in the annotations and only the genuinely complex ones are in code.
+
+## Collecting several problems at once
+
+Model validators stop at the first failure, which means a caller fixing cross-field errors discovers them one at a time &mdash; exactly the experience field validation avoids.
+
+If several rules should report together, collect them in one validator:
+
+```python
+@model_validator(mode="after")
+def check_all(self):
+    problems = []
+    if self.ends_on <= self.starts_on:
+        problems.append("ends_on must be after starts_on")
+    if self.seats < self.taken:
+        problems.append("seats cannot be fewer than taken")
+    if problems:
+        raise ValueError("; ".join(problems))
+    return self
+```
+
+It is less tidy than separate validators and it gives the caller everything in one response. Which matters depends on whether a human is fixing a form or a service is failing a request.
+
+## Validators and assignment
+
+With `validate_assignment=True`, after validators run again on every assignment.
+
+That is usually what you want &mdash; a cross-field invariant should hold after a change, not only at construction. It has two consequences worth knowing.
+
+An expensive validator now runs on every assignment, not once.
+
+And an intermediate state may be invalid. Setting `starts_on` to a date after the current `ends_on` raises, even though you were about to fix `ends_on` on the next line. There is no transaction; each assignment is validated alone.
+
+Where that bites, the functional approach is cleaner: build a new model with `model_copy(update={...})` giving both fields at once, or construct a fresh one. It is also a good argument for `frozen=True` on models with cross-field rules &mdash; if it cannot be mutated, it cannot pass through an invalid intermediate state.
+
+## Inheritance
+
+Model validators are inherited, so a base can carry an invariant that every subclass enforces.
+
+A subclass redefining a validator with the same name replaces it. Give it a different name to have both, and remember that the parent's runs first.
+
+This makes a base model a reasonable home for a rule shared across a family &mdash; "no model in this system may have an end before its start" &mdash; while each subclass adds its own.
+
+## What belongs where, once more
+
+The line worth holding, because it is the one people cross first.
+
+A model validator answers: **is this object internally consistent?** Dates in order, totals adding up, at least one contact method present. All answerable from the data in front of it.
+
+A service answers: **is this true of the world?** Does the track exist, is the name taken, does this user have permission. All requiring something the model cannot see.
+
+Keeping that line means models are testable with plain data, validation cannot make a network call, and a `ValidationError` always means the payload was malformed rather than that something external was unavailable. Those are three properties worth protecting.
+
+## Summary
+
+`model_validator(mode="after")` takes `self`, returns `self`, and sees every field already converted &mdash; the right place for any rule about relationships between fields. `mode="before"` is a classmethod taking raw input, for translating a payload shape.
+
+Model-level errors carry an empty `loc`, which your error handling needs to expect. Validators run in definition order and stop at the first failure. And keep them pure, so that validating a model never touches the world.
+
+## A short checklist
+
+Before writing one, three questions.
+
+**Does the rule involve more than one field?** If not, a field validator or a constraint is more specific and gives a better error location.
+
+**Can it be decided from the data alone?** If it needs a lookup, it belongs in the service layer, not here.
+
+**Should the caller see every failure at once?** If so, collect them in a single validator rather than writing several that stop at the first.
+
+## What this buys
+
+A model with cross-field rules is a model that cannot exist in a nonsensical state. A cohort whose end precedes its start is not merely flagged somewhere &mdash; it cannot be constructed.
+
+That is a strong guarantee, and it is what makes the rest of the codebase simpler. Every function receiving that model can stop checking, because the object could not have been built if the check would have failed. The rule exists once, at the boundary, instead of being re-asserted defensively wherever the data travels.
+
+
+## Mistakes people make
+
+**Using `info.data` in a field validator for a cross-field rule.** It only exposes fields declared earlier, so the rule works until somebody reorders the class for readability and then silently stops.
+
+**Forgetting to return `self`.** The same silent failure as everywhere else in this library.
+
+**Doing I/O.** A validator that queries a database makes the model untestable without one, turns a `ValidationError` into a possible timeout, and hides a network call somewhere nobody expects one.
+
+**Writing several validators when the caller needs every failure at once.** Model validators stop at the first raise, so a form with three cross-field problems reveals them one at a time. Collect them into one validator when they should be reported together.
+
+**Assuming `loc[0]` exists.** Model-level errors carry an empty `loc`. Error-handling code written before the first cross-field rule will raise `IndexError` the day one is added.
+
+**Mutating in an after validator on a model with `validate_assignment`.** The assignment re-triggers validation, which re-runs the validator. Use `object.__setattr__`, or set the value in a `before` validator instead.
+
+## Where the errors go
+
+One practical consequence of the empty `loc` deserves a final mention, because it shapes how the front end has to work.
+
+A field error can be rendered beside its input. A model error cannot &mdash; there is no single input it belongs to. Every form needs somewhere to display it: a banner above the fields, a summary at the top, a message near the submit button.
+
+If that place does not exist, cross-field errors are either invisible or attached arbitrarily to whichever field the code happened to pick. Both are worse than a plain sentence in an obvious place.
+
+It is a small piece of interface design that follows directly from a modelling decision, and it is easiest to get right by knowing it is coming.

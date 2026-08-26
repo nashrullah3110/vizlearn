@@ -11809,6 +11809,108 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "pydantic/aliases.html",
+  "title": "Aliases",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "You set `alias=\"publishedAt\"`. Why does `Module(published_at=...)` now fail?",
+    "o": [
+     "A bug",
+     "By default the alias replaces the Python name as input",
+     "Aliases are output-only",
+     "It needs by_alias"
+    ],
+    "a": 1,
+    "w": "The alias becomes the input name. `populate_by_name=True` restores the Python name as an accepted alternative, which is almost always what you want."
+   },
+   {
+    "t": "Your API accepts camelCase but returns snake_case. What is missing?",
+    "o": [
+     "populate_by_name",
+     "by_alias=True on the dump",
+     "validation_alias",
+     "An alias_generator"
+    ],
+    "a": 1,
+    "w": "Aliases are not used for output unless requested. FastAPI does this for you on response models, which is why a manual dump elsewhere can behave differently."
+   },
+   {
+    "t": "What is `AliasChoices` for?",
+    "o": [
+     "Choosing between models",
+     "Accepting several input spellings, first one present wins",
+     "Output formatting",
+     "Nested paths"
+    ],
+    "a": 1,
+    "w": "It is the clean way to run a rename: add the new name, keep the old, and clients migrate at their own pace with no branching in your code."
+   },
+   {
+    "t": "What does `AliasPath(\"author\", \"name\")` do?",
+    "o": [
+     "Renames the field",
+     "Pulls a value from a nested payload into a flat field",
+     "Creates a nested model",
+     "Sets a serialisation alias"
+    ],
+    "a": 1,
+    "w": "Strings are keys and integers are indices, so a nested response flattens into your model. It is validation-only - there is no serialisation equivalent."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/annotated_and_custom_types.html",
+  "title": "Annotated and Custom Types",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "What is `Annotated[str, Field(pattern=...)]`?",
+    "o": [
+     "A Pydantic-only construct",
+     "A real type you can name and reuse anywhere",
+     "A validator",
+     "A default value"
+    ],
+    "a": 1,
+    "w": "`Annotated` is standard typing. Bound to a name it becomes a reusable type, so a rule is defined once and every use site stays consistent."
+   },
+   {
+    "t": "In `Annotated[str, BeforeValidator(f), Field(pattern=p)]`, what runs first?",
+    "o": [
+     "The pattern",
+     "The before-validator, then coercion, then the pattern",
+     "They run in parallel",
+     "Undefined order"
+    ],
+    "a": 1,
+    "w": "Before-validators see raw input, then coercion happens, then constraints, then after-validators. Written the other way the pattern would reject values the normaliser was meant to fix."
+   },
+   {
+    "t": "Why is `Annotated[int, Field(gt=0)] = 10` preferable to `Field(default=10, gt=0)`?",
+    "o": [
+     "It is faster",
+     "It separates what the type is from what it defaults to, and the type can be named and reused",
+     "The second is invalid",
+     "No difference at all"
+    ],
+    "a": 1,
+    "w": "Behaviour is identical; the Annotated form keeps the constraint with the type and the default where defaults normally sit, and lets the constrained type be reused."
+   },
+   {
+    "t": "What does `SecretStr` protect against?",
+    "o": [
+     "Weak passwords",
+     "The value appearing in repr, logs and tracebacks",
+     "SQL injection",
+     "Short strings"
+    ],
+    "a": 1,
+    "w": "It hides the value in representations so a token cannot leak into a log by accident, and requires `.get_secret_value()` to read it - making every access deliberate."
+   }
+  ]
+ },
+ {
   "path": "pydantic/collections_of_models.html",
   "title": "Collections of Models",
   "cat": "Pydantic",
@@ -11856,6 +11958,108 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "One call into Rust validates the whole list. The comprehension does the same checks with one Python-to-Rust round trip per item."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/computed_fields.html",
+  "title": "Computed Fields",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "Why does a plain `@property` not appear in `model_dump()`?",
+    "o": [
+     "It is a bug",
+     "Properties are not fields; only `@computed_field` adds one to the output",
+     "It needs an annotation",
+     "It does appear"
+    ],
+    "a": 1,
+    "w": "A property is ordinary Python and Pydantic does not serialise it. `@computed_field` is the opt-in that makes a derived value part of the model's output."
+   },
+   {
+    "t": "What happens if you pass a computed field to the constructor?",
+    "o": [
+     "It overrides the calculation",
+     "It is ignored, or rejected with extra=forbid",
+     "It raises always",
+     "It is stored"
+    ],
+    "a": 1,
+    "w": "Computed fields are output-only. Allowing them as input would create a second source of truth for a value that is a function of the model."
+   },
+   {
+    "t": "A computed field divides by another field that can be zero. When does this fail?",
+    "o": [
+     "At validation, as a ValidationError",
+     "At serialisation, as a ZeroDivisionError",
+     "Never",
+     "At class definition"
+    ],
+    "a": 1,
+    "w": "The model validates fine - every field is the right type. The failure arrives at `model_dump()` and is not a ValidationError, so validation error handling does not catch it."
+   },
+   {
+    "t": "Which schema mode shows computed fields?",
+    "o": [
+     "validation",
+     "serialization",
+     "Both",
+     "Neither"
+    ],
+    "a": 1,
+    "w": "They describe what the model emits, never what it accepts, so they appear in `model_json_schema(mode=\"serialization\")` - which is what a FastAPI response model uses."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/custom_serializers.html",
+  "title": "Custom Serializers",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "Does a `@field_serializer` change what the field holds in memory?",
+    "o": [
+     "Yes",
+     "No - only the output; validation and the stored type are unaffected",
+     "Only in JSON mode",
+     "It replaces the validator"
+    ],
+    "a": 1,
+    "w": "It runs on the way out. The attribute is still the validated type, so arithmetic and comparisons keep working - which is what makes the feature safe."
+   },
+   {
+    "t": "A Decimal field is serialised as \"£12.50\". What does the schema say?",
+    "o": [
+     "string",
+     "Still a decimal, unless you set return_type",
+     "It errors",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "Serialisers change output but not the schema, so docs and generated clients describe a type the endpoint no longer returns. `return_type` keeps them honest."
+   },
+   {
+    "t": "Why prefer `@model_serializer(mode=\"wrap\")` over the plain form?",
+    "o": [
+     "It is faster",
+     "The handler produces the default output, so newly added fields still flow through",
+     "It is required",
+     "It supports JSON only"
+    ],
+    "a": 1,
+    "w": "The plain form makes every field your responsibility, so a field added later silently never appears. Wrapping augments the default rather than replacing it."
+   },
+   {
+    "t": "What is the argument against serialising a date as \"26 August 2026\"?",
+    "o": [
+     "It is slower",
+     "It is display formatting: a client cannot sort, filter or localise it",
+     "Dates cannot be formatted",
+     "It breaks validation"
+    ],
+    "a": 1,
+    "w": "ISO output is data every client can work with. Formatting assumes a language and a reader, and belongs in the layer that knows who the audience is."
    }
   ]
  },
@@ -12013,6 +12217,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "pydantic/json_schema.html",
+  "title": "JSON Schema",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "What does a `field_validator` contribute to the generated schema?",
+    "o": [
+     "The rule as a keyword",
+     "Nothing - it is invisible to consumers",
+     "A description",
+     "An example"
+    ],
+    "a": 1,
+    "w": "Arbitrary logic has no schema equivalent. The rule is still enforced, but documentation, generated clients and browser forms know nothing about it - which is why constraints are preferred where they can express the rule."
+   },
+   {
+    "t": "Where do computed fields appear?",
+    "o": [
+     "The validation schema",
+     "The serialization schema only",
+     "Both",
+     "Neither"
+    ],
+    "a": 1,
+    "w": "They are output-only, so advertising them in an input schema would tell callers to send something that cannot be sent."
+   },
+   {
+    "t": "Why does a nested model appear in `$defs` rather than inline?",
+    "o": [
+     "To save bytes only",
+     "So it is referenced once and becomes a named type in generated clients",
+     "It is a bug",
+     "Because of recursion limits"
+    ],
+    "a": 1,
+    "w": "A referenced definition becomes one named type used in several places, rather than several anonymous objects that happen to match. It is also what makes recursive models expressible."
+   },
+   {
+    "t": "What do `examples` on a field do?",
+    "o": [
+     "Change validation",
+     "Populate the interactive docs' request form with a working request",
+     "Set the default",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "They change no behaviour and flow into the schema, where documentation tools use them to give a first-time caller something that works rather than an empty box."
+   }
+  ]
+ },
+ {
   "path": "pydantic/nested_models.html",
   "title": "Nested Models",
   "cat": "Pydantic",
@@ -12060,6 +12315,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "`include` and `exclude` accept nested dicts to reach inside. For anything more structural than a field or two, a separate output model reads better and appears correctly in the schema."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/parsing_json.html",
+  "title": "Parsing JSON",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "What does `model_validate_json` do with malformed JSON?",
+    "o": [
+     "Raises JSONDecodeError",
+     "Raises ValidationError with type json_invalid, including a position",
+     "Returns None",
+     "Silently ignores it"
+    ],
+    "a": 1,
+    "w": "Syntax failures arrive through the same channel as validation failures, so one handler covers both - and the context names where in the document the problem is."
+   },
+   {
+    "t": "Why is `model_validate_json` more faithful for a `Decimal` field?",
+    "o": [
+     "It rounds better",
+     "json.loads makes a float first, losing precision before validation runs",
+     "Decimals are unsupported otherwise",
+     "It is not"
+    ],
+    "a": 1,
+    "w": "The direct parser reads the digits as written and can build the Decimal from exact text. Going via Python, the value is already an inexact float when Pydantic sees it."
+   },
+   {
+    "t": "You already have a dict from a database driver. Which method?",
+    "o": [
+     "model_validate_json",
+     "model_validate",
+     "Either",
+     "TypeAdapter"
+    ],
+    "a": 1,
+    "w": "There is no JSON text to parse. The rule is: text or bytes go to `model_validate_json`, Python objects go to `model_validate`."
+   },
+   {
+    "t": "Where should a `TypeAdapter` be constructed?",
+    "o": [
+     "Inside the function that uses it",
+     "Once at module level",
+     "Per request",
+     "It does not matter"
+    ],
+    "a": 1,
+    "w": "Constructing one compiles a schema. Doing that inside a loop or per call is a real performance mistake that is easy to miss."
    }
   ]
  },
@@ -12268,6 +12574,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "pydantic/type_adapter.html",
+  "title": "TypeAdapter",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "Why is `TypeAdapter(List[Lesson])` better than a wrapper model with one list field?",
+    "o": [
+     "It is the only way",
+     "Same validation with no artificial object, and the schema describes an array rather than an object",
+     "It is stricter",
+     "No real difference"
+    ],
+    "a": 1,
+    "w": "The wrapper exists only to hold the list, forces callers through `.items`, and makes the API document an object where the data is an array."
+   },
+   {
+    "t": "Where should a TypeAdapter be constructed?",
+    "o": [
+     "Inside the loop",
+     "Once at module level",
+     "Per request",
+     "It makes no difference"
+    ],
+    "a": 1,
+    "w": "Constructing one compiles a schema. Rebuilding it per call is real repeated work and does not look like a performance bug in review."
+   },
+   {
+    "t": "Which validates a thousand rows faster?",
+    "o": [
+     "A comprehension of model_validate",
+     "TypeAdapter(List[Model]).validate_python(rows)",
+     "They are identical",
+     "Neither validates"
+    ],
+    "a": 1,
+    "w": "One call lets the Rust core do the looping; the comprehension crosses between Python and Rust once per item. It is the most effective single-line optimisation here."
+   },
+   {
+    "t": "When is a model still the better choice than an adapter?",
+    "o": [
+     "Never",
+     "When the thing deserves a name, needs validators or config, or benefits from attribute access",
+     "Only for JSON",
+     "Only for nested data"
+    ],
+    "a": 1,
+    "w": "Adapters have no class body and hand back plain objects. Models name domain concepts and give validators, config and methods somewhere to live."
+   }
+  ]
+ },
+ {
   "path": "pydantic/types_and_coercion.html",
   "title": "Types and Coercion",
   "cat": "Pydantic",
@@ -12370,6 +12727,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "pydantic/validator_modes.html",
+  "title": "Validator Modes",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "Your validator turns a CSV string into a list, but it never runs. Why?",
+    "o": [
+     "A Pydantic bug",
+     "It is in after mode, and a string already failed list coercion before it",
+     "It needs @classmethod",
+     "The field is optional"
+    ],
+    "a": 1,
+    "w": "After validators run at step 4, and coercion failed at step 2. Shape-fixing logic must be in before mode, where the raw value is still available."
+   },
+   {
+    "t": "What does a `plain` validator skip?",
+    "o": [
+     "Nothing",
+     "Coercion and constraints - it replaces validation entirely",
+     "Only constraints",
+     "Only coercion"
+    ],
+    "a": 1,
+    "w": "It takes over completely. Whatever it returns becomes the field unvalidated, so producing the right type and raising on bad input are both your responsibility."
+   },
+   {
+    "t": "What does a `wrap` validator receive besides the value?",
+    "o": [
+     "The model",
+     "A handler that performs the normal validation",
+     "The field name",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "Calling the handler runs standard validation, so a wrap validator can catch its failure and substitute a value, or add context and re-raise."
+   },
+   {
+    "t": "In `Annotated[str, BeforeValidator(to_slug), Field(pattern=p)]`, what is the order?",
+    "o": [
+     "Pattern, then normaliser",
+     "Normaliser, then coercion, then pattern",
+     "Both at once",
+     "Pattern only"
+    ],
+    "a": 1,
+    "w": "The pipeline is before, coerce, constrain, after. Written the other way the pattern would reject the messy input the normaliser existed to clean."
+   }
+  ]
+ },
+ {
   "path": "pydantic/what_is_pydantic.html",
   "title": "What Pydantic Is For",
   "cat": "Pydantic",
@@ -12468,6 +12876,210 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Both `Module(**data)` and `model_validate(data)` work, but `model_validate` states that validation is happening and survives keys that are not valid Python identifiers."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/field_validator.html",
+  "title": "field_validator",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "What happens if a validator checks a value but forgets to return it?",
+    "o": [
+     "The original value is kept",
+     "The field becomes None",
+     "It raises",
+     "Validation is skipped"
+    ],
+    "a": 1,
+    "w": "Whatever the validator returns becomes the field, and a function with no return returns None. This fails silently, which is what makes it the most costly mistake with this API."
+   },
+   {
+    "t": "Why must `@classmethod` sit below `@field_validator`?",
+    "o": [
+     "Style only",
+     "Decorators apply bottom-up, so field_validator needs a classmethod to register",
+     "It does not matter",
+     "classmethod is optional"
+    ],
+    "a": 1,
+    "w": "The inner decorator runs first. Reversed, field_validator receives a plain function and the resulting error does not obviously explain the cause."
+   },
+   {
+    "t": "When is `mode=\"before\"` the right choice?",
+    "o": [
+     "Always",
+     "When fixing the shape of raw input, such as a CSV string that should be a list",
+     "For performance",
+     "When raising errors"
+    ],
+    "a": 1,
+    "w": "In after mode the value has already been coerced, so a string where a list was expected has already failed. Before mode is the only place to repair the shape."
+   },
+   {
+    "t": "Why prefer `Field(gt=0)` over a validator that checks `v > 0`?",
+    "o": [
+     "It is faster",
+     "The constraint appears in the JSON Schema; the validator is invisible to docs and clients",
+     "Validators cannot raise",
+     "No difference"
+    ],
+    "a": 1,
+    "w": "Both reject the same values, but only the constraint reaches documentation, generated clients and form builders that read the schema."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/model_config.html",
+  "title": "model_config",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "What does a model do by default with a key it did not declare?",
+    "o": [
+     "Raises",
+     "Silently ignores it",
+     "Stores it",
+     "Warns"
+    ],
+    "a": 1,
+    "w": "The default is `extra=\"ignore\"`. A typo in a key produces no error and no field, so the bug appears later as a value that is inexplicably a default."
+   },
+   {
+    "t": "Is `m.minutes = \"not a number\"` validated by default?",
+    "o": [
+     "Yes",
+     "No - validation happens at construction only",
+     "Only for ints",
+     "It raises AttributeError"
+    ],
+    "a": 1,
+    "w": "Assignment is plain Python unless `validate_assignment=True` is set. Without it, a model's declared types can quietly stop being true."
+   },
+   {
+    "t": "What does `frozen=True` give you besides blocking assignment?",
+    "o": [
+     "Faster validation",
+     "Hashability, so the model can be a dict key or set member",
+     "Automatic caching",
+     "Stricter types"
+    ],
+    "a": 1,
+    "w": "Immutability makes the model hashable, which unlocks ordinary Python that mutable models cannot do - and `model_copy(update=...)` still produces modified versions."
+   },
+   {
+    "t": "What is the risk of `from_attributes=True` on an output model?",
+    "o": [
+     "None",
+     "It reads any matching attribute, so undeclared-but-named fields like password_hash can reach the response, and lazy relations get loaded",
+     "It is slow",
+     "It breaks nesting"
+    ],
+    "a": 1,
+    "w": "It faithfully reads whatever attribute matches a field name, and touching a lazy ORM relationship triggers queries. Output models should list only what may be seen."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/model_dump_and_model_dump_json.html",
+  "title": "model_dump and model_dump_json",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "Why does `json.dumps(m.model_dump())` raise TypeError on a date field?",
+    "o": [
+     "model_dump is broken",
+     "model_dump returns real Python objects, which json.dumps cannot encode",
+     "Dates are unsupported",
+     "It needs an argument"
+    ],
+    "a": 1,
+    "w": "`model_dump()` deliberately preserves Python types. Use `model_dump_json()`, or `model_dump(mode=\"json\")` when something else does the encoding."
+   },
+   {
+    "t": "A PATCH client sends `{\"summary\": null}` to clear a field. Which filter preserves that?",
+    "o": [
+     "exclude_none",
+     "exclude_unset",
+     "exclude_defaults",
+     "Any of them"
+    ],
+    "a": 1,
+    "w": "`exclude_unset` keeps fields that were supplied, including explicit nulls. `exclude_none` would drop it, silently discarding the instruction to clear the value."
+   },
+   {
+    "t": "What does `Field(exclude=True)` do?",
+    "o": [
+     "Rejects the field on input",
+     "Keeps it out of every serialisation while remaining on the object",
+     "Hides it from repr only",
+     "Makes it optional"
+    ],
+    "a": 1,
+    "w": "The value is still there and still accessible; it just never appears in a dump. `SecretStr` covers the different risk of the value appearing in logs and tracebacks."
+   },
+   {
+    "t": "Is `model_dump(exclude={\"minutes\"})` valid input to the same model?",
+    "o": [
+     "Always",
+     "Not if minutes is required - the field is now missing",
+     "Only in JSON mode",
+     "Yes, defaults fill it"
+    ],
+    "a": 1,
+    "w": "An unfiltered dump round-trips, but filtering removes fields the model requires. This matters when a filtered dump is stored and later read back."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/model_validator.html",
+  "title": "model_validator",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "What must an `after` model validator return?",
+    "o": [
+     "Nothing",
+     "self",
+     "A dict",
+     "True"
+    ],
+    "a": 1,
+    "w": "It receives the finished model and must return it. Forgetting is the same silent failure as forgetting to return from a field validator."
+   },
+   {
+    "t": "What is the `loc` of an error raised by a model validator?",
+    "o": [
+     "The first field",
+     "An empty tuple",
+     "The model name",
+     "It has none"
+    ],
+    "a": 1,
+    "w": "The failure belongs to the object rather than any one field. Handling code that does `loc[0]` will raise IndexError the first time such a rule is added."
+   },
+   {
+    "t": "Why not use `info.data` in a field validator for a cross-field rule?",
+    "o": [
+     "It is slower",
+     "It only exposes fields declared earlier, so reordering the class breaks the rule",
+     "It is deprecated",
+     "It cannot raise"
+    ],
+    "a": 1,
+    "w": "Fields validate in declaration order. A rule depending on that order is invisible to whoever later reorders the class for readability."
+   },
+   {
+    "t": "Where does 'does this track exist in the database?' belong?",
+    "o": [
+     "A model validator",
+     "A field validator",
+     "The service layer, not the model",
+     "A constraint"
+    ],
+    "a": 2,
+    "w": "Models check shape and internal consistency using only the data. A validator doing I/O makes the model untestable, turns validation into a network call, and hides a query where nobody expects one."
    }
   ]
  },

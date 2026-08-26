@@ -1,0 +1,198 @@
+title: model_dump and model_dump_json: Getting Data Back Out
+intro: Two methods, several filters, and the one mistake that raises TypeError.
+
+## Two methods, and the difference that matters
+
+`model_dump()` returns a dictionary of Python objects. A `date` field is a `date`. A `Decimal` is a `Decimal`. An enum member is the member.
+
+`model_dump_json()` returns a JSON string, converting everything to something JSON can carry.
+
+The rule of thumb: **dump for inside, dump_json for outside**. If the data is going to another function, a template, a test assertion, use `model_dump()`. If it is going into an HTTP response, a queue, or a file, use `model_dump_json()`.
+
+There is a third form worth knowing: `model_dump(mode="json")` gives you a dictionary whose values are already JSON-compatible. That is what you want when something else will do the encoding &mdash; a framework, a JSON logger, an SDK that takes a dict.
+
+In Pydantic v1 these were `.dict()` and `.json()`. They still exist in v2 and warn, and they are all over the internet.
+
+## The TypeError
+
+Everybody meets this once:
+
+```python
+json.dumps(m.model_dump())
+# TypeError: Object of type date is not JSON serializable
+```
+
+It is confusing because the model obviously supports JSON, and the error blames a `date`.
+
+The explanation is that `model_dump()` deliberately did not convert anything. It handed you real Python objects, and `json.dumps` does not know what to do with a `date`.
+
+Three correct forms: `model_dump_json()` if you want the string, `json.dumps(model_dump(mode="json"))` if something else must do the encoding, or `model_dump(mode="json")` alone if you need the dict.
+
+## Shaping the output
+
+`include` and `exclude` select fields. A set names top-level fields; a dict reaches into nested models. The two spellings do not mix in one literal, so once anything needs to reach inside, every entry becomes a key with `True`.
+
+For lists of models there is a special key, `"__all__"`, applying a selection to every item.
+
+Both are useful for removing one obviously-internal field. Beyond that, a separate output model reads better, appears correctly in the schema, and does not require anyone to trace an exclusion expression to work out what an endpoint returns.
+
+## The three exclusions that look similar
+
+These get confused constantly, and the difference is the whole point of the update module.
+
+`exclude_unset=True` omits fields the caller never supplied. Fields explicitly sent, *including explicit nulls*, are kept.
+
+`exclude_defaults=True` omits fields whose value equals their default, whether supplied or not.
+
+`exclude_none=True` omits every field that is `None`, however it got that way.
+
+For a PATCH endpoint, `exclude_unset` is the correct one and the other two are wrong.
+
+Consider a client sending `{"summary": null}` meaning "clear the summary". With `exclude_unset` the output is `{"summary": None}` &mdash; the instruction survives. With `exclude_none` the output is `{}` &mdash; the instruction is gone, and the summary stays as it was. That is a bug users report as "the clear button does not work", and it is one argument away.
+
+`exclude_defaults` has a narrower use: producing a minimal config file, or a payload where anything unspecified should fall back to the receiver's defaults.
+
+## Keeping secrets out
+
+Two mechanisms, for two different exposures.
+
+`Field(exclude=True)` keeps a field out of every serialisation. It is still on the object and still accessible; it simply never appears in a dump. This is right for a password hash, an internal id, or anything the model needs and consumers must not see.
+
+`SecretStr` addresses a different risk: the value appearing in a `repr`, a log line or a traceback. It displays as `**********` and requires `.get_secret_value()` to read, which makes every access deliberate and easy to grep for.
+
+They are complementary. A token that must neither be logged nor serialised wants both.
+
+The safest structure of all is a separate output model that simply does not have the field. You cannot leak what is not there, and no future refactor can accidentally remove a flag.
+
+## Round tripping
+
+A dump is valid input to the same model:
+
+```python
+Module.model_validate(m.model_dump()) == m
+```
+
+That is genuinely useful for copying, for caching, and for tests.
+
+It stops being true the moment you filter. `model_dump(exclude={"minutes"})` produces a dict missing a required field, and validating it raises. Worth remembering when a filtered dump is being stored and later read back &mdash; the filter that made the output tidy also made it un-reloadable.
+
+Round tripping through JSON works too, and is exact for the types Pydantic knows.
+
+## Nested behaviour
+
+Everything recurses. `model_dump()` on a model containing models returns nested plain dicts, and `model_dump_json()` produces nested JSON.
+
+One thing to check when a nested model is a *different* class than you expect: serialisation follows the field's declared type. If you assign a subclass instance to a field annotated with the parent, by default the extra fields are not serialised, because the model serialises according to what it promised rather than what it happens to hold.
+
+That behaviour is deliberate &mdash; it stops a subclass leaking fields through an API that documented the parent &mdash; and it surprises people who expected the subclass's data. `SerializeAsAny` opts out where you genuinely want the richer output.
+
+## Warnings
+
+Pydantic will warn when serialisation encounters something it did not expect &mdash; typically a field holding a value that does not match its annotation, which happens when `validate_assignment` is off and something assigned freely.
+
+Those warnings are worth listening to rather than silencing. They mean the object's real contents have diverged from what the model claims, and the serialised output may not be what the schema promises.
+
+## Rounding trips and warnings
+
+Pydantic emits a warning when serialisation meets a value that does not match its field's annotation. That happens when `validate_assignment` is off and something assigned freely, leaving the object's contents at odds with what the model claims.
+
+Those warnings are worth reading rather than filtering. They mean the serialised output may not match the schema you publish, which is a defect a consumer will find before you do.
+
+If you see them regularly, the fix is upstream: turn on `validate_assignment`, or freeze the model so the divergence cannot happen.
+
+## Subclasses and what gets emitted
+
+If a field is annotated with a parent model and holds a subclass instance, the extra fields are **not** serialised by default. The model emits what it promised, not what it happens to hold.
+
+That is deliberate, and it is a safety property: a subclass carrying internal fields cannot leak them through an endpoint documented as returning the parent.
+
+It also surprises people who expected the richer output. `SerializeAsAny[Parent]` opts out where you genuinely want whatever the object actually is &mdash; and where you have satisfied yourself that everything a subclass might carry is safe to expose.
+
+## Context
+
+Both dump methods accept a `context` dict, and serialisers can read it through their `info` argument.
+
+That is the supported way to make output depend on something external without a global &mdash; a locale, a viewer's permissions, a feature flag:
+
+```python
+m.model_dump(context={"role": "admin"})
+```
+
+Used sparingly it is the clean solution to "this field is only visible to some callers". Used heavily it produces output nobody can predict from the model alone, and separate output models are clearer.
+
+## Choosing between filtering and separate models
+
+The recurring question in this module: `exclude` or a second model?
+
+Use `exclude` for one or two obviously-internal fields, where the shapes are otherwise identical and the intent is plain at the call site.
+
+Use a separate model when the difference is structural, when the same difference is needed in more than one place, or when the output is part of a public contract. A model is checked, appears correctly in the schema, cannot be forgotten at a new call site, and is impossible to get wrong by mistyping a field name in a set.
+
+The exclusion set is the thing that quietly stops matching the model. A field renamed in the model and not in the exclusion set silently starts appearing in your public output, and nothing raises.
+
+## Performance
+
+Serialisation happens in Rust and is fast, but it is not free, and two habits cost more than people expect.
+
+Serialising more than you send. Building a full dump and then picking three keys out of it does the work for every field including nested trees. `include` does the same job without the waste.
+
+Serialising the same object repeatedly. Inside a loop that renders one object per row, hoisting the dump out is the obvious fix and easy to miss.
+
+Neither matters at small scale. Both are visible when a response contains thousands of models.
+
+## Summary
+
+Two methods and a mode: `model_dump()` for Python objects, `model_dump_json()` for text, `model_dump(mode="json")` for a JSON-safe dict.
+
+The classic error is `json.dumps(model_dump())`, and the classic bug is `exclude_none` where `exclude_unset` was meant. Secrets want `Field(exclude=True)` and `SecretStr`, and a separate output model when you want a guarantee rather than a setting.
+
+## Summary
+
+`model_dump()` for Python objects, `model_dump_json()` for text, `model_dump(mode="json")` for a JSON-safe dict.
+
+`json.dumps(model_dump())` is the classic mistake; the dict is full of real objects.
+
+`exclude_unset` for PATCH, and not `exclude_none`, which discards the difference between "not mentioned" and "please clear this".
+
+`Field(exclude=True)` and `SecretStr` for secrets, and a separate output model when you want the guarantee rather than the setting.
+
+## A last habit
+
+Look at what your model actually emits, once, before it goes anywhere public.
+
+One `print(m.model_dump_json(indent=2))` shows you the keys, the casing, the formats, and anything present that should not be. It is the same five-minute review as printing the schema, and it catches a different set of problems &mdash; a secret that was never excluded, a nested field nobody meant to expose, snake_case where the rest of the API is camelCase.
+
+The output of a model is a contract with everyone who consumes it. It is worth having read it.
+
+
+## Mistakes people make
+
+**`json.dumps(model_dump())`.** The classic. The dict holds real `date` and `Decimal` objects, and the standard encoder refuses them. The error blames a date and the cause is the wrong method.
+
+**`exclude_none` where `exclude_unset` was meant.** On an update endpoint this discards a caller's explicit instruction to clear a field. It presents as "the clear button does not work" and is one argument away from correct.
+
+**Filtering a dump that is later reloaded.** An unfiltered dump round-trips; a filtered one is missing required fields and will not validate. This bites when the tidy output is stored and read back later.
+
+**Trusting an exclusion set to stay correct.** Rename a field in the model, forget the exclusion set, and something internal silently begins appearing in your public output. Nothing raises. A separate output model cannot fail this way.
+
+**Serialising more than you need.** Building a full dump of a nested tree to pick three keys out of it does all the work for every field. `include` does the same job without it.
+
+**Ignoring serialisation warnings.** They mean an object's contents no longer match what the model claims, usually because something was assigned without `validate_assignment`. The published schema and the actual output have diverged, and a consumer will find it first.
+
+## The two mistakes
+
+If only two things survive from this module, make them these.
+
+`json.dumps(model_dump())` raises, because the dict is full of real Python objects. Use `model_dump_json()`, or `mode="json"` when something else does the encoding.
+
+`exclude_none` is not `exclude_unset`. The first throws away a caller's explicit instruction to clear a field; the second preserves it. On a PATCH endpoint that difference is a bug users report and nobody can reproduce.
+
+## Output as a contract
+
+The output of a model is a contract, whether or not anybody wrote it down.
+
+Somebody is parsing those keys. Something depends on that date format. A client somewhere assumes a field is present because it always has been. None of that is in a document; it is in the behaviour, and it becomes binding the moment anyone builds against it.
+
+That is why the choices in this module deserve more care than they usually get. Adding a computed field changes every response the model feeds. Renaming a field breaks parsers. Changing an exclusion set alters what leaves your system, silently and without any test failing.
+
+The practical habit is to treat a model that reaches the outside world as a published interface: know what it emits, be deliberate about changing it, and prefer a separate output model whenever the shape you send differs from the shape you hold. A dedicated class makes the contract explicit, checkable and hard to alter by accident &mdash; which is exactly what a contract should be.

@@ -3100,8 +3100,40 @@ window.VIZLEARN_MODULES = [
   "desc": "Paste any text and watch a word cloud size each term by how often it appears, exposing what a document is really about."
  },
  {
+  "title": "Aliases",
+  "path": "pydantic/aliases.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Annotated and Custom Types",
+  "path": "pydantic/annotated_and_custom_types.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Collections of Models",
   "path": "pydantic/collections_of_models.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Computed Fields",
+  "path": "pydantic/computed_fields.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Custom Serializers",
+  "path": "pydantic/custom_serializers.html",
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
@@ -3132,8 +3164,24 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "JSON Schema",
+  "path": "pydantic/json_schema.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Nested Models",
   "path": "pydantic/nested_models.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Parsing JSON",
+  "path": "pydantic/parsing_json.html",
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
@@ -3172,6 +3220,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "TypeAdapter",
+  "path": "pydantic/type_adapter.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Types and Coercion",
   "path": "pydantic/types_and_coercion.html",
   "category": "Pydantic",
@@ -3188,6 +3244,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Validator Modes",
+  "path": "pydantic/validator_modes.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "What Pydantic Is For",
   "path": "pydantic/what_is_pydantic.html",
   "category": "Pydantic",
@@ -3198,6 +3262,38 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Your First BaseModel",
   "path": "pydantic/your_first_basemodel.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "field_validator",
+  "path": "pydantic/field_validator.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "model_config",
+  "path": "pydantic/model_config.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "model_dump and model_dump_json",
+  "path": "pydantic/model_dump_and_model_dump_json.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "model_validator",
+  "path": "pydantic/model_validator.html",
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",

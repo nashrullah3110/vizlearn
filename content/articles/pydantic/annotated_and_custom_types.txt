@@ -1,0 +1,237 @@
+title: Annotated and Custom Types: Define the Rule Once
+intro: The habit that stops the same constraint being copied into six models.
+
+## The duplication problem
+
+You write a slug field with a pattern. Then another model needs a slug, so the pattern is copied. Then a third. Six months later the rule changes to permit hyphens, and four of the six get updated.
+
+This is the most ordinary form of drift there is, and it does not need a clever solution &mdash; it needs the rule to exist once.
+
+## Annotated is the mechanism
+
+`Annotated[T, ...]` is standard `typing`. It means "this is a `T`, with extra metadata attached", and static type checkers see straight through to the `T` while libraries can read the metadata.
+
+Pydantic reads it:
+
+```python
+Slug = Annotated[str, Field(pattern=r"^[a-z0-9_]+$")]
+Minutes = Annotated[int, Field(gt=0, le=180)]
+```
+
+`Slug` is now a type. Use it in any model:
+
+```python
+class Module(BaseModel):
+    slug: Slug
+    minutes: Minutes = 10
+```
+
+One definition, every use site consistent, and one place to change it.
+
+## It reads better, too
+
+Beyond reuse, there is a readability argument that applies even to a type used once.
+
+`slug: str = Field(pattern=r"^[a-z0-9_]+$")` tells the reader this is a string and then makes them parse a regular expression to learn anything more. `slug: Slug` tells them what the field *is*. If they need the details, the definition is one jump away and has a name attached.
+
+The default placement is better as well. Compare:
+
+```python
+minutes: int = Field(default=10, gt=0, le=180)
+minutes: Annotated[int, Field(gt=0, le=180)] = 10
+```
+
+Both behave identically. The second separates the two concerns &mdash; what kind of value this is, and what it defaults to &mdash; and reads as a sentence: a `Minutes`, defaulting to 10.
+
+## Putting logic in the type
+
+Constraints are not the only thing that can live in an `Annotated`. Validators can too, which means a rule needing actual code can still be part of a reusable type rather than a method bolted to one model.
+
+```python
+def must_be_known(v: str) -> str:
+    if v not in KNOWN_TRACKS:
+        raise ValueError("unknown track %r" % v)
+    return v
+
+Track = Annotated[str, AfterValidator(must_be_known)]
+```
+
+Every model with a `Track` field now enforces it. Without this, the same `@field_validator` gets copied into each model, which is the original problem with extra steps.
+
+`BeforeValidator` does the same at the other end of the pipeline, which makes it the tool for normalisation:
+
+```python
+Slug = Annotated[str, BeforeValidator(to_slug), Field(pattern=r"^[a-z0-9_]+$")]
+```
+
+That type cleans its input and then checks it. Any model using it gets both behaviours, and neither is written twice.
+
+There is also `WrapValidator`, which wraps the whole validation step and can catch and replace failures. It is the most powerful and least often needed; reach for it when you want to supply a fallback rather than propagate an error.
+
+## The order things run in
+
+With several pieces of metadata, the pipeline is worth knowing:
+
+A `BeforeValidator` runs first, on the raw input. Then coercion to the base type. Then constraints from `Field`. Then an `AfterValidator`, on the final value.
+
+So `Annotated[str, BeforeValidator(to_slug), Field(pattern=...)]` normalises `"  The Chain RULE "` into `the_chain_rule` and *then* checks it against the pattern. Written the other way round, the pattern would reject the original before anything cleaned it.
+
+Multiple validators of the same kind run in the order they appear.
+
+## What ships already
+
+Before building your own, check what exists. Pydantic includes a good set:
+
+`PositiveInt`, `NegativeInt`, `NonNegativeInt`, `NonPositiveInt`, and the `Float` equivalents.
+
+`StrictInt`, `StrictStr`, `StrictBool`, `StrictFloat` for per-field strictness.
+
+`AwareDatetime`, `NaiveDatetime`, `PastDate`, `FutureDate` for time.
+
+`Json` for a field that holds a JSON string and should be parsed and validated as structured data.
+
+`SecretStr` and `SecretBytes`, which are worth knowing: they hide their value in `repr` and logs, so a password or token cannot leak into a traceback by accident. The real value comes from `.get_secret_value()`, which makes every access deliberate and greppable.
+
+## Composing types
+
+Named types compose, which is where this starts paying compound interest:
+
+```python
+Minutes = Annotated[int, Field(gt=0, le=180)]
+Schedule = Dict[str, List[Minutes]]
+```
+
+Every integer in that nested structure is validated as a `Minutes`. The constraint applies at every depth, and the annotation stays readable.
+
+This is also how to keep deep annotations comprehensible. `Dict[str, List[Annotated[int, Field(gt=0, le=180)]]]` is technically the same thing and nobody can read it.
+
+## Where to put them
+
+A `types.py` module beside your models is the usual answer, and it turns out to be a genuinely useful file. Read it and you learn the vocabulary of the domain &mdash; what a slug is, what a duration may be, what an identifier looks like &mdash; without reading a single model.
+
+That is worth more than the deduplication. A named set of domain types is documentation that cannot go stale, because it is the code that runs.
+
+## When not to bother
+
+Do not name a type used once with no rule attached. `Title = Annotated[str, Field()]` is ceremony.
+
+Do not build a custom type where a `Literal` or `Enum` is the honest answer. A pattern matching four values is a worse enumeration than an enumeration.
+
+And do not go so far that a reader cannot tell what a field actually is. `slug: Slug` is clear. `slug: NormalisedConstrainedIdentifier` is a name that has stopped helping.
+
+## Types that carry documentation
+
+Metadata inside `Annotated` reaches the schema exactly as it would from a `Field`, which means a named type can carry its own description:
+
+```python
+Minutes = Annotated[
+    int,
+    Field(gt=0, le=180, description="Reading time in minutes."),
+]
+```
+
+Now every field of that type is documented identically, everywhere, with no repetition. For an API with a dozen models sharing a vocabulary, that consistency is visible in the generated documentation and would be impossible to maintain by hand.
+
+## Composing with unions and containers
+
+Named types combine with everything else:
+
+```python
+Slug = Annotated[str, Field(pattern=r"^[a-z0-9_]+$")]
+OptionalSlug = Optional[Slug]
+SlugList = Annotated[List[Slug], Field(min_length=1)]
+```
+
+The last one is worth reading twice: the outer `Field` constrains the *list*, and each item is still validated as a `Slug`. Constraints at two levels, one line, still legible.
+
+That legibility is the point. The equivalent written inline is a nested `Annotated` that nobody will want to modify.
+
+## Custom types with `__get_pydantic_core_schema__`
+
+For a type Pydantic knows nothing about &mdash; a third-party class, a domain object with its own parsing &mdash; there is a protocol to teach it:
+
+```python
+class Money:
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source, handler):
+        ...
+```
+
+This is the full escape hatch, and it is genuinely the right answer for a library wrapping its own types.
+
+For application code it is almost never necessary. `Annotated` with a `BeforeValidator` that constructs the object, plus `arbitrary_types_allowed` if needed, covers nearly every case with a fraction of the machinery. Reach for the protocol when you are writing a library others will use with Pydantic, not when you have one awkward field.
+
+## Where a named type goes wrong
+
+**Naming the type after the field.** `ModuleTitle` cannot be reused by `Lesson`, which defeats the purpose. Name it after what it is: `Title`, `Slug`, `Minutes`.
+
+**Too many layers.** A type built from three other named types is impressive and unreadable. If a reader has to follow three definitions to learn what a field accepts, the abstraction has stopped paying.
+
+**Hiding a `Literal`.** A custom type validating membership of four strings is worse than the enumeration it is imitating.
+
+**Naming something with no rule.** `Name = Annotated[str, Field()]` is ceremony with no content.
+
+## The file this produces
+
+A `types.py` in a mature project is one of its most useful documents. Ten or twenty lines defining what a slug is, what a duration may be, what an identifier looks like, what money means here.
+
+Read it and you have the domain's vocabulary before opening a single model. That is the real return &mdash; not saved keystrokes, but a single place where the shape of the domain is stated and cannot drift from the code that enforces it.
+
+## Summary
+
+`Annotated[T, Field(...)]` makes a constraint into a named, reusable type. `AfterValidator` and `BeforeValidator` put logic inside that type so rules needing code are reusable too. Metadata runs left to right: before-validators, coercion, constraints, after-validators.
+
+Use the types Pydantic already ships. Collect your own in one module. And reach for this the second time you write the same rule, not the sixth.
+
+## When to start
+
+The rule of thumb is the second occurrence. The first time you write a constraint, write it inline. The second time you need the same one, name it.
+
+That threshold is low on purpose. The cost of naming a type is one line and the cost of not naming it compounds quietly &mdash; six copies of a rule, four of which are updated when it changes, and nobody notices the other two until something invalid gets through.
+
+Naming early also improves the models immediately, before any reuse happens, because `slug: Slug` reads better than a regular expression embedded in a field declaration. The reuse is the payoff; the readability is the down payment.
+
+
+## Mistakes people make
+
+**Naming the type after the field it first appeared on.** `ModuleTitle` is a type no other model can reasonably use, which removes the only reason to have named it. `Title` can be used by `Lesson`, `Track` and everything else.
+
+**Building a type where a `Literal` is the honest answer.** A constrained string validating membership of four values produces a worse error, a worse schema and worse static checking than the enumeration it is imitating.
+
+**Stacking layers until nobody can read it.** A type composed from three other named types is impressive and opaque. If understanding a field means following three definitions, the abstraction has stopped paying for itself.
+
+**Reaching for `__get_pydantic_core_schema__` too early.** The full protocol exists for library authors teaching Pydantic about their own types. Application code almost always wants an `Annotated` with a `BeforeValidator` instead, at a fraction of the complexity.
+
+**Putting the metadata in the wrong order.** `Annotated[str, Field(pattern=p), BeforeValidator(f)]` still runs the normaliser first &mdash; before-validators always precede coercion &mdash; but reading it in that order misleads whoever maintains it next. Write the pipeline in the order it executes.
+
+**Naming a type with no rule in it.** `Annotated[str, Field()]` is ceremony. If there is nothing to say about the type beyond `str`, write `str`.
+
+## The return
+
+A named type is not primarily about saving keystrokes.
+
+It is about there being one place where the shape of a domain idea is stated, and about every model that uses it inheriting that statement rather than a copy of it.
+
+The reuse prevents drift. The name improves every model it appears in. And the file they live in becomes the closest thing a codebase has to a written description of its own vocabulary &mdash; one that cannot go stale, because it is the code doing the work.
+
+## How this changes a codebase
+
+The visible effect is smaller models. The real effect is that decisions stop being scattered.
+
+Before: six models each declare a slug, each with its own copy of a pattern, and the definition of a slug exists only as an emergent property of six places agreeing.
+
+After: one line says what a slug is, and six models refer to it. The definition exists, in one place, with a name.
+
+That shift matters most at the moments codebases usually go wrong &mdash; when a rule changes, when somebody new adds a seventh model, when a bug turns out to be one of the six copies having been updated and the others not.
+
+It also changes how the code reads to somebody arriving. Models built from named domain types describe the domain. Models built from `str` and `int` with regular expressions attached describe a serialisation format, and the domain has to be inferred.
+
+The mechanism is a single line of `typing`. The return is a codebase where the vocabulary is written down.
+
+## A last practical note
+
+Introduce named types gradually rather than in one refactor.
+
+The natural moment is when you next write a rule for the second time. Extract it then, use it in both places, and move on. Repeat that for a few weeks and a `types.py` accumulates on its own, containing exactly the rules that actually repeat &mdash; which is a better selection than any up-front attempt to guess them.
+
+The reverse approach, sitting down to define a full vocabulary before it is needed, tends to produce types nothing uses and abstractions that do not match how the domain turned out.

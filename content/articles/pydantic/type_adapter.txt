@@ -1,0 +1,238 @@
+title: TypeAdapter: Validation Without a Model
+intro: The same machinery applied to any annotation - and the fastest way to validate a large collection.
+
+## The thing people work around
+
+A model validates a model. But plenty of data is not shaped like one.
+
+An endpoint returns a bare JSON array. A config value is a `Dict[str, float]`. A function takes a `List[UUID]` and you would like to check it. A queue message is a single integer.
+
+The common workaround is a wrapper model:
+
+```python
+class LessonList(BaseModel):
+    items: List[Lesson]
+```
+
+A box built only so that something can be inside it, and every caller has to reach through `.items` to get at the actual data.
+
+`TypeAdapter` is what that was working around:
+
+```python
+lessons = TypeAdapter(List[Lesson])
+lessons.validate_python(rows)
+```
+
+## The same surface as a model
+
+An adapter has the methods you already know, applied to the annotation instead of to a class:
+
+`validate_python` and `validate_json` for input. `dump_python` and `dump_json` for output. `json_schema` for the schema.
+
+So everything from the previous modules applies. Coercion works the same way. Constraints inside `Annotated` are honoured. Errors have the same `loc`, `type`, `msg` and `input`, so the error handler you already wrote covers adapters without modification.
+
+That last point is worth emphasising: this is not a parallel API with its own conventions. It is the same machinery, addressed differently.
+
+## What you can pass it
+
+Anything you can write as an annotation.
+
+Scalars: `TypeAdapter(int)`. Containers: `List`, `Dict`, `Set`, `Tuple`. Optionals and unions, including discriminated ones. Models. Constrained types from `Annotated`. Any nesting of those.
+
+`TypeAdapter(Annotated[int, Field(gt=0)])` validates a bare positive integer, which is occasionally exactly what a function argument needs.
+
+## Build it once
+
+This is the mistake worth naming loudly, because it is invisible and common.
+
+Constructing a `TypeAdapter` **compiles a schema**. That is real work &mdash; the same work that happens once when a model class is defined.
+
+```python
+for row in rows:
+    TypeAdapter(List[int]).validate_python(row)     # recompiles every iteration
+```
+
+The adapter belongs at module level, built once and reused:
+
+```python
+NUMBERS = TypeAdapter(List[int])
+
+for row in rows:
+    NUMBERS.validate_python(row)
+```
+
+The difference is large and it does not look like a performance bug in review, which is exactly why it survives.
+
+## Validating a collection in one call
+
+The second performance point is the more valuable one, and it applies to models too.
+
+Two ways to validate a thousand rows:
+
+```python
+[Lesson.model_validate(r) for r in rows]              # per item
+TypeAdapter(List[Lesson]).validate_python(rows)       # whole list
+```
+
+Both produce the same result. The first crosses from Python into Rust and back a thousand times. The second makes one call, and the loop happens inside the compiled core.
+
+For bulk work &mdash; importing a file, processing a batch, validating a large response &mdash; that is the single most effective optimisation available in this library, and it is one line.
+
+This is also the answer to the concern raised back in the first tier about validation cost on large collections. The cost is real; the way to reduce it is to let the core do the looping rather than to skip validating.
+
+## Where it earns its place
+
+**Bare arrays.** An endpoint that accepts or returns a JSON list.
+
+**Configuration.** A `Dict[str, str]` from environment or a file, validated without inventing a settings model for three values.
+
+**Function arguments.** Checking an argument at a public function's edge without wrapping it.
+
+**Bulk validation.** The performance case above.
+
+**Dynamic types.** Because it takes a type at runtime, you can build one from a type computed at runtime &mdash; useful in generic code and in libraries.
+
+## Schemas without models
+
+`json_schema()` produces a schema document for the annotation, which is how a framework documents an endpoint whose body is a bare array.
+
+That is the piece that makes the wrapper model genuinely unnecessary. Previously you needed the model to get a schema; now the annotation is enough, and your API documentation describes an array as an array rather than as an object with an `items` field nobody sends.
+
+## When a model is still better
+
+`TypeAdapter` is not a replacement for models, and reaching for it everywhere would be a mistake.
+
+A model gives you a **name**. `Lesson` means something; `Dict[str, Any]` does not. Named types are how a codebase stays comprehensible.
+
+A model gives you a place for **validators, config and methods**. An adapter has no class body.
+
+A model gives you **attribute access**. `lesson.minutes` beats `data["minutes"]`, and your editor can help with the first.
+
+So: models for the domain concepts, adapters for the shapes around them. A `List[Lesson]` is an adapter wrapping a model, and that is the usual arrangement &mdash; the model names the thing, the adapter handles the collection.
+
+## A small caution
+
+An adapter validates and hands back plain Python objects. `TypeAdapter(Dict[str, float])` gives you a dict, not something with guarantees attached.
+
+Nothing stops later code putting a string in that dict. Validation happened at a moment; it is not a permanent property of the object, which is the same as everywhere else in Pydantic and worth remembering when the validated thing is a mutable builtin rather than a model with `frozen=True` available.
+
+## Adapters and constrained types
+
+Because an adapter takes any annotation, it takes constrained ones:
+
+```python
+Port = Annotated[int, Field(ge=1, le=65535)]
+PORTS = TypeAdapter(List[Port])
+
+PORTS.validate_python(["80", "443"])     # [80, 443]
+PORTS.validate_python([0])               # ValidationError
+```
+
+That is a compact way to validate a list of values against a domain rule with no model anywhere. Configuration lists, command-line arguments and query parameters are all natural fits.
+
+## Validating function arguments
+
+An adapter at a public function's edge gives you the same guarantees a model would, without wrapping the arguments in an object:
+
+```python
+IDS = TypeAdapter(List[UUID])
+
+def fetch(ids):
+    ids = IDS.validate_python(ids)
+    ...
+```
+
+Pydantic also ships `@validate_call`, which reads a function's own annotations and validates arguments automatically. That is usually the nicer spelling when a whole function should be checked; an adapter is better when only one argument needs it, or when the check is conditional.
+
+## The schema for a bare shape
+
+`json_schema()` is what makes the wrapper model genuinely unnecessary rather than merely inconvenient.
+
+Before adapters, an endpoint accepting a bare JSON array needed a model to produce a schema, and the resulting documentation described an object with an `items` field that no client ever sent. With an adapter the schema describes an array, because an array is what it is.
+
+FastAPI uses this internally, which is why annotating a request body as `List[Item]` produces correct documentation with no wrapper in sight.
+
+## Adapters are cheap to hold, not to build
+
+The distinction that matters for performance: an adapter is expensive to *construct* and cheap to *use*.
+
+Constructing compiles a schema. Using it runs compiled code. So the pattern is always the same &mdash; build at module level, use anywhere:
+
+```python
+LESSONS = TypeAdapter(List[Lesson])
+```
+
+Uppercase by convention, because it is a module-level constant, and putting it at the top makes it obvious it is built once.
+
+If a type is only known at runtime, cache the adapters in a dict keyed by type rather than rebuilding. `functools.lru_cache` on a small factory function is the usual shape.
+
+## A short list of uses
+
+A bare JSON array in or out. A configuration dict. A function argument at a public edge. Bulk validation of a large collection in one call. A shape whose type is computed at runtime. A schema for something that is not a model.
+
+Each of those has a wrapper-model workaround, and each is cleaner without one.
+
+## Summary
+
+`TypeAdapter` applies the whole machinery &mdash; validation, coercion, constraints, serialisation, schemas, errors &mdash; to any annotation, with the same behaviour and the same error shapes as a model.
+
+Build it once at module level. Prefer one call over a Python loop for collections. Use models where a thing deserves a name and a class body; use adapters for the shapes around them.
+
+It is the piece most people find late, and the one that removes the most awkward code when they do.
+
+## Summary
+
+`TypeAdapter` applies validation, serialisation and schema generation to any annotation, with the same methods, the same coercion and the same errors as a model.
+
+Build it once at module level, because constructing one compiles a schema. Use it to validate whole collections in a single call rather than looping in Python. And reach for it whenever the data has no natural model around it &mdash; which turns out to be far more often than the wrapper-model habit suggests.
+
+## Why it is worth learning early
+
+Most people discover `TypeAdapter` after writing several wrapper models, and then go back and delete them.
+
+The habit it replaces is small but pervasive: reaching for a class because validation seemed to require one. Once you know an annotation is enough, a whole category of awkward code stops being written &mdash; the box around the list, the `.items` every caller has to unwrap, the schema that describes an object where the data is an array.
+
+Models for things that deserve names. Adapters for the shapes around them. That division is most of the judgement this module is trying to pass on.
+
+
+## Mistakes people make
+
+**Constructing inside a loop.** The single most costly mistake here, and the one that looks fine in review. Building an adapter compiles a schema; doing it per iteration repeats that work every time. Module level, uppercase, once.
+
+**Looping in Python over a collection.** `[Model.model_validate(r) for r in rows]` crosses between Python and Rust once per row. `TypeAdapter(List[Model]).validate_python(rows)` makes one call and loops inside the compiled core. For bulk work it is the highest-value one-line change available.
+
+**Using an adapter where a model belongs.** A `Dict[str, Any]` passed around a codebase is a shape with no name, no methods, no attribute access and no place to put a rule. If the thing is a domain concept, it deserves a class.
+
+**Assuming validation persists.** An adapter hands back plain Python objects. A validated `Dict[str, float]` is an ordinary dict, and nothing stops later code putting a string in it. Validation happened at a moment; it is not a property the object carries afterwards.
+
+**Forgetting it can serialise and generate schemas.** People discover `validate_python` and stop. `dump_json` and `json_schema` are the other half, and the schema in particular is what makes the wrapper model genuinely unnecessary rather than merely inconvenient.
+
+**Rebuilding adapters for runtime types without caching.** When the type is computed, cache the adapters in a dict keyed by type, or wrap a small factory in `functools.lru_cache`.
+
+## The short version
+
+Any annotation, the whole machinery, no class required.
+
+Build it once at module level, because construction compiles a schema. Validate collections in one call rather than looping in Python. And use it wherever the data has no natural model around it &mdash; which is more often than the wrapper-model habit suggests.
+
+## A note on naming and discovery
+
+One reason `TypeAdapter` is found late is that it does not look like the thing people are searching for. Someone with a bare JSON array searches for how to validate a list, finds examples using models, and builds the wrapper. Nothing in that path mentions adapters.
+
+So it is worth stating the shape plainly: **if you can write it as a type annotation, you can validate it, serialise it, and generate a schema for it, without a class.**
+
+That covers a great deal. A list of models. A dictionary of settings. A single constrained integer. An optional union. Anything nested from those.
+
+The corollary is equally useful: if you are writing a class purely so that something can be validated, stop and check whether an annotation would do. The wrapper model is a real and widespread pattern, and almost every instance of it predates its author discovering this.
+
+Where a class still earns its place is where a class was always the right answer &mdash; a domain concept that deserves a name, somewhere to hang methods, attribute access instead of subscripting, a place for validators and config. Those are properties of a model, not of validation, and adapters were never competing for them.
+
+## Where it sits in the library
+
+It is easy to read this module as being about an optimisation or a convenience. It is really about a boundary in how Pydantic is organised.
+
+`BaseModel` is a way of *declaring* a shape and getting behaviour attached to it. `TypeAdapter` is a way of *using* the same machinery against a shape declared some other way.
+
+Everything the library does &mdash; coercion rules, constraints, error paths, JSON parsing, serialisation, schema generation &mdash; lives underneath both. A model is not a more capable validator; it is a class with that validator bound to it, plus a namespace for methods and configuration.
+
+Seeing it that way makes the choice obvious rather than a matter of taste. Ask whether you need the class. If the answer is yes &mdash; because the thing has a name, needs methods, wants attribute access &mdash; write a model. If the answer is no, an annotation and an adapter give you identical validation with nothing extra to maintain.

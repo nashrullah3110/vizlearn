@@ -1,0 +1,191 @@
+title: Computed Fields: Derived Values in the Output
+intro: Values calculated from other fields that belong in the response but were never an input.
+
+## The gap it fills
+
+Some values are not data you receive; they are consequences of data you receive. A full name from a first and last. A total from a quantity and a price. A reading time from a word count. An `is_expired` flag from an expiry date and the clock.
+
+Storing them as fields is wrong, because they can then disagree with the values they came from. Accepting them from a caller is worse, because the caller can lie.
+
+The obvious answer is a `@property`, and it is half right. A property computes from the current values and cannot drift. But it is invisible to serialisation &mdash; `model_dump()` does not include it, `model_dump_json()` does not include it, and the schema does not know it exists. For a value that exists purely for internal use, that is fine. For one your API consumers need, it is not.
+
+`@computed_field` closes the gap: the value is derived, and it appears in the output.
+
+## The shape
+
+```python
+@computed_field
+@property
+def pace(self) -> float:
+    return round(self.minutes / self.lessons, 1)
+```
+
+Three mechanics.
+
+**Decorator order.** `@computed_field` goes above `@property`. The reverse does not work, and the failure is not self-explanatory.
+
+**The return annotation is required.** It becomes the field's type in the serialisation schema, and Pydantic will complain if it is missing. It is not merely documentation.
+
+**It reads the model.** Because it takes `self`, everything on the model is available &mdash; and validation has already happened, so those values are real converted types.
+
+## Output only, and why that matters
+
+A computed field is not an input. It does not appear in the constructor signature, it is not validated, and passing it is ignored &mdash; or rejected, if you have set `extra="forbid"`.
+
+That asymmetry is the whole point. The value is a function of the model, so allowing it to be supplied would allow it to be supplied *wrongly*, and you would have two sources of truth for one fact.
+
+It also means the value is always current. Change `minutes` and `pace` changes with it, because it is recomputed on access rather than stored. There is no stale-derived-value bug available, which is the class of bug this feature eliminates.
+
+## The schema, and the two modes
+
+A computed field appears in the **serialisation** schema and not the validation one, which is exactly right: it is something you emit, never something you accept.
+
+That distinction surfaces in `model_json_schema(mode=...)`. The default, `mode="validation"`, describes what the model accepts, and computed fields are absent. `mode="serialization"` describes what it produces, and they are present.
+
+For a FastAPI response model this is handled for you: the response schema is the serialisation one, so computed fields appear in the documentation as fields consumers can expect. That is usually the reason to reach for the feature in the first place.
+
+You can pass `description`, `title` and `examples` to the decorator, and they land in the schema like any other field's metadata. A derived value often needs a description more than a stored one does, because the name alone rarely explains the formula.
+
+## Excluding them
+
+Computed fields behave like fields for `include` and `exclude`:
+
+```python
+m.model_dump(exclude={"cost_pence", "margin"})
+```
+
+This is worth knowing because derived values are frequently the ones you do not want in a public response. A margin computed from a cost is a perfectly reasonable internal field and an unfortunate thing to leak, and it is easy to forget that adding a computed field changes what every existing serialisation emits.
+
+That is genuinely a footgun: unlike a normal field, which you had to add to the model deliberately, a computed field can be added for one internal purpose and silently appear in every API response the model feeds.
+
+## The cost
+
+A computed field runs on **every** serialisation. There is no caching.
+
+For arithmetic on a couple of fields that is irrelevant. For anything heavier it is not, and the cost multiplies: serialising a list of a thousand models runs every computed field a thousand times.
+
+If a value is expensive and genuinely needs to be in the output, compute it once and store it in a real field &mdash; accepting that you now own keeping it consistent. `functools.cached_property` is not a substitute here, because it does not participate in serialisation.
+
+The rule: computed fields are for cheap derivations. Arithmetic, string formatting, a comparison, a lookup in a small dict. Anything that touches I/O or loops over data does not belong.
+
+## The failure mode to guard against
+
+This is the sharpest edge in the module, and it is easy to walk into.
+
+A computed field that can raise turns a valid model into one that cannot be serialised.
+
+```python
+@computed_field
+@property
+def pace(self) -> float:
+    return self.minutes / self.lessons     # lessons could be 0
+```
+
+`Module(minutes=30, lessons=0)` validates perfectly. Every field is the right type and within its constraints. And then `model_dump()` raises `ZeroDivisionError` &mdash; not a `ValidationError`, not at the boundary, but at the moment you try to send a response.
+
+The failure is far from the cause and it is not a validation error, so none of the error handling you built for validation catches it.
+
+Two defences. Make the impossible state impossible: `lessons: int = Field(gt=0)` means the divisor cannot be zero and the computed field cannot fail. Or handle the edge inside the property and return something sensible. The first is better, because it fixes the model rather than the symptom.
+
+The general principle: a computed field should be **total** &mdash; defined for every combination of values the model permits. If it is not, either the model is too permissive or the value is not really a computed field.
+
+## Computed field, property, or stored?
+
+**Plain `@property`** when the value is for internal use and should not be serialised. Most helper methods on a model are this.
+
+**`@computed_field`** when the value is derived, cheap, total, and consumers need it in the output.
+
+**A stored field** when the value is expensive, when it must be preserved as it was at a point in time (a price at the moment of sale, not the current price), or when it genuinely is an input.
+
+That middle case &mdash; historical values &mdash; is worth flagging. A computed field always reflects the *current* inputs. If you need what the total was when the order was placed, that is data, not a derivation, and it belongs in a column.
+
+## Naming and the schema
+
+A computed field's name is the method name, and it appears in the output exactly as written. That is worth a moment's care, because renaming it later is a breaking change for every consumer.
+
+The return annotation is not optional, and it does real work: it becomes the field's type in the serialisation schema, so consumers and generated clients know what to expect.
+
+A `description` in the decorator is more valuable here than on ordinary fields. `total` does not explain whether tax is included; `minutes` does not explain the margin applied. The name is a label, and derived values usually need a sentence.
+
+## Serialisation aliases work too
+
+Computed fields accept `alias`, which matters if the rest of your API is camelCase:
+
+```python
+@computed_field(alias="estimatedMinutes")
+@property
+def estimated_minutes(self) -> int:
+    ...
+```
+
+Without it, a model whose ordinary fields are aliased will emit one stubbornly snake_case key among them. An `alias_generator` on the model does not apply to computed fields, so this is one place the whole-model convention needs a per-field top-up.
+
+## Ordering in the output
+
+Computed fields appear after regular fields in the serialised output, in the order they are defined.
+
+That is stable and predictable, and worth knowing if anything downstream cares about key order &mdash; a snapshot test, a diff, a human reading a log. You cannot interleave them with declared fields.
+
+## A pattern: flags derived from state
+
+One of the most useful applications is turning internal state into a flag a consumer can act on:
+
+```python
+@computed_field
+@property
+def is_expired(self) -> bool:
+    return self.expires_at < datetime.now(timezone.utc)
+```
+
+The consumer does not have to know your expiry rules, parse a date, or get the timezone right. They get a boolean.
+
+Two cautions with this specific shape. It depends on the clock, so serialising the same model twice can produce different output &mdash; which breaks snapshot tests and can surprise a cache. And it makes the model's output non-deterministic, which is a property worth being deliberate about rather than discovering.
+
+If determinism matters, pass the reference time in rather than reading the clock, or compute the flag in the layer that is producing the response.
+
+## Summary of the trade
+
+A computed field buys you a derived value in the output that can never disagree with its inputs, described in the schema, with no storage and no synchronisation.
+
+It costs a function call on every serialisation, and it demands that the function be total &mdash; defined for every state the model permits &mdash; because a failure there breaks serialisation of an object that validated perfectly.
+
+Cheap, total, and genuinely derived. Those three conditions are the whole rule.
+
+## Summary
+
+`@computed_field` above `@property`, with a return annotation. The value is derived, output-only, recomputed every time, and appears in the serialisation schema.
+
+Keep them cheap, because they run on every dump. Keep them total, because a computed field that raises breaks serialisation of a model that validated perfectly. And remember that adding one changes the output of every serialisation the model already feeds &mdash; including the public ones.
+
+## One more use worth knowing
+
+A computed field is a good place to expose a value the model stores in a form consumers should not have to understand.
+
+Storage often wants one shape and a consumer wants another: a duration in seconds internally, minutes in the response; a status code internally, a readable label outside; separate first and last names, a display name in the output.
+
+The computed field bridges that without duplicating state. The stored field remains the single source of truth, and the derived view is guaranteed to agree with it because it is computed from it.
+
+This is a better pattern than storing both, which is where the two eventually disagree and nobody can say which is right.
+
+
+## Mistakes people make
+
+**Writing one that can raise.** A division by a field that might be zero turns a perfectly valid model into one that cannot be serialised &mdash; and the failure is not a `ValidationError`, so none of your validation error handling catches it. Constrain the inputs so the impossible state cannot occur.
+
+**Putting expensive work in one.** It runs on every serialisation with no caching, and serialising a thousand models runs it a thousand times. Anything touching I/O or looping over data does not belong.
+
+**Forgetting the return annotation.** It is not documentation; it is the field's type in the serialisation schema, and Pydantic requires it.
+
+**Reading the clock.** A field derived from `datetime.now()` makes serialisation non-deterministic, which breaks snapshot tests and surprises caches. Pass the reference time in, or compute the flag where the response is produced.
+
+**Not aliasing it.** An `alias_generator` on the model does not reach computed fields, so a camelCase API ends up with one stubbornly snake_case key. The decorator takes `alias` for exactly this.
+
+**Adding one without checking what already consumes the model.** Unlike a regular field, which you deliberately added to a schema, a computed field written for one internal purpose immediately appears in every existing serialisation &mdash; including the public ones.
+
+## Deciding, in one line
+
+Cheap, total, and genuinely derived.
+
+Cheap, because it runs on every serialisation and there is no caching. Total, because a failure breaks the output of a model that validated perfectly. Genuinely derived, because if a caller could reasonably supply it, it is an input with a default rather than a computed value.
+
+Fail any of those three and the answer is something else &mdash; a stored field, a plain property, or a value computed in the layer producing the response.

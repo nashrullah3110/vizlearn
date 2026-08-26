@@ -1,0 +1,227 @@
+title: model_config: Settings That Change the Whole Model
+intro: Extra keys, mutability, assignment checking and string handling - the switches worth knowing.
+
+## Where behaviour lives
+
+Everything so far has been per field. `model_config` is per model: a `ConfigDict` assigned in the class body that changes how the whole thing behaves.
+
+```python
+class Module(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    title: str
+```
+
+In Pydantic v1 this was an inner `class Config`. That still works and is deprecated, and it is the clearest signal that a tutorial predates v2.
+
+There are a lot of settings. These are the ones that come up constantly.
+
+## extra: what to do with keys you did not declare
+
+The default is `"ignore"` &mdash; unknown keys are silently dropped.
+
+That is forgiving, and it hides mistakes. A caller sending `minuets` instead of `minutes` gets no error and no field; the model is built with whatever default `minutes` has, and the bug surfaces later as a value that is inexplicably wrong.
+
+`extra="forbid"` rejects them:
+
+```python
+model_config = ConfigDict(extra="forbid")
+```
+
+Now the typo is an error naming the offending key. For an internal API, a config file, or anything where you control both ends, this is almost always the better default. It converts a silent misunderstanding into an immediate one.
+
+The argument for `"ignore"` is forward compatibility on a public API: a client sending fields from a newer version should not break against an older server. That is a real consideration, and it applies to *your* API's request models rather than to every model in your codebase.
+
+`extra="allow"` keeps unknown keys, storing them on the model and exposing them through `model_extra`. It is right for a genuine passthrough &mdash; a webhook body you forward, an envelope whose payload you do not own. Everywhere else it turns your model into a dictionary with extra steps, and loses the guarantee that the fields on the object are the fields you declared.
+
+## Validation happens once
+
+This surprises people, and it is worth being explicit about.
+
+A model is validated when it is constructed. Assigning to an attribute afterwards is a plain Python assignment: no checking, no coercion.
+
+```python
+m = Module(minutes=8)
+m.minutes = "not a number"      # allowed, and now the field is a string
+```
+
+The reasoning is speed &mdash; most models are built, read and discarded, and checking every assignment would be work for a case that rarely arises.
+
+`validate_assignment=True` turns it on. Assignments are then validated and coerced like constructor arguments, so `m.minutes = "12"` gives you `12` and `m.minutes = "ages"` raises.
+
+Turn it on for any model that is genuinely mutated after construction, especially one holding configuration or accumulating state. It costs a little per assignment and removes a class of bug where a model's declared types quietly stop being true.
+
+Note that it also makes any `model_validator(mode="after")` run again on each assignment, which is usually what you want and is worth knowing if those validators are expensive.
+
+## frozen: the other answer to mutation
+
+`frozen=True` forbids assignment altogether. An attempt raises a `ValidationError` with type `frozen_instance`.
+
+It also makes the model **hashable**, so it can be a dictionary key or a set member &mdash; which unlocks a lot of ordinary Python that mutable models cannot do.
+
+For validated data that arrives from outside and is then only read, frozen is the right default and is under-used. It removes the question "did anything change this?" entirely, it makes the object safe to share across threads or pass anywhere without defensive copying, and it makes the intent explicit.
+
+`model_copy(update={...})` still works on a frozen model, so producing a modified version is one line. That is the functional-update pattern, and it is usually clearer than mutation anyway.
+
+Individual fields can be frozen with `Field(frozen=True)` when only part of the model should be fixed &mdash; an id that must never change while the rest of the record can.
+
+## String settings for human input
+
+Three settings that apply to every string field:
+
+`str_strip_whitespace=True` strips leading and trailing whitespace. For form data this is nearly always correct, and it removes a pile of one-line validators.
+
+`str_to_lower=True` and `str_to_upper=True` normalise case. Useful for emails, codes and identifiers; wrong for anything with display text, so apply it to models that are all identifiers rather than reaching for it globally.
+
+`str_min_length=1` sets a floor for every string. Combined with stripping, this is the compact way to say "no blank strings anywhere in this model", which is a rule most form models want and few state.
+
+## from_attributes: reading objects
+
+By default `model_validate` expects a mapping. `from_attributes=True` lets it read attributes off any object:
+
+```python
+class ModuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    title: str
+    minutes: int
+
+ModuleOut.model_validate(orm_row)
+```
+
+This is how a model turns a database row into a response, and it recurses, so a row with related objects becomes nested models without any manual conversion.
+
+It was `orm_mode` in v1, which is the name most existing material uses.
+
+Two cautions. It reads attributes, so a lazy-loading ORM relationship will be *loaded* when the model touches it &mdash; which is how a single serialisation quietly becomes fifty queries. And it will read any attribute matching a field name, so a model with a field called `password_hash` pointed at a user row will faithfully put the hash in your response. Output models should list only what may be seen.
+
+## A few more worth knowing
+
+`populate_by_name=True` lets a field be filled by either its alias or its Python name. It pairs with aliases and gets a module of its own next tier.
+
+`use_enum_values=True` stores the value rather than the enum member. It makes dumps simpler and loses the member's behaviour; usually the `str, Enum` mixin is the better answer.
+
+`validate_default=True` checks default values, which are otherwise trusted.
+
+`arbitrary_types_allowed=True` permits fields of types Pydantic knows nothing about, validated only by `isinstance`. It is an escape hatch for wrapping a third-party object, and a sign you might want a custom type instead.
+
+## Config is inherited
+
+A base model's config applies to every subclass, and a subclass can override individual settings.
+
+That makes a house base model a genuinely good pattern:
+
+```python
+class Base(BaseModel):
+    model_config = ConfigDict(extra="forbid",
+                              str_strip_whitespace=True,
+                              validate_assignment=True)
+```
+
+Every model in the codebase inherits from it and gets the same defaults, decided once. It is much better than the same `ConfigDict` copied into forty classes, four of which will end up different for no reason anybody remembers.
+
+## Suggested defaults
+
+For **request models** on a public API: `extra="ignore"` for forward compatibility, `str_strip_whitespace=True`.
+
+For **internal and config models**: `extra="forbid"`, so a typo is an error rather than a mystery.
+
+For **validated data that is then only read**: `frozen=True`.
+
+For **anything mutated after construction**: `validate_assignment=True`.
+
+## Settings that catch mistakes
+
+Three more worth knowing because each closes a specific hole.
+
+`validate_default=True` checks default values, which are otherwise trusted. A mistyped default sits silently until something downstream does arithmetic on a string. Worth turning on for models whose defaults come from constants defined elsewhere.
+
+`revalidate_instances="always"` re-validates a model instance passed into another model. By default an object that is already the right class is accepted as-is, on the reasonable assumption it was validated when built. If it was mutated afterwards without `validate_assignment`, that assumption is wrong, and this setting closes the gap at the cost of re-running validation.
+
+`ser_json_timedelta` and `ser_json_bytes` control how those two types serialise, which matters when a consumer expects seconds rather than an ISO duration.
+
+## Protected namespaces
+
+By default Pydantic reserves the `model_` prefix and warns if you declare a field starting with it, because that is where its own methods live &mdash; `model_dump`, `model_validate`, `model_fields`.
+
+That is a genuine problem if your domain has fields like `model_name` or `model_version`, which is common in anything ML-adjacent.
+
+`protected_namespaces=()` turns the warning off, and `protected_namespaces=("model_config",)` narrows it. Be aware that a field literally named `model_dump` would shadow the method, so the warning is doing real work &mdash; disable it deliberately rather than to silence noise.
+
+## Where to set config
+
+Three places, in increasing order of scope.
+
+On the class, as `model_config = ConfigDict(...)`. Explicit and local.
+
+On a shared base model, inherited by everything. Best for house conventions.
+
+As a keyword in the class definition &mdash; `class Module(BaseModel, frozen=True)` &mdash; which is compact and less discoverable.
+
+For a codebase of any size, the base model is the answer. One file states the conventions, every model follows them, and changing a convention is one edit rather than forty.
+
+## Config and inheritance
+
+Config merges rather than replaces. A subclass setting one key keeps its parent's other settings, which is what makes the base-model pattern practical.
+
+That also means an inherited setting can be surprising in a subclass that did not ask for it. If a base sets `extra="forbid"` and a subclass genuinely needs passthrough, it must say so explicitly &mdash; which is the right default, since silently permissive is worse than explicitly permissive.
+
+## A worked house base
+
+```python
+class Base(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+        validate_assignment=True,
+        populate_by_name=True,
+        alias_generator=to_camel,
+    )
+```
+
+Five decisions, made once. Typos in keys are errors. Whitespace never reaches a field. Assignments are checked. Fields accept either spelling. The whole API speaks camelCase.
+
+Every model inheriting from that is consistent with every other, and a new developer inherits the conventions without being told them.
+
+The one thing to avoid is a base so opinionated that half the models override half of it. If a setting is wrong for a third of your models, it does not belong in the shared base.
+
+## Summary
+
+`model_config` is where model-wide behaviour is decided. The four that matter most: `extra` for unknown keys, `validate_assignment` for mutation, `frozen` for immutability and hashability, and the `str_*` family for human input.
+
+Set them deliberately rather than by default, put your house settings on a shared base, and remember that the two most common silent bugs in this area &mdash; an ignored typo in a key and an unvalidated assignment &mdash; are both one config entry away from being loud.
+
+## The short version
+
+Four settings account for most of the value.
+
+`extra="forbid"` turns a typo in a key from a silent nothing into a named error. Set it anywhere you control both ends.
+
+`validate_assignment=True` extends validation past construction, so a model's declared types stay true for its whole life.
+
+`frozen=True` makes validated data immutable and hashable, which is the right shape for anything that arrives from outside and is then only read.
+
+`str_strip_whitespace=True` removes a category of trivial validator and a category of trivial bug.
+
+Put them on a shared base, decide them once, and let every model in the codebase inherit the same conventions.
+
+
+## Mistakes people make
+
+**Leaving `extra` at its default where you control both ends.** A typo in a key produces no error, no field and a value that silently falls back to a default. `extra="forbid"` turns a mystery into a message.
+
+**Assuming assignment is validated.** It is not. A model built correctly can hold anything at all a moment later, and the declared types quietly stop being true.
+
+**Copying the same `ConfigDict` into forty classes.** They drift. Four of them end up different for no reason anybody remembers. A shared base makes the convention one edit.
+
+**Using `from_attributes` on an output model without listing fields carefully.** It reads whatever attribute matches a field name, so a model pointed at a user row will faithfully serialise a password hash. It also triggers lazy ORM relationships, which is how one serialisation becomes fifty queries.
+
+**Silencing the protected-namespace warning reflexively.** A field literally named `model_dump` would shadow the method. Disable the warning deliberately for a domain that needs `model_` names, not to quieten noise.
+
+**Building a base so opinionated that half the models override it.** If a setting is wrong for a third of your models, it is not a house convention and does not belong in the shared base.
+
+## What it is really for
+
+Config is where a codebase records the decisions it has made about its own data.
+
+Whether an unexpected key is a mistake or a courtesy. Whether validated objects may change. Whether the wire speaks camelCase. Whether a blank string is a value.
+
+Those are real decisions, and every codebase makes them &mdash; usually implicitly, differently in different files, and rediscovered by each new person. Writing them once, on a shared base, turns a set of accidents into a convention.

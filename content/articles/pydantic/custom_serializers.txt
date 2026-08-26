@@ -1,0 +1,219 @@
+title: Custom Serializers: Changing What Comes Out
+intro: Per-field and per-model output control, and the strong argument for not using it.
+
+## What they do
+
+Pydantic's defaults are good: dates become ISO strings, decimals become strings, enums become values, nested models become nested objects. For most fields there is nothing to decide.
+
+When the default is genuinely wrong, `@field_serializer` replaces the output for one field:
+
+```python
+@field_serializer("amount")
+def show_money(self, value: Decimal) -> str:
+    return "£%.2f" % value
+```
+
+The method takes `self` and the value, and returns whatever should appear.
+
+## Only the output changes
+
+This is the important property. A serialiser does not change validation, and does not change what the field holds.
+
+`p.amount` is still a `Decimal`. Arithmetic works, comparisons work, and every rule you attached still ran. The serialiser is the last step on the way out, not a conversion applied to the model.
+
+That separation is what makes the feature safe. You are not weakening the model to satisfy a consumer's format preference.
+
+## Two modes, two outputs
+
+`when_used` restricts a serialiser to one direction:
+
+`"always"` is the default. `"json"` applies only to `model_dump_json()` and `model_dump(mode="json")`. `"unless-none"` skips it for null values.
+
+The `"json"` case is the useful one. It lets `model_dump()` keep a real `date` for code inside your program while JSON output gets whatever format a consumer needs. Without it, a formatting serialiser makes the Python dump useless for anything that wanted the object.
+
+## Serialising the whole model
+
+`@model_serializer` replaces the entire output:
+
+```python
+@model_serializer
+def as_envelope(self) -> dict:
+    return {"type": "module", "attributes": {...}}
+```
+
+This is for shapes that are not simply your fields &mdash; a JSON:API envelope, a legacy format you must emit, a payload where the structure differs from your internal one.
+
+It is powerful and it is a big hammer. Every field is now your responsibility, so a field added to the model does not appear in the output until somebody remembers to add it to the serialiser. That divergence is exactly the drift models exist to prevent.
+
+A `mode="wrap"` variant receives a handler that produces the default output, letting you take that and adjust it rather than rebuilding it. That is much safer, because new fields still flow through:
+
+```python
+@model_serializer(mode="wrap")
+def add_meta(self, handler):
+    data = handler(self)
+    data["_type"] = "module"
+    return data
+```
+
+Prefer the wrap form whenever you are augmenting rather than replacing.
+
+## The schema problem
+
+Here is the sharp edge, and it is easy to miss.
+
+A serialiser changes the output. It does not change the schema. So a `Decimal` field serialised as `"£12.50"` still appears in the generated schema as a decimal, your API documentation says one thing, and the endpoint returns another.
+
+For a public API that is a real defect: generated clients will produce a type that does not match the data they receive.
+
+`return_type` fixes it:
+
+```python
+@field_serializer("amount", return_type=str)
+```
+
+Now the serialisation schema reports a string, and the documentation matches reality. Set it whenever the serialised type differs from the field type, which is most of the time.
+
+## Secrets: a serialiser is the weakest option
+
+Masking a token with a serialiser is a common idea and the worst of the three available.
+
+`@field_serializer` producing `tok_…ef` keeps the value out of dumps and leaves it in `repr`, in logs, in tracebacks, and in any code that reads the attribute.
+
+`SecretStr` hides it from `repr` and requires `.get_secret_value()`, which makes access deliberate and greppable.
+
+`Field(exclude=True)` keeps it out of every serialisation entirely.
+
+For anything genuinely secret, use the type and the exclusion. Reach for a serialiser only when you want a *partial* value in the output on purpose &mdash; showing the last four digits of a card, which is a product decision rather than a security one.
+
+## The argument against most custom serialisers
+
+Most custom serialisers are display formatting that has ended up in the wrong layer.
+
+`"26 August 2026"` is a formatting choice. It assumes English, a date order, and a reader rather than a program. A client receiving it cannot sort by it, cannot filter on it, cannot show it in another language, and has to parse it back to do anything useful.
+
+`"2026-08-26"` is data. Every client can sort it, compare it and format it however that client's user needs.
+
+The same argument applies to currency symbols, thousands separators, relative times ("3 days ago") and rounded numbers. All of them are decisions that belong where the audience is known, which is the presentation layer, not the data model.
+
+So the honest guidance: before writing a serialiser, ask whether the default was wrong or merely unfamiliar. If it is being changed for a human reader, that logic probably belongs closer to the human.
+
+## When they are genuinely right
+
+**Emitting a legacy format** you do not control and cannot change.
+
+**Redacting deliberately**, where a partial value is the intended product behaviour.
+
+**Wrapping in an envelope** required by a specification, best done with `mode="wrap"`.
+
+**Computing a representation** that is expensive to store but cheap to derive, where a computed field would be the alternative.
+
+**Interoperating with something specific** &mdash; a system that wants timestamps in milliseconds, or booleans as `"Y"`/`"N"`.
+
+Each of those is a real constraint from outside, rather than a preference from inside.
+
+## The info argument
+
+Both decorators accept an optional `info` parameter carrying `mode`, `context` and the exclusion settings in force.
+
+`mode` lets one serialiser behave differently for Python and JSON output without needing `when_used`.
+
+`context` is the interesting one. It is a dict passed to the dump call, which makes output dependent on something the model does not know:
+
+```python
+@field_serializer("salary")
+def maybe_hide(self, v, info):
+    if (info.context or {}).get("role") != "hr":
+        return None
+    return v
+```
+
+Used carefully that is a clean answer to field-level visibility rules. Used freely it produces an endpoint whose output cannot be predicted from the model, and separate output models per audience are easier to reason about and to document.
+
+## Serialising unusual types
+
+The other legitimate reason to write a serialiser is a field whose type Pydantic has no opinion about &mdash; a third-party object accepted via `arbitrary_types_allowed`.
+
+Such a field has no default serialisation, so a dump either fails or produces something unhelpful. A serialiser turning it into a dict or a string is not a formatting preference; it is the only way the model can be serialised at all.
+
+If you find yourself doing this for a type used in several models, the better shape is a custom type that knows how to serialise itself, so the knowledge lives with the type rather than being repeated in every model that holds one.
+
+## Testing what you emit
+
+Custom serialisation is worth testing directly, because it is the part of a model that no other test exercises.
+
+Validation tests construct models; they do not check what comes out. A serialiser can be broken for months while every validation test passes.
+
+The test is short &mdash; build a model, dump it, assert on the result &mdash; and it is the only thing standing between a formatting change and a silently altered API response.
+
+Assert on `model_dump()` and `model_dump_json()` separately when `when_used` is involved, since that is precisely the case where they differ.
+
+## The decision, restated
+
+Before writing one, three questions.
+
+**Is the default actually wrong, or just unfamiliar?** ISO dates and decimal strings look odd and are correct.
+
+**Is this for a machine or a person?** Machines want data. People want formatting, and that belongs where the person is.
+
+**Will the schema still be true?** If not, set `return_type`, or you are publishing a document that lies about your own output.
+
+Most proposed serialisers fail one of those, which is the reason this module argues against its own subject as much as for it.
+
+## Summary
+
+`@field_serializer` for one field, `@model_serializer` for the whole output, `mode="wrap"` when augmenting rather than replacing so new fields still flow through.
+
+`when_used="json"` keeps Python dumps useful. `return_type` keeps the schema honest. `info.context` makes output conditional when that is genuinely needed.
+
+For secrets prefer `SecretStr` and `Field(exclude=True)`. And reach for a serialiser when an external constraint demands a shape &mdash; not when a default merely looks unfamiliar.
+
+## Summary
+
+`@field_serializer` for one field, `@model_serializer` for the whole model, `mode="wrap"` when augmenting rather than replacing. `when_used="json"` to keep Python dumps useful. `return_type` so the schema does not lie.
+
+For secrets, prefer `SecretStr` and `Field(exclude=True)`.
+
+And apply the test before writing one: is the default actually wrong for a machine, or merely unformatted for a person? Only the first is a serialiser's job.
+
+## What to remember
+
+Serialisation is the last thing that happens and the first thing a consumer sees.
+
+Pydantic's defaults are chosen so that output is data: sortable, comparable, parseable, unambiguous across locales. Most reasons to override them turn out to be formatting for a human, and humans are downstream of the layer that knows who they are.
+
+Override when something outside genuinely demands a shape. Set `return_type` so the schema keeps telling the truth. And test what you emit, because no other test does.
+
+
+## Mistakes people make
+
+**Formatting for a person in a data layer.** Covered at length, and still the most common. A date rendered as "26 August 2026" cannot be sorted, filtered or localised by anyone receiving it.
+
+**Forgetting `return_type`.** The output changes, the schema does not, and your documentation quietly starts describing something the endpoint no longer returns. Generated clients then produce a type that does not match the data, and the failure surfaces in someone else's codebase.
+
+**Using a plain `@model_serializer` for a small addition.** Replacing the entire output to add one key means every field is now hand-maintained, and a field added to the model six months later never appears. `mode="wrap"` adds the key and lets everything else flow through untouched.
+
+**Masking a secret with a serialiser and stopping there.** The dump is clean and the value is still in `repr`, still in logs, still in tracebacks, still readable by any code holding the model. `SecretStr` and `Field(exclude=True)` address the parts a serialiser cannot.
+
+**Not testing the output.** Validation tests construct models; they never look at what comes out. A serialiser can be broken for months while the suite stays green, and the first person to notice is a consumer.
+
+**Depending on context that is not always passed.** A serialiser reading `info.context` needs a sensible default for every call that does not supply one, including the ones in tests and the ones a framework makes internally. `(info.context or {})` rather than `info.context[...]` is the difference between a graceful default and a `TypeError` during a response.
+
+## The test
+
+Is the default wrong for a machine, or merely unformatted for a person?
+
+Only the first is a serialiser's job. Everything else &mdash; currency symbols, readable dates, relative times, rounded numbers &mdash; is a decision about an audience, and belongs where the audience is known.
+
+Applying that one question honestly removes most proposed serialisers, and makes the remaining ones easy to justify.
+
+## A final framing
+
+It helps to think of serialisation as the boundary in the other direction.
+
+Validation is where you stop trusting the outside world and convert its text into your types. Serialisation is where you stop assuming your types and produce something the outside world can read.
+
+Both are conversions at an edge, and both work best when they convert to something *neutral*. Validation does not try to guess what a caller meant; it accepts unambiguous readings and refuses the rest. Serialisation should be symmetrical: emit data with a single unambiguous reading, and let the consumer decide how to present it.
+
+A custom serialiser that formats for a human breaks that symmetry. It takes a value with one meaning and produces one with a presentation baked in, which the next layer has to undo before it can do anything else.
+
+That is the underlying reason the advice in this module runs against its own subject. The feature is well designed and occasionally essential. It is just that most of the reasons people reach for it are reasons to do the work somewhere else.
