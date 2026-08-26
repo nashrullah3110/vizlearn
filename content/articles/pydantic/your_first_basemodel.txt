@@ -101,6 +101,111 @@ The instinct is to build one model with a lot of optional fields. Resist it. Opt
 
 Separate models say what they mean. `ModuleSummary` has two required fields and is honest about it. Converting between them is one line, because a dump from one is valid input to the other whenever the fields line up.
 
+## Field order, and why it exists
+
+Fields have an order &mdash; the order you wrote them &mdash; and although you cannot pass them positionally, the order is not cosmetic.
+
+It determines the order of keys in `model_dump()` and in the generated JSON, which matters when a human reads the output or when something downstream diffs two payloads. It determines the order fields appear in the generated schema, and therefore in API documentation. And it determines validation order, which becomes significant once you write validators that look at previously-validated fields.
+
+The practical advice is to order fields the way you would explain them: identity first, then the important attributes, then the optional extras. It costs nothing and every reader of the output benefits.
+
+## Looking at the model itself
+
+A model knows about its own fields, and that introspection is available to you:
+
+```python
+Module.model_fields          # {'title': FieldInfo(...), 'minutes': FieldInfo(...)}
+list(Module.model_fields)    # ['title', 'minutes']
+```
+
+Each `FieldInfo` carries the annotation, whether the field is required, the default if there is one, and any metadata such as a description. This is what the schema generator reads, and it is available to you for the same kind of work &mdash; building a form, generating a table header, checking that every field has a description before you ship.
+
+`model_fields` is defined on the class, not the instance, so you can inspect a model without having any data for it.
+
+## Copying and changing
+
+Models are ordinary objects and you can assign to their attributes, but that is often not what you want &mdash; particularly if something else is holding a reference to the same object.
+
+`model_copy` makes a new one:
+
+```python
+original = Module(title="Vectors", track="maths", minutes=8)
+longer = original.model_copy(update={"minutes": 12})
+```
+
+Two things to know about it. The copy is shallow by default, so a nested model or a list is shared between the two objects; pass `deep=True` when that matters. And `update` does **not** validate the new values &mdash; it writes them in directly. If the values came from anywhere untrusted, build a new model instead of copying with an update.
+
+## Making a model immutable
+
+By default a model's attributes can be reassigned, and by default that reassignment is not validated:
+
+```python
+m.minutes = "not a number"    # allowed, and now the field is a string
+```
+
+Two settings fix two different halves of that. `validate_assignment=True` runs validation on assignment, so the line above raises. `frozen=True` forbids assignment entirely and makes the model hashable, so it can be a dictionary key or a set member.
+
+```python
+class Module(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    title: str
+```
+
+Frozen models are worth reaching for more often than people do. A value that arrives from outside, is validated once and then read many times has no business being mutable, and freezing it removes a whole class of "who changed this?" question.
+
+## Inheritance
+
+Models inherit, and it works the way you would hope: subclass fields are added to the parent's, and the parent's validators still run.
+
+```python
+class ModuleBase(BaseModel):
+    title: str
+    minutes: int
+
+class ModuleInDB(ModuleBase):
+    id: int
+    created_by: str
+```
+
+This is the standard way to express the family of shapes one concept needs &mdash; a base with the common fields, then `Create`, `Update` and `InDB` variants that add or relax what they must. It keeps the shared fields in one place, so a change to the base reaches all of them.
+
+Be careful with one thing: a subclass cannot make an inherited required field optional in a way that reads clearly. Redeclaring `title: str = "untitled"` works, but a reader now has to check two classes to know what `title` does. If the variants differ a lot, separate models are kinder than deep inheritance.
+
+## What `repr` gives you
+
+Printing a model prints its fields, which is more useful than the default `<Module object at 0x...>` and is one of the small things that makes models pleasant in a REPL or a log line.
+
+You can keep a field out of that output with `Field(repr=False)` &mdash; the obvious use being anything secret. A password hash or an API token in a model that gets logged is a genuine incident waiting to happen, and `repr=False` is the one-word fix.
+
+Note that it only affects the representation. The value is still in `model_dump()`, so a field that must never leave the process needs `exclude=True` as well, or a separate output model that simply does not have it.
+
+## Two mistakes worth avoiding early
+
+**Treating a model like a dictionary.** Models do not support `m["title"]`, and the instinct to reach for it usually signals code that is passing models where it should be passing dicts, or the reverse. Decide which side of the boundary a function is on: if it takes untrusted data, it takes a dict and validates it; if it takes validated data, it takes a model and uses attributes.
+
+**Putting expensive work in a model.** A model is constructed every time data arrives, and anything in a validator runs on that path. A network call, a database lookup or a file read inside a model turns validation into I/O, makes the model impossible to test without mocking, and turns a `ValidationError` into a timeout. Keep models pure: they check the shape of data using only the data. Rules that need to consult the world belong in the layer that owns the world.
+
+## A working shape to copy
+
+Putting the module together, the following is close to what a real model looks like once it has been through a couple of rounds of use:
+
+```python
+class Module(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    title: str
+    track: str
+    minutes: int = 10
+    published: bool = False
+
+    def slug(self) -> str:
+        return self.title.lower().replace(" ", "_")
+```
+
+Frozen, because it arrives from outside and is then only read. Two required fields, because a module without a title or a track is not a module. Two defaults with obvious values. One method, because the slug is derived from the title and belongs next to it.
+
+Nothing exotic, and it already gives you validation, coercion, equality, a readable `repr`, JSON in both directions and a schema. That ratio &mdash; how much you get for how little you wrote &mdash; is the reason the library is worth learning properly rather than copying from examples.
+
 ## What to try next
 
 Change something in the editors above and watch what happens. Add a field to a model and leave it out of the constructor call. Pass `minutes` as `"11"` and print its type. Remove a field from the JSON before validating it back.

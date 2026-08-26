@@ -92,6 +92,89 @@ Reach for **`pydantic.dataclasses.dataclass`** when you want validation on a dat
 
 Reach for **`TypeAdapter`** when the thing you need to validate is not a class.
 
+## The rest of the field
+
+Dataclasses are not the only alternative, and the others sit in predictable places.
+
+**`attrs`** is the library dataclasses were inspired by, and it is still ahead in features: converters, richer validators, better control over generated methods. It does validate, if you ask it to, and it is a reasonable choice for internal classes with complex construction. It is not aimed at the boundary and does not generate JSON Schema.
+
+**`NamedTuple`** gives you an immutable, tuple-shaped record with named access. It checks nothing at runtime, and its tuple-ness is either the point or a trap depending on whether you wanted something you can unpack and compare positionally.
+
+**`TypedDict`** describes the shape of a dictionary for a static type checker. It is worth being clear about this one: at runtime, a `TypedDict` **is a plain dict**. There is no class, no checking, and no error if a key is missing or the wrong type. It is a comment mypy can read. Where people usually want a `TypedDict` and validation, what they want is a model.
+
+**`SQLModel`** joins Pydantic and SQLAlchemy so one class can be both a table and a validated model. It is convenient and it is a coupling: your API shape and your database schema become the same object, which is fine until they need to differ, which they eventually do.
+
+## Memory, and the shape of an instance
+
+A `BaseModel` instance stores its data in `__dict__` plus some bookkeeping &mdash; `__pydantic_fields_set__` for what was supplied, and a reference to the compiled validator on the class.
+
+A dataclass also uses `__dict__` unless you declare `slots=True`, which trades the ability to add attributes for a smaller, faster object. A `NamedTuple` is the smallest of the lot, being a tuple.
+
+For thousands of objects this is invisible. For millions it is not, and it is a real reason to use something leaner for the interior of a numerical or batch-processing system. It is also a reason not to worry about it before you have measured, because "millions of objects" is a specific situation rather than a general one.
+
+## Moving between them
+
+Conversion is mechanical in every direction, which is what makes the boundary-then-interior pattern practical.
+
+From model to dataclass: `Module(**checked.model_dump())`.
+
+From dataclass to model: `ModuleIn.model_validate(dataclasses.asdict(d))`, or `model_validate(d)` directly, since Pydantic can read attributes off arbitrary objects when the model sets `from_attributes=True`.
+
+That last setting deserves a mention of its own. `from_attributes=True` lets a model validate from any object with matching attributes rather than requiring a dict:
+
+```python
+class ModuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    title: str
+    minutes: int
+
+ModuleOut.model_validate(orm_row)
+```
+
+This is how a model reads an ORM row, and it is the single most common reason to reach for it. In Pydantic v1 it was called `orm_mode`, which is the name most tutorials still use.
+
+## When a model is genuinely too much
+
+A short list of cases where reaching for `BaseModel` is over-engineering.
+
+A function returning two values does not need a model. A tuple, or a `NamedTuple` if the names help, is fine.
+
+A short-lived internal structure that never leaves the function that built it does not need validation, because nothing untrusted can reach it.
+
+A constant lookup table is a dict. Wrapping it in a model to get attribute access is a lot of ceremony for a dot.
+
+And a value with one field is usually just that value. `class Slug(BaseModel): value: str` is a wrapper that every caller has to unwrap. If you want a validated string type, `Annotated[str, Field(pattern=...)]` gives you that without the box.
+
+## The question to actually ask
+
+Not "which is faster" or "which is more modern", but: **does anything untrusted reach this object, and does it ever leave the process?**
+
+If untrusted data reaches it, you need validation, and `BaseModel` is the tool built for that.
+
+If it leaves the process &mdash; as JSON, in a response, in a schema &mdash; you want serialisation and documentation, and again that is `BaseModel`.
+
+If neither is true, you have an internal value, and the lightest thing that expresses it well is the right answer. That will usually be a dataclass, and occasionally a tuple.
+
+Most objects in most applications are at a boundary, which is why the honest general recommendation is to use models and stop worrying about it. The interesting cases are the exceptions, and now you can recognise them.
+
+## A note on migrating an existing codebase
+
+If you arrive at this with a project full of dataclasses, you do not have to choose in one go.
+
+The cheapest first move is to convert only the classes that sit at a boundary &mdash; whatever parses your config, whatever accepts a request body, whatever reads a file. Those are where bad data enters, and they are usually a small fraction of the classes in a project. Everything else can stay exactly as it is.
+
+The second move, if you want checking without restructuring, is `pydantic.dataclasses.dataclass` on the classes that stay. It is a one-line change per class, keeps `dataclasses.fields()` working for anything that introspects them, and starts raising on wrong types immediately.
+
+What you should not do is convert everything to `BaseModel` mechanically. You will end up validating objects that were constructed by your own code from already-validated data, paying for checks that cannot fail, and the diff will be too large for anyone to review properly.
+
+## Summary
+
+A dataclass generates a class from annotations and never looks at the types again. A model generates a class from annotations and enforces them, converts what can be converted, produces structured errors, serialises in both directions and emits a schema.
+
+The cost of all that is real and small, and it is paid where you decide to pay it. The discipline is the same one this whole tier has been building towards: know where your boundaries are, check there, and trust what you have checked.
+
+Choose a dataclass for internal values that never meet the outside world. Choose a model for everything else. And when you are genuinely unsure, choose the model &mdash; a slightly over-validated program is a much smaller problem than one where nobody can say which values are guaranteed.
+
 ## Where this leaves you
 
 That is tier one. You can define a model, predict exactly what it will convert, control what is required and what is merely nullable, narrow values to your domain with constraints, read the errors when data does not fit, and choose between a model and a plain class on grounds better than taste.

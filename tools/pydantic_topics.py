@@ -301,6 +301,70 @@ It is not a static type checker either. Mypy analyses code without running it; P
 
 And it is not free. Validation costs something, which is exactly why the boundary discipline matters: validate on the way in, once, and then trust the result rather than re-checking the same object at every layer.
 
+## What the hand-written version looks like
+
+It is worth seeing the code Pydantic replaces, because the comparison explains several of its design decisions at once.
+
+```python
+def parse_module(raw):
+    if not isinstance(raw, dict):
+        raise ValueError("expected an object")
+    title = raw.get("title")
+    if not isinstance(title, str):
+        raise ValueError("title must be a string")
+    minutes = raw.get("minutes")
+    if isinstance(minutes, str):
+        try:
+            minutes = int(minutes)
+        except ValueError:
+            raise ValueError("minutes must be a number")
+    elif not isinstance(minutes, int):
+        raise ValueError("minutes must be a number")
+    return {"title": title, "minutes": minutes}
+```
+
+Fifteen lines for two fields, and it is already worse than it looks. It stops at the first error, so a caller with two mistakes discovers them one at a time. Its messages do not say which field failed in a machine-readable way. It has no idea what to do about a third field when somebody adds one, and nothing forces that person to remember this function exists. And it describes the same shape a second time, in prose, in whatever documentation exists.
+
+The Pydantic version is the class definition and nothing else. Every one of those problems is solved as a side effect rather than as an additional feature.
+
+## The cost, and when it matters
+
+Validation is not free, and it is worth being concrete rather than reassuring.
+
+Building a model does real work: reading a compiled schema, checking each field, converting where needed, and constructing the object. A plain class assignment does none of that. If you construct millions of objects in a tight loop, you will measure the difference.
+
+Two things make it matter less than people fear. The first is that Pydantic v2 does the work in Rust rather than Python, which moved it from "noticeable" to "usually irrelevant". The second is scale: a model that validates in single-digit microseconds sits next to a database query taking milliseconds and a network call taking hundreds of milliseconds. In a typical request handler, validation is a rounding error on the request.
+
+Where it genuinely matters is bulk. Validating a hundred thousand rows from a file, or every element of a large array in a numerical pipeline, is a case where you should measure. The answer there is usually not to abandon models but to validate the container once rather than each item through a Python loop, which is a topic the `TypeAdapter` module returns to.
+
+The rule that follows is the one this article opened with: validate at the boundary, once. Re-validating an object that has already passed is pure cost with no information gained.
+
+## Where it came from, and why v2 matters
+
+Pydantic v1 was pure Python. It was popular enough to become a dependency of a large part of the ecosystem, and slow enough that its performance was a recurring complaint.
+
+Version 2, released in 2023, kept the API broadly recognisable and rewrote the engine in Rust as a separate package called `pydantic-core`. When you install `pydantic` you get both: a Python layer that reads your annotations and builds a schema, and a compiled core that executes that schema against data.
+
+This split explains several things you will notice. It is why validation is fast. It is why the error `type` codes look like machine identifiers rather than sentences &mdash; they come from the core. It is why `model_validate_json` beats `json.loads` plus validation, since the core parses and validates in one pass without building intermediate Python objects. And it is why a wheel exists for every platform: there is compiled code in there.
+
+The practical consequence for you is about documentation. A great deal of Pydantic material online predates v2 and describes an API that has moved. The reliable signals: v1 uses `@validator`, `.dict()`, `.json()` and `class Config`; v2 uses `@field_validator`, `.model_dump()`, `.model_dump_json()` and `model_config`. If an article uses the first set, treat everything in it as historical.
+
+## Four things people expect it to be
+
+**An ORM.** It is not, and it does not talk to a database. It pairs well with one &mdash; SQLModel exists precisely to join them &mdash; but a model is not a table and validating one does not persist anything.
+
+**A static type checker.** Also no. Mypy and Pyright analyse code without running it and catch mistakes in your own source. Pydantic checks values at runtime and catches mistakes in data. They overlap in vocabulary and not in job, and a serious codebase uses both.
+
+**A serialisation format.** `model_dump_json` produces JSON, but Pydantic is not competing with `json` or `msgpack`. It describes and checks the shape; the encoding is a service it offers on top.
+
+**Automatic.** Nothing validates until you ask. A function annotated with a model type does not check its argument; only constructing or validating a model does. There is a `@validate_call` decorator that brings the same checking to function arguments, and it is opt-in for the same reason.
+
+## The habit worth forming
+
+When you find yourself writing `if not isinstance(...)`, or reaching into a dictionary with `.get()` and a default, or writing a comment that explains what shape a parameter is meant to have &mdash; that is a model waiting to be written.
+
+The comment in particular is the strongest signal. A sentence describing the shape of data is a schema that cannot be executed, checked or kept honest. Turning it into a model costs about the same number of lines and cannot go stale.
+
 ## Where this track goes
 
 The next module builds a first model properly &mdash; fields, required versus optional, and what you get back. After that comes the part everyone trips over: precisely which values Pydantic will convert and which it will refuse, and how to read the error when it refuses.
@@ -601,6 +665,111 @@ The instinct is to build one model with a lot of optional fields. Resist it. Opt
 
 Separate models say what they mean. `ModuleSummary` has two required fields and is honest about it. Converting between them is one line, because a dump from one is valid input to the other whenever the fields line up.
 
+## Field order, and why it exists
+
+Fields have an order &mdash; the order you wrote them &mdash; and although you cannot pass them positionally, the order is not cosmetic.
+
+It determines the order of keys in `model_dump()` and in the generated JSON, which matters when a human reads the output or when something downstream diffs two payloads. It determines the order fields appear in the generated schema, and therefore in API documentation. And it determines validation order, which becomes significant once you write validators that look at previously-validated fields.
+
+The practical advice is to order fields the way you would explain them: identity first, then the important attributes, then the optional extras. It costs nothing and every reader of the output benefits.
+
+## Looking at the model itself
+
+A model knows about its own fields, and that introspection is available to you:
+
+```python
+Module.model_fields          # {'title': FieldInfo(...), 'minutes': FieldInfo(...)}
+list(Module.model_fields)    # ['title', 'minutes']
+```
+
+Each `FieldInfo` carries the annotation, whether the field is required, the default if there is one, and any metadata such as a description. This is what the schema generator reads, and it is available to you for the same kind of work &mdash; building a form, generating a table header, checking that every field has a description before you ship.
+
+`model_fields` is defined on the class, not the instance, so you can inspect a model without having any data for it.
+
+## Copying and changing
+
+Models are ordinary objects and you can assign to their attributes, but that is often not what you want &mdash; particularly if something else is holding a reference to the same object.
+
+`model_copy` makes a new one:
+
+```python
+original = Module(title="Vectors", track="maths", minutes=8)
+longer = original.model_copy(update={"minutes": 12})
+```
+
+Two things to know about it. The copy is shallow by default, so a nested model or a list is shared between the two objects; pass `deep=True` when that matters. And `update` does **not** validate the new values &mdash; it writes them in directly. If the values came from anywhere untrusted, build a new model instead of copying with an update.
+
+## Making a model immutable
+
+By default a model's attributes can be reassigned, and by default that reassignment is not validated:
+
+```python
+m.minutes = "not a number"    # allowed, and now the field is a string
+```
+
+Two settings fix two different halves of that. `validate_assignment=True` runs validation on assignment, so the line above raises. `frozen=True` forbids assignment entirely and makes the model hashable, so it can be a dictionary key or a set member.
+
+```python
+class Module(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    title: str
+```
+
+Frozen models are worth reaching for more often than people do. A value that arrives from outside, is validated once and then read many times has no business being mutable, and freezing it removes a whole class of "who changed this?" question.
+
+## Inheritance
+
+Models inherit, and it works the way you would hope: subclass fields are added to the parent's, and the parent's validators still run.
+
+```python
+class ModuleBase(BaseModel):
+    title: str
+    minutes: int
+
+class ModuleInDB(ModuleBase):
+    id: int
+    created_by: str
+```
+
+This is the standard way to express the family of shapes one concept needs &mdash; a base with the common fields, then `Create`, `Update` and `InDB` variants that add or relax what they must. It keeps the shared fields in one place, so a change to the base reaches all of them.
+
+Be careful with one thing: a subclass cannot make an inherited required field optional in a way that reads clearly. Redeclaring `title: str = "untitled"` works, but a reader now has to check two classes to know what `title` does. If the variants differ a lot, separate models are kinder than deep inheritance.
+
+## What `repr` gives you
+
+Printing a model prints its fields, which is more useful than the default `<Module object at 0x...>` and is one of the small things that makes models pleasant in a REPL or a log line.
+
+You can keep a field out of that output with `Field(repr=False)` &mdash; the obvious use being anything secret. A password hash or an API token in a model that gets logged is a genuine incident waiting to happen, and `repr=False` is the one-word fix.
+
+Note that it only affects the representation. The value is still in `model_dump()`, so a field that must never leave the process needs `exclude=True` as well, or a separate output model that simply does not have it.
+
+## Two mistakes worth avoiding early
+
+**Treating a model like a dictionary.** Models do not support `m["title"]`, and the instinct to reach for it usually signals code that is passing models where it should be passing dicts, or the reverse. Decide which side of the boundary a function is on: if it takes untrusted data, it takes a dict and validates it; if it takes validated data, it takes a model and uses attributes.
+
+**Putting expensive work in a model.** A model is constructed every time data arrives, and anything in a validator runs on that path. A network call, a database lookup or a file read inside a model turns validation into I/O, makes the model impossible to test without mocking, and turns a `ValidationError` into a timeout. Keep models pure: they check the shape of data using only the data. Rules that need to consult the world belong in the layer that owns the world.
+
+## A working shape to copy
+
+Putting the module together, the following is close to what a real model looks like once it has been through a couple of rounds of use:
+
+```python
+class Module(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    title: str
+    track: str
+    minutes: int = 10
+    published: bool = False
+
+    def slug(self) -> str:
+        return self.title.lower().replace(" ", "_")
+```
+
+Frozen, because it arrives from outside and is then only read. Two required fields, because a module without a title or a track is not a module. Two defaults with obvious values. One method, because the slug is derived from the title and belongs next to it.
+
+Nothing exotic, and it already gives you validation, coercion, equality, a readable `repr`, JSON in both directions and a schema. That ratio &mdash; how much you get for how little you wrote &mdash; is the reason the library is worth learning properly rather than copying from examples.
+
 ## What to try next
 
 Change something in the editors above and watch what happens. Add a field to a model and leave it out of the constructor call. Pass `minutes` as `"11"` and print its type. Remove a field from the JSON before validating it back.
@@ -859,6 +1028,86 @@ There is a module on strict mode in the next tier that covers when the trade is 
 Every refusal carries a stable `type` code, and they are worth recognising because they say precisely which rule fired:
 
 `int_parsing` means a string did not read as an integer. `int_from_float` means a float had a fractional part. `string_type` means a non-string reached a `str` field. `bool_parsing` means a string was not in the boolean table. Matching on these is more reliable than matching on the message, which is prose and may be reworded.
+
+## Dates, times and the other standard types
+
+Pydantic knows the common standard-library types, and the conversions are the ones you would want.
+
+A `datetime` field accepts a `datetime`, an ISO 8601 string such as `"2026-08-26T14:30:00"`, and a Unix timestamp as an integer or float. A `date` accepts `"2026-08-26"`. A `time` accepts `"14:30:00"`. A `timedelta` accepts a number of seconds or an ISO 8601 duration.
+
+`UUID` accepts a `UUID` or its string form. `Decimal` accepts a string, an int or a float &mdash; and for money you want the string, because `Decimal(0.1)` inherits the float's inaccuracy while `Decimal("0.1")` does not. `Path` accepts a string. `Enum` accepts the member or its value.
+
+The pattern is consistent: the type itself always works, and the obvious textual representation works. That is what makes models useful directly against JSON, where none of these types exist natively.
+
+Timezones deserve a warning. A naive `datetime` string produces a naive `datetime`, and comparing one of those to an aware one raises. If your application is timezone-aware, say so in the type with `AwareDatetime`, and the model will reject naive input rather than letting it through to fail later.
+
+## What a collection will accept
+
+Container types coerce their contents, item by item.
+
+`List[int]` given `["1", "2", "3"]` gives `[1, 2, 3]` &mdash; each element goes through the same rules described above. If one element fails, only that element fails, and the error's `loc` names its index.
+
+There is a shape rule as well as a content rule. A `List[int]` accepts a list, and in lax mode also a tuple, a set or a generator, because all of those are sequences of items. It does **not** accept a bare string, even though a string is technically iterable. That exception is deliberate and it is a mercy: `List[str]` given `"abc"` producing `["a", "b", "c"]` would be a memorably bad afternoon.
+
+`Dict[str, int]` coerces keys and values independently. `Set[int]` deduplicates, which means a set field can quietly return fewer items than were sent &mdash; usually what you want, occasionally a surprise.
+
+`Tuple[int, str]` is checked positionally and by length: exactly two items, first an int, second a string. `Tuple[int, ...]` means any number of ints.
+
+## None is not a wildcard
+
+A common early mistake is expecting `None` to be accepted wherever a value is missing. It is not. `None` is a value like any other, and it is accepted only where the type allows it &mdash; which means `Optional[X]`, or `X | None`.
+
+A field annotated `int` given `None` raises, with the type `int_type`. This is right: "no value" and "the number zero" are different facts, and a library that quietly turned one into the other would be hiding information.
+
+If you want missing to mean something specific, say it with a default: `minutes: int = 0` accepts an absent field and gives you a zero, while still refusing an explicit `None`.
+
+## JSON mode is stricter than Python mode
+
+There are two validation modes, and they differ in ways that occasionally matter.
+
+`model_validate` takes Python objects. `model_validate_json` takes a JSON string and parses it in the Rust core.
+
+The distinction shows up because JSON has fewer types than Python. A JSON document has no `datetime`, so a `datetime` field validated from JSON must accept a string &mdash; and it does. But in Python mode, some conversions that would be ambiguous in JSON are allowed because the input type already disambiguates them.
+
+For everyday models the two behave the same and you can ignore the difference. It becomes relevant with custom serialisers and with `Decimal`, where the JSON parser can preserve a number's exact textual form in a way that a Python float has already lost. When precision matters, validating from JSON directly is not just faster &mdash; it is more faithful.
+
+## The rules on one page
+
+Worth committing to memory, because most surprises are one of these:
+
+**To `int`:** whole-number strings yes, whitespace ignored; floats only when exact; `True` gives `1`; anything else raises.
+
+**To `float`:** ints yes, numeric strings yes, scientific notation yes.
+
+**To `str`:** other strings only. Numbers, booleans and `None` all raise.
+
+**To `bool`:** a fixed vocabulary of words and `0`/`1`; everything else raises, including `2`.
+
+**To a container:** the items are coerced individually; a string is never treated as a sequence of characters.
+
+**`None`:** allowed only where the annotation says so.
+
+**Everywhere:** conversion never loses information silently. Where it would, it raises instead.
+
+That last line is the principle the whole table is generated from. If you remember one thing, remember that, and you can usually predict the rest.
+
+## Debugging a conversion you did not expect
+
+When a field comes out as something surprising, there is a quick sequence that finds the cause almost every time.
+
+**Print the type, not the value.** `print(type(m.minutes).__name__, m.minutes)` distinguishes `9` the integer from `9` the string, which `print(m.minutes)` does not.
+
+**Look at the error's `input`.** If it raised, the report shows what actually arrived. It is frequently not what the caller believed they sent &mdash; `"null"` as a four-character string, a number wrapped in a list, an empty string where a missing field was intended.
+
+**Check for a `Union`.** Unexpected types nearly always come from a union member being chosen that you did not have in mind. `Union[int, str]` will hand you a string sometimes and an integer other times, and both are correct behaviour for the annotation you wrote.
+
+**Try it in strict mode.** Temporarily setting `strict=True` turns every silent conversion into an error that names the field. It is the fastest way to find out which conversions a model is actually performing, and you can turn it off again afterwards.
+
+## What to take away
+
+Coercion is the feature people distrust first and rely on most. It exists because the boundary is made of text, and it is bounded by a single principle: convert when the reading is unambiguous and nothing is lost, refuse otherwise.
+
+Once that principle is in your head, the individual rules stop needing to be memorised. `9.5` to an int loses information, so it raises. `"9"` to an int loses nothing, so it converts. `9` to a string loses nothing either, but that direction hides caller mistakes, so it is the one deliberate exception &mdash; and knowing it is an exception is easier than remembering it as an arbitrary rule.
 
 ## The practical shape
 
@@ -1165,6 +1414,114 @@ Reserve `None` for values that are genuinely absent in the domain: a summary nob
 
 And when you are modelling an update rather than a creation, reach for `exclude_unset` early. It is easier to build the endpoint correctly than to work out later why six columns went blank.
 
+## The ellipsis, and other spellings of "required"
+
+You will meet `Field(...)` in older code and in a lot of documentation:
+
+```python
+title: str = Field(..., min_length=3)
+```
+
+The literal `Ellipsis` was Pydantic v1's way of saying "there is no default, this is required", because `Field` needed something in the default position. It still works in v2, and it is redundant: omitting the default says the same thing.
+
+```python
+title: str = Field(min_length=3)     # identical, and clearer
+```
+
+Prefer the second. The first makes readers who have not met the convention stop and look it up, and it buys nothing.
+
+## Defaults that depend on the environment
+
+A default does not have to be a literal. `default_factory` takes any callable, which means a default can come from configuration, the clock, or a generator:
+
+```python
+created: datetime = Field(default_factory=datetime.now)
+request_id: str = Field(default_factory=lambda: uuid4().hex)
+retries: int = Field(default_factory=lambda: int(os.getenv("RETRIES", "3")))
+```
+
+The third one is worth a caution. Reading configuration inside a default factory works, but it happens at model-construction time rather than at import, which makes it harder to reason about and hard to override in tests. For anything that is really configuration, a settings model is the better home &mdash; that is a module in the last tier.
+
+There is also a form of `default_factory` that receives the already-validated data, letting a default depend on other fields. It is powerful and easy to overuse; a value computed from other fields is often better expressed as a `computed_field`, which does not pretend to be an input.
+
+## How this appears in the schema
+
+The distinction between required, optional and nullable is not just a Python concern &mdash; it shows up in the generated JSON Schema, and therefore in your API documentation and any client generated from it.
+
+A field with no default appears in the schema's `required` array. A field with a default does not, and its default is recorded. A nullable field's type becomes an `anyOf` including `null`.
+
+So the four combinations produce four genuinely different contracts for a consumer:
+
+`str` &mdash; must be sent, cannot be null.
+`str = "x"` &mdash; may be omitted, cannot be null.
+`Optional[str]` &mdash; must be sent, may be null.
+`Optional[str] = None` &mdash; may be omitted, may be null.
+
+Reading them as sentences like that is the fastest way to check you have written what you meant. If the sentence sounds wrong for your API, the annotation is wrong.
+
+## Designing create and update models
+
+The place all of this comes together is a resource with more than one shape.
+
+**Create** takes what a caller may supply. The server-assigned id is absent entirely &mdash; not optional, absent &mdash; because including it invites a caller to try setting it.
+
+**Update**, for a PATCH, has every field optional with a `None` default, and is dumped with `exclude_unset=True` so that untouched fields stay untouched.
+
+**Output** has everything the caller is allowed to see, with server-assigned fields required, because by the time you are returning one they exist.
+
+```python
+class ModuleCreate(BaseModel):
+    title: str
+    minutes: int = 10
+
+class ModuleUpdate(BaseModel):
+    title: Optional[str] = None
+    minutes: Optional[int] = None
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+    minutes: int
+```
+
+Three small classes rather than one clever one. Each says exactly what it means, and none of them needs a comment explaining which fields apply when.
+
+The temptation is always to collapse them into a single model with everything optional. It looks like less code and it is: it is also a model that documents nothing, generates useless API docs, and cannot tell a client what is guaranteed in a response.
+
+## A note on validation order
+
+Fields are validated in declaration order, and defaults are filled as part of that pass. This matters once you write a validator that reads another field: it can only see fields declared *above* it, because the ones below have not been processed yet.
+
+If a rule needs the whole object, that is what `model_validator(mode="after")` is for &mdash; it runs once, after every field is in place. Trying to express a cross-field rule as a field validator on whichever field happens to come last works until somebody reorders the class.
+
+## A checklist for a field you are about to write
+
+Four questions, in order, and the annotation falls out of the answers.
+
+**Can this be absent?** If yes, it needs a default. If no, leave the default off and let the model refuse.
+
+**Can this be null, meaningfully?** Only if "no value" is a real state in your domain &mdash; an unwritten summary, an unfinished end date. If `None` would just mean "nobody bothered", it is not nullable; it is defaulted.
+
+**Is the default a constant or does it depend on when we are?** A constant goes in directly. Anything computed &mdash; a time, an id, a fresh container &mdash; goes in `default_factory`.
+
+**Am I creating or updating?** Creating means required fields are required. Updating means everything is optional and you dump with `exclude_unset=True`.
+
+Most confusing models are the result of answering the second question with "I suppose so" instead of thinking about it. `Optional[X] = None` is the annotation people reach for when they have not decided, and a model full of them has quietly recorded that nothing was ever decided.
+
+## What this buys downstream
+
+The payoff for being precise here shows up somewhere else entirely: in the code that reads the model.
+
+If `summary: Optional[str] = None` genuinely means "may not have been written yet", then `if module.summary:` is a meaningful branch about the domain. If it means "we were not sure", every reader has to defend against `None` on every field, and the type system has stopped helping.
+
+Required fields are a promise to the rest of your program. Each one you make lets code downstream stop checking. That is the actual product of this module: not the syntax, but the discipline of deciding what is guaranteed and then writing it down where the compiler, the schema and the next reader can all see it.
+
+## One last distinction
+
+There is a fourth state people occasionally need, beyond required, defaulted and nullable: a field that may be absent but has no sensible default, where you genuinely want to know whether it was supplied.
+
+That is what `model_fields_set` and `exclude_unset` exist for, and it is worth naming explicitly because the instinct is to invent a sentinel &mdash; a magic string, a `-1`, a custom `UNSET` object &mdash; and thread it through the code. Pydantic already tracks the answer. Reach for the sentinel only when the value has to survive serialisation, which is rare, and think hard before you do, because every consumer of that data now has to know about your magic value.
+
 ## Next
 
 The next module is about the moment a model says no: how to read a `ValidationError` in full, what each part of an entry means, and how to turn one into a message a user can act on.
@@ -1460,6 +1817,128 @@ A caller insists they are sending a number, and `input` shows `"12"` with quotes
 
 None of that is visible in the message. All of it is visible in one line of the report.
 
+## The parts of an entry you have not used yet
+
+Beyond `loc`, `type`, `msg` and `input`, an error entry carries two more things.
+
+`url` is a link to the documentation page for that error type. It is the `https://errors.pydantic.dev/...` line you see at the end of a printed error. It is genuinely useful while learning and noise in a log, so it can be turned off: `e.errors(include_url=False)`.
+
+`ctx` holds the parameters of the rule that failed, when there are any. A `greater_than` error carries `{"gt": 0}`; a `string_too_short` carries `{"min_length": 3}`. This is what lets you write one message template per type and fill in the actual limit:
+
+```python
+TEMPLATES = {
+    "greater_than": "Must be more than {gt}.",
+    "string_too_short": "Needs at least {min_length} characters.",
+}
+msg = TEMPLATES[err["type"]].format(**err.get("ctx", {}))
+```
+
+That is the difference between "that is too short" and "needs at least 3 characters", without hard-coding the 3 in two places.
+
+## Errors from a JSON string
+
+`model_validate_json` produces the same error entries with one addition: when the JSON itself is malformed, you get a `json_invalid` error whose context includes the position in the document.
+
+That matters for large payloads. A missing comma four hundred lines into a config file produces an error that names the line, which is considerably more use than "invalid JSON".
+
+It is also why validating JSON directly is better than `json.loads` followed by `model_validate`. Go through `json.loads` and a syntax error is a `JSONDecodeError` from a different library, which you have to catch separately and which knows nothing about your model. Validate the JSON directly and malformed documents and invalid data arrive through one exception type, handled in one place.
+
+## Model-level errors have no field
+
+A rule that spans fields belongs to the object, not to any one field, so its `loc` is empty:
+
+```python
+@model_validator(mode="after")
+def check_window(self):
+    if self.ends_at <= self.starts_at:
+        raise ValueError("ends_at must be after starts_at")
+    return self
+```
+
+The resulting entry has `loc: ()`. Any code that assumes `loc[0]` exists will raise an `IndexError` on it &mdash; which is a bug that appears the first time somebody adds a cross-field rule, long after the error handling was written.
+
+Handle it explicitly. Grouping code should fall back to a key like `"_"` or `"__root__"` for empty locations, and the front end should have somewhere to display an error that is not attached to an input.
+
+## Testing that validation fails
+
+Validation logic deserves tests, and the useful ones assert on `type` and `loc` rather than on prose.
+
+```python
+import pytest
+from pydantic import ValidationError
+
+def test_minutes_must_be_positive():
+    with pytest.raises(ValidationError) as exc:
+        Module(title="Vectors", minutes=-1)
+    errors = exc.value.errors()
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ("minutes",)
+    assert errors[0]["type"] == "greater_than"
+```
+
+Asserting on the message makes the test fail when Pydantic rewords something, which teaches your team to distrust the suite. Asserting on `loc` and `type` tests the thing you actually care about: that the right rule fired on the right field.
+
+It is also worth testing the positive case explicitly &mdash; that a valid payload produces the values you expect, coercions included. A test that `minutes="9"` becomes the integer `9` documents an intention that is otherwise invisible.
+
+## Making errors useful to a human
+
+A last thought, because this is where validation meets the person using your software.
+
+The default messages are written for developers. "Input should be a valid integer, unable to parse string as an integer" is precise and it is not what you want beside a form field. A user does not care about parsing; they care that they typed "ten" in a box that wanted a number.
+
+The translation layer is small &mdash; a dictionary from `type` to a sentence &mdash; and it is worth building once, early, for the twenty or so error types your application can actually produce. Fall back to `msg` for anything unmapped so nothing ever renders blank.
+
+And keep the developer version too. Logging the full `errors()` while showing the friendly version means that when a user says "it told me my email was wrong and it wasn't", you have the `input` value that settles it.
+
+## A complete handler you can lift
+
+Putting the pieces together, this is a small function that covers everything above &mdash; grouping by field, using `ctx` for the limits, falling back gracefully, and handling model-level errors:
+
+```python
+TEMPLATES = {
+    "missing": "This field is required.",
+    "int_parsing": "Please enter a whole number.",
+    "greater_than": "Must be more than {gt}.",
+    "string_too_short": "Needs at least {min_length} characters.",
+}
+
+def friendly(exc: ValidationError) -> dict:
+    out = {}
+    for err in exc.errors(include_url=False):
+        field = ".".join(str(p) for p in err["loc"]) or "_form"
+        template = TEMPLATES.get(err["type"])
+        if template:
+            message = template.format(**err.get("ctx", {}))
+        else:
+            message = err["msg"]
+        out.setdefault(field, []).append(message)
+    return out
+```
+
+Twelve lines, and it covers every error the application can produce. New error types degrade to Pydantic's own wording rather than to a blank space, so nothing is ever invisible, and adding a nicer message later is one dictionary entry.
+
+## Why the design is the way it is
+
+It is worth noticing what this error model is optimised for, because it explains several choices that look odd in isolation.
+
+It reports everything at once because the expensive part of validation is the round trip to the user, not the checking.
+
+It uses stable codes rather than messages because the consumer is often another program, and programs need identifiers that do not move.
+
+It carries `input` because the most common question after a rejection is "what did they actually send", and the alternative is asking them.
+
+And it makes `loc` a path rather than a name because real payloads nest, and an error that cannot say *where* in a hundred-line document the problem is has told you almost nothing.
+
+Every one of those is a decision made for the person on the other end of the failure. Reading errors well is mostly a matter of noticing that the information you want is already in there.
+
+## One more habit
+
+Log the full error, show the friendly one.
+
+These are different audiences with different needs, and collapsing them serves neither. The user needs a sentence they can act on, in their language, next to the input that caused it. You need `loc`, `type`, `input` and enough context to reproduce the failure without asking anyone anything.
+
+Doing both costs one extra line at the point where you catch the exception, and it is the difference between a support conversation that starts with "can you tell me exactly what you typed" and one that starts with "I can see what happened". The information was in the exception the whole time; the only question is whether you kept it.
+
 ## Next
 
 The next module goes the other way: not reading the errors Pydantic produces, but writing the rules that produce them. `Field` constraints let you say more about a value than its type &mdash; a minimum, a length, a pattern &mdash; and every one of them comes back through exactly the machinery described here.
@@ -1723,6 +2202,117 @@ A constraint is a statement about a single value in isolation. Anything that dep
 Anything requiring a lookup &mdash; does this track exist, is this name taken &mdash; also does not belong here. A model should be able to validate without touching a database. Keep I/O-dependent rules in the layer that owns the I/O.
 
 And a constraint is not a substitute for thinking about the type. If a field can only be one of four strings, `Literal["maths", "python", "dsa", "ml"]` is better than a pattern: it is clearer, it produces a better error, and it appears in the schema as an enumeration a client can render as a dropdown.
+
+## Annotated: the other spelling
+
+Everything in this module can also be written with `Annotated`, and in modern Pydantic that spelling is often the better one:
+
+```python
+from typing import Annotated
+from pydantic import Field
+
+minutes: Annotated[int, Field(gt=0, le=180)]
+```
+
+The two forms behave identically for a simple field. The difference appears when a default is involved, and it is a real improvement:
+
+```python
+minutes: Annotated[int, Field(gt=0, le=180)] = 10
+```
+
+Here the constraint lives with the type and the default sits where defaults normally sit. In the `= Field(default=10, gt=0)` form the two are tangled together in one call, and it is easy to misread which part is the default.
+
+The bigger win is reuse, which the next section is about.
+
+## Constrained types you can name
+
+Because `Annotated` produces a type, you can give it a name and use it everywhere:
+
+```python
+Minutes = Annotated[int, Field(gt=0, le=180)]
+Slug = Annotated[str, Field(pattern=r"^[a-z0-9_]+$")]
+
+class Module(BaseModel):
+    slug: Slug
+    minutes: Minutes = 10
+
+class Lesson(BaseModel):
+    slug: Slug
+    minutes: Minutes
+```
+
+This is the single highest-value habit in this module. The rule for what a slug is now exists once. Change it and every model that uses it changes. Without this, the same regular expression gets copied into six models and four of them are updated when it changes.
+
+It also improves the reading. `slug: Slug` says what the field is; `slug: str = Field(pattern=r"^[a-z0-9_]+$")` makes the reader parse a regular expression to find out.
+
+Pydantic ships some of these ready-made &mdash; `PositiveInt`, `NonNegativeInt`, `PositiveFloat`, `StrictStr` and others &mdash; and they are worth using where they fit, for the same reason.
+
+## Strictness on a single field
+
+Whole-model strictness is a blunt instrument. Usually the need is narrower: lax about most of a payload, exact about one field where a silent conversion would be dangerous.
+
+```python
+user_id: int = Field(strict=True)
+```
+
+Now `user_id="123"` raises while the rest of the model still accepts strings for its numbers. Identifiers are the classic case: an id that arrives as text is usually a sign that something upstream is confused, and quietly converting it hides that.
+
+The `Annotated` form works too: `Annotated[int, Field(strict=True)]`, which can then be named and reused like any other constrained type.
+
+## More than one constraint, and how failures report
+
+A field can carry several constraints, and they are all checked. If more than one fails, you get more than one error entry for that field:
+
+```python
+title: str = Field(min_length=3, max_length=10, pattern=r"^[A-Z]")
+```
+
+Given `"ab"`, both `min_length` and `pattern` fail, and both appear. That is worth knowing when you build the field-to-messages mapping described in the errors module: a field maps to a *list* of messages, not one.
+
+Constraints are checked after coercion, and a coercion failure short-circuits the rest &mdash; there is no point comparing a value against zero when it never became a number. So a field produces either one `*_parsing` error or one or more constraint errors, never both.
+
+## What the schema does with them
+
+Every constraint has a JSON Schema equivalent, and Pydantic emits it:
+
+`gt` becomes `exclusiveMinimum`, `ge` becomes `minimum`, `lt` becomes `exclusiveMaximum`, `le` becomes `maximum`. `min_length` and `max_length` become `minLength`/`maxLength` for strings and `minItems`/`maxItems` for arrays. `pattern` becomes `pattern`. `multiple_of` becomes `multipleOf`.
+
+This is why constraints are better than validators when either would do. A `field_validator` that checks `v > 0` is invisible to the schema: the documentation says "integer", the client-side form has no idea, and the generated client will happily send `-1`. `Field(gt=0)` appears in the documentation as a documented minimum, and tooling that reads the schema can enforce it before a request is ever made.
+
+The general rule: express a rule as a constraint if a constraint can express it, and reach for a validator only when it cannot.
+
+## Constraints that are really types
+
+Finally, a check worth running on yourself. If a constraint is trying to enumerate a small set of allowed values, it is the wrong tool.
+
+```python
+track: str = Field(pattern=r"^(maths|python|dsa|ml)$")     # works
+track: Literal["maths", "python", "dsa", "ml"]             # better
+```
+
+The second version produces a clearer error, appears in the schema as an enumeration a client can render as a dropdown, and is checked by mypy in your own code. The regular expression does none of that, and it will be the thing somebody forgets to update when a fifth track is added.
+
+## A short catalogue to work from
+
+Everything available, in one place, so you can stop looking it up.
+
+**Numbers:** `gt`, `ge`, `lt`, `le`, `multiple_of`. Also `allow_inf_nan=False` for floats, which is worth setting on anything that will be serialised to JSON &mdash; `Infinity` and `NaN` are not valid JSON, and a value that validated happily will fail on the way out.
+
+**Strings:** `min_length`, `max_length`, `pattern`. Plus the config-level `str_strip_whitespace`, `str_to_lower` and `str_to_upper`, which apply to every string field on a model &mdash; stripping whitespace on input is almost always the right default for form data.
+
+**Collections:** `min_length`, `max_length`.
+
+**Decimals:** `max_digits` and `decimal_places`, which are what you want for money and which no amount of `float` will give you.
+
+**Everything:** `strict`, `frozen` on a single field, `description`, `title`, `examples`, `deprecated`, `repr=False`, `exclude=True`.
+
+## The habit this module is really teaching
+
+Look at the constraints you have written and ask what a reader learns from them. A well-constrained model is a specification: someone can read the class and know what the system considers a valid module, without opening a single function.
+
+An unconstrained model is a list of types, and the actual rules are scattered through the code that consumes it &mdash; a check here, an assertion there, an assumption somewhere else that nobody wrote down. Those rules still exist. They are just not anywhere you can read them, and they disagree with each other more often than anyone expects.
+
+Moving a rule into the model is not primarily about catching bad data, though it does that. It is about having one place where the shape of your domain is stated, which is the same reason the annotations were worth enforcing in the first place.
 
 ## Next
 
@@ -2028,6 +2618,89 @@ Reach for **`@dataclass`** for internal values that never leave the process and 
 Reach for **`pydantic.dataclasses.dataclass`** when you want validation on a dataclass that already exists.
 
 Reach for **`TypeAdapter`** when the thing you need to validate is not a class.
+
+## The rest of the field
+
+Dataclasses are not the only alternative, and the others sit in predictable places.
+
+**`attrs`** is the library dataclasses were inspired by, and it is still ahead in features: converters, richer validators, better control over generated methods. It does validate, if you ask it to, and it is a reasonable choice for internal classes with complex construction. It is not aimed at the boundary and does not generate JSON Schema.
+
+**`NamedTuple`** gives you an immutable, tuple-shaped record with named access. It checks nothing at runtime, and its tuple-ness is either the point or a trap depending on whether you wanted something you can unpack and compare positionally.
+
+**`TypedDict`** describes the shape of a dictionary for a static type checker. It is worth being clear about this one: at runtime, a `TypedDict` **is a plain dict**. There is no class, no checking, and no error if a key is missing or the wrong type. It is a comment mypy can read. Where people usually want a `TypedDict` and validation, what they want is a model.
+
+**`SQLModel`** joins Pydantic and SQLAlchemy so one class can be both a table and a validated model. It is convenient and it is a coupling: your API shape and your database schema become the same object, which is fine until they need to differ, which they eventually do.
+
+## Memory, and the shape of an instance
+
+A `BaseModel` instance stores its data in `__dict__` plus some bookkeeping &mdash; `__pydantic_fields_set__` for what was supplied, and a reference to the compiled validator on the class.
+
+A dataclass also uses `__dict__` unless you declare `slots=True`, which trades the ability to add attributes for a smaller, faster object. A `NamedTuple` is the smallest of the lot, being a tuple.
+
+For thousands of objects this is invisible. For millions it is not, and it is a real reason to use something leaner for the interior of a numerical or batch-processing system. It is also a reason not to worry about it before you have measured, because "millions of objects" is a specific situation rather than a general one.
+
+## Moving between them
+
+Conversion is mechanical in every direction, which is what makes the boundary-then-interior pattern practical.
+
+From model to dataclass: `Module(**checked.model_dump())`.
+
+From dataclass to model: `ModuleIn.model_validate(dataclasses.asdict(d))`, or `model_validate(d)` directly, since Pydantic can read attributes off arbitrary objects when the model sets `from_attributes=True`.
+
+That last setting deserves a mention of its own. `from_attributes=True` lets a model validate from any object with matching attributes rather than requiring a dict:
+
+```python
+class ModuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    title: str
+    minutes: int
+
+ModuleOut.model_validate(orm_row)
+```
+
+This is how a model reads an ORM row, and it is the single most common reason to reach for it. In Pydantic v1 it was called `orm_mode`, which is the name most tutorials still use.
+
+## When a model is genuinely too much
+
+A short list of cases where reaching for `BaseModel` is over-engineering.
+
+A function returning two values does not need a model. A tuple, or a `NamedTuple` if the names help, is fine.
+
+A short-lived internal structure that never leaves the function that built it does not need validation, because nothing untrusted can reach it.
+
+A constant lookup table is a dict. Wrapping it in a model to get attribute access is a lot of ceremony for a dot.
+
+And a value with one field is usually just that value. `class Slug(BaseModel): value: str` is a wrapper that every caller has to unwrap. If you want a validated string type, `Annotated[str, Field(pattern=...)]` gives you that without the box.
+
+## The question to actually ask
+
+Not "which is faster" or "which is more modern", but: **does anything untrusted reach this object, and does it ever leave the process?**
+
+If untrusted data reaches it, you need validation, and `BaseModel` is the tool built for that.
+
+If it leaves the process &mdash; as JSON, in a response, in a schema &mdash; you want serialisation and documentation, and again that is `BaseModel`.
+
+If neither is true, you have an internal value, and the lightest thing that expresses it well is the right answer. That will usually be a dataclass, and occasionally a tuple.
+
+Most objects in most applications are at a boundary, which is why the honest general recommendation is to use models and stop worrying about it. The interesting cases are the exceptions, and now you can recognise them.
+
+## A note on migrating an existing codebase
+
+If you arrive at this with a project full of dataclasses, you do not have to choose in one go.
+
+The cheapest first move is to convert only the classes that sit at a boundary &mdash; whatever parses your config, whatever accepts a request body, whatever reads a file. Those are where bad data enters, and they are usually a small fraction of the classes in a project. Everything else can stay exactly as it is.
+
+The second move, if you want checking without restructuring, is `pydantic.dataclasses.dataclass` on the classes that stay. It is a one-line change per class, keeps `dataclasses.fields()` working for anything that introspects them, and starts raising on wrong types immediately.
+
+What you should not do is convert everything to `BaseModel` mechanically. You will end up validating objects that were constructed by your own code from already-validated data, paying for checks that cannot fail, and the diff will be too large for anyone to review properly.
+
+## Summary
+
+A dataclass generates a class from annotations and never looks at the types again. A model generates a class from annotations and enforces them, converts what can be converted, produces structured errors, serialises in both directions and emits a schema.
+
+The cost of all that is real and small, and it is paid where you decide to pay it. The discipline is the same one this whole tier has been building towards: know where your boundaries are, check there, and trust what you have checked.
+
+Choose a dataclass for internal values that never meet the outside world. Choose a model for everything else. And when you are genuinely unsure, choose the model &mdash; a slightly over-validated program is a much smaller problem than one where nobody can say which values are guaranteed.
 
 ## Where this leaves you
 

@@ -77,6 +77,117 @@ Anything requiring a lookup &mdash; does this track exist, is this name taken &m
 
 And a constraint is not a substitute for thinking about the type. If a field can only be one of four strings, `Literal["maths", "python", "dsa", "ml"]` is better than a pattern: it is clearer, it produces a better error, and it appears in the schema as an enumeration a client can render as a dropdown.
 
+## Annotated: the other spelling
+
+Everything in this module can also be written with `Annotated`, and in modern Pydantic that spelling is often the better one:
+
+```python
+from typing import Annotated
+from pydantic import Field
+
+minutes: Annotated[int, Field(gt=0, le=180)]
+```
+
+The two forms behave identically for a simple field. The difference appears when a default is involved, and it is a real improvement:
+
+```python
+minutes: Annotated[int, Field(gt=0, le=180)] = 10
+```
+
+Here the constraint lives with the type and the default sits where defaults normally sit. In the `= Field(default=10, gt=0)` form the two are tangled together in one call, and it is easy to misread which part is the default.
+
+The bigger win is reuse, which the next section is about.
+
+## Constrained types you can name
+
+Because `Annotated` produces a type, you can give it a name and use it everywhere:
+
+```python
+Minutes = Annotated[int, Field(gt=0, le=180)]
+Slug = Annotated[str, Field(pattern=r"^[a-z0-9_]+$")]
+
+class Module(BaseModel):
+    slug: Slug
+    minutes: Minutes = 10
+
+class Lesson(BaseModel):
+    slug: Slug
+    minutes: Minutes
+```
+
+This is the single highest-value habit in this module. The rule for what a slug is now exists once. Change it and every model that uses it changes. Without this, the same regular expression gets copied into six models and four of them are updated when it changes.
+
+It also improves the reading. `slug: Slug` says what the field is; `slug: str = Field(pattern=r"^[a-z0-9_]+$")` makes the reader parse a regular expression to find out.
+
+Pydantic ships some of these ready-made &mdash; `PositiveInt`, `NonNegativeInt`, `PositiveFloat`, `StrictStr` and others &mdash; and they are worth using where they fit, for the same reason.
+
+## Strictness on a single field
+
+Whole-model strictness is a blunt instrument. Usually the need is narrower: lax about most of a payload, exact about one field where a silent conversion would be dangerous.
+
+```python
+user_id: int = Field(strict=True)
+```
+
+Now `user_id="123"` raises while the rest of the model still accepts strings for its numbers. Identifiers are the classic case: an id that arrives as text is usually a sign that something upstream is confused, and quietly converting it hides that.
+
+The `Annotated` form works too: `Annotated[int, Field(strict=True)]`, which can then be named and reused like any other constrained type.
+
+## More than one constraint, and how failures report
+
+A field can carry several constraints, and they are all checked. If more than one fails, you get more than one error entry for that field:
+
+```python
+title: str = Field(min_length=3, max_length=10, pattern=r"^[A-Z]")
+```
+
+Given `"ab"`, both `min_length` and `pattern` fail, and both appear. That is worth knowing when you build the field-to-messages mapping described in the errors module: a field maps to a *list* of messages, not one.
+
+Constraints are checked after coercion, and a coercion failure short-circuits the rest &mdash; there is no point comparing a value against zero when it never became a number. So a field produces either one `*_parsing` error or one or more constraint errors, never both.
+
+## What the schema does with them
+
+Every constraint has a JSON Schema equivalent, and Pydantic emits it:
+
+`gt` becomes `exclusiveMinimum`, `ge` becomes `minimum`, `lt` becomes `exclusiveMaximum`, `le` becomes `maximum`. `min_length` and `max_length` become `minLength`/`maxLength` for strings and `minItems`/`maxItems` for arrays. `pattern` becomes `pattern`. `multiple_of` becomes `multipleOf`.
+
+This is why constraints are better than validators when either would do. A `field_validator` that checks `v > 0` is invisible to the schema: the documentation says "integer", the client-side form has no idea, and the generated client will happily send `-1`. `Field(gt=0)` appears in the documentation as a documented minimum, and tooling that reads the schema can enforce it before a request is ever made.
+
+The general rule: express a rule as a constraint if a constraint can express it, and reach for a validator only when it cannot.
+
+## Constraints that are really types
+
+Finally, a check worth running on yourself. If a constraint is trying to enumerate a small set of allowed values, it is the wrong tool.
+
+```python
+track: str = Field(pattern=r"^(maths|python|dsa|ml)$")     # works
+track: Literal["maths", "python", "dsa", "ml"]             # better
+```
+
+The second version produces a clearer error, appears in the schema as an enumeration a client can render as a dropdown, and is checked by mypy in your own code. The regular expression does none of that, and it will be the thing somebody forgets to update when a fifth track is added.
+
+## A short catalogue to work from
+
+Everything available, in one place, so you can stop looking it up.
+
+**Numbers:** `gt`, `ge`, `lt`, `le`, `multiple_of`. Also `allow_inf_nan=False` for floats, which is worth setting on anything that will be serialised to JSON &mdash; `Infinity` and `NaN` are not valid JSON, and a value that validated happily will fail on the way out.
+
+**Strings:** `min_length`, `max_length`, `pattern`. Plus the config-level `str_strip_whitespace`, `str_to_lower` and `str_to_upper`, which apply to every string field on a model &mdash; stripping whitespace on input is almost always the right default for form data.
+
+**Collections:** `min_length`, `max_length`.
+
+**Decimals:** `max_digits` and `decimal_places`, which are what you want for money and which no amount of `float` will give you.
+
+**Everything:** `strict`, `frozen` on a single field, `description`, `title`, `examples`, `deprecated`, `repr=False`, `exclude=True`.
+
+## The habit this module is really teaching
+
+Look at the constraints you have written and ask what a reader learns from them. A well-constrained model is a specification: someone can read the class and know what the system considers a valid module, without opening a single function.
+
+An unconstrained model is a list of types, and the actual rules are scattered through the code that consumes it &mdash; a check here, an assertion there, an assumption somewhere else that nobody wrote down. Those rules still exist. They are just not anywhere you can read them, and they disagree with each other more often than anyone expects.
+
+Moving a rule into the model is not primarily about catching bad data, though it does that. It is about having one place where the shape of your domain is stated, which is the same reason the annotations were worth enforcing in the first place.
+
 ## Next
 
 That completes the foundations. You can define a model, know exactly what it will and will not convert, control what is required, narrow values to your domain, and read the errors when something does not fit.
