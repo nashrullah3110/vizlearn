@@ -252,6 +252,11 @@
         var lang = wrap.dataset.vzCode;
         var paint = HIGHLIGHT[lang];
         if (!paint) return;
+        // Idempotent, because /notebook/ calls this again for a cell it has
+        // just created. Attaching twice would stack a second set of key
+        // handlers on the same textarea and paint every keystroke twice.
+        if (wrap.dataset.vzCodeReady === '1') return;
+        wrap.dataset.vzCodeReady = '1';
 
         var ta = wrap.querySelector('.vz-code-input');
         var hl = wrap.querySelector('.vz-code-hl');
@@ -333,6 +338,10 @@
     }
 
     document.querySelectorAll('[data-vz-code]').forEach(attach);
+
+    // Editors that did not exist at load. /notebook/ adds a cell on demand and
+    // needs its editor coloured like the ones the page shipped with.
+    window.vzAttachCode = attach;
 
     /* Article code blocks.
      *

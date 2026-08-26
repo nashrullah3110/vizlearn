@@ -134,6 +134,9 @@ SHARED_SCRIPTS = (
 
     # Runnable editors, one per language.
     ("vizlearn-python.js", "vz-py"),
+    # /notebook/ keeps its own kernel: cells share a namespace, which the
+    # one-shot runner above deliberately does not do.
+    ("vizlearn-notebook.js", "vz-nb"),
     ("vizlearn-js.js", "vz-js"),
     ("vizlearn-html.js", "vz-html"),
     # Highlights editor blocks and the static <pre><code class="language-x">
@@ -184,7 +187,7 @@ def scripts_for(src):
 
 # The one-time migration wrote these directly; drop the loose copies.
 LOOSE_SCRIPT = re.compile(
-    r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa|vizlearn-keys|glossary|vizlearn-glossary|vizlearn-python|vizlearn-rails|vizlearn-js|vizlearn-html|vizlearn-code|vizlearn-interview|vizlearn-ragviz)\.js"></script>\n?')
+    r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa|vizlearn-keys|glossary|vizlearn-glossary|vizlearn-python|vizlearn-notebook|vizlearn-rails|vizlearn-js|vizlearn-html|vizlearn-code|vizlearn-interview|vizlearn-ragviz)\.js"></script>\n?')
 
 META_DESC = re.compile(r'<meta\s+name="description"\s+content="([^"]*)"\s*/?>', re.I)
 TITLE = re.compile(r"<title>(.*?)</title>", re.S)

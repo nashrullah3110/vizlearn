@@ -65,6 +65,7 @@ EXTRA = [
     "./assets/vizlearn-glossary.js",
     "./assets/glossary.js",
     "./assets/vizlearn-python.js",
+    "./assets/vizlearn-notebook.js",
     "./assets/vizlearn-ide.js",
     "./assets/vizlearn-code.js",
     "./assets/vizlearn-js.js",

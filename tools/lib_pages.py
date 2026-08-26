@@ -370,6 +370,18 @@ TOOL_PAGES = {
                        "call them in your browser - path and query validation, Pydantic "
                        "request bodies, status codes and the generated OpenAPI schema.",
     },
+    "notebook": {
+        "dir": "notebook",
+        "rel": "notebook/index.html",
+        "title": "Python Notebook",
+        "footer": True,
+        "lead": "Cells that share one kernel, with NumPy, pandas and Matplotlib "
+                "loaded. Charts and DataFrames render inline - no install, nothing "
+                "sent to a server.",
+        "description": "A free online Python notebook with NumPy, pandas and "
+                       "Matplotlib. Run cells that share state, and see DataFrames "
+                       "as tables and plots as charts - entirely in your browser.",
+    },
     "saved": {
         "dir": "saved",
         "rel": "saved/index.html",
