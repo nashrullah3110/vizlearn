@@ -1,0 +1,183 @@
+title: Enums and Literals: Closed Sets Done Properly
+intro: Two ways to say a field may only hold one of a fixed list, and when each is right.
+
+## The rule a type cannot express
+
+`track: str` allows every string ever written. Your application allows four. That gap is where invalid data lives, and closing it is one of the highest-value constraints available &mdash; a misspelt category is a bug that survives for months because nothing rejects it.
+
+There are two good ways to close it, and one common bad one.
+
+## Literal
+
+```python
+track: Literal["maths", "python", "dsa", "ml"]
+```
+
+The permitted values are written where the type goes. Anything else raises, with an error that lists the options.
+
+It is the smallest thing that works, it needs no imports beyond `typing`, and mypy understands it &mdash; so your own code gets checked against the same set. A comparison against `"mathematics"` is flagged by your editor before it ever runs.
+
+## Why not a regular expression
+
+`Field(pattern=r"^(maths|python|dsa|ml)$")` enforces the same rule. It is worse in four distinct ways, and they are worth listing because the pattern approach is common.
+
+**The error.** A `Literal` says the input should be one of a list, and gives the list. A pattern says the string should match a regular expression, and prints the expression. One of those is usable by a person who did not write your code.
+
+**The schema.** A `Literal` becomes `enum` in JSON Schema. Documentation renders it as a set of choices, a generated client offers a type with four options, a form builder makes a dropdown. A `pattern` becomes a `pattern`, and every tool downstream shrugs.
+
+**Static checking.** Mypy knows the four values of a `Literal` and will tell you when a comparison can never be true. It has no idea what a regular expression permits.
+
+**Maintenance.** Adding a fifth track means editing a regular expression, which is a place people make mistakes, versus adding a word to a list.
+
+The only case for a pattern is a set that is genuinely open &mdash; a format rather than a list. Slugs, postcodes, identifiers. If you can enumerate the values, enumerate them.
+
+## Enum
+
+An `Enum` gives the set an identity:
+
+```python
+class Track(str, Enum):
+    MATHS = "maths"
+    PYTHON = "python"
+    DSA = "dsa"
+```
+
+Three things follow that a `Literal` does not give you.
+
+**A name to refer to.** `Track.MATHS` instead of `"maths"` in the code that consumes the model. That means a typo is an `AttributeError` at import rather than a comparison that quietly returns `False`.
+
+**One definition.** The set exists once and is used by every model that needs it. A `Literal` written out in four models is four copies &mdash; though `Annotated` fixes that, and a named `Track = Literal[...]` alias is a perfectly good middle ground.
+
+**Somewhere to put behaviour.** A display label, a colour, an ordering, a `from_legacy_name` classmethod. Enums can have methods and properties, and that is often exactly where that logic belongs.
+
+## The str mixin is not optional
+
+Write `class Track(str, Enum)`, not `class Track(Enum)`, unless you have a specific reason.
+
+Without the mixin, members are not strings. `Track.MATHS == "maths"` is `False`, which breaks every comparison in code that does not know about the enum. `json.dumps` refuses them. String formatting produces `Track.MATHS` rather than `maths`.
+
+With the mixin, members *are* strings with extra structure. Every comparison works, serialisation is plain text, and code that was written before the enum existed keeps working.
+
+Python 3.11 added `StrEnum`, which is the same idea with a cleaner spelling. Either is fine; the plain `Enum` is the one to avoid.
+
+## What comes out when you dump
+
+This trips people up, so it is worth being explicit.
+
+`model_dump()` returns Python objects, so an enum field comes back as the enum member. That is usually what you want inside your program.
+
+`model_dump(mode="json")` and `model_dump_json()` convert members to their values, because JSON has no enums. So the wire format is the plain string either way.
+
+With the `str` mixin the distinction rarely bites, since the member behaves like its value anyway. Without it, a member reaching `json.dumps` raises, and that is the shape of the bug.
+
+## Literals do more than strings
+
+Any hashable literal works: `Literal[1, 2]`, `Literal[True]`, `Literal[None]`, and mixtures.
+
+`Literal[1, 2]` for a version field is a genuinely good pattern &mdash; it makes a payload's supported versions explicit and rejects an unsupported one at the boundary with a clear message, rather than somewhere deep in code written for version 1.
+
+One thing to know, because it differs from a plain `int` field: a `Literal` compares the value as given rather than parsing it first. `Literal[1, 2]` given the string `"2"` raises `literal_error`, where `minutes: int` would happily have converted it. If a version number arrives from a query string as text, annotate it `int` and constrain it, or convert before validating.
+
+## The one place Literal is required
+
+A discriminated union reads its tag from a `Literal` field. Nothing else will do &mdash; not a `str` with a default, not an `Enum` member as a default &mdash; because the mechanism needs the value known at class-definition time to build the lookup table.
+
+So if you are writing polymorphic models, `Literal` is not a stylistic choice. It is the mechanism.
+
+## Choosing
+
+Reach for **`Literal`** when the set is small, local, and does not need behaviour. A status field used by one model, a discriminator tag, a version number.
+
+Reach for **`Enum`** when the set is part of your domain vocabulary, is used in several places, or wants methods. Anything you would find yourself writing a constants module for.
+
+Reach for a **named `Literal` alias** &mdash; `Track = Literal["maths", "python"]` &mdash; when you want reuse without the ceremony of a class. It is underused and it is often exactly right.
+
+And avoid a bare `str` with a comment listing the allowed values. That comment is a schema that nothing enforces, and it will be wrong within a year.
+
+## Migration, briefly
+
+One practical warning. Adding a value to a `Literal` or `Enum` is safe. Removing one is a breaking change for anyone who has stored the old value, and validation will start rejecting data that was previously fine &mdash; including rows already in your database.
+
+The usual fix is to keep the old value accepted, mapped to something sensible in a validator, for as long as old data exists. It is worth thinking about before you tighten a set that has been open for a while.
+
+## Named literal aliases
+
+There is a middle option between an inline `Literal` and a full `Enum` that deserves more use than it gets:
+
+```python
+Track = Literal["maths", "python", "dsa", "ml"]
+
+class Module(BaseModel):
+    track: Track
+
+class Lesson(BaseModel):
+    track: Track
+```
+
+One definition, reused, with no class to write and no `.value` to remember. Mypy narrows it in your own code, and the schema still gets a proper enumeration.
+
+It is the right answer surprisingly often. The reason to reach past it for a real `Enum` is behaviour &mdash; a label, an ordering, a lookup &mdash; or the ergonomics of `Track.MATHS` over the bare string. If you need neither, the alias is less machinery for the same result.
+
+## Enums in the schema
+
+Both spellings produce an `enum` in JSON Schema, but they differ in one useful way.
+
+A `Literal` inlines the values into the field. An `Enum` produces a named definition in `$defs` that the field references, so a set used by six fields appears once and is referenced six times.
+
+That matters for generated clients. A referenced definition typically becomes a named type in the target language &mdash; a TypeScript union alias, a Java enum &mdash; which is reusable on the consumer's side too. Inlined values become six anonymous unions that happen to have the same members.
+
+So for a set that appears in more than a couple of places in a public API, an `Enum` gives your consumers a better artefact, not just you.
+
+## Defaults and the two spellings
+
+A small ergonomic difference worth knowing.
+
+With a `Literal`, the default is the value: `track: Track = "maths"`.
+
+With an `Enum`, the default is normally the member: `track: Track = Track.MATHS`. The string also works, because validation coerces it, but the member reads better and is checked by your editor.
+
+One caution with enum defaults: `= Track.MATHS` is evaluated once at class-definition time, which is fine because enum members are singletons and immutable. This is one of the few mutable-looking defaults that is genuinely safe.
+
+## Extending a set safely
+
+Adding a value is backwards compatible for the producer and not always for the consumer.
+
+Your model will accept the new value immediately. Every client that has generated a type from your schema will not, until they regenerate &mdash; and a strict client may reject a response containing a tag it has never heard of.
+
+This is a real API design consideration rather than a Pydantic one, and the usual mitigations are: version the endpoint, document that the set is open to extension so clients build tolerant parsers, or introduce the new value behind a flag until consumers have caught up.
+
+Removing a value is worse and worth stating plainly: it will start rejecting data you have already stored. If a `track` column contains `"legacy"` and you remove it from the enum, every read of those rows now raises. The safe path is to keep accepting the old value, map it in a validator, and only remove it once the data is gone.
+
+## Where an enum is the wrong shape
+
+Two cases where reaching for an enum causes more trouble than it prevents.
+
+**A set that genuinely changes at runtime.** Categories a user can create, tags from a database, anything editable through an admin interface. An enum is fixed at import; a set that changes needs a validator that checks against the current list, and that check belongs in the layer that can see the list.
+
+**A set with hundreds of members.** Country codes, currency codes, timezone names. Technically an enum works; practically the schema becomes enormous, the generated client becomes enormous, and the error message lists three hundred options. A pattern plus a lookup is kinder to everybody.
+
+The rule of thumb: enumerate when the set is small, stable and part of your domain's vocabulary. Otherwise validate membership another way.
+
+## Summary
+
+`Literal` for small, local sets and for discriminator tags. A named `Literal` alias when the same small set is used in a few places. `Enum` when the set is domain vocabulary, needs behaviour, or appears across a public API where consumers benefit from a named type. `str, Enum` always, never a bare `Enum`. And never a bare `str` with a comment.
+
+## The underlying point
+
+A closed set is one of the few pieces of domain knowledge that a type system can hold completely.
+
+Most rules are approximations &mdash; a length bound, a range, a pattern that permits things you would reject. "This field is one of these four values" is exact. There is nothing left over, no edge case, no judgement call. Writing it down as a `Literal` or an `Enum` captures the entire truth about that field.
+
+That is why it is worth the small effort of not writing `str`. You get an exact error, a schema a client can render, a static check on your own comparisons, and a definition that cannot drift from the code that uses it &mdash; all from choosing a more specific annotation than the one that would have worked.
+
+## A last practical note
+
+When you add an enum to an existing field, run your data through it before you deploy.
+
+A `str` field that has been accepting anything for a year almost certainly contains values nobody expected &mdash; a trailing space, a different case, an old name from before a rename, a placeholder somebody typed once. Every one of those will start raising the moment the annotation tightens.
+
+Finding them beforehand is a short script and an afternoon. Finding them afterwards is an incident, because the failures arrive on reads of existing data rather than on new input, which is the direction nobody tests.
+
+## Next
+
+The next module covers the types Pydantic already knows how to parse for you &mdash; dates, times, UUIDs and decimals &mdash; and the traps in each, particularly the two that cost money: floats and timezones.

@@ -11809,6 +11809,159 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "pydantic/collections_of_models.html",
+  "title": "Collections of Models",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "Item 1 of a 4-item list is invalid. What happens to items 2 and 3?",
+    "o": [
+     "They are skipped",
+     "They are still validated and their failures reported too",
+     "The whole list is rejected untested",
+     "Only item 1 is reported"
+    ],
+    "a": 1,
+    "w": "Validation covers the whole collection and reports every failure in one exception, which is what makes bulk imports fixable in a single pass."
+   },
+   {
+    "t": "What does `Set[float]` do with `[1.0, 2.0, 1.0]`?",
+    "o": [
+     "Raises on the duplicate",
+     "Gives a set of two items",
+     "Gives three items",
+     "Gives a list"
+    ],
+    "a": 1,
+    "w": "Sets deduplicate silently. That is right for tags and wrong for measurements - if repeats are meaningful, use a list."
+   },
+   {
+    "t": "You need to validate a bare JSON array of models. What is the right tool?",
+    "o": [
+     "A wrapper model with one list field",
+     "TypeAdapter(List[Model])",
+     "A loop calling model_validate",
+     "It cannot be validated"
+    ],
+    "a": 1,
+    "w": "`TypeAdapter` validates any annotation directly. The wrapper model is the workaround people reach for before discovering it."
+   },
+   {
+    "t": "Why is `TypeAdapter(List[X]).validate_python(rows)` better than a list comprehension of `X.model_validate`?",
+    "o": [
+     "No difference",
+     "It loops inside the compiled core rather than crossing into Python per item",
+     "It skips validation",
+     "It is only for JSON"
+    ],
+    "a": 1,
+    "w": "One call into Rust validates the whole list. The comprehension does the same checks with one Python-to-Rust round trip per item."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/dates_uuids_and_decimals.html",
+  "title": "Dates, UUIDs and Decimals",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "Why does `Decimal(\"0.1\")` differ from `Decimal(0.1)`?",
+    "o": [
+     "They are the same",
+     "The float is already inexact before Decimal sees it",
+     "Decimal cannot take strings",
+     "The string is rounded"
+    ],
+    "a": 1,
+    "w": "0.1 has no exact binary representation, so the float is already wrong when it is handed over. Decimal faithfully preserves the wrong value - which is why money travels as a string."
+   },
+   {
+    "t": "What happens when you compare a naive datetime with an aware one?",
+    "o": [
+     "It works",
+     "Python raises TypeError",
+     "The naive one is assumed UTC",
+     "Pydantic converts it"
+    ],
+    "a": 1,
+    "w": "They are not comparable. A model accepting plain `datetime` takes both kinds happily, so the failure appears far from the model - which is what `AwareDatetime` prevents."
+   },
+   {
+    "t": "Why does `json.dumps(m.model_dump())` fail on a model with a date field?",
+    "o": [
+     "model_dump is broken",
+     "model_dump returns Python objects, and json.dumps cannot serialise a date",
+     "Dates are unsupported",
+     "It needs mode='python'"
+    ],
+    "a": 1,
+    "w": "`model_dump()` deliberately keeps Python types. Use `model_dump_json()`, or `model_dump(mode=\"json\")` when you need the dict first."
+   },
+   {
+    "t": "Which constraint expresses 'a currency amount in whole pence'?",
+    "o": [
+     "gt=0",
+     "decimal_places=2",
+     "max_length=2",
+     "multiple_of=0.01"
+    ],
+    "a": 1,
+    "w": "`decimal_places=2` rejects values with more precision than the system handles, and records that decision in the schema where it can be read."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/enums_and_literals.html",
+  "title": "Enums and Literals",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "Why prefer `Literal[\"a\", \"b\"]` over `Field(pattern=r\"^(a|b)$\")`?",
+    "o": [
+     "It is faster",
+     "Better error, appears as an enum in the schema, and mypy understands it",
+     "Patterns do not work",
+     "No real difference"
+    ],
+    "a": 1,
+    "w": "The Literal error lists the allowed values, the schema becomes a renderable choice for clients and docs, and static checkers can verify your own comparisons against it."
+   },
+   {
+    "t": "Why write `class Track(str, Enum)` rather than `class Track(Enum)`?",
+    "o": [
+     "It is required by Pydantic",
+     "So members compare equal to their strings and serialise as plain text",
+     "It is faster",
+     "To allow methods"
+    ],
+    "a": 1,
+    "w": "Without the mixin, `Track.MATHS == \"maths\"` is False and json.dumps refuses the member, which breaks any code that does not know the enum exists."
+   },
+   {
+    "t": "What does `model_dump()` return for an enum field, versus `model_dump_json()`?",
+    "o": [
+     "Both give the value",
+     "The member, and the value respectively",
+     "Both give the member",
+     "It raises"
+    ],
+    "a": 1,
+    "w": "`model_dump()` keeps Python objects, so you get the member. JSON has no enums, so the JSON forms convert to the underlying value."
+   },
+   {
+    "t": "Where is `Literal` not just a preference but the required mechanism?",
+    "o": [
+     "Any string field",
+     "As the tag of a discriminated union",
+     "Optional fields",
+     "Nested models"
+    ],
+    "a": 1,
+    "w": "The discriminator lookup is built at class-definition time, so the tag value must be known then - which is what Literal provides and a plain str does not."
+   }
+  ]
+ },
+ {
   "path": "pydantic/field_constraints.html",
   "title": "Field Constraints",
   "cat": "Pydantic",
@@ -11856,6 +12009,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Metadata changes no behaviour but flows into `model_json_schema()`, which FastAPI renders as documentation. It is the cheapest documentation available."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/nested_models.html",
+  "title": "Nested Models",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "What is the `loc` for a bad `email` inside a nested `author` field?",
+    "o": [
+     "('email',)",
+     "('author',)",
+     "('author', 'email')",
+     "It has no loc"
+    ],
+    "a": 2,
+    "w": "`loc` is the full path to the failing value. That is what makes a deeply nested payload debuggable rather than merely rejected."
+   },
+   {
+    "t": "You pass `author=\"Ada\"` where a nested `Author` model is expected. Where does the error point?",
+    "o": [
+     "At author.name",
+     "At the author field itself",
+     "At the whole model",
+     "Nowhere - it is accepted"
+    ],
+    "a": 1,
+    "w": "A string cannot be read as an Author at all, so the failure is on the field rather than inside it - a different problem from one of Author's own fields being wrong."
+   },
+   {
+    "t": "Why use `Field(default_factory=Author)` rather than `= Author()` for a nested default?",
+    "o": [
+     "It is faster",
+     "`= Author()` is evaluated once at class definition, so every parent would share one instance",
+     "They are identical",
+     "`= Author()` is a syntax error"
+    ],
+    "a": 1,
+    "w": "The expression runs when the class body runs. A factory is called per instance, which is what a per-parent default needs."
+   },
+   {
+    "t": "How do you exclude one field of a nested model from `model_dump`?",
+    "o": [
+     "Not possible",
+     "exclude={\"author\": {\"email\"}}",
+     "exclude=\"author.email\"",
+     "Only with a separate model"
+    ],
+    "a": 1,
+    "w": "`include` and `exclude` accept nested dicts to reach inside. For anything more structural than a field or two, a separate output model reads better and appears correctly in the schema."
    }
   ]
  },
@@ -12013,6 +12217,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "pydantic/strict_vs_lax_mode.html",
+  "title": "Strict vs Lax Mode",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "Why is lax mode the default?",
+    "o": [
+     "It is faster",
+     "Because data at a boundary arrives as text and would otherwise need manual conversion everywhere",
+     "For backwards compatibility",
+     "It is not - strict is"
+    ],
+    "a": 1,
+    "w": "Query strings, form posts and CSVs contain no integers. Refusing text would put an `int()` call in a try block in front of every model, which is the code the library removes."
+   },
+   {
+    "t": "Does strict mode refuse an `int` for a `float` field?",
+    "o": [
+     "Yes",
+     "No - widening loses nothing, so it is allowed",
+     "Only in JSON mode",
+     "Only for negatives"
+    ],
+    "a": 1,
+    "w": "Strict removes parsing, not lossless widening. `bool` for an `int` is also still accepted, because bool genuinely is a subclass of int in Python."
+   },
+   {
+    "t": "A strict model validates a `date` field from a JSON string. What happens?",
+    "o": [
+     "Refused - it is a string",
+     "Accepted, because JSON has no date type",
+     "Converted silently in all modes",
+     "It raises a config error"
+    ],
+    "a": 1,
+    "w": "Strict refuses *unnecessary* conversion. From Python a real date object was available so a string is refused; from JSON the string is the only representation there is."
+   },
+   {
+    "t": "Which field is the classic candidate for `strict=True` in an otherwise lax model?",
+    "o": [
+     "A description",
+     "An identifier or a money amount",
+     "An optional note",
+     "A title"
+    ],
+    "a": 1,
+    "w": "An id arriving as text usually means something upstream lost a type, and a Decimal accepting a float accepts an already-inexact value. Both are cases where silence hides a real problem."
+   }
+  ]
+ },
+ {
   "path": "pydantic/types_and_coercion.html",
   "title": "Types and Coercion",
   "cat": "Pydantic",
@@ -12060,6 +12315,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 2,
     "w": "At the boundary, coercion removes conversion code you would otherwise write. Inside, a wrong type is a bug of your own, and silently fixing it hides the bug."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/unions_and_discriminated_unions.html",
+  "title": "Unions and Discriminated Unions",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "In smart mode, what does Pydantic try first for a union?",
+    "o": [
+     "Left to right conversion",
+     "An exact type match across all members",
+     "The narrowest type",
+     "Random order"
+    ],
+    "a": 1,
+    "w": "An exact match wins without any conversion. Only when nothing matches exactly does it fall back to converting left to right, which is where order starts to matter."
+   },
+   {
+    "t": "Two models in a union can both accept `{\"title\": \"x\"}`. What happens?",
+    "o": [
+     "A ValidationError",
+     "The first one that validates wins, by position",
+     "Both are returned",
+     "The one with more fields wins"
+    ],
+    "a": 1,
+    "w": "This is the dangerous case: no error, just the wrong object. Defaults make it much more likely, since they let a member accept payloads it was never meant for."
+   },
+   {
+    "t": "What does `Field(discriminator=\"kind\")` require of each member?",
+    "o": [
+     "A str field named kind",
+     "A Literal field named kind with a distinct value",
+     "Nothing",
+     "An Enum"
+    ],
+    "a": 1,
+    "w": "The value must be known at class-definition time so Pydantic can build the tag-to-model lookup, which is what `Literal` provides and a plain `str` does not."
+   },
+   {
+    "t": "Why do discriminated unions produce better errors?",
+    "o": [
+     "They have shorter messages",
+     "Only one branch is attempted, so only its errors are reported",
+     "They suppress errors",
+     "They validate less"
+    ],
+    "a": 1,
+    "w": "Without a tag, every member is tried and every member's failures are reported. With one, exactly one branch runs, so the report is about the shape the data actually claimed to be."
    }
   ]
  },

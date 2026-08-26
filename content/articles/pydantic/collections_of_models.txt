@@ -1,0 +1,191 @@
+title: Collections of Models, and Errors That Know Their Index
+intro: Lists, dicts, sets and tuples - what gets validated, what gets converted, and where failures point.
+
+## Item by item
+
+A container annotation describes two things: the shape of the container and the type of what is in it. Both are enforced.
+
+```python
+lessons: List[Lesson]
+```
+
+Given a list, Pydantic walks it and validates each element as a `Lesson`. A dict becomes a `Lesson` object. An element that is already a `Lesson` passes through. An element that is neither produces an error &mdash; for that element only.
+
+That last part matters more than it sounds. Validation does not abandon the collection at the first bad item. It checks all of them and reports all the failures, which for a bulk import is the difference between fixing one row per attempt and seeing the whole problem at once.
+
+## The index is part of the path
+
+An integer in `loc` is a position. So `("lessons", 1, "minutes")` reads as: the `lessons` field, the item at index 1, its `minutes` field.
+
+For a payload with a hundred items this is the entire diagnosis. Without it, "one of your lessons has an invalid duration" sends the caller looking through a hundred objects by hand.
+
+Note that the index is the position in the *input*, which is what you want &mdash; it lets the caller map the error back to the data they sent. If you are surfacing these to a user editing a form with repeated rows, the index is exactly the row number to highlight.
+
+## Dicts, and what the key does
+
+`Dict[str, Stats]` validates keys against `str` and values against `Stats`, independently.
+
+The key type is a real constraint, and a useful one. `Dict[int, Stats]` will coerce the string keys that JSON forces on you back into integers, which is a small annoyance handled once instead of at every read site. JSON object keys are always strings, so this comes up more often than you would expect.
+
+In the error path, the key appears where an index would: `("tracks", "maths", "minutes")`. Same mechanism, same readability.
+
+A caution about key coercion with untrusted data: `Dict[int, X]` given `{"1": ...}` gives you `{1: ...}`, and two keys that differ only as strings can collide as integers. It is a narrow case, but it is the kind of thing worth knowing before it happens.
+
+## Sets deduplicate
+
+`Set[str]` given `["maths", "vectors", "maths"]` gives a set of two items. No error, no warning &mdash; deduplication is what a set is for.
+
+That is usually the intent. Where it bites is when the duplicates were meaningful and nobody thought about it: a list of tags is fine to deduplicate; a list of readings from a sensor is not, and a `Set[float]` will silently discard every repeated measurement.
+
+Sets are also unordered, so the order you sent is not the order you get back, and `model_dump_json` has to produce an array from something with no defined order. If order matters, use a list &mdash; and if uniqueness matters too, check it in a validator, which gives you an error instead of silent removal.
+
+## Tuples check length and position
+
+There are two spellings and they mean different things.
+
+`Tuple[int, str]` is a fixed shape: exactly two items, the first an int, the second a string. Length is part of the contract, and a three-item input fails with `too_long`.
+
+`Tuple[int, ...]` is a homogeneous sequence of any length &mdash; the same as `List[int]` except immutable on the way out.
+
+Fixed tuples are good for genuinely positional data: coordinates, RGB values, a dimension pair. They are a poor choice for anything where the positions have names, because `point[0]` is worse than `point.x` and nobody can tell what `config[3]` is. If you find yourself writing a comment to explain the positions, you want a model.
+
+## Constraining the container
+
+`min_length` and `max_length` count items:
+
+```python
+lessons: List[str] = Field(min_length=1, max_length=4)
+```
+
+`min_length=1` is the useful one. "This must not be empty" is a real rule, and expressing it as a constraint rather than a validator means it appears in the schema as `minItems`, so a generated client and the API documentation both know about it.
+
+Empty collections are worth a moment's thought generally. An empty list is a valid list, and code that assumes at least one element will fail on it &mdash; usually with an `IndexError` far from the model. Deciding explicitly whether empty is allowed, and writing that decision down, removes a whole category of downstream surprise.
+
+## Bare arrays and TypeAdapter
+
+Not every payload has an object around it. An endpoint that returns a JSON array of lessons has no natural wrapper model, and the traditional workaround is to invent one:
+
+```python
+class LessonList(BaseModel):      # a box built only to hold a list
+    items: List[Lesson]
+```
+
+`TypeAdapter` is what that workaround was working around:
+
+```python
+lessons = TypeAdapter(List[Lesson])
+parsed = lessons.validate_json(payload)
+```
+
+You get the same validation, the same error paths, and `dump_json` in the other direction. It also works for anything else you can annotate &mdash; `Dict[str, float]`, `Optional[int]`, a bare `Lesson`, a union.
+
+Build the adapter once and reuse it. Constructing a `TypeAdapter` compiles a schema, which is not free; doing it inside a loop is a genuine and easily-missed performance mistake. Module level is the right home.
+
+## Performance with large collections
+
+This is the place in Pydantic where validation cost becomes visible, so it is worth being concrete.
+
+Validating ten thousand items means ten thousand validations. The work happens in Rust, which makes it far faster than a Python loop doing the same checks, but it is not free.
+
+The important thing is to let the core do the looping. `TypeAdapter(List[Lesson]).validate_python(rows)` validates the whole list in one call into the compiled core. Writing `[Lesson.model_validate(r) for r in rows]` does the same work with ten thousand round trips between Python and Rust, and it is measurably slower for no benefit.
+
+If you are streaming a very large file, validate in batches rather than building one enormous list, for memory reasons rather than validation ones.
+
+And apply the rule from the first tier: validate once, at the boundary. Re-validating a list of models that has already been checked is the most expensive no-op available.
+
+## Choosing the container
+
+`List` when order matters or duplicates are meaningful &mdash; which is most of the time.
+
+`Set` when the values are genuinely a set and you want deduplication as a feature, not as an accident.
+
+`Dict` when items are looked up by a key that means something. If you find yourself scanning a list to find the item with a matching id on every read, a dict keyed by that id is the shape you wanted.
+
+`Tuple` for fixed positional data, and only when the positions do not deserve names.
+
+## Mutable defaults, one more time
+
+The rule from the defaults module has a specific shape here that is worth repeating, because collections are where it bites.
+
+```python
+lessons: List[Lesson] = []
+```
+
+This is safe in Pydantic. The default is deep-copied per instance, so two models never share a list. In plain Python the equivalent would be the classic shared-mutable-default bug, and the habit people bring from there is to reach for `default_factory` reflexively.
+
+That habit is not wrong, and `Field(default_factory=list)` is arguably clearer about intent. But it is worth knowing which of the two rules you are following, because the reason matters: use a factory because the default must be *computed*, not because a literal would be shared.
+
+## Uniqueness without a set
+
+If you want a list &mdash; order preserved, JSON array on the way out &mdash; but duplicates rejected rather than silently dropped, a set is the wrong tool. Deduplication and rejection are different behaviours.
+
+The check belongs in a validator, which is the next tier's subject, but the shape is worth seeing now:
+
+```python
+@field_validator("tags")
+@classmethod
+def unique(cls, v: List[str]) -> List[str]:
+    if len(set(v)) != len(v):
+        raise ValueError("tags must be unique")
+    return v
+```
+
+The difference from `Set[str]` is what the caller learns. A set tells them nothing and quietly returns fewer items; the validator tells them their input was wrong. For a form where somebody typed the same tag twice, the second is much more useful.
+
+## Nested collections
+
+Collections nest as freely as models do, and the error paths keep working:
+
+```python
+schedule: Dict[str, List[Lesson]]
+```
+
+A failure inside produces `("schedule", "monday", 2, "minutes")` &mdash; the key, the index, the field. Four elements, and it names exactly one value in a structure that would otherwise take a while to search by hand.
+
+The practical limit is comprehension rather than capability. `Dict[str, List[Dict[str, List[int]]]]` is valid and nobody can read it. Once an annotation needs more than about three levels, extracting a model for the inner shape makes the outer one legible again &mdash; and gives the inner shape a name, which is usually the thing that was missing.
+
+## Ordering and duplicates in the output
+
+Two small behaviours that surprise people at serialisation time.
+
+A `Set` has no order, so `model_dump_json` produces an array in whatever order the set iterates. That order is stable within a run but is not the input order, and it is not guaranteed across runs. If a client diffs your responses, or a test compares JSON strings, a set field will produce spurious differences. Use a list and sort it if you need determinism.
+
+A `Dict` preserves insertion order in modern Python, so dict fields do round-trip in a stable order. That is a language guarantee rather than a Pydantic one, but it is dependable.
+
+## Choosing well, in practice
+
+Most collection bugs come from picking the container for the wrong reason.
+
+Choosing `Set` because "items should be unique" gives you silent deduplication when what you wanted was an error.
+
+Choosing `Tuple` because "it should not change" gives you positional access when what you wanted was a frozen model.
+
+Choosing `List` when every read starts with a scan for a matching id means you wanted a `Dict` and are paying a linear search for it.
+
+The question that resolves all three: what does the *consumer* of this field do with it? Iterate in order, look one up by key, or check membership? Each of those has an obvious container, and the answer is rarely about what the producer finds convenient to send.
+
+## What the container says to a reader
+
+A last thought that applies to every collection you annotate.
+
+The container type is documentation. `List[Lesson]` says these are ordered and repeats are meaningful. `Set[str]` says order is irrelevant and duplicates are not a thing. `Dict[str, Stats]` says you look these up by name. `Tuple[int, int]` says exactly two, and the positions mean something fixed.
+
+Someone reading the model learns all of that without opening a single function. Choosing the container carelessly &mdash; defaulting to `List` because it is the one that always works &mdash; throws that away and leaves the reader to infer the rules from the code that consumes it, which is exactly the situation models exist to prevent.
+
+## Two failure modes to watch for
+
+**Assuming non-empty.** Code that reads `items[0]` will raise on a valid empty list. Either constrain the field with `min_length=1` so an empty collection never reaches you, or handle the empty case explicitly. Silently assuming is how a rare payload becomes an incident.
+
+**Assuming small.** A list annotation places no upper bound, so a caller can send a million items and your process will try to validate all of them. For any public endpoint, `max_length` is a cheap denial-of-service guard as well as a documented limit, and it costs one argument.
+
+Both are the same oversight: a container's *size* is part of its contract, and leaving it unstated means the contract is whatever the caller decides.
+
+## Next
+
+Collections handle many things of the same type. The next module is about the opposite problem: a field that could be one of several *different* types, and how to make that choice explicit rather than letting Pydantic guess.
+
+## Summary
+
+Containers validate their contents item by item, and every failure carries a path that names the exact position &mdash; index for a sequence, key for a mapping. Nothing is skipped because something earlier failed, so one report covers the whole collection.
+
+Choose the container for what the consumer does with it, not for what is convenient to build. Constrain the size, because an unbounded collection is an unstated contract. And when the payload is a bare array with no object around it, use `TypeAdapter` rather than inventing a wrapper model to hold it.

@@ -1,0 +1,191 @@
+title: Dates, UUIDs and Decimals: The Types JSON Does Not Have
+intro: What Pydantic parses for you, and the two traps that cost real money.
+
+## Why this module exists
+
+JSON has six types: string, number, boolean, null, array and object. Your domain has more. Dates, timestamps, durations, identifiers, money &mdash; none of them exist on the wire, and all of them arrive as strings or numbers that have to be turned back into something useful.
+
+That conversion is tedious, easy to get subtly wrong, and Pydantic already does it. Knowing exactly what it accepts saves writing the parsing, and knowing where the traps are saves the bugs.
+
+## Dates and times
+
+`date` accepts a `date`, an ISO string like `"2026-08-26"`, and a Unix timestamp &mdash; but only one that lands exactly on midnight. A timestamp with a time component raises `date_from_datetime_inexact`, on the reasoning that silently discarding the time would lose information you might have needed.
+
+`datetime` accepts a `datetime`, an ISO 8601 string with or without an offset, and a Unix timestamp as an int or float. Both `"2026-08-26T14:30:00"` and the space-separated variant work, and so does a trailing `Z`.
+
+`time` accepts `"14:30"` and `"14:30:00.123"`.
+
+`timedelta` accepts a number of seconds or an ISO 8601 duration such as `"PT1H30M"`.
+
+The pattern is the one from the coercion module: the type itself always works, and the obvious textual form works. What you get back is a real object, so `.year`, `.weekday()` and arithmetic all work without you having called `strptime` anywhere.
+
+## The timezone trap
+
+This is the first of the two expensive ones.
+
+A `datetime` string without an offset produces a **naive** datetime &mdash; one with no `tzinfo`. A string with an offset produces an **aware** one. Both are valid `datetime` objects and both pass a `datetime` annotation.
+
+They cannot be compared. `naive < aware` raises `TypeError`. Subtracting one from the other raises. So a model that accepts both will work perfectly until the day a client sends the other kind, and then fail somewhere entirely unrelated to the model.
+
+The fix is to be explicit in the type:
+
+```python
+from pydantic import AwareDatetime
+
+updated_at: AwareDatetime
+```
+
+Now a naive string is rejected at the boundary, with a clear message, at the point the bad data arrived. `NaiveDatetime` exists for the opposite requirement.
+
+The general advice for anything with users in more than one place: store and transmit UTC with an explicit offset, use `AwareDatetime` in your models, and convert to local time only at the moment of display. A system that is consistently aware has no timezone bugs; a system that is inconsistently aware has nothing but.
+
+## Money is not a float
+
+This is the second expensive trap, and it is not a Pydantic quirk &mdash; it is how binary floating point works.
+
+`0.1 + 0.2` is not `0.3` in any language using IEEE 754, because `0.1` cannot be represented exactly in binary any more than one-third can be in decimal. The error is tiny and it accumulates, and financial code that accumulates errors eventually produces a total that is a penny out and an afternoon nobody enjoys.
+
+`Decimal` represents decimal fractions exactly. But the conversion matters enormously:
+
+```python
+Decimal(0.1)     # 0.1000000000000000055511151231257827
+Decimal("0.1")   # 0.1
+```
+
+By the time a float exists, the information is already lost. Passing it to `Decimal` faithfully preserves the wrong number.
+
+So money should travel as a **string** in JSON, and be validated as `Decimal`. That is why so many payment APIs quote amounts as `"12.50"` rather than `12.50`, and it is a convention worth adopting rather than fighting.
+
+If a float is unavoidable on the way in, be aware that you have already lost exactness and any quantisation is damage control, not a fix.
+
+## Constraining a decimal
+
+Two constraints exist for decimals specifically:
+
+```python
+amount: Decimal = Field(gt=0, max_digits=8, decimal_places=2)
+```
+
+`decimal_places=2` rejects `"12.505"`. `max_digits=8` bounds the total number of significant digits. Together they express "a currency amount" far better than any `float` annotation can, and they appear in the schema.
+
+This is also a good example of a constraint carrying domain meaning. `decimal_places=2` is a statement that this system deals in whole pence, which is a real decision that would otherwise live only in whoever's head made it.
+
+## UUIDs and paths
+
+`UUID` accepts a `UUID` or its string form, and rejects anything that is not a valid UUID &mdash; which is a genuinely useful check, since an id from an untrusted source is a common injection vector when it is treated as an opaque string.
+
+What you get back is a real `UUID`, so `.version` and `.hex` work. Note that `model_dump()` gives you the `UUID` object and the JSON forms give the string, which matters if you pass the dump to something expecting text.
+
+`Path` accepts a string and gives you a `pathlib.Path`, with `.suffix`, `.parent` and the rest. A caution: validating something as a `Path` does not make it safe. It does not check the path exists, and it certainly does not prevent `../../etc/passwd`. Path traversal is a security check you still have to write.
+
+`EmailStr` deserves a mention because people look for it: it exists, but it lives in a separate package (`email-validator`) that must be installed. Without it, a plain `str` with a pattern is the pragmatic option &mdash; and worth remembering that no regular expression genuinely validates an email address. The only real check is sending a message to it.
+
+## What comes out
+
+Because none of these types exist in JSON, serialisation has to convert them, and the mode decides whether it does.
+
+`model_dump()` returns Python objects: a `date` stays a `date`, a `Decimal` stays a `Decimal`. Right for passing data within your program.
+
+`model_dump(mode="json")` returns JSON-compatible values: dates become ISO strings, decimals become strings, UUIDs become strings.
+
+`model_dump_json()` returns the JSON text directly.
+
+The mistake worth avoiding is `json.dumps(model.model_dump())`. That passes `date` and `Decimal` objects to a serialiser that cannot handle them, and raises `TypeError: Object of type date is not JSON serializable` &mdash; a confusing error, since the model clearly supports JSON. Use `model_dump_json()`, or `model_dump(mode="json")` if you need the dict first.
+
+## A checklist for these types
+
+Use `AwareDatetime` rather than `datetime` for anything that crosses a timezone boundary, which in practice means anything with users.
+
+Use `Decimal` with a string input for money, always, and add `decimal_places`.
+
+Use `UUID` rather than `str` for identifiers that are UUIDs &mdash; the validation is free and catches malformed input at the door.
+
+Use `date` rather than `datetime` when there is no time, because a date that is secretly midnight in some timezone is a bug waiting for a daylight-saving transition.
+
+And use `model_dump_json()` rather than assembling JSON yourself, so the conversions happen where they are already correct.
+
+## Formatting on the way out
+
+Pydantic serialises dates and datetimes as ISO 8601, which is the right default and is not always the format a consumer wants.
+
+Changing it is a field serialiser, which is the next tier's material, but the shape is short:
+
+```python
+@field_serializer("published_on")
+def show_date(self, value: date) -> str:
+    return value.strftime("%d %B %Y")
+```
+
+Worth a word of caution though. A model that serialises dates in a human format is producing display output, and display formatting usually belongs in the layer that knows the reader's locale rather than in the data model. For an API, ISO 8601 is almost always the correct answer and the consumer formats it.
+
+The one common exception is a date-only field where the ISO string is already right and the concern is the *type* &mdash; making sure a `date` does not accidentally serialise as a full datetime with a spurious midnight. Using `date` rather than `datetime` handles that at the source.
+
+## Timestamps, seconds and milliseconds
+
+A practical trap when accepting Unix timestamps: JavaScript's `Date.now()` returns **milliseconds**, and most of the rest of the world uses **seconds**.
+
+Pydantic assumes seconds. Hand it a millisecond timestamp and you get a date tens of thousands of years in the future, validated happily, because it is a perfectly valid datetime.
+
+There is no way for the library to know which you meant, so the check is yours. A constraint on the datetime range is the cheapest guard:
+
+```python
+updated_at: AwareDatetime = Field(le=datetime(2100, 1, 1, tzinfo=timezone.utc))
+```
+
+Anything from a millisecond timestamp fails that immediately and obviously, at the boundary, rather than appearing in a report as the year 57,000.
+
+## Decimals and JSON output
+
+`Decimal` serialises to a JSON **string** by default, not a number. That is deliberate and it is correct: a JSON number is a float to most parsers, so writing `12.50` as a number would hand the receiving end the same inexactness you used `Decimal` to avoid.
+
+It does mean a consumer expecting a number gets a string, which occasionally surprises people integrating with an existing client. The answer is nearly always to fix the client rather than the serialisation &mdash; but if you must emit a number, a field serialiser can do it, and you should be aware you are choosing convenience over exactness.
+
+The same reasoning explains why money should arrive as a string. A payload that sends `"12.50"` and validates it as `Decimal` is exact from end to end. One that sends `12.50` as a JSON number has already lost the guarantee before your model saw it.
+
+## Comparing and storing
+
+Two habits that prevent most date bugs downstream.
+
+**Store UTC, display local.** Convert at the edges only. A system where everything internal is UTC with an explicit offset has no ambiguity anywhere; one that stores local times has an unanswerable question every time the clocks change.
+
+**Use the narrowest type.** If a field is genuinely a date, annotate it `date`, not `datetime`. A `datetime` standing in for a date carries a time that means nothing, and that meaningless midnight will eventually be shifted by a timezone conversion into the previous day. Choosing `date` makes that impossible rather than unlikely.
+
+## A quick reference
+
+`date` &mdash; ISO string, or a timestamp landing exactly on midnight.
+
+`datetime` &mdash; ISO string with or without offset, or a Unix timestamp in seconds. Prefer `AwareDatetime`.
+
+`time` &mdash; `"14:30"` or `"14:30:00.123"`.
+
+`timedelta` &mdash; seconds as a number, or an ISO duration like `"PT1H30M"`.
+
+`Decimal` &mdash; a string, always, for anything financial. Constrain with `decimal_places`.
+
+`UUID` &mdash; the UUID or its string form; invalid strings are rejected.
+
+`Path` &mdash; a string; note that validation says nothing about safety or existence.
+
+None of these exist in JSON, so all of them are strings on the wire, and `model_dump_json()` is the thing that knows how to make them.
+
+## Why these traps are expensive
+
+The two traps in this module &mdash; naive datetimes and floats for money &mdash; share a shape worth recognising, because it is the shape of most expensive bugs.
+
+Neither fails at the point of the mistake. A naive datetime validates perfectly and sits in the model until something compares it to an aware one, possibly weeks later, in a different module, written by somebody else. A float price validates perfectly and is exactly right for every value anyone tests with, and wrong by fractions of a penny in aggregate.
+
+That delay is what makes them costly. A bug that raises immediately costs minutes. A bug that produces plausible wrong answers costs however long it takes for somebody to notice the totals do not reconcile, plus the work of finding out why.
+
+Annotating `AwareDatetime` and `Decimal` moves both failures to the boundary, where they are named, located and cheap. That is the same argument as the whole library, applied to the two types where getting it wrong costs the most.
+
+## The general lesson
+
+Every type in this module exists because JSON is poorer than your domain, and the gap has to be closed somewhere.
+
+Closing it in the model means the conversion happens once, in a place that is declared, tested and visible in the schema. Closing it in the consuming code means it happens everywhere, differently, and one of those places will forget the timezone or the decimal places.
+
+Choosing the precise type is not pedantry. It is deciding that the gap gets closed at the boundary rather than scattered through everything downstream.
+
+## Next
+
+That completes the shapes. The last module in this tier returns to coercion with a sharper question: now that you know what Pydantic will convert, when should you stop it?

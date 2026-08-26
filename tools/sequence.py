@@ -445,6 +445,12 @@ SEQUENCE = {
         "pydantic/reading_a_validation_error.html",
         "pydantic/field_constraints.html",
         "pydantic/pydantic_vs_dataclasses.html",
+        "pydantic/nested_models.html",
+        "pydantic/collections_of_models.html",
+        "pydantic/unions_and_discriminated_unions.html",
+        "pydantic/enums_and_literals.html",
+        "pydantic/dates_uuids_and_decimals.html",
+        "pydantic/strict_vs_lax_mode.html",
     ],
     "python": [
         "python/hello_python.html",

@@ -1,0 +1,199 @@
+title: Strict vs Lax Mode: Where Coercion Helps and Where It Hides Bugs
+intro: The default is right at the edge of your system and wrong in the middle. Choosing per field is the answer.
+
+## Two different jobs
+
+Everything in this tier has assumed lax mode, which is the default: convert anything with an unambiguous reading, refuse the rest.
+
+That is exactly right at a boundary. A query string is text. A form post is text. A CSV is text. If validation refused everything that was not already the right Python type, the code in front of every model would be a pile of `int()` calls in `try` blocks, which is the code the library exists to delete.
+
+It is exactly wrong three layers in. If a function inside your own system passes a string where an integer was expected, that is a bug you wrote. Converting it silently means the bug survives, and the symptom appears somewhere else &mdash; usually as a number that is subtly wrong rather than an error that names the cause.
+
+Same behaviour, opposite value, depending on which side of the boundary you are standing on. Which is why the setting exists.
+
+## Turning it on
+
+Per model:
+
+```python
+class Config(BaseModel):
+    model_config = ConfigDict(strict=True)
+```
+
+Per field:
+
+```python
+user_id: int = Field(strict=True)
+```
+
+Or as a reusable type, which is generally the nicest:
+
+```python
+UserId = Annotated[int, Field(strict=True)]
+```
+
+Pydantic also ships `StrictInt`, `StrictStr`, `StrictBool` and `StrictFloat`, which are the same thing pre-named.
+
+## Per field is the usual answer
+
+Whole-model strictness sounds tidy and is often impractical, because a real payload mixes fields that arrive as text with fields that do not.
+
+The narrower need is much more common: be lax about most of a model and exact about the one or two fields where a quiet conversion would be dangerous.
+
+**Identifiers** are the classic case. A `user_id` arriving as `"42"` rather than `42` usually means something upstream lost a type &mdash; a JSON serialiser configured oddly, a value that went through a URL and was never converted back. Accepting it papers over that. Refusing it tells you where the problem is while it is still cheap to find.
+
+**Money** is the other. A `Decimal` field that accepts a float will accept an already-inexact value and validate it happily, which is the worst possible outcome for a currency amount.
+
+**Booleans** are worth considering too. `bool` is generous in lax mode &mdash; `"yes"`, `"on"`, `"t"` all work &mdash; and that is genuinely useful for a checkbox and genuinely alarming for a flag that controls whether money moves.
+
+## What strict still allows
+
+Strict does not mean "no conversion whatsoever", and the exceptions are principled.
+
+An `int` is still accepted for a `float` field, because widening an integer to a float loses nothing and Python treats the two as numerically compatible throughout.
+
+A `bool` is still accepted for an `int` field, because `bool` genuinely is a subclass of `int` in Python. That one occasionally surprises people, and if it matters, a validator is the way to exclude it.
+
+What strict removes is **parsing** &mdash; turning text into something else. `"3.0"` to a float is parsing, and strict refuses it.
+
+## Strict and JSON
+
+There is a subtlety worth understanding, because it looks like an inconsistency and is not.
+
+In strict mode, validating from a JSON string still accepts the textual forms JSON has no alternative to. A `date` field validated from JSON accepts `"2026-08-26"`, because JSON has no date type and there is no stricter form available.
+
+Validated from Python, the same strict model refuses that string, because in Python a real `date` object *was* available and a string means somebody skipped a step.
+
+The principle is consistent once stated: strict mode refuses *unnecessary* conversion. When the format offers no alternative, accepting the only available representation is not laxity.
+
+This is one more reason `model_validate_json` is worth preferring over `json.loads` plus `model_validate`. It knows the input was JSON and applies the right rules; going via Python objects loses that context.
+
+## The two-model pattern
+
+The clean way to express all of this is a lax model at the boundary and a strict one inside:
+
+```python
+class ModuleIn(BaseModel):          # boundary: text arrives, convert it
+    title: str
+    minutes: int
+
+class Module(BaseModel):            # interior: types are already right
+    model_config = ConfigDict(strict=True, frozen=True)
+    title: str
+    minutes: int
+```
+
+The boundary model absorbs the messiness of the wire. The interior model is a statement that everything past this point has been checked, and a mistake in your own code will be caught rather than converted.
+
+Adding `frozen=True` to the interior model is a natural companion: validated data that only gets read has no reason to be mutable, and freezing it removes another class of question.
+
+Whether this is worth two classes depends on the system. For a small application it is over-engineering, and one lax model is fine. For a large one with several layers and several teams, the strict interior model is a contract that catches real mistakes.
+
+## A middle path
+
+If two models feels like too much, there is a lighter version that gets most of the benefit: turn on `validate_assignment` and make the important fields strict.
+
+```python
+class Module(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+    user_id: Annotated[int, Field(strict=True)]
+    minutes: int
+```
+
+Now the payload can arrive as text and be converted, but the identifier must be right, and later assignments are checked rather than trusted. One class, and the two most common bug sources are closed.
+
+## When to reach for strict
+
+**Do** use it on identifiers, money, and any flag with consequences.
+
+**Do** use it for interior models in a layered system, where wrong types indicate your own bugs.
+
+**Do** use it in tests, where you want to assert on exactly what a function produced without coercion smoothing it over.
+
+**Do not** use it on a public API's request model. Your clients send JSON, JSON sends text, and refusing `"12"` for a duration will generate support tickets rather than better data.
+
+**Do not** reach for it as a general "safer" setting. Lax mode is not sloppy; it is the correct behaviour for the job it was designed for. Strictness applied indiscriminately just moves work back into your callers.
+
+## Strictness in tests
+
+There is a use for strict mode that has nothing to do with production, and it is one of the most valuable.
+
+In a test, coercion can hide the thing you are asserting. A test that checks a function returned `minutes=12` will pass if the function returned `"12"` and the model converted it &mdash; so the test does not actually verify the behaviour it claims to.
+
+Validating the result with a strict model closes that gap. The assertion becomes about the real type, and a function that starts returning strings fails the test rather than quietly relying on coercion downstream.
+
+The same applies to fixtures. A fixture built with `minutes="12"` is not exercising the same code path as production data that arrives as an integer, and strictness makes that visible.
+
+## What strict does not protect you from
+
+Worth being clear about the limits, because "strict" sounds like a general safety setting and is not.
+
+It does not check ranges. `StrictInt` accepts `-999999` happily; that is what `Field(gt=0)` is for.
+
+It does not check meaning. A strict `str` accepts an empty string, a string of spaces, and a string containing a script tag.
+
+It does not make a model safe to expose. Strictness is about types, not about authorisation, sanitisation or business rules.
+
+And it does not remove the need to think about the boundary. A strict model at the edge of a public API does not make the API safer; it makes it harder to call correctly, which pushes the conversion into your consumers' code where you cannot see it.
+
+## Reading the errors
+
+Strict failures have their own error types, and recognising them saves a moment's confusion.
+
+Where a lax model would report `int_parsing` for `"twelve"`, a strict model reports `int_type` for `"12"` &mdash; the message is about the *type* being wrong rather than the value being unparseable.
+
+That distinction is genuinely useful in a log. `int_parsing` means somebody sent nonsense. `int_type` on a strict field means somebody sent a well-formed value in the wrong representation, which is usually a wiring problem in a caller rather than bad input from a user, and the two deserve different responses.
+
+## A decision you can apply mechanically
+
+For each field, ask where its value comes from.
+
+**From a human, a form, a URL or a CSV** &mdash; lax. It is text, it will always be text, and refusing it moves work to the caller with no benefit.
+
+**From another service's JSON** &mdash; lax for anything JSON has no type for, strict for identifiers. A partner sending `"user_id": "42"` is worth knowing about.
+
+**From your own code, past the boundary** &mdash; strict. A wrong type here is your bug and you want it loud.
+
+**From a test** &mdash; strict, so the assertion means what it says.
+
+Applied field by field, that produces models that are permissive exactly where permissiveness helps and exact everywhere else &mdash; which is the whole point, and is not something a single global setting can express.
+
+## The principle underneath
+
+Both modes exist because validation answers a different question in different places.
+
+At the boundary the question is "can I make sense of this?", and being generous is correct, because the sender had no better option than text.
+
+Inside the question is "is this what I think it is?", and being generous is wrong, because the sender is you and a mismatch means something is broken.
+
+Getting this right is mostly a matter of noticing which question you are asking. The setting is small; the habit of asking is the thing worth taking away.
+
+## One more reason it matters
+
+Coercion is the feature people are most suspicious of when they meet Pydantic and most dependent on within a week. That reversal is worth understanding, because it is the same reversal that makes the strict/lax choice feel difficult.
+
+The suspicion is reasonable: a library that silently changes your data sounds like a library that will eventually change it wrongly. The dependence is also reasonable: the boundary really is made of text, and something has to do the converting.
+
+What resolves it is that Pydantic's conversion is bounded by a rule you can state in one sentence &mdash; convert when the reading is unambiguous and nothing is lost &mdash; and that you can switch it off, per field, wherever that rule is not the one you want.
+
+Very few libraries give you both the sensible default and the precise override. Knowing that the override exists, and where to apply it, is what turns coercion from something you tolerate into something you have decided about.
+
+## Where to start if you are unsure
+
+If this is a new codebase, the pragmatic default is: lax everywhere, plus `strict=True` on identifiers and money.
+
+That combination takes ten seconds to apply, keeps every request model easy to call, and closes the two cases where a silent conversion most often indicates a real problem upstream. It is a better starting point than either extreme, and you can tighten specific fields later as you learn where your data actually goes wrong.
+
+The one thing worth doing deliberately rather than by default is choosing, once, for each new field. Strictness applied by habit is no better than laxity applied by habit.
+
+## Where tier two leaves you
+
+You can now describe data with real shape: models inside models, collections with meaningful error paths, unions that say which branch they are, closed sets of values, and the standard-library types that JSON cannot carry. And you can decide, per field, how much conversion you are willing to accept.
+
+What you cannot yet do is express a rule that no annotation can hold &mdash; a value that must be checked against another value, a field computed from the rest, a normalisation applied before checking. That is the next tier, and it starts with validators.
+
+## Summary
+
+Lax mode converts anything unambiguous and is correct at the boundary, because the boundary is text. Strict mode requires the annotated type and is correct inside, because a mismatch there is your own bug.
+
+Set it per field rather than per model in most cases. Strict still permits lossless widening, and still accepts the string forms JSON has no alternative to. Identifiers, money and consequential flags are the fields where it earns its place first.
