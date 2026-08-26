@@ -7,7 +7,7 @@
  *
  * Markup the page supplies (one or more per page):
  *
- *   <div class="vz-py" data-vz-py>
+ *   <div class="vz-py" data-vz-py data-vz-packages="pydantic">
  *     <script type="text/plain" class="py-src">print("Hello, Python!")</script>
  *     <textarea class="py-editor" aria-label="Python code editor"></textarea>
  *     <button type="button" class="py-run-btn">Run</button>
@@ -18,6 +18,12 @@
  *
  * Nothing here knows which module it is on; it finds every .vz-py block on the
  * page and wires each independently, sharing the single interpreter.
+ *
+ * data-vz-packages is an optional comma-separated list of Pyodide packages the
+ * block needs - "pydantic" for the Pydantic track. They are fetched from the
+ * same CDN as the interpreter on the first Run that asks for them and then
+ * stay loaded for the rest of the visit, so a page with four Pydantic editors
+ * downloads the library once.
  */
 (function () {
   'use strict';
@@ -88,6 +94,7 @@
     var wsrc =
       'importScripts("' + PYODIDE_URL + 'pyodide.js");\n' +
       'var py = null;\n' +
+      'var loaded = {};\n' +
       'self.onmessage = function (e) {\n' +
       '  var m = e.data;\n' +
       '  if (m.type === "init") {\n' +
@@ -100,9 +107,24 @@
       '      postMessage({ type: "ready" });\n' +
       '    }).catch(function (err) { postMessage({ type: "fatal", text: String(err) }); });\n' +
       '  } else if (m.type === "run") {\n' +
-      '    try { py.globals.set("__code__", m.code); }\n' +
-      '    catch (err) { postMessage({ type: "err", text: String(err) }); }\n' +
-      '    py.runPythonAsync("_viz_run(__code__)").then(function () {\n' +
+      '    var want = m.packages || [];\n' +
+      '    var need = [];\n' +
+      '    for (var i = 0; i < want.length; i++) {\n' +
+      '      if (!loaded[want[i]]) need.push(want[i]);\n' +
+      '    }\n' +
+      '    if (need.length) postMessage({ type: "loading", names: need });\n' +
+      '    var prep = need.length ? py.loadPackage(need) : Promise.resolve();\n' +
+      '    prep.then(function () {\n' +
+      '      for (var j = 0; j < need.length; j++) loaded[need[j]] = true;\n' +
+      // "loaded" is what starts the run budget on the page. It has to be sent
+      // after the wheels are in and before the first line executes, or a slow
+      // library download is billed to the run timer and reported as an
+      // infinite loop.
+      '      postMessage({ type: "loaded" });\n' +
+      '      try { py.globals.set("__code__", m.code); }\n' +
+      '      catch (err) { postMessage({ type: "err", text: String(err) }); }\n' +
+      '      return py.runPythonAsync("_viz_run(__code__)");\n' +
+      '    }).then(function () {\n' +
       '      postMessage({ type: "done" });\n' +
       '    }, function (err) {\n' +
       '      var msg = (err && (err.message || err.toString())) || String(err);\n' +
@@ -197,7 +219,7 @@
     out.scrollTop = out.scrollHeight;
   }
 
-  function runBlock(block, code) {
+  function runBlock(block, code, packages) {
     var parts = els(block);
     var out = parts.output;
     out.textContent = '';
@@ -223,12 +245,14 @@
       // The timeout may already have fired and terminated the worker while
       // this promise was still pending; `worker` is null in that case.
       if (timedOut || !worker) return;
-      // The interpreter is up, so the run's own budget starts here.
+      // The interpreter is up, but a block that asks for a library still has
+      // a download in front of it. The load budget therefore stays in force
+      // until the worker reports "loaded", which it sends immediately when
+      // there is nothing to fetch.
       clearTimeout(timer);
       timer = setTimeout(function () {
-        giveUp('The interpreter was stopped \u2014 the code probably looped forever.');
-      }, RUN_TIMEOUT);
-      setStatus(block, 'Running\u2026');
+        giveUp('A library did not finish downloading \u2014 check the connection and try again.');
+      }, LOAD_TIMEOUT);
       var finish = function () {
         clearTimeout(timer);
         if (timedOut) return;
@@ -239,7 +263,17 @@
         if (timedOut) return;
         if (e.data.type === 'out') appendOut(block, e.data.text);
         else if (e.data.type === 'err') appendOut(block, e.data.text, 'py-out-err');
-        else if (e.data.type === 'done') finish();
+        else if (e.data.type === 'loading') {
+          setStatus(block, 'Loading ' + e.data.names.join(', ') + '\u2026');
+        } else if (e.data.type === 'loaded') {
+          // Everything the code imports is in place; the run's own budget
+          // starts here.
+          clearTimeout(timer);
+          timer = setTimeout(function () {
+            giveUp('The interpreter was stopped \u2014 the code probably looped forever.');
+          }, RUN_TIMEOUT);
+          setStatus(block, 'Running\u2026');
+        } else if (e.data.type === 'done') finish();
       };
       worker.onerror = function (e) {
         if (timedOut) return;
@@ -247,7 +281,7 @@
         finish();
       };
       try {
-        worker.postMessage({ type: 'run', code: code });
+        worker.postMessage({ type: 'run', code: code, packages: packages || [] });
       } catch (err) {
         appendOut(block, String(err), 'py-out-err');
         finish();
@@ -281,9 +315,14 @@
         }
         indentOnTab(parts.editor);
 
+        var packages = (block.getAttribute('data-vz-packages') || '')
+          .split(',')
+          .map(function (n) { return n.trim(); })
+          .filter(function (n) { return n.length > 0; });
+
         parts.run.addEventListener('click', function () {
           if (parts.run.disabled) return;
-          runBlock(block, parts.editor.value);
+          runBlock(block, parts.editor.value, packages);
         });
 
         // Guarded: this used to be unconditional, so a block authored without

@@ -348,6 +348,17 @@ TOOL_PAGES = {
                        "inline JavaScript, and see a live sandboxed preview in your "
                        "browser - entirely offline, with console output shown as you go.",
     },
+    "pydantic-lab": {
+        "dir": "pydantic-lab",
+        "rel": "pydantic-lab/index.html",
+        "title": "Pydantic Compiler",
+        "footer": True,
+        "lead": "Write Pydantic models and run them. Real Pydantic v2 on real CPython, "
+                "in your browser - no install, no account, nothing sent to a server.",
+        "description": "A free online Pydantic compiler. Define BaseModel classes and "
+                       "run them against real data in your browser - Pydantic v2 on "
+                       "CPython compiled to WebAssembly, with full validation errors.",
+    },
     "saved": {
         "dir": "saved",
         "rel": "saved/index.html",
