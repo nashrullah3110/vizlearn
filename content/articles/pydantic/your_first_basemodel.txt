@@ -1,0 +1,108 @@
+title: Your First BaseModel, End to End
+intro: Defining a model, creating one, reading it back, and getting the data out again.
+
+## The whole idea in three lines
+
+A Pydantic model is a class that inherits from `BaseModel` and lists its fields as annotations.
+
+```python
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    track: str
+    minutes: int
+```
+
+That is the entire definition. There is no `__init__`, no assignment of `self.title = title`, no validation code. Pydantic reads the annotations when the class is created and builds the machinery from them &mdash; a constructor, a validator, a serialiser, an equality method and a readable `repr`.
+
+The economy matters more than it first appears. Adding a field is one line. In the hand-written equivalent it is four: the parameter, the assignment, the check, and the line in `to_dict`. Those four drift apart over time, and the drift is where bugs live.
+
+## Creating one
+
+Models take keyword arguments:
+
+```python
+m = Module(title="Dot Product", track="maths", minutes=11)
+```
+
+Positional arguments are refused, and the refusal is deliberate rather than an oversight. Models grow. A field added in the middle of a class body would silently change what every positional call meant, and nothing would raise &mdash; the values would simply land in the wrong slots. Requiring names makes that class of bug impossible.
+
+When the data is already a dictionary, which it usually is if it came from JSON, there are two ways in:
+
+```python
+Module(**data)
+Module.model_validate(data)
+```
+
+They do the same work. `model_validate` reads better in a pipeline, makes it obvious that validation is happening, and does not break if the dictionary happens to contain a key that is not a valid Python identifier.
+
+## What you get back
+
+An ordinary object. Attribute access works, methods you define work, and the values have the types the annotations promised:
+
+```python
+m.title          # "Dot Product"
+m.minutes + 1    # 12  - a real int, not a string
+```
+
+That last line is the payoff. Downstream code does not need to check or convert anything, because the conversion already happened at the door.
+
+Models are not dictionaries. `m["title"]` raises, and asking for a field that does not exist raises `AttributeError` like any other object. This is a feature: a typo in a dictionary key returns `None` or a `KeyError` deep inside a function, whereas a typo in an attribute name is caught immediately and is visible to your editor's autocomplete.
+
+## Methods and behaviour
+
+Because a model is a class, you can give it methods:
+
+```python
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+    def slug(self) -> str:
+        return self.title.lower().replace(" ", "_")
+```
+
+This is worth doing. Logic that depends only on a model's own fields belongs on the model, where it is discoverable and testable, rather than in a loose function three modules away.
+
+Later in this track you will meet `@computed_field`, which is the version of this that also appears in the serialised output.
+
+## Getting the data out
+
+Two methods, and the difference between them is worth getting right early.
+
+`model_dump()` returns a dictionary of Python objects. A `datetime` field comes back as a `datetime`, a `Decimal` as a `Decimal`. Use it when the data is staying inside your program &mdash; passing to another function, feeding a template, comparing in a test.
+
+`model_dump_json()` returns a JSON string, converting everything into something JSON can represent. Use it when the data is leaving: an HTTP response, a message queue, a file on disk. It handles the types that plain `json.dumps` refuses outright, which is a small mercy you will appreciate the first time a `datetime` appears in a payload.
+
+Both take arguments that shape the output &mdash; `include`, `exclude`, `exclude_none`, `by_alias` &mdash; and those get a module of their own in the serialisation tier.
+
+If you have read older tutorials you will have seen `.dict()` and `.json()`. Those are the Pydantic v1 names. They still work in v2 but emit deprecation warnings, and a great deal of writing on the internet has not caught up.
+
+## The round trip
+
+Put the two directions together and you have the shape of most web services:
+
+```python
+wire = original.model_dump_json()          # going out
+received = Module.model_validate_json(wire) # coming back in
+original == received                        # True
+```
+
+That equality is worth noticing. Models compare by value, not identity, so two separately constructed models with the same contents are equal. In tests this turns a page of field-by-field assertions into one line.
+
+`model_validate_json` is also the right way to accept JSON. It is tempting to write `json.loads` followed by `model_validate`, and it works, but parsing inside Pydantic's Rust core is faster and the errors it produces know where in the document the problem was.
+
+## Two models of the same thing
+
+A pattern that arrives quickly in real work: the same subject needs different shapes in different places. A list endpoint returns a title and a duration; a detail endpoint returns everything; a create endpoint accepts everything except the id, which the server assigns.
+
+The instinct is to build one model with a lot of optional fields. Resist it. Optional-everything means the model no longer documents anything &mdash; every field might be missing, so no reader can tell what is actually guaranteed.
+
+Separate models say what they mean. `ModuleSummary` has two required fields and is honest about it. Converting between them is one line, because a dump from one is valid input to the other whenever the fields line up.
+
+## What to try next
+
+Change something in the editors above and watch what happens. Add a field to a model and leave it out of the constructor call. Pass `minutes` as `"11"` and print its type. Remove a field from the JSON before validating it back.
+
+The next module is precisely about those conversions: which values Pydantic will quietly accept and turn into the type you asked for, and which it will refuse.

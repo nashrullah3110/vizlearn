@@ -3100,6 +3100,62 @@ window.VIZLEARN_MODULES = [
   "desc": "Paste any text and watch a word cloud size each term by how often it appears, exposing what a document is really about."
  },
  {
+  "title": "Field Constraints",
+  "path": "pydantic/field_constraints.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Pydantic vs Dataclasses",
+  "path": "pydantic/pydantic_vs_dataclasses.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Reading a ValidationError",
+  "path": "pydantic/reading_a_validation_error.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Required, Optional and Defaults",
+  "path": "pydantic/required_optional_and_defaults.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Types and Coercion",
+  "path": "pydantic/types_and_coercion.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "What Pydantic Is For",
+  "path": "pydantic/what_is_pydantic.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Your First BaseModel",
+  "path": "pydantic/your_first_basemodel.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "*args and **kwargs",
   "path": "python/args_and_kwargs.html",
   "category": "Python",

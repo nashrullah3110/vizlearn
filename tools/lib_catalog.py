@@ -24,6 +24,7 @@ DIR_META = {
     "gen_ai": ("Gen AI", "robot"),
     "maths": ("Maths", "sigma"),
     "python": ("Python", "code"),
+    "pydantic": ("Pydantic", "code"),
     "interview": ("Interview", "interview"),
 }
 

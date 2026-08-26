@@ -203,6 +203,26 @@ TOPICS = {
             "handful of ideas every later module leans on.",
         ],
     },
+    "pydantic": {
+        "dir": "pydantic",
+        "title": "Pydantic",
+        "h1": "Pydantic, by Running It",
+        "lead": "Type annotations that actually do something. Validation, coercion "
+                "and serialisation, each one runnable on the page.",
+        "keywords": "pydantic tutorial, pydantic basemodel, pydantic validation, "
+                    "pydantic v2, python data validation, pydantic field",
+        "intro": [
+            "A Python type annotation does nothing at runtime. Write "
+            "<code>def price(x: int)</code> and Python will hand your function the "
+            "string \"cat\" without a word of complaint. Pydantic is the library that "
+            "makes those annotations real - it reads them, checks the data against "
+            "them, and tells you precisely what was wrong when it does not fit.",
+            "This track works up from a first model to validators, serialisation and "
+            "schemas. Every idea arrives as a small program you can run and edit on "
+            "the page, because the fastest way to settle what Pydantic does with a "
+            "value is to hand it one and look.",
+        ],
+    },
     "interview": {
         "dir": "interview",
         "title": "Interview Questions",
@@ -229,7 +249,7 @@ TOPICS = {
 
 # Display order on the hub and in the footer.
 TOPIC_ORDER = ["maths", "ml", "dl", "dsa", "nlp", "computer-vision", "db",
-               "gen-ai", "python", "interview"]
+               "gen-ai", "python", "pydantic", "interview"]
 
 DIR_TO_TOPIC = {t["dir"]: k for k, t in TOPICS.items()}
 

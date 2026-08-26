@@ -11809,6 +11809,363 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "pydantic/field_constraints.html",
+  "title": "Field Constraints",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "What does `pattern=r\"[a-z]+\"` accept?",
+    "o": [
+     "Only all-lowercase strings",
+     "Also 'abc123!!!' - it matches from the start but need not reach the end",
+     "Nothing",
+     "Any string"
+    ],
+    "a": 1,
+    "w": "`pattern` matches from the start rather than requiring the whole string. Without `^...$` anchors it fails permissively, which is how this bug survives longest."
+   },
+   {
+    "t": "A field is `int = Field(gt=0)` and receives `\"5\"`. What happens?",
+    "o": [
+     "Rejected - it is a string",
+     "Coerced to 5, then compared against 0, and accepted",
+     "Compared as text",
+     "Rejected - gt needs a float"
+    ],
+    "a": 1,
+    "w": "Constraints run after coercion. That is also why the two failure modes have different error types: `int_parsing` versus `greater_than`."
+   },
+   {
+    "t": "Does `Field(gt=0)` with no default make a field optional?",
+    "o": [
+     "Yes",
+     "No - it is still required",
+     "Only for ints",
+     "It defaults to 0"
+    ],
+    "a": 1,
+    "w": "Requiredness is decided by the presence of a default. `Field` with only constraints supplies no default, so the field stays required."
+   },
+   {
+    "t": "Why write `description=` on a field?",
+    "o": [
+     "It makes validation stricter",
+     "It appears in the generated JSON Schema and therefore in API docs",
+     "It is required",
+     "It speeds up validation"
+    ],
+    "a": 1,
+    "w": "Metadata changes no behaviour but flows into `model_json_schema()`, which FastAPI renders as documentation. It is the cheapest documentation available."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/pydantic_vs_dataclasses.html",
+  "title": "Pydantic vs Dataclasses",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "What does `@dataclass` do with the annotation `minutes: int`?",
+    "o": [
+     "Checks the value is an int",
+     "Converts the value",
+     "Uses it only to decide the field exists",
+     "Raises if it is wrong"
+    ],
+    "a": 2,
+    "w": "A dataclass reads annotations to discover the fields and generate an `__init__` that assigns them. The types are never checked at runtime."
+   },
+   {
+    "t": "Where does validation genuinely earn its cost?",
+    "o": [
+     "Everywhere, always",
+     "At the boundary where untrusted data arrives",
+     "Only in tests",
+     "Nowhere - it is too slow"
+    ],
+    "a": 1,
+    "w": "Data crossing into your code is a guess until checked. Past that line it has already been proven, and re-checking the same values buys nothing."
+   },
+   {
+    "t": "You need to validate a bare `List[int]` with no model around it. What do you use?",
+    "o": [
+     "A one-field wrapper model",
+     "TypeAdapter",
+     "A dataclass",
+     "It cannot be done"
+    ],
+    "a": 1,
+    "w": "`TypeAdapter(List[int])` applies the full machinery to any annotation. The wrapper model is the workaround people use before they discover it."
+   },
+   {
+    "t": "What does `pydantic.dataclasses.dataclass` give you?",
+    "o": [
+     "Nothing different",
+     "The dataclass API with validation added",
+     "A faster dataclass",
+     "A BaseModel"
+    ],
+    "a": 1,
+    "w": "It is a drop-in that keeps dataclass introspection while validating on construction - useful for adding checks to existing dataclasses without rewriting them as models."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/reading_a_validation_error.html",
+  "title": "Reading a ValidationError",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "A payload has four invalid fields. How many exceptions does Pydantic raise?",
+    "o": [
+     "Four",
+     "One, carrying all four",
+     "One per model",
+     "It stops at the first"
+    ],
+    "a": 1,
+    "w": "Every field is checked and a single `ValidationError` carries the complete list, so a caller can fix everything in one pass."
+   },
+   {
+    "t": "What does `loc` of `('lessons', 1, 'minutes')` mean?",
+    "o": [
+     "Three separate errors",
+     "The minutes field of the item at index 1 in lessons",
+     "A field literally named lessons.1.minutes",
+     "Line 1 of the file"
+    ],
+    "a": 1,
+    "w": "`loc` is a path. Integers are sequence indices and strings are field names, so this locates one value inside a nested structure."
+   },
+   {
+    "t": "Why match on `type` rather than `msg`?",
+    "o": [
+     "type is shorter",
+     "msg is prose and gets reworded between releases",
+     "msg is always empty",
+     "There is no difference"
+    ],
+    "a": 1,
+    "w": "Types are stable identifiers; messages are human sentences that may be clarified or translated. Matching on prose breaks quietly on upgrade."
+   },
+   {
+    "t": "What should a custom validator raise to join the same error report?",
+    "o": [
+     "ValidationError",
+     "ValueError",
+     "TypeError",
+     "Exception"
+    ],
+    "a": 1,
+    "w": "Pydantic catches `ValueError`, wraps it with the field's location and gives it the type `value_error`. Building a `ValidationError` by hand is unnecessary."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/required_optional_and_defaults.html",
+  "title": "Required, Optional and Defaults",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "A field is declared `note: Optional[str]` with no default. Is it required?",
+    "o": [
+     "No - Optional makes it optional",
+     "Yes - it is nullable but still required",
+     "Only in strict mode",
+     "It defaults to None"
+    ],
+    "a": 1,
+    "w": "`Optional[str]` means `str or None`, which is about allowed values. Requiredness is decided by whether a default exists. Pydantic v1 added the default implicitly; v2 deliberately does not."
+   },
+   {
+    "t": "Which tells you whether a caller actually supplied a field?",
+    "o": [
+     "model_dump()",
+     "model_fields_set",
+     "model_json_schema()",
+     "The field being None"
+    ],
+    "a": 1,
+    "w": "After validation an omitted field and an explicitly null one both read as `None`. `model_fields_set` is the only record of what was actually sent."
+   },
+   {
+    "t": "What does `model_dump(exclude_unset=True)` produce, and why does it matter?",
+    "o": [
+     "Everything except None",
+     "Only fields the caller supplied - the right shape for PATCH",
+     "Only required fields",
+     "An empty dict"
+    ],
+    "a": 1,
+    "w": "An update that dumps every field will overwrite untouched columns with defaults or None. Excluding unset fields keeps 'not mentioned' meaning 'leave alone'."
+   },
+   {
+    "t": "Why use `default_factory=datetime.now` instead of `= datetime.now()`?",
+    "o": [
+     "It is faster",
+     "The second freezes the time the class was defined",
+     "Both are identical",
+     "The second is a syntax error"
+    ],
+    "a": 1,
+    "w": "`datetime.now()` is evaluated once, when the class body runs, so every instance would claim the same creation time. A factory is called per instance."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/types_and_coercion.html",
+  "title": "Types and Coercion",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "A field is `n: int`. What does Pydantic do with the float `9.5`?",
+    "o": [
+     "Gives 9",
+     "Gives 10",
+     "Raises a ValidationError",
+     "Gives 9.5"
+    ],
+    "a": 2,
+    "w": "Conversion happens only when nothing is lost. `9.0` becomes `9`, but rounding `9.5` would discard information, so it refuses rather than guessing."
+   },
+   {
+    "t": "A field is `s: str`. What happens with the integer `9`?",
+    "o": [
+     "Gives \"9\"",
+     "Raises a ValidationError",
+     "Gives 9",
+     "Gives None"
+    ],
+    "a": 1,
+    "w": "This is the asymmetry to remember. Text arriving where a number is wanted is normal; a number arriving where text is wanted is usually a real bug in the caller, so it is not hidden."
+   },
+   {
+    "t": "What does a `bool` field do with the string `\"false\"`?",
+    "o": [
+     "True, because the string is non-empty",
+     "False",
+     "Raises",
+     "None"
+    ],
+    "a": 1,
+    "w": "Pydantic reads the meaning of the word, not the emptiness of the container. Plain Python's `bool(\"false\")` is `True`, which is why query-string parsing needs this behaviour."
+   },
+   {
+    "t": "When is strict mode the right choice?",
+    "o": [
+     "Always",
+     "At the boundary where text arrives",
+     "Deep inside a system where types should already be correct",
+     "Never"
+    ],
+    "a": 2,
+    "w": "At the boundary, coercion removes conversion code you would otherwise write. Inside, a wrong type is a bug of your own, and silently fixing it hides the bug."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/what_is_pydantic.html",
+  "title": "What Pydantic Is For",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "What does a plain Python type annotation do at runtime?",
+    "o": [
+     "Rejects wrong types",
+     "Converts the value",
+     "Nothing",
+     "Logs a warning"
+    ],
+    "a": 2,
+    "w": "Annotations are stored and ignored while the program runs. They serve readers, editors and static checkers. Pydantic is one of the tools that chooses to act on them."
+   },
+   {
+    "t": "A model field is annotated `minutes: int` and receives the string `\"9\"`. What happens by default?",
+    "o": [
+     "ValidationError",
+     "It becomes the integer 9",
+     "It stays the string \"9\"",
+     "It becomes None"
+    ],
+    "a": 1,
+    "w": "Default lax mode converts anything with an unambiguous reading, because data crossing a boundary usually arrives as text. `\"nine\"` would raise, because there is no unambiguous reading."
+   },
+   {
+    "t": "Why does Pydantic report every invalid field rather than stopping at the first?",
+    "o": [
+     "It is faster",
+     "So a caller can fix everything in one pass",
+     "To make errors longer",
+     "It stops at the first by default"
+    ],
+    "a": 1,
+    "w": "One raise carrying the full list means a form can highlight all its broken inputs at once, instead of revealing them one resubmission at a time."
+   },
+   {
+    "t": "Where does a Pydantic model earn its place?",
+    "o": [
+     "At the boundary where outside data enters",
+     "In every function",
+     "Only in tests",
+     "In the database layer"
+    ],
+    "a": 0,
+    "w": "Validate once where untrusted data arrives, and everything downstream can assume the shape is correct. Re-checking at every layer costs time and adds no safety."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/your_first_basemodel.html",
+  "title": "Your First BaseModel",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "Why does a model refuse positional arguments?",
+    "o": [
+     "To save memory",
+     "Because adding a field would silently change what positional calls mean",
+     "Because dicts are unordered",
+     "It does not - they work"
+    ],
+    "a": 1,
+    "w": "Models gain fields over time. If position mattered, inserting a field would reassign every existing positional call's values without raising anything."
+   },
+   {
+    "t": "What is the difference between `model_dump()` and `model_dump_json()`?",
+    "o": [
+     "None",
+     "dump gives Python objects, dump_json gives a JSON-safe string",
+     "dump_json is deprecated",
+     "dump only works on nested models"
+    ],
+    "a": 1,
+    "w": "`model_dump()` keeps Python types like `datetime` intact for use inside your program. `model_dump_json()` converts everything to something JSON can carry, for data that is leaving the process."
+   },
+   {
+    "t": "Two separately created `Module` objects have identical field values. What does `==` return?",
+    "o": [
+     "False - different objects",
+     "True - models compare by value",
+     "It raises",
+     "Only if you define __eq__"
+    ],
+    "a": 1,
+    "w": "Pydantic generates an `__eq__` that compares field values, which is what makes assertions in tests short."
+   },
+   {
+    "t": "You have a dict from `json.loads`. Which is the better way to build a model from it?",
+    "o": [
+     "Module(**data)",
+     "Module.model_validate(data)",
+     "Module.parse(data)",
+     "Module.from_dict(data)"
+    ],
+    "a": 1,
+    "w": "Both `Module(**data)` and `model_validate(data)` work, but `model_validate` states that validation is happening and survives keys that are not valid Python identifiers."
+   }
+  ]
+ },
+ {
   "path": "python/args_and_kwargs.html",
   "title": "*args and **kwargs",
   "cat": "Python",

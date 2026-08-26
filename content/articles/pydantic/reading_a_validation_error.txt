@@ -1,0 +1,95 @@
+title: Reading a ValidationError, and Turning It Into a Message
+intro: Every field checked, every failure in one report - and what each part of an entry is for.
+
+## One raise, every problem
+
+Most hand-written validation gives up at the first thing it does not like. The caller fixes it, resubmits, and meets the next one. Four mistakes take four round trips.
+
+Pydantic checks every field and raises once, carrying the complete list. For a signup form that is the difference between a form which highlights all four broken inputs immediately and one which reveals them slowly, like a bad quiz.
+
+`e.error_count()` tells you how many. `str(e)` gives a readable summary, which is what you saw printed in the first editor above. Both are for humans.
+
+## errors() is the version for code
+
+`e.errors()` returns a list of dictionaries, and this is what you build anything real on top of. Each entry has four parts, and they do different jobs.
+
+**`loc`** is where the problem is. It is a tuple, not a string, and it describes a path rather than naming a field. For a flat model it has one element. For nested data it has as many as it needs to reach the value.
+
+**`type`** is which rule failed, as a short stable identifier: `missing`, `int_parsing`, `string_too_short`, `greater_than`, `value_error`.
+
+**`msg`** is the human sentence, in English, written by Pydantic.
+
+**`input`** is the value that actually arrived.
+
+## loc, in detail
+
+Reading `loc` well is most of debugging a large payload.
+
+Integers in the tuple are sequence indices. Strings are field or key names. So `("lessons", 1, "minutes")` reads as: inside `lessons`, the item at index 1, its `minutes` field. Joining it with dots &mdash; `lessons.1.minutes` &mdash; gives you something you can paste into a search or show to a colleague.
+
+For a union you will sometimes see the union member's name in the path too, because Pydantic reports which branch it was attempting when it failed. That looks noisy at first and is genuinely useful when a discriminated union picks the wrong branch.
+
+The important habit is to render the path rather than the field name. Code that does `err["loc"][0]` works fine until the first nested model arrives, at which point every error appears to be about the top-level container.
+
+## Match on type, not on message
+
+This is the rule that saves the most future pain.
+
+Messages are prose. They get reworded, clarified and occasionally translated between releases. Any code that does `if "should be a valid integer" in err["msg"]` is one minor upgrade away from silently failing.
+
+Types are identifiers. `int_parsing` will still be `int_parsing`. Mapping them to your own copy is a dictionary lookup:
+
+```python
+FRIENDLY = {
+    "string_too_short": "That needs to be a bit longer.",
+    "missing": "This one is required.",
+}
+```
+
+This is also how you localise. The type is the key; your translation table holds the sentences.
+
+A useful default is to fall back to `err["msg"]` when a type is not in your table. You get good copy for the cases you have thought about, and something serviceable for the ones you have not.
+
+## The shape an API wants
+
+Most front ends want errors grouped by field, so each message can render beside the input that caused it:
+
+```python
+problems = {}
+for err in e.errors():
+    field = ".".join(str(p) for p in err["loc"]) or "_"
+    problems.setdefault(field, []).append(err["msg"])
+```
+
+A list per field, because one field can fail several rules at once. The `or "_"` catches model-level errors, whose `loc` is empty because they belong to the whole object rather than any single field &mdash; a cross-field rule like "end date must be after start date" has nowhere else to go.
+
+If you are using FastAPI, this transformation already happens for you: a `ValidationError` on a request body becomes a 422 whose body is essentially `e.errors()`. Knowing the shape means knowing what your own clients receive.
+
+## Your own errors, in the same report
+
+Custom rules do not need a separate channel. A validator that raises `ValueError` is caught and folded into the same list, with the type `value_error` and your message:
+
+```python
+@field_validator("track")
+@classmethod
+def known_track(cls, v: str) -> str:
+    if v not in {"maths", "python", "dsa", "ml"}:
+        raise ValueError("unknown track %r" % v)
+    return v
+```
+
+This is a good thing to notice early. It means one piece of error-handling code covers built-in and custom validation alike, and a caller cannot tell &mdash; or need to care &mdash; which kind of rule they broke.
+
+Raise `ValueError`, not `ValidationError`. Constructing a `ValidationError` by hand is awkward and unnecessary; Pydantic wraps yours correctly and adds the location for you. An `AssertionError` also works, but is a poor choice because assertions vanish when Python is run with `-O`.
+
+## What input tells you
+
+Do not skip `input`. It is often the entire diagnosis.
+
+A caller insists they are sending a number, and `input` shows `"12"` with quotes &mdash; they are sending a string, and their JSON serialiser is the culprit. Or it shows `None` for a field they believe they set, and their own code has a missing key. Or it shows `"null"`, the four-character string, and something in the chain stringified a null.
+
+None of that is visible in the message. All of it is visible in one line of the report.
+
+## Next
+
+The next module goes the other way: not reading the errors Pydantic produces, but writing the rules that produce them. `Field` constraints let you say more about a value than its type &mdash; a minimum, a length, a pattern &mdash; and every one of them comes back through exactly the machinery described here.

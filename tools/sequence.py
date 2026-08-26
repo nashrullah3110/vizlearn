@@ -437,6 +437,15 @@ SEQUENCE = {
     "interview": _INTERVIEW,
 
     # Run it first, then meet the pieces: the track teaches by execution.
+    "pydantic": [
+        "pydantic/what_is_pydantic.html",
+        "pydantic/your_first_basemodel.html",
+        "pydantic/types_and_coercion.html",
+        "pydantic/required_optional_and_defaults.html",
+        "pydantic/reading_a_validation_error.html",
+        "pydantic/field_constraints.html",
+        "pydantic/pydantic_vs_dataclasses.html",
+    ],
     "python": [
         "python/hello_python.html",
         "python/input_and_output.html",

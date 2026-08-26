@@ -1,0 +1,80 @@
+title: Types and Coercion: What Pydantic Will and Will Not Convert
+intro: The rules behind the library's most surprising behaviour, one value at a time.
+
+## Why it converts at all
+
+The first time someone sees `minutes="9"` become `9` they usually ask whether that is safe. It is a fair question, and the answer is in where models get used.
+
+Data arriving from outside a program is nearly always text. A query string is text. An HTML form submission is text. A CSV is text. An environment variable is text. If a model refused everything that was not already the right Python type, the code in front of every model would be a pile of `int(...)` calls wrapped in `try`, which is exactly the code the library exists to remove.
+
+So the default &mdash; **lax mode** &mdash; is to accept any value with one unambiguous reading, and refuse the rest. The rules are worth knowing precisely, because "unambiguous" turns out to be a stricter test than most people expect.
+
+## Into int
+
+A string converts if it reads as a whole number, surrounding whitespace included: `"9"` and `"  9  "` both give `9`.
+
+A float converts only if nothing is lost. `9.0` becomes `9`. **`9.5` raises.** This is the rule people are most often surprised by, and it is the right one: rounding silently is how a total ends up being a penny out and nobody can find why. If you want rounding, ask for it explicitly.
+
+`True` becomes `1`, because `bool` is a subclass of `int` in Python and always has been.
+
+Everything else refuses: `"nine"`, `None`, a list, a dict. There is no reading of `"nine"` that is unambiguous without inventing a natural-language parser.
+
+## Into float
+
+More permissive, because floats can represent more. Integers widen (`9` gives `9.0`). Strings that read as numbers convert, and scientific notation like `"1e3"` works. `True` gives `1.0`.
+
+Note that this is one place where information genuinely can be lost &mdash; a very large integer will not survive a trip through a float exactly &mdash; but that is a property of floating point rather than of Pydantic.
+
+## Into str, and the asymmetry
+
+Here is the rule that catches people: **a number does not become a string.** A field annotated `str` given `9` raises.
+
+That seems inconsistent until you think about which direction the mistake usually runs. Text arriving where a number was wanted is normal &mdash; it is what the wire looks like. A number arriving where text was wanted is usually a genuine mistake in the calling code, and converting it would bury that mistake. The asymmetry is doing useful work.
+
+If you actually want numbers accepted as text, say so with a validator that runs before conversion. There is a module on those later.
+
+## Into bool
+
+Booleans have their own table, and it is not Python's.
+
+`True` comes from `True`, `1`, `1.0`, and the strings `"1"`, `"true"`, `"True"`, `"yes"`, `"on"`, `"t"`, `"y"`. `False` comes from `False`, `0`, `0.0`, and the strings `"0"`, `"false"`, `"no"`, `"off"`, `"f"`, `"n"`. Anything else &mdash; `"maybe"`, `2`, `""`, `None` &mdash; raises.
+
+Compare that with plain Python, where `bool("false")` is `True` because the string is non-empty. Pydantic reads the *meaning* of the word rather than the emptiness of the container, which is almost always what you wanted when the value came from a checkbox or a query parameter. It is also why `?published=false` does the right thing without you writing a special case.
+
+## Unions and order
+
+A `Union[int, str]` has to decide which member to try. Pydantic v2 uses **smart mode**: it first looks for a member the value already matches exactly, and only then tries conversion, left to right.
+
+That resolves the common cases sensibly &mdash; an actual `int` stays an `int`, an unconvertible string stays a string &mdash; but it does not remove ambiguity entirely. A string like `"9"` can satisfy both members, and which one wins depends on the order you wrote.
+
+Where the distinction matters, do not lean on order. Say what you mean: a discriminated union picks a member by an explicit tag field, and strict mode removes conversion from the question. Both have modules later in this track.
+
+## Turning it off
+
+Coercion is right at the boundary and often wrong inside. Once data has been validated at the door, a value arriving as the wrong type deeper in the system is a bug in your own code, and quietly fixing it hides the bug.
+
+Strict mode makes conversion an error:
+
+```python
+class Strict(BaseModel):
+    model_config = ConfigDict(strict=True)
+    minutes: int
+```
+
+`Strict(minutes="9")` now raises; `Strict(minutes=9)` is fine. Strictness can also be set on a single field, which is the more common need &mdash; lax about most things, exact about the one that matters.
+
+There is a module on strict mode in the next tier that covers when the trade is worth making.
+
+## Reading the type codes
+
+Every refusal carries a stable `type` code, and they are worth recognising because they say precisely which rule fired:
+
+`int_parsing` means a string did not read as an integer. `int_from_float` means a float had a fractional part. `string_type` means a non-string reached a `str` field. `bool_parsing` means a string was not in the boolean table. Matching on these is more reliable than matching on the message, which is prose and may be reworded.
+
+## The practical shape
+
+Run the last editor above and look at what happened. A dictionary of four strings &mdash; exactly what a browser sends &mdash; became a model with a string, an int, a float and a bool, each usable in arithmetic without a single conversion call in sight.
+
+That is the whole value proposition. You wrote the types once, in the annotations, and the messy part happened at the boundary where it belongs.
+
+The next module deals with the fields that are not always there: optional values, defaults, and the difference between "missing" and "null" that trips up nearly everyone.

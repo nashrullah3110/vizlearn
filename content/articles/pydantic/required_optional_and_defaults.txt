@@ -1,0 +1,108 @@
+title: Required, Optional and Defaults: The Three-Way Distinction
+intro: Why Optional does not mean optional, and how to tell "not sent" from "sent as null".
+
+## The rule, first
+
+A field is required when it has no default value. That is the entire rule, and the type annotation plays no part in it.
+
+```python
+class Module(BaseModel):
+    title: str        # required
+    minutes: int = 10 # optional, defaults to 10
+```
+
+Leave out `title` and the model refuses to be built, with an error whose `type` is `missing`. Leave out `minutes` and you get `10`.
+
+Everything confusing about this topic comes from one word being borrowed for two jobs.
+
+## Optional does not mean optional
+
+`Optional[str]` comes from the `typing` module, where it means exactly one thing: `str or None`. It is a statement about which *values* are allowed. It says nothing whatsoever about whether the field has to be supplied.
+
+```python
+class Strict(BaseModel):
+    note: Optional[str]        # nullable, and STILL REQUIRED
+```
+
+`Strict(note=None)` works. `Strict()` raises `missing`. This surprises nearly everyone once, and the surprise is entirely the fault of English rather than of Pydantic &mdash; `Optional` was named for type theory, not for form fields.
+
+To get the behaviour people usually mean, add the default:
+
+```python
+class Truly(BaseModel):
+    note: Optional[str] = None   # nullable AND optional
+```
+
+It is worth internalising as two separate questions. *Can this value be null?* is answered by the type. *Must the caller provide it?* is answered by whether there is a default. They are independent, and all four combinations are legitimate and occasionally useful.
+
+Pydantic v1 blurred this: it made `Optional` fields default to `None` automatically. Pydantic v2 stopped, precisely because the implicit default hid the distinction. If you find old code that relies on it, this is one of the changes that will bite during a migration.
+
+## Missing and null are different facts
+
+For most models the difference does not matter. For anything that updates existing data, it matters enormously.
+
+Consider a PATCH endpoint. A client sends `{"title": "New Name"}`. What should happen to `summary`? Obviously nothing &mdash; they did not mention it. Now a client sends `{"summary": null}`. What should happen? Just as obviously, `summary` should be cleared. Those are opposite intentions, and after validation both fields are `None` in the model.
+
+`model_fields_set` recovers the distinction. It is a set of the field names the caller actually supplied:
+
+```python
+Update(title="x").model_fields_set   # {"title"}
+Update().model_fields_set            # set()
+```
+
+And `model_dump(exclude_unset=True)` uses it, returning only the fields that were provided. That output is the correct thing to apply to an existing record: absent keys are absent, and an explicit `None` is present and clears the value.
+
+Getting this wrong is a real and common bug. An update endpoint that dumps the whole model and writes every field will happily overwrite six columns with `None` because the client only mentioned one.
+
+## The mutable default trap, and why it is not one here
+
+Every Python programmer eventually learns this the hard way:
+
+```python
+def add_tag(tag, tags=[]):
+    tags.append(tag)
+    return tags
+```
+
+The list is created once, when the function is defined, and shared by every call that does not pass one. The second call sees the first call's data.
+
+Pydantic does not have this bug. A default like `tags: List[str] = []` is deep-copied for each new instance, so two models never share a list. You can write the natural thing and it is safe.
+
+`default_factory` still matters, though, for defaults that must be *computed* rather than copied. A timestamp, a generated id, a counter &mdash; anything whose value should reflect the moment of creation:
+
+```python
+created: datetime = Field(default_factory=datetime.now)
+```
+
+Written as `= datetime.now()` that would freeze the time the class was defined, and every model would claim to have been created at import.
+
+## Defaults are not checked
+
+This one is quiet and occasionally costly. By default, Pydantic does not validate default values:
+
+```python
+class Sloppy(BaseModel):
+    minutes: int = "not a number"
+```
+
+That class definition raises nothing, and `Sloppy().minutes` is the string. The reasoning is speed &mdash; you wrote the default yourself, so checking it on every instantiation is work with no expected payoff.
+
+The cost is that a mistyped default is invisible until something downstream does arithmetic. If you would rather be told, `model_config = ConfigDict(validate_default=True)` turns the checking on, at a small cost per instance.
+
+For a model with hand-written defaults that never change, the default behaviour is fine. For a model whose defaults come from configuration or a constant defined elsewhere, turning validation on is cheap insurance.
+
+## Choosing well
+
+A few habits that keep models honest.
+
+Prefer required fields. Every default is a decision made on behalf of a caller who did not make it, and a model where everything is optional documents nothing &mdash; a reader cannot tell what is actually guaranteed.
+
+Do not use `None` as a stand-in for a real default. If a missing duration means ten minutes, write `minutes: int = 10`, not `Optional[int] = None` with a `or 10` scattered through the code that follows.
+
+Reserve `None` for values that are genuinely absent in the domain: a summary nobody has written yet, an end date for something still running. Then `None` carries meaning rather than marking a gap in the model.
+
+And when you are modelling an update rather than a creation, reach for `exclude_unset` early. It is easier to build the endpoint correctly than to work out later why six columns went blank.
+
+## Next
+
+The next module is about the moment a model says no: how to read a `ValidationError` in full, what each part of an entry means, and how to turn one into a message a user can act on.
