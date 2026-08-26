@@ -24,6 +24,22 @@
  * same CDN as the interpreter on the first Run that asks for them and then
  * stay loaded for the rest of the visit, so a page with four Pydantic editors
  * downloads the library once.
+ *
+ * data-vz-wheels is the same idea for libraries Pyodide does not ship: a
+ * comma-separated list of .whl paths, installed with micropip. They are
+ * resolved against the page before being handed to the worker, because the
+ * worker is created from a blob: URL and a relative path means nothing there.
+ * The wheels are served from this site rather than PyPI, so the versions are
+ * pinned and a run does not depend on a third party being up.
+ *
+ * An optional <script type="text/plain" class="py-prelude"> inside the block
+ * is executed in the same namespace immediately before the reader's code and
+ * is not shown in the editor. It exists for setup that a library needs but a
+ * lesson should not open with - /fastapi-lab/ uses it for the test client.
+ * Keep it small: code the reader cannot see is code they cannot debug.
+ *
+ * data-vz-label names the download in the status line ("Loading FastAPI...")
+ * where the bare package list would be four names long.
  */
 (function () {
   'use strict';
@@ -67,8 +83,18 @@
   // make a later one appear to work.
   var RUNNER_SRC = [
     'import ast, sys, traceback',
-    'def _viz_run(code):',
+    'def _viz_run(code, prelude=""):',
     '    g = {"__name__": "__main__"}',
+    // The prelude shares the namespace, so what it defines is simply there
+    // for the reader's code. Its failure is reported as the page's fault,
+    // not theirs: nothing they typed can be the cause.
+    '    if prelude:',
+    '        try:',
+    '            exec(compile(prelude, "<prelude>", "exec"), g)',
+    '        except BaseException:',
+    '            sys.stderr.write("The page setup for this editor failed:\\n")',
+    '            sys.stderr.write(traceback.format_exc())',
+    '            return',
     '    try:',
     '        tree = ast.parse(code, "<user>", "exec")',
     '        if len(tree.body) == 1 and isinstance(tree.body[0], ast.Expr):',
@@ -112,18 +138,38 @@
       '    for (var i = 0; i < want.length; i++) {\n' +
       '      if (!loaded[want[i]]) need.push(want[i]);\n' +
       '    }\n' +
-      '    if (need.length) postMessage({ type: "loading", names: need });\n' +
+      '    var wheels = m.wheels || [];\n' +
+      '    var newWheels = [];\n' +
+      '    for (var w = 0; w < wheels.length; w++) {\n' +
+      '      if (!loaded[wheels[w]]) newWheels.push(wheels[w]);\n' +
+      '    }\n' +
+      '    if (need.length || newWheels.length) {\n' +
+      '      postMessage({ type: "loading", names: m.label ? [m.label] : need });\n' +
+      '    }\n' +
+      '    if (newWheels.length) need.push("micropip");\n' +
       '    var prep = need.length ? py.loadPackage(need) : Promise.resolve();\n' +
       '    prep.then(function () {\n' +
+      '      if (!newWheels.length) return;\n' +
+      // micropip resolves dependencies against what is already installed, so
+      // the Pyodide-shipped pydantic has to be in place before this runs -
+      // otherwise micropip fetches the newest pydantic from PyPI, whose
+      // pydantic-core has no wasm build, and the install dies there.
+      '      py.globals.set("__wheels__", newWheels);\n' +
+      '      return py.runPythonAsync("import micropip\\nawait micropip.install(list(__wheels__))");\n' +
+      '    }).then(function () {\n' +
       '      for (var j = 0; j < need.length; j++) loaded[need[j]] = true;\n' +
+      '      for (var k = 0; k < newWheels.length; k++) loaded[newWheels[k]] = true;\n' +
       // "loaded" is what starts the run budget on the page. It has to be sent
       // after the wheels are in and before the first line executes, or a slow
       // library download is billed to the run timer and reported as an
       // infinite loop.
       '      postMessage({ type: "loaded" });\n' +
-      '      try { py.globals.set("__code__", m.code); }\n' +
+      '      try {\n' +
+      '        py.globals.set("__code__", m.code);\n' +
+      '        py.globals.set("__prelude__", m.prelude || "");\n' +
+      '      }\n' +
       '      catch (err) { postMessage({ type: "err", text: String(err) }); }\n' +
-      '      return py.runPythonAsync("_viz_run(__code__)");\n' +
+      '      return py.runPythonAsync("_viz_run(__code__, __prelude__)");\n' +
       '    }).then(function () {\n' +
       '      postMessage({ type: "done" });\n' +
       '    }, function (err) {\n' +
@@ -219,7 +265,8 @@
     out.scrollTop = out.scrollHeight;
   }
 
-  function runBlock(block, code, packages) {
+  function runBlock(block, code, opts) {
+    opts = opts || {};
     var parts = els(block);
     var out = parts.output;
     out.textContent = '';
@@ -281,7 +328,14 @@
         finish();
       };
       try {
-        worker.postMessage({ type: 'run', code: code, packages: packages || [] });
+        worker.postMessage({
+          type: 'run',
+          code: code,
+          packages: opts.packages || [],
+          wheels: opts.wheels || [],
+          prelude: opts.prelude || '',
+          label: opts.label || ''
+        });
       } catch (err) {
         appendOut(block, String(err), 'py-out-err');
         finish();
@@ -315,14 +369,27 @@
         }
         indentOnTab(parts.editor);
 
-        var packages = (block.getAttribute('data-vz-packages') || '')
-          .split(',')
-          .map(function (n) { return n.trim(); })
-          .filter(function (n) { return n.length > 0; });
+        var list = function (attr) {
+          return (block.getAttribute(attr) || '')
+            .split(',')
+            .map(function (n) { return n.trim(); })
+            .filter(function (n) { return n.length > 0; });
+        };
+        var packages = list('data-vz-packages');
+        // The worker lives at a blob: URL, where a relative path resolves
+        // against nothing useful. Absolutise against the page instead.
+        var wheels = list('data-vz-wheels').map(function (u) {
+          return new URL(u, document.baseURI).href;
+        });
+        var preludeEl = block.querySelector('.py-prelude');
+        var prelude = preludeEl ? preludeEl.textContent : '';
+        var label = block.getAttribute('data-vz-label') || '';
 
         parts.run.addEventListener('click', function () {
           if (parts.run.disabled) return;
-          runBlock(block, parts.editor.value, packages);
+          runBlock(block, parts.editor.value, {
+            packages: packages, wheels: wheels, prelude: prelude, label: label
+          });
         });
 
         // Guarded: this used to be unconditional, so a block authored without

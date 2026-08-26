@@ -359,6 +359,17 @@ TOOL_PAGES = {
                        "run them against real data in your browser - Pydantic v2 on "
                        "CPython compiled to WebAssembly, with full validation errors.",
     },
+    "fastapi-lab": {
+        "dir": "fastapi-lab",
+        "rel": "fastapi-lab/index.html",
+        "title": "FastAPI Compiler",
+        "footer": True,
+        "lead": "Define routes and call them. A real FastAPI app running in your "
+                "browser - no server, no install, nothing sent anywhere.",
+        "description": "A free online FastAPI compiler. Write real FastAPI routes and "
+                       "call them in your browser - path and query validation, Pydantic "
+                       "request bodies, status codes and the generated OpenAPI schema.",
+    },
     "saved": {
         "dir": "saved",
         "rel": "saved/index.html",
