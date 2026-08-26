@@ -1,0 +1,185 @@
+title: Performance and pydantic-core: What Validation Actually Costs
+intro: Why v2 is fast, where the time goes, and the three habits that account for most of the difference.
+
+## Two libraries in a trench coat
+
+Installing `pydantic` installs two things.
+
+A **Python layer** that reads your class, interprets the annotations, resolves types, and builds a schema describing how to validate the model. This runs once, when the class is defined.
+
+**`pydantic-core`**, a compiled Rust engine that executes that schema against data. This runs every time you validate.
+
+Almost everything about v2's performance follows from that split. Validation is compiled code walking a prepared schema, not Python interpreting annotations per call. Version 1 did the latter, which is why v2 was a rewrite rather than an optimisation.
+
+It also explains details you will have noticed. Error `type` codes look like machine identifiers because they come from the core. `model_validate_json` beats parsing separately because the core parses and validates in one pass. And there is a compiled wheel per platform, because there is compiled code in there.
+
+## Where the time actually goes
+
+Three components, worth separating.
+
+**Schema building** happens once per class or adapter. It is the most expensive single operation and it should be invisible &mdash; unless you build schemas repeatedly, which is the mistake below.
+
+**Validation** happens per value. Cost scales with how much work there is: a value already of the right type is checked and passed through; one needing conversion costs more; one needing a custom validator costs the most, because that means leaving Rust for Python.
+
+**Serialisation** is generally cheaper than validation, and follows the same shape.
+
+## The three habits
+
+Almost all avoidable cost comes down to three things.
+
+### Validate once
+
+The rule from the first module, restated as a performance point: re-validating an object that has already passed produces an identical result for the full price.
+
+It happens more than people expect. A model validated in a request handler, passed to a service that validates it again, handed to a repository that constructs its own model from it. Each layer is defensively re-checking data that cannot have changed.
+
+The discipline is to decide where the boundary is and trust everything past it. If a function's argument is a model, it has been validated; checking again buys nothing.
+
+The exception is genuinely mutable data. If `validate_assignment` is off and something has been assigning freely, the object may no longer match its annotations &mdash; but the fix there is to turn on the setting or freeze the model, not to re-validate.
+
+### Validate collections in one call
+
+```python
+[Model.model_validate(r) for r in rows]              # per item
+TypeAdapter(List[Model]).validate_python(rows)       # whole list
+```
+
+Identical results. The first crosses between Python and Rust once per row; the second makes one call and loops inside the core.
+
+For bulk work &mdash; a file import, a batch job, a large API response &mdash; this is the single most effective change available, and it is one line.
+
+### Parse JSON directly
+
+`model_validate_json(raw)` rather than `model_validate(json.loads(raw))`.
+
+The two-step form builds a complete intermediate structure of Python objects, then converts it again. The direct form reads the text and constructs the final values in one pass.
+
+As the parsing module covered, it is also better for errors and for decimal precision. Three benefits for less code.
+
+## Validators are the expensive part
+
+A `field_validator` is Python. Every time it runs, the core suspends, calls into the interpreter, and resumes.
+
+For a model built a few times per request that is irrelevant. For a hundred thousand rows it is the dominant cost, and it is worth two questions.
+
+**Could this be a constraint?** `Field(gt=0)` and a validator checking `v > 0` reject the same values, and the constraint runs in Rust. It also reaches the schema, which is the more important reason.
+
+**Is it doing work that could be done once?** A validator that rebuilds a set of permitted values on every call is doing that per item. Hoisting it to module level is usually a bigger win than anything else in the model.
+
+## Building schemas repeatedly
+
+The mistake that looks like nothing in review:
+
+```python
+for row in rows:
+    TypeAdapter(List[int]).validate_python(row)     # recompiles every iteration
+```
+
+Adapters belong at module level. The same applies to any pattern that defines a model class inside a function called repeatedly &mdash; each call builds a new class and a new schema.
+
+Where the type is only known at runtime, cache the adapters in a dict keyed by type, or wrap a factory in `functools.lru_cache`.
+
+## Keeping perspective
+
+Two things worth saying plainly.
+
+**Validation is usually not your bottleneck.** A model validating in single-digit microseconds sits next to a database query taking milliseconds and a network call taking hundreds. In a typical request handler, validation is a rounding error. Choosing a dataclass "for performance" in a handler that then makes three SQL queries is optimising the wrong end.
+
+**Measure before changing anything.** The habits above are free &mdash; adopt them because they are also clearer. Anything beyond them should follow a profile, not an intuition.
+
+The place validation genuinely dominates is bulk: large collections, file imports, high-throughput pipelines. That is where the one-call-per-collection rule earns real time.
+
+## A note on these timings
+
+Every measurement on this page runs on CPython compiled to WebAssembly, several times slower than a native interpreter, on one core.
+
+The **ratios** transfer &mdash; validating a list in one call really is faster than looping, by roughly the factor shown. The **absolute seconds** do not. Do not quote them as figures for a server.
+
+That caveat applies to any benchmark run anywhere, including ones you write yourself on your laptop. Relative comparisons under identical conditions are informative; absolute numbers are a property of the machine.
+
+## Summary
+
+Pydantic v2 is a Python layer that builds schemas and a Rust core that runs them, which is why validation is cheap enough to do on every request.
+
+Three habits account for most of the avoidable cost: validate once at the boundary, validate collections in a single call, and parse JSON directly. Prefer constraints over validators where either would do, and build schemas once rather than in a loop.
+
+Then stop, because validation is rarely the slow part, and the remaining questions belong to a profiler rather than to a rule of thumb.
+
+## What not to optimise
+
+A short list of things that look like performance decisions and are not.
+
+**Choosing a dataclass over a model in a request handler.** The handler then makes three database queries. The validation was never the cost.
+
+**Skipping validation on data from your own database.** It is cheap on already-correct types, and the guarantee is worth more than the microseconds. If a column can be null and the model says it cannot, you want to know.
+
+**Avoiding nested models to reduce validation count.** A flat model with the same fields does the same total work; nesting is an organisational choice, not a performance one.
+
+**Reaching for `model_construct`.** It skips validation entirely, which makes it fast and unsafe. It exists for cases where the data provably came from a trusted source &mdash; reconstructing from your own cache, say. Using it to speed up a normal path removes the property you installed the library for.
+
+## Measuring properly
+
+If you do need to measure, three things make the result meaningful.
+
+**Warm up.** The first construction of a model builds its schema. Timing that alongside the validations makes the first run look terrible and tells you nothing about the steady state.
+
+**Time the right thing.** Wrap the validation, not the loop that also builds the input data. Constructing ten thousand dictionaries is not free either.
+
+**Compare under identical conditions.** Same machine, same process, same interpreter. Absolute numbers do not survive a move between any of those, which is why the timings on this page are presented as ratios.
+
+`time.perf_counter` is sufficient for A-versus-B. For finding where time goes in a real application, a profiler will point at the database long before it points at validation.
+
+## Summary
+
+Two pieces: Python builds the schema once, Rust executes it per value. Cost scales with how much conversion and how much custom Python is involved.
+
+Three habits cover nearly all avoidable cost &mdash; validate once at the boundary, validate collections in a single call, parse JSON directly. Prefer constraints to validators where either works, and build schemas at module level rather than in a loop.
+
+Then stop. Validation is rarely the bottleneck, and the remaining questions belong to a profiler.
+
+
+## Mistakes people make
+
+**Re-validating what has already passed.** The most common and most expensive no-op. If a function's argument is a model, it was validated; checking again produces an identical result for the full price.
+
+**Looping in Python over a collection.** `[Model.model_validate(r) for r in rows]` crosses into Rust once per row. One call with a `TypeAdapter(List[Model])` does the loop inside the core.
+
+**Building schemas repeatedly.** A `TypeAdapter` constructed inside a loop, or a model class defined inside a function called per request, recompiles a schema every time. Module level, once.
+
+**Doing work inside a validator that could be done outside.** Rebuilding a set of permitted values on every call does it per item. Hoisting it is often a bigger win than anything else in the model.
+
+**Using `model_construct` to go faster.** It skips validation entirely. That is correct for reconstructing from a provably trusted source and a way of quietly removing the guarantee everywhere else.
+
+**Optimising validation before profiling.** In a handler that makes three database queries, validation is a rounding error. A profiler will point at the database long before it points here.
+
+**Quoting benchmark seconds.** Absolute numbers are a property of the machine &mdash; doubly so on this page, which runs on WebAssembly. Ratios under identical conditions transfer; seconds do not.
+
+## Why it was worth rewriting
+
+It is worth understanding what the v2 rewrite actually bought, because it explains why this module is short.
+
+In v1, validation was Python interpreting annotations on every call. That put Pydantic on the critical path of a lot of applications in a way that showed up in profiles, and made "is validation too slow?" a reasonable question to ask routinely.
+
+Moving execution into Rust changed the answer from "sometimes" to "almost never". A model that validates in a few microseconds does not compete with anything else in a request.
+
+So the practical guidance became much simpler: adopt the three habits because they are also clearer code, and otherwise stop thinking about it. That is a better place to be than a set of tuning tricks, and it is the reason most of this module is about what not to optimise.
+
+## The honest summary
+
+Most applications should not think about this module at all.
+
+Adopt the three habits &mdash; validate once, validate collections in one call, parse JSON directly &mdash; because each is also clearer code than the alternative, and then stop. They are not performance tricks; they are the obvious way to write it, which happens also to be the fast way.
+
+If something is genuinely slow, profile it. The answer will usually be I/O, and on the occasions it really is validation the answer will usually be one of the three habits not being followed, or a validator doing per-item work that belongs outside the loop.
+
+What changed in v2 is that this stopped being a live concern for ordinary code. Validation used to be something you budgeted for; now it is something you can put at every boundary without thinking about the cost. That is a better outcome than any tuning advice.
+
+## In one line
+
+Validate once at the boundary, validate collections in a single call, and hand JSON straight to Pydantic &mdash; then stop thinking about it, because in v2 validation is almost never the slow part.
+
+## A closing thought
+
+The most useful performance property of Pydantic v2 is not that it is fast. It is that it is fast enough to stop being a consideration.
+
+That changes how you write code. Validation at every boundary stops being a trade-off and becomes the default, which means more of your program can assume its inputs are correct &mdash; and that is worth considerably more than the microseconds.

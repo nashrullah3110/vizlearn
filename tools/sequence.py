@@ -463,6 +463,11 @@ SEQUENCE = {
         "pydantic/custom_serializers.html",
         "pydantic/json_schema.html",
         "pydantic/type_adapter.html",
+        "pydantic/generic_models.html",
+        "pydantic/settings_management.html",
+        "pydantic/pydantic_with_fastapi.html",
+        "pydantic/performance_and_pydantic_core.html",
+        "pydantic/migrating_v1_to_v2.html",
     ],
     "python": [
         "python/hello_python.html",

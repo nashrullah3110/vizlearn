@@ -28,11 +28,19 @@ TOPICS = []
 CHECKS = {}
 
 
-def topic(slug, title, cat, lead, svg, steps, notes, article, check):
-    """One module. `steps` is a list of (heading, blurb, code) triples."""
+def topic(slug, title, cat, lead, svg, steps, notes, article, check,
+          wheels=None, prelude=None):
+    """One module. `steps` is a list of (heading, blurb, code) triples.
+
+    `wheels` names extra .whl files this module's editors need on top of the
+    Pyodide-shipped pydantic - tier five needs pydantic-settings and the
+    FastAPI stack. `prelude` is setup code run before the reader's, in the
+    same namespace and not shown in the editor.
+    """
     TOPICS.append({
         "slug": slug, "title": title, "cat": cat, "lead": lead, "svg": svg,
         "steps": steps, "notes": notes, "article": article, "check": check,
+        "wheels": wheels or [], "prelude": prelude or "",
     })
     # build_labs.py expects {"check": [...]}, not the bare list - the same
     # shape python_topics.CHECKS uses.
@@ -9849,5 +9857,2035 @@ Seeing it that way makes the choice obvious rather than a matter of taste. Ask w
          "options": ["Never", "When the thing deserves a name, needs validators or config, or benefits from attribute access", "Only for JSON", "Only for nested data"],
          "answer": 1,
          "why": "Adapters have no class body and hand back plain objects. Models name domain concepts and give validators, config and methods somewhere to live."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 26. Generic models
+# ---------------------------------------------------------------------------
+topic(
+    "generic_models",
+    "Generic Models",
+    "In Practice",
+    "One envelope, many payloads - the pattern behind every paginated response "
+    "you have ever consumed.",
+    _svg(_box(16, 20, 128, 54, S) + _txt(80, 34, "Page[T]", A, 9) +
+         _box(30, 42, 44, 22, S) + _txt(52, 56, "Module", M, 8) +
+         _box(86, 42, 44, 22, S) + _txt(108, 56, "Lesson", M, 8)),
+    [
+        ("The duplication a generic removes",
+         "Two envelopes with identical structure and one differing field. A third "
+         "resource means a third copy.",
+         '''from typing import List
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+
+class Lesson(BaseModel):
+    name: str
+
+class ModulePage(BaseModel):
+    items: List[Module]
+    total: int
+    page: int
+
+class LessonPage(BaseModel):          # the same class again
+    items: List[Lesson]
+    total: int
+    page: int
+
+print(ModulePage(items=[{"title": "Vectors"}], total=1, page=1))
+print(LessonPage(items=[{"name": "Direction"}], total=1, page=1))'''),
+
+        ("One envelope, parameterised",
+         "Inherit from <code>Generic[T]</code> and the payload type becomes an "
+         "argument. Validation applies to whatever you fill it with.",
+         '''from typing import Generic, List, TypeVar
+from pydantic import BaseModel
+
+T = TypeVar("T")
+
+class Page(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+    page: int = 1
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+class Lesson(BaseModel):
+    name: str
+
+mp = Page[Module](items=[{"title": "Vectors", "minutes": "8"}], total=1)
+lp = Page[Lesson](items=[{"name": "Direction"}], total=1)
+
+print("modules:", mp)
+print("lessons:", lp)
+print()
+print("inner type:", type(mp.items[0]).__name__, "| coerced:", mp.items[0].minutes)'''),
+
+        ("The parameter is validated",
+         "A generic is not a free pass. The payload is checked against whatever type "
+         "you supplied, with the usual errors and paths.",
+         '''from typing import Generic, List, TypeVar
+from pydantic import BaseModel, ValidationError
+
+T = TypeVar("T")
+
+class Page(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+try:
+    Page[Module](items=[{"title": "Vectors", "minutes": "soon"}], total=1)
+except ValidationError as e:
+    err = e.errors()[0]
+    print("path:", err["loc"])
+    print("said:", err["msg"])
+
+# And a plain type works just as well as a model:
+print()
+print("ints:", Page[int](items=["1", "2", "3"], total=3))'''),
+
+        ("Bounded and constrained parameters",
+         "<code>TypeVar(bound=...)</code> restricts what the parameter may be, which "
+         "keeps a generic honest about what it can hold.",
+         '''from typing import Generic, List, TypeVar
+from pydantic import BaseModel
+
+class Resource(BaseModel):
+    id: int
+
+TResource = TypeVar("TResource", bound=Resource)
+
+class Page(BaseModel, Generic[TResource]):
+    items: List[TResource]
+
+    def ids(self):
+        return [item.id for item in self.items]     # safe: bound guarantees .id
+
+class Module(Resource):
+    title: str
+
+p = Page[Module](items=[{"id": 1, "title": "Vectors"},
+                        {"id": 2, "title": "Norms"}])
+print(p)
+print("ids:", p.ids())'''),
+
+        ("Several parameters",
+         "A generic can take more than one, which is how a result-or-error envelope "
+         "gets written once.",
+         '''from typing import Generic, Optional, TypeVar
+from pydantic import BaseModel
+
+D = TypeVar("D")
+E = TypeVar("E")
+
+class Result(BaseModel, Generic[D, E]):
+    ok: bool
+    data: Optional[D] = None
+    error: Optional[E] = None
+
+class Module(BaseModel):
+    title: str
+
+class Problem(BaseModel):
+    code: str
+    detail: str
+
+good = Result[Module, Problem](ok=True, data={"title": "Vectors"})
+bad = Result[Module, Problem](ok=False,
+                              error={"code": "not_found", "detail": "no such module"})
+
+print("ok  :", good)
+print("bad :", bad)'''),
+
+        ("What the schema does with it",
+         "Each parameterisation becomes its own definition, so a generated client "
+         "gets a real named type rather than an untyped envelope.",
+         '''import json
+from typing import Generic, List, TypeVar
+from pydantic import BaseModel
+
+T = TypeVar("T")
+
+class Page(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+
+class Module(BaseModel):
+    title: str
+
+schema = Page[Module].model_json_schema()
+print("title :", schema["title"])
+print("props :", list(schema["properties"]))
+print("$defs :", list(schema.get("$defs", {})))
+print()
+print("items :", json.dumps(schema["properties"]["items"]))'''),
+    ],
+    [
+        "Inherit from both <code>BaseModel</code> and <code>Generic[T]</code>, then parameterise with <code>Page[Module]</code>.",
+        "The parameter is fully validated &mdash; a generic gives you reuse, not an escape from checking.",
+        "Each parameterisation is a distinct class, built and cached the first time you use it.",
+        "<code>TypeVar(bound=X)</code> restricts the parameter, which lets methods on the generic safely use what <code>X</code> guarantees.",
+        "The generated schema names each parameterisation (<code>Page[Module]</code>), so clients get real named types rather than an envelope of anything.",
+        "Parameterise at module level rather than inside a hot function &mdash; building the class the first time costs something.",
+    ],
+    '''
+title: Generic Models: One Envelope, Many Payloads
+intro: The pattern behind every paginated response, written once instead of once per resource.
+
+## The duplication
+
+Every API with more than one list endpoint grows the same class several times:
+
+```python
+class ModulePage(BaseModel):
+    items: List[Module]
+    total: int
+    page: int
+
+class LessonPage(BaseModel):
+    items: List[Lesson]
+    total: int
+    page: int
+```
+
+Identical apart from one type. A third resource means a third copy, and a change to pagination means editing all of them &mdash; or, more realistically, editing most of them.
+
+## The generic version
+
+```python
+T = TypeVar("T")
+
+class Page(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+    page: int = 1
+```
+
+Inherit from `BaseModel` and `Generic[T]`, use `T` where the varying type goes, and parameterise at the point of use:
+
+```python
+Page[Module](items=[...], total=1)
+```
+
+One definition. Adding a field to the envelope reaches every resource at once, and there is no possibility of the copies disagreeing because there are no copies.
+
+## It is still validated
+
+A common assumption is that a generic loosens things. It does not.
+
+`Page[Module]` validates `items` as a list of `Module`, with every rule `Module` carries. Coercion works, constraints run, errors have the usual paths &mdash; `("items", 0, "minutes")` names the first item's field exactly as it would in a non-generic model.
+
+`Page[int]` validates a list of integers, with the same coercion rules as anywhere else. The parameter can be any type Pydantic understands, not only models.
+
+## Each parameterisation is a real class
+
+`Page[Module]` is a distinct class, created the first time you write it and cached afterwards.
+
+That has two consequences worth knowing.
+
+It has a name, `Page[Module]`, which appears in the schema and in error messages, so a consumer sees a specific type rather than a vague envelope.
+
+And building it costs something. The cost is small and paid once per parameterisation, but it means `Page[Module]` inside a hot function is doing a lookup that a module-level alias would avoid:
+
+```python
+ModulePage = Page[Module]
+```
+
+That alias is also better style: it names the type once and every use site is shorter.
+
+## Bounded parameters
+
+An unbounded `TypeVar` can be anything, so a generic cannot assume anything about it. A bound fixes that:
+
+```python
+TResource = TypeVar("TResource", bound=Resource)
+
+class Page(BaseModel, Generic[TResource]):
+    items: List[TResource]
+
+    def ids(self):
+        return [item.id for item in self.items]
+```
+
+Because the parameter must be a `Resource`, every item is guaranteed to have `id`, and the method is safe. Without the bound, mypy would object and the method would be a runtime gamble.
+
+Bounds are also documentation. `Generic[TResource]` with a bound says what kind of thing this envelope is for; a bare `T` says nothing.
+
+## Several parameters
+
+More than one is allowed, and the result-or-error envelope is the common case:
+
+```python
+class Result(BaseModel, Generic[D, E]):
+    ok: bool
+    data: Optional[D] = None
+    error: Optional[E] = None
+```
+
+Written once, used as `Result[Module, Problem]` everywhere. This is a pattern many codebases reinvent per endpoint.
+
+Keep the count low. Two parameters is comfortable, three is a stretch, and beyond that the type is usually trying to be several types at once.
+
+## Schemas and clients
+
+Each parameterisation generates its own schema, titled with the parameterised name.
+
+That is the practical payoff for consumers. A generated TypeScript client gets `PageModule` and `PageLesson` as distinct types, each with correctly typed `items`. Without generics you would have written those classes by hand and got the same result at more cost; with a hand-rolled `items: List[Any]` envelope you would get a client that types `items` as `any` and helps nobody.
+
+FastAPI handles generic response models directly &mdash; `response_model=Page[Module]` &mdash; and documents it correctly.
+
+## Inheritance and generics together
+
+A generic model can be subclassed, and a subclass can fix the parameter:
+
+```python
+class ModulePage(Page[Module]):
+    facets: Dict[str, int] = {}
+```
+
+That gives you the shared envelope plus something specific to one resource. It is a good pattern when one endpoint genuinely needs an extra field, and a bad one if every subclass adds something &mdash; at that point the envelope is not actually shared.
+
+## When not to reach for one
+
+**Two use sites.** Two near-identical classes are easier to read than a generic. The pattern earns its keep at three or four, and the cost of waiting is small.
+
+**The classes differ in more than one type.** A generic with a parameter and three overridden fields is not a shared shape.
+
+**A union would say it better.** If the payload is one of a fixed small set rather than arbitrary, a discriminated union describes that precisely and a generic does not.
+
+**The envelope has no structure.** `Generic[T]` wrapping a single field of type `T` is a box. `TypeAdapter` validates the payload directly without one.
+
+## Summary
+
+`class Page(BaseModel, Generic[T])`, parameterised as `Page[Module]`. Full validation of the parameter, a real class per parameterisation with a real name in the schema, and bounds when the generic needs to rely on what the parameter provides.
+
+Alias parameterisations at module level. Keep the parameter count low. And reach for it at the third copy, not the second.
+
+## Generics and validation cost
+
+Parameterising is not free, and it is worth knowing where the cost falls.
+
+`Page[Module]` builds a class the first time it is written: resolving the type variable, constructing a schema, caching the result. Every subsequent use of the same parameterisation reuses it.
+
+So the cost is per distinct parameterisation, paid once, and it is the same cost a hand-written `ModulePage` would have paid at import. Validation itself is identical &mdash; the schema the generic produces is the schema the hand-written class would have produced.
+
+The mistake, as with `TypeAdapter`, is doing the parameterisation somewhere repetitive. `Page[Module]` inside a function called per request performs a cached lookup each time; a module-level alias performs it once. The difference is small and free to avoid.
+
+## Generics with FastAPI
+
+`response_model=Page[Module]` works directly, and the documentation names the type correctly &mdash; `PageModule` in the generated schema, with `items` typed as an array of `Module`.
+
+That is worth doing rather than falling back to an untyped envelope. A response model of `Page[Module]` gives every consumer a real type; a model with `items: List[Any]` gives them nothing, and they will write the type by hand on their side and get it wrong when yours changes.
+
+The same applies to a `Result[Data, Error]` envelope. If your API wraps every response, making that wrapper generic is the difference between a client library that knows what each endpoint returns and one that unwraps `any`.
+
+## Summary
+
+`class Page(BaseModel, Generic[T])`, used as `Page[Module]`. The parameter is fully validated with its own rules. Each parameterisation is a real, named class that appears correctly in the schema and in generated clients.
+
+Bound the type variable when the generic needs to rely on what the parameter provides. Alias parameterisations at module level. Keep the parameter count to one or two.
+
+And reach for it at the third copy of an envelope, not the second &mdash; two similar classes are easier to read than a generic, and the pattern earns its keep as soon as there are more.
+
+
+## Mistakes people make
+
+**Reaching for one at the second copy.** Two similar classes read better than a generic. The pattern earns its keep around the third or fourth, and waiting costs almost nothing.
+
+**Parameterising in a hot path.** `Page[Module]` performs a cached class lookup every time it is evaluated. A module-level alias does it once and reads better at every use site.
+
+**Leaving the type variable unbounded when methods need it.** A method calling `item.id` on a bare `T` is a runtime gamble that mypy will object to. `TypeVar(bound=Resource)` makes the guarantee real and documents what the envelope is for.
+
+**Too many parameters.** Two is comfortable. Three is a stretch. Beyond that the type is trying to be several types, and separate classes will be clearer.
+
+**Wrapping a single field.** `Generic[T]` around a model with one field of type `T` is a box. `TypeAdapter` validates the payload directly and produces a schema that describes what the data actually is.
+
+**Assuming a generic is looser.** It is not. `Page[Module]` validates its items with every rule `Module` carries, and the error paths are identical to a hand-written envelope's.
+
+**Forgetting `response_model=Page[Module]`.** Falling back to an untyped envelope in FastAPI means every consumer gets `any` and writes the type by hand on their side &mdash; where it will be wrong the first time yours changes.
+
+## Reading a generic model
+
+One practical note for anyone maintaining these.
+
+A generic reads worse than the classes it replaces, and that is the trade. `class ModulePage(BaseModel)` with three concrete fields can be understood at a glance; `class Page(BaseModel, Generic[T])` requires the reader to hold a type variable in their head and then find the parameterisations to know what it is ever filled with.
+
+Two things make that cost small. Name the type variable meaningfully &mdash; `TResource` says more than `T` once there is more than one. And alias the parameterisations at module level, so a reader searching for "what does the modules endpoint return" finds `ModulePage = Page[Module]` rather than an expression buried in a decorator.
+
+Neither costs anything, and both turn a generic from something clever into something ordinary.
+
+## A worked shape
+
+Most APIs end up with two generic envelopes and nothing else.
+
+```python
+T = TypeVar("T")
+
+class Page(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+    page: int = 1
+    size: int = 20
+
+class Result(BaseModel, Generic[T]):
+    ok: bool
+    data: Optional[T] = None
+    error: Optional[Problem] = None
+
+ModulePage = Page[Module]
+LessonPage = Page[Lesson]
+```
+
+Two definitions and a handful of aliases replace one envelope class per resource, which in a system of fifteen resources is fifteen classes all saying the same thing.
+
+The aliases matter as much as the generics. They give each parameterisation a name a reader can search for, keep the parameterisation out of hot paths, and make endpoint signatures short: `response_model=ModulePage` rather than a bracketed expression in a decorator.
+
+Adding a field to pagination &mdash; a cursor, a `has_more` flag &mdash; is then one edit that reaches every list endpoint at once, correctly, including in the documentation and in every generated client. That is the property worth having, and the reason the pattern survives contact with a real codebase.
+
+## Generics and static checking
+
+One benefit that does not show up at runtime at all.
+
+Mypy and Pyright understand `Generic[T]`, so `Page[Module]` is a type they can reason about. `page.items[0].title` is checked; `page.items[0].name` is flagged before the code runs.
+
+A hand-written `ModulePage` gives the same static benefit, so this is not an argument for generics over concrete classes. It is an argument against the shortcut people reach for when they tire of writing envelopes:
+
+```python
+class Page(BaseModel):
+    items: List[Any]
+```
+
+That validates nothing about the payload, tells mypy nothing, and produces a schema in which `items` is an array of anything. Every consumer &mdash; your own code, a static checker, a generated client &mdash; is worse off.
+
+The choice is not really "generic or concrete". It is "typed or untyped", and the generic is what makes the typed option cheap enough that nobody reaches for the untyped one.
+
+## Why envelopes end up generic
+
+It is worth noticing why this pattern appears in nearly every API of any size, because it is not really about generics.
+
+An API with fifteen list endpoints has fifteen responses that differ in exactly one place. That is a shape, and shapes want names. Writing fifteen classes to express one shape is the kind of duplication that looks harmless in a small codebase and becomes a maintenance surface in a large one &mdash; not because typing it is hard, but because changing it later means finding all fifteen.
+
+The generic is simply the language feature that lets the shape have a name. `Page` is the concept; `Page[Module]` is that concept applied. Once written, adding a field to pagination is a single edit that cannot miss a case, and every consumer sees the change consistently.
+
+That is the same argument as extracting a nested model, or naming a constrained type, or putting config on a shared base. Each is a different mechanism for the same principle: state a decision once, in a place that has a name, and let everything that needs it refer to that rather than to a copy.
+''',
+    [
+        {"q": "Does `Page[Module]` validate its `items`?",
+         "options": ["No - generics skip validation", "Yes, fully, with Module's own rules and normal error paths", "Only the length", "Only in strict mode"],
+         "answer": 1,
+         "why": "A generic gives reuse, not an escape from checking. Coercion, constraints and error paths all behave exactly as in a non-generic model."},
+        {"q": "Why alias `ModulePage = Page[Module]` at module level?",
+         "options": ["Required syntax", "Each parameterisation builds a real class; the alias names it once and avoids repeating the lookup", "It changes validation", "For mypy only"],
+         "answer": 1,
+         "why": "`Page[Module]` creates and caches a distinct class. Naming it once is both clearer at every use site and avoids doing the lookup in a hot path."},
+        {"q": "What does `TypeVar(\"T\", bound=Resource)` let you do?",
+         "options": ["Nothing extra", "Write methods on the generic that rely on what Resource guarantees", "Skip validation", "Allow any type"],
+         "answer": 1,
+         "why": "The bound means every parameterisation is a Resource, so a method can safely use `item.id`. It also documents what the envelope is for."},
+        {"q": "When is a generic the wrong tool?",
+         "options": ["Always", "At two use sites, or when the payload is one of a fixed small set", "For paginated responses", "With models"],
+         "answer": 1,
+         "why": "Two near-identical classes read better than a generic; the pattern earns its keep around the third. And a fixed small set of payloads is a discriminated union, which says more."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 27. Settings management
+# ---------------------------------------------------------------------------
+topic(
+    "settings_management",
+    "Settings Management",
+    "In Practice",
+    "Typed configuration from the environment, validated at start-up instead of "
+    "failing at midnight.",
+    _svg(_txt(34, 30, "DB_PORT=5432", M, 7) + _arrow(72, 26, 90, 26) + _txt(120, 30, "int", A, 8) +
+         _txt(34, 52, 'DEBUG="yes"', M, 7) + _arrow(72, 48, 90, 48) + _txt(120, 52, "bool", A, 8) +
+         _box(14, 62, 132, 18, S, A) + _txt(80, 75, "checked at start-up", A, 8)),
+    [
+        ("Configuration is a boundary too",
+         "<code>os.environ</code> gives strings and no guarantees. A settings model "
+         "reads, converts and checks in one place.",
+         '''import os
+from pydantic_settings import BaseSettings
+
+# The environment as your process actually sees it: strings, or nothing.
+os.environ["APP_PORT"] = "8642"
+os.environ["APP_DEBUG"] = "yes"
+
+print("raw    :", repr(os.environ.get("APP_PORT")),
+      repr(os.environ.get("APP_DEBUG")))
+
+class Settings(BaseSettings):
+    app_port: int = 8000
+    app_debug: bool = False
+    app_name: str = "VizLearn"
+
+s = Settings()
+print("typed  :", s)
+print("port+1 :", s.app_port + 1, "(a real int)")
+print("not    :", not s.app_debug)'''),
+
+        ("Missing configuration fails at start-up",
+         "A required setting with no value raises immediately, naming the variable "
+         "&mdash; rather than surfacing as an error hours later.",
+         '''import os
+from pydantic_settings import BaseSettings
+from pydantic import ValidationError
+
+for key in ("DATABASE_URL", "SECRET_KEY"):
+    os.environ.pop(key, None)
+
+class Settings(BaseSettings):
+    database_url: str          # required
+    secret_key: str            # required
+    timeout: int = 30
+
+try:
+    Settings()
+except ValidationError as e:
+    print("missing at start-up:", e.error_count())
+    for err in e.errors():
+        print("   ", err["loc"][0], "->", err["type"])
+
+os.environ["DATABASE_URL"] = "postgres://localhost/viz"
+os.environ["SECRET_KEY"] = "s3cret"
+print()
+print("with values:", Settings())'''),
+
+        ("Prefixes and explicit names",
+         "<code>env_prefix</code> namespaces a whole model; "
+         "<code>validation_alias</code> pins one field to a specific variable.",
+         '''import os
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+os.environ["VIZ_HOST"] = "0.0.0.0"
+os.environ["VIZ_PORT"] = "8642"
+os.environ["DATABASE_URL"] = "postgres://localhost/viz"
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="VIZ_")
+
+    host: str = "127.0.0.1"
+    port: int = 8000
+    # This one does not follow the prefix - name it explicitly.
+    db: str = Field(validation_alias="DATABASE_URL")
+
+print(Settings())'''),
+
+        ("Constraints and validators still apply",
+         "A settings model is a model. Everything from the earlier tiers works, which "
+         "is what makes configuration checkable rather than merely typed.",
+         '''import os
+from typing import Literal
+from pydantic import Field, ValidationError
+from pydantic_settings import BaseSettings
+
+os.environ.update({"PORT": "70000", "ENV": "staging", "WORKERS": "0"})
+
+class Settings(BaseSettings):
+    port: int = Field(ge=1, le=65535)
+    env: Literal["dev", "test", "prod"]
+    workers: int = Field(gt=0)
+
+try:
+    Settings()
+except ValidationError as e:
+    for err in e.errors():
+        print("%-8s %-22s %s" % (err["loc"][0], err["type"], err["msg"]))
+
+os.environ.update({"PORT": "8642", "ENV": "prod", "WORKERS": "4"})
+print()
+print("valid:", Settings())'''),
+
+        ("Nested settings from one variable",
+         "A nested model can be filled from JSON in a single variable, or from "
+         "delimited names.",
+         '''import os
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Redis(BaseModel):
+    host: str = "localhost"
+    port: int = 6379
+
+os.environ["REDIS"] = '{"host": "cache.internal", "port": "6380"}'
+
+class Settings(BaseSettings):
+    redis: Redis = Redis()
+
+print("from json  :", Settings().redis)
+
+# Or with a delimiter, one variable per leaf:
+os.environ.pop("REDIS")
+os.environ["REDIS__HOST"] = "other.internal"
+os.environ["REDIS__PORT"] = "6381"
+
+class Nested(BaseSettings):
+    model_config = SettingsConfigDict(env_nested_delimiter="__")
+    redis: Redis = Redis()
+
+print("from parts :", Nested().redis)'''),
+
+        ("Secrets, and not printing them",
+         "<code>SecretStr</code> keeps a value out of logs and tracebacks, which "
+         "matters most in the object every process prints at start-up.",
+         '''import os
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings
+
+os.environ.update({"SECRET_KEY": "sk_live_abcdef123456",
+                   "DATABASE_URL": "postgres://user:hunter2@db/viz"})
+
+class Unsafe(BaseSettings):
+    secret_key: str
+    database_url: str
+
+class Safe(BaseSettings):
+    secret_key: SecretStr
+    database_url: SecretStr
+
+print("unsafe:", Unsafe())
+print()
+print("safe  :", Safe())
+print("dump  :", Safe().model_dump())
+print()
+print("reading it deliberately:", Safe().secret_key.get_secret_value()[:6] + "...")'''),
+    ],
+    [
+        "<code>BaseSettings</code> is a <code>BaseModel</code> that reads its values from the environment. Everything you know about models applies.",
+        "Field names map to environment variables case-insensitively; <code>env_prefix</code> namespaces the whole model and <code>validation_alias</code> pins one field.",
+        "A missing required setting fails at start-up, naming the variable &mdash; not at 3am when the code path is first taken.",
+        "Constraints and validators work, so configuration can be <em>checked</em>, not merely typed: a port in range, an environment from a fixed set.",
+        "Nested models come from JSON in one variable, or from <code>env_nested_delimiter</code> names such as <code>REDIS__HOST</code>.",
+        "Use <code>SecretStr</code> for credentials. A settings object is the thing most likely to be printed at start-up, and that is how secrets reach logs.",
+    ],
+    '''
+title: Settings Management: Configuration That Fails Early
+intro: Typed, validated configuration from the environment - and why start-up is the right place to fail.
+
+## Configuration is untrusted input
+
+Everything in this track has argued that data crossing into your program should be validated at the boundary. Configuration is such data, and it is usually treated as though it is not.
+
+The typical code is `int(os.environ.get("PORT", "8000"))` scattered through a codebase, with no central statement of what configuration exists, no defaults in one place, and no check that anything required is actually set. A missing variable becomes a `None` that travels until something fails on it.
+
+`pydantic-settings` applies the model discipline to it. `BaseSettings` is a `BaseModel` that reads its values from the environment.
+
+```python
+class Settings(BaseSettings):
+    app_port: int = 8000
+    app_debug: bool = False
+    database_url: str
+```
+
+Field names map to environment variables case-insensitively, so `app_port` reads `APP_PORT`. Values arrive as strings and are coerced by the ordinary rules &mdash; which is exactly the case lax coercion was designed for.
+
+Note `app_debug: bool`. The boolean vocabulary from the coercion module means `APP_DEBUG=yes`, `=1`, `=true` and `=on` all work, and `=maybe` raises. That is a much better outcome than `bool(os.environ.get("APP_DEBUG"))`, where the string `"false"` is `True`.
+
+## Failing at start-up
+
+The single biggest benefit is *when* the failure happens.
+
+`database_url: str` has no default, so it is required. If the variable is not set, constructing `Settings()` raises immediately, naming the field. A deployment missing a variable fails at boot, visibly, before serving anything.
+
+The alternative is a `None` that sits quietly until the first request touching the database, which may be minutes or hours later, and produces an error about `NoneType` far from the cause.
+
+That is why settings should be instantiated once at start-up, not lazily on first use. The whole value is in failing before the process claims to be ready.
+
+## Naming
+
+Three mechanisms, in increasing specificity.
+
+**Implicit.** `app_port` reads `APP_PORT`. Case-insensitive.
+
+**Prefix.** `env_prefix="VIZ_"` in `SettingsConfigDict` makes every field read `VIZ_`-prefixed variables. This is how you keep an application's configuration from colliding with everything else in a container.
+
+**Explicit.** `Field(validation_alias="DATABASE_URL")` pins one field to one variable, which is what you need for the shared names that do not follow your prefix &mdash; `DATABASE_URL`, `PORT`, `TZ`.
+
+`AliasChoices` works here too, which is the clean way to accept both an old and a new variable name during a migration.
+
+## Checking, not just typing
+
+A settings model is a model, so everything from the earlier tiers applies &mdash; and configuration is a place where that matters more than people expect.
+
+```python
+port: int = Field(ge=1, le=65535)
+env: Literal["dev", "test", "prod"]
+workers: int = Field(gt=0)
+```
+
+`ENV=staging` now fails at boot with a message naming the three permitted values. Without it, `staging` propagates through the application and produces behaviour nobody intended, because some `if env == "prod"` was false and nothing said so.
+
+This is the strongest argument for settings models over a config dict: configuration errors are among the most common causes of production incidents, and almost all of them are typos or values outside a permitted set. Both are exactly what validation catches.
+
+Validators work too, for cross-field rules &mdash; "if `TLS_ENABLED`, then `CERT_PATH` must be set" is a `model_validator` and a genuinely useful one.
+
+## Nesting
+
+Grouped configuration can be a nested model, filled two ways.
+
+From JSON in one variable: `REDIS='{"host": "cache", "port": 6380}'`.
+
+Or from delimited names, with `env_nested_delimiter="__"`: `REDIS__HOST=cache` and `REDIS__PORT=6380`.
+
+The delimited form is usually nicer operationally &mdash; each value is its own variable, so it can be set independently and overridden per environment without rewriting a JSON blob.
+
+## Files
+
+`env_file=".env"` in `SettingsConfigDict` reads a dotenv file, which is where local development configuration usually lives. Real environment variables take precedence, so a deployed process is never affected by a file that happened to ship.
+
+There is also `secrets_dir`, which reads each field from a file of that name in a directory &mdash; the shape Docker and Kubernetes secrets use, where a secret is mounted as a file rather than exposed in the environment.
+
+The precedence order, highest first: values passed directly to `Settings(...)`, then the environment, then the dotenv file, then the secrets directory, then defaults. That is worth knowing when a value is not what you expected.
+
+## Secrets
+
+Use `SecretStr` for credentials, and the reason is specific.
+
+A settings object is the single thing most likely to be printed. Log it at start-up to record the configuration, and a plain `str` password is in your logs forever. Include it in an error report and it goes to your error tracker. `repr` it in a debugger session that gets pasted into a ticket, and it is in the ticket.
+
+`SecretStr` displays as `**********` everywhere and requires `.get_secret_value()` to read, which makes every real access deliberate and greppable.
+
+Note that a `SecretStr` in `model_dump()` stays hidden, so a settings dump is safe to log &mdash; which is the property you want.
+
+## One instance
+
+Build it once and pass it around, or use a cached accessor:
+
+```python
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+```
+
+Constructing settings reads the environment and validates, and doing that per request is wasted work. The cached function is also convenient in FastAPI, where it can be a dependency and overridden in tests.
+
+Avoid a module-level global constructed at import. It runs at import time, which makes it awkward to test with different values and can fail before logging is configured &mdash; producing a start-up crash with no useful output.
+
+## Testing
+
+Two habits make settings testable.
+
+Instantiate with explicit values: `Settings(app_port=1234)` bypasses the environment entirely, which is what a unit test wants.
+
+And use `monkeypatch.setenv` for tests that genuinely exercise the environment reading. Do not mutate `os.environ` directly, because the change leaks into every test that follows.
+
+## Summary
+
+`BaseSettings` treats configuration as what it is: untrusted input crossing a boundary. Field names map to variables, `env_prefix` namespaces them, `validation_alias` pins the exceptions.
+
+Required fields with no default make a deployment fail at boot rather than at midnight. Constraints and `Literal` catch the typos and out-of-range values that cause most configuration incidents. `SecretStr` keeps credentials out of the logs that a settings object is uniquely likely to end up in.
+
+Build it once, at start-up, and let it refuse to start when something is wrong.
+
+## Layering environments
+
+Most applications need the same settings with different values per environment, and the clean shape uses ordinary inheritance:
+
+```python
+class Settings(BaseSettings):
+    env: Literal["dev", "test", "prod"] = "dev"
+    debug: bool = False
+    db_pool_size: int = 5
+
+class ProdSettings(Settings):
+    debug: bool = False
+    db_pool_size: int = 20
+```
+
+That is better than branching on `env` inside the application, because each environment's configuration is stated in one place and can be read without tracing conditionals.
+
+Where it goes wrong is depth. Three levels of settings inheritance with overrides at each is harder to reason about than a flat model whose values come from the environment. Prefer supplying different values to the same model wherever you can, and reserve subclassing for genuine structural differences.
+
+## What belongs in settings
+
+Not everything configurable belongs here.
+
+**Yes:** anything that differs between environments (URLs, credentials, pool sizes, log levels), anything secret, anything an operator may need to change without a deploy.
+
+**No:** application constants that never vary, feature logic dressed up as configuration, or anything a caller supplies per request &mdash; that is a request model.
+
+The test is whether a value could reasonably differ between your laptop and production. If it could not, it is a constant, and making it configurable adds a failure mode with no benefit: another variable that can be unset, misspelt or set to something nonsensical.
+
+## Summary
+
+`BaseSettings` treats configuration as untrusted input crossing a boundary, which is what it is. Field names map to environment variables, `env_prefix` namespaces them, `validation_alias` pins the exceptions.
+
+Required fields with no default make a misconfigured deployment fail at boot with the variable named, rather than hours later. Constraints and `Literal` catch the typos and out-of-range values behind most configuration incidents. `SecretStr` keeps credentials out of the logs a settings object is uniquely likely to reach.
+
+Build it once, cache it, and let it refuse to start when something is wrong.
+
+
+## Mistakes people make
+
+**Instantiating settings lazily.** The entire benefit is failing at boot with the variable named. Construct them at start-up; a settings object built on first use turns a configuration error into a runtime one, hours later.
+
+**Giving everything a default.** A default on `DATABASE_URL` means a misconfigured deployment starts happily and points at the wrong database. Required fields should be required.
+
+**A module-level global built at import.** It runs before logging is configured, so a failure produces a crash with no useful output, and it is awkward to test with different values. A cached accessor function is better.
+
+**Plain `str` for credentials.** A settings object is the thing most likely to be logged at start-up or attached to an error report. `SecretStr` is the difference between that being routine and being an incident.
+
+**`env: str` instead of a `Literal`.** `ENV=staging` then silently takes every else-branch in the application, and nothing anywhere says the value was not recognised.
+
+**Mutating `os.environ` in tests.** It leaks into every test that follows and produces failures that depend on ordering. `monkeypatch.setenv`, or pass values directly.
+
+**Configuring things that never vary.** Every setting is another variable that can be unset, misspelt or set to something nonsensical. If it could not reasonably differ between your laptop and production, it is a constant.
+
+## Testing configuration
+
+Two habits keep settings testable.
+
+Instantiate with explicit values where the test is not about the environment: `Settings(port=1234)` bypasses reading it entirely, which is what a unit test wants and is far clearer than arranging variables around the call.
+
+Use `monkeypatch.setenv` when the test genuinely exercises the reading, never a direct mutation of `os.environ` &mdash; that leaks into every test after it and produces failures that depend on ordering.
+
+And test the failure case. A test asserting that a missing `DATABASE_URL` raises is worth having, because it is the behaviour the whole module exists for, and it is the one nobody notices has broken until a deployment comes up healthy with no database.
+
+## A last note on start-up
+
+There is a general principle behind this module worth stating on its own.
+
+The best time to discover that something is misconfigured is before the process claims to be ready. Not on the first request, not when a code path is first taken, and not at three in the morning when the only person who knows what `WORKERS` should be is asleep.
+
+A settings model turns configuration from something an application discovers gradually into something it asserts at boot. Every required variable is checked, every value is converted to the type the code expects, every constrained field is inside its range, and if any of that fails the process stops with a message naming exactly what is wrong.
+
+That is the same argument as validating a request body, applied to the other kind of input a program takes. It is just that request bodies are obviously untrusted and configuration usually is not treated that way &mdash; which is precisely why configuration errors cause so many incidents.
+
+## Summary
+
+`BaseSettings` is a model that reads the environment, which means configuration gets the same treatment as any other untrusted input.
+
+Names map implicitly, `env_prefix` namespaces a model, `validation_alias` pins the exceptions. Required fields with no default make a misconfigured deploy fail at boot rather than hours later. Constraints and `Literal` catch the typos and out-of-range values behind most configuration incidents. `SecretStr` keeps credentials out of the logs.
+
+Build it once at start-up, cache it, inject it, and let it refuse to start when something is wrong.
+
+## One habit
+
+Instantiate settings on the first line of your application's start-up, before anything else runs.
+
+That single placement decision is what converts a class of production incident into a failed deploy. Everything else in this module is detail around it.
+''',
+    [
+        {"q": "Why does a required setting with no default matter?",
+         "options": ["It is faster", "The process fails at boot naming the variable, instead of producing a None that fails hours later", "It saves memory", "It enables caching"],
+         "answer": 1,
+         "why": "Failing before the process claims to be ready is the whole point. A missing variable that becomes None surfaces far from its cause, whenever that code path is first taken."},
+        {"q": "`APP_DEBUG=false` with a `bool` field gives what?",
+         "options": ["True, because the string is non-empty", "False", "A ValidationError", "None"],
+         "answer": 1,
+         "why": "Pydantic reads the meaning of the word, unlike `bool(os.environ.get(...))` where any non-empty string is truthy. That difference is a classic configuration bug."},
+        {"q": "Why is `env: Literal[\"dev\", \"test\", \"prod\"]` better than `env: str`?",
+         "options": ["It is faster", "ENV=staging fails at boot with the permitted values named, instead of silently taking every else-branch", "It uses less memory", "No difference"],
+         "answer": 1,
+         "why": "Typos and out-of-range values cause most configuration incidents. A closed set catches them at start-up rather than letting them alter behaviour silently."},
+        {"q": "Why use `SecretStr` in a settings model specifically?",
+         "options": ["It encrypts the value", "A settings object is the thing most likely to be logged or printed at start-up", "It is required", "It speeds up reading"],
+         "answer": 1,
+         "why": "It is not encryption - it hides the value from repr, logs and tracebacks, and requires `.get_secret_value()` so every real access is deliberate."},
+    ],
+    wheels=["python_dotenv-1.2.3-py3-none-any.whl",
+            "pydantic_settings-2.3.4-py3-none-any.whl"],
+)
+
+
+# ---------------------------------------------------------------------------
+# 28. Pydantic with FastAPI
+# ---------------------------------------------------------------------------
+topic(
+    "pydantic_with_fastapi",
+    "Pydantic with FastAPI",
+    "In Practice",
+    "The reason most people arrive here: request bodies, response models and "
+    "documentation generated from the annotations you already wrote.",
+    _svg(_box(12, 22, 46, 22, S) + _txt(35, 36, "request", M, 8) +
+         _arrow(60, 33, 74, 33) +
+         _box(78, 22, 66, 22, S, A) + _txt(111, 36, "BaseModel", A, 8) +
+         _arrow(111, 48, 111, 60) + _txt(80, 74, "422 / docs / client", M, 8)),
+    [
+        ("A model is the request body",
+         "Annotate a parameter with a model and FastAPI parses, validates and hands "
+         "you a real object. <code>client</code> calls the app through ASGI.",
+         '''from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0, le=180)
+
+@app.post("/modules/", status_code=201)
+def create(module: ModuleIn):
+    return {"created": module.title, "minutes": module.minutes}
+
+client = TestClient(app)
+
+r = client.post("/modules/", json={"title": "Vectors", "minutes": "8"})
+print(r.status_code, r.json())
+print()
+print("the string 8 became an int before the handler ran")'''),
+
+        ("Validation failures become 422",
+         "A <code>ValidationError</code> on a request body is turned into a 422 whose "
+         "body is essentially <code>errors()</code>.",
+         '''from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0)
+
+@app.post("/modules/")
+def create(module: ModuleIn):
+    return {"ok": True}
+
+client = TestClient(app)
+
+r = client.post("/modules/", json={"title": "no", "minutes": -1})
+print("status:", r.status_code)
+for err in r.json()["detail"]:
+    print("  %-22s %-18s %s" % (".".join(str(p) for p in err["loc"]),
+                                err["type"], err["msg"]))'''),
+
+        ("Path and query parameters too",
+         "The same rules apply to values from the URL. The <code>loc</code> tells the "
+         "caller which part of the request was wrong.",
+         '''from typing import Optional
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules/{module_id}")
+def read(module_id: int, verbose: bool = False, q: Optional[str] = None):
+    return {"id": module_id, "verbose": verbose, "q": q}
+
+client = TestClient(app)
+
+print(client.get("/modules/7").json())
+print(client.get("/modules/7?verbose=yes&q=norms").json())
+
+r = client.get("/modules/abc")
+print()
+print("bad path:", r.status_code, r.json()["detail"][0]["loc"],
+      r.json()["detail"][0]["type"])'''),
+
+        ("response_model shapes what comes back",
+         "The output is validated and filtered against the model, so a field the "
+         "response model does not declare cannot leak.",
+         '''from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class UserOut(BaseModel):
+    id: int
+    name: str
+
+@app.get("/users/{user_id}", response_model=UserOut)
+def read(user_id: int):
+    # The handler returns more than the response model declares.
+    return {"id": user_id, "name": "Ada",
+            "password_hash": "$2b$12$secret",
+            "internal_note": "do not ship"}
+
+client = TestClient(app)
+print(client.get("/users/1").json())
+print()
+print("The extra keys were filtered out by the response model.")'''),
+
+        ("Three models for one resource",
+         "Create, update and output are different shapes. Separate models say what "
+         "each endpoint actually accepts and returns.",
+         '''from typing import Optional
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+DB = {1: {"id": 1, "title": "Vectors", "minutes": 8}}
+
+class ModuleCreate(BaseModel):
+    title: str
+    minutes: int = 10
+
+class ModuleUpdate(BaseModel):
+    title: Optional[str] = None
+    minutes: Optional[int] = None
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+    minutes: int
+
+@app.patch("/modules/{module_id}", response_model=ModuleOut)
+def update(module_id: int, patch: ModuleUpdate):
+    stored = DB[module_id]
+    stored.update(patch.model_dump(exclude_unset=True))   # only what was sent
+    return stored
+
+client = TestClient(app)
+print("before:", DB[1])
+print("patch :", client.patch("/modules/1", json={"minutes": 12}).json())
+print("title untouched, because it was never sent")'''),
+
+        ("The schema is the documentation",
+         "Everything you wrote &mdash; constraints, descriptions, examples &mdash; is "
+         "in the OpenAPI document FastAPI serves.",
+         '''import json
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="VizLearn API")
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3, description="Shown as the page heading.",
+                       examples=["Dot Product"])
+    minutes: int = Field(default=10, gt=0, le=180,
+                         description="Estimated reading time.")
+
+@app.post("/modules/")
+def create(module: ModuleIn):
+    return module
+
+spec = app.openapi()
+print("paths  :", list(spec["paths"]))
+print()
+schema = spec["components"]["schemas"]["ModuleIn"]
+for name, prop in schema["properties"].items():
+    print("%-8s %s" % (name, json.dumps(prop)))'''),
+    ],
+    [
+        "A parameter annotated with a model <em>is</em> the request body. FastAPI parses the JSON and validates it before your handler runs.",
+        "A <code>ValidationError</code> becomes a 422 whose <code>detail</code> is essentially <code>e.errors()</code> &mdash; the shape you already know how to read.",
+        "Path and query parameters are validated by the same rules, and <code>loc</code> starts with <code>path</code>, <code>query</code> or <code>body</code>.",
+        "<code>response_model</code> validates <em>and filters</em> the output, so a field it does not declare cannot leak from a handler that returned too much.",
+        "Use separate <code>Create</code>, <code>Update</code> and <code>Out</code> models. One model with everything optional documents nothing.",
+        "Your constraints, descriptions and examples are the OpenAPI document, which is the interactive docs and every generated client.",
+    ],
+    '''
+title: Pydantic with FastAPI: Where It All Arrives
+intro: Request bodies, response models and documentation, all from annotations you already wrote.
+
+## Why this is the common entry point
+
+Most people meet Pydantic through FastAPI, and often without realising they are two libraries. That is a compliment to the integration and it leaves a gap: everything that looks like FastAPI magic is Pydantic doing what the previous tiers described.
+
+FastAPI has no validation layer of its own. It reads your annotations, hands the request body to a Pydantic model, converts the resulting `ValidationError` into a 422, and turns the generated JSON Schema into your documentation. That is the whole of it, and knowing where the line falls makes both easier to reason about.
+
+## The request body
+
+```python
+@app.post("/modules/", status_code=201)
+def create(module: ModuleIn):
+    return {"created": module.title}
+```
+
+A parameter annotated with a model is the body. FastAPI reads the request, validates it with `model_validate_json`, and calls your handler with a real object.
+
+By the time your code runs, `module.minutes` is an integer &mdash; even if the client sent `"8"` &mdash; and every constraint has passed. There is no checking to do at the top of the handler, which is the point.
+
+Scalars annotated with ordinary types become query or path parameters, and the same coercion applies: `?verbose=yes` becomes `True` because of the boolean vocabulary from the coercion module.
+
+## 422, and what it contains
+
+When validation fails, the handler never runs. FastAPI returns 422 with a body whose `detail` is essentially `e.errors()`.
+
+So everything from the errors module applies directly to what your API returns. `loc` is a path, and its first element is `body`, `path`, `query` or `header` &mdash; telling the caller which part of the request was wrong before naming the field within it.
+
+That is worth showing your API's consumers. A 422 from a FastAPI service is more informative than most people realise, and clients frequently discard it and report "bad request".
+
+If you want a different shape, an exception handler for `RequestValidationError` lets you reformat it globally &mdash; and the grouping code from the errors module drops straight in.
+
+## response_model does two things
+
+```python
+@app.get("/users/{user_id}", response_model=UserOut)
+```
+
+It **validates** the output, which catches a handler returning the wrong shape before a client does.
+
+And it **filters** the output to the model's fields. A handler returning a dict with `password_hash` in it produces a response without one, because `UserOut` does not declare it.
+
+That second behaviour is a genuine security property and worth relying on deliberately. The pattern to internalise: a response model should list exactly what a caller may see, and then over-returning from a handler cannot leak. Relying instead on the handler returning precisely the right keys means every future edit to that handler is a chance to leak something.
+
+It also fixes the schema. Without `response_model` the documentation cannot say what an endpoint returns; with it, consumers get a typed response.
+
+## Three models, not one
+
+The instinct is one `Module` model everywhere. Resist it, for the reasons the defaults module gave.
+
+**Create** takes what a caller may supply. No `id` &mdash; not optional, absent &mdash; because the server assigns it.
+
+**Update** has everything optional, and the handler applies `model_dump(exclude_unset=True)` so untouched fields stay untouched. This is the correct PATCH shape, and getting it wrong is how six columns become `None`.
+
+**Out** declares exactly what may be seen, with server-assigned fields required.
+
+Three small classes, each honest. One model with everything optional produces documentation that guarantees nothing and a response type no client can rely on.
+
+## Dependencies
+
+`Depends` composes validated values the same way:
+
+```python
+def pagination(page: int = 1, size: int = Query(default=20, le=100)) -> Page:
+    return Page(page=page, size=size)
+
+@app.get("/modules/")
+def list_modules(p: Page = Depends(pagination)):
+    ...
+```
+
+The dependency's parameters are validated like any others, so the constraint on `size` is enforced and documented, and every endpoint using it inherits both.
+
+`get_settings` from the settings module is the same pattern, and being a dependency makes it overridable in tests.
+
+## Where validation stops
+
+The line from the validators module matters here more than anywhere.
+
+A model checks shape and internal consistency. "Does this track exist?" is a fact about the world, and it belongs in the handler or the service layer &mdash; not least because the right response is a 404 or a 409, not a 422.
+
+Keeping that separation means your models stay testable without a database, and your status codes stay meaningful.
+
+## The documentation is your schema
+
+`app.openapi()` is assembled from `model_json_schema()` for every model you used. Which means every recommendation from the schema module cashes out here:
+
+A `Field(gt=0)` appears as a documented minimum; a validator checking the same thing appears as nothing.
+
+A `Literal` becomes a set of choices in the docs and a union type in a generated client; a `pattern` becomes an opaque string.
+
+A `description` appears beside the field. An `examples` entry pre-fills the interactive request form, so a first-time caller can send a working request instead of guessing.
+
+This is the concrete payback for being specific in your annotations, and it is visible to everybody who uses your API rather than only to you.
+
+## A note on this page
+
+There is no server here &mdash; a browser tab cannot listen on a port. `client` calls the app through ASGI, which is the same interface uvicorn uses, so routing, validation, status codes and schema generation all behave exactly as they would in production.
+
+The full explanation, and the one behaviour that genuinely differs, is on the [FastAPI compiler](../fastapi-lab/) page.
+
+## Summary
+
+FastAPI is Pydantic at the edges of an HTTP application. A model parameter is the body; failures become 422 carrying `errors()`; `response_model` validates and filters what goes out; the schema becomes your documentation and your consumers' clients.
+
+Use separate models per direction. Put facts about the world in the service layer and shape in the model. And write constraints rather than validators wherever you can, because only one of them reaches the people calling you.
+
+## Where the boundary between the two libraries falls
+
+It is worth being able to say which library is doing what, because it changes where you look when something is wrong.
+
+**FastAPI** decides routing, reads the request, chooses which parameters come from the path, the query and the body, calls your handler, and turns the result into a response. It also assembles the OpenAPI document.
+
+**Pydantic** validates and converts every one of those values, produces the errors, and generates the schema for each model that goes into the document.
+
+So a 422 you disagree with is a Pydantic question &mdash; a model's annotations, constraints or validators. A field arriving from the wrong part of the request is a FastAPI question. Documentation that is missing a constraint is a Pydantic question, because the constraint was never in the schema.
+
+Most confusion about "FastAPI validation" resolves the moment that split is clear.
+
+## Dependencies and settings
+
+The settings model from the previous module composes naturally here:
+
+```python
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+@app.get("/health")
+def health(settings: Settings = Depends(get_settings)):
+    return {"env": settings.env}
+```
+
+Cached, so the environment is read and validated once rather than per request. And overridable in tests through FastAPI's dependency overrides, which is much cleaner than mutating the environment around a test.
+
+The same pattern covers anything constructed once and used everywhere &mdash; a database session factory, a client for another service, a pagination object built from validated query parameters.
+
+## Summary
+
+A model parameter is the request body, validated before your handler runs. Failures become a 422 whose `detail` is `e.errors()`, with `loc` naming which part of the request was wrong.
+
+`response_model` validates and filters the output, so undeclared fields cannot leak &mdash; a property worth relying on deliberately rather than trusting each handler to return exactly the right keys.
+
+Separate `Create`, `Update` and `Out` models per resource. Keep facts about the world in the service layer and shape in the model. And prefer constraints to validators, because only one of them reaches the documentation your callers read.
+
+
+## Mistakes people make
+
+**No `response_model`.** The documentation cannot say what the endpoint returns, and nothing filters the output, so a handler that starts returning an extra key starts leaking it.
+
+**One model for every direction.** Everything optional so it can serve create, update and read at once. It documents nothing, and no client can tell what is guaranteed in a response.
+
+**Dumping the whole update model.** `patch.model_dump()` without `exclude_unset=True` writes every field, so untouched columns are overwritten with `None` or defaults. This is the bug behind "it cleared fields I never edited".
+
+**Putting existence checks in validators.** "Does this track exist" belongs in the handler. In a model it makes validation an I/O call, makes the model untestable without a database, and returns a 422 where a 404 was correct.
+
+**Validators instead of constraints.** Both reject the same values; only the constraint appears in the documentation and in generated clients. Your callers see one of them.
+
+**Assuming a 422 body is opaque.** It is `e.errors()`, with `loc` naming body, path or query and then the field. A lot of clients discard it and report "bad request" when the exact problem was right there.
+
+**Instantiating settings per request.** Reading and validating the environment on every call is wasted work. Cache it with `lru_cache` and inject it with `Depends`, which is also what makes it overridable in tests.
+
+## A last habit
+
+Open your own `/docs` page occasionally and read it as a consumer would.
+
+It is generated from your models, so everything this track has argued about being specific in annotations is visible there and nowhere else in your workflow. Fields with no description. A `str` where a `Literal` belongs. An endpoint with no `response_model`, so the response section says nothing. A required field you meant to default.
+
+None of that shows up in your tests, because your tests know what they are sending. It shows up for the person integrating with you, at the point where it is expensive to ask you about it.
+
+Five minutes reading your own documentation catches most of it, and it is the same five minutes recommended in the schema module &mdash; just from the other end.
+
+## Where to go from here
+
+This is the last module in the track, and the one where everything else cashes out.
+
+The annotations from tier one decide what a request body accepts. The shapes from tier two &mdash; nested models, collections, discriminated unions, closed sets &mdash; decide how expressive your API can be about its own data. The validators and config from tier three enforce what annotations cannot say. The serialisation and schema work from tier four decides what consumers receive and what your documentation tells them.
+
+FastAPI adds routing and an HTTP layer on top, and almost nothing else. Which means the quality of an API built this way is very largely the quality of its models.
+
+That is a good position to be in, because models are cheap to improve. Narrowing a `str` to a `Literal`, moving a rule from a validator to a constraint, splitting one all-optional model into three honest ones, adding a description to a field whose name is not self-explanatory &mdash; each is a small edit, and each is visible to everybody who calls you.
+
+## One last thing to check
+
+Before shipping an endpoint, three questions that take a minute each.
+
+**Does it have a `response_model`?** Without one the documentation says nothing about the response, and nothing filters what a handler returns.
+
+**Is the update path using `exclude_unset=True`?** Without it, a PATCH overwrites fields the caller never mentioned.
+
+**Would a 422 from this endpoint tell a caller what to fix?** If a field is a bare `str` where a `Literal` belongs, or a rule lives in a validator that the schema cannot show, the answer is no &mdash; and the caller finds out by being rejected rather than by reading.
+
+## Summary
+
+A model parameter is the request body, validated before your handler runs. Failures become a 422 whose `detail` is `e.errors()`, with `loc` naming which part of the request was wrong.
+
+`response_model` validates and filters the output, so undeclared fields cannot leak. Separate `Create`, `Update` and `Out` models per resource, and dump updates with `exclude_unset=True`.
+
+Keep facts about the world in the service layer and shape in the model. And prefer constraints to validators, because only one of the two reaches the documentation your callers actually read.
+''',
+    [
+        {"q": "What does `response_model` do besides validating the output?",
+         "options": ["Nothing", "Filters it to the declared fields, so undeclared keys cannot leak", "Caches it", "Sets the status code"],
+         "answer": 1,
+         "why": "A handler returning a dict with `password_hash` produces a response without one. It is a real security property, and more reliable than trusting every future edit of the handler."},
+        {"q": "What is in a FastAPI 422 response body?",
+         "options": ["A plain string", "Essentially `e.errors()` - loc, type, msg and input per failure", "Only the first error", "Nothing useful"],
+         "answer": 1,
+         "why": "Everything from the errors module applies directly, with `loc` starting at `body`, `path`, `query` or `header` to say which part of the request was wrong."},
+        {"q": "Why separate Create, Update and Out models?",
+         "options": ["FastAPI requires it", "Each says what that endpoint actually accepts or returns; one all-optional model guarantees nothing", "It is faster", "For nesting"],
+         "answer": 1,
+         "why": "Create excludes server-assigned fields, Update is all-optional for `exclude_unset`, Out declares exactly what may be seen. Collapsing them produces documentation that promises nothing."},
+        {"q": "Where does 'does this track exist?' belong?",
+         "options": ["A field validator", "A model validator", "The handler or service layer", "response_model"],
+         "answer": 2,
+         "why": "It is a fact about the world, not the shape of the payload - and the right answer is a 404 or 409 rather than a 422. Keeping it out also keeps models testable without a database."},
+    ],
+    wheels=["sniffio-1.3.1-py3-none-any.whl",
+            "anyio-4.6.2.post1-py3-none-any.whl",
+            "starlette-0.41.3-py3-none-any.whl",
+            "fastapi-0.115.6-py3-none-any.whl"],
+    prelude=__import__("build_fastapi_lab").PRELUDE,
+)
+
+
+# ---------------------------------------------------------------------------
+# 29. Performance and pydantic-core
+# ---------------------------------------------------------------------------
+topic(
+    "performance_and_pydantic_core",
+    "Performance and pydantic-core",
+    "In Practice",
+    "Why v2 is fast, what validation actually costs, and the three habits that "
+    "account for most of the difference.",
+    _svg(_box(16, 18, 128, 24, S) + _txt(80, 34, "Python: reads annotations", M, 8) +
+         _arrow(80, 46, 80, 54) +
+         _box(16, 56, 128, 22, S, A) + _txt(80, 71, "Rust core: runs the schema", A, 8)),
+    [
+        ("Already-correct types are nearly free",
+         "Validation cost depends on how much converting there is to do. A value that "
+         "is already right is checked and passed through.",
+         '''import time
+from pydantic import BaseModel
+
+class Point(BaseModel):
+    x: float
+    y: float
+
+N = 20000
+
+t = time.perf_counter()
+for _ in range(N):
+    Point(x=1.0, y=2.0)          # already floats
+native = time.perf_counter() - t
+
+t = time.perf_counter()
+for _ in range(N):
+    Point(x="1.0", y="2.0")      # strings needing conversion
+converted = time.perf_counter() - t
+
+print("already typed : %.3f s" % native)
+print("needing parse : %.3f s" % converted)
+print("ratio         : %.2fx" % (converted / native))'''),
+
+        ("Validate once, not at every layer",
+         "Re-validating something that has already passed is the most expensive no-op "
+         "available. The result is identical.",
+         '''import time
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+rows = [{"title": "M%d" % i, "minutes": i % 60} for i in range(3000)]
+
+t = time.perf_counter()
+once = [Module.model_validate(r) for r in rows]
+first = time.perf_counter() - t
+
+t = time.perf_counter()
+again = [Module.model_validate(m) for m in once]     # they are already models
+second = time.perf_counter() - t
+
+print("first pass  : %.3f s" % first)
+print("second pass : %.3f s" % second)
+print("gained      :", once == again, "- nothing at all")'''),
+
+        ("Let the core do the looping",
+         "One call into Rust for a whole list beats a Python loop making one call per "
+         "item. Same result, less crossing back and forth.",
+         '''import time
+from typing import List
+from pydantic import BaseModel, TypeAdapter
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+rows = [{"title": "M%d" % i, "minutes": i % 60} for i in range(4000)]
+adapter = TypeAdapter(List[Module])
+
+t = time.perf_counter()
+a = [Module.model_validate(r) for r in rows]
+per_item = time.perf_counter() - t
+
+t = time.perf_counter()
+b = adapter.validate_python(rows)
+whole = time.perf_counter() - t
+
+print("per item   : %.3f s" % per_item)
+print("whole list : %.3f s" % whole)
+print("ratio      : %.1fx" % (per_item / whole))
+print("identical  :", a == b)'''),
+
+        ("Validators are Python in a Rust pipeline",
+         "Every custom validator is a call back out of the compiled core. A constraint "
+         "doing the same job stays inside it.",
+         '''import time
+from pydantic import BaseModel, Field, field_validator
+
+class ByConstraint(BaseModel):
+    minutes: int = Field(gt=0, le=180)
+
+class ByValidator(BaseModel):
+    minutes: int
+
+    @field_validator("minutes")
+    @classmethod
+    def check(cls, v: int) -> int:
+        if not 0 < v <= 180:
+            raise ValueError("out of range")
+        return v
+
+N = 20000
+for cls in (ByConstraint, ByValidator):
+    t = time.perf_counter()
+    for _ in range(N):
+        cls(minutes=30)
+    print("%-13s %.3f s" % (cls.__name__, time.perf_counter() - t))
+
+print()
+print("Same rule. One runs in Rust, the other calls into Python per item.")'''),
+
+        ("Build schemas once",
+         "Constructing a model class or a TypeAdapter compiles a schema. Doing it "
+         "inside a loop repeats that work every time.",
+         '''import time
+from typing import List
+from pydantic import TypeAdapter
+
+rows = [[1, 2, 3] for _ in range(400)]
+
+t = time.perf_counter()
+for row in rows:
+    TypeAdapter(List[int]).validate_python(row)
+rebuilt = time.perf_counter() - t
+
+adapter = TypeAdapter(List[int])
+t = time.perf_counter()
+for row in rows:
+    adapter.validate_python(row)
+reused = time.perf_counter() - t
+
+print("rebuilt each time : %.4f s" % rebuilt)
+print("built once        : %.4f s" % reused)
+print("ratio             : %.1fx" % (rebuilt / reused))'''),
+
+        ("Parsing JSON directly",
+         "The last of the three habits: hand the text over instead of building an "
+         "intermediate dict for it.",
+         '''import json, time
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+payload = json.dumps({"title": "Vectors", "minutes": 8})
+N = 8000
+
+t = time.perf_counter()
+for _ in range(N):
+    Module.model_validate(json.loads(payload))
+two_step = time.perf_counter() - t
+
+t = time.perf_counter()
+for _ in range(N):
+    Module.model_validate_json(payload)
+one_step = time.perf_counter() - t
+
+print("json.loads + validate : %.3f s" % two_step)
+print("model_validate_json   : %.3f s" % one_step)
+print("ratio                 : %.2fx" % (two_step / one_step))'''),
+    ],
+    [
+        "Pydantic v2 is two pieces: a Python layer that reads your annotations and builds a schema, and <code>pydantic-core</code>, a Rust engine that executes it.",
+        "Cost scales with how much converting is needed. A value already of the right type is checked and passed through cheaply.",
+        "Validate <strong>once</strong>, at the boundary. Re-validating an object that has already passed produces the same result for the full price.",
+        "Validate a collection in <strong>one call</strong> &mdash; <code>TypeAdapter(List[X])</code> &mdash; so the loop happens inside the core rather than in Python.",
+        "Every custom validator is a call back out into Python. A <code>Field</code> constraint doing the same job stays in Rust.",
+        "These timings run on WebAssembly, several times slower than a native interpreter. The <em>ratios</em> transfer; the seconds do not.",
+    ],
+    '''
+title: Performance and pydantic-core: What Validation Actually Costs
+intro: Why v2 is fast, where the time goes, and the three habits that account for most of the difference.
+
+## Two libraries in a trench coat
+
+Installing `pydantic` installs two things.
+
+A **Python layer** that reads your class, interprets the annotations, resolves types, and builds a schema describing how to validate the model. This runs once, when the class is defined.
+
+**`pydantic-core`**, a compiled Rust engine that executes that schema against data. This runs every time you validate.
+
+Almost everything about v2's performance follows from that split. Validation is compiled code walking a prepared schema, not Python interpreting annotations per call. Version 1 did the latter, which is why v2 was a rewrite rather than an optimisation.
+
+It also explains details you will have noticed. Error `type` codes look like machine identifiers because they come from the core. `model_validate_json` beats parsing separately because the core parses and validates in one pass. And there is a compiled wheel per platform, because there is compiled code in there.
+
+## Where the time actually goes
+
+Three components, worth separating.
+
+**Schema building** happens once per class or adapter. It is the most expensive single operation and it should be invisible &mdash; unless you build schemas repeatedly, which is the mistake below.
+
+**Validation** happens per value. Cost scales with how much work there is: a value already of the right type is checked and passed through; one needing conversion costs more; one needing a custom validator costs the most, because that means leaving Rust for Python.
+
+**Serialisation** is generally cheaper than validation, and follows the same shape.
+
+## The three habits
+
+Almost all avoidable cost comes down to three things.
+
+### Validate once
+
+The rule from the first module, restated as a performance point: re-validating an object that has already passed produces an identical result for the full price.
+
+It happens more than people expect. A model validated in a request handler, passed to a service that validates it again, handed to a repository that constructs its own model from it. Each layer is defensively re-checking data that cannot have changed.
+
+The discipline is to decide where the boundary is and trust everything past it. If a function's argument is a model, it has been validated; checking again buys nothing.
+
+The exception is genuinely mutable data. If `validate_assignment` is off and something has been assigning freely, the object may no longer match its annotations &mdash; but the fix there is to turn on the setting or freeze the model, not to re-validate.
+
+### Validate collections in one call
+
+```python
+[Model.model_validate(r) for r in rows]              # per item
+TypeAdapter(List[Model]).validate_python(rows)       # whole list
+```
+
+Identical results. The first crosses between Python and Rust once per row; the second makes one call and loops inside the core.
+
+For bulk work &mdash; a file import, a batch job, a large API response &mdash; this is the single most effective change available, and it is one line.
+
+### Parse JSON directly
+
+`model_validate_json(raw)` rather than `model_validate(json.loads(raw))`.
+
+The two-step form builds a complete intermediate structure of Python objects, then converts it again. The direct form reads the text and constructs the final values in one pass.
+
+As the parsing module covered, it is also better for errors and for decimal precision. Three benefits for less code.
+
+## Validators are the expensive part
+
+A `field_validator` is Python. Every time it runs, the core suspends, calls into the interpreter, and resumes.
+
+For a model built a few times per request that is irrelevant. For a hundred thousand rows it is the dominant cost, and it is worth two questions.
+
+**Could this be a constraint?** `Field(gt=0)` and a validator checking `v > 0` reject the same values, and the constraint runs in Rust. It also reaches the schema, which is the more important reason.
+
+**Is it doing work that could be done once?** A validator that rebuilds a set of permitted values on every call is doing that per item. Hoisting it to module level is usually a bigger win than anything else in the model.
+
+## Building schemas repeatedly
+
+The mistake that looks like nothing in review:
+
+```python
+for row in rows:
+    TypeAdapter(List[int]).validate_python(row)     # recompiles every iteration
+```
+
+Adapters belong at module level. The same applies to any pattern that defines a model class inside a function called repeatedly &mdash; each call builds a new class and a new schema.
+
+Where the type is only known at runtime, cache the adapters in a dict keyed by type, or wrap a factory in `functools.lru_cache`.
+
+## Keeping perspective
+
+Two things worth saying plainly.
+
+**Validation is usually not your bottleneck.** A model validating in single-digit microseconds sits next to a database query taking milliseconds and a network call taking hundreds. In a typical request handler, validation is a rounding error. Choosing a dataclass "for performance" in a handler that then makes three SQL queries is optimising the wrong end.
+
+**Measure before changing anything.** The habits above are free &mdash; adopt them because they are also clearer. Anything beyond them should follow a profile, not an intuition.
+
+The place validation genuinely dominates is bulk: large collections, file imports, high-throughput pipelines. That is where the one-call-per-collection rule earns real time.
+
+## A note on these timings
+
+Every measurement on this page runs on CPython compiled to WebAssembly, several times slower than a native interpreter, on one core.
+
+The **ratios** transfer &mdash; validating a list in one call really is faster than looping, by roughly the factor shown. The **absolute seconds** do not. Do not quote them as figures for a server.
+
+That caveat applies to any benchmark run anywhere, including ones you write yourself on your laptop. Relative comparisons under identical conditions are informative; absolute numbers are a property of the machine.
+
+## Summary
+
+Pydantic v2 is a Python layer that builds schemas and a Rust core that runs them, which is why validation is cheap enough to do on every request.
+
+Three habits account for most of the avoidable cost: validate once at the boundary, validate collections in a single call, and parse JSON directly. Prefer constraints over validators where either would do, and build schemas once rather than in a loop.
+
+Then stop, because validation is rarely the slow part, and the remaining questions belong to a profiler rather than to a rule of thumb.
+
+## What not to optimise
+
+A short list of things that look like performance decisions and are not.
+
+**Choosing a dataclass over a model in a request handler.** The handler then makes three database queries. The validation was never the cost.
+
+**Skipping validation on data from your own database.** It is cheap on already-correct types, and the guarantee is worth more than the microseconds. If a column can be null and the model says it cannot, you want to know.
+
+**Avoiding nested models to reduce validation count.** A flat model with the same fields does the same total work; nesting is an organisational choice, not a performance one.
+
+**Reaching for `model_construct`.** It skips validation entirely, which makes it fast and unsafe. It exists for cases where the data provably came from a trusted source &mdash; reconstructing from your own cache, say. Using it to speed up a normal path removes the property you installed the library for.
+
+## Measuring properly
+
+If you do need to measure, three things make the result meaningful.
+
+**Warm up.** The first construction of a model builds its schema. Timing that alongside the validations makes the first run look terrible and tells you nothing about the steady state.
+
+**Time the right thing.** Wrap the validation, not the loop that also builds the input data. Constructing ten thousand dictionaries is not free either.
+
+**Compare under identical conditions.** Same machine, same process, same interpreter. Absolute numbers do not survive a move between any of those, which is why the timings on this page are presented as ratios.
+
+`time.perf_counter` is sufficient for A-versus-B. For finding where time goes in a real application, a profiler will point at the database long before it points at validation.
+
+## Summary
+
+Two pieces: Python builds the schema once, Rust executes it per value. Cost scales with how much conversion and how much custom Python is involved.
+
+Three habits cover nearly all avoidable cost &mdash; validate once at the boundary, validate collections in a single call, parse JSON directly. Prefer constraints to validators where either works, and build schemas at module level rather than in a loop.
+
+Then stop. Validation is rarely the bottleneck, and the remaining questions belong to a profiler.
+
+
+## Mistakes people make
+
+**Re-validating what has already passed.** The most common and most expensive no-op. If a function's argument is a model, it was validated; checking again produces an identical result for the full price.
+
+**Looping in Python over a collection.** `[Model.model_validate(r) for r in rows]` crosses into Rust once per row. One call with a `TypeAdapter(List[Model])` does the loop inside the core.
+
+**Building schemas repeatedly.** A `TypeAdapter` constructed inside a loop, or a model class defined inside a function called per request, recompiles a schema every time. Module level, once.
+
+**Doing work inside a validator that could be done outside.** Rebuilding a set of permitted values on every call does it per item. Hoisting it is often a bigger win than anything else in the model.
+
+**Using `model_construct` to go faster.** It skips validation entirely. That is correct for reconstructing from a provably trusted source and a way of quietly removing the guarantee everywhere else.
+
+**Optimising validation before profiling.** In a handler that makes three database queries, validation is a rounding error. A profiler will point at the database long before it points here.
+
+**Quoting benchmark seconds.** Absolute numbers are a property of the machine &mdash; doubly so on this page, which runs on WebAssembly. Ratios under identical conditions transfer; seconds do not.
+
+## Why it was worth rewriting
+
+It is worth understanding what the v2 rewrite actually bought, because it explains why this module is short.
+
+In v1, validation was Python interpreting annotations on every call. That put Pydantic on the critical path of a lot of applications in a way that showed up in profiles, and made "is validation too slow?" a reasonable question to ask routinely.
+
+Moving execution into Rust changed the answer from "sometimes" to "almost never". A model that validates in a few microseconds does not compete with anything else in a request.
+
+So the practical guidance became much simpler: adopt the three habits because they are also clearer code, and otherwise stop thinking about it. That is a better place to be than a set of tuning tricks, and it is the reason most of this module is about what not to optimise.
+
+## The honest summary
+
+Most applications should not think about this module at all.
+
+Adopt the three habits &mdash; validate once, validate collections in one call, parse JSON directly &mdash; because each is also clearer code than the alternative, and then stop. They are not performance tricks; they are the obvious way to write it, which happens also to be the fast way.
+
+If something is genuinely slow, profile it. The answer will usually be I/O, and on the occasions it really is validation the answer will usually be one of the three habits not being followed, or a validator doing per-item work that belongs outside the loop.
+
+What changed in v2 is that this stopped being a live concern for ordinary code. Validation used to be something you budgeted for; now it is something you can put at every boundary without thinking about the cost. That is a better outcome than any tuning advice.
+
+## In one line
+
+Validate once at the boundary, validate collections in a single call, and hand JSON straight to Pydantic &mdash; then stop thinking about it, because in v2 validation is almost never the slow part.
+
+## A closing thought
+
+The most useful performance property of Pydantic v2 is not that it is fast. It is that it is fast enough to stop being a consideration.
+
+That changes how you write code. Validation at every boundary stops being a trade-off and becomes the default, which means more of your program can assume its inputs are correct &mdash; and that is worth considerably more than the microseconds.
+''',
+    [
+        {"q": "What are the two pieces of Pydantic v2?",
+         "options": ["A parser and a serialiser", "A Python layer that builds schemas and a Rust core that executes them", "Two Python packages", "A validator and a model class"],
+         "answer": 1,
+         "why": "Schema building happens once per class in Python; validation runs compiled Rust against that schema. That split is why v2 is fast and why v1 needed a rewrite rather than tuning."},
+        {"q": "Which is faster for validating 4,000 rows?",
+         "options": ["A comprehension of model_validate", "TypeAdapter(List[Model]).validate_python(rows)", "Identical", "Depends on the model"],
+         "answer": 1,
+         "why": "One call lets the loop happen inside the core. The comprehension crosses between Python and Rust once per row - the most effective one-line change for bulk work."},
+        {"q": "Why is a `field_validator` more expensive than an equivalent `Field` constraint?",
+         "options": ["It is not", "It calls out of the Rust core into Python for every value", "It validates twice", "It rebuilds the schema"],
+         "answer": 1,
+         "why": "Constraints run inside the compiled core; a validator suspends it to call the interpreter. The constraint also reaches the schema, which is the more important reason to prefer it."},
+        {"q": "How should the timings on this page be read?",
+         "options": ["As figures for a production server", "As ratios only - WebAssembly is several times slower than a native interpreter", "As worst cases", "They are exact"],
+         "answer": 1,
+         "why": "Relative comparisons under identical conditions transfer; absolute seconds are a property of the machine. That is true of any benchmark, including ones you run yourself."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 30. Migrating v1 to v2
+# ---------------------------------------------------------------------------
+topic(
+    "migrating_v1_to_v2",
+    "Migrating v1 to v2",
+    "In Practice",
+    "The renames, the behaviour changes that do not raise, and how to tell which "
+    "version a tutorial is describing.",
+    _svg(_box(12, 24, 56, 24, S) + _txt(40, 40, ".dict()", M, 8) +
+         _arrow(72, 36, 90, 36) +
+         _box(94, 24, 54, 24, S, A) + _txt(121, 40, "model_dump", A, 8) +
+         _txt(80, 68, "v1  ->  v2", M, 8)),
+    [
+        ("The method renames",
+         "The most visible change. The old names still exist in v2 and warn, which is "
+         "why so much code and so many tutorials still use them.",
+         '''from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+m = Module(title="Vectors", minutes=8)
+
+pairs = [
+    (".dict()",            "model_dump()"),
+    (".json()",            "model_dump_json()"),
+    (".parse_obj(d)",      "model_validate(d)"),
+    (".parse_raw(s)",      "model_validate_json(s)"),
+    (".schema()",          "model_json_schema()"),
+    (".copy()",            "model_copy()"),
+    (".construct()",       "model_construct()"),
+    ("__fields__",         "model_fields"),
+    ("__fields_set__",     "model_fields_set"),
+]
+for old, new in pairs:
+    print("  %-18s ->  %s" % (old, new))
+
+print()
+print("still works :", m.model_dump())'''),
+
+        ("Validators were renamed and reshaped",
+         "<code>@validator</code> became <code>@field_validator</code>, and "
+         "<code>@root_validator</code> became <code>@model_validator</code> with an "
+         "explicit mode.",
+         '''from pydantic import BaseModel, field_validator, model_validator
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    lessons: int
+
+    # v1: @validator("title")
+    @field_validator("title")
+    @classmethod
+    def tidy(cls, v: str) -> str:
+        return v.strip().title()
+
+    # v1: @root_validator  ->  now needs mode= explicitly
+    @model_validator(mode="after")
+    def fits(self):
+        if self.lessons > self.minutes:
+            raise ValueError("more lessons than minutes")
+        return self
+
+print(Module(title="  vectors ", minutes=30, lessons=5))
+
+# v1 validators took (cls, v, values); v2 takes (cls, v, info) and
+# reads earlier fields from info.data.'''),
+
+        ("Config became model_config",
+         "The inner <code>class Config</code> is the clearest signal that code or a "
+         "tutorial predates v2.",
+         '''from pydantic import BaseModel, ConfigDict
+
+# v1:
+#   class Module(BaseModel):
+#       class Config:
+#           extra = "forbid"
+#           allow_mutation = False
+#           orm_mode = True
+
+class Module(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",          # same name
+        frozen=True,             # was allow_mutation = False
+        from_attributes=True,    # was orm_mode
+    )
+    title: str
+
+m = Module(title="Vectors")
+print(m)
+
+try:
+    m.title = "Norms"
+except Exception as e:
+    print("frozen:", type(e).__name__)'''),
+
+        ("Optional no longer implies a default",
+         "The behaviour change most likely to bite, because v1 filled the default in "
+         "for you and v2 does not.",
+         '''from typing import Optional
+from pydantic import BaseModel, ValidationError
+
+class Module(BaseModel):
+    title: str
+    summary: Optional[str]          # v1: optional. v2: REQUIRED, may be None.
+
+try:
+    Module(title="Vectors")
+except ValidationError as e:
+    print("v2 refuses:", e.errors()[0]["loc"], e.errors()[0]["type"])
+
+print("explicit None works:", Module(title="Vectors", summary=None))
+
+class Fixed(BaseModel):
+    title: str
+    summary: Optional[str] = None   # what v1 did implicitly
+
+print("with a default     :", Fixed(title="Vectors"))'''),
+
+        ("Constraint arguments were renamed",
+         "<code>min_items</code>, <code>max_items</code> and <code>regex</code> are "
+         "gone. The replacements are shorter and consistent across types.",
+         '''from typing import List
+from pydantic import BaseModel, Field, ValidationError
+
+# v1: Field(min_items=1, max_items=4) and Field(regex=...)
+class Module(BaseModel):
+    slug: str = Field(pattern=r"^[a-z_]+$")       # was regex=
+    lessons: List[str] = Field(min_length=1,      # was min_items=
+                               max_length=4)      # was max_items=
+
+print(Module(slug="dot_product", lessons=["a", "b"]))
+
+for bad in [{"slug": "Dot Product", "lessons": ["a"]},
+            {"slug": "ok", "lessons": []}]:
+    try:
+        Module.model_validate(bad)
+    except ValidationError as e:
+        print("%-38s %s" % (str(bad)[:36], e.errors()[0]["type"]))'''),
+
+        ("Errors changed shape",
+         "Error codes were renamed and <code>ctx</code>, <code>url</code> and stable "
+         "types arrived. Code matching on v1 messages will silently stop working.",
+         '''from pydantic import BaseModel, Field, ValidationError
+
+class Module(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0)
+
+try:
+    Module(title="no", minutes=0)
+except ValidationError as e:
+    for err in e.errors():
+        print("loc :", err["loc"])
+        print("type:", err["type"], "  <- v1 called these 'value_error.any_str.min_length'")
+        print("ctx :", err.get("ctx"))
+        print()
+
+print("Match on type, never on msg - that advice exists because of this.")'''),
+    ],
+    [
+        "<code>.dict()</code> &rarr; <code>model_dump()</code>, <code>.json()</code> &rarr; <code>model_dump_json()</code>, <code>.parse_obj()</code> &rarr; <code>model_validate()</code>, <code>.schema()</code> &rarr; <code>model_json_schema()</code>.",
+        "<code>@validator</code> &rarr; <code>@field_validator</code> (with <code>@classmethod</code>), <code>@root_validator</code> &rarr; <code>@model_validator(mode=...)</code>.",
+        "<code>class Config</code> &rarr; <code>model_config = ConfigDict(...)</code>. <code>orm_mode</code> became <code>from_attributes</code>; <code>allow_mutation=False</code> became <code>frozen=True</code>.",
+        "<strong>The one that does not raise a rename error:</strong> <code>Optional[X]</code> no longer defaults to <code>None</code>. It is now required-but-nullable unless you add <code>= None</code>.",
+        "<code>min_items</code>/<code>max_items</code> became <code>min_length</code>/<code>max_length</code>; <code>regex</code> became <code>pattern</code>.",
+        "Error <code>type</code> codes were renamed wholesale. Anything matching on v1 codes or on message text stops working silently.",
+    ],
+    '''
+title: Migrating v1 to v2: What Changed and What Bites
+intro: The renames, the behaviour changes that fail silently, and how to date a tutorial.
+
+## Why this module exists even if you never migrate
+
+Pydantic v1 was popular for years, and a great deal of writing about it is still the top result for many searches. Reading a v1 answer as though it describes v2 is a genuine source of confusion.
+
+So the most useful thing here may simply be the ability to date a page.
+
+**It is v1 if you see:** `@validator`, `@root_validator`, `.dict()`, `.json()`, `.parse_obj()`, `class Config`, `orm_mode`, `min_items`, `regex=`.
+
+**It is v2 if you see:** `@field_validator`, `@model_validator`, `.model_dump()`, `model_config = ConfigDict(...)`, `from_attributes`, `min_length`, `pattern=`.
+
+If a page uses the first set, treat everything in it as historical &mdash; not only the names, but the behaviour it describes.
+
+## The renames
+
+The mechanical part, and the easy part:
+
+`.dict()` → `model_dump()`. `.json()` → `model_dump_json()`. `.parse_obj()` → `model_validate()`. `.parse_raw()` → `model_validate_json()`. `.schema()` → `model_json_schema()`. `.copy()` → `model_copy()`. `.construct()` → `model_construct()`. `__fields__` → `model_fields`. `__fields_set__` → `model_fields_set`.
+
+The `model_` prefix is deliberate: it namespaces the library's methods away from your field names, which is also why Pydantic warns about fields starting with `model_`.
+
+Most old names still exist in v2 and emit deprecation warnings. That is a kindness for migration and the reason so much code still uses them &mdash; nothing forced the change.
+
+## Validators
+
+`@validator` became `@field_validator`, and it now requires `@classmethod` underneath.
+
+The signature changed too. v1 took `(cls, v, values)` where `values` was a dict of previously-validated fields; v2 takes `(cls, v, info)` and the same data is `info.data`.
+
+`@root_validator` became `@model_validator`, and the mode is now explicit. v1's `pre=True` is `mode="before"`; the default post-validator is `mode="after"` and receives the model rather than a dict of values, returning `self`.
+
+That last change is more than cosmetic. A v1 root validator worked with a dict; a v2 after-validator works with the finished model, so fields are converted and attribute access works.
+
+## Config
+
+`class Config` became `model_config = ConfigDict(...)`, with several settings renamed:
+
+`orm_mode` → `from_attributes`. `allow_mutation = False` → `frozen=True`. `allow_population_by_field_name` → `populate_by_name`. `anystr_strip_whitespace` → `str_strip_whitespace`. `min_anystr_length` → `str_min_length`.
+
+An inner `class Config` still works and warns. It is the single clearest signal that code has not been migrated.
+
+## The change that bites
+
+Everything above produces a warning or an error. This one does not:
+
+```python
+summary: Optional[str]
+```
+
+In v1 that was optional and defaulted to `None`. In v2 it is **required** and nullable &mdash; you must pass it, and you may pass `None`.
+
+Nothing warns, because the annotation is still valid. What happens is that code which used to work starts raising `missing` at runtime, in whatever code path first constructs the model without that field.
+
+The fix is one addition per field: `Optional[str] = None`.
+
+The reason for the change is the one the defaults module gave: v1's implicit default hid the distinction between "may be omitted" and "may be null", which are genuinely different contracts. v2 made you say which you meant.
+
+If you are migrating anything substantial, search for `Optional[` first. It will be the largest single source of failures.
+
+## Constraint renames
+
+`min_items`/`max_items` → `min_length`/`max_length`, now consistent with strings.
+
+`regex` → `pattern`.
+
+`allow_mutation` on a field → `frozen`.
+
+`const=True` is gone; use `Literal[value]`.
+
+Some v1 helper types were removed or changed too. `constr(regex=...)` becomes `Annotated[str, Field(pattern=...)]`, which is the modern spelling anyway.
+
+## Errors
+
+Error `type` codes were renamed wholesale. v1's `value_error.any_str.min_length` is v2's `string_too_short`. v1's `type_error.integer` is v2's `int_type` or `int_parsing` depending on the cause.
+
+`ctx` now carries the rule's parameters, and `url` links to documentation for the type.
+
+This is where the standing advice in this track &mdash; match on `type`, never on `msg` &mdash; comes from. Code that matched v1 message strings broke on upgrade with no warning at all, which is exactly the failure mode that advice prevents.
+
+If you are migrating, any error-handling code is worth reviewing directly rather than trusting tests, because a broken branch that never matches will not fail loudly.
+
+## A practical order
+
+If you are doing this on a real codebase:
+
+**Install v2 and run the test suite.** Deprecation warnings tell you where the renames are, and they are mechanical.
+
+**Search for `Optional[` and add the defaults.** Largest source of genuine failures, and invisible until executed.
+
+**Rewrite validators.** Add `@classmethod`, rename the decorators, change `values` to `info.data`, and make `mode` explicit on root validators.
+
+**Convert `class Config` blocks**, renaming the settings that moved.
+
+**Review error handling last**, because that is where the failures are silent.
+
+There is a tool, `bump-pydantic`, which does the mechanical parts automatically. It is worth running first and reviewing carefully; it handles the renames well and cannot know your intent on the `Optional` question.
+
+## What you get for it
+
+The migration is not free, and it is worth knowing what it buys.
+
+Validation is substantially faster, because the core is Rust rather than Python. Strict mode exists. Discriminated unions became a first-class feature. `TypeAdapter` arrived, and with it validation without a wrapper model. Error output became structured and stable. `computed_field` exists. Serialisation gained real control.
+
+Most of this track describes features that are v2-only. If you are reading it against a v1 codebase, that is the gap.
+
+## Summary
+
+Renames are mechanical and mostly warn. `Optional[X]` losing its implicit `None` default is the change that fails silently and needs a deliberate search. Validators changed shape, not just name. Config moved into `model_config`. Error codes were renamed wholesale, which is why matching on `type` rather than `msg` is the rule.
+
+And when reading anything about Pydantic online, check which vocabulary it uses before trusting it.
+
+## Things that were removed outright
+
+A few v1 features have no v2 equivalent, and finding them late is unpleasant.
+
+`copy_on_model_validation` is gone; the behaviour is controlled by `revalidate_instances` instead.
+
+`GetterDict`, the customisation hook for `orm_mode`, was removed. `from_attributes` reads attributes directly, and anything more involved belongs in a `model_validator(mode="before")`.
+
+`json_encoders` in Config is deprecated in favour of field and model serialisers, which are more precise and appear in the right place.
+
+`parse_file` is gone. Read the file yourself and use `model_validate_json` on the bytes, which is better anyway &mdash; the errors name the position in the document.
+
+`const=True` is gone; a `Literal` says the same thing and produces a better schema.
+
+## Running both versions at once
+
+For a large migration, `pydantic.v1` is available inside v2: `from pydantic.v1 import BaseModel` gives the old library alongside the new one.
+
+That makes an incremental migration possible &mdash; move one module at a time, with both versions installed as a single package.
+
+Two cautions. The two are not interoperable: a v1 model cannot be a field of a v2 model, and mixing them at a boundary means converting through dicts. And a dependency that has not migrated may pull in its own expectations, so check what your libraries require before assuming you can take it slowly.
+
+It is a transitional tool. Code left half-migrated for a year tends to stay that way, and the two vocabularies side by side are genuinely confusing to read.
+
+## Summary
+
+Renames are mechanical and mostly warn. `Optional[X]` losing its implicit `None` is the change that fails silently, and searching for it first will save the most time.
+
+Validators changed shape as well as name &mdash; `@classmethod`, `info.data`, explicit modes. Config moved into `model_config` with several settings renamed. Error codes were replaced wholesale, so error-handling code deserves direct review rather than trust in tests.
+
+`bump-pydantic` handles the mechanical parts. What it cannot do is decide what you meant by `Optional`, which is precisely the part that matters.
+
+
+## Mistakes people make
+
+**Trusting the test suite to find everything.** Renames warn and errors are loud, but two categories fail quietly: `Optional` fields that are now required, and error-handling branches matching v1 codes that simply never match again. Neither necessarily fails a test.
+
+**Running `bump-pydantic` and shipping.** It handles the mechanical renames well and cannot know what you meant by `Optional[X]`. Review its output rather than treating it as a migration.
+
+**Migrating models and not validators.** A `@validator` still importable from `pydantic` in v2 is the deprecated shim. The signature changed &mdash; `values` became `info.data` &mdash; and a validator reading the wrong argument name will not behave as it did.
+
+**Leaving `class Config` because it still works.** It warns rather than failing, so it survives indefinitely, and it is the single clearest marker of code that has not really been migrated.
+
+**Living in `pydantic.v1` permanently.** The compatibility import exists for a transition. Two vocabularies side by side in one codebase are genuinely confusing, and half-migrated code tends to stay that way.
+
+**Reading v1 answers as v2.** The most common problem for people who never migrate anything. Check for `@validator`, `.dict()` and `class Config` before trusting a page &mdash; the behaviour it describes has changed too, not only the spelling.
+
+## Deciding whether to migrate
+
+If you are on v1 and wondering whether it is worth it, the honest position.
+
+v1 is no longer developed and receives only security fixes. The ecosystem has moved: FastAPI, LangChain, SQLModel and most libraries that integrate with Pydantic now target v2, and staying on v1 increasingly means pinning things around it.
+
+Against that, the migration is real work on a large codebase, and it is work with no visible feature at the end of it.
+
+The pragmatic answer for most teams is to migrate when something else forces the question &mdash; a dependency that needs v2, or a piece of work that touches the models anyway &mdash; rather than as a standalone project. The `pydantic.v1` compatibility import exists to make that gradual approach viable.
+
+What is not viable is starting new code on v1. Everything in this track past the first tier is v2, and the gap widens.
+
+## Where this leaves the track
+
+That is the last module. Thirty of them, from a type annotation that does nothing at runtime to an API whose documentation writes itself.
+
+The through-line has been one idea: **be specific at the boundary, once**. Specific enough that the annotation says what you mean, that the constraint reaches the schema, that the error names the field, and that everything downstream can stop defending itself.
+
+Everything else has been mechanism. Coercion rules so text can arrive as text. Validators for the rules types cannot hold. Serialisation so output is data rather than presentation. Schemas so other tools can read what you already wrote.
+
+The version history matters here only because v2 is where most of that became true. If you are reading this against a v1 codebase, the gap is not stylistic.
+
+## A migration checklist
+
+Condensed, in the order that finds problems soonest.
+
+Install v2 and run the suite. Fix what fails loudly &mdash; imports, removed arguments, renamed helpers.
+
+Search `Optional[` and add `= None` wherever the field was meant to be omissible. Largest source of silent breakage.
+
+Rewrite validators: `@field_validator` with `@classmethod`, `@model_validator` with an explicit mode, `values` becomes `info.data`.
+
+Convert `class Config` blocks, renaming `orm_mode`, `allow_mutation` and the `anystr_` family.
+
+Rename constraint arguments: `min_items`, `max_items`, `regex`.
+
+Review error handling by hand. Anything matching v1 type codes or message text has stopped matching, silently, and tests may not notice.
+
+Then remove the deprecated method names once the warnings are the only thing left.
+
+## If you are only reading, not migrating
+
+The most common use of this module is not migration at all &mdash; it is dating an answer you found while looking for something else.
+
+That skill is worth more than it sounds. A confident, well-written, highly-ranked answer describing v1 behaviour will send you in the wrong direction for an afternoon, and nothing about it announces its age.
+
+The tell is the vocabulary. `@validator`, `.dict()`, `class Config`, `orm_mode`, `min_items`, `regex=`. Any one of those means the page predates v2, and the behaviour it describes may have changed as well as the spelling &mdash; `Optional` being the sharpest example, since the code will look correct and simply not work.
+''',
+    [
+        {"q": "In v2, what does `summary: Optional[str]` with no default mean?",
+         "options": ["Optional, defaults to None as in v1", "Required, and may be None", "Forbidden", "It warns"],
+         "answer": 1,
+         "why": "v1 added the default implicitly; v2 does not. Nothing warns, so code that worked starts raising `missing` at runtime - the largest source of failures in a real migration."},
+        {"q": "What replaced `@root_validator`?",
+         "options": ["@field_validator", "@model_validator with an explicit mode", "@validator", "Nothing"],
+         "answer": 1,
+         "why": "The mode is now explicit, and an after-validator receives the finished model as `self` rather than a dict of values - so fields are already converted."},
+        {"q": "Which of these dates a tutorial as v1?",
+         "options": ["model_config", "class Config and .dict()", "field_validator", "TypeAdapter"],
+         "answer": 1,
+         "why": "An inner `class Config`, `.dict()`, `@validator`, `orm_mode` and `min_items` are all v1 vocabulary. Treat the behaviour such a page describes as historical too."},
+        {"q": "Why review error-handling code carefully during a migration?",
+         "options": ["It is slower in v2", "Error type codes were renamed wholesale, and a branch that never matches fails silently", "Errors were removed", "It is unchanged"],
+         "answer": 1,
+         "why": "Code matching v1 codes or message strings stops matching with no exception raised. This is precisely why the advice throughout is to match on `type` rather than `msg`."},
     ],
 )

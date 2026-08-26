@@ -12217,6 +12217,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "pydantic/generic_models.html",
+  "title": "Generic Models",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "Does `Page[Module]` validate its `items`?",
+    "o": [
+     "No - generics skip validation",
+     "Yes, fully, with Module's own rules and normal error paths",
+     "Only the length",
+     "Only in strict mode"
+    ],
+    "a": 1,
+    "w": "A generic gives reuse, not an escape from checking. Coercion, constraints and error paths all behave exactly as in a non-generic model."
+   },
+   {
+    "t": "Why alias `ModulePage = Page[Module]` at module level?",
+    "o": [
+     "Required syntax",
+     "Each parameterisation builds a real class; the alias names it once and avoids repeating the lookup",
+     "It changes validation",
+     "For mypy only"
+    ],
+    "a": 1,
+    "w": "`Page[Module]` creates and caches a distinct class. Naming it once is both clearer at every use site and avoids doing the lookup in a hot path."
+   },
+   {
+    "t": "What does `TypeVar(\"T\", bound=Resource)` let you do?",
+    "o": [
+     "Nothing extra",
+     "Write methods on the generic that rely on what Resource guarantees",
+     "Skip validation",
+     "Allow any type"
+    ],
+    "a": 1,
+    "w": "The bound means every parameterisation is a Resource, so a method can safely use `item.id`. It also documents what the envelope is for."
+   },
+   {
+    "t": "When is a generic the wrong tool?",
+    "o": [
+     "Always",
+     "At two use sites, or when the payload is one of a fixed small set",
+     "For paginated responses",
+     "With models"
+    ],
+    "a": 1,
+    "w": "Two near-identical classes read better than a generic; the pattern earns its keep around the third. And a fixed small set of payloads is a discriminated union, which says more."
+   }
+  ]
+ },
+ {
   "path": "pydantic/json_schema.html",
   "title": "JSON Schema",
   "cat": "Pydantic",
@@ -12264,6 +12315,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "They change no behaviour and flow into the schema, where documentation tools use them to give a first-time caller something that works rather than an empty box."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/migrating_v1_to_v2.html",
+  "title": "Migrating v1 to v2",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "In v2, what does `summary: Optional[str]` with no default mean?",
+    "o": [
+     "Optional, defaults to None as in v1",
+     "Required, and may be None",
+     "Forbidden",
+     "It warns"
+    ],
+    "a": 1,
+    "w": "v1 added the default implicitly; v2 does not. Nothing warns, so code that worked starts raising `missing` at runtime - the largest source of failures in a real migration."
+   },
+   {
+    "t": "What replaced `@root_validator`?",
+    "o": [
+     "@field_validator",
+     "@model_validator with an explicit mode",
+     "@validator",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "The mode is now explicit, and an after-validator receives the finished model as `self` rather than a dict of values - so fields are already converted."
+   },
+   {
+    "t": "Which of these dates a tutorial as v1?",
+    "o": [
+     "model_config",
+     "class Config and .dict()",
+     "field_validator",
+     "TypeAdapter"
+    ],
+    "a": 1,
+    "w": "An inner `class Config`, `.dict()`, `@validator`, `orm_mode` and `min_items` are all v1 vocabulary. Treat the behaviour such a page describes as historical too."
+   },
+   {
+    "t": "Why review error-handling code carefully during a migration?",
+    "o": [
+     "It is slower in v2",
+     "Error type codes were renamed wholesale, and a branch that never matches fails silently",
+     "Errors were removed",
+     "It is unchanged"
+    ],
+    "a": 1,
+    "w": "Code matching v1 codes or message strings stops matching with no exception raised. This is precisely why the advice throughout is to match on `type` rather than `msg`."
    }
   ]
  },
@@ -12370,6 +12472,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "pydantic/performance_and_pydantic_core.html",
+  "title": "Performance and pydantic-core",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "What are the two pieces of Pydantic v2?",
+    "o": [
+     "A parser and a serialiser",
+     "A Python layer that builds schemas and a Rust core that executes them",
+     "Two Python packages",
+     "A validator and a model class"
+    ],
+    "a": 1,
+    "w": "Schema building happens once per class in Python; validation runs compiled Rust against that schema. That split is why v2 is fast and why v1 needed a rewrite rather than tuning."
+   },
+   {
+    "t": "Which is faster for validating 4,000 rows?",
+    "o": [
+     "A comprehension of model_validate",
+     "TypeAdapter(List[Model]).validate_python(rows)",
+     "Identical",
+     "Depends on the model"
+    ],
+    "a": 1,
+    "w": "One call lets the loop happen inside the core. The comprehension crosses between Python and Rust once per row - the most effective one-line change for bulk work."
+   },
+   {
+    "t": "Why is a `field_validator` more expensive than an equivalent `Field` constraint?",
+    "o": [
+     "It is not",
+     "It calls out of the Rust core into Python for every value",
+     "It validates twice",
+     "It rebuilds the schema"
+    ],
+    "a": 1,
+    "w": "Constraints run inside the compiled core; a validator suspends it to call the interpreter. The constraint also reaches the schema, which is the more important reason to prefer it."
+   },
+   {
+    "t": "How should the timings on this page be read?",
+    "o": [
+     "As figures for a production server",
+     "As ratios only - WebAssembly is several times slower than a native interpreter",
+     "As worst cases",
+     "They are exact"
+    ],
+    "a": 1,
+    "w": "Relative comparisons under identical conditions transfer; absolute seconds are a property of the machine. That is true of any benchmark, including ones you run yourself."
+   }
+  ]
+ },
+ {
   "path": "pydantic/pydantic_vs_dataclasses.html",
   "title": "Pydantic vs Dataclasses",
   "cat": "Pydantic",
@@ -12417,6 +12570,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "It is a drop-in that keeps dataclass introspection while validating on construction - useful for adding checks to existing dataclasses without rewriting them as models."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/pydantic_with_fastapi.html",
+  "title": "Pydantic with FastAPI",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "What does `response_model` do besides validating the output?",
+    "o": [
+     "Nothing",
+     "Filters it to the declared fields, so undeclared keys cannot leak",
+     "Caches it",
+     "Sets the status code"
+    ],
+    "a": 1,
+    "w": "A handler returning a dict with `password_hash` produces a response without one. It is a real security property, and more reliable than trusting every future edit of the handler."
+   },
+   {
+    "t": "What is in a FastAPI 422 response body?",
+    "o": [
+     "A plain string",
+     "Essentially `e.errors()` - loc, type, msg and input per failure",
+     "Only the first error",
+     "Nothing useful"
+    ],
+    "a": 1,
+    "w": "Everything from the errors module applies directly, with `loc` starting at `body`, `path`, `query` or `header` to say which part of the request was wrong."
+   },
+   {
+    "t": "Why separate Create, Update and Out models?",
+    "o": [
+     "FastAPI requires it",
+     "Each says what that endpoint actually accepts or returns; one all-optional model guarantees nothing",
+     "It is faster",
+     "For nesting"
+    ],
+    "a": 1,
+    "w": "Create excludes server-assigned fields, Update is all-optional for `exclude_unset`, Out declares exactly what may be seen. Collapsing them produces documentation that promises nothing."
+   },
+   {
+    "t": "Where does 'does this track exist?' belong?",
+    "o": [
+     "A field validator",
+     "A model validator",
+     "The handler or service layer",
+     "response_model"
+    ],
+    "a": 2,
+    "w": "It is a fact about the world, not the shape of the payload - and the right answer is a 404 or 409 rather than a 422. Keeping it out also keeps models testable without a database."
    }
   ]
  },
@@ -12519,6 +12723,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "`datetime.now()` is evaluated once, when the class body runs, so every instance would claim the same creation time. A factory is called per instance."
+   }
+  ]
+ },
+ {
+  "path": "pydantic/settings_management.html",
+  "title": "Settings Management",
+  "cat": "Pydantic",
+  "q": [
+   {
+    "t": "Why does a required setting with no default matter?",
+    "o": [
+     "It is faster",
+     "The process fails at boot naming the variable, instead of producing a None that fails hours later",
+     "It saves memory",
+     "It enables caching"
+    ],
+    "a": 1,
+    "w": "Failing before the process claims to be ready is the whole point. A missing variable that becomes None surfaces far from its cause, whenever that code path is first taken."
+   },
+   {
+    "t": "`APP_DEBUG=false` with a `bool` field gives what?",
+    "o": [
+     "True, because the string is non-empty",
+     "False",
+     "A ValidationError",
+     "None"
+    ],
+    "a": 1,
+    "w": "Pydantic reads the meaning of the word, unlike `bool(os.environ.get(...))` where any non-empty string is truthy. That difference is a classic configuration bug."
+   },
+   {
+    "t": "Why is `env: Literal[\"dev\", \"test\", \"prod\"]` better than `env: str`?",
+    "o": [
+     "It is faster",
+     "ENV=staging fails at boot with the permitted values named, instead of silently taking every else-branch",
+     "It uses less memory",
+     "No difference"
+    ],
+    "a": 1,
+    "w": "Typos and out-of-range values cause most configuration incidents. A closed set catches them at start-up rather than letting them alter behaviour silently."
+   },
+   {
+    "t": "Why use `SecretStr` in a settings model specifically?",
+    "o": [
+     "It encrypts the value",
+     "A settings object is the thing most likely to be logged or printed at start-up",
+     "It is required",
+     "It speeds up reading"
+    ],
+    "a": 1,
+    "w": "It is not encryption - it hides the value from repr, logs and tracebacks, and requires `.get_secret_value()` so every real access is deliberate."
    }
   ]
  },

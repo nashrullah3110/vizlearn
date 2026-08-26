@@ -1,0 +1,205 @@
+title: Settings Management: Configuration That Fails Early
+intro: Typed, validated configuration from the environment - and why start-up is the right place to fail.
+
+## Configuration is untrusted input
+
+Everything in this track has argued that data crossing into your program should be validated at the boundary. Configuration is such data, and it is usually treated as though it is not.
+
+The typical code is `int(os.environ.get("PORT", "8000"))` scattered through a codebase, with no central statement of what configuration exists, no defaults in one place, and no check that anything required is actually set. A missing variable becomes a `None` that travels until something fails on it.
+
+`pydantic-settings` applies the model discipline to it. `BaseSettings` is a `BaseModel` that reads its values from the environment.
+
+```python
+class Settings(BaseSettings):
+    app_port: int = 8000
+    app_debug: bool = False
+    database_url: str
+```
+
+Field names map to environment variables case-insensitively, so `app_port` reads `APP_PORT`. Values arrive as strings and are coerced by the ordinary rules &mdash; which is exactly the case lax coercion was designed for.
+
+Note `app_debug: bool`. The boolean vocabulary from the coercion module means `APP_DEBUG=yes`, `=1`, `=true` and `=on` all work, and `=maybe` raises. That is a much better outcome than `bool(os.environ.get("APP_DEBUG"))`, where the string `"false"` is `True`.
+
+## Failing at start-up
+
+The single biggest benefit is *when* the failure happens.
+
+`database_url: str` has no default, so it is required. If the variable is not set, constructing `Settings()` raises immediately, naming the field. A deployment missing a variable fails at boot, visibly, before serving anything.
+
+The alternative is a `None` that sits quietly until the first request touching the database, which may be minutes or hours later, and produces an error about `NoneType` far from the cause.
+
+That is why settings should be instantiated once at start-up, not lazily on first use. The whole value is in failing before the process claims to be ready.
+
+## Naming
+
+Three mechanisms, in increasing specificity.
+
+**Implicit.** `app_port` reads `APP_PORT`. Case-insensitive.
+
+**Prefix.** `env_prefix="VIZ_"` in `SettingsConfigDict` makes every field read `VIZ_`-prefixed variables. This is how you keep an application's configuration from colliding with everything else in a container.
+
+**Explicit.** `Field(validation_alias="DATABASE_URL")` pins one field to one variable, which is what you need for the shared names that do not follow your prefix &mdash; `DATABASE_URL`, `PORT`, `TZ`.
+
+`AliasChoices` works here too, which is the clean way to accept both an old and a new variable name during a migration.
+
+## Checking, not just typing
+
+A settings model is a model, so everything from the earlier tiers applies &mdash; and configuration is a place where that matters more than people expect.
+
+```python
+port: int = Field(ge=1, le=65535)
+env: Literal["dev", "test", "prod"]
+workers: int = Field(gt=0)
+```
+
+`ENV=staging` now fails at boot with a message naming the three permitted values. Without it, `staging` propagates through the application and produces behaviour nobody intended, because some `if env == "prod"` was false and nothing said so.
+
+This is the strongest argument for settings models over a config dict: configuration errors are among the most common causes of production incidents, and almost all of them are typos or values outside a permitted set. Both are exactly what validation catches.
+
+Validators work too, for cross-field rules &mdash; "if `TLS_ENABLED`, then `CERT_PATH` must be set" is a `model_validator` and a genuinely useful one.
+
+## Nesting
+
+Grouped configuration can be a nested model, filled two ways.
+
+From JSON in one variable: `REDIS='{"host": "cache", "port": 6380}'`.
+
+Or from delimited names, with `env_nested_delimiter="__"`: `REDIS__HOST=cache` and `REDIS__PORT=6380`.
+
+The delimited form is usually nicer operationally &mdash; each value is its own variable, so it can be set independently and overridden per environment without rewriting a JSON blob.
+
+## Files
+
+`env_file=".env"` in `SettingsConfigDict` reads a dotenv file, which is where local development configuration usually lives. Real environment variables take precedence, so a deployed process is never affected by a file that happened to ship.
+
+There is also `secrets_dir`, which reads each field from a file of that name in a directory &mdash; the shape Docker and Kubernetes secrets use, where a secret is mounted as a file rather than exposed in the environment.
+
+The precedence order, highest first: values passed directly to `Settings(...)`, then the environment, then the dotenv file, then the secrets directory, then defaults. That is worth knowing when a value is not what you expected.
+
+## Secrets
+
+Use `SecretStr` for credentials, and the reason is specific.
+
+A settings object is the single thing most likely to be printed. Log it at start-up to record the configuration, and a plain `str` password is in your logs forever. Include it in an error report and it goes to your error tracker. `repr` it in a debugger session that gets pasted into a ticket, and it is in the ticket.
+
+`SecretStr` displays as `**********` everywhere and requires `.get_secret_value()` to read, which makes every real access deliberate and greppable.
+
+Note that a `SecretStr` in `model_dump()` stays hidden, so a settings dump is safe to log &mdash; which is the property you want.
+
+## One instance
+
+Build it once and pass it around, or use a cached accessor:
+
+```python
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+```
+
+Constructing settings reads the environment and validates, and doing that per request is wasted work. The cached function is also convenient in FastAPI, where it can be a dependency and overridden in tests.
+
+Avoid a module-level global constructed at import. It runs at import time, which makes it awkward to test with different values and can fail before logging is configured &mdash; producing a start-up crash with no useful output.
+
+## Testing
+
+Two habits make settings testable.
+
+Instantiate with explicit values: `Settings(app_port=1234)` bypasses the environment entirely, which is what a unit test wants.
+
+And use `monkeypatch.setenv` for tests that genuinely exercise the environment reading. Do not mutate `os.environ` directly, because the change leaks into every test that follows.
+
+## Summary
+
+`BaseSettings` treats configuration as what it is: untrusted input crossing a boundary. Field names map to variables, `env_prefix` namespaces them, `validation_alias` pins the exceptions.
+
+Required fields with no default make a deployment fail at boot rather than at midnight. Constraints and `Literal` catch the typos and out-of-range values that cause most configuration incidents. `SecretStr` keeps credentials out of the logs that a settings object is uniquely likely to end up in.
+
+Build it once, at start-up, and let it refuse to start when something is wrong.
+
+## Layering environments
+
+Most applications need the same settings with different values per environment, and the clean shape uses ordinary inheritance:
+
+```python
+class Settings(BaseSettings):
+    env: Literal["dev", "test", "prod"] = "dev"
+    debug: bool = False
+    db_pool_size: int = 5
+
+class ProdSettings(Settings):
+    debug: bool = False
+    db_pool_size: int = 20
+```
+
+That is better than branching on `env` inside the application, because each environment's configuration is stated in one place and can be read without tracing conditionals.
+
+Where it goes wrong is depth. Three levels of settings inheritance with overrides at each is harder to reason about than a flat model whose values come from the environment. Prefer supplying different values to the same model wherever you can, and reserve subclassing for genuine structural differences.
+
+## What belongs in settings
+
+Not everything configurable belongs here.
+
+**Yes:** anything that differs between environments (URLs, credentials, pool sizes, log levels), anything secret, anything an operator may need to change without a deploy.
+
+**No:** application constants that never vary, feature logic dressed up as configuration, or anything a caller supplies per request &mdash; that is a request model.
+
+The test is whether a value could reasonably differ between your laptop and production. If it could not, it is a constant, and making it configurable adds a failure mode with no benefit: another variable that can be unset, misspelt or set to something nonsensical.
+
+## Summary
+
+`BaseSettings` treats configuration as untrusted input crossing a boundary, which is what it is. Field names map to environment variables, `env_prefix` namespaces them, `validation_alias` pins the exceptions.
+
+Required fields with no default make a misconfigured deployment fail at boot with the variable named, rather than hours later. Constraints and `Literal` catch the typos and out-of-range values behind most configuration incidents. `SecretStr` keeps credentials out of the logs a settings object is uniquely likely to reach.
+
+Build it once, cache it, and let it refuse to start when something is wrong.
+
+
+## Mistakes people make
+
+**Instantiating settings lazily.** The entire benefit is failing at boot with the variable named. Construct them at start-up; a settings object built on first use turns a configuration error into a runtime one, hours later.
+
+**Giving everything a default.** A default on `DATABASE_URL` means a misconfigured deployment starts happily and points at the wrong database. Required fields should be required.
+
+**A module-level global built at import.** It runs before logging is configured, so a failure produces a crash with no useful output, and it is awkward to test with different values. A cached accessor function is better.
+
+**Plain `str` for credentials.** A settings object is the thing most likely to be logged at start-up or attached to an error report. `SecretStr` is the difference between that being routine and being an incident.
+
+**`env: str` instead of a `Literal`.** `ENV=staging` then silently takes every else-branch in the application, and nothing anywhere says the value was not recognised.
+
+**Mutating `os.environ` in tests.** It leaks into every test that follows and produces failures that depend on ordering. `monkeypatch.setenv`, or pass values directly.
+
+**Configuring things that never vary.** Every setting is another variable that can be unset, misspelt or set to something nonsensical. If it could not reasonably differ between your laptop and production, it is a constant.
+
+## Testing configuration
+
+Two habits keep settings testable.
+
+Instantiate with explicit values where the test is not about the environment: `Settings(port=1234)` bypasses reading it entirely, which is what a unit test wants and is far clearer than arranging variables around the call.
+
+Use `monkeypatch.setenv` when the test genuinely exercises the reading, never a direct mutation of `os.environ` &mdash; that leaks into every test after it and produces failures that depend on ordering.
+
+And test the failure case. A test asserting that a missing `DATABASE_URL` raises is worth having, because it is the behaviour the whole module exists for, and it is the one nobody notices has broken until a deployment comes up healthy with no database.
+
+## A last note on start-up
+
+There is a general principle behind this module worth stating on its own.
+
+The best time to discover that something is misconfigured is before the process claims to be ready. Not on the first request, not when a code path is first taken, and not at three in the morning when the only person who knows what `WORKERS` should be is asleep.
+
+A settings model turns configuration from something an application discovers gradually into something it asserts at boot. Every required variable is checked, every value is converted to the type the code expects, every constrained field is inside its range, and if any of that fails the process stops with a message naming exactly what is wrong.
+
+That is the same argument as validating a request body, applied to the other kind of input a program takes. It is just that request bodies are obviously untrusted and configuration usually is not treated that way &mdash; which is precisely why configuration errors cause so many incidents.
+
+## Summary
+
+`BaseSettings` is a model that reads the environment, which means configuration gets the same treatment as any other untrusted input.
+
+Names map implicitly, `env_prefix` namespaces a model, `validation_alias` pins the exceptions. Required fields with no default make a misconfigured deploy fail at boot rather than hours later. Constraints and `Literal` catch the typos and out-of-range values behind most configuration incidents. `SecretStr` keeps credentials out of the logs.
+
+Build it once at start-up, cache it, inject it, and let it refuse to start when something is wrong.
+
+## One habit
+
+Instantiate settings on the first line of your application's start-up, before anything else runs.
+
+That single placement decision is what converts a class of production incident into a failed deploy. Everything else in this module is detail around it.

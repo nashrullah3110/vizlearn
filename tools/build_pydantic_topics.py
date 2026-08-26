@@ -68,7 +68,7 @@ def esc(s):
     return html.escape(s, quote=False)
 
 
-def editor(filename, code):
+def editor(filename, code, wheels=(), prelude=""):
     """One runnable program, wired to assets/vizlearn-python.js.
 
     The source is emitted raw. <script> content is raw text, so entities are
@@ -78,8 +78,15 @@ def editor(filename, code):
     """
     if "</script" in code.lower():
         raise SystemExit("%s contains </script and would break out of the tag" % filename)
-    return """                <div class="vz-py" data-vz-py data-vz-packages="pydantic" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">%(code)s</script>
+    extra = ""
+    if wheels:
+        extra += ' data-vz-wheels="%s"' % ",".join("../assets/wheels/" + w for w in wheels)
+    pre = ""
+    if prelude:
+        pre = ('<script type="text/plain" class="py-prelude">%s</script>\n                    '
+               % prelude.strip())
+    return """                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl"%(extra)s data-vz-label="Pydantic">
+                    %(pre)s<script type="text/plain" class="py-src">%(code)s</script>
                     <div class="vz-code-bar">
                         <span class="vz-code-dot"></span><span>%(file)s</span>
                         <span class="vz-code-lang">Pydantic</span>
@@ -103,10 +110,10 @@ def editor(filename, code):
                              data-empty="Press Run to execute this code."></pre>
                     </div>
                 </div>
-""" % {"code": code.rstrip(), "file": esc(filename)}
+""" % {"code": code.rstrip(), "file": esc(filename), "extra": extra, "pre": pre}
 
 
-def step_card(n, heading, blurb, code):
+def step_card(n, heading, blurb, code, wheels=(), prelude=""):
     return """            <div class="card-container">
                 <div class="card-header">
                     <div class="vz-step-head">
@@ -119,7 +126,7 @@ def step_card(n, heading, blurb, code):
 %(editor)s                </div>
             </div>""" % {
         "n": n, "head": esc(heading), "blurb": blurb,
-        "editor": editor("step_%02d.py" % n, code),
+        "editor": editor("step_%02d.py" % n, code, wheels, prelude),
     }
 
 
@@ -130,7 +137,7 @@ def page(t):
         "/* page-specific rules go here; the shared system is in vizlearn.css */",
         CSS.strip("\n"))
 
-    steps = "\n".join(step_card(i + 1, h, b, c)
+    steps = "\n".join(step_card(i + 1, h, b, c, t.get("wheels", ()), t.get("prelude", ""))
                       for i, (h, b, c) in enumerate(t["steps"]))
 
     notes = "\n".join('                        <div class="py-note">%s</div>' % n

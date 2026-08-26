@@ -1,0 +1,200 @@
+title: Pydantic with FastAPI: Where It All Arrives
+intro: Request bodies, response models and documentation, all from annotations you already wrote.
+
+## Why this is the common entry point
+
+Most people meet Pydantic through FastAPI, and often without realising they are two libraries. That is a compliment to the integration and it leaves a gap: everything that looks like FastAPI magic is Pydantic doing what the previous tiers described.
+
+FastAPI has no validation layer of its own. It reads your annotations, hands the request body to a Pydantic model, converts the resulting `ValidationError` into a 422, and turns the generated JSON Schema into your documentation. That is the whole of it, and knowing where the line falls makes both easier to reason about.
+
+## The request body
+
+```python
+@app.post("/modules/", status_code=201)
+def create(module: ModuleIn):
+    return {"created": module.title}
+```
+
+A parameter annotated with a model is the body. FastAPI reads the request, validates it with `model_validate_json`, and calls your handler with a real object.
+
+By the time your code runs, `module.minutes` is an integer &mdash; even if the client sent `"8"` &mdash; and every constraint has passed. There is no checking to do at the top of the handler, which is the point.
+
+Scalars annotated with ordinary types become query or path parameters, and the same coercion applies: `?verbose=yes` becomes `True` because of the boolean vocabulary from the coercion module.
+
+## 422, and what it contains
+
+When validation fails, the handler never runs. FastAPI returns 422 with a body whose `detail` is essentially `e.errors()`.
+
+So everything from the errors module applies directly to what your API returns. `loc` is a path, and its first element is `body`, `path`, `query` or `header` &mdash; telling the caller which part of the request was wrong before naming the field within it.
+
+That is worth showing your API's consumers. A 422 from a FastAPI service is more informative than most people realise, and clients frequently discard it and report "bad request".
+
+If you want a different shape, an exception handler for `RequestValidationError` lets you reformat it globally &mdash; and the grouping code from the errors module drops straight in.
+
+## response_model does two things
+
+```python
+@app.get("/users/{user_id}", response_model=UserOut)
+```
+
+It **validates** the output, which catches a handler returning the wrong shape before a client does.
+
+And it **filters** the output to the model's fields. A handler returning a dict with `password_hash` in it produces a response without one, because `UserOut` does not declare it.
+
+That second behaviour is a genuine security property and worth relying on deliberately. The pattern to internalise: a response model should list exactly what a caller may see, and then over-returning from a handler cannot leak. Relying instead on the handler returning precisely the right keys means every future edit to that handler is a chance to leak something.
+
+It also fixes the schema. Without `response_model` the documentation cannot say what an endpoint returns; with it, consumers get a typed response.
+
+## Three models, not one
+
+The instinct is one `Module` model everywhere. Resist it, for the reasons the defaults module gave.
+
+**Create** takes what a caller may supply. No `id` &mdash; not optional, absent &mdash; because the server assigns it.
+
+**Update** has everything optional, and the handler applies `model_dump(exclude_unset=True)` so untouched fields stay untouched. This is the correct PATCH shape, and getting it wrong is how six columns become `None`.
+
+**Out** declares exactly what may be seen, with server-assigned fields required.
+
+Three small classes, each honest. One model with everything optional produces documentation that guarantees nothing and a response type no client can rely on.
+
+## Dependencies
+
+`Depends` composes validated values the same way:
+
+```python
+def pagination(page: int = 1, size: int = Query(default=20, le=100)) -> Page:
+    return Page(page=page, size=size)
+
+@app.get("/modules/")
+def list_modules(p: Page = Depends(pagination)):
+    ...
+```
+
+The dependency's parameters are validated like any others, so the constraint on `size` is enforced and documented, and every endpoint using it inherits both.
+
+`get_settings` from the settings module is the same pattern, and being a dependency makes it overridable in tests.
+
+## Where validation stops
+
+The line from the validators module matters here more than anywhere.
+
+A model checks shape and internal consistency. "Does this track exist?" is a fact about the world, and it belongs in the handler or the service layer &mdash; not least because the right response is a 404 or a 409, not a 422.
+
+Keeping that separation means your models stay testable without a database, and your status codes stay meaningful.
+
+## The documentation is your schema
+
+`app.openapi()` is assembled from `model_json_schema()` for every model you used. Which means every recommendation from the schema module cashes out here:
+
+A `Field(gt=0)` appears as a documented minimum; a validator checking the same thing appears as nothing.
+
+A `Literal` becomes a set of choices in the docs and a union type in a generated client; a `pattern` becomes an opaque string.
+
+A `description` appears beside the field. An `examples` entry pre-fills the interactive request form, so a first-time caller can send a working request instead of guessing.
+
+This is the concrete payback for being specific in your annotations, and it is visible to everybody who uses your API rather than only to you.
+
+## A note on this page
+
+There is no server here &mdash; a browser tab cannot listen on a port. `client` calls the app through ASGI, which is the same interface uvicorn uses, so routing, validation, status codes and schema generation all behave exactly as they would in production.
+
+The full explanation, and the one behaviour that genuinely differs, is on the [FastAPI compiler](../fastapi-lab/) page.
+
+## Summary
+
+FastAPI is Pydantic at the edges of an HTTP application. A model parameter is the body; failures become 422 carrying `errors()`; `response_model` validates and filters what goes out; the schema becomes your documentation and your consumers' clients.
+
+Use separate models per direction. Put facts about the world in the service layer and shape in the model. And write constraints rather than validators wherever you can, because only one of them reaches the people calling you.
+
+## Where the boundary between the two libraries falls
+
+It is worth being able to say which library is doing what, because it changes where you look when something is wrong.
+
+**FastAPI** decides routing, reads the request, chooses which parameters come from the path, the query and the body, calls your handler, and turns the result into a response. It also assembles the OpenAPI document.
+
+**Pydantic** validates and converts every one of those values, produces the errors, and generates the schema for each model that goes into the document.
+
+So a 422 you disagree with is a Pydantic question &mdash; a model's annotations, constraints or validators. A field arriving from the wrong part of the request is a FastAPI question. Documentation that is missing a constraint is a Pydantic question, because the constraint was never in the schema.
+
+Most confusion about "FastAPI validation" resolves the moment that split is clear.
+
+## Dependencies and settings
+
+The settings model from the previous module composes naturally here:
+
+```python
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+@app.get("/health")
+def health(settings: Settings = Depends(get_settings)):
+    return {"env": settings.env}
+```
+
+Cached, so the environment is read and validated once rather than per request. And overridable in tests through FastAPI's dependency overrides, which is much cleaner than mutating the environment around a test.
+
+The same pattern covers anything constructed once and used everywhere &mdash; a database session factory, a client for another service, a pagination object built from validated query parameters.
+
+## Summary
+
+A model parameter is the request body, validated before your handler runs. Failures become a 422 whose `detail` is `e.errors()`, with `loc` naming which part of the request was wrong.
+
+`response_model` validates and filters the output, so undeclared fields cannot leak &mdash; a property worth relying on deliberately rather than trusting each handler to return exactly the right keys.
+
+Separate `Create`, `Update` and `Out` models per resource. Keep facts about the world in the service layer and shape in the model. And prefer constraints to validators, because only one of them reaches the documentation your callers read.
+
+
+## Mistakes people make
+
+**No `response_model`.** The documentation cannot say what the endpoint returns, and nothing filters the output, so a handler that starts returning an extra key starts leaking it.
+
+**One model for every direction.** Everything optional so it can serve create, update and read at once. It documents nothing, and no client can tell what is guaranteed in a response.
+
+**Dumping the whole update model.** `patch.model_dump()` without `exclude_unset=True` writes every field, so untouched columns are overwritten with `None` or defaults. This is the bug behind "it cleared fields I never edited".
+
+**Putting existence checks in validators.** "Does this track exist" belongs in the handler. In a model it makes validation an I/O call, makes the model untestable without a database, and returns a 422 where a 404 was correct.
+
+**Validators instead of constraints.** Both reject the same values; only the constraint appears in the documentation and in generated clients. Your callers see one of them.
+
+**Assuming a 422 body is opaque.** It is `e.errors()`, with `loc` naming body, path or query and then the field. A lot of clients discard it and report "bad request" when the exact problem was right there.
+
+**Instantiating settings per request.** Reading and validating the environment on every call is wasted work. Cache it with `lru_cache` and inject it with `Depends`, which is also what makes it overridable in tests.
+
+## A last habit
+
+Open your own `/docs` page occasionally and read it as a consumer would.
+
+It is generated from your models, so everything this track has argued about being specific in annotations is visible there and nowhere else in your workflow. Fields with no description. A `str` where a `Literal` belongs. An endpoint with no `response_model`, so the response section says nothing. A required field you meant to default.
+
+None of that shows up in your tests, because your tests know what they are sending. It shows up for the person integrating with you, at the point where it is expensive to ask you about it.
+
+Five minutes reading your own documentation catches most of it, and it is the same five minutes recommended in the schema module &mdash; just from the other end.
+
+## Where to go from here
+
+This is the last module in the track, and the one where everything else cashes out.
+
+The annotations from tier one decide what a request body accepts. The shapes from tier two &mdash; nested models, collections, discriminated unions, closed sets &mdash; decide how expressive your API can be about its own data. The validators and config from tier three enforce what annotations cannot say. The serialisation and schema work from tier four decides what consumers receive and what your documentation tells them.
+
+FastAPI adds routing and an HTTP layer on top, and almost nothing else. Which means the quality of an API built this way is very largely the quality of its models.
+
+That is a good position to be in, because models are cheap to improve. Narrowing a `str` to a `Literal`, moving a rule from a validator to a constraint, splitting one all-optional model into three honest ones, adding a description to a field whose name is not self-explanatory &mdash; each is a small edit, and each is visible to everybody who calls you.
+
+## One last thing to check
+
+Before shipping an endpoint, three questions that take a minute each.
+
+**Does it have a `response_model`?** Without one the documentation says nothing about the response, and nothing filters what a handler returns.
+
+**Is the update path using `exclude_unset=True`?** Without it, a PATCH overwrites fields the caller never mentioned.
+
+**Would a 422 from this endpoint tell a caller what to fix?** If a field is a bare `str` where a `Literal` belongs, or a rule lives in a validator that the schema cannot show, the answer is no &mdash; and the caller finds out by being rejected rather than by reading.
+
+## Summary
+
+A model parameter is the request body, validated before your handler runs. Failures become a 422 whose `detail` is `e.errors()`, with `loc` naming which part of the request was wrong.
+
+`response_model` validates and filters the output, so undeclared fields cannot leak. Separate `Create`, `Update` and `Out` models per resource, and dump updates with `exclude_unset=True`.
+
+Keep facts about the world in the service layer and shape in the model. And prefer constraints to validators, because only one of the two reaches the documentation your callers actually read.

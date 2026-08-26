@@ -3164,8 +3164,24 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Generic Models",
+  "path": "pydantic/generic_models.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "JSON Schema",
   "path": "pydantic/json_schema.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Migrating v1 to v2",
+  "path": "pydantic/migrating_v1_to_v2.html",
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
@@ -3188,8 +3204,24 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Performance and pydantic-core",
+  "path": "pydantic/performance_and_pydantic_core.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Pydantic vs Dataclasses",
   "path": "pydantic/pydantic_vs_dataclasses.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Pydantic with FastAPI",
+  "path": "pydantic/pydantic_with_fastapi.html",
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
@@ -3206,6 +3238,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Required, Optional and Defaults",
   "path": "pydantic/required_optional_and_defaults.html",
+  "category": "Pydantic",
+  "topic": "pydantic",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Settings Management",
+  "path": "pydantic/settings_management.html",
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",

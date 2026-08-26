@@ -1,0 +1,207 @@
+title: Migrating v1 to v2: What Changed and What Bites
+intro: The renames, the behaviour changes that fail silently, and how to date a tutorial.
+
+## Why this module exists even if you never migrate
+
+Pydantic v1 was popular for years, and a great deal of writing about it is still the top result for many searches. Reading a v1 answer as though it describes v2 is a genuine source of confusion.
+
+So the most useful thing here may simply be the ability to date a page.
+
+**It is v1 if you see:** `@validator`, `@root_validator`, `.dict()`, `.json()`, `.parse_obj()`, `class Config`, `orm_mode`, `min_items`, `regex=`.
+
+**It is v2 if you see:** `@field_validator`, `@model_validator`, `.model_dump()`, `model_config = ConfigDict(...)`, `from_attributes`, `min_length`, `pattern=`.
+
+If a page uses the first set, treat everything in it as historical &mdash; not only the names, but the behaviour it describes.
+
+## The renames
+
+The mechanical part, and the easy part:
+
+`.dict()` → `model_dump()`. `.json()` → `model_dump_json()`. `.parse_obj()` → `model_validate()`. `.parse_raw()` → `model_validate_json()`. `.schema()` → `model_json_schema()`. `.copy()` → `model_copy()`. `.construct()` → `model_construct()`. `__fields__` → `model_fields`. `__fields_set__` → `model_fields_set`.
+
+The `model_` prefix is deliberate: it namespaces the library's methods away from your field names, which is also why Pydantic warns about fields starting with `model_`.
+
+Most old names still exist in v2 and emit deprecation warnings. That is a kindness for migration and the reason so much code still uses them &mdash; nothing forced the change.
+
+## Validators
+
+`@validator` became `@field_validator`, and it now requires `@classmethod` underneath.
+
+The signature changed too. v1 took `(cls, v, values)` where `values` was a dict of previously-validated fields; v2 takes `(cls, v, info)` and the same data is `info.data`.
+
+`@root_validator` became `@model_validator`, and the mode is now explicit. v1's `pre=True` is `mode="before"`; the default post-validator is `mode="after"` and receives the model rather than a dict of values, returning `self`.
+
+That last change is more than cosmetic. A v1 root validator worked with a dict; a v2 after-validator works with the finished model, so fields are converted and attribute access works.
+
+## Config
+
+`class Config` became `model_config = ConfigDict(...)`, with several settings renamed:
+
+`orm_mode` → `from_attributes`. `allow_mutation = False` → `frozen=True`. `allow_population_by_field_name` → `populate_by_name`. `anystr_strip_whitespace` → `str_strip_whitespace`. `min_anystr_length` → `str_min_length`.
+
+An inner `class Config` still works and warns. It is the single clearest signal that code has not been migrated.
+
+## The change that bites
+
+Everything above produces a warning or an error. This one does not:
+
+```python
+summary: Optional[str]
+```
+
+In v1 that was optional and defaulted to `None`. In v2 it is **required** and nullable &mdash; you must pass it, and you may pass `None`.
+
+Nothing warns, because the annotation is still valid. What happens is that code which used to work starts raising `missing` at runtime, in whatever code path first constructs the model without that field.
+
+The fix is one addition per field: `Optional[str] = None`.
+
+The reason for the change is the one the defaults module gave: v1's implicit default hid the distinction between "may be omitted" and "may be null", which are genuinely different contracts. v2 made you say which you meant.
+
+If you are migrating anything substantial, search for `Optional[` first. It will be the largest single source of failures.
+
+## Constraint renames
+
+`min_items`/`max_items` → `min_length`/`max_length`, now consistent with strings.
+
+`regex` → `pattern`.
+
+`allow_mutation` on a field → `frozen`.
+
+`const=True` is gone; use `Literal[value]`.
+
+Some v1 helper types were removed or changed too. `constr(regex=...)` becomes `Annotated[str, Field(pattern=...)]`, which is the modern spelling anyway.
+
+## Errors
+
+Error `type` codes were renamed wholesale. v1's `value_error.any_str.min_length` is v2's `string_too_short`. v1's `type_error.integer` is v2's `int_type` or `int_parsing` depending on the cause.
+
+`ctx` now carries the rule's parameters, and `url` links to documentation for the type.
+
+This is where the standing advice in this track &mdash; match on `type`, never on `msg` &mdash; comes from. Code that matched v1 message strings broke on upgrade with no warning at all, which is exactly the failure mode that advice prevents.
+
+If you are migrating, any error-handling code is worth reviewing directly rather than trusting tests, because a broken branch that never matches will not fail loudly.
+
+## A practical order
+
+If you are doing this on a real codebase:
+
+**Install v2 and run the test suite.** Deprecation warnings tell you where the renames are, and they are mechanical.
+
+**Search for `Optional[` and add the defaults.** Largest source of genuine failures, and invisible until executed.
+
+**Rewrite validators.** Add `@classmethod`, rename the decorators, change `values` to `info.data`, and make `mode` explicit on root validators.
+
+**Convert `class Config` blocks**, renaming the settings that moved.
+
+**Review error handling last**, because that is where the failures are silent.
+
+There is a tool, `bump-pydantic`, which does the mechanical parts automatically. It is worth running first and reviewing carefully; it handles the renames well and cannot know your intent on the `Optional` question.
+
+## What you get for it
+
+The migration is not free, and it is worth knowing what it buys.
+
+Validation is substantially faster, because the core is Rust rather than Python. Strict mode exists. Discriminated unions became a first-class feature. `TypeAdapter` arrived, and with it validation without a wrapper model. Error output became structured and stable. `computed_field` exists. Serialisation gained real control.
+
+Most of this track describes features that are v2-only. If you are reading it against a v1 codebase, that is the gap.
+
+## Summary
+
+Renames are mechanical and mostly warn. `Optional[X]` losing its implicit `None` default is the change that fails silently and needs a deliberate search. Validators changed shape, not just name. Config moved into `model_config`. Error codes were renamed wholesale, which is why matching on `type` rather than `msg` is the rule.
+
+And when reading anything about Pydantic online, check which vocabulary it uses before trusting it.
+
+## Things that were removed outright
+
+A few v1 features have no v2 equivalent, and finding them late is unpleasant.
+
+`copy_on_model_validation` is gone; the behaviour is controlled by `revalidate_instances` instead.
+
+`GetterDict`, the customisation hook for `orm_mode`, was removed. `from_attributes` reads attributes directly, and anything more involved belongs in a `model_validator(mode="before")`.
+
+`json_encoders` in Config is deprecated in favour of field and model serialisers, which are more precise and appear in the right place.
+
+`parse_file` is gone. Read the file yourself and use `model_validate_json` on the bytes, which is better anyway &mdash; the errors name the position in the document.
+
+`const=True` is gone; a `Literal` says the same thing and produces a better schema.
+
+## Running both versions at once
+
+For a large migration, `pydantic.v1` is available inside v2: `from pydantic.v1 import BaseModel` gives the old library alongside the new one.
+
+That makes an incremental migration possible &mdash; move one module at a time, with both versions installed as a single package.
+
+Two cautions. The two are not interoperable: a v1 model cannot be a field of a v2 model, and mixing them at a boundary means converting through dicts. And a dependency that has not migrated may pull in its own expectations, so check what your libraries require before assuming you can take it slowly.
+
+It is a transitional tool. Code left half-migrated for a year tends to stay that way, and the two vocabularies side by side are genuinely confusing to read.
+
+## Summary
+
+Renames are mechanical and mostly warn. `Optional[X]` losing its implicit `None` is the change that fails silently, and searching for it first will save the most time.
+
+Validators changed shape as well as name &mdash; `@classmethod`, `info.data`, explicit modes. Config moved into `model_config` with several settings renamed. Error codes were replaced wholesale, so error-handling code deserves direct review rather than trust in tests.
+
+`bump-pydantic` handles the mechanical parts. What it cannot do is decide what you meant by `Optional`, which is precisely the part that matters.
+
+
+## Mistakes people make
+
+**Trusting the test suite to find everything.** Renames warn and errors are loud, but two categories fail quietly: `Optional` fields that are now required, and error-handling branches matching v1 codes that simply never match again. Neither necessarily fails a test.
+
+**Running `bump-pydantic` and shipping.** It handles the mechanical renames well and cannot know what you meant by `Optional[X]`. Review its output rather than treating it as a migration.
+
+**Migrating models and not validators.** A `@validator` still importable from `pydantic` in v2 is the deprecated shim. The signature changed &mdash; `values` became `info.data` &mdash; and a validator reading the wrong argument name will not behave as it did.
+
+**Leaving `class Config` because it still works.** It warns rather than failing, so it survives indefinitely, and it is the single clearest marker of code that has not really been migrated.
+
+**Living in `pydantic.v1` permanently.** The compatibility import exists for a transition. Two vocabularies side by side in one codebase are genuinely confusing, and half-migrated code tends to stay that way.
+
+**Reading v1 answers as v2.** The most common problem for people who never migrate anything. Check for `@validator`, `.dict()` and `class Config` before trusting a page &mdash; the behaviour it describes has changed too, not only the spelling.
+
+## Deciding whether to migrate
+
+If you are on v1 and wondering whether it is worth it, the honest position.
+
+v1 is no longer developed and receives only security fixes. The ecosystem has moved: FastAPI, LangChain, SQLModel and most libraries that integrate with Pydantic now target v2, and staying on v1 increasingly means pinning things around it.
+
+Against that, the migration is real work on a large codebase, and it is work with no visible feature at the end of it.
+
+The pragmatic answer for most teams is to migrate when something else forces the question &mdash; a dependency that needs v2, or a piece of work that touches the models anyway &mdash; rather than as a standalone project. The `pydantic.v1` compatibility import exists to make that gradual approach viable.
+
+What is not viable is starting new code on v1. Everything in this track past the first tier is v2, and the gap widens.
+
+## Where this leaves the track
+
+That is the last module. Thirty of them, from a type annotation that does nothing at runtime to an API whose documentation writes itself.
+
+The through-line has been one idea: **be specific at the boundary, once**. Specific enough that the annotation says what you mean, that the constraint reaches the schema, that the error names the field, and that everything downstream can stop defending itself.
+
+Everything else has been mechanism. Coercion rules so text can arrive as text. Validators for the rules types cannot hold. Serialisation so output is data rather than presentation. Schemas so other tools can read what you already wrote.
+
+The version history matters here only because v2 is where most of that became true. If you are reading this against a v1 codebase, the gap is not stylistic.
+
+## A migration checklist
+
+Condensed, in the order that finds problems soonest.
+
+Install v2 and run the suite. Fix what fails loudly &mdash; imports, removed arguments, renamed helpers.
+
+Search `Optional[` and add `= None` wherever the field was meant to be omissible. Largest source of silent breakage.
+
+Rewrite validators: `@field_validator` with `@classmethod`, `@model_validator` with an explicit mode, `values` becomes `info.data`.
+
+Convert `class Config` blocks, renaming `orm_mode`, `allow_mutation` and the `anystr_` family.
+
+Rename constraint arguments: `min_items`, `max_items`, `regex`.
+
+Review error handling by hand. Anything matching v1 type codes or message text has stopped matching, silently, and tests may not notice.
+
+Then remove the deprecated method names once the warnings are the only thing left.
+
+## If you are only reading, not migrating
+
+The most common use of this module is not migration at all &mdash; it is dating an answer you found while looking for something else.
+
+That skill is worth more than it sounds. A confident, well-written, highly-ranked answer describing v1 behaviour will send you in the wrong direction for an afternoon, and nothing about it announces its age.
+
+The tell is the vocabulary. `@validator`, `.dict()`, `class Config`, `orm_mode`, `min_items`, `regex=`. Any one of those means the page predates v2, and the behaviour it describes may have changed as well as the spelling &mdash; `Optional` being the sharpest example, since the code will look correct and simply not work.
