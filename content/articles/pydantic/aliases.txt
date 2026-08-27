@@ -11,6 +11,147 @@ intro: camelCase payloads, reserved words, legacy names, and nested shapes flatt
 
 **The name changed.** You are renaming a field and both spellings must work through a deprecation window.
 
+
+## The wire says camelCase
+
+An alias lets a field be populated from a different key without renaming your Python attribute.
+
+```python-run
+from pydantic import BaseModel, Field
+
+class Module(BaseModel):
+    title: str
+    published_at: str = Field(alias="publishedAt")
+    reading_minutes: int = Field(alias="readingMinutes")
+
+payload = {"title": "Vectors", "publishedAt": "2026-08-26", "readingMinutes": 8}
+
+m = Module.model_validate(payload)
+print("python side :", m.published_at, "|", m.reading_minutes)
+print("dump        :", m.model_dump())
+print("dump by alias:", m.model_dump(by_alias=True))
+```
+
+## By default the alias replaces the name
+
+Once a field has an alias, the Python name no longer works as input &mdash; unless you turn <code>populate_by_name</code> on.
+
+```python-run
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+class Strict(BaseModel):
+    published_at: str = Field(alias="publishedAt")
+
+class Either(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    published_at: str = Field(alias="publishedAt")
+
+print("alias works  :", Strict(publishedAt="2026-08-26"))
+
+try:
+    Strict(published_at="2026-08-26")
+except ValidationError as e:
+    print("name refused :", e.errors()[0]["type"], e.errors()[0]["loc"])
+
+print()
+print("with populate_by_name, both work:")
+print("  ", Either(publishedAt="2026-08-26"))
+print("  ", Either(published_at="2026-08-26"))
+```
+
+## Different names in and out
+
+<code>validation_alias</code> and <code>serialization_alias</code> separate the two directions, which a single <code>alias</code> cannot.
+
+```python-run
+from pydantic import BaseModel, Field
+
+class Module(BaseModel):
+    minutes: int = Field(validation_alias="durationMinutes",
+                         serialization_alias="reading_minutes")
+
+m = Module.model_validate({"durationMinutes": 8})
+
+print("python    :", m.minutes)
+print("plain dump:", m.model_dump())
+print("by alias  :", m.model_dump(by_alias=True))
+print()
+print("It reads one name and writes another - useful when translating")
+print("between two systems that disagree about both.")
+```
+
+## Accepting several spellings
+
+<code>AliasChoices</code> takes the first key that is present, which is how you support an old and a new name at once.
+
+```python-run
+from pydantic import AliasChoices, BaseModel, Field
+
+class Module(BaseModel):
+    minutes: int = Field(
+        validation_alias=AliasChoices("minutes", "readingMinutes", "duration"))
+
+for payload in [{"minutes": 8},
+                {"readingMinutes": 9},
+                {"duration": 10}]:
+    print("%-26s -> %d" % (str(payload), Module.model_validate(payload).minutes))
+
+print()
+print("One field, three accepted spellings, no branching in your code.")
+```
+
+## Reaching into a nested payload
+
+<code>AliasPath</code> pulls a value out of a nested structure, flattening someone else's shape into yours.
+
+```python-run
+from pydantic import AliasPath, BaseModel, Field
+
+class Module(BaseModel):
+    title: str
+    author_name: str = Field(validation_alias=AliasPath("author", "name"))
+    first_tag: str = Field(validation_alias=AliasPath("tags", 0))
+
+payload = {
+    "title": "Vectors",
+    "author": {"name": "Ada", "email": "ada@vizlearn.in"},
+    "tags": ["maths", "linear-algebra"],
+}
+
+m = Module.model_validate(payload)
+print(m)
+print()
+print("A nested API response became a flat model, with no manual digging.")
+```
+
+## Generating aliases for the whole model
+
+<code>alias_generator</code> applies a rule to every field, which beats writing <code>alias=</code> forty times.
+
+```python-run
+from pydantic import BaseModel, ConfigDict
+
+def to_camel(name: str) -> str:
+    head, *rest = name.split("_")
+    return head + "".join(word.capitalize() for word in rest)
+
+class ApiModel(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel,
+                              populate_by_name=True)
+
+class Module(ApiModel):
+    title: str
+    published_at: str
+    reading_minutes: int
+
+m = Module.model_validate({"title": "Vectors",
+                           "publishedAt": "2026-08-26",
+                           "readingMinutes": 8})
+
+print("python :", m.reading_minutes)
+print("out    :", m.model_dump(by_alias=True))
+print("by name:", Module(title="X", published_at="Y", reading_minutes=1).reading_minutes)
+```
 ## The simple form
 
 ```python

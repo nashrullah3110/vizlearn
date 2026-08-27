@@ -15,6 +15,175 @@ You can verify that, and the first editor above does &mdash; `read_modules()` ca
 
 What the app records from the signature is more than the name. It notes which parameters correspond to placeholders in the path, which have defaults, and what each is annotated as. That analysis happens once, at import, which is why routing is cheap at request time.
 
+
+## The decorator registers a route
+
+It does not wrap the function. It records the path, the method and the signature in the app's routing table.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules")
+def read_modules():
+    return [{"title": "Vectors"}, {"title": "Norms"}]
+
+print("routes registered:")
+for route in app.routes:
+    methods = getattr(route, "methods", None)
+    if methods:
+        print("  %-8s %s" % (",".join(sorted(methods)), route.path))
+
+print()
+print("the function is untouched:", read_modules())
+```
+
+## The return value becomes JSON
+
+Dicts, lists, models, primitives &mdash; all serialised for you. The default status is 200.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+@app.get("/dict")
+def a(): return {"kind": "dict"}
+
+@app.get("/list")
+def b(): return [1, 2, 3]
+
+@app.get("/model")
+def c(): return Module(title="Vectors", minutes=8)
+
+@app.get("/scalar")
+def d(): return "just a string"
+
+client = TestClient(app)
+for path in ["/dict", "/list", "/model", "/scalar"]:
+    r = client.get(path)
+    print("%-8s %s  %-14s %s" % (path, r.status_code,
+                                 r.headers.get("content-type"), r.text))
+```
+
+## Choosing the status code
+
+<code>status_code</code> on the decorator sets the default for that route. The <code>status</code> module names them so you do not have to remember numbers.
+
+```python-run
+from fastapi import FastAPI, status
+
+app = FastAPI()
+
+@app.post("/modules", status_code=status.HTTP_201_CREATED)
+def create():
+    return {"created": True}
+
+@app.delete("/modules/{i}", status_code=status.HTTP_204_NO_CONTENT)
+def delete(i: int):
+    return None                       # 204 means "nothing to say"
+
+client = TestClient(app)
+r1 = client.post("/modules")
+r2 = client.delete("/modules/1")
+print("create :", r1.status_code, r1.json())
+print("delete :", r2.status_code, repr(r2.text), "<- 204 has no body")
+```
+
+## Order matters when paths overlap
+
+Routes are matched in the order they were registered, so a fixed path must come before a variable one that would also match it.
+
+```python-run
+from fastapi import FastAPI
+
+wrong = FastAPI()
+
+@wrong.get("/modules/{module_id}")
+def by_id(module_id: str):
+    return {"matched": "by_id", "value": module_id}
+
+@wrong.get("/modules/latest")            # registered second - never reached
+def latest_wrong():
+    return {"matched": "latest"}
+
+right = FastAPI()
+
+@right.get("/modules/latest")            # fixed path first
+def latest_right():
+    return {"matched": "latest"}
+
+@right.get("/modules/{module_id}")
+def by_id2(module_id: str):
+    return {"matched": "by_id", "value": module_id}
+
+print("wrong order:", TestClient(wrong).get("/modules/latest").json())
+print("right order:", TestClient(right).get("/modules/latest").json())
+print("still works:", TestClient(right).get("/modules/7").json())
+```
+
+## Describing the endpoint
+
+<code>summary</code>, <code>description</code> and <code>tags</code> shape the documentation. The docstring becomes the description if you do not supply one.
+
+```python-run
+import json
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules", summary="List modules", tags=["modules"])
+def read_modules():
+    """Return every published module, newest first.
+
+    Unpublished drafts are excluded.
+    """
+    return []
+
+spec = app.openapi()["paths"]["/modules"]["get"]
+print("summary    :", spec["summary"])
+print("tags       :", spec["tags"])
+print("description:")
+print(spec["description"])
+```
+
+## A whole small API
+
+Everything so far in one app: two routes, a model, a status code and an in-memory store.
+
+```python-run
+from fastapi import FastAPI, status
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="VizLearn")
+DB = {1: {"id": 1, "title": "Vectors", "minutes": 8}}
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(default=10, gt=0)
+
+@app.get("/modules", tags=["modules"])
+def list_modules():
+    return list(DB.values())
+
+@app.post("/modules", status_code=status.HTTP_201_CREATED, tags=["modules"])
+def create_module(module: ModuleIn):
+    new_id = max(DB) + 1
+    DB[new_id] = {"id": new_id, **module.model_dump()}
+    return DB[new_id]
+
+client = TestClient(app)
+print("before :", client.get("/modules").json())
+r = client.post("/modules", json={"title": "Eigenvalues", "minutes": 14})
+print("created:", r.status_code, r.json())
+print("after  :", client.get("/modules").json())
+```
 ## The return value
 
 Whatever you return is converted to JSON: dictionaries, lists, Pydantic models, and primitives like strings and numbers. The default status is 200 and the content type is `application/json`.

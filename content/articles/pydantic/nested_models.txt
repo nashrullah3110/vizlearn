@@ -19,6 +19,186 @@ That is it. Everything else follows from that one fact, which is worth stating p
 
 When `Module` is validated, the value for `author` is handed to `Author` for validation. If it is already an `Author`, it passes through. If it is a dict, it becomes one. If it is neither, the error says so.
 
+
+## A model can be a field type
+
+Annotate a field with another model and Pydantic validates the inner one too. A plain dict on the way in becomes a real object on the way out.
+
+```python-run
+from pydantic import BaseModel
+
+class Author(BaseModel):
+    name: str
+    email: str
+
+class Module(BaseModel):
+    title: str
+    author: Author          # <- another model
+
+m = Module(title="Vectors",
+           author={"name": "Ada", "email": "ada@vizlearn.in"})
+
+print(m)
+print()
+print("author is a :", type(m.author).__name__)
+print("dotted acces:", m.author.name)
+print("not a dict  :", isinstance(m.author, dict))
+```
+
+## Errors carry the whole path
+
+This is where <code>loc</code> earns its design. The path names the route to the bad value, not just the top-level field that contained it.
+
+```python-run
+from pydantic import BaseModel, ValidationError
+
+class Author(BaseModel):
+    name: str
+    email: str
+
+class Module(BaseModel):
+    title: str
+    author: Author
+
+try:
+    Module(title="Vectors", author={"name": None, "email": 42})
+except ValidationError as e:
+    for err in e.errors():
+        path = ".".join(str(p) for p in err["loc"])
+        print("%-16s %s" % (path, err["msg"]))
+
+print()
+# Compare with a failure at the top level:
+try:
+    Module(title="Vectors", author="Ada")
+except ValidationError as e:
+    err = e.errors()[0]
+    print("%-16s %s" % (".".join(str(p) for p in err["loc"]), err["msg"]))
+```
+
+## Nesting goes as deep as you like
+
+Three levels behaves exactly like two. The path simply gets longer, which is the point &mdash; it stays readable however deep the payload is.
+
+```python-run
+from typing import List
+from pydantic import BaseModel, ValidationError
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+class Module(BaseModel):
+    title: str
+    lessons: List[Lesson]
+
+class Track(BaseModel):
+    title: str
+    modules: List[Module]
+
+data = {"title": "Maths", "modules": [
+    {"title": "Vectors", "lessons": [
+        {"name": "Direction", "minutes": 4},
+        {"name": "Magnitude", "minutes": "soon"},   # <- three levels down
+    ]},
+]}
+
+try:
+    Track.model_validate(data)
+except ValidationError as e:
+    err = e.errors()[0]
+    print("path :", err["loc"])
+    print("read :", ".".join(str(p) for p in err["loc"]))
+    print("said :", err["msg"])
+```
+
+## Optional and defaulted nested models
+
+The rules from the defaults module apply unchanged. A nested model can be absent, null, or given a default like anything else.
+
+```python-run
+from typing import Optional
+from pydantic import BaseModel, Field
+
+class Author(BaseModel):
+    name: str = "unknown"
+    email: Optional[str] = None
+
+class Module(BaseModel):
+    title: str
+    author: Optional[Author] = None            # may be absent entirely
+    reviewer: Author = Field(default_factory=Author)   # always present
+
+bare = Module(title="Norms")
+print("no author    :", bare.author)
+print("but reviewer :", bare.reviewer)
+print()
+
+full = Module(title="Norms", author={"name": "Ada"})
+print("given        :", full.author)
+print("inner default:", full.author.email)
+```
+
+## Dumping and reloading a nested tree
+
+<code>model_dump()</code> recurses, so the whole tree comes back as nested dicts &mdash; and that output is valid input again.
+
+```python-run
+from typing import List
+from pydantic import BaseModel
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+class Module(BaseModel):
+    title: str
+    lessons: List[Lesson]
+
+m = Module(title="Vectors", lessons=[
+    {"name": "Direction", "minutes": 4},
+    {"name": "Magnitude", "minutes": 6},
+])
+
+d = m.model_dump()
+print("dict  :", d)
+print("inner :", type(d["lessons"][0]).__name__, "- plain dicts, all the way down")
+print()
+print("json  :", m.model_dump_json())
+print()
+again = Module.model_validate(d)
+print("round trip equal:", again == m)
+```
+
+## Trimming what comes out
+
+<code>exclude</code> reaches into nested models with a dict, which is how you keep an internal field out of a public response.
+
+```python-run
+from typing import List
+from pydantic import BaseModel
+
+class Author(BaseModel):
+    name: str
+    email: str
+
+class Module(BaseModel):
+    title: str
+    author: Author
+    internal_notes: str
+
+m = Module(title="Vectors",
+           author={"name": "Ada", "email": "ada@vizlearn.in"},
+           internal_notes="needs a diagram")
+
+print("everything :", m.model_dump())
+print()
+print("public     :", m.model_dump(exclude={"internal_notes": True,
+                                            "author": {"email"}}))
+print()
+print("just a bit :", m.model_dump(include={"title": True,
+                                            "author": {"name"}}))
+```
 ## Dicts in, objects out
 
 The conversion from dict to object is the part that makes nesting useful rather than merely possible.

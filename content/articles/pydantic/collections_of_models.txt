@@ -13,6 +13,175 @@ Given a list, Pydantic walks it and validates each element as a `Lesson`. A dict
 
 That last part matters more than it sounds. Validation does not abandon the collection at the first bad item. It checks all of them and reports all the failures, which for a bulk import is the difference between fixing one row per attempt and seeing the whole problem at once.
 
+
+## A list of models
+
+Each item is validated separately with the inner model's own rules. Dicts become objects, item by item.
+
+```python-run
+from typing import List
+from pydantic import BaseModel
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+class Module(BaseModel):
+    title: str
+    lessons: List[Lesson]
+
+m = Module(title="Vectors", lessons=[
+    {"name": "Direction", "minutes": "4"},     # note the string
+    {"name": "Magnitude", "minutes": 6},
+])
+
+for lesson in m.lessons:
+    print("%-12s %2d min  (%s)" % (lesson.name, lesson.minutes,
+                                   type(lesson).__name__))
+
+print()
+print("total:", sum(l.minutes for l in m.lessons), "minutes")
+```
+
+## The index is in the error path
+
+When one item fails, only that item fails, and the path names its position. The other items still validate.
+
+```python-run
+from typing import List
+from pydantic import BaseModel, ValidationError
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+class Module(BaseModel):
+    title: str
+    lessons: List[Lesson]
+
+bad = {"title": "Vectors", "lessons": [
+    {"name": "Direction", "minutes": 4},
+    {"name": "Magnitude", "minutes": "soon"},   # index 1
+    {"name": None, "minutes": 5},               # index 2
+    {"name": "Basis"},                          # index 3, missing minutes
+]}
+
+try:
+    Module.model_validate(bad)
+except ValidationError as e:
+    print("problems:", e.error_count())
+    for err in e.errors():
+        print("  %-22s %s" % (".".join(str(p) for p in err["loc"]), err["msg"]))
+```
+
+## Dicts keyed by something meaningful
+
+<code>Dict[str, Model]</code> validates keys and values independently. The key appears in the error path just as an index would.
+
+```python-run
+from typing import Dict
+from pydantic import BaseModel, ValidationError
+
+class Stats(BaseModel):
+    modules: int
+    minutes: int
+
+class Site(BaseModel):
+    tracks: Dict[str, Stats]
+
+s = Site(tracks={
+    "maths": {"modules": 47, "minutes": "520"},
+    "python": {"modules": 46, "minutes": 410},
+})
+
+for name, stats in s.tracks.items():
+    print("%-8s %2d modules, %d minutes" % (name, stats.modules, stats.minutes))
+
+try:
+    Site(tracks={"maths": {"modules": 47, "minutes": "ages"}})
+except ValidationError as e:
+    print()
+    print("path:", e.errors()[0]["loc"])
+```
+
+## Sets deduplicate, tuples are positional
+
+A set silently drops repeats, which is usually what you want and occasionally a surprise. A fixed tuple checks length and position.
+
+```python-run
+from typing import Set, Tuple
+from pydantic import BaseModel, ValidationError
+
+class Module(BaseModel):
+    tags: Set[str]
+    grid: Tuple[int, int]              # exactly two ints
+    scores: Tuple[float, ...]          # any number of floats
+
+m = Module(tags=["maths", "vectors", "maths", "maths"],
+           grid=("3", "4"),
+           scores=[1, "2.5", 3])
+
+print("tags   :", sorted(m.tags), "<- four in, three out")
+print("grid   :", m.grid)
+print("scores :", m.scores)
+
+try:
+    Module(tags=["a"], grid=(1, 2, 3), scores=[])
+except ValidationError as e:
+    print()
+    print("wrong length:", e.errors()[0]["msg"])
+```
+
+## Constraining the collection itself
+
+<code>min_length</code> and <code>max_length</code> apply to the container, so “at least one” is a constraint rather than a validator.
+
+```python-run
+from typing import List
+from pydantic import BaseModel, Field, ValidationError
+
+class Module(BaseModel):
+    title: str
+    lessons: List[str] = Field(min_length=1, max_length=4)
+
+print(Module(title="Vectors", lessons=["Direction", "Magnitude"]))
+
+for bad in [[], ["a", "b", "c", "d", "e"]]:
+    try:
+        Module(title="Vectors", lessons=bad)
+    except ValidationError as e:
+        err = e.errors()[0]
+        print("%-24s %-18s %s" % (str(bad)[:22], err["type"], err["msg"]))
+```
+
+## A list is not a model - use TypeAdapter
+
+When the payload is a bare array with no object around it, you do not need a wrapper model. <code>TypeAdapter</code> validates the annotation directly.
+
+```python-run
+from typing import List
+from pydantic import BaseModel, TypeAdapter, ValidationError
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+payload = '[{"name": "Direction", "minutes": "4"}, {"name": "Magnitude", "minutes": 6}]'
+
+lessons = TypeAdapter(List[Lesson])
+
+parsed = lessons.validate_json(payload)
+print("parsed :", parsed)
+print("typed  :", type(parsed[0]).__name__, "| minutes is", type(parsed[0].minutes).__name__)
+print()
+print("back out:", lessons.dump_json(parsed).decode())
+
+try:
+    lessons.validate_python([{"name": "X", "minutes": "soon"}])
+except ValidationError as e:
+    print()
+    print("errors work the same:", e.errors()[0]["loc"])
+```
 ## The index is part of the path
 
 An integer in `loc` is a position. So `("lessons", 1, "minutes")` reads as: the `lessons` field, the item at index 1, its `minutes` field.

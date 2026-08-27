@@ -140,10 +140,67 @@ def _block(lines):
     return "<p>%s</p>" % inline(text)
 
 
-FENCE = re.compile(r"^\s*```(\w*)\s*$")
+FENCE = re.compile(r"^\s*```([\w-]*)\s*$")
 
 
-def body_html(text):
+# Tracks whose articles may contain runnable code.
+#
+# A ```python-run fence in one of these becomes a real editor rather than a
+# static <pre>, which is the whole point: a reader meets the program at the
+# moment the prose introduces it, not in a separate slab above the article
+# with the prose repeating a non-runnable copy of it further down.
+#
+# Filled by the track generators (build_pydantic_topics.py and its FastAPI
+# sibling) before build_articles.py renders anything.
+RUNNABLE = {}
+
+
+def runnable_editor(code, spec, n):
+    """One `.vz-py` block, wired to assets/vizlearn-python.js.
+
+    The source is emitted raw: <script> content is raw text, so entities are
+    not decoded inside it and escaping would corrupt the program. The only
+    sequence that would need escaping is a literal </script>, checked for
+    here because a content file is easier to edit than a generator.
+    """
+    if "</script" in code.lower():
+        raise SystemExit("a runnable block contains </script and would break out")
+    attrs = ' data-vz-py data-vz-packages="%s"' % spec.get("packages", "")
+    if spec.get("wheels"):
+        attrs += ' data-vz-wheels="%s"' % spec["wheels"]
+    if spec.get("label"):
+        attrs += ' data-vz-label="%s"' % spec["label"]
+    pre = ""
+    if spec.get("prelude"):
+        pre = ('<script type="text/plain" class="py-prelude">%s</script>'
+               % spec["prelude"].strip())
+    return (
+        '<div class="vz-py vz-py-inline"%(attrs)s>'
+        '%(pre)s'
+        '<script type="text/plain" class="py-src">%(code)s</script>'
+        '<div class="vz-code-bar"><span class="vz-code-dot"></span>'
+        '<span>%(file)s</span><span class="vz-code-lang">%(lang)s</span></div>'
+        '<div class="vz-code" data-vz-code="python">'
+        '<div class="vz-code-gutter" aria-hidden="true"></div>'
+        '<div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre>'
+        '<textarea class="vz-code-input py-editor" aria-label="Runnable example"'
+        ' spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>'
+        '</div></div>'
+        '<div class="py-controls">'
+        '<button type="button" class="py-run-btn">Run</button>'
+        '<button type="button" class="py-reset-btn">Reset</button>'
+        '<span class="py-status"></span></div>'
+        '<div class="vz-console"><div class="vz-console-bar">Output</div>'
+        '<pre class="vz-console-body py-output" aria-live="polite"'
+        ' data-empty="Press Run to execute this code."></pre></div>'
+        '</div>'
+    ) % {"attrs": attrs, "pre": pre, "code": code.rstrip(),
+         "file": spec.get("filename", "example.py") % n if "%" in
+                 spec.get("filename", "example.py") else spec.get("filename", "example.py"),
+         "lang": spec.get("label", "Python")}
+
+
+def body_html(text, spec=None, counter=None):
     """The HTML for one section's body."""
     out = []
     buf = []
@@ -152,9 +209,14 @@ def body_html(text):
         m = FENCE.match(line)
         if fence is not None:
             if m:
-                code = html.escape("\n".join(buf))
-                cls = ' class="language-%s"' % fence if fence else ""
-                out.append("<pre><code%s>%s</code></pre>" % (cls, code))
+                raw = "\n".join(buf)
+                if fence.endswith("-run") and spec:
+                    counter[0] += 1
+                    out.append(runnable_editor(raw, spec, counter[0]))
+                else:
+                    cls = ' class="language-%s"' % fence if fence else ""
+                    out.append("<pre><code%s>%s</code></pre>"
+                               % (cls, html.escape(raw)))
                 buf, fence = [], None
             else:
                 buf.append(line)
@@ -175,8 +237,13 @@ def body_html(text):
 HEADING = re.compile(r"^##\s+(.*?)\s*$")
 
 
-def parse(text):
-    """A content file -> {"title", "intro", "sections"}."""
+def parse(text, spec=None):
+    """A content file -> {"title", "intro", "sections"}.
+
+    `spec` describes how a ```lang-run fence should be rendered for this
+    track; None means every fence stays a static <pre>.
+    """
+    counter = [0]
     meta = {}
     lines = text.replace("\r\n", "\n").split("\n")
     i = 0
@@ -198,7 +265,7 @@ def parse(text):
         m = HEADING.match(line)
         if m:
             if heading is not None:
-                sections.append((heading, body_html("\n".join(buf))))
+                sections.append((heading, body_html("\n".join(buf), spec, counter)))
             # Headings take the same inline pass as body text, or a
             # heading like `The `or` lookalike` prints its backticks.
             # Anchor ids are unaffected: slug() strips tags first.
@@ -206,7 +273,7 @@ def parse(text):
         else:
             buf.append(line)
     if heading is not None:
-        sections.append((heading, body_html("\n".join(buf))))
+        sections.append((heading, body_html("\n".join(buf), spec, counter)))
 
     entry = {"intro": meta.get("intro", ""), "sections": sections}
     if meta.get("title"):
@@ -333,8 +400,20 @@ def content_dir(root):
     return os.path.join(root, "content", "articles")
 
 
+def _load_specs():
+    """Populate RUNNABLE from tools/runnable_specs.py, if it is importable."""
+    if RUNNABLE:
+        return
+    try:
+        import runnable_specs
+    except ImportError:
+        return
+    RUNNABLE.update(runnable_specs.resolve())
+
+
 def load(root):
     """{page path: entry} for every content file under content/articles/."""
+    _load_specs()
     base = content_dir(root)
     out = {}
     for dirpath, _dirs, names in os.walk(base):
@@ -343,8 +422,9 @@ def load(root):
                 continue
             path = os.path.join(dirpath, name)
             rel = os.path.relpath(path, base)[: -len(".txt")] + ".html"
+            track = os.path.relpath(dirpath, base).split(os.sep)[0]
             with open(path, encoding="utf-8") as fh:
-                entry = parse(fh.read())
+                entry = parse(fh.read(), RUNNABLE.get(track))
             if entry["sections"]:
                 out[rel.replace(os.sep, "/")] = entry
     return out

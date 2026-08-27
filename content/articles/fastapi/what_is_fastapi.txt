@@ -13,6 +13,160 @@ What FastAPI itself contributes is the join: reading a function's signature to w
 
 That is a small amount of code doing something valuable, and knowing where the seams are makes both debugging and reading the source much easier. A 422 you disagree with is a Pydantic question. A route that does not match is a Starlette question. A parameter arriving from the wrong place is a FastAPI question.
 
+
+## Four lines is a working API
+
+A function, a decorator and a type annotation. Everything else on this page is an elaboration of these.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def read_root():
+    return {"track": "FastAPI", "modules": 30}
+
+# There is no server here, so `client` calls the app directly.
+r = TestClient(app).get("/")
+print(r.status_code, r.json())
+```
+
+## The annotation does the work
+
+The same argument, twice: once as a plain string, once annotated. Only one of them is checked and converted.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/untyped/{value}")
+def untyped(value):
+    return {"value": value, "type": type(value).__name__}
+
+@app.get("/typed/{value}")
+def typed(value: int):
+    return {"value": value, "type": type(value).__name__}
+
+c = TestClient(app)
+print("untyped:", c.get("/untyped/42").json())
+print("typed  :", c.get("/typed/42").json())
+print()
+r = c.get("/typed/abc")
+print("typed, bad input:", r.status_code, r.json()["detail"][0]["msg"])
+```
+
+## Underneath it is one async function
+
+An ASGI app takes a request as a dictionary and sends the response back as messages. uvicorn's whole job is translating sockets into that.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/hello")
+def hello():
+    return {"hello": "world"}
+
+# Calling the app the way a server would, by hand.
+scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1",
+         "method": "GET", "scheme": "http", "path": "/hello",
+         "raw_path": b"/hello", "query_string": b"", "root_path": "",
+         "headers": [(b"host", b"testserver")],
+         "client": ("test", 1), "server": ("testserver", 80)}
+
+messages = []
+async def receive():
+    return {"type": "http.request", "body": b"", "more_body": False}
+async def send(m):
+    messages.append(m)
+
+drive(app(scope, receive, send))
+
+for m in messages:
+    print(m["type"], "->", {k: v for k, v in m.items() if k != "type"})
+```
+
+## The docs are generated, not written
+
+The annotations become a JSON Schema, which becomes an OpenAPI document, which becomes the page at <code>/docs</code>.
+
+```python-run
+import json
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="VizLearn API", version="1.0.0")
+
+class Module(BaseModel):
+    title: str = Field(min_length=3, description="Shown as the page heading.")
+    minutes: int = Field(default=10, gt=0, le=180)
+
+@app.post("/modules/", status_code=201)
+def create(module: Module):
+    return module
+
+spec = app.openapi()
+print("title  :", spec["info"]["title"], spec["info"]["version"])
+print("paths  :", list(spec["paths"]))
+print()
+for name, prop in spec["components"]["schemas"]["Module"]["properties"].items():
+    print("%-8s %s" % (name, json.dumps(prop)))
+```
+
+## Errors before your code runs
+
+A request that does not fit never reaches the handler. The 422 is produced by validation, not by anything you wrote.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+reached = []
+
+class Module(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0)
+
+@app.post("/modules/")
+def create(module: Module):
+    reached.append(module.title)          # only runs if validation passed
+    return {"ok": True}
+
+c = TestClient(app)
+print("good:", c.post("/modules/", json={"title": "Vectors", "minutes": 8}).status_code)
+print("bad :", c.post("/modules/", json={"title": "no", "minutes": -1}).status_code)
+print()
+print("handler ran for:", reached, "<- the bad request never got there")
+```
+
+## Sync and async both work
+
+A <code>def</code> endpoint and an <code>async def</code> one are both ordinary here. Which to use is a real decision, and gets its own module.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/sync")
+def sync_endpoint():
+    return {"style": "def"}
+
+@app.get("/async")
+async def async_endpoint():
+    return {"style": "async def"}
+
+c = TestClient(app)
+print("sync :", c.get("/sync").json())
+print("async:", c.get("/async").json())
+print()
+print("Same response. The difference is where the function runs,")
+print("which matters once it starts doing real work.")
+```
 ## Underneath: one async function
 
 An ASGI application is a callable:

@@ -160,6 +160,28 @@
             font-family: var(--vz-mono); font-size: 0.85em;
             color: var(--accent-primary);
         }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
     </style>
 </head>
 <body class="flex flex-col min-h-screen light-mode">
@@ -209,336 +231,10 @@
                     <h3 id="vz-s-the-habit-worth-changing">The habit worth changing</h3>
                     <p>Most people write this:</p><pre><code class="language-python">data = json.loads(raw)
 model = Module.model_validate(data)</code></pre><p>It works. The better form is:</p><pre><code class="language-python">model = Module.model_validate_json(raw)</code></pre><p>It is not merely shorter. It is faster, produces better errors, and is more faithful with numbers. Three separate reasons, and they compound.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-speed">Speed</a></li><li><a href="#vz-s-error-quality">Error quality</a></li><li><a href="#vz-s-fidelity-with-numbers">Fidelity with numbers</a></li><li><a href="#vz-s-the-other-direction">The other direction</a></li><li><a href="#vz-s-bytes-work-too">Bytes work too</a></li><li><a href="#vz-s-non-model-shapes">Non-model shapes</a></li><li><a href="#vz-s-when-to-keep-the-two-steps">When to keep the two steps</a></li><li><a href="#vz-s-in-practice-with-a-framework">In practice with a framework</a></li><li><a href="#vz-s-strictness-and-json">Strictness and JSON</a></li><li><a href="#vz-s-large-payloads">Large payloads</a></li><li><a href="#vz-s-reading-from-a-file">Reading from a file</a></li><li><a href="#vz-s-other-formats">Other formats</a></li><li><a href="#vz-s-what-to-take-away">What to take away</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-where-this-fits">Where this fits</a></li><li><a href="#vz-s-mistakes-people-make">Mistakes people make</a></li><li><a href="#vz-s-one-line-four-improvements">One line, four improvements</a></li><li><a href="#vz-s-why-the-habit-persists">Why the habit persists</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-one-call-instead-of-two">One call instead of two</a></li><li><a href="#vz-s-malformed-json-is-one-exception-not-two">Malformed JSON is one exception, not two</a></li><li><a href="#vz-s-one-handler-for-both-failure-kinds">One handler for both failure kinds</a></li><li><a href="#vz-s-decimals-keep-their-exact-text">Decimals keep their exact text</a></li><li><a href="#vz-s-dumping-and-reloading">Dumping and reloading</a></li><li><a href="#vz-s-bare-arrays-and-other-shapes">Bare arrays and other shapes</a></li><li><a href="#vz-s-speed">Speed</a></li><li><a href="#vz-s-error-quality">Error quality</a></li><li><a href="#vz-s-fidelity-with-numbers">Fidelity with numbers</a></li><li><a href="#vz-s-the-other-direction">The other direction</a></li><li><a href="#vz-s-bytes-work-too">Bytes work too</a></li><li><a href="#vz-s-non-model-shapes">Non-model shapes</a></li><li><a href="#vz-s-when-to-keep-the-two-steps">When to keep the two steps</a></li><li><a href="#vz-s-in-practice-with-a-framework">In practice with a framework</a></li><li><a href="#vz-s-strictness-and-json">Strictness and JSON</a></li><li><a href="#vz-s-large-payloads">Large payloads</a></li><li><a href="#vz-s-reading-from-a-file">Reading from a file</a></li><li><a href="#vz-s-other-formats">Other formats</a></li><li><a href="#vz-s-what-to-take-away">What to take away</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-where-this-fits">Where this fits</a></li><li><a href="#vz-s-mistakes-people-make">Mistakes people make</a></li><li><a href="#vz-s-one-line-four-improvements">One line, four improvements</a></li><li><a href="#vz-s-why-the-habit-persists">Why the habit persists</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
-            <div class="lg:col-span-7 space-y-6" data-vz-viz>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">01</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">One call instead of two</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>model_validate_json</code> parses and validates together, inside the Rust core, without building an intermediate dict.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">import json
-from pydantic import BaseModel
-
-class Module(BaseModel):
-    title: str
-    minutes: int
-
-payload = '{"title": "Vectors", "minutes": 8}'
-
-two_steps = Module.model_validate(json.loads(payload))
-one_step = Module.model_validate_json(payload)
-
-print("two steps:", two_steps)
-print("one step :", one_step)
-print("equal    :", two_steps == one_step)
-print()
-print("Same result. The second never materialises the dict.")</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_01.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">02</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Malformed JSON is one exception, not two</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Going via <code>json.loads</code> means catching a <code>JSONDecodeError</code> separately. The direct call folds it into <code>ValidationError</code>.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">import json
-from pydantic import BaseModel, ValidationError
-
-class Module(BaseModel):
-    title: str
-    minutes: int
-
-broken = '{"title": "Vectors", "minutes": 8'      # missing brace
-
-try:
-    Module.model_validate(json.loads(broken))
-except json.JSONDecodeError as e:
-    print("via loads :", type(e).__name__, "- a different exception type")
-
-try:
-    Module.model_validate_json(broken)
-except ValidationError as e:
-    err = e.errors()[0]
-    print("direct    :", err["type"])
-    print("            ", err["msg"])
-    print("position  :", err.get("ctx"))</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_02.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">03</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">One handler for both failure kinds</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Because syntax errors and validation errors arrive the same way, the code that deals with a bad request has one shape.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel, Field, ValidationError
-
-class Module(BaseModel):
-    title: str = Field(min_length=3)
-    minutes: int = Field(gt=0)
-
-def accept(raw: str):
-    try:
-        return Module.model_validate_json(raw), None
-    except ValidationError as e:
-        return None, [(".".join(str(p) for p in err["loc"]) or "_body", err["msg"])
-                      for err in e.errors()]
-
-for raw in ['{"title": "Vectors", "minutes": 8}',
-            '{"title": "Vectors", "minutes": 8',
-            '{"title": "no", "minutes": -1}']:
-    model, problems = accept(raw)
-    print(raw[:38])
-    print("   ->", model if model else problems)</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_03.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">04</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Decimals keep their exact text</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">The JSON parser sees the digits as written. Going through Python floats loses that before validation ever runs.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">import json
-from decimal import Decimal
-from pydantic import BaseModel
-
-class Price(BaseModel):
-    amount: Decimal
-
-payload = '{"amount": 0.1}'
-
-via_python = Price.model_validate(json.loads(payload))
-direct = Price.model_validate_json(payload)
-
-print("via json.loads    :", via_python.amount)
-print("model_validate_json:", direct.amount)
-print()
-print("json.loads made a float first, and the float was already inexact.")
-print("The direct parser read the characters 0.1 and kept them.")</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_04.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">05</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Dumping and reloading</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">The other direction is symmetric, and a JSON round trip is exact for every type Pydantic knows.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from datetime import date
-from decimal import Decimal
-from pydantic import BaseModel
-
-class Module(BaseModel):
-    title: str
-    published_on: date
-    price: Decimal
-
-m = Module(title="Vectors", published_on="2026-08-26", price="12.50")
-
-wire = m.model_dump_json()
-print("out :", wire)
-
-back = Module.model_validate_json(wire)
-print("in  :", back)
-print("equal:", back == m)
-print()
-print("date and Decimal both survived the trip intact.")</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_05.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">06</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Bare arrays and other shapes</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>TypeAdapter</code> gives the same one-step parsing for anything that is not a model.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from typing import List, Dict
-from pydantic import BaseModel, TypeAdapter, ValidationError
-
-class Lesson(BaseModel):
-    name: str
-    minutes: int
-
-lessons = TypeAdapter(List[Lesson])
-
-payload = '[{"name": "Direction", "minutes": "4"}, {"name": "Magnitude", "minutes": 6}]'
-parsed = lessons.validate_json(payload)
-print("parsed:", parsed)
-print("out   :", lessons.dump_json(parsed).decode())
-
-scores = TypeAdapter(Dict[str, float])
-print("dict  :", scores.validate_json('{"maths": "4.5", "python": 4}'))
-
-try:
-    lessons.validate_json('[{"name": "X", "minutes": "soon"}]')
-except ValidationError as e:
-    print("error :", e.errors()[0]["loc"], e.errors()[0]["type"])</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_06.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            </div>
-            <div class="lg:col-span-5 space-y-6">
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
                 <div class="card-container">
                     <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
                     <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
@@ -567,6 +263,138 @@ except ValidationError as e:
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-one-call-instead-of-two">One call instead of two</h3>
+                    <p><code>model_validate_json</code> parses and validates together, inside the Rust core, without building an intermediate dict.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">import json
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+payload = '{"title": "Vectors", "minutes": 8}'
+
+two_steps = Module.model_validate(json.loads(payload))
+one_step = Module.model_validate_json(payload)
+
+print("two steps:", two_steps)
+print("one step :", one_step)
+print("equal    :", two_steps == one_step)
+print()
+print("Same result. The second never materialises the dict.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-malformed-json-is-one-exception-not-two">Malformed JSON is one exception, not two</h3>
+                    <p>Going via <code>json.loads</code> means catching a <code>JSONDecodeError</code> separately. The direct call folds it into <code>ValidationError</code>.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">import json
+from pydantic import BaseModel, ValidationError
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+broken = '{"title": "Vectors", "minutes": 8'      # missing brace
+
+try:
+    Module.model_validate(json.loads(broken))
+except json.JSONDecodeError as e:
+    print("via loads :", type(e).__name__, "- a different exception type")
+
+try:
+    Module.model_validate_json(broken)
+except ValidationError as e:
+    err = e.errors()[0]
+    print("direct    :", err["type"])
+    print("            ", err["msg"])
+    print("position  :", err.get("ctx"))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-one-handler-for-both-failure-kinds">One handler for both failure kinds</h3>
+                    <p>Because syntax errors and validation errors arrive the same way, the code that deals with a bad request has one shape.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel, Field, ValidationError
+
+class Module(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0)
+
+def accept(raw: str):
+    try:
+        return Module.model_validate_json(raw), None
+    except ValidationError as e:
+        return None, [(".".join(str(p) for p in err["loc"]) or "_body", err["msg"])
+                      for err in e.errors()]
+
+for raw in ['{"title": "Vectors", "minutes": 8}',
+            '{"title": "Vectors", "minutes": 8',
+            '{"title": "no", "minutes": -1}']:
+    model, problems = accept(raw)
+    print(raw[:38])
+    print("   ->", model if model else problems)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-decimals-keep-their-exact-text">Decimals keep their exact text</h3>
+                    <p>The JSON parser sees the digits as written. Going through Python floats loses that before validation ever runs.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">import json
+from decimal import Decimal
+from pydantic import BaseModel
+
+class Price(BaseModel):
+    amount: Decimal
+
+payload = '{"amount": 0.1}'
+
+via_python = Price.model_validate(json.loads(payload))
+direct = Price.model_validate_json(payload)
+
+print("via json.loads    :", via_python.amount)
+print("model_validate_json:", direct.amount)
+print()
+print("json.loads made a float first, and the float was already inexact.")
+print("The direct parser read the characters 0.1 and kept them.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-dumping-and-reloading">Dumping and reloading</h3>
+                    <p>The other direction is symmetric, and a JSON round trip is exact for every type Pydantic knows.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from datetime import date
+from decimal import Decimal
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    published_on: date
+    price: Decimal
+
+m = Module(title="Vectors", published_on="2026-08-26", price="12.50")
+
+wire = m.model_dump_json()
+print("out :", wire)
+
+back = Module.model_validate_json(wire)
+print("in  :", back)
+print("equal:", back == m)
+print()
+print("date and Decimal both survived the trip intact.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-bare-arrays-and-other-shapes">Bare arrays and other shapes</h3>
+                    <p><code>TypeAdapter</code> gives the same one-step parsing for anything that is not a model.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from typing import List, Dict
+from pydantic import BaseModel, TypeAdapter, ValidationError
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+lessons = TypeAdapter(List[Lesson])
+
+payload = '[{"name": "Direction", "minutes": "4"}, {"name": "Magnitude", "minutes": 6}]'
+parsed = lessons.validate_json(payload)
+print("parsed:", parsed)
+print("out   :", lessons.dump_json(parsed).decode())
+
+scores = TypeAdapter(Dict[str, float])
+print("dict  :", scores.validate_json('{"maths": "4.5", "python": 4}'))
+
+try:
+    lessons.validate_json('[{"name": "X", "minutes": "soon"}]')
+except ValidationError as e:
+    print("error :", e.errors()[0]["loc"], e.errors()[0]["type"])</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-speed">Speed</h3>
                     <p>The two-step version parses JSON into Python objects &mdash; dicts, lists, strings, floats &mdash; and then validates those objects, converting again into what the model wants.</p><p>Every intermediate object is allocated and thrown away. For a large payload that is a lot of garbage created for no purpose.</p><p><code>model_validate_json</code> parses and validates in a single pass inside <code>pydantic-core</code>, the Rust engine. It reads the JSON text and constructs the final values directly, skipping the intermediate representation entirely.</p><p>The saving grows with payload size. For a small request body it is unimportant; for a large document, or a high-throughput endpoint, it is a real difference for a change that makes the code shorter.</p>

@@ -160,6 +160,28 @@
             font-family: var(--vz-mono); font-size: 0.85em;
             color: var(--accent-primary);
         }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
     </style>
 </head>
 <body class="flex flex-col min-h-screen light-mode">
@@ -213,341 +235,10 @@ class Module(BaseModel):
     title: str
     track: str
     minutes: int</code></pre><p>That is the entire definition. There is no <code>__init__</code>, no assignment of <code>self.title = title</code>, no validation code. Pydantic reads the annotations when the class is created and builds the machinery from them &mdash; a constructor, a validator, a serialiser, an equality method and a readable <code>repr</code>.</p><p>The economy matters more than it first appears. Adding a field is one line. In the hand-written equivalent it is four: the parameter, the assignment, the check, and the line in <code>to_dict</code>. Those four drift apart over time, and the drift is where bugs live.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-creating-one">Creating one</a></li><li><a href="#vz-s-what-you-get-back">What you get back</a></li><li><a href="#vz-s-methods-and-behaviour">Methods and behaviour</a></li><li><a href="#vz-s-getting-the-data-out">Getting the data out</a></li><li><a href="#vz-s-the-round-trip">The round trip</a></li><li><a href="#vz-s-two-models-of-the-same-thing">Two models of the same thing</a></li><li><a href="#vz-s-field-order-and-why-it-exists">Field order, and why it exists</a></li><li><a href="#vz-s-looking-at-the-model-itself">Looking at the model itself</a></li><li><a href="#vz-s-copying-and-changing">Copying and changing</a></li><li><a href="#vz-s-making-a-model-immutable">Making a model immutable</a></li><li><a href="#vz-s-inheritance">Inheritance</a></li><li><a href="#vz-s-what-repr-gives-you">What repr gives you</a></li><li><a href="#vz-s-two-mistakes-worth-avoiding-early">Two mistakes worth avoiding early</a></li><li><a href="#vz-s-a-working-shape-to-copy">A working shape to copy</a></li><li><a href="#vz-s-what-to-try-next">What to try next</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-subclass-annotate-done">Subclass, annotate, done</a></li><li><a href="#vz-s-keyword-arguments-and-why">Keyword arguments, and why</a></li><li><a href="#vz-s-fields-are-ordinary-attributes">Fields are ordinary attributes</a></li><li><a href="#vz-s-getting-the-data-back-out">Getting the data back out</a></li><li><a href="#vz-s-round-trip">Round trip</a></li><li><a href="#vz-s-two-models-one-shape">Two models, one shape</a></li><li><a href="#vz-s-creating-one">Creating one</a></li><li><a href="#vz-s-what-you-get-back">What you get back</a></li><li><a href="#vz-s-methods-and-behaviour">Methods and behaviour</a></li><li><a href="#vz-s-getting-the-data-out">Getting the data out</a></li><li><a href="#vz-s-the-round-trip">The round trip</a></li><li><a href="#vz-s-two-models-of-the-same-thing">Two models of the same thing</a></li><li><a href="#vz-s-field-order-and-why-it-exists">Field order, and why it exists</a></li><li><a href="#vz-s-looking-at-the-model-itself">Looking at the model itself</a></li><li><a href="#vz-s-copying-and-changing">Copying and changing</a></li><li><a href="#vz-s-making-a-model-immutable">Making a model immutable</a></li><li><a href="#vz-s-inheritance">Inheritance</a></li><li><a href="#vz-s-what-repr-gives-you">What repr gives you</a></li><li><a href="#vz-s-two-mistakes-worth-avoiding-early">Two mistakes worth avoiding early</a></li><li><a href="#vz-s-a-working-shape-to-copy">A working shape to copy</a></li><li><a href="#vz-s-what-to-try-next">What to try next</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
-            <div class="lg:col-span-7 space-y-6" data-vz-viz>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">01</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Subclass, annotate, done</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">A model is a class inheriting from <code>BaseModel</code> whose annotations list the fields. There is no <code>__init__</code> to write &mdash; Pydantic builds one from the annotations.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel
-
-class Module(BaseModel):
-    title: str
-    track: str
-    minutes: int
-
-m = Module(title="Dot Product", track="maths", minutes=11)
-
-print(m)
-print()
-print("one field  :", m.title)
-print("another    :", m.minutes)
-print("its type   :", type(m.minutes).__name__)</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_01.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">02</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Keyword arguments, and why</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Fields are passed by name. Positional arguments are refused on purpose: a model can grow fields over time, and position would silently change meaning when it did.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel
-
-class Module(BaseModel):
-    title: str
-    track: str
-    minutes: int
-
-# This is the way.
-print(Module(title="Norms", track="maths", minutes=8))
-
-# This is not:
-try:
-    Module("Norms", "maths", 8)
-except TypeError as e:
-    print("TypeError:", e)
-
-# A dict works too, which is what you usually have from JSON.
-data = {"title": "Norms", "track": "maths", "minutes": 8}
-print(Module(**data))
-print(Module.model_validate(data))     # the explicit version</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_02.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">03</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Fields are ordinary attributes</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Once built, a model behaves like a normal object: attribute access, methods, everything. It is a class, not a dictionary wearing a hat.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel
-
-class Module(BaseModel):
-    title: str
-    track: str
-    minutes: int
-
-    # Methods work exactly as they do on any class.
-    def slug(self) -> str:
-        return self.title.lower().replace(" ", "_")
-
-    def is_long(self) -> bool:
-        return self.minutes > 10
-
-m = Module(title="Matrix Multiplication", track="maths", minutes=15)
-
-print("title :", m.title)
-print("slug  :", m.slug())
-print("long? :", m.is_long())
-
-# Reading a field that does not exist fails like any attribute would.
-try:
-    print(m.author)
-except AttributeError as e:
-    print("AttributeError:", e)</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_03.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">04</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Getting the data back out</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>model_dump()</code> returns a plain dict and <code>model_dump_json()</code> a JSON string. These are how a model leaves your program again.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel
-
-class Module(BaseModel):
-    title: str
-    track: str
-    minutes: int
-
-m = Module(title="Eigenvalues", track="maths", minutes=14)
-
-d = m.model_dump()
-print("dict   :", d)
-print("a key  :", d["track"])
-print()
-print("json   :", m.model_dump_json())
-print("pretty :")
-print(m.model_dump_json(indent=2))</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_04.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">05</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Round trip</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Out to JSON and back in again. This is the everyday shape of an API: receive, validate, work, serialise, send.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel
-
-class Module(BaseModel):
-    title: str
-    track: str
-    minutes: int
-
-original = Module(title="Projections", track="maths", minutes=9)
-
-wire = original.model_dump_json()
-print("sent     :", wire)
-
-received = Module.model_validate_json(wire)
-print("received :", received)
-print()
-print("equal?   :", original == received)
-
-# Models compare by value, not identity - handy in tests.
-print("same obj?:", original is received)</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_05.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">06</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Two models, one shape</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Because a model is just a class, the ordinary tools apply. Here two models describe the same subject at different depths &mdash; the pattern behind "summary" and "detail" API responses.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel
-
-class ModuleSummary(BaseModel):
-    title: str
-    minutes: int
-
-class ModuleDetail(BaseModel):
-    title: str
-    minutes: int
-    track: str
-    description: str
-
-full = ModuleDetail(
-    title="The Chain Rule",
-    minutes=13,
-    track="maths",
-    description="How derivatives compose, and why backpropagation is this rule.",
-)
-
-# Build the smaller one from the bigger one's data.
-summary = ModuleSummary.model_validate(full.model_dump())
-
-print("detail  :", full.model_dump())
-print()
-print("summary :", summary.model_dump())</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_06.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            </div>
-            <div class="lg:col-span-5 space-y-6">
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
                 <div class="card-container">
                     <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
                     <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
@@ -576,6 +267,143 @@ print("summary :", summary.model_dump())</script>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-subclass-annotate-done">Subclass, annotate, done</h3>
+                    <p>A model is a class inheriting from <code>BaseModel</code> whose annotations list the fields. There is no <code>__init__</code> to write &mdash; Pydantic builds one from the annotations.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    track: str
+    minutes: int
+
+m = Module(title="Dot Product", track="maths", minutes=11)
+
+print(m)
+print()
+print("one field  :", m.title)
+print("another    :", m.minutes)
+print("its type   :", type(m.minutes).__name__)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-keyword-arguments-and-why">Keyword arguments, and why</h3>
+                    <p>Fields are passed by name. Positional arguments are refused on purpose: a model can grow fields over time, and position would silently change meaning when it did.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    track: str
+    minutes: int
+
+# This is the way.
+print(Module(title="Norms", track="maths", minutes=8))
+
+# This is not:
+try:
+    Module("Norms", "maths", 8)
+except TypeError as e:
+    print("TypeError:", e)
+
+# A dict works too, which is what you usually have from JSON.
+data = {"title": "Norms", "track": "maths", "minutes": 8}
+print(Module(**data))
+print(Module.model_validate(data))     # the explicit version</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-fields-are-ordinary-attributes">Fields are ordinary attributes</h3>
+                    <p>Once built, a model behaves like a normal object: attribute access, methods, everything. It is a class, not a dictionary wearing a hat.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    track: str
+    minutes: int
+
+    # Methods work exactly as they do on any class.
+    def slug(self) -> str:
+        return self.title.lower().replace(" ", "_")
+
+    def is_long(self) -> bool:
+        return self.minutes > 10
+
+m = Module(title="Matrix Multiplication", track="maths", minutes=15)
+
+print("title :", m.title)
+print("slug  :", m.slug())
+print("long? :", m.is_long())
+
+# Reading a field that does not exist fails like any attribute would.
+try:
+    print(m.author)
+except AttributeError as e:
+    print("AttributeError:", e)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-getting-the-data-back-out">Getting the data back out</h3>
+                    <p><code>model_dump()</code> returns a plain dict and <code>model_dump_json()</code> a JSON string. These are how a model leaves your program again.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    track: str
+    minutes: int
+
+m = Module(title="Eigenvalues", track="maths", minutes=14)
+
+d = m.model_dump()
+print("dict   :", d)
+print("a key  :", d["track"])
+print()
+print("json   :", m.model_dump_json())
+print("pretty :")
+print(m.model_dump_json(indent=2))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-round-trip">Round trip</h3>
+                    <p>Out to JSON and back in again. This is the everyday shape of an API: receive, validate, work, serialise, send.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    track: str
+    minutes: int
+
+original = Module(title="Projections", track="maths", minutes=9)
+
+wire = original.model_dump_json()
+print("sent     :", wire)
+
+received = Module.model_validate_json(wire)
+print("received :", received)
+print()
+print("equal?   :", original == received)
+
+# Models compare by value, not identity - handy in tests.
+print("same obj?:", original is received)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-two-models-one-shape">Two models, one shape</h3>
+                    <p>Because a model is just a class, the ordinary tools apply. Here two models describe the same subject at different depths &mdash; the pattern behind "summary" and "detail" API responses.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel
+
+class ModuleSummary(BaseModel):
+    title: str
+    minutes: int
+
+class ModuleDetail(BaseModel):
+    title: str
+    minutes: int
+    track: str
+    description: str
+
+full = ModuleDetail(
+    title="The Chain Rule",
+    minutes=13,
+    track="maths",
+    description="How derivatives compose, and why backpropagation is this rule.",
+)
+
+# Build the smaller one from the bigger one's data.
+summary = ModuleSummary.model_validate(full.model_dump())
+
+print("detail  :", full.model_dump())
+print()
+print("summary :", summary.model_dump())</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-creating-one">Creating one</h3>
                     <p>Models take keyword arguments:</p><pre><code class="language-python">m = Module(title=&quot;Dot Product&quot;, track=&quot;maths&quot;, minutes=11)</code></pre><p>Positional arguments are refused, and the refusal is deliberate rather than an oversight. Models grow. A field added in the middle of a class body would silently change what every positional call meant, and nothing would raise &mdash; the values would simply land in the wrong slots. Requiring names makes that class of bug impossible.</p><p>When the data is already a dictionary, which it usually is if it came from JSON, there are two ways in:</p><pre><code class="language-python">Module(**data)
@@ -703,7 +531,7 @@ class ModuleInDB(ModuleBase):
 <script type="application/json" id="vz-lab-data">{"presets": [], "readouts": [], "viz": "", "keys": {"actions": [{"label": "Run", "sel": ".py-run-btn", "i": 0}, {"label": "Reset", "sel": ".py-reset-btn", "i": 0}, {"label": "Run", "sel": ".py-run-btn", "i": 1}, {"label": "Reset", "sel": ".py-reset-btn", "i": 1}, {"label": "Run", "sel": ".py-run-btn", "i": 2}, {"label": "Reset", "sel": ".py-reset-btn", "i": 2}, {"label": "Run", "sel": ".py-run-btn", "i": 3}, {"label": "Reset", "sel": ".py-reset-btn", "i": 3}]}}</script>
 <!-- VIZLEARN:LAB:END -->
 <!-- VIZLEARN:MODULE:BEGIN (generated by tools/build_module_ui.py) -->
-<div class="vz-extras"><section class="vz-cheatsheet" aria-labelledby="vz-cheat-h"><div class="vz-cheat-top"><span class="vz-cheat-label"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg> Cheat sheet</span><button type="button" class="vz-btn" data-vz-copy><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg> Copy</button></div><h2 class="vz-cheat-title" id="vz-cheat-h">Your First BaseModel</h2><p class="vz-cheat-text">A model is a class inheriting from BaseModel whose annotations list the fields. There is no __init__ to write — Pydantic builds one from the annotations.</p><div class="vz-cheat-foot">PYDANTIC &middot; vizlearn.in/pydantic/your_first_basemodel.html</div></section><section class="vz-related" aria-labelledby="vz-rel-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><h2 id="vz-rel-h">More in Pydantic</h2><span class="vz-rule"></span></div><div class="vz-rail"><a class="vz-card" href="../pydantic/types_and_coercion.html" data-vz-path="pydantic/types_and_coercion.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><text x="28" y="32" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">"9"</text><path d="M42 28 L66 28" stroke="var(--text-muted)" stroke-width="2"/><text x="84" y="32" fill="var(--accent-primary)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">9</text><text x="28" y="52" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">9.5</text><path d="M42 48 L66 48" stroke="var(--text-muted)" stroke-width="2"/><text x="88" y="52" fill="var(--accent-primary)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">error</text><text x="28" y="72" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">"nine"</text><path d="M48 68 L66 68" stroke="var(--text-muted)" stroke-width="2"/><text x="88" y="72" fill="var(--accent-primary)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">error</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Types and Coercion</span></span></a><a class="vz-card" href="../pydantic/required_optional_and_defaults.html" data-vz-path="pydantic/required_optional_and_defaults.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="10" y="26" width="44" height="38" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="32" y="42" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">missing</text><text x="32" y="55" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">raises</text><rect x="58" y="26" width="44" height="38" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="42" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">None</text><text x="80" y="55" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">allowed</text><rect x="106" y="26" width="44" height="38" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="128" y="42" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">default</text><text x="128" y="55" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">filled</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Required, Optional and Defaults</span></span></a><a class="vz-card" href="../pydantic/reading_a_validation_error.html" data-vz-path="pydantic/reading_a_validation_error.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="16" y="20" width="128" height="20" rx="3" fill="var(--bg-surface)" stroke="var(--accent-primary)" stroke-width="2"/><text x="80" y="33" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">3 validation errors</text><rect x="16" y="46" width="128" height="14" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="56" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">loc  -  where</text><rect x="16" y="62" width="128" height="14" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="72" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">type  -  which rule</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Reading a ValidationError</span></span></a><a class="vz-card" href="../pydantic/field_constraints.html" data-vz-path="pydantic/field_constraints.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><text x="80" y="24" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">minutes: int</text><rect x="28" y="34" width="104" height="22" rx="3" fill="var(--bg-surface)" stroke="var(--accent-primary)" stroke-width="2"/><text x="80" y="48" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">Field(gt=0, le=180)</text><text x="52" y="72" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">-5  refused</text><text x="120" y="72" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">12  ok</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Field Constraints</span></span></a></div></section><section class="vz-author" aria-labelledby="vz-author-h"><h2 id="vz-author-h" class="vz-author-h">About the author</h2><p class="vz-author-body"><strong>Ashish Jangra</strong> builds and maintains VizLearn. Every module here is written and the visualisation behind it hand-built, so the numbers in a readout come from the same code that draws the picture. Corrections are genuinely welcome and get priority over everything else &mdash; if a page states something wrong, or an animation misrepresents what the algorithm does, <a href="../contact.html">get in touch</a>.</p><p class="vz-author-links"><a href="../about.html">About VizLearn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://github.com/AshishJangra27" rel="noopener me">GitHub</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://www.linkedin.com/in/ashish-jangra/" rel="noopener me">LinkedIn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="../contact.html">Contact</a></p></section><nav class="vz-prevnext" aria-label="Module navigation"><a class="vz-pn vz-pn-prev" href="../pydantic/what_is_pydantic.html" rel="prev"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span class="vz-pn-text"><span class="vz-pn-label">Previous</span><span class="vz-pn-title">What Pydantic Is For</span></span></a><a class="vz-pn vz-pn-next" href="../pydantic/types_and_coercion.html" rel="next"><span class="vz-pn-text"><span class="vz-pn-label">Next</span><span class="vz-pn-title">Types and Coercion</span></span><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a></nav></div>
+<div class="vz-extras"><section class="vz-cheatsheet" aria-labelledby="vz-cheat-h"><div class="vz-cheat-top"><span class="vz-cheat-label"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg> Cheat sheet</span><button type="button" class="vz-btn" data-vz-copy><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg> Copy</button></div><h2 class="vz-cheat-title" id="vz-cheat-h">Your First BaseModel</h2><p class="vz-cheat-text">That is the entire definition. There is no __init__, no assignment of self.title = title, no validation code. Pydantic reads the annotations when the class is created and builds the machinery from them — a constructor, a validator, a serialiser, an equality method and a readable repr.</p><div class="vz-cheat-foot">PYDANTIC &middot; vizlearn.in/pydantic/your_first_basemodel.html</div></section><section class="vz-related" aria-labelledby="vz-rel-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><h2 id="vz-rel-h">More in Pydantic</h2><span class="vz-rule"></span></div><div class="vz-rail"><a class="vz-card" href="../pydantic/types_and_coercion.html" data-vz-path="pydantic/types_and_coercion.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><text x="28" y="32" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">"9"</text><path d="M42 28 L66 28" stroke="var(--text-muted)" stroke-width="2"/><text x="84" y="32" fill="var(--accent-primary)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">9</text><text x="28" y="52" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">9.5</text><path d="M42 48 L66 48" stroke="var(--text-muted)" stroke-width="2"/><text x="88" y="52" fill="var(--accent-primary)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">error</text><text x="28" y="72" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">"nine"</text><path d="M48 68 L66 68" stroke="var(--text-muted)" stroke-width="2"/><text x="88" y="72" fill="var(--accent-primary)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">error</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Types and Coercion</span></span></a><a class="vz-card" href="../pydantic/required_optional_and_defaults.html" data-vz-path="pydantic/required_optional_and_defaults.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="10" y="26" width="44" height="38" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="32" y="42" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">missing</text><text x="32" y="55" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">raises</text><rect x="58" y="26" width="44" height="38" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="42" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">None</text><text x="80" y="55" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">allowed</text><rect x="106" y="26" width="44" height="38" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="128" y="42" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">default</text><text x="128" y="55" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">filled</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Required, Optional and Defaults</span></span></a><a class="vz-card" href="../pydantic/reading_a_validation_error.html" data-vz-path="pydantic/reading_a_validation_error.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="16" y="20" width="128" height="20" rx="3" fill="var(--bg-surface)" stroke="var(--accent-primary)" stroke-width="2"/><text x="80" y="33" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">3 validation errors</text><rect x="16" y="46" width="128" height="14" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="56" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">loc  -  where</text><rect x="16" y="62" width="128" height="14" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="72" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">type  -  which rule</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Reading a ValidationError</span></span></a><a class="vz-card" href="../pydantic/field_constraints.html" data-vz-path="pydantic/field_constraints.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><text x="80" y="24" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">minutes: int</text><rect x="28" y="34" width="104" height="22" rx="3" fill="var(--bg-surface)" stroke="var(--accent-primary)" stroke-width="2"/><text x="80" y="48" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">Field(gt=0, le=180)</text><text x="52" y="72" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">-5  refused</text><text x="120" y="72" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">12  ok</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Field Constraints</span></span></a></div></section><section class="vz-author" aria-labelledby="vz-author-h"><h2 id="vz-author-h" class="vz-author-h">About the author</h2><p class="vz-author-body"><strong>Ashish Jangra</strong> builds and maintains VizLearn. Every module here is written and the visualisation behind it hand-built, so the numbers in a readout come from the same code that draws the picture. Corrections are genuinely welcome and get priority over everything else &mdash; if a page states something wrong, or an animation misrepresents what the algorithm does, <a href="../contact.html">get in touch</a>.</p><p class="vz-author-links"><a href="../about.html">About VizLearn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://github.com/AshishJangra27" rel="noopener me">GitHub</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://www.linkedin.com/in/ashish-jangra/" rel="noopener me">LinkedIn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="../contact.html">Contact</a></p></section><nav class="vz-prevnext" aria-label="Module navigation"><a class="vz-pn vz-pn-prev" href="../pydantic/what_is_pydantic.html" rel="prev"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span class="vz-pn-text"><span class="vz-pn-label">Previous</span><span class="vz-pn-title">What Pydantic Is For</span></span></a><a class="vz-pn vz-pn-next" href="../pydantic/types_and_coercion.html" rel="next"><span class="vz-pn-text"><span class="vz-pn-label">Next</span><span class="vz-pn-title">Types and Coercion</span></span><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a></nav></div>
 <!-- VIZLEARN:MODULE:END -->
 <!-- VIZLEARN:AD-BOTTOM:BEGIN (generated by tools/build_ads.py) -->
         <!-- placement reserved; set AD_SLOTS['bottom'] in tools/build_seo.py to enable -->

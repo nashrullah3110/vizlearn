@@ -160,6 +160,28 @@
             font-family: var(--vz-mono); font-size: 0.85em;
             color: var(--accent-primary);
         }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
     </style>
 </head>
 <body class="flex flex-col min-h-screen light-mode">
@@ -210,349 +232,10 @@
                     <p>Everything so far has been per field. <code>model_config</code> is per model: a <code>ConfigDict</code> assigned in the class body that changes how the whole thing behaves.</p><pre><code class="language-python">class Module(BaseModel):
     model_config = ConfigDict(extra=&quot;forbid&quot;, frozen=True)
     title: str</code></pre><p>In Pydantic v1 this was an inner <code>class Config</code>. That still works and is deprecated, and it is the clearest signal that a tutorial predates v2.</p><p>There are a lot of settings. These are the ones that come up constantly.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-extra-what-to-do-with-keys-you-did-not-declare">extra: what to do with keys you did not declare</a></li><li><a href="#vz-s-validation-happens-once">Validation happens once</a></li><li><a href="#vz-s-frozen-the-other-answer-to-mutation">frozen: the other answer to mutation</a></li><li><a href="#vz-s-string-settings-for-human-input">String settings for human input</a></li><li><a href="#vz-s-from-attributes-reading-objects">from_attributes: reading objects</a></li><li><a href="#vz-s-a-few-more-worth-knowing">A few more worth knowing</a></li><li><a href="#vz-s-config-is-inherited">Config is inherited</a></li><li><a href="#vz-s-suggested-defaults">Suggested defaults</a></li><li><a href="#vz-s-settings-that-catch-mistakes">Settings that catch mistakes</a></li><li><a href="#vz-s-protected-namespaces">Protected namespaces</a></li><li><a href="#vz-s-where-to-set-config">Where to set config</a></li><li><a href="#vz-s-config-and-inheritance">Config and inheritance</a></li><li><a href="#vz-s-a-worked-house-base">A worked house base</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-the-short-version">The short version</a></li><li><a href="#vz-s-mistakes-people-make">Mistakes people make</a></li><li><a href="#vz-s-what-it-is-really-for">What it is really for</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-unknown-keys-are-ignored-by-default">Unknown keys are ignored by default</a></li><li><a href="#vz-s-or-keep-them">Or keep them</a></li><li><a href="#vz-s-assignment-is-not-checked-unless-you-ask">Assignment is not checked unless you ask</a></li><li><a href="#vz-s-frozen-models-are-hashable">Frozen models are hashable</a></li><li><a href="#vz-s-string-handling-for-form-data">String handling for form data</a></li><li><a href="#vz-s-reading-from-objects-not-just-dicts">Reading from objects, not just dicts</a></li><li><a href="#vz-s-extra-what-to-do-with-keys-you-did-not-declare">extra: what to do with keys you did not declare</a></li><li><a href="#vz-s-validation-happens-once">Validation happens once</a></li><li><a href="#vz-s-frozen-the-other-answer-to-mutation">frozen: the other answer to mutation</a></li><li><a href="#vz-s-string-settings-for-human-input">String settings for human input</a></li><li><a href="#vz-s-from-attributes-reading-objects">from_attributes: reading objects</a></li><li><a href="#vz-s-a-few-more-worth-knowing">A few more worth knowing</a></li><li><a href="#vz-s-config-is-inherited">Config is inherited</a></li><li><a href="#vz-s-suggested-defaults">Suggested defaults</a></li><li><a href="#vz-s-settings-that-catch-mistakes">Settings that catch mistakes</a></li><li><a href="#vz-s-protected-namespaces">Protected namespaces</a></li><li><a href="#vz-s-where-to-set-config">Where to set config</a></li><li><a href="#vz-s-config-and-inheritance">Config and inheritance</a></li><li><a href="#vz-s-a-worked-house-base">A worked house base</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-the-short-version">The short version</a></li><li><a href="#vz-s-mistakes-people-make">Mistakes people make</a></li><li><a href="#vz-s-what-it-is-really-for">What it is really for</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
-            <div class="lg:col-span-7 space-y-6" data-vz-viz>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">01</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Unknown keys are ignored by default</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Extra keys in the input are silently dropped. That is forgiving and it hides typos, which is why <code>extra="forbid"</code> exists.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel, ConfigDict, ValidationError
-
-class Lenient(BaseModel):
-    title: str
-    minutes: int
-
-class Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    title: str
-    minutes: int
-
-payload = {"title": "Vectors", "minutes": 8, "minuets": 99}   # typo
-
-m = Lenient.model_validate(payload)
-print("ignored :", m.model_dump(), "<- the typo vanished silently")
-
-try:
-    Strict.model_validate(payload)
-except ValidationError as e:
-    err = e.errors()[0]
-    print("forbid  :", err["type"], "->", err["loc"], err["msg"])</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_01.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">02</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Or keep them</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>extra="allow"</code> stores unknown keys on the model. Useful for a passthrough payload; a liability everywhere else.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel, ConfigDict
-
-class Passthrough(BaseModel):
-    model_config = ConfigDict(extra="allow")
-    title: str
-
-m = Passthrough(title="Vectors", source="partner-api", trace_id="abc123")
-
-print("declared :", m.title)
-print("extra    :", m.model_extra)
-print("dumped   :", m.model_dump())
-print()
-print("attribute access works:", m.source)</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_02.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">03</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Assignment is not checked unless you ask</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Validation happens at construction. Assigning afterwards writes whatever you give it &mdash; until <code>validate_assignment</code> is on.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel, ConfigDict, ValidationError
-
-class Loose(BaseModel):
-    minutes: int
-
-class Checked(BaseModel):
-    model_config = ConfigDict(validate_assignment=True)
-    minutes: int
-
-a = Loose(minutes=8)
-a.minutes = "not a number"
-print("loose   :", repr(a.minutes), "<- an int field holding a str")
-
-b = Checked(minutes=8)
-b.minutes = "12"
-print("checked :", repr(b.minutes), "<- coerced on assignment")
-
-try:
-    b.minutes = "ages"
-except ValidationError as e:
-    print("checked :", e.errors()[0]["msg"])</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_03.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">04</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Frozen models are hashable</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>frozen=True</code> forbids assignment entirely and lets the model be a dict key or set member.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel, ConfigDict, ValidationError
-
-class Point(BaseModel):
-    model_config = ConfigDict(frozen=True)
-    x: int
-    y: int
-
-p = Point(x=1, y=2)
-print("value:", p)
-
-try:
-    p.x = 5
-except ValidationError as e:
-    print("frozen:", e.errors()[0]["type"])
-
-seen = {Point(x=1, y=2), Point(x=1, y=2), Point(x=3, y=4)}
-print()
-print("in a set  :", len(seen), "unique points")
-print("as a key  :", {Point(x=1, y=2): "origin-ish"})</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_04.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">05</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">String handling for form data</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Three settings remove a pile of trivial validators when the input comes from humans.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel, ConfigDict
-
-class Raw(BaseModel):
-    email: str
-    code: str
-
-class Tidy(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True,
-                              str_to_lower=True)
-    email: str
-    code: str
-
-messy = {"email": "  ADA@VizLearn.IN  ", "code": "  ABC123 "}
-
-print("raw  :", Raw.model_validate(messy).model_dump())
-print("tidy :", Tidy.model_validate(messy).model_dump())
-print()
-print("str_min_length works too, as a model-wide floor:")
-
-class NoBlanks(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, str_min_length=1)
-    title: str
-
-try:
-    NoBlanks(title="   ")
-except Exception as e:
-    print("  blank title:", type(e).__name__)</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_05.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">06</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Reading from objects, not just dicts</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>from_attributes</code> lets a model validate anything with matching attributes &mdash; which is how a model reads an ORM row.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel, ConfigDict, ValidationError
-
-class Row:                       # pretend this came from a database
-    def __init__(self, title, minutes):
-        self.title = title
-        self.minutes = minutes
-
-class Plain(BaseModel):
-    title: str
-    minutes: int
-
-class FromObj(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    title: str
-    minutes: int
-
-row = Row("Vectors", 8)
-
-try:
-    Plain.model_validate(row)
-except ValidationError as e:
-    print("without :", e.errors()[0]["type"])
-
-print("with    :", FromObj.model_validate(row))
-print()
-print("In Pydantic v1 this setting was called orm_mode.")</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_06.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            </div>
-            <div class="lg:col-span-5 space-y-6">
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
                 <div class="card-container">
                     <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
                     <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
@@ -581,6 +264,151 @@ print("In Pydantic v1 this setting was called orm_mode.")</script>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-unknown-keys-are-ignored-by-default">Unknown keys are ignored by default</h3>
+                    <p>Extra keys in the input are silently dropped. That is forgiving and it hides typos, which is why <code>extra="forbid"</code> exists.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Lenient(BaseModel):
+    title: str
+    minutes: int
+
+class Strict(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str
+    minutes: int
+
+payload = {"title": "Vectors", "minutes": 8, "minuets": 99}   # typo
+
+m = Lenient.model_validate(payload)
+print("ignored :", m.model_dump(), "<- the typo vanished silently")
+
+try:
+    Strict.model_validate(payload)
+except ValidationError as e:
+    err = e.errors()[0]
+    print("forbid  :", err["type"], "->", err["loc"], err["msg"])</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-or-keep-them">Or keep them</h3>
+                    <p><code>extra="allow"</code> stores unknown keys on the model. Useful for a passthrough payload; a liability everywhere else.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel, ConfigDict
+
+class Passthrough(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    title: str
+
+m = Passthrough(title="Vectors", source="partner-api", trace_id="abc123")
+
+print("declared :", m.title)
+print("extra    :", m.model_extra)
+print("dumped   :", m.model_dump())
+print()
+print("attribute access works:", m.source)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-assignment-is-not-checked-unless-you-ask">Assignment is not checked unless you ask</h3>
+                    <p>Validation happens at construction. Assigning afterwards writes whatever you give it &mdash; until <code>validate_assignment</code> is on.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Loose(BaseModel):
+    minutes: int
+
+class Checked(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+    minutes: int
+
+a = Loose(minutes=8)
+a.minutes = "not a number"
+print("loose   :", repr(a.minutes), "<- an int field holding a str")
+
+b = Checked(minutes=8)
+b.minutes = "12"
+print("checked :", repr(b.minutes), "<- coerced on assignment")
+
+try:
+    b.minutes = "ages"
+except ValidationError as e:
+    print("checked :", e.errors()[0]["msg"])</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-frozen-models-are-hashable">Frozen models are hashable</h3>
+                    <p><code>frozen=True</code> forbids assignment entirely and lets the model be a dict key or set member.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Point(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    x: int
+    y: int
+
+p = Point(x=1, y=2)
+print("value:", p)
+
+try:
+    p.x = 5
+except ValidationError as e:
+    print("frozen:", e.errors()[0]["type"])
+
+seen = {Point(x=1, y=2), Point(x=1, y=2), Point(x=3, y=4)}
+print()
+print("in a set  :", len(seen), "unique points")
+print("as a key  :", {Point(x=1, y=2): "origin-ish"})</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-string-handling-for-form-data">String handling for form data</h3>
+                    <p>Three settings remove a pile of trivial validators when the input comes from humans.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel, ConfigDict
+
+class Raw(BaseModel):
+    email: str
+    code: str
+
+class Tidy(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True,
+                              str_to_lower=True)
+    email: str
+    code: str
+
+messy = {"email": "  ADA@VizLearn.IN  ", "code": "  ABC123 "}
+
+print("raw  :", Raw.model_validate(messy).model_dump())
+print("tidy :", Tidy.model_validate(messy).model_dump())
+print()
+print("str_min_length works too, as a model-wide floor:")
+
+class NoBlanks(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, str_min_length=1)
+    title: str
+
+try:
+    NoBlanks(title="   ")
+except Exception as e:
+    print("  blank title:", type(e).__name__)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-reading-from-objects-not-just-dicts">Reading from objects, not just dicts</h3>
+                    <p><code>from_attributes</code> lets a model validate anything with matching attributes &mdash; which is how a model reads an ORM row.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Row:                       # pretend this came from a database
+    def __init__(self, title, minutes):
+        self.title = title
+        self.minutes = minutes
+
+class Plain(BaseModel):
+    title: str
+    minutes: int
+
+class FromObj(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    title: str
+    minutes: int
+
+row = Row("Vectors", 8)
+
+try:
+    Plain.model_validate(row)
+except ValidationError as e:
+    print("without :", e.errors()[0]["type"])
+
+print("with    :", FromObj.model_validate(row))
+print()
+print("In Pydantic v1 this setting was called orm_mode.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-extra-what-to-do-with-keys-you-did-not-declare">extra: what to do with keys you did not declare</h3>
                     <p>The default is <code>"ignore"</code> &mdash; unknown keys are silently dropped.</p><p>That is forgiving, and it hides mistakes. A caller sending <code>minuets</code> instead of <code>minutes</code> gets no error and no field; the model is built with whatever default <code>minutes</code> has, and the bug surfaces later as a value that is inexplicably wrong.</p><p><code>extra="forbid"</code> rejects them:</p><pre><code class="language-python">model_config = ConfigDict(extra=&quot;forbid&quot;)</code></pre><p>Now the typo is an error naming the offending key. For an internal API, a config file, or anything where you control both ends, this is almost always the better default. It converts a silent misunderstanding into an immediate one.</p><p>The argument for <code>"ignore"</code> is forward compatibility on a public API: a client sending fields from a newer version should not break against an older server. That is a real consideration, and it applies to *your* API's request models rather than to every model in your codebase.</p><p><code>extra="allow"</code> keeps unknown keys, storing them on the model and exposing them through <code>model_extra</code>. It is right for a genuine passthrough &mdash; a webhook body you forward, an envelope whose payload you do not own. Everywhere else it turns your model into a dictionary with extra steps, and loses the guarantee that the fields on the object are the fields you declared.</p>

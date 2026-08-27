@@ -15,6 +15,175 @@ In Pydantic v1 this was an inner `class Config`. That still works and is depreca
 
 There are a lot of settings. These are the ones that come up constantly.
 
+
+## Unknown keys are ignored by default
+
+Extra keys in the input are silently dropped. That is forgiving and it hides typos, which is why <code>extra="forbid"</code> exists.
+
+```python-run
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Lenient(BaseModel):
+    title: str
+    minutes: int
+
+class Strict(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str
+    minutes: int
+
+payload = {"title": "Vectors", "minutes": 8, "minuets": 99}   # typo
+
+m = Lenient.model_validate(payload)
+print("ignored :", m.model_dump(), "<- the typo vanished silently")
+
+try:
+    Strict.model_validate(payload)
+except ValidationError as e:
+    err = e.errors()[0]
+    print("forbid  :", err["type"], "->", err["loc"], err["msg"])
+```
+
+## Or keep them
+
+<code>extra="allow"</code> stores unknown keys on the model. Useful for a passthrough payload; a liability everywhere else.
+
+```python-run
+from pydantic import BaseModel, ConfigDict
+
+class Passthrough(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    title: str
+
+m = Passthrough(title="Vectors", source="partner-api", trace_id="abc123")
+
+print("declared :", m.title)
+print("extra    :", m.model_extra)
+print("dumped   :", m.model_dump())
+print()
+print("attribute access works:", m.source)
+```
+
+## Assignment is not checked unless you ask
+
+Validation happens at construction. Assigning afterwards writes whatever you give it &mdash; until <code>validate_assignment</code> is on.
+
+```python-run
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Loose(BaseModel):
+    minutes: int
+
+class Checked(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+    minutes: int
+
+a = Loose(minutes=8)
+a.minutes = "not a number"
+print("loose   :", repr(a.minutes), "<- an int field holding a str")
+
+b = Checked(minutes=8)
+b.minutes = "12"
+print("checked :", repr(b.minutes), "<- coerced on assignment")
+
+try:
+    b.minutes = "ages"
+except ValidationError as e:
+    print("checked :", e.errors()[0]["msg"])
+```
+
+## Frozen models are hashable
+
+<code>frozen=True</code> forbids assignment entirely and lets the model be a dict key or set member.
+
+```python-run
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Point(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    x: int
+    y: int
+
+p = Point(x=1, y=2)
+print("value:", p)
+
+try:
+    p.x = 5
+except ValidationError as e:
+    print("frozen:", e.errors()[0]["type"])
+
+seen = {Point(x=1, y=2), Point(x=1, y=2), Point(x=3, y=4)}
+print()
+print("in a set  :", len(seen), "unique points")
+print("as a key  :", {Point(x=1, y=2): "origin-ish"})
+```
+
+## String handling for form data
+
+Three settings remove a pile of trivial validators when the input comes from humans.
+
+```python-run
+from pydantic import BaseModel, ConfigDict
+
+class Raw(BaseModel):
+    email: str
+    code: str
+
+class Tidy(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True,
+                              str_to_lower=True)
+    email: str
+    code: str
+
+messy = {"email": "  ADA@VizLearn.IN  ", "code": "  ABC123 "}
+
+print("raw  :", Raw.model_validate(messy).model_dump())
+print("tidy :", Tidy.model_validate(messy).model_dump())
+print()
+print("str_min_length works too, as a model-wide floor:")
+
+class NoBlanks(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, str_min_length=1)
+    title: str
+
+try:
+    NoBlanks(title="   ")
+except Exception as e:
+    print("  blank title:", type(e).__name__)
+```
+
+## Reading from objects, not just dicts
+
+<code>from_attributes</code> lets a model validate anything with matching attributes &mdash; which is how a model reads an ORM row.
+
+```python-run
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Row:                       # pretend this came from a database
+    def __init__(self, title, minutes):
+        self.title = title
+        self.minutes = minutes
+
+class Plain(BaseModel):
+    title: str
+    minutes: int
+
+class FromObj(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    title: str
+    minutes: int
+
+row = Row("Vectors", 8)
+
+try:
+    Plain.model_validate(row)
+except ValidationError as e:
+    print("without :", e.errors()[0]["type"])
+
+print("with    :", FromObj.model_validate(row))
+print()
+print("In Pydantic v1 this setting was called orm_mode.")
+```
 ## extra: what to do with keys you did not declare
 
 The default is `"ignore"` &mdash; unknown keys are silently dropped.

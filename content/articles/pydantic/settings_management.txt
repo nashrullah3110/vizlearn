@@ -20,6 +20,174 @@ Field names map to environment variables case-insensitively, so `app_port` reads
 
 Note `app_debug: bool`. The boolean vocabulary from the coercion module means `APP_DEBUG=yes`, `=1`, `=true` and `=on` all work, and `=maybe` raises. That is a much better outcome than `bool(os.environ.get("APP_DEBUG"))`, where the string `"false"` is `True`.
 
+
+## Configuration is a boundary too
+
+<code>os.environ</code> gives strings and no guarantees. A settings model reads, converts and checks in one place.
+
+```python-run
+import os
+from pydantic_settings import BaseSettings
+
+# The environment as your process actually sees it: strings, or nothing.
+os.environ["APP_PORT"] = "8642"
+os.environ["APP_DEBUG"] = "yes"
+
+print("raw    :", repr(os.environ.get("APP_PORT")),
+      repr(os.environ.get("APP_DEBUG")))
+
+class Settings(BaseSettings):
+    app_port: int = 8000
+    app_debug: bool = False
+    app_name: str = "VizLearn"
+
+s = Settings()
+print("typed  :", s)
+print("port+1 :", s.app_port + 1, "(a real int)")
+print("not    :", not s.app_debug)
+```
+
+## Missing configuration fails at start-up
+
+A required setting with no value raises immediately, naming the variable &mdash; rather than surfacing as an error hours later.
+
+```python-run
+import os
+from pydantic_settings import BaseSettings
+from pydantic import ValidationError
+
+for key in ("DATABASE_URL", "SECRET_KEY"):
+    os.environ.pop(key, None)
+
+class Settings(BaseSettings):
+    database_url: str          # required
+    secret_key: str            # required
+    timeout: int = 30
+
+try:
+    Settings()
+except ValidationError as e:
+    print("missing at start-up:", e.error_count())
+    for err in e.errors():
+        print("   ", err["loc"][0], "->", err["type"])
+
+os.environ["DATABASE_URL"] = "postgres://localhost/viz"
+os.environ["SECRET_KEY"] = "s3cret"
+print()
+print("with values:", Settings())
+```
+
+## Prefixes and explicit names
+
+<code>env_prefix</code> namespaces a whole model; <code>validation_alias</code> pins one field to a specific variable.
+
+```python-run
+import os
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+os.environ["VIZ_HOST"] = "0.0.0.0"
+os.environ["VIZ_PORT"] = "8642"
+os.environ["DATABASE_URL"] = "postgres://localhost/viz"
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="VIZ_")
+
+    host: str = "127.0.0.1"
+    port: int = 8000
+    # This one does not follow the prefix - name it explicitly.
+    db: str = Field(validation_alias="DATABASE_URL")
+
+print(Settings())
+```
+
+## Constraints and validators still apply
+
+A settings model is a model. Everything from the earlier tiers works, which is what makes configuration checkable rather than merely typed.
+
+```python-run
+import os
+from typing import Literal
+from pydantic import Field, ValidationError
+from pydantic_settings import BaseSettings
+
+os.environ.update({"PORT": "70000", "ENV": "staging", "WORKERS": "0"})
+
+class Settings(BaseSettings):
+    port: int = Field(ge=1, le=65535)
+    env: Literal["dev", "test", "prod"]
+    workers: int = Field(gt=0)
+
+try:
+    Settings()
+except ValidationError as e:
+    for err in e.errors():
+        print("%-8s %-22s %s" % (err["loc"][0], err["type"], err["msg"]))
+
+os.environ.update({"PORT": "8642", "ENV": "prod", "WORKERS": "4"})
+print()
+print("valid:", Settings())
+```
+
+## Nested settings from one variable
+
+A nested model can be filled from JSON in a single variable, or from delimited names.
+
+```python-run
+import os
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Redis(BaseModel):
+    host: str = "localhost"
+    port: int = 6379
+
+os.environ["REDIS"] = '{"host": "cache.internal", "port": "6380"}'
+
+class Settings(BaseSettings):
+    redis: Redis = Redis()
+
+print("from json  :", Settings().redis)
+
+# Or with a delimiter, one variable per leaf:
+os.environ.pop("REDIS")
+os.environ["REDIS__HOST"] = "other.internal"
+os.environ["REDIS__PORT"] = "6381"
+
+class Nested(BaseSettings):
+    model_config = SettingsConfigDict(env_nested_delimiter="__")
+    redis: Redis = Redis()
+
+print("from parts :", Nested().redis)
+```
+
+## Secrets, and not printing them
+
+<code>SecretStr</code> keeps a value out of logs and tracebacks, which matters most in the object every process prints at start-up.
+
+```python-run
+import os
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings
+
+os.environ.update({"SECRET_KEY": "sk_live_abcdef123456",
+                   "DATABASE_URL": "postgres://user:hunter2@db/viz"})
+
+class Unsafe(BaseSettings):
+    secret_key: str
+    database_url: str
+
+class Safe(BaseSettings):
+    secret_key: SecretStr
+    database_url: SecretStr
+
+print("unsafe:", Unsafe())
+print()
+print("safe  :", Safe())
+print("dump  :", Safe().model_dump())
+print()
+print("reading it deliberately:", Safe().secret_key.get_secret_value()[:6] + "...")
+```
 ## Failing at start-up
 
 The single biggest benefit is *when* the failure happens.

@@ -160,6 +160,28 @@
             font-family: var(--vz-mono); font-size: 0.85em;
             color: var(--accent-primary);
         }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
     </style>
 </head>
 <body class="flex flex-col min-h-screen light-mode">
@@ -211,348 +233,10 @@
     app_port: int = 8000
     app_debug: bool = False
     database_url: str</code></pre><p>Field names map to environment variables case-insensitively, so <code>app_port</code> reads <code>APP_PORT</code>. Values arrive as strings and are coerced by the ordinary rules &mdash; which is exactly the case lax coercion was designed for.</p><p>Note <code>app_debug: bool</code>. The boolean vocabulary from the coercion module means <code>APP_DEBUG=yes</code>, <code>=1</code>, <code>=true</code> and <code>=on</code> all work, and <code>=maybe</code> raises. That is a much better outcome than <code>bool(os.environ.get("APP_DEBUG"))</code>, where the string <code>"false"</code> is <code>True</code>.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-failing-at-start-up">Failing at start-up</a></li><li><a href="#vz-s-naming">Naming</a></li><li><a href="#vz-s-checking-not-just-typing">Checking, not just typing</a></li><li><a href="#vz-s-nesting">Nesting</a></li><li><a href="#vz-s-files">Files</a></li><li><a href="#vz-s-secrets">Secrets</a></li><li><a href="#vz-s-one-instance">One instance</a></li><li><a href="#vz-s-testing">Testing</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-layering-environments">Layering environments</a></li><li><a href="#vz-s-what-belongs-in-settings">What belongs in settings</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-mistakes-people-make">Mistakes people make</a></li><li><a href="#vz-s-testing-configuration">Testing configuration</a></li><li><a href="#vz-s-a-last-note-on-start-up">A last note on start-up</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-one-habit">One habit</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-configuration-is-a-boundary-too">Configuration is a boundary too</a></li><li><a href="#vz-s-missing-configuration-fails-at-start-up">Missing configuration fails at start-up</a></li><li><a href="#vz-s-prefixes-and-explicit-names">Prefixes and explicit names</a></li><li><a href="#vz-s-constraints-and-validators-still-apply">Constraints and validators still apply</a></li><li><a href="#vz-s-nested-settings-from-one-variable">Nested settings from one variable</a></li><li><a href="#vz-s-secrets-and-not-printing-them">Secrets, and not printing them</a></li><li><a href="#vz-s-failing-at-start-up">Failing at start-up</a></li><li><a href="#vz-s-naming">Naming</a></li><li><a href="#vz-s-checking-not-just-typing">Checking, not just typing</a></li><li><a href="#vz-s-nesting">Nesting</a></li><li><a href="#vz-s-files">Files</a></li><li><a href="#vz-s-secrets">Secrets</a></li><li><a href="#vz-s-one-instance">One instance</a></li><li><a href="#vz-s-testing">Testing</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-layering-environments">Layering environments</a></li><li><a href="#vz-s-what-belongs-in-settings">What belongs in settings</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-mistakes-people-make">Mistakes people make</a></li><li><a href="#vz-s-testing-configuration">Testing configuration</a></li><li><a href="#vz-s-a-last-note-on-start-up">A last note on start-up</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-one-habit">One habit</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
-            <div class="lg:col-span-7 space-y-6" data-vz-viz>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">01</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Configuration is a boundary too</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>os.environ</code> gives strings and no guarantees. A settings model reads, converts and checks in one place.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/python_dotenv-1.2.3-py3-none-any.whl,../assets/wheels/pydantic_settings-2.3.4-py3-none-any.whl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">import os
-from pydantic_settings import BaseSettings
-
-# The environment as your process actually sees it: strings, or nothing.
-os.environ["APP_PORT"] = "8642"
-os.environ["APP_DEBUG"] = "yes"
-
-print("raw    :", repr(os.environ.get("APP_PORT")),
-      repr(os.environ.get("APP_DEBUG")))
-
-class Settings(BaseSettings):
-    app_port: int = 8000
-    app_debug: bool = False
-    app_name: str = "VizLearn"
-
-s = Settings()
-print("typed  :", s)
-print("port+1 :", s.app_port + 1, "(a real int)")
-print("not    :", not s.app_debug)</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_01.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">02</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Missing configuration fails at start-up</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">A required setting with no value raises immediately, naming the variable &mdash; rather than surfacing as an error hours later.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/python_dotenv-1.2.3-py3-none-any.whl,../assets/wheels/pydantic_settings-2.3.4-py3-none-any.whl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">import os
-from pydantic_settings import BaseSettings
-from pydantic import ValidationError
-
-for key in ("DATABASE_URL", "SECRET_KEY"):
-    os.environ.pop(key, None)
-
-class Settings(BaseSettings):
-    database_url: str          # required
-    secret_key: str            # required
-    timeout: int = 30
-
-try:
-    Settings()
-except ValidationError as e:
-    print("missing at start-up:", e.error_count())
-    for err in e.errors():
-        print("   ", err["loc"][0], "->", err["type"])
-
-os.environ["DATABASE_URL"] = "postgres://localhost/viz"
-os.environ["SECRET_KEY"] = "s3cret"
-print()
-print("with values:", Settings())</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_02.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">03</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Prefixes and explicit names</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>env_prefix</code> namespaces a whole model; <code>validation_alias</code> pins one field to a specific variable.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/python_dotenv-1.2.3-py3-none-any.whl,../assets/wheels/pydantic_settings-2.3.4-py3-none-any.whl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">import os
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-os.environ["VIZ_HOST"] = "0.0.0.0"
-os.environ["VIZ_PORT"] = "8642"
-os.environ["DATABASE_URL"] = "postgres://localhost/viz"
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="VIZ_")
-
-    host: str = "127.0.0.1"
-    port: int = 8000
-    # This one does not follow the prefix - name it explicitly.
-    db: str = Field(validation_alias="DATABASE_URL")
-
-print(Settings())</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_03.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">04</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Constraints and validators still apply</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">A settings model is a model. Everything from the earlier tiers works, which is what makes configuration checkable rather than merely typed.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/python_dotenv-1.2.3-py3-none-any.whl,../assets/wheels/pydantic_settings-2.3.4-py3-none-any.whl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">import os
-from typing import Literal
-from pydantic import Field, ValidationError
-from pydantic_settings import BaseSettings
-
-os.environ.update({"PORT": "70000", "ENV": "staging", "WORKERS": "0"})
-
-class Settings(BaseSettings):
-    port: int = Field(ge=1, le=65535)
-    env: Literal["dev", "test", "prod"]
-    workers: int = Field(gt=0)
-
-try:
-    Settings()
-except ValidationError as e:
-    for err in e.errors():
-        print("%-8s %-22s %s" % (err["loc"][0], err["type"], err["msg"]))
-
-os.environ.update({"PORT": "8642", "ENV": "prod", "WORKERS": "4"})
-print()
-print("valid:", Settings())</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_04.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">05</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Nested settings from one variable</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">A nested model can be filled from JSON in a single variable, or from delimited names.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/python_dotenv-1.2.3-py3-none-any.whl,../assets/wheels/pydantic_settings-2.3.4-py3-none-any.whl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">import os
-from pydantic import BaseModel
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-class Redis(BaseModel):
-    host: str = "localhost"
-    port: int = 6379
-
-os.environ["REDIS"] = '{"host": "cache.internal", "port": "6380"}'
-
-class Settings(BaseSettings):
-    redis: Redis = Redis()
-
-print("from json  :", Settings().redis)
-
-# Or with a delimiter, one variable per leaf:
-os.environ.pop("REDIS")
-os.environ["REDIS__HOST"] = "other.internal"
-os.environ["REDIS__PORT"] = "6381"
-
-class Nested(BaseSettings):
-    model_config = SettingsConfigDict(env_nested_delimiter="__")
-    redis: Redis = Redis()
-
-print("from parts :", Nested().redis)</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_05.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">06</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Secrets, and not printing them</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>SecretStr</code> keeps a value out of logs and tracebacks, which matters most in the object every process prints at start-up.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/python_dotenv-1.2.3-py3-none-any.whl,../assets/wheels/pydantic_settings-2.3.4-py3-none-any.whl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">import os
-from pydantic import SecretStr
-from pydantic_settings import BaseSettings
-
-os.environ.update({"SECRET_KEY": "sk_live_abcdef123456",
-                   "DATABASE_URL": "postgres://user:hunter2@db/viz"})
-
-class Unsafe(BaseSettings):
-    secret_key: str
-    database_url: str
-
-class Safe(BaseSettings):
-    secret_key: SecretStr
-    database_url: SecretStr
-
-print("unsafe:", Unsafe())
-print()
-print("safe  :", Safe())
-print("dump  :", Safe().model_dump())
-print()
-print("reading it deliberately:", Safe().secret_key.get_secret_value()[:6] + "...")</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_06.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            </div>
-            <div class="lg:col-span-5 space-y-6">
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
                 <div class="card-container">
                     <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
                     <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
@@ -581,6 +265,150 @@ print("reading it deliberately:", Safe().secret_key.get_secret_value()[:6] + "..
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-configuration-is-a-boundary-too">Configuration is a boundary too</h3>
+                    <p><code>os.environ</code> gives strings and no guarantees. A settings model reads, converts and checks in one place.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">import os
+from pydantic_settings import BaseSettings
+
+# The environment as your process actually sees it: strings, or nothing.
+os.environ["APP_PORT"] = "8642"
+os.environ["APP_DEBUG"] = "yes"
+
+print("raw    :", repr(os.environ.get("APP_PORT")),
+      repr(os.environ.get("APP_DEBUG")))
+
+class Settings(BaseSettings):
+    app_port: int = 8000
+    app_debug: bool = False
+    app_name: str = "VizLearn"
+
+s = Settings()
+print("typed  :", s)
+print("port+1 :", s.app_port + 1, "(a real int)")
+print("not    :", not s.app_debug)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-missing-configuration-fails-at-start-up">Missing configuration fails at start-up</h3>
+                    <p>A required setting with no value raises immediately, naming the variable &mdash; rather than surfacing as an error hours later.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">import os
+from pydantic_settings import BaseSettings
+from pydantic import ValidationError
+
+for key in ("DATABASE_URL", "SECRET_KEY"):
+    os.environ.pop(key, None)
+
+class Settings(BaseSettings):
+    database_url: str          # required
+    secret_key: str            # required
+    timeout: int = 30
+
+try:
+    Settings()
+except ValidationError as e:
+    print("missing at start-up:", e.error_count())
+    for err in e.errors():
+        print("   ", err["loc"][0], "->", err["type"])
+
+os.environ["DATABASE_URL"] = "postgres://localhost/viz"
+os.environ["SECRET_KEY"] = "s3cret"
+print()
+print("with values:", Settings())</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-prefixes-and-explicit-names">Prefixes and explicit names</h3>
+                    <p><code>env_prefix</code> namespaces a whole model; <code>validation_alias</code> pins one field to a specific variable.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">import os
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+os.environ["VIZ_HOST"] = "0.0.0.0"
+os.environ["VIZ_PORT"] = "8642"
+os.environ["DATABASE_URL"] = "postgres://localhost/viz"
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="VIZ_")
+
+    host: str = "127.0.0.1"
+    port: int = 8000
+    # This one does not follow the prefix - name it explicitly.
+    db: str = Field(validation_alias="DATABASE_URL")
+
+print(Settings())</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-constraints-and-validators-still-apply">Constraints and validators still apply</h3>
+                    <p>A settings model is a model. Everything from the earlier tiers works, which is what makes configuration checkable rather than merely typed.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">import os
+from typing import Literal
+from pydantic import Field, ValidationError
+from pydantic_settings import BaseSettings
+
+os.environ.update({"PORT": "70000", "ENV": "staging", "WORKERS": "0"})
+
+class Settings(BaseSettings):
+    port: int = Field(ge=1, le=65535)
+    env: Literal["dev", "test", "prod"]
+    workers: int = Field(gt=0)
+
+try:
+    Settings()
+except ValidationError as e:
+    for err in e.errors():
+        print("%-8s %-22s %s" % (err["loc"][0], err["type"], err["msg"]))
+
+os.environ.update({"PORT": "8642", "ENV": "prod", "WORKERS": "4"})
+print()
+print("valid:", Settings())</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-nested-settings-from-one-variable">Nested settings from one variable</h3>
+                    <p>A nested model can be filled from JSON in a single variable, or from delimited names.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">import os
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Redis(BaseModel):
+    host: str = "localhost"
+    port: int = 6379
+
+os.environ["REDIS"] = '{"host": "cache.internal", "port": "6380"}'
+
+class Settings(BaseSettings):
+    redis: Redis = Redis()
+
+print("from json  :", Settings().redis)
+
+# Or with a delimiter, one variable per leaf:
+os.environ.pop("REDIS")
+os.environ["REDIS__HOST"] = "other.internal"
+os.environ["REDIS__PORT"] = "6381"
+
+class Nested(BaseSettings):
+    model_config = SettingsConfigDict(env_nested_delimiter="__")
+    redis: Redis = Redis()
+
+print("from parts :", Nested().redis)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-secrets-and-not-printing-them">Secrets, and not printing them</h3>
+                    <p><code>SecretStr</code> keeps a value out of logs and tracebacks, which matters most in the object every process prints at start-up.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">import os
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings
+
+os.environ.update({"SECRET_KEY": "sk_live_abcdef123456",
+                   "DATABASE_URL": "postgres://user:hunter2@db/viz"})
+
+class Unsafe(BaseSettings):
+    secret_key: str
+    database_url: str
+
+class Safe(BaseSettings):
+    secret_key: SecretStr
+    database_url: SecretStr
+
+print("unsafe:", Unsafe())
+print()
+print("safe  :", Safe())
+print("dump  :", Safe().model_dump())
+print()
+print("reading it deliberately:", Safe().secret_key.get_secret_value()[:6] + "...")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-failing-at-start-up">Failing at start-up</h3>
                     <p>The single biggest benefit is *when* the failure happens.</p><p><code>database_url: str</code> has no default, so it is required. If the variable is not set, constructing <code>Settings()</code> raises immediately, naming the field. A deployment missing a variable fails at boot, visibly, before serving anything.</p><p>The alternative is a <code>None</code> that sits quietly until the first request touching the database, which may be minutes or hours later, and produces an error about <code>NoneType</code> far from the cause.</p><p>That is why settings should be instantiated once at start-up, not lazily on first use. The whole value is in failing before the process claims to be ready.</p>

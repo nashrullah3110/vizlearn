@@ -15,6 +15,170 @@ Leave out `title` and the model refuses to be built, with an error whose `type` 
 
 Everything confusing about this topic comes from one word being borrowed for two jobs.
 
+
+## A field with no default is required
+
+That is the whole rule. Leave it out and the model refuses to exist, with the error type <code>missing</code>.
+
+```python-run
+from pydantic import BaseModel, ValidationError
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+print(Module(title="Norms", minutes=8))
+
+try:
+    Module(title="Norms")
+except ValidationError as e:
+    err = e.errors()[0]
+    print("refused :", err["loc"], "->", err["msg"], "|", err["type"])
+```
+
+## Optional[int] is not an optional field
+
+This is the single most common misreading in the library. <code>Optional[int]</code> means “int or None”. It says nothing about whether the field must be supplied.
+
+```python-run
+from typing import Optional
+from pydantic import BaseModel, ValidationError
+
+class Strict(BaseModel):
+    note: Optional[str]           # nullable, but STILL REQUIRED
+
+class Truly(BaseModel):
+    note: Optional[str] = None    # nullable AND optional
+
+print("explicit None :", Strict(note=None))
+
+try:
+    Strict()
+except ValidationError as e:
+    print("omitted       : refused ->", e.errors()[0]["type"])
+
+print("with a default:", Truly())
+print("still nullable:", Truly(note=None))
+
+# The default is what makes a field optional. Not the type.
+```
+
+## Three states, not two
+
+“Not sent” and “sent as null” are different facts, and an API often needs to tell them apart. <code>model_fields_set</code> is how you ask.
+
+```python-run
+from typing import Optional
+from pydantic import BaseModel
+
+class Update(BaseModel):
+    title: Optional[str] = None
+    minutes: Optional[int] = None
+
+absent = Update()
+nulled = Update(title=None)
+given  = Update(title="Projections")
+
+for name, m in [("omitted", absent), ("sent as null", nulled), ("sent", given)]:
+    print("%-13s fields_set=%-12s dump=%s"
+          % (name, m.model_fields_set, m.model_dump()))
+
+print()
+print("only what was actually sent:", given.model_dump(exclude_unset=True))
+print("this is how a PATCH endpoint avoids overwriting untouched fields")
+```
+
+## The mutable default trap
+
+In ordinary Python a mutable default is shared by every call. Pydantic does not have that bug &mdash; but the habit it teaches, <code>default_factory</code>, is still what you want for anything computed.
+
+```python-run
+from typing import List
+from pydantic import BaseModel, Field
+
+# First, the classic Python bug, so the contrast is clear:
+def add_tag(tag, tags=[]):        # <- shared list, created once
+    tags.append(tag)
+    return tags
+
+print("plain python:", add_tag("maths"))
+print("plain python:", add_tag("python"), "<- the first call leaked in")
+
+# Pydantic copies the default per instance, so this is safe:
+class Module(BaseModel):
+    title: str
+    tags: List[str] = []
+
+a = Module(title="A")
+b = Module(title="B")
+a.tags.append("maths")
+print()
+print("a.tags:", a.tags)
+print("b.tags:", b.tags, "<- unaffected")
+
+# Use default_factory when the default must be COMPUTED per instance:
+import itertools
+counter = itertools.count(1)
+
+class Draft(BaseModel):
+    order: int = Field(default_factory=lambda: next(counter))
+
+print()
+print("factory:", Draft().order, Draft().order, Draft().order)
+```
+
+## Defaults are not validated by default
+
+Pydantic trusts what you wrote in the class body and skips checking it. That is a speed decision, and it means a wrong default sits there quietly until you ask for it to be checked.
+
+```python-run
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Sloppy(BaseModel):
+    minutes: int = "not a number"     # nonsense, and never noticed
+
+class Careful(BaseModel):
+    model_config = ConfigDict(validate_default=True)
+    minutes: int = "not a number"
+
+s = Sloppy()
+print("sloppy  :", repr(s.minutes), "<- a str in an int field")
+print("and so  :", type(s.minutes).__name__)
+
+try:
+    Careful()
+except ValidationError as e:
+    print("careful : caught it ->", e.errors()[0]["msg"])
+```
+
+## Putting it together
+
+A realistic model: some fields the caller must supply, some with sensible defaults, one genuinely nullable, and a list that starts empty.
+
+```python-run
+from typing import List, Optional
+from pydantic import BaseModel, Field
+
+class Module(BaseModel):
+    title: str                                   # required
+    track: str                                   # required
+    minutes: int = 10                            # defaulted
+    published: bool = False                      # defaulted
+    summary: Optional[str] = None                # nullable and optional
+    tags: List[str] = Field(default_factory=list)
+
+minimal = Module(title="Determinant", track="maths")
+print("minimal :", minimal.model_dump())
+print()
+
+full = Module(title="Determinant", track="maths", minutes=13,
+              published=True, summary="Area, and what a matrix does to it.",
+              tags=["linear-algebra", "geometry"])
+print("full    :", full.model_dump())
+print()
+print("what the caller actually set:", full.model_fields_set)
+print("only their input           :", minimal.model_dump(exclude_unset=True))
+```
 ## Optional does not mean optional
 
 `Optional[str]` comes from the `typing` module, where it means exactly one thing: `str or None`. It is a statement about which *values* are allowed. It says nothing whatsoever about whether the field has to be supplied.

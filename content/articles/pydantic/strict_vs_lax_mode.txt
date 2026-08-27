@@ -11,6 +11,180 @@ It is exactly wrong three layers in. If a function inside your own system passes
 
 Same behaviour, opposite value, depending on which side of the boundary you are standing on. Which is why the setting exists.
 
+
+## The same model, two answers
+
+Lax converts anything unambiguous. Strict requires the value to already be the annotated type.
+
+```python-run
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Lax(BaseModel):
+    minutes: int
+    rating: float
+    published: bool
+
+class Strict(BaseModel):
+    model_config = ConfigDict(strict=True)
+    minutes: int
+    rating: float
+    published: bool
+
+payload = {"minutes": "12", "rating": "4.5", "published": "true"}
+
+print("lax    :", Lax.model_validate(payload))
+
+try:
+    Strict.model_validate(payload)
+except ValidationError as e:
+    print("strict :", e.error_count(), "errors")
+    for err in e.errors():
+        print("   %-10s %s" % (err["loc"][0], err["type"]))
+
+print()
+print("strict, correct types:",
+      Strict(minutes=12, rating=4.5, published=True))
+```
+
+## Strict on one field only
+
+The usual need is narrower than a whole model: lax about most of a payload, exact about the one field where a quiet conversion would be dangerous.
+
+```python-run
+from pydantic import BaseModel, Field, ValidationError
+
+class Event(BaseModel):
+    user_id: int = Field(strict=True)      # must really be an int
+    minutes: int                            # happily takes "12"
+    note: str
+
+e = Event(user_id=42, minutes="12", note="watched")
+print("ok :", e)
+
+try:
+    Event(user_id="42", minutes="12", note="watched")
+except ValidationError as exc:
+    err = exc.errors()[0]
+    print()
+    print("field:", err["loc"][0])
+    print("type :", err["type"])
+    print("said :", err["msg"])
+```
+
+## Strict as a reusable type
+
+<code>Annotated</code> turns strictness into a named type, so the rule lives in one place and reads well at every use.
+
+```python-run
+from typing import Annotated
+from pydantic import BaseModel, Field, StrictInt, ValidationError
+
+UserId = Annotated[int, Field(strict=True)]
+
+class Enrolment(BaseModel):
+    user_id: UserId
+    module_id: UserId
+    progress: int          # ordinary, lax
+
+print(Enrolment(user_id=1, module_id=2, progress="40"))
+
+for bad in [{"user_id": "1", "module_id": 2, "progress": 0},
+            {"user_id": 1, "module_id": "2", "progress": 0}]:
+    try:
+        Enrolment.model_validate(bad)
+    except ValidationError as e:
+        print("refused:", e.errors()[0]["loc"][0])
+
+# Pydantic ships some of these ready made:
+class Ready(BaseModel):
+    n: StrictInt
+print()
+print("StrictInt is the same idea:", Ready(n=5))
+```
+
+## What strict still allows
+
+Strict is not “no conversion at all”. Widening that cannot lose information still happens, and a bool is still an int in Python.
+
+```python-run
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+class S(BaseModel):
+    model_config = ConfigDict(strict=True)
+    x: float
+
+for value in [1.5, 2, True, "3.0"]:
+    try:
+        print("%-6r -> %r" % (value, S(x=value).x))
+    except ValidationError:
+        print("%-6r -> refused" % (value,))
+
+print()
+print("int -> float is a widening with no loss, so strict permits it.")
+print("The string is refused: that would be parsing, not widening.")
+```
+
+## JSON is strict-aware
+
+Validating from JSON in strict mode still accepts the forms JSON has no choice about &mdash; a date has to arrive as text because JSON has no dates.
+
+```python-run
+from datetime import date
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Strict(BaseModel):
+    model_config = ConfigDict(strict=True)
+    published_on: date
+    minutes: int
+
+# From JSON: the date must be a string, and strict accepts that.
+print("from json  :", Strict.model_validate_json(
+    '{"published_on": "2026-08-26", "minutes": 12}'))
+
+# From Python: a string date is refused, because a real date was available.
+try:
+    Strict(published_on="2026-08-26", minutes=12)
+except ValidationError as e:
+    print("from python:", e.errors()[0]["msg"])
+
+print("from python:", Strict(published_on=date(2026, 8, 26), minutes=12))
+```
+
+## The pattern worth copying
+
+Two models: a lax one at the boundary that accepts the wire format, and a strict one inside where a wrong type means a bug of your own.
+
+```python-run
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+class ModuleIn(BaseModel):
+    "The boundary. Text arrives; convert it."
+    title: str
+    minutes: int
+    published: bool
+
+class Module(BaseModel):
+    "The interior. Types are already right; a mismatch is our bug."
+    model_config = ConfigDict(strict=True, frozen=True)
+    title: str
+    minutes: int
+    published: bool
+
+raw = {"title": "Vectors", "minutes": "12", "published": "yes"}
+
+checked = ModuleIn.model_validate(raw)
+module = Module.model_validate(checked.model_dump())
+
+print("boundary :", checked)
+print("interior :", module)
+print()
+
+# Later, somewhere in our own code, a mistake:
+try:
+    Module(title="Norms", minutes="8", published=False)
+except ValidationError as e:
+    print("caught our own bug:", e.errors()[0]["msg"])
+```
 ## Turning it on
 
 Per model:

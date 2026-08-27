@@ -7,6 +7,177 @@ intro: A field that could be several shapes, and how to make the choice explicit
 
 For simple types the decision is usually obvious and usually right. For models it is frequently neither, and the failure mode is the worst kind: it does not raise, it just gives you the wrong object.
 
+
+## Smart mode: exact match first
+
+A union tries an exact type match before it tries converting. That resolves the obvious cases and leaves the ambiguous ones to order.
+
+```python-run
+from typing import Union
+from pydantic import BaseModel
+
+class M(BaseModel):
+    v: Union[int, str]
+
+for value in [9, "nine", "9", 9.0, True]:
+    got = M(v=value).v
+    print("%-8r -> %-8r (%s)" % (value, got, type(got).__name__))
+
+# 9 stays an int and "nine" stays a str because both match exactly.
+# "9" is where it gets interesting: it matches str exactly, so str wins,
+# even though int is written first.
+```
+
+## Where order does change the answer
+
+When no member matches exactly, the union converts left to right. The same input can then produce different types depending on how you wrote it.
+
+```python-run
+from typing import Union
+from pydantic import BaseModel
+
+class A(BaseModel):
+    v: Union[int, float]
+
+class B(BaseModel):
+    v: Union[float, int]
+
+for value in ["7"]:
+    a, b = A(v=value).v, B(v=value).v
+    print("int|float gives %-6r (%s)" % (a, type(a).__name__))
+    print("float|int gives %-6r (%s)" % (b, type(b).__name__))
+
+print()
+print("Same input, two annotations, two types. If that distinction")
+print("matters to your program, do not express it as a plain Union.")
+```
+
+## Unions of models get ambiguous fast
+
+Two models with overlapping fields are a coin toss. Pydantic will pick the first that validates, which may not be the one the data meant.
+
+```python-run
+from typing import Union
+from pydantic import BaseModel
+
+class Video(BaseModel):
+    title: str
+    seconds: int = 0
+
+class Quiz(BaseModel):
+    title: str
+    questions: int = 0
+
+class Item(BaseModel):
+    content: Union[Video, Quiz]
+
+# Unambiguous - only Quiz has 'questions':
+print(Item(content={"title": "Vectors", "questions": 5}).content)
+
+# Ambiguous - both models accept a bare title, and Video is written first:
+guess = Item(content={"title": "Vectors"}).content
+print(guess, "<- got", type(guess).__name__, "by position, not by meaning")
+```
+
+## A discriminator makes it explicit
+
+Give each model a literal tag field and point <code>Field(discriminator=)</code> at it. Pydantic then reads the tag and goes straight to the right model.
+
+```python-run
+from typing import Literal, Union
+from pydantic import BaseModel, Field
+
+class Video(BaseModel):
+    kind: Literal["video"]
+    title: str
+    seconds: int
+
+class Quiz(BaseModel):
+    kind: Literal["quiz"]
+    title: str
+    questions: int
+
+class Item(BaseModel):
+    content: Union[Video, Quiz] = Field(discriminator="kind")
+
+print(Item(content={"kind": "video", "title": "Vectors", "seconds": 240}).content)
+print(Item(content={"kind": "quiz", "title": "Check", "questions": 4}).content)
+
+# No guessing left: the tag decides.
+```
+
+## Better errors, too
+
+Without a discriminator a failure reports every branch it tried. With one, it reports the single branch that was actually meant.
+
+```python-run
+from typing import Literal, Union
+from pydantic import BaseModel, Field, ValidationError
+
+class Video(BaseModel):
+    kind: Literal["video"]
+    seconds: int
+
+class Quiz(BaseModel):
+    kind: Literal["quiz"]
+    questions: int
+
+class Plain(BaseModel):
+    content: Union[Video, Quiz]
+
+class Tagged(BaseModel):
+    content: Union[Video, Quiz] = Field(discriminator="kind")
+
+bad = {"content": {"kind": "video", "seconds": "lots"}}
+
+try:
+    Plain.model_validate(bad)
+except ValidationError as e:
+    print("without discriminator:", e.error_count(), "errors")
+    for err in e.errors():
+        print("   ", err["loc"], err["type"])
+
+try:
+    Tagged.model_validate(bad)
+except ValidationError as e:
+    print()
+    print("with discriminator   :", e.error_count(), "error")
+    for err in e.errors():
+        print("   ", err["loc"], err["type"])
+```
+
+## An unknown tag fails cleanly
+
+The discriminator itself is validated. A tag nobody declared produces one clear error naming the values that are allowed.
+
+```python-run
+from typing import Literal, Union, List
+from pydantic import BaseModel, Field, ValidationError
+
+class Video(BaseModel):
+    kind: Literal["video"]
+    seconds: int
+
+class Quiz(BaseModel):
+    kind: Literal["quiz"]
+    questions: int
+
+class Track(BaseModel):
+    items: List[Union[Video, Quiz]] = Field(discriminator="kind")
+
+t = Track(items=[{"kind": "video", "seconds": 240},
+                 {"kind": "quiz", "questions": 4}])
+for item in t.items:
+    print(type(item).__name__, "->", item.model_dump())
+
+try:
+    Track(items=[{"kind": "podcast", "seconds": 10}])
+except ValidationError as e:
+    err = e.errors()[0]
+    print()
+    print("type :", err["type"])
+    print("said :", err["msg"])
+```
 ## Smart mode, and what it actually does
 
 Pydantic v2 does not simply try members left to right. It uses **smart mode**, which is a two-pass strategy.

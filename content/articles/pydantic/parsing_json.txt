@@ -18,6 +18,162 @@ model = Module.model_validate_json(raw)
 
 It is not merely shorter. It is faster, produces better errors, and is more faithful with numbers. Three separate reasons, and they compound.
 
+
+## One call instead of two
+
+<code>model_validate_json</code> parses and validates together, inside the Rust core, without building an intermediate dict.
+
+```python-run
+import json
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+payload = '{"title": "Vectors", "minutes": 8}'
+
+two_steps = Module.model_validate(json.loads(payload))
+one_step = Module.model_validate_json(payload)
+
+print("two steps:", two_steps)
+print("one step :", one_step)
+print("equal    :", two_steps == one_step)
+print()
+print("Same result. The second never materialises the dict.")
+```
+
+## Malformed JSON is one exception, not two
+
+Going via <code>json.loads</code> means catching a <code>JSONDecodeError</code> separately. The direct call folds it into <code>ValidationError</code>.
+
+```python-run
+import json
+from pydantic import BaseModel, ValidationError
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+broken = '{"title": "Vectors", "minutes": 8'      # missing brace
+
+try:
+    Module.model_validate(json.loads(broken))
+except json.JSONDecodeError as e:
+    print("via loads :", type(e).__name__, "- a different exception type")
+
+try:
+    Module.model_validate_json(broken)
+except ValidationError as e:
+    err = e.errors()[0]
+    print("direct    :", err["type"])
+    print("            ", err["msg"])
+    print("position  :", err.get("ctx"))
+```
+
+## One handler for both failure kinds
+
+Because syntax errors and validation errors arrive the same way, the code that deals with a bad request has one shape.
+
+```python-run
+from pydantic import BaseModel, Field, ValidationError
+
+class Module(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0)
+
+def accept(raw: str):
+    try:
+        return Module.model_validate_json(raw), None
+    except ValidationError as e:
+        return None, [(".".join(str(p) for p in err["loc"]) or "_body", err["msg"])
+                      for err in e.errors()]
+
+for raw in ['{"title": "Vectors", "minutes": 8}',
+            '{"title": "Vectors", "minutes": 8',
+            '{"title": "no", "minutes": -1}']:
+    model, problems = accept(raw)
+    print(raw[:38])
+    print("   ->", model if model else problems)
+```
+
+## Decimals keep their exact text
+
+The JSON parser sees the digits as written. Going through Python floats loses that before validation ever runs.
+
+```python-run
+import json
+from decimal import Decimal
+from pydantic import BaseModel
+
+class Price(BaseModel):
+    amount: Decimal
+
+payload = '{"amount": 0.1}'
+
+via_python = Price.model_validate(json.loads(payload))
+direct = Price.model_validate_json(payload)
+
+print("via json.loads    :", via_python.amount)
+print("model_validate_json:", direct.amount)
+print()
+print("json.loads made a float first, and the float was already inexact.")
+print("The direct parser read the characters 0.1 and kept them.")
+```
+
+## Dumping and reloading
+
+The other direction is symmetric, and a JSON round trip is exact for every type Pydantic knows.
+
+```python-run
+from datetime import date
+from decimal import Decimal
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    published_on: date
+    price: Decimal
+
+m = Module(title="Vectors", published_on="2026-08-26", price="12.50")
+
+wire = m.model_dump_json()
+print("out :", wire)
+
+back = Module.model_validate_json(wire)
+print("in  :", back)
+print("equal:", back == m)
+print()
+print("date and Decimal both survived the trip intact.")
+```
+
+## Bare arrays and other shapes
+
+<code>TypeAdapter</code> gives the same one-step parsing for anything that is not a model.
+
+```python-run
+from typing import List, Dict
+from pydantic import BaseModel, TypeAdapter, ValidationError
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+lessons = TypeAdapter(List[Lesson])
+
+payload = '[{"name": "Direction", "minutes": "4"}, {"name": "Magnitude", "minutes": 6}]'
+parsed = lessons.validate_json(payload)
+print("parsed:", parsed)
+print("out   :", lessons.dump_json(parsed).decode())
+
+scores = TypeAdapter(Dict[str, float])
+print("dict  :", scores.validate_json('{"maths": "4.5", "python": 4}'))
+
+try:
+    lessons.validate_json('[{"name": "X", "minutes": "soon"}]')
+except ValidationError as e:
+    print("error :", e.errors()[0]["loc"], e.errors()[0]["type"])
+```
 ## Speed
 
 The two-step version parses JSON into Python objects &mdash; dicts, lists, strings, floats &mdash; and then validates those objects, converting again into what the model wants.

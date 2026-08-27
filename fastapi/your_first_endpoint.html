@@ -160,6 +160,28 @@
             font-family: var(--vz-mono); font-size: 0.85em;
             color: var(--accent-primary);
         }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
     </style>
 </head>
 <body class="flex flex-col min-h-screen light-mode">
@@ -210,1351 +232,10 @@
                     <pre><code class="language-python">@app.get(&quot;/modules&quot;)
 def read_modules():
     return [{&quot;title&quot;: &quot;Vectors&quot;}]</code></pre><p>The instinct is that <code>@app.get</code> wraps the function in something. It does not. It <strong>registers</strong> it: the app records the path, the HTTP method and the function's signature in a routing table, and returns the function unchanged.</p><p>You can verify that, and the first editor above does &mdash; <code>read_modules()</code> called directly still returns the list. This is worth knowing because it means an endpoint is an ordinary function, testable on its own, with no framework machinery attached to it.</p><p>What the app records from the signature is more than the name. It notes which parameters correspond to placeholders in the path, which have defaults, and what each is annotated as. That analysis happens once, at import, which is why routing is cheap at request time.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-the-return-value">The return value</a></li><li><a href="#vz-s-status-codes">Status codes</a></li><li><a href="#vz-s-route-order">Route order</a></li><li><a href="#vz-s-describing-what-you-built">Describing what you built</a></li><li><a href="#vz-s-path-design-briefly">Path design, briefly</a></li><li><a href="#vz-s-what-running-these-means">What running these means</a></li><li><a href="#vz-s-the-other-methods">The other methods</a></li><li><a href="#vz-s-trailing-slashes">Trailing slashes</a></li><li><a href="#vz-s-returning-a-response-directly">Returning a Response directly</a></li><li><a href="#vz-s-where-handlers-should-stop">Where handlers should stop</a></li><li><a href="#vz-s-mistakes-people-make">Mistakes people make</a></li><li><a href="#vz-s-next">Next</a></li><li><a href="#vz-s-a-shape-worth-copying">A shape worth copying</a></li><li><a href="#vz-s-where-routes-live-as-an-app-grows">Where routes live as an app grows</a></li><li><a href="#vz-s-reloading-while-you-work">Reloading while you work</a></li><li><a href="#vz-s-the-one-line-summary">The one-line summary</a></li><li><a href="#vz-s-a-closing-thought">A closing thought</a></li><li><a href="#vz-s-what-to-check-before-shipping-one">What to check before shipping one</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-the-decorator-registers-a-route">The decorator registers a route</a></li><li><a href="#vz-s-the-return-value-becomes-json">The return value becomes JSON</a></li><li><a href="#vz-s-choosing-the-status-code">Choosing the status code</a></li><li><a href="#vz-s-order-matters-when-paths-overlap">Order matters when paths overlap</a></li><li><a href="#vz-s-describing-the-endpoint">Describing the endpoint</a></li><li><a href="#vz-s-a-whole-small-api">A whole small API</a></li><li><a href="#vz-s-the-return-value">The return value</a></li><li><a href="#vz-s-status-codes">Status codes</a></li><li><a href="#vz-s-route-order">Route order</a></li><li><a href="#vz-s-describing-what-you-built">Describing what you built</a></li><li><a href="#vz-s-path-design-briefly">Path design, briefly</a></li><li><a href="#vz-s-what-running-these-means">What running these means</a></li><li><a href="#vz-s-the-other-methods">The other methods</a></li><li><a href="#vz-s-trailing-slashes">Trailing slashes</a></li><li><a href="#vz-s-returning-a-response-directly">Returning a Response directly</a></li><li><a href="#vz-s-where-handlers-should-stop">Where handlers should stop</a></li><li><a href="#vz-s-mistakes-people-make">Mistakes people make</a></li><li><a href="#vz-s-next">Next</a></li><li><a href="#vz-s-a-shape-worth-copying">A shape worth copying</a></li><li><a href="#vz-s-where-routes-live-as-an-app-grows">Where routes live as an app grows</a></li><li><a href="#vz-s-reloading-while-you-work">Reloading while you work</a></li><li><a href="#vz-s-the-one-line-summary">The one-line summary</a></li><li><a href="#vz-s-a-closing-thought">A closing thought</a></li><li><a href="#vz-s-what-to-check-before-shipping-one">What to check before shipping one</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
-            <div class="lg:col-span-7 space-y-6" data-vz-viz>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">01</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">The decorator registers a route</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">It does not wrap the function. It records the path, the method and the signature in the app's routing table.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI">
-                    <script type="text/plain" class="py-prelude">import json as _json
-from contextlib import asynccontextmanager
-
-# Starlette hands a sync `def` endpoint to a threadpool. There are no threads
-# here, so run it inline. This is the one behaviour that differs from a real
-# server: a blocking call in a `def` endpoint blocks everything.
-async def _inline(func, *args, **kwargs):
-    return func(*args, **kwargs)
-
-# `from X import run_in_threadpool` binds the name at import time, so every
-# module that imported it needs patching - not just the one it came from.
-# Missing fastapi.dependencies.utils is why Depends used to fail here with
-# "can't start new thread": the dependency solver had its own bound copy.
-import starlette.concurrency, starlette.background, starlette.responses
-import starlette.routing
-import fastapi.concurrency, fastapi.routing
-import fastapi.dependencies.utils as _deps
-
-for _mod in (starlette.concurrency, starlette.background, starlette.routing,
-             fastapi.concurrency, fastapi.routing, _deps):
-    if hasattr(_mod, "run_in_threadpool"):
-        _mod.run_in_threadpool = _inline
-
-
-@asynccontextmanager
-async def _inline_cm(cm):
-    """Stands in for contextmanager_in_threadpool - runs a sync CM inline.
-
-    This is what makes a `yield` dependency work, teardown included.
-    """
-    value = cm.__enter__()
-    try:
-        yield value
-    except Exception as e:
-        if not cm.__exit__(type(e), e, e.__traceback__):
-            raise
-    else:
-        cm.__exit__(None, None, None)
-
-
-async def _inline_iter(it):
-    """Stands in for iterate_in_threadpool - drives a sync iterator inline."""
-    for item in it:
-        yield item
-
-
-for _mod in (fastapi.concurrency, _deps):
-    if hasattr(_mod, "contextmanager_in_threadpool"):
-        _mod.contextmanager_in_threadpool = _inline_cm
-for _mod in (starlette.concurrency, starlette.responses):
-    if hasattr(_mod, "iterate_in_threadpool"):
-        _mod.iterate_in_threadpool = _inline_iter
-
-
-def _drive(coro):
-    """Run an ASGI coroutine to completion without an event loop.
-
-    Nothing in a request that never touches real I/O suspends, so one send()
-    carries it to StopIteration. If it does suspend there is no loop to hand
-    it to, and saying so is better than hanging.
-    """
-    try:
-        coro.send(None)
-    except StopIteration as stop:
-        return stop.value
-    coro.close()
-    raise RuntimeError(
-        "This endpoint awaited real I/O (a network call, a sleep), which the "
-        "browser sandbox cannot run. Remove the await and try again.")
-
-
-class _ClientResponse:
-    """The part of httpx.Response that a FastAPI example actually touches.
-
-    Deliberately *not* called Response. FastAPI has its own Response class
-    that readers import and construct, and a test-client class sitting on
-    that name in their namespace is a trap - the failure is a confusing
-    AttributeError deep in starlette rather than anything that names the
-    collision.
-    """
-
-    def __init__(self, status_code, headers, content):
-        self.status_code = status_code
-        self.headers = headers
-        self.content = content
-        self.text = content.decode("utf-8", "replace")
-
-    def json(self):
-        return _json.loads(self.text)
-
-    def __repr__(self):
-        return "<Response [%s]>" % self.status_code
-
-
-class TestClient:
-    """Calls the app through ASGI - the same path a real server would use."""
-
-    def __init__(self, app, base_url="http://testserver"):
-        self.app = app
-        self.base_url = base_url
-
-    def request(self, method, url, json=None, content=None, headers=None):
-        path, _, query = url.partition("?")
-        body = b""
-        hdrs = [(b"host", b"testserver")]
-        if json is not None:
-            body = _json.dumps(json).encode()
-            hdrs.append((b"content-type", b"application/json"))
-        elif content is not None:
-            body = content if isinstance(content, bytes) else str(content).encode()
-        for key, value in (headers or {}).items():
-            hdrs.append((key.lower().encode(), value.encode()))
-        hdrs.append((b"content-length", str(len(body)).encode()))
-
-        scope = {
-            "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
-            "http_version": "1.1", "method": method.upper(), "scheme": "http",
-            "path": path, "raw_path": path.encode(), "query_string": query.encode(),
-            "root_path": "", "headers": hdrs,
-            "client": ("testclient", 50000), "server": ("testserver", 80),
-        }
-
-        # After the body, report a disconnect. A streaming response starts a
-        # listener that waits for one, and a receive() that never sends it
-        # spins forever - which used to hang the worker rather than fail.
-        state = {"delivered": False}
-
-        async def receive():
-            if state["delivered"]:
-                return {"type": "http.disconnect"}
-            state["delivered"] = True
-            return {"type": "http.request", "body": body, "more_body": False}
-
-        messages = []
-
-        async def send(message):
-            messages.append(message)
-
-        _drive(self.app(scope, receive, send))
-
-        status, out_headers, chunks = None, {}, b""
-        for message in messages:
-            if message["type"] == "http.response.start":
-                status = message["status"]
-                out_headers = {k.decode(): v.decode()
-                               for k, v in message.get("headers", [])}
-            elif message["type"] == "http.response.body":
-                chunks += message.get("body", b"")
-        return _ClientResponse(status, out_headers, chunks)
-
-    def get(self, url, **kw):
-        return self.request("GET", url, **kw)
-
-    def post(self, url, **kw):
-        return self.request("POST", url, **kw)
-
-    def put(self, url, **kw):
-        return self.request("PUT", url, **kw)
-
-    def patch(self, url, **kw):
-        return self.request("PATCH", url, **kw)
-
-    def delete(self, url, **kw):
-        return self.request("DELETE", url, **kw)
-
-
-drive = _drive</script>
-                    <script type="text/plain" class="py-src">from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/modules")
-def read_modules():
-    return [{"title": "Vectors"}, {"title": "Norms"}]
-
-print("routes registered:")
-for route in app.routes:
-    methods = getattr(route, "methods", None)
-    if methods:
-        print("  %-8s %s" % (",".join(sorted(methods)), route.path))
-
-print()
-print("the function is untouched:", read_modules())</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_01.py</span>
-                        <span class="vz-code-lang">FastAPI</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="FastAPI code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">02</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">The return value becomes JSON</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Dicts, lists, models, primitives &mdash; all serialised for you. The default status is 200.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI">
-                    <script type="text/plain" class="py-prelude">import json as _json
-from contextlib import asynccontextmanager
-
-# Starlette hands a sync `def` endpoint to a threadpool. There are no threads
-# here, so run it inline. This is the one behaviour that differs from a real
-# server: a blocking call in a `def` endpoint blocks everything.
-async def _inline(func, *args, **kwargs):
-    return func(*args, **kwargs)
-
-# `from X import run_in_threadpool` binds the name at import time, so every
-# module that imported it needs patching - not just the one it came from.
-# Missing fastapi.dependencies.utils is why Depends used to fail here with
-# "can't start new thread": the dependency solver had its own bound copy.
-import starlette.concurrency, starlette.background, starlette.responses
-import starlette.routing
-import fastapi.concurrency, fastapi.routing
-import fastapi.dependencies.utils as _deps
-
-for _mod in (starlette.concurrency, starlette.background, starlette.routing,
-             fastapi.concurrency, fastapi.routing, _deps):
-    if hasattr(_mod, "run_in_threadpool"):
-        _mod.run_in_threadpool = _inline
-
-
-@asynccontextmanager
-async def _inline_cm(cm):
-    """Stands in for contextmanager_in_threadpool - runs a sync CM inline.
-
-    This is what makes a `yield` dependency work, teardown included.
-    """
-    value = cm.__enter__()
-    try:
-        yield value
-    except Exception as e:
-        if not cm.__exit__(type(e), e, e.__traceback__):
-            raise
-    else:
-        cm.__exit__(None, None, None)
-
-
-async def _inline_iter(it):
-    """Stands in for iterate_in_threadpool - drives a sync iterator inline."""
-    for item in it:
-        yield item
-
-
-for _mod in (fastapi.concurrency, _deps):
-    if hasattr(_mod, "contextmanager_in_threadpool"):
-        _mod.contextmanager_in_threadpool = _inline_cm
-for _mod in (starlette.concurrency, starlette.responses):
-    if hasattr(_mod, "iterate_in_threadpool"):
-        _mod.iterate_in_threadpool = _inline_iter
-
-
-def _drive(coro):
-    """Run an ASGI coroutine to completion without an event loop.
-
-    Nothing in a request that never touches real I/O suspends, so one send()
-    carries it to StopIteration. If it does suspend there is no loop to hand
-    it to, and saying so is better than hanging.
-    """
-    try:
-        coro.send(None)
-    except StopIteration as stop:
-        return stop.value
-    coro.close()
-    raise RuntimeError(
-        "This endpoint awaited real I/O (a network call, a sleep), which the "
-        "browser sandbox cannot run. Remove the await and try again.")
-
-
-class _ClientResponse:
-    """The part of httpx.Response that a FastAPI example actually touches.
-
-    Deliberately *not* called Response. FastAPI has its own Response class
-    that readers import and construct, and a test-client class sitting on
-    that name in their namespace is a trap - the failure is a confusing
-    AttributeError deep in starlette rather than anything that names the
-    collision.
-    """
-
-    def __init__(self, status_code, headers, content):
-        self.status_code = status_code
-        self.headers = headers
-        self.content = content
-        self.text = content.decode("utf-8", "replace")
-
-    def json(self):
-        return _json.loads(self.text)
-
-    def __repr__(self):
-        return "<Response [%s]>" % self.status_code
-
-
-class TestClient:
-    """Calls the app through ASGI - the same path a real server would use."""
-
-    def __init__(self, app, base_url="http://testserver"):
-        self.app = app
-        self.base_url = base_url
-
-    def request(self, method, url, json=None, content=None, headers=None):
-        path, _, query = url.partition("?")
-        body = b""
-        hdrs = [(b"host", b"testserver")]
-        if json is not None:
-            body = _json.dumps(json).encode()
-            hdrs.append((b"content-type", b"application/json"))
-        elif content is not None:
-            body = content if isinstance(content, bytes) else str(content).encode()
-        for key, value in (headers or {}).items():
-            hdrs.append((key.lower().encode(), value.encode()))
-        hdrs.append((b"content-length", str(len(body)).encode()))
-
-        scope = {
-            "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
-            "http_version": "1.1", "method": method.upper(), "scheme": "http",
-            "path": path, "raw_path": path.encode(), "query_string": query.encode(),
-            "root_path": "", "headers": hdrs,
-            "client": ("testclient", 50000), "server": ("testserver", 80),
-        }
-
-        # After the body, report a disconnect. A streaming response starts a
-        # listener that waits for one, and a receive() that never sends it
-        # spins forever - which used to hang the worker rather than fail.
-        state = {"delivered": False}
-
-        async def receive():
-            if state["delivered"]:
-                return {"type": "http.disconnect"}
-            state["delivered"] = True
-            return {"type": "http.request", "body": body, "more_body": False}
-
-        messages = []
-
-        async def send(message):
-            messages.append(message)
-
-        _drive(self.app(scope, receive, send))
-
-        status, out_headers, chunks = None, {}, b""
-        for message in messages:
-            if message["type"] == "http.response.start":
-                status = message["status"]
-                out_headers = {k.decode(): v.decode()
-                               for k, v in message.get("headers", [])}
-            elif message["type"] == "http.response.body":
-                chunks += message.get("body", b"")
-        return _ClientResponse(status, out_headers, chunks)
-
-    def get(self, url, **kw):
-        return self.request("GET", url, **kw)
-
-    def post(self, url, **kw):
-        return self.request("POST", url, **kw)
-
-    def put(self, url, **kw):
-        return self.request("PUT", url, **kw)
-
-    def patch(self, url, **kw):
-        return self.request("PATCH", url, **kw)
-
-    def delete(self, url, **kw):
-        return self.request("DELETE", url, **kw)
-
-
-drive = _drive</script>
-                    <script type="text/plain" class="py-src">from fastapi import FastAPI
-from pydantic import BaseModel
-
-app = FastAPI()
-
-class Module(BaseModel):
-    title: str
-    minutes: int
-
-@app.get("/dict")
-def a(): return {"kind": "dict"}
-
-@app.get("/list")
-def b(): return [1, 2, 3]
-
-@app.get("/model")
-def c(): return Module(title="Vectors", minutes=8)
-
-@app.get("/scalar")
-def d(): return "just a string"
-
-client = TestClient(app)
-for path in ["/dict", "/list", "/model", "/scalar"]:
-    r = client.get(path)
-    print("%-8s %s  %-14s %s" % (path, r.status_code,
-                                 r.headers.get("content-type"), r.text))</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_02.py</span>
-                        <span class="vz-code-lang">FastAPI</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="FastAPI code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">03</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Choosing the status code</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>status_code</code> on the decorator sets the default for that route. The <code>status</code> module names them so you do not have to remember numbers.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI">
-                    <script type="text/plain" class="py-prelude">import json as _json
-from contextlib import asynccontextmanager
-
-# Starlette hands a sync `def` endpoint to a threadpool. There are no threads
-# here, so run it inline. This is the one behaviour that differs from a real
-# server: a blocking call in a `def` endpoint blocks everything.
-async def _inline(func, *args, **kwargs):
-    return func(*args, **kwargs)
-
-# `from X import run_in_threadpool` binds the name at import time, so every
-# module that imported it needs patching - not just the one it came from.
-# Missing fastapi.dependencies.utils is why Depends used to fail here with
-# "can't start new thread": the dependency solver had its own bound copy.
-import starlette.concurrency, starlette.background, starlette.responses
-import starlette.routing
-import fastapi.concurrency, fastapi.routing
-import fastapi.dependencies.utils as _deps
-
-for _mod in (starlette.concurrency, starlette.background, starlette.routing,
-             fastapi.concurrency, fastapi.routing, _deps):
-    if hasattr(_mod, "run_in_threadpool"):
-        _mod.run_in_threadpool = _inline
-
-
-@asynccontextmanager
-async def _inline_cm(cm):
-    """Stands in for contextmanager_in_threadpool - runs a sync CM inline.
-
-    This is what makes a `yield` dependency work, teardown included.
-    """
-    value = cm.__enter__()
-    try:
-        yield value
-    except Exception as e:
-        if not cm.__exit__(type(e), e, e.__traceback__):
-            raise
-    else:
-        cm.__exit__(None, None, None)
-
-
-async def _inline_iter(it):
-    """Stands in for iterate_in_threadpool - drives a sync iterator inline."""
-    for item in it:
-        yield item
-
-
-for _mod in (fastapi.concurrency, _deps):
-    if hasattr(_mod, "contextmanager_in_threadpool"):
-        _mod.contextmanager_in_threadpool = _inline_cm
-for _mod in (starlette.concurrency, starlette.responses):
-    if hasattr(_mod, "iterate_in_threadpool"):
-        _mod.iterate_in_threadpool = _inline_iter
-
-
-def _drive(coro):
-    """Run an ASGI coroutine to completion without an event loop.
-
-    Nothing in a request that never touches real I/O suspends, so one send()
-    carries it to StopIteration. If it does suspend there is no loop to hand
-    it to, and saying so is better than hanging.
-    """
-    try:
-        coro.send(None)
-    except StopIteration as stop:
-        return stop.value
-    coro.close()
-    raise RuntimeError(
-        "This endpoint awaited real I/O (a network call, a sleep), which the "
-        "browser sandbox cannot run. Remove the await and try again.")
-
-
-class _ClientResponse:
-    """The part of httpx.Response that a FastAPI example actually touches.
-
-    Deliberately *not* called Response. FastAPI has its own Response class
-    that readers import and construct, and a test-client class sitting on
-    that name in their namespace is a trap - the failure is a confusing
-    AttributeError deep in starlette rather than anything that names the
-    collision.
-    """
-
-    def __init__(self, status_code, headers, content):
-        self.status_code = status_code
-        self.headers = headers
-        self.content = content
-        self.text = content.decode("utf-8", "replace")
-
-    def json(self):
-        return _json.loads(self.text)
-
-    def __repr__(self):
-        return "<Response [%s]>" % self.status_code
-
-
-class TestClient:
-    """Calls the app through ASGI - the same path a real server would use."""
-
-    def __init__(self, app, base_url="http://testserver"):
-        self.app = app
-        self.base_url = base_url
-
-    def request(self, method, url, json=None, content=None, headers=None):
-        path, _, query = url.partition("?")
-        body = b""
-        hdrs = [(b"host", b"testserver")]
-        if json is not None:
-            body = _json.dumps(json).encode()
-            hdrs.append((b"content-type", b"application/json"))
-        elif content is not None:
-            body = content if isinstance(content, bytes) else str(content).encode()
-        for key, value in (headers or {}).items():
-            hdrs.append((key.lower().encode(), value.encode()))
-        hdrs.append((b"content-length", str(len(body)).encode()))
-
-        scope = {
-            "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
-            "http_version": "1.1", "method": method.upper(), "scheme": "http",
-            "path": path, "raw_path": path.encode(), "query_string": query.encode(),
-            "root_path": "", "headers": hdrs,
-            "client": ("testclient", 50000), "server": ("testserver", 80),
-        }
-
-        # After the body, report a disconnect. A streaming response starts a
-        # listener that waits for one, and a receive() that never sends it
-        # spins forever - which used to hang the worker rather than fail.
-        state = {"delivered": False}
-
-        async def receive():
-            if state["delivered"]:
-                return {"type": "http.disconnect"}
-            state["delivered"] = True
-            return {"type": "http.request", "body": body, "more_body": False}
-
-        messages = []
-
-        async def send(message):
-            messages.append(message)
-
-        _drive(self.app(scope, receive, send))
-
-        status, out_headers, chunks = None, {}, b""
-        for message in messages:
-            if message["type"] == "http.response.start":
-                status = message["status"]
-                out_headers = {k.decode(): v.decode()
-                               for k, v in message.get("headers", [])}
-            elif message["type"] == "http.response.body":
-                chunks += message.get("body", b"")
-        return _ClientResponse(status, out_headers, chunks)
-
-    def get(self, url, **kw):
-        return self.request("GET", url, **kw)
-
-    def post(self, url, **kw):
-        return self.request("POST", url, **kw)
-
-    def put(self, url, **kw):
-        return self.request("PUT", url, **kw)
-
-    def patch(self, url, **kw):
-        return self.request("PATCH", url, **kw)
-
-    def delete(self, url, **kw):
-        return self.request("DELETE", url, **kw)
-
-
-drive = _drive</script>
-                    <script type="text/plain" class="py-src">from fastapi import FastAPI, status
-
-app = FastAPI()
-
-@app.post("/modules", status_code=status.HTTP_201_CREATED)
-def create():
-    return {"created": True}
-
-@app.delete("/modules/{i}", status_code=status.HTTP_204_NO_CONTENT)
-def delete(i: int):
-    return None                       # 204 means "nothing to say"
-
-client = TestClient(app)
-r1 = client.post("/modules")
-r2 = client.delete("/modules/1")
-print("create :", r1.status_code, r1.json())
-print("delete :", r2.status_code, repr(r2.text), "<- 204 has no body")</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_03.py</span>
-                        <span class="vz-code-lang">FastAPI</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="FastAPI code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">04</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Order matters when paths overlap</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Routes are matched in the order they were registered, so a fixed path must come before a variable one that would also match it.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI">
-                    <script type="text/plain" class="py-prelude">import json as _json
-from contextlib import asynccontextmanager
-
-# Starlette hands a sync `def` endpoint to a threadpool. There are no threads
-# here, so run it inline. This is the one behaviour that differs from a real
-# server: a blocking call in a `def` endpoint blocks everything.
-async def _inline(func, *args, **kwargs):
-    return func(*args, **kwargs)
-
-# `from X import run_in_threadpool` binds the name at import time, so every
-# module that imported it needs patching - not just the one it came from.
-# Missing fastapi.dependencies.utils is why Depends used to fail here with
-# "can't start new thread": the dependency solver had its own bound copy.
-import starlette.concurrency, starlette.background, starlette.responses
-import starlette.routing
-import fastapi.concurrency, fastapi.routing
-import fastapi.dependencies.utils as _deps
-
-for _mod in (starlette.concurrency, starlette.background, starlette.routing,
-             fastapi.concurrency, fastapi.routing, _deps):
-    if hasattr(_mod, "run_in_threadpool"):
-        _mod.run_in_threadpool = _inline
-
-
-@asynccontextmanager
-async def _inline_cm(cm):
-    """Stands in for contextmanager_in_threadpool - runs a sync CM inline.
-
-    This is what makes a `yield` dependency work, teardown included.
-    """
-    value = cm.__enter__()
-    try:
-        yield value
-    except Exception as e:
-        if not cm.__exit__(type(e), e, e.__traceback__):
-            raise
-    else:
-        cm.__exit__(None, None, None)
-
-
-async def _inline_iter(it):
-    """Stands in for iterate_in_threadpool - drives a sync iterator inline."""
-    for item in it:
-        yield item
-
-
-for _mod in (fastapi.concurrency, _deps):
-    if hasattr(_mod, "contextmanager_in_threadpool"):
-        _mod.contextmanager_in_threadpool = _inline_cm
-for _mod in (starlette.concurrency, starlette.responses):
-    if hasattr(_mod, "iterate_in_threadpool"):
-        _mod.iterate_in_threadpool = _inline_iter
-
-
-def _drive(coro):
-    """Run an ASGI coroutine to completion without an event loop.
-
-    Nothing in a request that never touches real I/O suspends, so one send()
-    carries it to StopIteration. If it does suspend there is no loop to hand
-    it to, and saying so is better than hanging.
-    """
-    try:
-        coro.send(None)
-    except StopIteration as stop:
-        return stop.value
-    coro.close()
-    raise RuntimeError(
-        "This endpoint awaited real I/O (a network call, a sleep), which the "
-        "browser sandbox cannot run. Remove the await and try again.")
-
-
-class _ClientResponse:
-    """The part of httpx.Response that a FastAPI example actually touches.
-
-    Deliberately *not* called Response. FastAPI has its own Response class
-    that readers import and construct, and a test-client class sitting on
-    that name in their namespace is a trap - the failure is a confusing
-    AttributeError deep in starlette rather than anything that names the
-    collision.
-    """
-
-    def __init__(self, status_code, headers, content):
-        self.status_code = status_code
-        self.headers = headers
-        self.content = content
-        self.text = content.decode("utf-8", "replace")
-
-    def json(self):
-        return _json.loads(self.text)
-
-    def __repr__(self):
-        return "<Response [%s]>" % self.status_code
-
-
-class TestClient:
-    """Calls the app through ASGI - the same path a real server would use."""
-
-    def __init__(self, app, base_url="http://testserver"):
-        self.app = app
-        self.base_url = base_url
-
-    def request(self, method, url, json=None, content=None, headers=None):
-        path, _, query = url.partition("?")
-        body = b""
-        hdrs = [(b"host", b"testserver")]
-        if json is not None:
-            body = _json.dumps(json).encode()
-            hdrs.append((b"content-type", b"application/json"))
-        elif content is not None:
-            body = content if isinstance(content, bytes) else str(content).encode()
-        for key, value in (headers or {}).items():
-            hdrs.append((key.lower().encode(), value.encode()))
-        hdrs.append((b"content-length", str(len(body)).encode()))
-
-        scope = {
-            "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
-            "http_version": "1.1", "method": method.upper(), "scheme": "http",
-            "path": path, "raw_path": path.encode(), "query_string": query.encode(),
-            "root_path": "", "headers": hdrs,
-            "client": ("testclient", 50000), "server": ("testserver", 80),
-        }
-
-        # After the body, report a disconnect. A streaming response starts a
-        # listener that waits for one, and a receive() that never sends it
-        # spins forever - which used to hang the worker rather than fail.
-        state = {"delivered": False}
-
-        async def receive():
-            if state["delivered"]:
-                return {"type": "http.disconnect"}
-            state["delivered"] = True
-            return {"type": "http.request", "body": body, "more_body": False}
-
-        messages = []
-
-        async def send(message):
-            messages.append(message)
-
-        _drive(self.app(scope, receive, send))
-
-        status, out_headers, chunks = None, {}, b""
-        for message in messages:
-            if message["type"] == "http.response.start":
-                status = message["status"]
-                out_headers = {k.decode(): v.decode()
-                               for k, v in message.get("headers", [])}
-            elif message["type"] == "http.response.body":
-                chunks += message.get("body", b"")
-        return _ClientResponse(status, out_headers, chunks)
-
-    def get(self, url, **kw):
-        return self.request("GET", url, **kw)
-
-    def post(self, url, **kw):
-        return self.request("POST", url, **kw)
-
-    def put(self, url, **kw):
-        return self.request("PUT", url, **kw)
-
-    def patch(self, url, **kw):
-        return self.request("PATCH", url, **kw)
-
-    def delete(self, url, **kw):
-        return self.request("DELETE", url, **kw)
-
-
-drive = _drive</script>
-                    <script type="text/plain" class="py-src">from fastapi import FastAPI
-
-wrong = FastAPI()
-
-@wrong.get("/modules/{module_id}")
-def by_id(module_id: str):
-    return {"matched": "by_id", "value": module_id}
-
-@wrong.get("/modules/latest")            # registered second - never reached
-def latest_wrong():
-    return {"matched": "latest"}
-
-right = FastAPI()
-
-@right.get("/modules/latest")            # fixed path first
-def latest_right():
-    return {"matched": "latest"}
-
-@right.get("/modules/{module_id}")
-def by_id2(module_id: str):
-    return {"matched": "by_id", "value": module_id}
-
-print("wrong order:", TestClient(wrong).get("/modules/latest").json())
-print("right order:", TestClient(right).get("/modules/latest").json())
-print("still works:", TestClient(right).get("/modules/7").json())</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_04.py</span>
-                        <span class="vz-code-lang">FastAPI</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="FastAPI code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">05</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Describing the endpoint</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>summary</code>, <code>description</code> and <code>tags</code> shape the documentation. The docstring becomes the description if you do not supply one.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI">
-                    <script type="text/plain" class="py-prelude">import json as _json
-from contextlib import asynccontextmanager
-
-# Starlette hands a sync `def` endpoint to a threadpool. There are no threads
-# here, so run it inline. This is the one behaviour that differs from a real
-# server: a blocking call in a `def` endpoint blocks everything.
-async def _inline(func, *args, **kwargs):
-    return func(*args, **kwargs)
-
-# `from X import run_in_threadpool` binds the name at import time, so every
-# module that imported it needs patching - not just the one it came from.
-# Missing fastapi.dependencies.utils is why Depends used to fail here with
-# "can't start new thread": the dependency solver had its own bound copy.
-import starlette.concurrency, starlette.background, starlette.responses
-import starlette.routing
-import fastapi.concurrency, fastapi.routing
-import fastapi.dependencies.utils as _deps
-
-for _mod in (starlette.concurrency, starlette.background, starlette.routing,
-             fastapi.concurrency, fastapi.routing, _deps):
-    if hasattr(_mod, "run_in_threadpool"):
-        _mod.run_in_threadpool = _inline
-
-
-@asynccontextmanager
-async def _inline_cm(cm):
-    """Stands in for contextmanager_in_threadpool - runs a sync CM inline.
-
-    This is what makes a `yield` dependency work, teardown included.
-    """
-    value = cm.__enter__()
-    try:
-        yield value
-    except Exception as e:
-        if not cm.__exit__(type(e), e, e.__traceback__):
-            raise
-    else:
-        cm.__exit__(None, None, None)
-
-
-async def _inline_iter(it):
-    """Stands in for iterate_in_threadpool - drives a sync iterator inline."""
-    for item in it:
-        yield item
-
-
-for _mod in (fastapi.concurrency, _deps):
-    if hasattr(_mod, "contextmanager_in_threadpool"):
-        _mod.contextmanager_in_threadpool = _inline_cm
-for _mod in (starlette.concurrency, starlette.responses):
-    if hasattr(_mod, "iterate_in_threadpool"):
-        _mod.iterate_in_threadpool = _inline_iter
-
-
-def _drive(coro):
-    """Run an ASGI coroutine to completion without an event loop.
-
-    Nothing in a request that never touches real I/O suspends, so one send()
-    carries it to StopIteration. If it does suspend there is no loop to hand
-    it to, and saying so is better than hanging.
-    """
-    try:
-        coro.send(None)
-    except StopIteration as stop:
-        return stop.value
-    coro.close()
-    raise RuntimeError(
-        "This endpoint awaited real I/O (a network call, a sleep), which the "
-        "browser sandbox cannot run. Remove the await and try again.")
-
-
-class _ClientResponse:
-    """The part of httpx.Response that a FastAPI example actually touches.
-
-    Deliberately *not* called Response. FastAPI has its own Response class
-    that readers import and construct, and a test-client class sitting on
-    that name in their namespace is a trap - the failure is a confusing
-    AttributeError deep in starlette rather than anything that names the
-    collision.
-    """
-
-    def __init__(self, status_code, headers, content):
-        self.status_code = status_code
-        self.headers = headers
-        self.content = content
-        self.text = content.decode("utf-8", "replace")
-
-    def json(self):
-        return _json.loads(self.text)
-
-    def __repr__(self):
-        return "<Response [%s]>" % self.status_code
-
-
-class TestClient:
-    """Calls the app through ASGI - the same path a real server would use."""
-
-    def __init__(self, app, base_url="http://testserver"):
-        self.app = app
-        self.base_url = base_url
-
-    def request(self, method, url, json=None, content=None, headers=None):
-        path, _, query = url.partition("?")
-        body = b""
-        hdrs = [(b"host", b"testserver")]
-        if json is not None:
-            body = _json.dumps(json).encode()
-            hdrs.append((b"content-type", b"application/json"))
-        elif content is not None:
-            body = content if isinstance(content, bytes) else str(content).encode()
-        for key, value in (headers or {}).items():
-            hdrs.append((key.lower().encode(), value.encode()))
-        hdrs.append((b"content-length", str(len(body)).encode()))
-
-        scope = {
-            "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
-            "http_version": "1.1", "method": method.upper(), "scheme": "http",
-            "path": path, "raw_path": path.encode(), "query_string": query.encode(),
-            "root_path": "", "headers": hdrs,
-            "client": ("testclient", 50000), "server": ("testserver", 80),
-        }
-
-        # After the body, report a disconnect. A streaming response starts a
-        # listener that waits for one, and a receive() that never sends it
-        # spins forever - which used to hang the worker rather than fail.
-        state = {"delivered": False}
-
-        async def receive():
-            if state["delivered"]:
-                return {"type": "http.disconnect"}
-            state["delivered"] = True
-            return {"type": "http.request", "body": body, "more_body": False}
-
-        messages = []
-
-        async def send(message):
-            messages.append(message)
-
-        _drive(self.app(scope, receive, send))
-
-        status, out_headers, chunks = None, {}, b""
-        for message in messages:
-            if message["type"] == "http.response.start":
-                status = message["status"]
-                out_headers = {k.decode(): v.decode()
-                               for k, v in message.get("headers", [])}
-            elif message["type"] == "http.response.body":
-                chunks += message.get("body", b"")
-        return _ClientResponse(status, out_headers, chunks)
-
-    def get(self, url, **kw):
-        return self.request("GET", url, **kw)
-
-    def post(self, url, **kw):
-        return self.request("POST", url, **kw)
-
-    def put(self, url, **kw):
-        return self.request("PUT", url, **kw)
-
-    def patch(self, url, **kw):
-        return self.request("PATCH", url, **kw)
-
-    def delete(self, url, **kw):
-        return self.request("DELETE", url, **kw)
-
-
-drive = _drive</script>
-                    <script type="text/plain" class="py-src">import json
-from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/modules", summary="List modules", tags=["modules"])
-def read_modules():
-    """Return every published module, newest first.
-
-    Unpublished drafts are excluded.
-    """
-    return []
-
-spec = app.openapi()["paths"]["/modules"]["get"]
-print("summary    :", spec["summary"])
-print("tags       :", spec["tags"])
-print("description:")
-print(spec["description"])</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_05.py</span>
-                        <span class="vz-code-lang">FastAPI</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="FastAPI code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">06</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">A whole small API</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Everything so far in one app: two routes, a model, a status code and an in-memory store.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI">
-                    <script type="text/plain" class="py-prelude">import json as _json
-from contextlib import asynccontextmanager
-
-# Starlette hands a sync `def` endpoint to a threadpool. There are no threads
-# here, so run it inline. This is the one behaviour that differs from a real
-# server: a blocking call in a `def` endpoint blocks everything.
-async def _inline(func, *args, **kwargs):
-    return func(*args, **kwargs)
-
-# `from X import run_in_threadpool` binds the name at import time, so every
-# module that imported it needs patching - not just the one it came from.
-# Missing fastapi.dependencies.utils is why Depends used to fail here with
-# "can't start new thread": the dependency solver had its own bound copy.
-import starlette.concurrency, starlette.background, starlette.responses
-import starlette.routing
-import fastapi.concurrency, fastapi.routing
-import fastapi.dependencies.utils as _deps
-
-for _mod in (starlette.concurrency, starlette.background, starlette.routing,
-             fastapi.concurrency, fastapi.routing, _deps):
-    if hasattr(_mod, "run_in_threadpool"):
-        _mod.run_in_threadpool = _inline
-
-
-@asynccontextmanager
-async def _inline_cm(cm):
-    """Stands in for contextmanager_in_threadpool - runs a sync CM inline.
-
-    This is what makes a `yield` dependency work, teardown included.
-    """
-    value = cm.__enter__()
-    try:
-        yield value
-    except Exception as e:
-        if not cm.__exit__(type(e), e, e.__traceback__):
-            raise
-    else:
-        cm.__exit__(None, None, None)
-
-
-async def _inline_iter(it):
-    """Stands in for iterate_in_threadpool - drives a sync iterator inline."""
-    for item in it:
-        yield item
-
-
-for _mod in (fastapi.concurrency, _deps):
-    if hasattr(_mod, "contextmanager_in_threadpool"):
-        _mod.contextmanager_in_threadpool = _inline_cm
-for _mod in (starlette.concurrency, starlette.responses):
-    if hasattr(_mod, "iterate_in_threadpool"):
-        _mod.iterate_in_threadpool = _inline_iter
-
-
-def _drive(coro):
-    """Run an ASGI coroutine to completion without an event loop.
-
-    Nothing in a request that never touches real I/O suspends, so one send()
-    carries it to StopIteration. If it does suspend there is no loop to hand
-    it to, and saying so is better than hanging.
-    """
-    try:
-        coro.send(None)
-    except StopIteration as stop:
-        return stop.value
-    coro.close()
-    raise RuntimeError(
-        "This endpoint awaited real I/O (a network call, a sleep), which the "
-        "browser sandbox cannot run. Remove the await and try again.")
-
-
-class _ClientResponse:
-    """The part of httpx.Response that a FastAPI example actually touches.
-
-    Deliberately *not* called Response. FastAPI has its own Response class
-    that readers import and construct, and a test-client class sitting on
-    that name in their namespace is a trap - the failure is a confusing
-    AttributeError deep in starlette rather than anything that names the
-    collision.
-    """
-
-    def __init__(self, status_code, headers, content):
-        self.status_code = status_code
-        self.headers = headers
-        self.content = content
-        self.text = content.decode("utf-8", "replace")
-
-    def json(self):
-        return _json.loads(self.text)
-
-    def __repr__(self):
-        return "<Response [%s]>" % self.status_code
-
-
-class TestClient:
-    """Calls the app through ASGI - the same path a real server would use."""
-
-    def __init__(self, app, base_url="http://testserver"):
-        self.app = app
-        self.base_url = base_url
-
-    def request(self, method, url, json=None, content=None, headers=None):
-        path, _, query = url.partition("?")
-        body = b""
-        hdrs = [(b"host", b"testserver")]
-        if json is not None:
-            body = _json.dumps(json).encode()
-            hdrs.append((b"content-type", b"application/json"))
-        elif content is not None:
-            body = content if isinstance(content, bytes) else str(content).encode()
-        for key, value in (headers or {}).items():
-            hdrs.append((key.lower().encode(), value.encode()))
-        hdrs.append((b"content-length", str(len(body)).encode()))
-
-        scope = {
-            "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
-            "http_version": "1.1", "method": method.upper(), "scheme": "http",
-            "path": path, "raw_path": path.encode(), "query_string": query.encode(),
-            "root_path": "", "headers": hdrs,
-            "client": ("testclient", 50000), "server": ("testserver", 80),
-        }
-
-        # After the body, report a disconnect. A streaming response starts a
-        # listener that waits for one, and a receive() that never sends it
-        # spins forever - which used to hang the worker rather than fail.
-        state = {"delivered": False}
-
-        async def receive():
-            if state["delivered"]:
-                return {"type": "http.disconnect"}
-            state["delivered"] = True
-            return {"type": "http.request", "body": body, "more_body": False}
-
-        messages = []
-
-        async def send(message):
-            messages.append(message)
-
-        _drive(self.app(scope, receive, send))
-
-        status, out_headers, chunks = None, {}, b""
-        for message in messages:
-            if message["type"] == "http.response.start":
-                status = message["status"]
-                out_headers = {k.decode(): v.decode()
-                               for k, v in message.get("headers", [])}
-            elif message["type"] == "http.response.body":
-                chunks += message.get("body", b"")
-        return _ClientResponse(status, out_headers, chunks)
-
-    def get(self, url, **kw):
-        return self.request("GET", url, **kw)
-
-    def post(self, url, **kw):
-        return self.request("POST", url, **kw)
-
-    def put(self, url, **kw):
-        return self.request("PUT", url, **kw)
-
-    def patch(self, url, **kw):
-        return self.request("PATCH", url, **kw)
-
-    def delete(self, url, **kw):
-        return self.request("DELETE", url, **kw)
-
-
-drive = _drive</script>
-                    <script type="text/plain" class="py-src">from fastapi import FastAPI, status
-from pydantic import BaseModel, Field
-
-app = FastAPI(title="VizLearn")
-DB = {1: {"id": 1, "title": "Vectors", "minutes": 8}}
-
-class ModuleIn(BaseModel):
-    title: str = Field(min_length=3)
-    minutes: int = Field(default=10, gt=0)
-
-@app.get("/modules", tags=["modules"])
-def list_modules():
-    return list(DB.values())
-
-@app.post("/modules", status_code=status.HTTP_201_CREATED, tags=["modules"])
-def create_module(module: ModuleIn):
-    new_id = max(DB) + 1
-    DB[new_id] = {"id": new_id, **module.model_dump()}
-    return DB[new_id]
-
-client = TestClient(app)
-print("before :", client.get("/modules").json())
-r = client.post("/modules", json={"title": "Eigenvalues", "minutes": 14})
-print("created:", r.status_code, r.json())
-print("after  :", client.get("/modules").json())</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_06.py</span>
-                        <span class="vz-code-lang">FastAPI</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="FastAPI code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            </div>
-            <div class="lg:col-span-5 space-y-6">
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
                 <div class="card-container">
                     <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
                     <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
@@ -1583,6 +264,1147 @@ print("after  :", client.get("/modules").json())</script>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-the-decorator-registers-a-route">The decorator registers a route</h3>
+                    <p>It does not wrap the function. It records the path, the method and the signature in the app's routing table.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
+from contextlib import asynccontextmanager
+
+# Starlette hands a sync `def` endpoint to a threadpool. There are no threads
+# here, so run it inline. This is the one behaviour that differs from a real
+# server: a blocking call in a `def` endpoint blocks everything.
+async def _inline(func, *args, **kwargs):
+    return func(*args, **kwargs)
+
+# `from X import run_in_threadpool` binds the name at import time, so every
+# module that imported it needs patching - not just the one it came from.
+# Missing fastapi.dependencies.utils is why Depends used to fail here with
+# "can't start new thread": the dependency solver had its own bound copy.
+import starlette.concurrency, starlette.background, starlette.responses
+import starlette.routing
+import fastapi.concurrency, fastapi.routing
+import fastapi.dependencies.utils as _deps
+
+for _mod in (starlette.concurrency, starlette.background, starlette.routing,
+             fastapi.concurrency, fastapi.routing, _deps):
+    if hasattr(_mod, "run_in_threadpool"):
+        _mod.run_in_threadpool = _inline
+
+
+@asynccontextmanager
+async def _inline_cm(cm):
+    """Stands in for contextmanager_in_threadpool - runs a sync CM inline.
+
+    This is what makes a `yield` dependency work, teardown included.
+    """
+    value = cm.__enter__()
+    try:
+        yield value
+    except Exception as e:
+        if not cm.__exit__(type(e), e, e.__traceback__):
+            raise
+    else:
+        cm.__exit__(None, None, None)
+
+
+async def _inline_iter(it):
+    """Stands in for iterate_in_threadpool - drives a sync iterator inline."""
+    for item in it:
+        yield item
+
+
+for _mod in (fastapi.concurrency, _deps):
+    if hasattr(_mod, "contextmanager_in_threadpool"):
+        _mod.contextmanager_in_threadpool = _inline_cm
+for _mod in (starlette.concurrency, starlette.responses):
+    if hasattr(_mod, "iterate_in_threadpool"):
+        _mod.iterate_in_threadpool = _inline_iter
+
+
+def _drive(coro):
+    """Run an ASGI coroutine to completion without an event loop.
+
+    Nothing in a request that never touches real I/O suspends, so one send()
+    carries it to StopIteration. If it does suspend there is no loop to hand
+    it to, and saying so is better than hanging.
+    """
+    try:
+        coro.send(None)
+    except StopIteration as stop:
+        return stop.value
+    coro.close()
+    raise RuntimeError(
+        "This endpoint awaited real I/O (a network call, a sleep), which the "
+        "browser sandbox cannot run. Remove the await and try again.")
+
+
+class _ClientResponse:
+    """The part of httpx.Response that a FastAPI example actually touches.
+
+    Deliberately *not* called Response. FastAPI has its own Response class
+    that readers import and construct, and a test-client class sitting on
+    that name in their namespace is a trap - the failure is a confusing
+    AttributeError deep in starlette rather than anything that names the
+    collision.
+    """
+
+    def __init__(self, status_code, headers, content):
+        self.status_code = status_code
+        self.headers = headers
+        self.content = content
+        self.text = content.decode("utf-8", "replace")
+
+    def json(self):
+        return _json.loads(self.text)
+
+    def __repr__(self):
+        return "<Response [%s]>" % self.status_code
+
+
+class TestClient:
+    """Calls the app through ASGI - the same path a real server would use."""
+
+    def __init__(self, app, base_url="http://testserver"):
+        self.app = app
+        self.base_url = base_url
+
+    def request(self, method, url, json=None, content=None, headers=None):
+        path, _, query = url.partition("?")
+        body = b""
+        hdrs = [(b"host", b"testserver")]
+        if json is not None:
+            body = _json.dumps(json).encode()
+            hdrs.append((b"content-type", b"application/json"))
+        elif content is not None:
+            body = content if isinstance(content, bytes) else str(content).encode()
+        for key, value in (headers or {}).items():
+            hdrs.append((key.lower().encode(), value.encode()))
+        hdrs.append((b"content-length", str(len(body)).encode()))
+
+        scope = {
+            "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1", "method": method.upper(), "scheme": "http",
+            "path": path, "raw_path": path.encode(), "query_string": query.encode(),
+            "root_path": "", "headers": hdrs,
+            "client": ("testclient", 50000), "server": ("testserver", 80),
+        }
+
+        # After the body, report a disconnect. A streaming response starts a
+        # listener that waits for one, and a receive() that never sends it
+        # spins forever - which used to hang the worker rather than fail.
+        state = {"delivered": False}
+
+        async def receive():
+            if state["delivered"]:
+                return {"type": "http.disconnect"}
+            state["delivered"] = True
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        messages = []
+
+        async def send(message):
+            messages.append(message)
+
+        _drive(self.app(scope, receive, send))
+
+        status, out_headers, chunks = None, {}, b""
+        for message in messages:
+            if message["type"] == "http.response.start":
+                status = message["status"]
+                out_headers = {k.decode(): v.decode()
+                               for k, v in message.get("headers", [])}
+            elif message["type"] == "http.response.body":
+                chunks += message.get("body", b"")
+        return _ClientResponse(status, out_headers, chunks)
+
+    def get(self, url, **kw):
+        return self.request("GET", url, **kw)
+
+    def post(self, url, **kw):
+        return self.request("POST", url, **kw)
+
+    def put(self, url, **kw):
+        return self.request("PUT", url, **kw)
+
+    def patch(self, url, **kw):
+        return self.request("PATCH", url, **kw)
+
+    def delete(self, url, **kw):
+        return self.request("DELETE", url, **kw)
+
+
+drive = _drive</script><script type="text/plain" class="py-src">from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules")
+def read_modules():
+    return [{"title": "Vectors"}, {"title": "Norms"}]
+
+print("routes registered:")
+for route in app.routes:
+    methods = getattr(route, "methods", None)
+    if methods:
+        print("  %-8s %s" % (",".join(sorted(methods)), route.path))
+
+print()
+print("the function is untouched:", read_modules())</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">FastAPI</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-the-return-value-becomes-json">The return value becomes JSON</h3>
+                    <p>Dicts, lists, models, primitives &mdash; all serialised for you. The default status is 200.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
+from contextlib import asynccontextmanager
+
+# Starlette hands a sync `def` endpoint to a threadpool. There are no threads
+# here, so run it inline. This is the one behaviour that differs from a real
+# server: a blocking call in a `def` endpoint blocks everything.
+async def _inline(func, *args, **kwargs):
+    return func(*args, **kwargs)
+
+# `from X import run_in_threadpool` binds the name at import time, so every
+# module that imported it needs patching - not just the one it came from.
+# Missing fastapi.dependencies.utils is why Depends used to fail here with
+# "can't start new thread": the dependency solver had its own bound copy.
+import starlette.concurrency, starlette.background, starlette.responses
+import starlette.routing
+import fastapi.concurrency, fastapi.routing
+import fastapi.dependencies.utils as _deps
+
+for _mod in (starlette.concurrency, starlette.background, starlette.routing,
+             fastapi.concurrency, fastapi.routing, _deps):
+    if hasattr(_mod, "run_in_threadpool"):
+        _mod.run_in_threadpool = _inline
+
+
+@asynccontextmanager
+async def _inline_cm(cm):
+    """Stands in for contextmanager_in_threadpool - runs a sync CM inline.
+
+    This is what makes a `yield` dependency work, teardown included.
+    """
+    value = cm.__enter__()
+    try:
+        yield value
+    except Exception as e:
+        if not cm.__exit__(type(e), e, e.__traceback__):
+            raise
+    else:
+        cm.__exit__(None, None, None)
+
+
+async def _inline_iter(it):
+    """Stands in for iterate_in_threadpool - drives a sync iterator inline."""
+    for item in it:
+        yield item
+
+
+for _mod in (fastapi.concurrency, _deps):
+    if hasattr(_mod, "contextmanager_in_threadpool"):
+        _mod.contextmanager_in_threadpool = _inline_cm
+for _mod in (starlette.concurrency, starlette.responses):
+    if hasattr(_mod, "iterate_in_threadpool"):
+        _mod.iterate_in_threadpool = _inline_iter
+
+
+def _drive(coro):
+    """Run an ASGI coroutine to completion without an event loop.
+
+    Nothing in a request that never touches real I/O suspends, so one send()
+    carries it to StopIteration. If it does suspend there is no loop to hand
+    it to, and saying so is better than hanging.
+    """
+    try:
+        coro.send(None)
+    except StopIteration as stop:
+        return stop.value
+    coro.close()
+    raise RuntimeError(
+        "This endpoint awaited real I/O (a network call, a sleep), which the "
+        "browser sandbox cannot run. Remove the await and try again.")
+
+
+class _ClientResponse:
+    """The part of httpx.Response that a FastAPI example actually touches.
+
+    Deliberately *not* called Response. FastAPI has its own Response class
+    that readers import and construct, and a test-client class sitting on
+    that name in their namespace is a trap - the failure is a confusing
+    AttributeError deep in starlette rather than anything that names the
+    collision.
+    """
+
+    def __init__(self, status_code, headers, content):
+        self.status_code = status_code
+        self.headers = headers
+        self.content = content
+        self.text = content.decode("utf-8", "replace")
+
+    def json(self):
+        return _json.loads(self.text)
+
+    def __repr__(self):
+        return "<Response [%s]>" % self.status_code
+
+
+class TestClient:
+    """Calls the app through ASGI - the same path a real server would use."""
+
+    def __init__(self, app, base_url="http://testserver"):
+        self.app = app
+        self.base_url = base_url
+
+    def request(self, method, url, json=None, content=None, headers=None):
+        path, _, query = url.partition("?")
+        body = b""
+        hdrs = [(b"host", b"testserver")]
+        if json is not None:
+            body = _json.dumps(json).encode()
+            hdrs.append((b"content-type", b"application/json"))
+        elif content is not None:
+            body = content if isinstance(content, bytes) else str(content).encode()
+        for key, value in (headers or {}).items():
+            hdrs.append((key.lower().encode(), value.encode()))
+        hdrs.append((b"content-length", str(len(body)).encode()))
+
+        scope = {
+            "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1", "method": method.upper(), "scheme": "http",
+            "path": path, "raw_path": path.encode(), "query_string": query.encode(),
+            "root_path": "", "headers": hdrs,
+            "client": ("testclient", 50000), "server": ("testserver", 80),
+        }
+
+        # After the body, report a disconnect. A streaming response starts a
+        # listener that waits for one, and a receive() that never sends it
+        # spins forever - which used to hang the worker rather than fail.
+        state = {"delivered": False}
+
+        async def receive():
+            if state["delivered"]:
+                return {"type": "http.disconnect"}
+            state["delivered"] = True
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        messages = []
+
+        async def send(message):
+            messages.append(message)
+
+        _drive(self.app(scope, receive, send))
+
+        status, out_headers, chunks = None, {}, b""
+        for message in messages:
+            if message["type"] == "http.response.start":
+                status = message["status"]
+                out_headers = {k.decode(): v.decode()
+                               for k, v in message.get("headers", [])}
+            elif message["type"] == "http.response.body":
+                chunks += message.get("body", b"")
+        return _ClientResponse(status, out_headers, chunks)
+
+    def get(self, url, **kw):
+        return self.request("GET", url, **kw)
+
+    def post(self, url, **kw):
+        return self.request("POST", url, **kw)
+
+    def put(self, url, **kw):
+        return self.request("PUT", url, **kw)
+
+    def patch(self, url, **kw):
+        return self.request("PATCH", url, **kw)
+
+    def delete(self, url, **kw):
+        return self.request("DELETE", url, **kw)
+
+
+drive = _drive</script><script type="text/plain" class="py-src">from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+@app.get("/dict")
+def a(): return {"kind": "dict"}
+
+@app.get("/list")
+def b(): return [1, 2, 3]
+
+@app.get("/model")
+def c(): return Module(title="Vectors", minutes=8)
+
+@app.get("/scalar")
+def d(): return "just a string"
+
+client = TestClient(app)
+for path in ["/dict", "/list", "/model", "/scalar"]:
+    r = client.get(path)
+    print("%-8s %s  %-14s %s" % (path, r.status_code,
+                                 r.headers.get("content-type"), r.text))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">FastAPI</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-choosing-the-status-code">Choosing the status code</h3>
+                    <p><code>status_code</code> on the decorator sets the default for that route. The <code>status</code> module names them so you do not have to remember numbers.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
+from contextlib import asynccontextmanager
+
+# Starlette hands a sync `def` endpoint to a threadpool. There are no threads
+# here, so run it inline. This is the one behaviour that differs from a real
+# server: a blocking call in a `def` endpoint blocks everything.
+async def _inline(func, *args, **kwargs):
+    return func(*args, **kwargs)
+
+# `from X import run_in_threadpool` binds the name at import time, so every
+# module that imported it needs patching - not just the one it came from.
+# Missing fastapi.dependencies.utils is why Depends used to fail here with
+# "can't start new thread": the dependency solver had its own bound copy.
+import starlette.concurrency, starlette.background, starlette.responses
+import starlette.routing
+import fastapi.concurrency, fastapi.routing
+import fastapi.dependencies.utils as _deps
+
+for _mod in (starlette.concurrency, starlette.background, starlette.routing,
+             fastapi.concurrency, fastapi.routing, _deps):
+    if hasattr(_mod, "run_in_threadpool"):
+        _mod.run_in_threadpool = _inline
+
+
+@asynccontextmanager
+async def _inline_cm(cm):
+    """Stands in for contextmanager_in_threadpool - runs a sync CM inline.
+
+    This is what makes a `yield` dependency work, teardown included.
+    """
+    value = cm.__enter__()
+    try:
+        yield value
+    except Exception as e:
+        if not cm.__exit__(type(e), e, e.__traceback__):
+            raise
+    else:
+        cm.__exit__(None, None, None)
+
+
+async def _inline_iter(it):
+    """Stands in for iterate_in_threadpool - drives a sync iterator inline."""
+    for item in it:
+        yield item
+
+
+for _mod in (fastapi.concurrency, _deps):
+    if hasattr(_mod, "contextmanager_in_threadpool"):
+        _mod.contextmanager_in_threadpool = _inline_cm
+for _mod in (starlette.concurrency, starlette.responses):
+    if hasattr(_mod, "iterate_in_threadpool"):
+        _mod.iterate_in_threadpool = _inline_iter
+
+
+def _drive(coro):
+    """Run an ASGI coroutine to completion without an event loop.
+
+    Nothing in a request that never touches real I/O suspends, so one send()
+    carries it to StopIteration. If it does suspend there is no loop to hand
+    it to, and saying so is better than hanging.
+    """
+    try:
+        coro.send(None)
+    except StopIteration as stop:
+        return stop.value
+    coro.close()
+    raise RuntimeError(
+        "This endpoint awaited real I/O (a network call, a sleep), which the "
+        "browser sandbox cannot run. Remove the await and try again.")
+
+
+class _ClientResponse:
+    """The part of httpx.Response that a FastAPI example actually touches.
+
+    Deliberately *not* called Response. FastAPI has its own Response class
+    that readers import and construct, and a test-client class sitting on
+    that name in their namespace is a trap - the failure is a confusing
+    AttributeError deep in starlette rather than anything that names the
+    collision.
+    """
+
+    def __init__(self, status_code, headers, content):
+        self.status_code = status_code
+        self.headers = headers
+        self.content = content
+        self.text = content.decode("utf-8", "replace")
+
+    def json(self):
+        return _json.loads(self.text)
+
+    def __repr__(self):
+        return "<Response [%s]>" % self.status_code
+
+
+class TestClient:
+    """Calls the app through ASGI - the same path a real server would use."""
+
+    def __init__(self, app, base_url="http://testserver"):
+        self.app = app
+        self.base_url = base_url
+
+    def request(self, method, url, json=None, content=None, headers=None):
+        path, _, query = url.partition("?")
+        body = b""
+        hdrs = [(b"host", b"testserver")]
+        if json is not None:
+            body = _json.dumps(json).encode()
+            hdrs.append((b"content-type", b"application/json"))
+        elif content is not None:
+            body = content if isinstance(content, bytes) else str(content).encode()
+        for key, value in (headers or {}).items():
+            hdrs.append((key.lower().encode(), value.encode()))
+        hdrs.append((b"content-length", str(len(body)).encode()))
+
+        scope = {
+            "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1", "method": method.upper(), "scheme": "http",
+            "path": path, "raw_path": path.encode(), "query_string": query.encode(),
+            "root_path": "", "headers": hdrs,
+            "client": ("testclient", 50000), "server": ("testserver", 80),
+        }
+
+        # After the body, report a disconnect. A streaming response starts a
+        # listener that waits for one, and a receive() that never sends it
+        # spins forever - which used to hang the worker rather than fail.
+        state = {"delivered": False}
+
+        async def receive():
+            if state["delivered"]:
+                return {"type": "http.disconnect"}
+            state["delivered"] = True
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        messages = []
+
+        async def send(message):
+            messages.append(message)
+
+        _drive(self.app(scope, receive, send))
+
+        status, out_headers, chunks = None, {}, b""
+        for message in messages:
+            if message["type"] == "http.response.start":
+                status = message["status"]
+                out_headers = {k.decode(): v.decode()
+                               for k, v in message.get("headers", [])}
+            elif message["type"] == "http.response.body":
+                chunks += message.get("body", b"")
+        return _ClientResponse(status, out_headers, chunks)
+
+    def get(self, url, **kw):
+        return self.request("GET", url, **kw)
+
+    def post(self, url, **kw):
+        return self.request("POST", url, **kw)
+
+    def put(self, url, **kw):
+        return self.request("PUT", url, **kw)
+
+    def patch(self, url, **kw):
+        return self.request("PATCH", url, **kw)
+
+    def delete(self, url, **kw):
+        return self.request("DELETE", url, **kw)
+
+
+drive = _drive</script><script type="text/plain" class="py-src">from fastapi import FastAPI, status
+
+app = FastAPI()
+
+@app.post("/modules", status_code=status.HTTP_201_CREATED)
+def create():
+    return {"created": True}
+
+@app.delete("/modules/{i}", status_code=status.HTTP_204_NO_CONTENT)
+def delete(i: int):
+    return None                       # 204 means "nothing to say"
+
+client = TestClient(app)
+r1 = client.post("/modules")
+r2 = client.delete("/modules/1")
+print("create :", r1.status_code, r1.json())
+print("delete :", r2.status_code, repr(r2.text), "<- 204 has no body")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">FastAPI</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-order-matters-when-paths-overlap">Order matters when paths overlap</h3>
+                    <p>Routes are matched in the order they were registered, so a fixed path must come before a variable one that would also match it.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
+from contextlib import asynccontextmanager
+
+# Starlette hands a sync `def` endpoint to a threadpool. There are no threads
+# here, so run it inline. This is the one behaviour that differs from a real
+# server: a blocking call in a `def` endpoint blocks everything.
+async def _inline(func, *args, **kwargs):
+    return func(*args, **kwargs)
+
+# `from X import run_in_threadpool` binds the name at import time, so every
+# module that imported it needs patching - not just the one it came from.
+# Missing fastapi.dependencies.utils is why Depends used to fail here with
+# "can't start new thread": the dependency solver had its own bound copy.
+import starlette.concurrency, starlette.background, starlette.responses
+import starlette.routing
+import fastapi.concurrency, fastapi.routing
+import fastapi.dependencies.utils as _deps
+
+for _mod in (starlette.concurrency, starlette.background, starlette.routing,
+             fastapi.concurrency, fastapi.routing, _deps):
+    if hasattr(_mod, "run_in_threadpool"):
+        _mod.run_in_threadpool = _inline
+
+
+@asynccontextmanager
+async def _inline_cm(cm):
+    """Stands in for contextmanager_in_threadpool - runs a sync CM inline.
+
+    This is what makes a `yield` dependency work, teardown included.
+    """
+    value = cm.__enter__()
+    try:
+        yield value
+    except Exception as e:
+        if not cm.__exit__(type(e), e, e.__traceback__):
+            raise
+    else:
+        cm.__exit__(None, None, None)
+
+
+async def _inline_iter(it):
+    """Stands in for iterate_in_threadpool - drives a sync iterator inline."""
+    for item in it:
+        yield item
+
+
+for _mod in (fastapi.concurrency, _deps):
+    if hasattr(_mod, "contextmanager_in_threadpool"):
+        _mod.contextmanager_in_threadpool = _inline_cm
+for _mod in (starlette.concurrency, starlette.responses):
+    if hasattr(_mod, "iterate_in_threadpool"):
+        _mod.iterate_in_threadpool = _inline_iter
+
+
+def _drive(coro):
+    """Run an ASGI coroutine to completion without an event loop.
+
+    Nothing in a request that never touches real I/O suspends, so one send()
+    carries it to StopIteration. If it does suspend there is no loop to hand
+    it to, and saying so is better than hanging.
+    """
+    try:
+        coro.send(None)
+    except StopIteration as stop:
+        return stop.value
+    coro.close()
+    raise RuntimeError(
+        "This endpoint awaited real I/O (a network call, a sleep), which the "
+        "browser sandbox cannot run. Remove the await and try again.")
+
+
+class _ClientResponse:
+    """The part of httpx.Response that a FastAPI example actually touches.
+
+    Deliberately *not* called Response. FastAPI has its own Response class
+    that readers import and construct, and a test-client class sitting on
+    that name in their namespace is a trap - the failure is a confusing
+    AttributeError deep in starlette rather than anything that names the
+    collision.
+    """
+
+    def __init__(self, status_code, headers, content):
+        self.status_code = status_code
+        self.headers = headers
+        self.content = content
+        self.text = content.decode("utf-8", "replace")
+
+    def json(self):
+        return _json.loads(self.text)
+
+    def __repr__(self):
+        return "<Response [%s]>" % self.status_code
+
+
+class TestClient:
+    """Calls the app through ASGI - the same path a real server would use."""
+
+    def __init__(self, app, base_url="http://testserver"):
+        self.app = app
+        self.base_url = base_url
+
+    def request(self, method, url, json=None, content=None, headers=None):
+        path, _, query = url.partition("?")
+        body = b""
+        hdrs = [(b"host", b"testserver")]
+        if json is not None:
+            body = _json.dumps(json).encode()
+            hdrs.append((b"content-type", b"application/json"))
+        elif content is not None:
+            body = content if isinstance(content, bytes) else str(content).encode()
+        for key, value in (headers or {}).items():
+            hdrs.append((key.lower().encode(), value.encode()))
+        hdrs.append((b"content-length", str(len(body)).encode()))
+
+        scope = {
+            "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1", "method": method.upper(), "scheme": "http",
+            "path": path, "raw_path": path.encode(), "query_string": query.encode(),
+            "root_path": "", "headers": hdrs,
+            "client": ("testclient", 50000), "server": ("testserver", 80),
+        }
+
+        # After the body, report a disconnect. A streaming response starts a
+        # listener that waits for one, and a receive() that never sends it
+        # spins forever - which used to hang the worker rather than fail.
+        state = {"delivered": False}
+
+        async def receive():
+            if state["delivered"]:
+                return {"type": "http.disconnect"}
+            state["delivered"] = True
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        messages = []
+
+        async def send(message):
+            messages.append(message)
+
+        _drive(self.app(scope, receive, send))
+
+        status, out_headers, chunks = None, {}, b""
+        for message in messages:
+            if message["type"] == "http.response.start":
+                status = message["status"]
+                out_headers = {k.decode(): v.decode()
+                               for k, v in message.get("headers", [])}
+            elif message["type"] == "http.response.body":
+                chunks += message.get("body", b"")
+        return _ClientResponse(status, out_headers, chunks)
+
+    def get(self, url, **kw):
+        return self.request("GET", url, **kw)
+
+    def post(self, url, **kw):
+        return self.request("POST", url, **kw)
+
+    def put(self, url, **kw):
+        return self.request("PUT", url, **kw)
+
+    def patch(self, url, **kw):
+        return self.request("PATCH", url, **kw)
+
+    def delete(self, url, **kw):
+        return self.request("DELETE", url, **kw)
+
+
+drive = _drive</script><script type="text/plain" class="py-src">from fastapi import FastAPI
+
+wrong = FastAPI()
+
+@wrong.get("/modules/{module_id}")
+def by_id(module_id: str):
+    return {"matched": "by_id", "value": module_id}
+
+@wrong.get("/modules/latest")            # registered second - never reached
+def latest_wrong():
+    return {"matched": "latest"}
+
+right = FastAPI()
+
+@right.get("/modules/latest")            # fixed path first
+def latest_right():
+    return {"matched": "latest"}
+
+@right.get("/modules/{module_id}")
+def by_id2(module_id: str):
+    return {"matched": "by_id", "value": module_id}
+
+print("wrong order:", TestClient(wrong).get("/modules/latest").json())
+print("right order:", TestClient(right).get("/modules/latest").json())
+print("still works:", TestClient(right).get("/modules/7").json())</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">FastAPI</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-describing-the-endpoint">Describing the endpoint</h3>
+                    <p><code>summary</code>, <code>description</code> and <code>tags</code> shape the documentation. The docstring becomes the description if you do not supply one.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
+from contextlib import asynccontextmanager
+
+# Starlette hands a sync `def` endpoint to a threadpool. There are no threads
+# here, so run it inline. This is the one behaviour that differs from a real
+# server: a blocking call in a `def` endpoint blocks everything.
+async def _inline(func, *args, **kwargs):
+    return func(*args, **kwargs)
+
+# `from X import run_in_threadpool` binds the name at import time, so every
+# module that imported it needs patching - not just the one it came from.
+# Missing fastapi.dependencies.utils is why Depends used to fail here with
+# "can't start new thread": the dependency solver had its own bound copy.
+import starlette.concurrency, starlette.background, starlette.responses
+import starlette.routing
+import fastapi.concurrency, fastapi.routing
+import fastapi.dependencies.utils as _deps
+
+for _mod in (starlette.concurrency, starlette.background, starlette.routing,
+             fastapi.concurrency, fastapi.routing, _deps):
+    if hasattr(_mod, "run_in_threadpool"):
+        _mod.run_in_threadpool = _inline
+
+
+@asynccontextmanager
+async def _inline_cm(cm):
+    """Stands in for contextmanager_in_threadpool - runs a sync CM inline.
+
+    This is what makes a `yield` dependency work, teardown included.
+    """
+    value = cm.__enter__()
+    try:
+        yield value
+    except Exception as e:
+        if not cm.__exit__(type(e), e, e.__traceback__):
+            raise
+    else:
+        cm.__exit__(None, None, None)
+
+
+async def _inline_iter(it):
+    """Stands in for iterate_in_threadpool - drives a sync iterator inline."""
+    for item in it:
+        yield item
+
+
+for _mod in (fastapi.concurrency, _deps):
+    if hasattr(_mod, "contextmanager_in_threadpool"):
+        _mod.contextmanager_in_threadpool = _inline_cm
+for _mod in (starlette.concurrency, starlette.responses):
+    if hasattr(_mod, "iterate_in_threadpool"):
+        _mod.iterate_in_threadpool = _inline_iter
+
+
+def _drive(coro):
+    """Run an ASGI coroutine to completion without an event loop.
+
+    Nothing in a request that never touches real I/O suspends, so one send()
+    carries it to StopIteration. If it does suspend there is no loop to hand
+    it to, and saying so is better than hanging.
+    """
+    try:
+        coro.send(None)
+    except StopIteration as stop:
+        return stop.value
+    coro.close()
+    raise RuntimeError(
+        "This endpoint awaited real I/O (a network call, a sleep), which the "
+        "browser sandbox cannot run. Remove the await and try again.")
+
+
+class _ClientResponse:
+    """The part of httpx.Response that a FastAPI example actually touches.
+
+    Deliberately *not* called Response. FastAPI has its own Response class
+    that readers import and construct, and a test-client class sitting on
+    that name in their namespace is a trap - the failure is a confusing
+    AttributeError deep in starlette rather than anything that names the
+    collision.
+    """
+
+    def __init__(self, status_code, headers, content):
+        self.status_code = status_code
+        self.headers = headers
+        self.content = content
+        self.text = content.decode("utf-8", "replace")
+
+    def json(self):
+        return _json.loads(self.text)
+
+    def __repr__(self):
+        return "<Response [%s]>" % self.status_code
+
+
+class TestClient:
+    """Calls the app through ASGI - the same path a real server would use."""
+
+    def __init__(self, app, base_url="http://testserver"):
+        self.app = app
+        self.base_url = base_url
+
+    def request(self, method, url, json=None, content=None, headers=None):
+        path, _, query = url.partition("?")
+        body = b""
+        hdrs = [(b"host", b"testserver")]
+        if json is not None:
+            body = _json.dumps(json).encode()
+            hdrs.append((b"content-type", b"application/json"))
+        elif content is not None:
+            body = content if isinstance(content, bytes) else str(content).encode()
+        for key, value in (headers or {}).items():
+            hdrs.append((key.lower().encode(), value.encode()))
+        hdrs.append((b"content-length", str(len(body)).encode()))
+
+        scope = {
+            "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1", "method": method.upper(), "scheme": "http",
+            "path": path, "raw_path": path.encode(), "query_string": query.encode(),
+            "root_path": "", "headers": hdrs,
+            "client": ("testclient", 50000), "server": ("testserver", 80),
+        }
+
+        # After the body, report a disconnect. A streaming response starts a
+        # listener that waits for one, and a receive() that never sends it
+        # spins forever - which used to hang the worker rather than fail.
+        state = {"delivered": False}
+
+        async def receive():
+            if state["delivered"]:
+                return {"type": "http.disconnect"}
+            state["delivered"] = True
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        messages = []
+
+        async def send(message):
+            messages.append(message)
+
+        _drive(self.app(scope, receive, send))
+
+        status, out_headers, chunks = None, {}, b""
+        for message in messages:
+            if message["type"] == "http.response.start":
+                status = message["status"]
+                out_headers = {k.decode(): v.decode()
+                               for k, v in message.get("headers", [])}
+            elif message["type"] == "http.response.body":
+                chunks += message.get("body", b"")
+        return _ClientResponse(status, out_headers, chunks)
+
+    def get(self, url, **kw):
+        return self.request("GET", url, **kw)
+
+    def post(self, url, **kw):
+        return self.request("POST", url, **kw)
+
+    def put(self, url, **kw):
+        return self.request("PUT", url, **kw)
+
+    def patch(self, url, **kw):
+        return self.request("PATCH", url, **kw)
+
+    def delete(self, url, **kw):
+        return self.request("DELETE", url, **kw)
+
+
+drive = _drive</script><script type="text/plain" class="py-src">import json
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules", summary="List modules", tags=["modules"])
+def read_modules():
+    """Return every published module, newest first.
+
+    Unpublished drafts are excluded.
+    """
+    return []
+
+spec = app.openapi()["paths"]["/modules"]["get"]
+print("summary    :", spec["summary"])
+print("tags       :", spec["tags"])
+print("description:")
+print(spec["description"])</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">FastAPI</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-a-whole-small-api">A whole small API</h3>
+                    <p>Everything so far in one app: two routes, a model, a status code and an in-memory store.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
+from contextlib import asynccontextmanager
+
+# Starlette hands a sync `def` endpoint to a threadpool. There are no threads
+# here, so run it inline. This is the one behaviour that differs from a real
+# server: a blocking call in a `def` endpoint blocks everything.
+async def _inline(func, *args, **kwargs):
+    return func(*args, **kwargs)
+
+# `from X import run_in_threadpool` binds the name at import time, so every
+# module that imported it needs patching - not just the one it came from.
+# Missing fastapi.dependencies.utils is why Depends used to fail here with
+# "can't start new thread": the dependency solver had its own bound copy.
+import starlette.concurrency, starlette.background, starlette.responses
+import starlette.routing
+import fastapi.concurrency, fastapi.routing
+import fastapi.dependencies.utils as _deps
+
+for _mod in (starlette.concurrency, starlette.background, starlette.routing,
+             fastapi.concurrency, fastapi.routing, _deps):
+    if hasattr(_mod, "run_in_threadpool"):
+        _mod.run_in_threadpool = _inline
+
+
+@asynccontextmanager
+async def _inline_cm(cm):
+    """Stands in for contextmanager_in_threadpool - runs a sync CM inline.
+
+    This is what makes a `yield` dependency work, teardown included.
+    """
+    value = cm.__enter__()
+    try:
+        yield value
+    except Exception as e:
+        if not cm.__exit__(type(e), e, e.__traceback__):
+            raise
+    else:
+        cm.__exit__(None, None, None)
+
+
+async def _inline_iter(it):
+    """Stands in for iterate_in_threadpool - drives a sync iterator inline."""
+    for item in it:
+        yield item
+
+
+for _mod in (fastapi.concurrency, _deps):
+    if hasattr(_mod, "contextmanager_in_threadpool"):
+        _mod.contextmanager_in_threadpool = _inline_cm
+for _mod in (starlette.concurrency, starlette.responses):
+    if hasattr(_mod, "iterate_in_threadpool"):
+        _mod.iterate_in_threadpool = _inline_iter
+
+
+def _drive(coro):
+    """Run an ASGI coroutine to completion without an event loop.
+
+    Nothing in a request that never touches real I/O suspends, so one send()
+    carries it to StopIteration. If it does suspend there is no loop to hand
+    it to, and saying so is better than hanging.
+    """
+    try:
+        coro.send(None)
+    except StopIteration as stop:
+        return stop.value
+    coro.close()
+    raise RuntimeError(
+        "This endpoint awaited real I/O (a network call, a sleep), which the "
+        "browser sandbox cannot run. Remove the await and try again.")
+
+
+class _ClientResponse:
+    """The part of httpx.Response that a FastAPI example actually touches.
+
+    Deliberately *not* called Response. FastAPI has its own Response class
+    that readers import and construct, and a test-client class sitting on
+    that name in their namespace is a trap - the failure is a confusing
+    AttributeError deep in starlette rather than anything that names the
+    collision.
+    """
+
+    def __init__(self, status_code, headers, content):
+        self.status_code = status_code
+        self.headers = headers
+        self.content = content
+        self.text = content.decode("utf-8", "replace")
+
+    def json(self):
+        return _json.loads(self.text)
+
+    def __repr__(self):
+        return "<Response [%s]>" % self.status_code
+
+
+class TestClient:
+    """Calls the app through ASGI - the same path a real server would use."""
+
+    def __init__(self, app, base_url="http://testserver"):
+        self.app = app
+        self.base_url = base_url
+
+    def request(self, method, url, json=None, content=None, headers=None):
+        path, _, query = url.partition("?")
+        body = b""
+        hdrs = [(b"host", b"testserver")]
+        if json is not None:
+            body = _json.dumps(json).encode()
+            hdrs.append((b"content-type", b"application/json"))
+        elif content is not None:
+            body = content if isinstance(content, bytes) else str(content).encode()
+        for key, value in (headers or {}).items():
+            hdrs.append((key.lower().encode(), value.encode()))
+        hdrs.append((b"content-length", str(len(body)).encode()))
+
+        scope = {
+            "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1", "method": method.upper(), "scheme": "http",
+            "path": path, "raw_path": path.encode(), "query_string": query.encode(),
+            "root_path": "", "headers": hdrs,
+            "client": ("testclient", 50000), "server": ("testserver", 80),
+        }
+
+        # After the body, report a disconnect. A streaming response starts a
+        # listener that waits for one, and a receive() that never sends it
+        # spins forever - which used to hang the worker rather than fail.
+        state = {"delivered": False}
+
+        async def receive():
+            if state["delivered"]:
+                return {"type": "http.disconnect"}
+            state["delivered"] = True
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        messages = []
+
+        async def send(message):
+            messages.append(message)
+
+        _drive(self.app(scope, receive, send))
+
+        status, out_headers, chunks = None, {}, b""
+        for message in messages:
+            if message["type"] == "http.response.start":
+                status = message["status"]
+                out_headers = {k.decode(): v.decode()
+                               for k, v in message.get("headers", [])}
+            elif message["type"] == "http.response.body":
+                chunks += message.get("body", b"")
+        return _ClientResponse(status, out_headers, chunks)
+
+    def get(self, url, **kw):
+        return self.request("GET", url, **kw)
+
+    def post(self, url, **kw):
+        return self.request("POST", url, **kw)
+
+    def put(self, url, **kw):
+        return self.request("PUT", url, **kw)
+
+    def patch(self, url, **kw):
+        return self.request("PATCH", url, **kw)
+
+    def delete(self, url, **kw):
+        return self.request("DELETE", url, **kw)
+
+
+drive = _drive</script><script type="text/plain" class="py-src">from fastapi import FastAPI, status
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="VizLearn")
+DB = {1: {"id": 1, "title": "Vectors", "minutes": 8}}
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(default=10, gt=0)
+
+@app.get("/modules", tags=["modules"])
+def list_modules():
+    return list(DB.values())
+
+@app.post("/modules", status_code=status.HTTP_201_CREATED, tags=["modules"])
+def create_module(module: ModuleIn):
+    new_id = max(DB) + 1
+    DB[new_id] = {"id": new_id, **module.model_dump()}
+    return DB[new_id]
+
+client = TestClient(app)
+print("before :", client.get("/modules").json())
+r = client.post("/modules", json={"title": "Eigenvalues", "minutes": 14})
+print("created:", r.status_code, r.json())
+print("after  :", client.get("/modules").json())</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">FastAPI</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-the-return-value">The return value</h3>
                     <p>Whatever you return is converted to JSON: dictionaries, lists, Pydantic models, and primitives like strings and numbers. The default status is 200 and the content type is <code>application/json</code>.</p><p>Returning a model is the most useful case, because the model decides the shape. Returning a bare string produces <code>"just a string"</code> &mdash; valid JSON, with the quotes &mdash; which occasionally surprises people expecting plain text. If you want plain text, say so with <code>PlainTextResponse</code>.</p><p>For anything you care about, declare a <code>response_model</code> rather than relying on what the handler happens to return. That gets a module of its own shortly, and it is the difference between an endpoint that documents its output and one that does not.</p>

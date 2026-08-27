@@ -15,6 +15,163 @@ Otherwise it is a **query parameter**.
 
 That last rule is the default, and it is why a handler with a plain `limit: int = 10` works with no annotation ceremony at all.
 
+
+## Anything not in the path is a query parameter
+
+A function argument that is not a path placeholder and is not a model is read from the query string.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules")
+def list_modules(track: str = "maths", limit: int = 10, verbose: bool = False):
+    return {"track": track, "limit": limit, "verbose": verbose,
+            "types": [type(v).__name__ for v in (track, limit, verbose)]}
+
+client = TestClient(app)
+print("defaults :", client.get("/modules").json())
+print("supplied :", client.get("/modules?track=python&limit=3&verbose=yes").json())
+```
+
+## Required, optional and nullable
+
+A default makes it optional. No default makes it required. <code>Optional</code> only says it may be null.
+
+```python-run
+from typing import Optional
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/search")
+def search(q: str,                       # required
+           track: Optional[str] = None,  # optional, may be absent
+           limit: int = 10):             # optional, has a default
+    return {"q": q, "track": track, "limit": limit}
+
+client = TestClient(app)
+print("minimum :", client.get("/search?q=vectors").json())
+print("full    :", client.get("/search?q=vectors&track=maths&limit=3").json())
+
+r = client.get("/search")
+print()
+print("missing q:", r.status_code, r.json()["detail"][0]["loc"],
+      r.json()["detail"][0]["type"])
+```
+
+## Constraints and metadata
+
+<code>Query()</code> carries the same arguments as <code>Field</code>, and they land in the documentation.
+
+```python-run
+import json
+from fastapi import FastAPI, Query
+
+app = FastAPI()
+
+@app.get("/modules")
+def list_modules(
+    q: str = Query(default="", max_length=50, description="Free-text search."),
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    return {"q": q, "limit": limit, "offset": offset}
+
+client = TestClient(app)
+print("ok  :", client.get("/modules?limit=25").json())
+r = client.get("/modules?limit=500")
+print("over:", r.status_code, r.json()["detail"][0]["msg"])
+print()
+for p in app.openapi()["paths"]["/modules"]["get"]["parameters"]:
+    print("%-7s %s" % (p["name"], json.dumps(p["schema"])))
+```
+
+## Repeated parameters become a list
+
+<code>?tag=a&amp;tag=b</code> is how a query string expresses more than one value. Annotate it as a list and you get one.
+
+```python-run
+from typing import List
+from fastapi import FastAPI, Query
+
+app = FastAPI()
+
+@app.get("/modules")
+def list_modules(tag: List[str] = Query(default=[]),
+                 id: List[int] = Query(default=[])):
+    return {"tag": tag, "id": id}
+
+client = TestClient(app)
+print("none    :", client.get("/modules").json())
+print("one     :", client.get("/modules?tag=maths").json())
+print("several :", client.get("/modules?tag=maths&tag=vectors&id=1&id=2").json())
+print()
+print("note the ids are ints, converted item by item")
+```
+
+## Booleans, and what counts as true
+
+Query strings are text, so a flag arrives as a word. Pydantic reads the meaning rather than the emptiness.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/flag")
+def flag(on: bool = False):
+    return {"on": on}
+
+client = TestClient(app)
+for value in ["true", "True", "yes", "on", "1", "false", "no", "off", "0"]:
+    print("%-6s -> %s" % (value, client.get("/flag?on=" + value).json()["on"]))
+
+r = client.get("/flag?on=maybe")
+print()
+print("maybe  ->", r.status_code, r.json()["detail"][0]["type"])
+print()
+print('In plain Python bool("false") is', bool("false"), "- which is why this matters.")
+```
+
+## A realistic listing endpoint
+
+Search, filter, sort and paginate: the shape almost every collection endpoint ends up with.
+
+```python-run
+from typing import List, Literal, Optional
+from fastapi import FastAPI, Query
+
+app = FastAPI()
+DB = [
+    {"id": 1, "title": "Vectors", "track": "maths", "minutes": 8},
+    {"id": 2, "title": "Norms", "track": "maths", "minutes": 6},
+    {"id": 3, "title": "Loops", "track": "python", "minutes": 12},
+]
+
+@app.get("/modules")
+def list_modules(
+    q: Optional[str] = Query(default=None, max_length=50),
+    track: List[str] = Query(default=[]),
+    sort: Literal["title", "minutes"] = "title",
+    limit: int = Query(default=10, ge=1, le=100),
+):
+    rows = DB
+    if q:
+        rows = [r for r in rows if q.lower() in r["title"].lower()]
+    if track:
+        rows = [r for r in rows if r["track"] in track]
+    rows = sorted(rows, key=lambda r: r[sort])[:limit]
+    return {"count": len(rows), "items": rows}
+
+client = TestClient(app)
+print(client.get("/modules").json())
+print(client.get("/modules?track=maths&sort=minutes").json())
+print(client.get("/modules?q=loop").json())
+print()
+print("bad sort:", client.get("/modules?sort=colour").status_code)
+```
 ## Required versus optional
 
 The rule is the same one from the Pydantic track, and it is worth restating because it is the most common confusion here too.

@@ -16,6 +16,155 @@ That is a small problem when the wrong value is only printed. It becomes a real 
 
 This is the gap Pydantic fills. It reads the annotations you already write and enforces them, at a moment you choose.
 
+
+## A type hint is only a note to the reader
+
+Python does not check annotations at runtime. This function promises an <code>int</code> and is handed a string, and Python raises nothing at all &mdash; the failure arrives later, somewhere else, as something confusing.
+
+```python-run
+# The annotation says int. Python does not care.
+def modules_left(count: int) -> str:
+    return "You have " + str(count) + " modules to go"
+
+print(modules_left(12))
+print(modules_left("twelve"))     # no error - the annotation is decoration
+print(modules_left(None))         # still no error
+
+# The damage shows up later, in arithmetic that should have worked:
+def halfway(count: int) -> float:
+    return count / 2
+
+print(halfway(12))
+try:
+    print(halfway("twelve"))
+except TypeError as e:
+    print("TypeError:", e)        # <- the real failure, far from the cause
+```
+
+## The same promise, enforced
+
+A Pydantic model reads the same annotations and actually applies them. Nothing about the type declarations changed &mdash; only who is reading them.
+
+```python-run
+from pydantic import BaseModel, ValidationError
+
+class Reader(BaseModel):
+    name: str
+    modules_done: int
+
+ok = Reader(name="Ada", modules_done=12)
+print("valid  :", ok)
+
+try:
+    Reader(name="Ada", modules_done="twelve")
+except ValidationError as e:
+    print("caught :", e.errors()[0]["msg"])
+
+# The point: the failure happens here, at the moment the bad value arrives,
+# not three functions later when someone tries to divide by it.
+```
+
+## It converts, not just complains
+
+Data arriving from JSON, a form or a query string is text. Pydantic converts what can be converted and rejects what cannot, so the rest of your program works with real types.
+
+```python-run
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    published: bool
+
+# Everything here arrives as a string, the way a web form would send it.
+m = Module(title="Vectors", minutes="9", published="true")
+
+print(m)
+print("minutes is  :", type(m.minutes).__name__, "->", m.minutes + 1)
+print("published is:", type(m.published).__name__, "->", not m.published)
+
+# Try changing "9" to "nine" and running this again.
+```
+
+## Errors that name the problem
+
+When it does refuse, it refuses with detail: which field, what was wrong, and what it actually received. Every field is checked, so you get the whole list rather than the first failure.
+
+```python-run
+from pydantic import BaseModel, ValidationError
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    published: bool
+
+try:
+    Module(title=None, minutes="nine", published="maybe")
+except ValidationError as e:
+    print("problems found:", e.error_count())
+    print()
+    for err in e.errors():
+        print("field :", err["loc"][0])
+        print("  said:", err["msg"])
+        print("  got :", repr(err["input"]))
+        print()
+```
+
+## Where a model belongs
+
+Pydantic earns its place at the <strong>boundary</strong> &mdash; the line where data you did not write enters code you did. Validate once on the way in, and everything downstream can stop guessing.
+
+```python-run
+import json
+from pydantic import BaseModel, ValidationError
+
+# Pretend this arrived from an API, a file, or a form post.
+payload = '{"title": "Dot Product", "minutes": "11", "published": "yes"}'
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    published: bool
+
+module = Module.model_validate_json(payload)   # one line: parse AND check
+print("parsed  :", module)
+
+# From here on, minutes really is an int. No isinstance checks needed.
+def reading_time(m: Module) -> str:
+    return "about %d minutes" % round(m.minutes * 1.2)
+
+print("derived :", reading_time(module))
+
+bad = '{"title": "Norms", "minutes": "a while", "published": "yes"}'
+try:
+    Module.model_validate_json(bad)
+except ValidationError as e:
+    print("rejected:", e.errors()[0]["msg"])
+```
+
+## What you get for free
+
+Because the model already describes the data precisely, it can also hand that description to other tools &mdash; as a dict, as JSON, or as a schema that documentation and API tooling can read.
+
+```python-run
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    published: bool
+
+m = Module(title="Eigenvalues", minutes=14, published=True)
+
+print("as a dict :", m.model_dump())
+print("as JSON   :", m.model_dump_json())
+print()
+print("the schema it generated:")
+schema = m.model_json_schema()
+for name, spec in schema["properties"].items():
+    print("  %-10s %s" % (name, spec.get("type")))
+print("  required:", schema["required"])
+```
 ## Validation is a boundary problem
 
 Almost no bad data originates inside your program. It arrives: from a JSON request body, a form post, a config file, a CSV, a database column that has been nullable since 2019, an environment variable, another team's API. Everything that crosses into your code from outside is, until proven otherwise, a guess.

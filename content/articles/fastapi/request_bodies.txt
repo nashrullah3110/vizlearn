@@ -15,6 +15,194 @@ By the time the function runs, `module.minutes` is an integer &mdash; even if th
 
 This is also the moment where the whole Pydantic track becomes directly applicable. Field constraints, nested models, validators, aliases, enums, `Literal`, strict mode: all of it works here, unchanged, because this *is* Pydantic.
 
+
+## A model parameter is the body
+
+Annotate a parameter with a model and FastAPI parses the JSON, validates it, and hands you an object.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(default=10, gt=0, le=180)
+    published: bool = False
+
+@app.post("/modules", status_code=201)
+def create(module: ModuleIn):
+    return {"title": module.title, "minutes": module.minutes,
+            "type": type(module.minutes).__name__}
+
+client = TestClient(app)
+r = client.post("/modules", json={"title": "Vectors", "minutes": "8"})
+print(r.status_code, r.json())
+print()
+print("the string 8 became an int before the handler ran")
+```
+
+## Failures never reach your code
+
+Every field is checked and the 422 carries the whole list, with <code>loc</code> starting at <code>body</code>.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+reached = []
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0)
+
+@app.post("/modules")
+def create(module: ModuleIn):
+    reached.append(module.title)
+    return {"ok": True}
+
+client = TestClient(app)
+r = client.post("/modules", json={"title": "no", "minutes": -1})
+print("status:", r.status_code)
+for err in r.json()["detail"]:
+    print("  %-22s %-18s %s" % (".".join(str(p) for p in err["loc"]),
+                                err["type"], err["msg"]))
+print()
+print("handler ran for:", reached)
+```
+
+## Nested and repeated structure
+
+A model can contain models and lists of them. The error path reaches all the way down.
+
+```python-run
+from typing import List
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int = Field(gt=0)
+
+class ModuleIn(BaseModel):
+    title: str
+    lessons: List[Lesson] = Field(min_length=1)
+
+@app.post("/modules", status_code=201)
+def create(module: ModuleIn):
+    return {"title": module.title,
+            "total": sum(l.minutes for l in module.lessons)}
+
+client = TestClient(app)
+print(client.post("/modules", json={"title": "Vectors", "lessons": [
+    {"name": "Direction", "minutes": 4}, {"name": "Magnitude", "minutes": "6"}]}).json())
+
+r = client.post("/modules", json={"title": "Vectors", "lessons": [
+    {"name": "Direction", "minutes": 4}, {"name": "Magnitude", "minutes": "soon"}]})
+print()
+print("bad item:", r.json()["detail"][0]["loc"])
+```
+
+## Body plus path plus query
+
+One handler can take all three. FastAPI works out where each comes from and the error says which.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class ModuleIn(BaseModel):
+    title: str
+    minutes: int
+
+@app.put("/tracks/{track}/modules/{module_id}")
+def replace(track: str, module_id: int, module: ModuleIn, notify: bool = False):
+    return {"track": track, "module_id": module_id,
+            "title": module.title, "notify": notify}
+
+client = TestClient(app)
+r = client.put("/tracks/maths/modules/7?notify=yes",
+               json={"title": "Vectors", "minutes": 8})
+print(r.json())
+
+bad = client.put("/tracks/maths/modules/seven", json={"title": "V", "minutes": "x"})
+print()
+print("failures name their source:")
+for err in bad.json()["detail"]:
+    print("  ", err["loc"])
+```
+
+## Two models in one body
+
+Two model parameters make FastAPI nest them under their names, which is occasionally what you want.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Module(BaseModel):
+    title: str
+
+class Author(BaseModel):
+    name: str
+
+@app.post("/publish")
+def publish(module: Module, author: Author, notify: bool = False):
+    return {"module": module.title, "author": author.name, "notify": notify}
+
+client = TestClient(app)
+r = client.post("/publish?notify=1", json={
+    "module": {"title": "Vectors"},
+    "author": {"name": "Ada"},
+})
+print(r.json())
+print()
+print("body schema:", list(app.openapi()["paths"]["/publish"]["post"]
+                           ["requestBody"]["content"]["application/json"]["schema"]))
+```
+
+## Rejecting keys you did not declare
+
+By default unknown keys are ignored, which hides typos. <code>extra="forbid"</code> turns them into errors.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel, ConfigDict
+
+app = FastAPI()
+
+class Lenient(BaseModel):
+    title: str
+    minutes: int = 10
+
+class Strict(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str
+    minutes: int = 10
+
+@app.post("/lenient")
+def a(m: Lenient): return m.model_dump()
+
+@app.post("/strict")
+def b(m: Strict): return m.model_dump()
+
+payload = {"title": "Vectors", "minuets": 30}     # typo
+
+client = TestClient(app)
+print("lenient:", client.post("/lenient", json=payload).json(),
+      "<- typo vanished, minutes is the default")
+r = client.post("/strict", json=payload)
+print("strict :", r.status_code, r.json()["detail"][0]["loc"],
+      r.json()["detail"][0]["type"])
+```
 ## Failures happen first
 
 If the body does not fit the model, your handler is never called. FastAPI returns 422 with a `detail` that is essentially `e.errors()`.

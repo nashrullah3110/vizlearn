@@ -18,6 +18,167 @@ That is the entire definition. There is no `__init__`, no assignment of `self.ti
 
 The economy matters more than it first appears. Adding a field is one line. In the hand-written equivalent it is four: the parameter, the assignment, the check, and the line in `to_dict`. Those four drift apart over time, and the drift is where bugs live.
 
+
+## Subclass, annotate, done
+
+A model is a class inheriting from <code>BaseModel</code> whose annotations list the fields. There is no <code>__init__</code> to write &mdash; Pydantic builds one from the annotations.
+
+```python-run
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    track: str
+    minutes: int
+
+m = Module(title="Dot Product", track="maths", minutes=11)
+
+print(m)
+print()
+print("one field  :", m.title)
+print("another    :", m.minutes)
+print("its type   :", type(m.minutes).__name__)
+```
+
+## Keyword arguments, and why
+
+Fields are passed by name. Positional arguments are refused on purpose: a model can grow fields over time, and position would silently change meaning when it did.
+
+```python-run
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    track: str
+    minutes: int
+
+# This is the way.
+print(Module(title="Norms", track="maths", minutes=8))
+
+# This is not:
+try:
+    Module("Norms", "maths", 8)
+except TypeError as e:
+    print("TypeError:", e)
+
+# A dict works too, which is what you usually have from JSON.
+data = {"title": "Norms", "track": "maths", "minutes": 8}
+print(Module(**data))
+print(Module.model_validate(data))     # the explicit version
+```
+
+## Fields are ordinary attributes
+
+Once built, a model behaves like a normal object: attribute access, methods, everything. It is a class, not a dictionary wearing a hat.
+
+```python-run
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    track: str
+    minutes: int
+
+    # Methods work exactly as they do on any class.
+    def slug(self) -> str:
+        return self.title.lower().replace(" ", "_")
+
+    def is_long(self) -> bool:
+        return self.minutes > 10
+
+m = Module(title="Matrix Multiplication", track="maths", minutes=15)
+
+print("title :", m.title)
+print("slug  :", m.slug())
+print("long? :", m.is_long())
+
+# Reading a field that does not exist fails like any attribute would.
+try:
+    print(m.author)
+except AttributeError as e:
+    print("AttributeError:", e)
+```
+
+## Getting the data back out
+
+<code>model_dump()</code> returns a plain dict and <code>model_dump_json()</code> a JSON string. These are how a model leaves your program again.
+
+```python-run
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    track: str
+    minutes: int
+
+m = Module(title="Eigenvalues", track="maths", minutes=14)
+
+d = m.model_dump()
+print("dict   :", d)
+print("a key  :", d["track"])
+print()
+print("json   :", m.model_dump_json())
+print("pretty :")
+print(m.model_dump_json(indent=2))
+```
+
+## Round trip
+
+Out to JSON and back in again. This is the everyday shape of an API: receive, validate, work, serialise, send.
+
+```python-run
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    track: str
+    minutes: int
+
+original = Module(title="Projections", track="maths", minutes=9)
+
+wire = original.model_dump_json()
+print("sent     :", wire)
+
+received = Module.model_validate_json(wire)
+print("received :", received)
+print()
+print("equal?   :", original == received)
+
+# Models compare by value, not identity - handy in tests.
+print("same obj?:", original is received)
+```
+
+## Two models, one shape
+
+Because a model is just a class, the ordinary tools apply. Here two models describe the same subject at different depths &mdash; the pattern behind "summary" and "detail" API responses.
+
+```python-run
+from pydantic import BaseModel
+
+class ModuleSummary(BaseModel):
+    title: str
+    minutes: int
+
+class ModuleDetail(BaseModel):
+    title: str
+    minutes: int
+    track: str
+    description: str
+
+full = ModuleDetail(
+    title="The Chain Rule",
+    minutes=13,
+    track="maths",
+    description="How derivatives compose, and why backpropagation is this rule.",
+)
+
+# Build the smaller one from the bigger one's data.
+summary = ModuleSummary.model_validate(full.model_dump())
+
+print("detail  :", full.model_dump())
+print()
+print("summary :", summary.model_dump())
+```
 ## Creating one
 
 Models take keyword arguments:

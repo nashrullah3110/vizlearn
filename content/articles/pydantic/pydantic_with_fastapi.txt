@@ -7,6 +7,177 @@ Most people meet Pydantic through FastAPI, and often without realising they are 
 
 FastAPI has no validation layer of its own. It reads your annotations, hands the request body to a Pydantic model, converts the resulting `ValidationError` into a 422, and turns the generated JSON Schema into your documentation. That is the whole of it, and knowing where the line falls makes both easier to reason about.
 
+
+## A model is the request body
+
+Annotate a parameter with a model and FastAPI parses, validates and hands you a real object. <code>client</code> calls the app through ASGI.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0, le=180)
+
+@app.post("/modules/", status_code=201)
+def create(module: ModuleIn):
+    return {"created": module.title, "minutes": module.minutes}
+
+client = TestClient(app)
+
+r = client.post("/modules/", json={"title": "Vectors", "minutes": "8"})
+print(r.status_code, r.json())
+print()
+print("the string 8 became an int before the handler ran")
+```
+
+## Validation failures become 422
+
+A <code>ValidationError</code> on a request body is turned into a 422 whose body is essentially <code>errors()</code>.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0)
+
+@app.post("/modules/")
+def create(module: ModuleIn):
+    return {"ok": True}
+
+client = TestClient(app)
+
+r = client.post("/modules/", json={"title": "no", "minutes": -1})
+print("status:", r.status_code)
+for err in r.json()["detail"]:
+    print("  %-22s %-18s %s" % (".".join(str(p) for p in err["loc"]),
+                                err["type"], err["msg"]))
+```
+
+## Path and query parameters too
+
+The same rules apply to values from the URL. The <code>loc</code> tells the caller which part of the request was wrong.
+
+```python-run
+from typing import Optional
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules/{module_id}")
+def read(module_id: int, verbose: bool = False, q: Optional[str] = None):
+    return {"id": module_id, "verbose": verbose, "q": q}
+
+client = TestClient(app)
+
+print(client.get("/modules/7").json())
+print(client.get("/modules/7?verbose=yes&q=norms").json())
+
+r = client.get("/modules/abc")
+print()
+print("bad path:", r.status_code, r.json()["detail"][0]["loc"],
+      r.json()["detail"][0]["type"])
+```
+
+## response_model shapes what comes back
+
+The output is validated and filtered against the model, so a field the response model does not declare cannot leak.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class UserOut(BaseModel):
+    id: int
+    name: str
+
+@app.get("/users/{user_id}", response_model=UserOut)
+def read(user_id: int):
+    # The handler returns more than the response model declares.
+    return {"id": user_id, "name": "Ada",
+            "password_hash": "$2b$12$secret",
+            "internal_note": "do not ship"}
+
+client = TestClient(app)
+print(client.get("/users/1").json())
+print()
+print("The extra keys were filtered out by the response model.")
+```
+
+## Three models for one resource
+
+Create, update and output are different shapes. Separate models say what each endpoint actually accepts and returns.
+
+```python-run
+from typing import Optional
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+DB = {1: {"id": 1, "title": "Vectors", "minutes": 8}}
+
+class ModuleCreate(BaseModel):
+    title: str
+    minutes: int = 10
+
+class ModuleUpdate(BaseModel):
+    title: Optional[str] = None
+    minutes: Optional[int] = None
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+    minutes: int
+
+@app.patch("/modules/{module_id}", response_model=ModuleOut)
+def update(module_id: int, patch: ModuleUpdate):
+    stored = DB[module_id]
+    stored.update(patch.model_dump(exclude_unset=True))   # only what was sent
+    return stored
+
+client = TestClient(app)
+print("before:", DB[1])
+print("patch :", client.patch("/modules/1", json={"minutes": 12}).json())
+print("title untouched, because it was never sent")
+```
+
+## The schema is the documentation
+
+Everything you wrote &mdash; constraints, descriptions, examples &mdash; is in the OpenAPI document FastAPI serves.
+
+```python-run
+import json
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="VizLearn API")
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3, description="Shown as the page heading.",
+                       examples=["Dot Product"])
+    minutes: int = Field(default=10, gt=0, le=180,
+                         description="Estimated reading time.")
+
+@app.post("/modules/")
+def create(module: ModuleIn):
+    return module
+
+spec = app.openapi()
+print("paths  :", list(spec["paths"]))
+print()
+schema = spec["components"]["schemas"]["ModuleIn"]
+for name, prop in schema["properties"].items():
+    print("%-8s %s" % (name, json.dumps(prop)))
+```
 ## The request body
 
 ```python

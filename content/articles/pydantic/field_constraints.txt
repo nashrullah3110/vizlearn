@@ -15,6 +15,159 @@ Now the model refuses what the domain refuses. Two things follow from that, and 
 
 The first is that bad data stops at the door. The second is that the rule is now written down in the one place a reader will look. A check buried in a service function is invisible to everyone who does not open that function; a constraint on the field is part of the model's definition, and it appears in the generated schema, the API documentation and your editor's tooltips.
 
+
+## A type is a weak promise
+
+<code>int</code> allows every integer, including the ones your domain has no meaning for. <code>Field</code> is where you narrow it.
+
+```python-run
+from pydantic import BaseModel, Field, ValidationError
+
+class Loose(BaseModel):
+    minutes: int
+
+class Tight(BaseModel):
+    minutes: int = Field(gt=0, le=180)
+
+print("loose accepts nonsense :", Loose(minutes=-5000).minutes)
+
+for value in [12, 0, -5, 181]:
+    try:
+        print("tight %-5s -> ok" % value, Tight(minutes=value).minutes)
+    except ValidationError as e:
+        print("tight %-5s -> %s" % (value, e.errors()[0]["msg"]))
+```
+
+## Number bounds
+
+Four comparisons, named after the operators they stand for: <code>gt</code>, <code>ge</code>, <code>lt</code>, <code>le</code>. Plus <code>multiple_of</code> for step sizes.
+
+```python-run
+from pydantic import BaseModel, Field, ValidationError
+
+class Rating(BaseModel):
+    score: float = Field(ge=0, le=5)          # 0 to 5 inclusive
+    votes: int = Field(gt=0)                  # strictly positive
+    step: int = Field(multiple_of=5)          # 0, 5, 10, ...
+
+for payload in [{"score": 4.5, "votes": 12, "step": 10},
+                {"score": 5.0, "votes": 1, "step": 0},
+                {"score": 5.1, "votes": 12, "step": 10},
+                {"score": 4.0, "votes": 0, "step": 10},
+                {"score": 4.0, "votes": 3, "step": 7}]:
+    try:
+        Rating.model_validate(payload)
+        print("%-42s ok" % str(payload))
+    except ValidationError as e:
+        err = e.errors()[0]
+        print("%-42s %s: %s" % (str(payload), err["loc"][0], err["msg"]))
+```
+
+## String length and shape
+
+<code>min_length</code> and <code>max_length</code> bound the size; <code>pattern</code> is a regular expression the whole value must match.
+
+```python-run
+from pydantic import BaseModel, Field, ValidationError
+
+class Module(BaseModel):
+    title: str = Field(min_length=3, max_length=60)
+    slug: str = Field(pattern=r"^[a-z0-9_]+$")
+
+for payload in [{"title": "Dot Product", "slug": "dot_product"},
+                {"title": "Hi", "slug": "hi"},
+                {"title": "Dot Product", "slug": "Dot Product"},
+                {"title": "Dot Product", "slug": "dot-product"}]:
+    try:
+        Module.model_validate(payload)
+        print("%-46s ok" % str(payload))
+    except ValidationError as e:
+        err = e.errors()[0]
+        print("%-46s %s: %s" % (str(payload), err["loc"][0], err["msg"]))
+
+# Note the last one: a hyphen is not in [a-z0-9_], so it fails.
+```
+
+## Collection sizes
+
+The same length arguments work on lists, sets and dicts &mdash; useful for “at least one” rules that would otherwise be a validator.
+
+```python-run
+from typing import List
+from pydantic import BaseModel, Field, ValidationError
+
+class Track(BaseModel):
+    title: str
+    modules: List[str] = Field(min_length=1, max_length=5)
+
+print(Track(title="Maths", modules=["Vectors", "Norms"]))
+
+for bad in [[], ["a", "b", "c", "d", "e", "f"]]:
+    try:
+        Track(title="Maths", modules=bad)
+    except ValidationError as e:
+        print("%-32s %s" % (str(bad)[:30], e.errors()[0]["msg"]))
+```
+
+## Constraints and defaults together
+
+<code>Field</code> carries the default as well as the rules. The first positional argument is the default; <code>default_factory</code> covers anything that must be computed.
+
+```python-run
+from typing import List
+from pydantic import BaseModel, Field
+
+class Module(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(default=10, gt=0, le=180)
+    tags: List[str] = Field(default_factory=list, max_length=8)
+
+print("defaults used :", Module(title="Norms").model_dump())
+print("overridden    :", Module(title="Norms", minutes=25,
+                                tags=["maths"]).model_dump())
+
+# A required field with constraints simply has no default:
+class Required(BaseModel):
+    minutes: int = Field(gt=0)      # constrained AND required
+
+try:
+    Required()
+except Exception as e:
+    print()
+    print("still required:", type(e).__name__)
+```
+
+## Metadata is not decoration
+
+<code>description</code>, <code>title</code> and <code>examples</code> go into the generated JSON Schema &mdash; which is what FastAPI turns into your API documentation. Writing them is writing your docs.
+
+```python-run
+import json
+from pydantic import BaseModel, Field
+
+class Module(BaseModel):
+    title: str = Field(
+        min_length=3,
+        description="Shown as the page heading.",
+        examples=["Dot Product"],
+    )
+    minutes: int = Field(
+        default=10, gt=0, le=180,
+        description="Estimated reading time.",
+    )
+
+schema = Module.model_json_schema()
+
+for name, spec in schema["properties"].items():
+    print(name)
+    for key in ("type", "description", "default", "minLength",
+                "exclusiveMinimum", "maximum", "examples"):
+        if key in spec:
+            print("   %-17s %s" % (key, spec[key]))
+    print()
+
+print("required:", schema.get("required", []))
+```
 ## The number constraints
 
 Four comparisons, named for the operators: `gt`, `ge`, `lt`, `le`. There is no `eq`, because that is what a `Literal` is for.

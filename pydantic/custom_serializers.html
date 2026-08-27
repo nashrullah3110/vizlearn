@@ -160,6 +160,28 @@
             font-family: var(--vz-mono); font-size: 0.85em;
             color: var(--accent-primary);
         }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
     </style>
 </head>
 <body class="flex flex-col min-h-screen light-mode">
@@ -210,331 +232,10 @@
                     <p>Pydantic's defaults are good: dates become ISO strings, decimals become strings, enums become values, nested models become nested objects. For most fields there is nothing to decide.</p><p>When the default is genuinely wrong, <code>@field_serializer</code> replaces the output for one field:</p><pre><code class="language-python">@field_serializer(&quot;amount&quot;)
 def show_money(self, value: Decimal) -&gt; str:
     return &quot;£%.2f&quot; % value</code></pre><p>The method takes <code>self</code> and the value, and returns whatever should appear.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-only-the-output-changes">Only the output changes</a></li><li><a href="#vz-s-two-modes-two-outputs">Two modes, two outputs</a></li><li><a href="#vz-s-serialising-the-whole-model">Serialising the whole model</a></li><li><a href="#vz-s-the-schema-problem">The schema problem</a></li><li><a href="#vz-s-secrets-a-serialiser-is-the-weakest-option">Secrets: a serialiser is the weakest option</a></li><li><a href="#vz-s-the-argument-against-most-custom-serialisers">The argument against most custom serialisers</a></li><li><a href="#vz-s-when-they-are-genuinely-right">When they are genuinely right</a></li><li><a href="#vz-s-the-info-argument">The info argument</a></li><li><a href="#vz-s-serialising-unusual-types">Serialising unusual types</a></li><li><a href="#vz-s-testing-what-you-emit">Testing what you emit</a></li><li><a href="#vz-s-the-decision-restated">The decision, restated</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-what-to-remember">What to remember</a></li><li><a href="#vz-s-mistakes-people-make">Mistakes people make</a></li><li><a href="#vz-s-the-test">The test</a></li><li><a href="#vz-s-a-final-framing">A final framing</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-a-field-serialiser">A field serialiser</a></li><li><a href="#vz-s-only-the-output-changes">Only the output changes</a></li><li><a href="#vz-s-different-output-for-json-and-python">Different output for JSON and Python</a></li><li><a href="#vz-s-serialising-a-whole-model">Serialising a whole model</a></li><li><a href="#vz-s-hiding-a-value-instead-of-formatting-it">Hiding a value instead of formatting it</a></li><li><a href="#vz-s-when-the-default-was-already-right">When the default was already right</a></li><li><a href="#vz-s-only-the-output-changes">Only the output changes</a></li><li><a href="#vz-s-two-modes-two-outputs">Two modes, two outputs</a></li><li><a href="#vz-s-serialising-the-whole-model">Serialising the whole model</a></li><li><a href="#vz-s-the-schema-problem">The schema problem</a></li><li><a href="#vz-s-secrets-a-serialiser-is-the-weakest-option">Secrets: a serialiser is the weakest option</a></li><li><a href="#vz-s-the-argument-against-most-custom-serialisers">The argument against most custom serialisers</a></li><li><a href="#vz-s-when-they-are-genuinely-right">When they are genuinely right</a></li><li><a href="#vz-s-the-info-argument">The info argument</a></li><li><a href="#vz-s-serialising-unusual-types">Serialising unusual types</a></li><li><a href="#vz-s-testing-what-you-emit">Testing what you emit</a></li><li><a href="#vz-s-the-decision-restated">The decision, restated</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-summary">Summary</a></li><li><a href="#vz-s-what-to-remember">What to remember</a></li><li><a href="#vz-s-mistakes-people-make">Mistakes people make</a></li><li><a href="#vz-s-the-test">The test</a></li><li><a href="#vz-s-a-final-framing">A final framing</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
-            <div class="lg:col-span-7 space-y-6" data-vz-viz>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">01</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">A field serialiser</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>@field_serializer</code> replaces the output for one field. The input side is untouched.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from decimal import Decimal
-from pydantic import BaseModel, field_serializer
-
-class Price(BaseModel):
-    amount: Decimal
-
-    @field_serializer("amount")
-    def show_money(self, value: Decimal) -> str:
-        return "£%.2f" % value
-
-p = Price(amount="12.5")
-
-print("on the object:", p.amount, "(a", type(p.amount).__name__ + ")")
-print("dumped       :", p.model_dump())
-print("as json      :", p.model_dump_json())</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_01.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">02</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Only the output changes</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Validation still produces the real type, so arithmetic and comparisons keep working. Serialisation is the last step, not a conversion.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from decimal import Decimal
-from pydantic import BaseModel, field_serializer
-
-class Basket(BaseModel):
-    unit: Decimal
-    quantity: int
-
-    @field_serializer("unit")
-    def money(self, v: Decimal) -> str:
-        return "£%.2f" % v
-
-b = Basket(unit="4.25", quantity=3)
-
-print("still a Decimal:", b.unit * b.quantity)
-print("comparison     :", b.unit > Decimal("4"))
-print("but dumped     :", b.model_dump())</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_02.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">03</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Different output for JSON and Python</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>when_used</code> restricts a serialiser to one mode, so internal dumps keep the real object.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from datetime import date
-from pydantic import BaseModel, field_serializer
-
-class Module(BaseModel):
-    title: str
-    published_on: date
-
-    @field_serializer("published_on", when_used="json")
-    def pretty(self, value: date) -> str:
-        return value.strftime("%d %B %Y")
-
-m = Module(title="Vectors", published_on="2026-08-26")
-
-print("mode=python:", m.model_dump())
-print("mode=json  :", m.model_dump(mode="json"))
-print("json string:", m.model_dump_json())
-print()
-print("The Python dump keeps a real date for code that needs one.")</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_03.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">04</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Serialising a whole model</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb"><code>@model_serializer</code> replaces the entire output, which is how you emit a shape that is not simply your fields.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel, model_serializer
-
-class Module(BaseModel):
-    title: str
-    minutes: int
-    track: str
-
-    @model_serializer
-    def as_envelope(self) -> dict:
-        return {
-            "type": "module",
-            "id": self.title.lower().replace(" ", "-"),
-            "attributes": {"title": self.title,
-                           "minutes": self.minutes,
-                           "track": self.track},
-        }
-
-m = Module(title="Dot Product", minutes=11, track="maths")
-print(m.model_dump())
-print()
-print(m.model_dump_json(indent=2))</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_04.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">05</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Hiding a value instead of formatting it</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">A serialiser is one way to redact. <code>SecretStr</code> and <code>Field(exclude=True)</code> are usually better, and the comparison is worth seeing.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel, Field, SecretStr, field_serializer
-
-class User(BaseModel):
-    name: str
-    email: str
-    token_a: str                       # redacted by a serialiser
-    token_b: SecretStr                 # hidden by its type
-    token_c: str = Field(exclude=True)  # never serialised at all
-
-    @field_serializer("token_a")
-    def mask(self, v: str) -> str:
-        return v[:4] + "…" + v[-2:]
-
-u = User(name="Ada", email="ada@vizlearn.in",
-         token_a="tok_live_abcdef", token_b="tok_live_ghijkl",
-         token_c="tok_live_mnopqr")
-
-print("repr :", u)
-print()
-print("dump :", u.model_dump())</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_05.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">06</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">When the default was already right</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Most custom serialisers are display formatting in the wrong layer. Compare what a consumer can do with each.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from datetime import date
-from pydantic import BaseModel, field_serializer
-
-class Pretty(BaseModel):
-    on: date
-
-    @field_serializer("on")
-    def fmt(self, v: date) -> str:
-        return v.strftime("%d %B %Y")
-
-class Plain(BaseModel):
-    on: date
-
-d = date(2026, 8, 26)
-print("pretty:", Pretty(on=d).model_dump_json())
-print("plain :", Plain(on=d).model_dump_json())
-print()
-print("A client can sort, filter and localise the second.")
-print("The first has to be parsed back, and only by an English reader.")</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_06.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            </div>
-            <div class="lg:col-span-5 space-y-6">
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
                 <div class="card-container">
                     <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
                     <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
@@ -563,6 +264,133 @@ print("The first has to be parsed back, and only by an English reader.")</script
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-a-field-serialiser">A field serialiser</h3>
+                    <p><code>@field_serializer</code> replaces the output for one field. The input side is untouched.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from decimal import Decimal
+from pydantic import BaseModel, field_serializer
+
+class Price(BaseModel):
+    amount: Decimal
+
+    @field_serializer("amount")
+    def show_money(self, value: Decimal) -> str:
+        return "£%.2f" % value
+
+p = Price(amount="12.5")
+
+print("on the object:", p.amount, "(a", type(p.amount).__name__ + ")")
+print("dumped       :", p.model_dump())
+print("as json      :", p.model_dump_json())</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-only-the-output-changes">Only the output changes</h3>
+                    <p>Validation still produces the real type, so arithmetic and comparisons keep working. Serialisation is the last step, not a conversion.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from decimal import Decimal
+from pydantic import BaseModel, field_serializer
+
+class Basket(BaseModel):
+    unit: Decimal
+    quantity: int
+
+    @field_serializer("unit")
+    def money(self, v: Decimal) -> str:
+        return "£%.2f" % v
+
+b = Basket(unit="4.25", quantity=3)
+
+print("still a Decimal:", b.unit * b.quantity)
+print("comparison     :", b.unit > Decimal("4"))
+print("but dumped     :", b.model_dump())</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-different-output-for-json-and-python">Different output for JSON and Python</h3>
+                    <p><code>when_used</code> restricts a serialiser to one mode, so internal dumps keep the real object.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from datetime import date
+from pydantic import BaseModel, field_serializer
+
+class Module(BaseModel):
+    title: str
+    published_on: date
+
+    @field_serializer("published_on", when_used="json")
+    def pretty(self, value: date) -> str:
+        return value.strftime("%d %B %Y")
+
+m = Module(title="Vectors", published_on="2026-08-26")
+
+print("mode=python:", m.model_dump())
+print("mode=json  :", m.model_dump(mode="json"))
+print("json string:", m.model_dump_json())
+print()
+print("The Python dump keeps a real date for code that needs one.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-serialising-a-whole-model">Serialising a whole model</h3>
+                    <p><code>@model_serializer</code> replaces the entire output, which is how you emit a shape that is not simply your fields.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel, model_serializer
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    track: str
+
+    @model_serializer
+    def as_envelope(self) -> dict:
+        return {
+            "type": "module",
+            "id": self.title.lower().replace(" ", "-"),
+            "attributes": {"title": self.title,
+                           "minutes": self.minutes,
+                           "track": self.track},
+        }
+
+m = Module(title="Dot Product", minutes=11, track="maths")
+print(m.model_dump())
+print()
+print(m.model_dump_json(indent=2))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-hiding-a-value-instead-of-formatting-it">Hiding a value instead of formatting it</h3>
+                    <p>A serialiser is one way to redact. <code>SecretStr</code> and <code>Field(exclude=True)</code> are usually better, and the comparison is worth seeing.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel, Field, SecretStr, field_serializer
+
+class User(BaseModel):
+    name: str
+    email: str
+    token_a: str                       # redacted by a serialiser
+    token_b: SecretStr                 # hidden by its type
+    token_c: str = Field(exclude=True)  # never serialised at all
+
+    @field_serializer("token_a")
+    def mask(self, v: str) -> str:
+        return v[:4] + "…" + v[-2:]
+
+u = User(name="Ada", email="ada@vizlearn.in",
+         token_a="tok_live_abcdef", token_b="tok_live_ghijkl",
+         token_c="tok_live_mnopqr")
+
+print("repr :", u)
+print()
+print("dump :", u.model_dump())</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-when-the-default-was-already-right">When the default was already right</h3>
+                    <p>Most custom serialisers are display formatting in the wrong layer. Compare what a consumer can do with each.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from datetime import date
+from pydantic import BaseModel, field_serializer
+
+class Pretty(BaseModel):
+    on: date
+
+    @field_serializer("on")
+    def fmt(self, v: date) -> str:
+        return v.strftime("%d %B %Y")
+
+class Plain(BaseModel):
+    on: date
+
+d = date(2026, 8, 26)
+print("pretty:", Pretty(on=d).model_dump_json())
+print("plain :", Plain(on=d).model_dump_json())
+print()
+print("A client can sort, filter and localise the second.")
+print("The first has to be parsed back, and only by an English reader.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-only-the-output-changes">Only the output changes</h3>
                     <p>This is the important property. A serialiser does not change validation, and does not change what the field holds.</p><p><code>p.amount</code> is still a <code>Decimal</code>. Arithmetic works, comparisons work, and every rule you attached still ran. The serialiser is the last step on the way out, not a conversion applied to the model.</p><p>That separation is what makes the feature safe. You are not weakening the model to satisfy a consumer's format preference.</p>

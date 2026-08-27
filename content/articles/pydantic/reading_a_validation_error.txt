@@ -9,6 +9,177 @@ Pydantic checks every field and raises once, carrying the complete list. For a s
 
 `e.error_count()` tells you how many. `str(e)` gives a readable summary, which is what you saw printed in the first editor above. Both are for humans.
 
+
+## It does not stop at the first problem
+
+Every field is checked and one exception is raised carrying all of them. That is what lets a form highlight four broken inputs at once instead of revealing them one submission at a time.
+
+```python-run
+from pydantic import BaseModel, ValidationError
+
+class Module(BaseModel):
+    title: str
+    track: str
+    minutes: int
+    published: bool
+
+try:
+    Module(title=None, track=42, minutes="soon", published="perhaps")
+except ValidationError as e:
+    print("count:", e.error_count())
+    print()
+    print(e)
+```
+
+## errors() is the version for code
+
+Printing the exception gives prose for a human. <code>errors()</code> gives a list of dicts &mdash; the version you build an API response or a translated message from.
+
+```python-run
+from pydantic import BaseModel, ValidationError
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+try:
+    Module(title=None, minutes="soon")
+except ValidationError as e:
+    for err in e.errors():
+        print("loc   :", err["loc"])
+        print("type  :", err["type"])
+        print("msg   :", err["msg"])
+        print("input :", repr(err["input"]))
+        print("-" * 40)
+```
+
+## loc is a path, not a name
+
+For a flat model it is just the field. For anything nested it is the route to the value: a list index is an integer, a nested field is a string.
+
+```python-run
+from typing import List
+from pydantic import BaseModel, ValidationError
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+class Track(BaseModel):
+    title: str
+    lessons: List[Lesson]
+
+bad = {
+    "title": "Maths",
+    "lessons": [
+        {"name": "Vectors", "minutes": 8},
+        {"name": "Norms", "minutes": "later"},     # index 1
+        {"name": None, "minutes": 5},              # index 2
+    ],
+}
+
+try:
+    Track.model_validate(bad)
+except ValidationError as e:
+    for err in e.errors():
+        path = ".".join(str(p) for p in err["loc"])
+        print("%-22s %s" % (path, err["msg"]))
+```
+
+## type is the stable handle
+
+The message is prose and may be reworded between releases. The type is a machine code that will not move &mdash; match on it, not on the sentence.
+
+```python-run
+from pydantic import BaseModel, Field, ValidationError
+
+class Module(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0)
+
+FRIENDLY = {
+    "string_too_short": "That needs to be a bit longer.",
+    "greater_than": "That has to be more than zero.",
+    "int_parsing": "Please enter a whole number.",
+    "missing": "This one is required.",
+}
+
+for payload in [{"title": "Hi", "minutes": 5},
+                {"title": "Vectors", "minutes": -3},
+                {"title": "Vectors", "minutes": "ten"},
+                {"title": "Vectors"}]:
+    try:
+        Module.model_validate(payload)
+        print("%-38s ok" % str(payload))
+    except ValidationError as e:
+        err = e.errors()[0]
+        nice = FRIENDLY.get(err["type"], err["msg"])
+        print("%-38s %s -> %s" % (str(payload), err["loc"][0], nice))
+```
+
+## Turning errors into a response
+
+The shape most APIs want: a mapping of field name to a list of messages, ready to render beside the inputs that produced them.
+
+```python-run
+import json
+from pydantic import BaseModel, Field, ValidationError
+
+class Signup(BaseModel):
+    name: str = Field(min_length=2)
+    email: str = Field(pattern=r"^[^@]+@[^@]+\.[^@]+$")
+    modules_done: int = Field(ge=0)
+
+def validate(payload):
+    try:
+        return Signup.model_validate(payload), None
+    except ValidationError as e:
+        problems = {}
+        for err in e.errors():
+            field = ".".join(str(p) for p in err["loc"]) or "_"
+            problems.setdefault(field, []).append(err["msg"])
+        return None, problems
+
+model, problems = validate({"name": "A", "email": "nope", "modules_done": -1})
+print("problems:")
+print(json.dumps(problems, indent=2))
+
+model, problems = validate({"name": "Ada", "email": "ada@vizlearn.in",
+                            "modules_done": 12})
+print()
+print("accepted:", model)
+```
+
+## Errors you raise yourself
+
+A validator that raises <code>ValueError</code> is folded into the same report, with the type <code>value_error</code>. Your rules and the built-in ones come back together.
+
+```python-run
+from pydantic import BaseModel, field_validator, ValidationError
+
+class Module(BaseModel):
+    title: str
+    track: str
+
+    @field_validator("track")
+    @classmethod
+    def known_track(cls, v: str) -> str:
+        allowed = {"maths", "python", "dsa", "ml"}
+        if v not in allowed:
+            raise ValueError("unknown track %r (try one of %s)"
+                             % (v, ", ".join(sorted(allowed))))
+        return v
+
+print(Module(title="Vectors", track="maths"))
+
+try:
+    Module(title=None, track="astrology")
+except ValidationError as e:
+    print()
+    print("both problems, one report:")
+    for err in e.errors():
+        print("  %-8s %-12s %s" % (err["loc"][0], err["type"], err["msg"]))
+```
 ## errors() is the version for code
 
 `e.errors()` returns a list of dictionaries, and this is what you build anything real on top of. Each entry has four parts, and they do different jobs.

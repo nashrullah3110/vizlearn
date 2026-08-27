@@ -15,6 +15,154 @@ Three things happen from those two lines. The router matches the URL and pulls o
 
 The name has to match. `{module_id}` in the path and `module_id` in the signature are connected by name, not position, and a mismatch is an error at import rather than at request time &mdash; which is the right moment to find out.
 
+
+## A placeholder becomes an argument
+
+Whatever is in braces in the path is matched to a parameter of the same name. The annotation decides what it becomes.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules/{module_id}")
+def read(module_id: int):
+    return {"module_id": module_id, "type": type(module_id).__name__}
+
+client = TestClient(app)
+print(client.get("/modules/7").json())
+print(client.get("/modules/0042").json(), "<- leading zeros gone; it is an int")
+
+r = client.get("/modules/seven")
+print()
+print("not a number:", r.status_code, r.json()["detail"][0]["msg"])
+```
+
+## The error names the path
+
+<code>loc</code> starts with <code>path</code>, so a caller knows the problem is in the URL rather than in what they sent.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules/{module_id}/lessons/{lesson_id}")
+def read(module_id: int, lesson_id: int):
+    return {"module": module_id, "lesson": lesson_id}
+
+client = TestClient(app)
+print("valid  :", client.get("/modules/7/lessons/2").json())
+
+r = client.get("/modules/7/lessons/two")
+for err in r.json()["detail"]:
+    print("loc    :", err["loc"])
+    print("type   :", err["type"])
+    print("msg    :", err["msg"])
+```
+
+## Constraining the value
+
+<code>Path()</code> carries the same constraints as Pydantic's <code>Field</code>, and they reach the documentation.
+
+```python-run
+import json
+from fastapi import FastAPI, Path
+
+app = FastAPI()
+
+@app.get("/modules/{module_id}")
+def read(module_id: int = Path(ge=1, le=9999,
+                               description="Identifier of the module.")):
+    return {"module_id": module_id}
+
+client = TestClient(app)
+print("ok :", client.get("/modules/7").json())
+r = client.get("/modules/0")
+print("0  :", r.status_code, r.json()["detail"][0]["msg"])
+print()
+spec = app.openapi()["paths"]["/modules/{module_id}"]["get"]["parameters"][0]
+print("documented as:", json.dumps(spec))
+```
+
+## A closed set of values
+
+An <code>Enum</code> in the path gives you validation, a readable error and a set of choices in the docs.
+
+```python-run
+from enum import Enum
+from fastapi import FastAPI
+
+class Track(str, Enum):
+    MATHS = "maths"
+    PYTHON = "python"
+    DSA = "dsa"
+
+app = FastAPI()
+
+@app.get("/tracks/{track}")
+def read(track: Track):
+    return {"track": track.value, "label": track.name.title()}
+
+client = TestClient(app)
+print("valid  :", client.get("/tracks/maths").json())
+
+r = client.get("/tracks/astrology")
+print("invalid:", r.status_code, r.json()["detail"][0]["msg"])
+print()
+print("in the schema:", app.openapi()["components"]["schemas"]["Track"])
+```
+
+## Paths that contain slashes
+
+A normal parameter stops at the next slash. The <code>:path</code> converter lets one swallow the rest.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/files/{name}")
+def one_segment(name: str):
+    return {"kind": "single", "name": name}
+
+@app.get("/assets/{full_path:path}")
+def whole_path(full_path: str):
+    return {"kind": "path", "full_path": full_path}
+
+client = TestClient(app)
+print(client.get("/files/logo.png").json())
+print(client.get("/assets/og/maths/vectors.png").json())
+print()
+r = client.get("/files/og/maths.png")
+print("single segment cannot match a slash:", r.status_code)
+```
+
+## Order still decides
+
+The rule from the last module, in its most common form: a fixed segment must be registered before a parameter that would also match it.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules/latest")
+def latest():
+    return {"route": "latest"}
+
+@app.get("/modules/{module_id}")
+def by_id(module_id: int):
+    return {"route": "by_id", "id": module_id}
+
+client = TestClient(app)
+print("/modules/latest ->", client.get("/modules/latest").json())
+print("/modules/7      ->", client.get("/modules/7").json())
+print()
+r = client.get("/modules/oldest")
+print("/modules/oldest ->", r.status_code,
+      "- no fixed route, and 'oldest' is not an int")
+```
 ## They are always required
 
 There is no such thing as an optional path parameter, and the reason is structural: the parameter is part of the URL. A request that omits it is a request to a different URL, which either matches another route or does not match at all.

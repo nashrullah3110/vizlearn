@@ -7,6 +7,181 @@ JSON has six types: string, number, boolean, null, array and object. Your domain
 
 That conversion is tedious, easy to get subtly wrong, and Pydantic already does it. Knowing exactly what it accepts saves writing the parsing, and knowing where the traps are saves the bugs.
 
+
+## Dates and times from strings
+
+ISO 8601 text and Unix timestamps both work. This is what makes a model usable directly against JSON, which has no date type at all.
+
+```python-run
+from datetime import date, datetime, time, timedelta
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    published_on: date
+    updated_at: datetime
+    slot: time
+    length: timedelta
+
+m = Module(published_on="2026-08-26",
+           updated_at="2026-08-26T14:30:00",
+           slot="14:30",
+           length=900)                    # seconds
+
+print("date     :", m.published_on, type(m.published_on).__name__)
+print("datetime :", m.updated_at)
+print("time     :", m.slot)
+print("duration :", m.length, "->", m.length.total_seconds(), "seconds")
+print()
+print("a unix timestamp works too:")
+print("  ", Module(published_on=1787702400,     # exactly midnight UTC
+                   updated_at=1787836800,
+                   slot="09:00", length="PT1H30M").updated_at)
+```
+
+## The timezone trap
+
+A naive datetime and an aware one cannot be compared. If your system is timezone-aware, say so in the type and let bad input be rejected.
+
+```python-run
+from datetime import datetime, timezone
+from pydantic import BaseModel, AwareDatetime, NaiveDatetime, ValidationError
+
+class Loose(BaseModel):
+    at: datetime
+
+class Aware(BaseModel):
+    at: AwareDatetime
+
+naive = Loose(at="2026-08-26T14:30:00").at
+aware = Loose(at="2026-08-26T14:30:00+00:00").at
+
+print("naive :", naive, "| tzinfo:", naive.tzinfo)
+print("aware :", aware, "| tzinfo:", aware.tzinfo)
+
+try:
+    print(naive < aware)
+except TypeError as e:
+    print()
+    print("comparing them:", e)
+
+try:
+    Aware(at="2026-08-26T14:30:00")
+except ValidationError as e:
+    print()
+    print("AwareDatetime rejects naive input:", e.errors()[0]["msg"])
+```
+
+## Money is not a float
+
+Binary floating point cannot represent most decimal fractions. <code>Decimal</code> can &mdash; but only if you keep the value as text on the way in.
+
+```python-run
+from decimal import Decimal
+from pydantic import BaseModel
+
+print("plain python:")
+print("  0.1 + 0.2      =", 0.1 + 0.2)
+print("  == 0.3         ?", 0.1 + 0.2 == 0.3)
+print()
+
+class FromFloat(BaseModel):
+    price: Decimal
+
+class Money(BaseModel):
+    price: Decimal
+
+a = FromFloat(price=0.1)          # the float was already inexact
+b = Money(price="0.1")            # the text is exact
+
+print("Decimal from float :", a.price)
+print("Decimal from str   :", b.price)
+print()
+print("three of each      :", a.price * 3, "|", b.price * 3)
+print()
+print("This is why prices travel as strings in JSON.")
+```
+
+## Constraining a decimal properly
+
+<code>max_digits</code> and <code>decimal_places</code> say what a currency amount actually is, and no amount of <code>float</code> will give you them.
+
+```python-run
+from decimal import Decimal
+from pydantic import BaseModel, Field, ValidationError
+
+class Price(BaseModel):
+    amount: Decimal = Field(gt=0, max_digits=8, decimal_places=2)
+
+print(Price(amount="12.50"))
+print(Price(amount="99999.99"))
+
+for bad in ["12.505", "0", "123456789.00"]:
+    try:
+        Price(amount=bad)
+    except ValidationError as e:
+        print("%-14s %-20s %s" % (bad, e.errors()[0]["type"], e.errors()[0]["msg"]))
+```
+
+## UUIDs and paths
+
+Both accept their string form, which is the only form JSON has. A UUID field also rejects a string that is not one.
+
+```python-run
+from uuid import UUID, uuid4
+from pathlib import Path
+from pydantic import BaseModel, ValidationError
+
+class Asset(BaseModel):
+    id: UUID
+    location: Path
+
+a = Asset(id="123e4567-e89b-12d3-a456-426614174000",
+          location="assets/og/maths.png")
+
+print("id       :", a.id, "->", type(a.id).__name__)
+print("version  :", a.id.version)
+print("path     :", a.location, "->", type(a.location).__name__)
+print("suffix   :", a.location.suffix)
+print("parent   :", a.location.parent)
+
+try:
+    Asset(id="not-a-uuid", location="x")
+except ValidationError as e:
+    print()
+    print("bad uuid :", e.errors()[0]["msg"])
+```
+
+## What comes out the other side
+
+None of these types exist in JSON, so serialising converts them. <code>model_dump()</code> keeps the objects; the JSON forms make text.
+
+```python-run
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from uuid import UUID
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    id: UUID
+    published_on: date
+    updated_at: datetime
+    price: Decimal
+
+m = Module(id="123e4567-e89b-12d3-a456-426614174000",
+           published_on="2026-08-26",
+           updated_at="2026-08-26T14:30:00+00:00",
+           price="12.50")
+
+py = m.model_dump()
+print("mode=python:")
+for k, v in py.items():
+    print("   %-13s %-42s %s" % (k, str(v), type(v).__name__))
+
+print()
+print("mode=json  :", m.model_dump(mode="json"))
+print()
+print("json string:", m.model_dump_json())
+```
 ## Dates and times
 
 `date` accepts a `date`, an ISO string like `"2026-08-26"`, and a Unix timestamp &mdash; but only one that lands exactly on midnight. A timestamp with a time component raises `date_from_datetime_inexact`, on the reasoning that silently discarding the time would lose information you might have needed.

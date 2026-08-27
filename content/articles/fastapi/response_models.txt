@@ -9,6 +9,187 @@ That is convenient and it is how data leaks. A handler that returns a database r
 
 The failure mode is quiet and it compounds. A column added to a table six months later silently starts appearing in an API response, because the endpoint was never told what it was allowed to send.
 
+
+## Without one, whatever you return is sent
+
+A handler returning an internal row sends every key in it, including the ones nobody outside should see.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+ROW = {"id": 1, "title": "Vectors", "minutes": 8,
+       "internal_notes": "needs a diagram",
+       "author_email": "ada@vizlearn.in"}
+
+@app.get("/modules/1")
+def read():
+    return ROW
+
+print(TestClient(app).get("/modules/1").json())
+print()
+print("Two fields there were never meant for a caller.")
+```
+
+## response_model decides the shape
+
+Declare it and the return value is filtered through the model. Anything not declared is dropped.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+ROW = {"id": 1, "title": "Vectors", "minutes": 8,
+       "internal_notes": "needs a diagram",
+       "author_email": "ada@vizlearn.in"}
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+    minutes: int
+
+@app.get("/modules/1", response_model=ModuleOut)
+def read():
+    return ROW                      # extra keys are removed, not sent
+
+print(TestClient(app).get("/modules/1").json())
+print()
+print("The handler still returns the whole row. The model decides what leaves.")
+```
+
+## The return annotation works too
+
+Annotating the return type does the same job and reads better. FastAPI treats it as the response model.
+
+```python-run
+from typing import List
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+
+DB = [{"id": 1, "title": "Vectors", "secret": "x"},
+      {"id": 2, "title": "Norms", "secret": "y"}]
+
+@app.get("/modules")
+def list_modules() -> List[ModuleOut]:
+    return DB
+
+client = TestClient(app)
+print(client.get("/modules").json())
+print()
+print("A list works the same way, filtered item by item.")
+```
+
+## It validates your own output
+
+The response is checked against the model. A handler that returns the wrong shape fails loudly instead of shipping it.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+
+@app.get("/good", response_model=ModuleOut)
+def good():
+    return {"id": 1, "title": "Vectors"}
+
+@app.get("/bad", response_model=ModuleOut)
+def bad():
+    return {"id": "not-a-number", "title": "Vectors"}
+
+client = TestClient(app)
+print("good:", client.get("/good").status_code, client.get("/good").json())
+try:
+    r = client.get("/bad")
+    print("bad :", r.status_code)
+except Exception as e:
+    print("bad : raised", type(e).__name__)
+    print("      ", str(e).splitlines()[-1][:90])
+print()
+print("A broken response is a 500 - your bug, not the caller's.")
+```
+
+## Dropping unset and null fields
+
+<code>response_model_exclude_none</code> and its siblings trim the output without a second model.
+
+```python-run
+from typing import Optional
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+    summary: Optional[str] = None
+    tags: list = []
+
+ROW = {"id": 1, "title": "Vectors"}
+
+@app.get("/plain", response_model=ModuleOut)
+def plain(): return ROW
+
+@app.get("/tight", response_model=ModuleOut, response_model_exclude_none=True)
+def tight(): return ROW
+
+@app.get("/unset", response_model=ModuleOut, response_model_exclude_unset=True)
+def unset(): return ROW
+
+client = TestClient(app)
+print("plain :", client.get("/plain").json())
+print("none  :", client.get("/tight").json())
+print("unset :", client.get("/unset").json())
+```
+
+## Input and output are different shapes
+
+Separate models for what you accept and what you return &mdash; the pattern almost every real endpoint ends up with.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+DB = {}
+
+class ModuleCreate(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(default=10, gt=0)
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+    minutes: int
+
+@app.post("/modules", response_model=ModuleOut, status_code=201)
+def create(module: ModuleCreate):
+    new_id = len(DB) + 1
+    DB[new_id] = {"id": new_id, **module.model_dump(),
+                  "created_by": "internal-service"}
+    return DB[new_id]
+
+client = TestClient(app)
+r = client.post("/modules", json={"title": "Eigenvalues", "minutes": 14})
+print("returned:", r.json())
+print("stored  :", DB[1])
+print()
+print("created_by is in the store and not in the response.")
+```
 ## Declaring the shape
 
 ```python

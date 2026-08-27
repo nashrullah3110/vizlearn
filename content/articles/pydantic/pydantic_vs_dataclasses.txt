@@ -18,6 +18,187 @@ Two lines of difference, and both give you a constructor, a readable `repr`, equ
 
 It matters in exactly one place: what happens when the data is wrong.
 
+
+## Side by side
+
+The class bodies are nearly identical. What they do with a wrong value is not.
+
+```python-run
+from dataclasses import dataclass, asdict
+from pydantic import BaseModel, ValidationError
+
+@dataclass
+class ModuleDC:
+    title: str
+    minutes: int
+
+class ModuleBM(BaseModel):
+    title: str
+    minutes: int
+
+d = ModuleDC(title="Norms", minutes="eight")
+print("dataclass accepted :", d)
+print("   minutes is a    :", type(d.minutes).__name__)
+
+try:
+    ModuleBM(title="Norms", minutes="eight")
+except ValidationError as e:
+    print("pydantic refused   :", e.errors()[0]["msg"])
+
+print()
+print("both convert to dicts:")
+print("  ", asdict(d))
+print("  ", ModuleBM(title="Norms", minutes=8).model_dump())
+```
+
+## A dataclass will take anything
+
+It generates an <code>__init__</code> that assigns. It does not look at the annotations at all beyond deciding which fields exist.
+
+```python-run
+from dataclasses import dataclass
+
+@dataclass
+class Module:
+    title: str
+    minutes: int
+    published: bool
+
+m = Module(title=None, minutes=[1, 2, 3], published="perhaps")
+print("constructed happily:", m)
+print()
+print("title     :", type(m.title).__name__)
+print("minutes   :", type(m.minutes).__name__)
+print("published :", type(m.published).__name__)
+
+# Nothing is wrong until something downstream assumes otherwise:
+try:
+    print(m.minutes / 2)
+except TypeError as e:
+    print()
+    print("and here it finally breaks:", e)
+```
+
+## Speed is the real trade
+
+A dataclass is faster to build because it does nothing. Where the data is already trustworthy, that difference is free.
+
+```python-run
+import time
+from dataclasses import dataclass
+from pydantic import BaseModel
+
+@dataclass
+class PointDC:
+    x: float
+    y: float
+
+class PointBM(BaseModel):
+    x: float
+    y: float
+
+N = 20000
+
+t = time.perf_counter()
+for i in range(N):
+    PointDC(x=1.0, y=2.0)
+dc = time.perf_counter() - t
+
+t = time.perf_counter()
+for i in range(N):
+    PointBM(x=1.0, y=2.0)
+bm = time.perf_counter() - t
+
+print("dataclass : %.3f s" % dc)
+print("pydantic  : %.3f s" % bm)
+print("ratio     : %.1fx" % (bm / dc))
+print()
+print("Everything here runs slower than a real interpreter, so the")
+print("ratio is the number that transfers, not the seconds.")
+```
+
+## Use both, at different depths
+
+The usual answer is not one or the other. Validate at the boundary, then work with something cheap inside.
+
+```python-run
+from dataclasses import dataclass
+from pydantic import BaseModel
+
+# The boundary: whatever arrived, checked once.
+class ModuleIn(BaseModel):
+    title: str
+    minutes: int
+
+# The interior: trusted, cheap, used in hot loops.
+@dataclass
+class Module:
+    title: str
+    minutes: int
+
+    def reading_time(self) -> str:
+        return "about %d min" % round(self.minutes * 1.2)
+
+raw = {"title": "Eigenvalues", "minutes": "14"}   # note the string
+
+checked = ModuleIn.model_validate(raw)            # validate ONCE
+module = Module(**checked.model_dump())           # then go cheap
+
+print("validated :", checked)
+print("internal  :", module)
+print("derived   :", module.reading_time())
+```
+
+## Pydantic can validate a dataclass too
+
+If you like the dataclass API but want the checking, <code>pydantic.dataclasses.dataclass</code> is a drop-in that validates.
+
+```python-run
+from pydantic.dataclasses import dataclass
+from pydantic import ValidationError
+
+@dataclass
+class Module:
+    title: str
+    minutes: int
+
+print("coerces  :", Module(title="Norms", minutes="8"))
+
+try:
+    Module(title="Norms", minutes="eight")
+except ValidationError as e:
+    print("refuses  :", e.errors()[0]["msg"])
+
+# It is still a real dataclass:
+import dataclasses
+print()
+print("is a dataclass:", dataclasses.is_dataclass(Module))
+print("fields        :", [f.name for f in dataclasses.fields(Module)])
+```
+
+## Validating anything with TypeAdapter
+
+You do not need a model at all to get validation. <code>TypeAdapter</code> applies the same machinery to any annotation.
+
+```python-run
+from typing import Dict, List
+from pydantic import TypeAdapter, ValidationError
+
+minutes = TypeAdapter(List[int])
+print("list :", minutes.validate_python(["8", "12", 14.0]))
+
+lookup = TypeAdapter(Dict[str, float])
+print("dict :", lookup.validate_python({"maths": "4.5", "python": 4}))
+
+try:
+    minutes.validate_python(["8", "soon"])
+except ValidationError as e:
+    err = e.errors()[0]
+    print("bad  :", err["loc"], err["msg"])
+
+# Useful for a function argument, a config blob, or a JSON array
+# that has no natural model around it.
+```
 ## What a dataclass actually does
 
 `@dataclass` reads the annotations to find out which fields exist and in what order, and then generates an `__init__` that assigns them. That is the extent of its interest in the types. The annotation `minutes: int` is used to decide that a field called `minutes` exists. Its being an `int` is never checked, tested or acted on.

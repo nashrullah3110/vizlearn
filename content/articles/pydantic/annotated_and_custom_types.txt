@@ -7,6 +7,160 @@ You write a slug field with a pattern. Then another model needs a slug, so the p
 
 This is the most ordinary form of drift there is, and it does not need a clever solution &mdash; it needs the rule to exist once.
 
+
+## The same rule, written twice
+
+Two models needing the same constrained field is where duplication starts. It is fine at two and a problem at six.
+
+```python-run
+from pydantic import BaseModel, Field
+
+class Module(BaseModel):
+    slug: str = Field(pattern=r"^[a-z0-9_]+$")
+    minutes: int = Field(gt=0, le=180)
+
+class Lesson(BaseModel):
+    slug: str = Field(pattern=r"^[a-z0-9_]+$")     # copied
+    minutes: int = Field(gt=0, le=180)             # copied
+
+print(Module(slug="dot_product", minutes=11))
+print(Lesson(slug="direction", minutes=4))
+print()
+print("Two definitions of one rule. Change it and you must remember both.")
+```
+
+## Annotated names the type
+
+<code>Annotated[T, Field(...)]</code> is a real type. Give it a name and the rule exists once.
+
+```python-run
+from typing import Annotated
+from pydantic import BaseModel, Field, ValidationError
+
+Slug = Annotated[str, Field(pattern=r"^[a-z0-9_]+$")]
+Minutes = Annotated[int, Field(gt=0, le=180)]
+
+class Module(BaseModel):
+    slug: Slug
+    minutes: Minutes = 10
+
+class Lesson(BaseModel):
+    slug: Slug
+    minutes: Minutes
+
+print(Module(slug="dot_product"))
+print(Lesson(slug="direction", minutes=4))
+
+for cls, bad in [(Module, {"slug": "Dot Product"}), (Lesson, {"slug": "x", "minutes": 0})]:
+    try:
+        cls.model_validate(bad)
+    except ValidationError as e:
+        print("%-7s %s" % (cls.__name__, e.errors()[0]["msg"]))
+```
+
+## Defaults read better this way
+
+With <code>Annotated</code> the constraint lives with the type and the default sits where defaults normally sit.
+
+```python-run
+from typing import Annotated
+from pydantic import BaseModel, Field
+
+class Tangled(BaseModel):
+    # constraint and default in one call - which part is which?
+    minutes: int = Field(default=10, gt=0, le=180)
+
+class Clear(BaseModel):
+    # the type carries the rule; the default is just a default
+    minutes: Annotated[int, Field(gt=0, le=180)] = 10
+
+print(Tangled())
+print(Clear())
+print()
+print("Same behaviour. The second reads as 'a Minutes, defaulting to 10'.")
+```
+
+## AfterValidator: logic inside a type
+
+A validator can be part of the type itself, so the rule travels with it instead of being a method on one model.
+
+```python-run
+from typing import Annotated
+from pydantic import BaseModel, AfterValidator, ValidationError
+
+def must_be_known(v: str) -> str:
+    known = {"maths", "python", "dsa", "ml"}
+    if v not in known:
+        raise ValueError("unknown track %r; try %s" % (v, ", ".join(sorted(known))))
+    return v
+
+Track = Annotated[str, AfterValidator(must_be_known)]
+
+class Module(BaseModel):
+    track: Track
+
+class Enrolment(BaseModel):
+    track: Track          # same rule, no duplicated method
+
+print(Module(track="maths"))
+print(Enrolment(track="dsa"))
+
+try:
+    Enrolment(track="astrology")
+except ValidationError as e:
+    print("refused:", e.errors()[0]["msg"])
+```
+
+## BeforeValidator normalises inside the type
+
+Pair a before-validator with a constraint and the type both cleans and checks &mdash; every model that uses it gets both.
+
+```python-run
+from typing import Annotated
+from pydantic import BaseModel, BeforeValidator, Field, ValidationError
+
+def to_slug(v):
+    if isinstance(v, str):
+        return "_".join(v.strip().lower().split())
+    return v
+
+Slug = Annotated[str, BeforeValidator(to_slug), Field(pattern=r"^[a-z0-9_]+$")]
+
+class Module(BaseModel):
+    slug: Slug
+
+print(Module(slug="  The Chain   RULE "))
+print(Module(slug="dot_product"))
+
+try:
+    Module(slug="chain-rule!")          # normalised, then still invalid
+except ValidationError as e:
+    print("refused:", e.errors()[0]["msg"])
+```
+
+## What ships already
+
+Pydantic includes a set of these. Use them where they fit rather than rebuilding the same thing.
+
+```python-run
+from pydantic import (BaseModel, PositiveInt, NonNegativeInt, StrictInt,
+                      AwareDatetime, ValidationError)
+
+class Stats(BaseModel):
+    views: NonNegativeInt          # >= 0
+    minutes: PositiveInt           # > 0
+    user_id: StrictInt             # no "42"
+
+print(Stats(views=0, minutes=8, user_id=42))
+
+for bad in [{"views": -1, "minutes": 8, "user_id": 1},
+            {"views": 0, "minutes": 0, "user_id": 1},
+            {"views": 0, "minutes": 8, "user_id": "1"}]:
+    try:
+        Stats.model_validate(bad)
+    except ValidationError as e:
+        print("%-42s %s" % (str(bad), e.errors()[0]["type"]))
+```
 ## Annotated is the mechanism
 
 `Annotated[T, ...]` is standard `typing`. It means "this is a `T`, with extra metadata attached", and static type checkers see straight through to the `T` while libraries can read the metadata.

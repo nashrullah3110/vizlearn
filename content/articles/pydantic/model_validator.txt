@@ -11,6 +11,181 @@ An end date must be after a start date. A discount must not exceed the price. Ei
 
 `model_validator` is the tool built for the job.
 
+
+## A rule about two fields
+
+<code>mode="after"</code> runs once, on the finished model, with every field populated and converted. Return <code>self</code>.
+
+```python-run
+from datetime import date
+from pydantic import BaseModel, model_validator, ValidationError
+
+class Cohort(BaseModel):
+    starts_on: date
+    ends_on: date
+
+    @model_validator(mode="after")
+    def ends_after_start(self):
+        if self.ends_on <= self.starts_on:
+            raise ValueError("ends_on must be after starts_on")
+        return self
+
+print(Cohort(starts_on="2026-09-01", ends_on="2026-12-01"))
+
+try:
+    Cohort(starts_on="2026-12-01", ends_on="2026-09-01")
+except ValidationError as e:
+    err = e.errors()[0]
+    print()
+    print("loc  :", err["loc"], "<- empty: it belongs to the model, not a field")
+    print("said :", err["msg"])
+```
+
+## Order does not matter here
+
+A field validator can only see fields declared above it. A model validator sees all of them, however the class is written.
+
+```python-run
+from pydantic import BaseModel, model_validator, ValidationError
+
+class Budget(BaseModel):
+    spent: int
+    total: int          # declared AFTER spent
+
+    @model_validator(mode="after")
+    def within_budget(self):
+        if self.spent > self.total:
+            raise ValueError("spent %d exceeds total %d" % (self.spent, self.total))
+        return self
+
+print(Budget(spent=40, total=100))
+
+try:
+    Budget(spent=140, total=100)
+except ValidationError as e:
+    print("refused:", e.errors()[0]["msg"])
+
+print()
+print("A field_validator on 'spent' could not have done this:")
+print("'total' is declared later, so it is not in info.data yet.")
+```
+
+## At least one of these
+
+The classic cross-field rule. Neither field is individually wrong; the combination is.
+
+```python-run
+from typing import Optional
+from pydantic import BaseModel, model_validator, ValidationError
+
+class Contact(BaseModel):
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+    @model_validator(mode="after")
+    def one_way_to_reach(self):
+        if not self.email and not self.phone:
+            raise ValueError("provide at least an email or a phone number")
+        return self
+
+print(Contact(email="ada@vizlearn.in"))
+print(Contact(phone="+44 20 7946 0958"))
+
+try:
+    Contact()
+except ValidationError as e:
+    print()
+    print("refused:", e.errors()[0]["msg"])
+```
+
+## mode=before: reshaping the whole payload
+
+A before validator receives the raw input for the entire model. It is where you accept a legacy shape and translate it.
+
+```python-run
+from pydantic import BaseModel, model_validator
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_old_shape(cls, data):
+        if isinstance(data, dict):
+            data = dict(data)
+            # v1 of our API called these something else.
+            if "name" in data and "title" not in data:
+                data["title"] = data.pop("name")
+            if "duration_seconds" in data and "minutes" not in data:
+                data["minutes"] = round(data.pop("duration_seconds") / 60)
+        return data
+
+print("new shape:", Module(title="Vectors", minutes=8))
+print("old shape:", Module.model_validate({"name": "Vectors",
+                                           "duration_seconds": 480}))
+```
+
+## Deriving a field from others
+
+An after validator can set fields as well as check them &mdash; useful when one value should be filled in from the rest.
+
+```python-run
+from typing import Optional
+from pydantic import BaseModel, model_validator
+
+class Module(BaseModel):
+    title: str
+    slug: Optional[str] = None
+
+    @model_validator(mode="after")
+    def fill_slug(self):
+        if self.slug is None:
+            object.__setattr__(self, "slug",
+                               self.title.lower().replace(" ", "-"))
+        return self
+
+print(Module(title="The Chain Rule"))
+print(Module(title="The Chain Rule", slug="chain-rule"))
+
+print()
+print("For values that are ALWAYS derived and never supplied,")
+print("a computed_field is the better tool - that is the next module.")
+```
+
+## Several rules, and where they report
+
+Model validators run in definition order, after every field. The first to raise stops the rest, so put the cheapest check first.
+
+```python-run
+from pydantic import BaseModel, model_validator, ValidationError
+
+class Enrolment(BaseModel):
+    seats: int
+    taken: int
+    waitlist: int
+
+    @model_validator(mode="after")
+    def taken_fits(self):
+        if self.taken > self.seats:
+            raise ValueError("taken cannot exceed seats")
+        return self
+
+    @model_validator(mode="after")
+    def waitlist_only_when_full(self):
+        if self.waitlist and self.taken < self.seats:
+            raise ValueError("no waitlist while seats remain")
+        return self
+
+print(Enrolment(seats=30, taken=30, waitlist=4))
+
+for bad in [{"seats": 10, "taken": 12, "waitlist": 0},
+            {"seats": 10, "taken": 5, "waitlist": 3}]:
+    try:
+        Enrolment.model_validate(bad)
+    except ValidationError as e:
+        print("%-40s %s" % (str(bad), e.errors()[0]["msg"]))
+```
 ## mode="after"
 
 The common case. It runs once, after every field has been validated and converted, and receives the finished model:

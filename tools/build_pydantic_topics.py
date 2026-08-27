@@ -57,6 +57,28 @@ CSS = """
             font-family: 'JetBrains Mono', monospace; font-size: 0.85em;
             color: var(--accent-primary);
         }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
 """
 
 
@@ -130,6 +152,36 @@ def step_card(n, heading, blurb, code, wheels=(), prelude=""):
     }
 
 
+
+def merged_article(t):
+    """The article with the walkthrough steps folded into it.
+
+    The steps used to sit in a column above the article, which meant a reader
+    met six programs before any prose explained them and then read an article
+    repeating similar code that could not be run. They are now sections of
+    the article itself, each a heading, a sentence and a runnable editor.
+
+    They go *after* the article's opening section rather than before it, for
+    two reasons: build_lede.py lifts the first section out as the Overview,
+    which should stay introductory; and the prose written after them refers
+    to "the editor above", which is still true once they sit above it.
+    """
+    text = t["article"].strip()
+    blocks = []
+    for heading, blurb, code in t["steps"]:
+        blocks.append("## %s\n\n%s\n\n```python-run\n%s\n```"
+                      % (heading, blurb.strip(), code.rstrip()))
+    steps = "\n\n".join(blocks)
+
+    # Split after the first "## " section so the lede is untouched.
+    first = text.find("\n## ")
+    if first == -1:
+        return text + "\n\n" + steps
+    second = text.find("\n## ", first + 1)
+    if second == -1:
+        return text + "\n\n" + steps
+    return text[:second] + "\n\n" + steps + text[second:]
+
 def page(t):
     rel = rel_for(t)
     iso = last_modified(rel)
@@ -137,8 +189,6 @@ def page(t):
         "/* page-specific rules go here; the shared system is in vizlearn.css */",
         CSS.strip("\n"))
 
-    steps = "\n".join(step_card(i + 1, h, b, c, t.get("wheels", ()), t.get("prelude", ""))
-                      for i, (h, b, c) in enumerate(t["steps"]))
 
     notes = "\n".join('                        <div class="py-note">%s</div>' % n
                       for n in t["notes"])
@@ -150,11 +200,8 @@ def page(t):
             <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">%(title)s</h1>
             <p class="vz-pt-lead">%(lead)s</p>
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
-            <div class="lg:col-span-7 space-y-6" data-vz-viz>
-%(steps)s
-            </div>
-            <div class="lg:col-span-5 space-y-6">
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
                 <div class="card-container">
                     <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
                     <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
@@ -170,7 +217,6 @@ def page(t):
                                        (t["cat"], None)]),
         "title": esc(t["title"]),
         "lead": esc(t["lead"]),
-        "steps": steps,
         "notes": notes,
     }
     mount = """    <!-- auto-article-vizlearn -->
@@ -207,7 +253,7 @@ def main():
     os.makedirs(art_dir, exist_ok=True)
     for t in TOPICS:
         open(os.path.join(art_dir, "%s.txt" % t["slug"]), "w",
-             encoding="utf-8").write(t["article"].strip() + "\n")
+             encoding="utf-8").write(merged_article(t) + "\n")
 
     index = os.path.join(ROOT, "index.html")
     src = open(index, encoding="utf-8").read()

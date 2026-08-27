@@ -9,6 +9,154 @@ You wrote none of it. It is derived entirely from the annotations, `Field` argum
 
 This is quietly the reason Pydantic became a dependency of half the modern Python ecosystem. Validation is useful; a *machine-readable description of your data that cannot drift from the code* is what other tools can build on.
 
+
+## What a model already knows
+
+<code>model_json_schema()</code> turns the annotations into a JSON Schema document. Nothing extra was written to produce it.
+
+```python-run
+import json
+from pydantic import BaseModel, Field
+
+class Module(BaseModel):
+    title: str = Field(min_length=3, description="Shown as the page heading.")
+    minutes: int = Field(default=10, gt=0, le=180)
+    published: bool = False
+
+print(json.dumps(Module.model_json_schema(), indent=2))
+```
+
+## Constraints become schema keywords
+
+Every constraint has a standard equivalent, which is why a constraint is worth more than an equivalent validator.
+
+```python-run
+import json
+from pydantic import BaseModel, Field, field_validator
+
+class ByConstraint(BaseModel):
+    minutes: int = Field(gt=0, le=180)
+    title: str = Field(min_length=3, max_length=60)
+
+class ByValidator(BaseModel):
+    minutes: int
+    title: str
+
+    @field_validator("minutes")
+    @classmethod
+    def positive(cls, v):
+        if not 0 < v <= 180:
+            raise ValueError("out of range")
+        return v
+
+for cls in (ByConstraint, ByValidator):
+    props = cls.model_json_schema()["properties"]
+    print(cls.__name__)
+    print("   minutes:", json.dumps(props["minutes"]))
+    print("   title  :", json.dumps(props["title"]))
+```
+
+## Nested models become $defs
+
+A reused model appears once as a definition and is referenced, which is what lets a generated client produce a named type.
+
+```python-run
+import json
+from typing import List
+from pydantic import BaseModel
+
+class Author(BaseModel):
+    name: str
+    email: str
+
+class Module(BaseModel):
+    title: str
+    author: Author
+    reviewers: List[Author]
+
+schema = Module.model_json_schema()
+print("properties:")
+for name, spec in schema["properties"].items():
+    print("   %-11s %s" % (name, json.dumps(spec)))
+print()
+print("$defs:", list(schema["$defs"]))
+print()
+print("Author is defined once and referenced twice.")
+```
+
+## Two modes: what it takes, what it gives
+
+Computed fields appear only in the serialisation schema, because they are output and never input.
+
+```python-run
+import json
+from pydantic import BaseModel, computed_field
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+    @computed_field(description="Reading time with a margin.")
+    @property
+    def estimated(self) -> int:
+        return round(self.minutes * 1.2)
+
+for mode in ("validation", "serialization"):
+    props = Module.model_json_schema(mode=mode)["properties"]
+    print("%-14s %s" % (mode, list(props)))
+
+print()
+print("An input model must not advertise a field callers cannot send.")
+```
+
+## Literals and enums become choices
+
+This is the concrete payoff from the enums module: a client can render a dropdown, and a pattern gives it nothing to work with.
+
+```python-run
+import json
+from enum import Enum
+from typing import Literal
+from pydantic import BaseModel, Field
+
+class Track(str, Enum):
+    MATHS = "maths"
+    PYTHON = "python"
+
+class M(BaseModel):
+    a: Literal["draft", "published"]
+    b: Track
+    c: str = Field(pattern=r"^(draft|published)$")
+
+schema = M.model_json_schema()
+for name, spec in schema["properties"].items():
+    print("%-3s %s" % (name, json.dumps(spec)))
+print()
+print("$defs:", json.dumps(schema.get("$defs", {})))
+```
+
+## Adding what the annotations cannot say
+
+<code>json_schema_extra</code> attaches anything the schema supports but Pydantic has no annotation for.
+
+```python-run
+import json
+from pydantic import BaseModel, ConfigDict, Field
+
+class Module(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"title": "Vectors", "minutes": 8}]})
+
+    title: str = Field(
+        min_length=3,
+        description="Shown as the page heading.",
+        examples=["Dot Product", "Eigenvalues"],
+        json_schema_extra={"x-editable": True},
+    )
+    minutes: int = Field(default=10, gt=0)
+
+print(json.dumps(Module.model_json_schema(), indent=2))
+```
 ## What reads it
 
 **FastAPI** turns these schemas into your OpenAPI document, which becomes the interactive docs at `/docs`. The descriptions you wrote on fields appear next to those fields. The examples pre-fill the request form. The constraints show as documented limits.

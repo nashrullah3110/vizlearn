@@ -13,6 +13,181 @@ Almost everything about v2's performance follows from that split. Validation is 
 
 It also explains details you will have noticed. Error `type` codes look like machine identifiers because they come from the core. `model_validate_json` beats parsing separately because the core parses and validates in one pass. And there is a compiled wheel per platform, because there is compiled code in there.
 
+
+## Already-correct types are nearly free
+
+Validation cost depends on how much converting there is to do. A value that is already right is checked and passed through.
+
+```python-run
+import time
+from pydantic import BaseModel
+
+class Point(BaseModel):
+    x: float
+    y: float
+
+N = 20000
+
+t = time.perf_counter()
+for _ in range(N):
+    Point(x=1.0, y=2.0)          # already floats
+native = time.perf_counter() - t
+
+t = time.perf_counter()
+for _ in range(N):
+    Point(x="1.0", y="2.0")      # strings needing conversion
+converted = time.perf_counter() - t
+
+print("already typed : %.3f s" % native)
+print("needing parse : %.3f s" % converted)
+print("ratio         : %.2fx" % (converted / native))
+```
+
+## Validate once, not at every layer
+
+Re-validating something that has already passed is the most expensive no-op available. The result is identical.
+
+```python-run
+import time
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+rows = [{"title": "M%d" % i, "minutes": i % 60} for i in range(3000)]
+
+t = time.perf_counter()
+once = [Module.model_validate(r) for r in rows]
+first = time.perf_counter() - t
+
+t = time.perf_counter()
+again = [Module.model_validate(m) for m in once]     # they are already models
+second = time.perf_counter() - t
+
+print("first pass  : %.3f s" % first)
+print("second pass : %.3f s" % second)
+print("gained      :", once == again, "- nothing at all")
+```
+
+## Let the core do the looping
+
+One call into Rust for a whole list beats a Python loop making one call per item. Same result, less crossing back and forth.
+
+```python-run
+import time
+from typing import List
+from pydantic import BaseModel, TypeAdapter
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+rows = [{"title": "M%d" % i, "minutes": i % 60} for i in range(4000)]
+adapter = TypeAdapter(List[Module])
+
+t = time.perf_counter()
+a = [Module.model_validate(r) for r in rows]
+per_item = time.perf_counter() - t
+
+t = time.perf_counter()
+b = adapter.validate_python(rows)
+whole = time.perf_counter() - t
+
+print("per item   : %.3f s" % per_item)
+print("whole list : %.3f s" % whole)
+print("ratio      : %.1fx" % (per_item / whole))
+print("identical  :", a == b)
+```
+
+## Validators are Python in a Rust pipeline
+
+Every custom validator is a call back out of the compiled core. A constraint doing the same job stays inside it.
+
+```python-run
+import time
+from pydantic import BaseModel, Field, field_validator
+
+class ByConstraint(BaseModel):
+    minutes: int = Field(gt=0, le=180)
+
+class ByValidator(BaseModel):
+    minutes: int
+
+    @field_validator("minutes")
+    @classmethod
+    def check(cls, v: int) -> int:
+        if not 0 < v <= 180:
+            raise ValueError("out of range")
+        return v
+
+N = 20000
+for cls in (ByConstraint, ByValidator):
+    t = time.perf_counter()
+    for _ in range(N):
+        cls(minutes=30)
+    print("%-13s %.3f s" % (cls.__name__, time.perf_counter() - t))
+
+print()
+print("Same rule. One runs in Rust, the other calls into Python per item.")
+```
+
+## Build schemas once
+
+Constructing a model class or a TypeAdapter compiles a schema. Doing it inside a loop repeats that work every time.
+
+```python-run
+import time
+from typing import List
+from pydantic import TypeAdapter
+
+rows = [[1, 2, 3] for _ in range(400)]
+
+t = time.perf_counter()
+for row in rows:
+    TypeAdapter(List[int]).validate_python(row)
+rebuilt = time.perf_counter() - t
+
+adapter = TypeAdapter(List[int])
+t = time.perf_counter()
+for row in rows:
+    adapter.validate_python(row)
+reused = time.perf_counter() - t
+
+print("rebuilt each time : %.4f s" % rebuilt)
+print("built once        : %.4f s" % reused)
+print("ratio             : %.1fx" % (rebuilt / reused))
+```
+
+## Parsing JSON directly
+
+The last of the three habits: hand the text over instead of building an intermediate dict for it.
+
+```python-run
+import json, time
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+payload = json.dumps({"title": "Vectors", "minutes": 8})
+N = 8000
+
+t = time.perf_counter()
+for _ in range(N):
+    Module.model_validate(json.loads(payload))
+two_step = time.perf_counter() - t
+
+t = time.perf_counter()
+for _ in range(N):
+    Module.model_validate_json(payload)
+one_step = time.perf_counter() - t
+
+print("json.loads + validate : %.3f s" % two_step)
+print("model_validate_json   : %.3f s" % one_step)
+print("ratio                 : %.2fx" % (two_step / one_step))
+```
 ## Where the time actually goes
 
 Three components, worth separating.

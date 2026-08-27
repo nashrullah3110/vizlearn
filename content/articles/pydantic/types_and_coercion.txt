@@ -9,6 +9,159 @@ Data arriving from outside a program is nearly always text. A query string is te
 
 So the default &mdash; **lax mode** &mdash; is to accept any value with one unambiguous reading, and refuse the rest. The rules are worth knowing precisely, because "unambiguous" turns out to be a stricter test than most people expect.
 
+
+## What becomes an int
+
+Strings that read as whole numbers convert. Floats convert only when nothing is lost. Everything else raises &mdash; guessing would be worse than failing.
+
+```python-run
+from pydantic import BaseModel, ValidationError
+
+class M(BaseModel):
+    n: int
+
+for value in ["9", 9.0, True, "  9  ", 9, "9.0", 9.5, "nine", None, [9]]:
+    try:
+        print("%-8r -> %r" % (value, M(n=value).n))
+    except ValidationError as e:
+        print("%-8r -> refused (%s)" % (value, e.errors()[0]["type"]))
+
+# Note 9.0 converts but 9.5 does not: dropping .5 would lose information
+# you might have needed, so Pydantic refuses rather than rounding.
+```
+
+## What becomes a float, and what becomes a str
+
+Ints widen to floats without complaint. Strings, however, are strict in one surprising direction: a number is <em>not</em> silently turned into text.
+
+```python-run
+from pydantic import BaseModel, ValidationError
+
+class F(BaseModel):
+    x: float
+
+class S(BaseModel):
+    s: str
+
+print("-- into float --")
+for value in [9, "9.5", "1e3", True, "abc"]:
+    try:
+        print("%-8r -> %r" % (value, F(x=value).x))
+    except ValidationError:
+        print("%-8r -> refused" % (value,))
+
+print()
+print("-- into str --")
+for value in ["hello", 9, 9.5, True, None]:
+    try:
+        print("%-8r -> %r" % (value, S(s=value).s))
+    except ValidationError:
+        print("%-8r -> refused" % (value,))
+
+# str is the asymmetry worth remembering: int -> str does NOT happen.
+```
+
+## Booleans are the trap
+
+<code>bool</code> accepts a specific list of words and numbers. It is more generous than <code>bool()</code> and stricter at the same time &mdash; and the difference bites when parsing query strings.
+
+```python-run
+from pydantic import BaseModel, ValidationError
+
+class B(BaseModel):
+    flag: bool
+
+for value in ["true", "True", "yes", "on", "1", 1,
+              "false", "no", "off", "0", 0,
+              "maybe", 2, "", None]:
+    try:
+        print("%-8r -> %r" % (value, B(flag=value).flag))
+    except ValidationError:
+        print("%-8r -> refused" % (value,))
+
+# Compare with plain Python, where every non-empty string is truthy:
+print()
+print('bool("false") in plain Python is', bool("false"))
+print("Pydantic reads the *meaning* of the word, not its emptiness.")
+```
+
+## Order matters inside a Union
+
+A union tries its members left to right in smart mode. That is usually what you want, but it means the order you write can change the type you get.
+
+```python-run
+from typing import Union
+from pydantic import BaseModel
+
+class Loose(BaseModel):
+    v: Union[int, str]
+
+class Reversed(BaseModel):
+    v: Union[str, int]
+
+for value in ["9", 9, "nine"]:
+    a = Loose(v=value).v
+    b = Reversed(v=value).v
+    print("%-6r -> int|str gives %-6r (%s)   str|int gives %-6r (%s)"
+          % (value, a, type(a).__name__, b, type(b).__name__))
+
+# If the distinction matters, do not rely on order - say what you mean
+# with a discriminated union, or turn on strict mode.
+```
+
+## Turning coercion off
+
+When data should already be the right type &mdash; deep inside a system rather than at its edge &mdash; strict mode makes conversion an error instead of a convenience.
+
+```python-run
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+class Lax(BaseModel):
+    minutes: int
+
+class Strict(BaseModel):
+    model_config = ConfigDict(strict=True)
+    minutes: int
+
+print("lax    :", Lax(minutes="9").minutes)
+
+try:
+    Strict(minutes="9")
+except ValidationError as e:
+    print("strict :", e.errors()[0]["msg"])
+
+print("strict :", Strict(minutes=9).minutes, "(a real int is fine)")
+
+# Strict can also be set per field - see the constraints module.
+```
+
+## A realistic mixed payload
+
+Everything so far, applied to the kind of dictionary a form or query string actually produces: all strings, several types wanted.
+
+```python-run
+from pydantic import BaseModel
+
+class ModuleForm(BaseModel):
+    title: str
+    minutes: int
+    rating: float
+    published: bool
+
+# Exactly what a browser form submission looks like: strings throughout.
+raw = {"title": "Bayes' Theorem", "minutes": "12",
+       "rating": "4.5", "published": "on"}
+
+m = ModuleForm.model_validate(raw)
+
+print("model :", m)
+print()
+for name, value in m.model_dump().items():
+    print("  %-10s %-8r %s" % (name, value, type(value).__name__))
+
+print()
+print("arithmetic works now:", m.minutes * 2, "|", round(m.rating + 0.5, 1))
+```
 ## Into int
 
 A string converts if it reads as a whole number, surrounding whitespace included: `"9"` and `"  9  "` both give `9`.

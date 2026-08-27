@@ -13,6 +13,155 @@ There is a third form worth knowing: `model_dump(mode="json")` gives you a dicti
 
 In Pydantic v1 these were `.dict()` and `.json()`. They still exist in v2 and warn, and they are all over the internet.
 
+
+## Two methods, two purposes
+
+<code>model_dump()</code> gives Python objects for use inside your program. <code>model_dump_json()</code> gives text for leaving it.
+
+```python-run
+from datetime import date
+from decimal import Decimal
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    published_on: date
+    price: Decimal
+
+m = Module(title="Vectors", published_on="2026-08-26", price="12.50")
+
+d = m.model_dump()
+print("dump    :", d)
+for k, v in d.items():
+    print("   %-14s %s" % (k, type(v).__name__))
+
+print()
+print("dump_json:", m.model_dump_json())
+```
+
+## The TypeError everybody meets once
+
+Passing <code>model_dump()</code> to <code>json.dumps</code> fails, because the dict still holds real Python objects.
+
+```python-run
+import json
+from datetime import date
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    published_on: date
+
+m = Module(title="Vectors", published_on="2026-08-26")
+
+try:
+    json.dumps(m.model_dump())
+except TypeError as e:
+    print("json.dumps(model_dump()) ->", e)
+
+print()
+print("correct  :", m.model_dump_json())
+print("or first :", json.dumps(m.model_dump(mode="json")))
+```
+
+## Choosing what comes out
+
+<code>include</code> and <code>exclude</code> pick fields, and reach into nested models with a dict.
+
+```python-run
+from pydantic import BaseModel
+
+class Author(BaseModel):
+    name: str
+    email: str
+
+class Module(BaseModel):
+    title: str
+    author: Author
+    internal_notes: str
+
+m = Module(title="Vectors",
+           author={"name": "Ada", "email": "ada@vizlearn.in"},
+           internal_notes="needs a diagram")
+
+print("all      :", m.model_dump())
+print("public   :", m.model_dump(exclude={"internal_notes": True,
+                                          "author": {"email"}}))
+print("minimal  :", m.model_dump(include={"title": True,
+                                          "author": {"name"}}))
+```
+
+## Dropping what was never set
+
+Three filters that matter for updates: <code>exclude_unset</code>, <code>exclude_defaults</code> and <code>exclude_none</code>.
+
+```python-run
+from typing import Optional
+from pydantic import BaseModel
+
+class Update(BaseModel):
+    title: Optional[str] = None
+    minutes: int = 10
+    summary: Optional[str] = None
+
+m = Update(title="Vectors", summary=None)
+
+print("everything      :", m.model_dump())
+print("exclude_unset   :", m.model_dump(exclude_unset=True))
+print("exclude_defaults:", m.model_dump(exclude_defaults=True))
+print("exclude_none    :", m.model_dump(exclude_none=True))
+print()
+print("exclude_unset keeps summary=None because it WAS sent.")
+print("exclude_none drops it, losing the instruction to clear the field.")
+```
+
+## Excluding a field permanently
+
+<code>Field(exclude=True)</code> keeps a value out of every serialisation, which is what you want for anything secret.
+
+```python-run
+from pydantic import BaseModel, Field, SecretStr
+
+class User(BaseModel):
+    name: str
+    password_hash: str = Field(exclude=True)
+    api_token: SecretStr
+
+u = User(name="Ada", password_hash="$2b$12$abcdef", api_token="tok_live_123")
+
+print("repr    :", u)
+print("dump    :", u.model_dump())
+print("json    :", u.model_dump_json())
+print()
+print("the value is still there when you ask for it:")
+print("   hash :", u.password_hash)
+print("   token:", u.api_token.get_secret_value())
+```
+
+## Round tripping
+
+A dump is valid input again &mdash; but only if you did not filter it. That is worth checking rather than assuming.
+
+```python-run
+from pydantic import BaseModel, ValidationError
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+m = Module(title="Vectors", minutes=8)
+
+full = Module.model_validate(m.model_dump())
+print("round trip :", full == m)
+
+try:
+    Module.model_validate(m.model_dump(exclude={"minutes"}))
+except ValidationError as e:
+    print("filtered   :", e.errors()[0]["type"], "- a filtered dump is not valid input")
+
+print()
+print("json round trip:", Module.model_validate_json(m.model_dump_json()) == m)
+```
 ## The TypeError
 
 Everybody meets this once:

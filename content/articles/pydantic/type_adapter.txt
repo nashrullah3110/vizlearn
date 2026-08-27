@@ -23,6 +23,157 @@ lessons = TypeAdapter(List[Lesson])
 lessons.validate_python(rows)
 ```
 
+
+## The wrapper model you do not need
+
+A bare list has no object around it. The usual workaround is a one-field model; <code>TypeAdapter</code> is what that was working around.
+
+```python-run
+from typing import List
+from pydantic import BaseModel, TypeAdapter
+
+class Wrapper(BaseModel):        # a box built only to hold a list
+    items: List[int]
+
+print("workaround:", Wrapper(items=["1", "2", "3"]).items)
+
+numbers = TypeAdapter(List[int])
+print("direct    :", numbers.validate_python(["1", "2", "3"]))
+print("from json :", numbers.validate_json("[1, 2, 3]"))
+```
+
+## It works on anything you can annotate
+
+Scalars, containers, unions, models, and combinations of them all go through the same machinery.
+
+```python-run
+from typing import Dict, List, Optional, Union
+from pydantic import BaseModel, TypeAdapter
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+cases = [
+    (TypeAdapter(int), "42"),
+    (TypeAdapter(Optional[int]), None),
+    (TypeAdapter(List[str]), ("a", "b")),
+    (TypeAdapter(Dict[str, float]), {"maths": "4.5"}),
+    (TypeAdapter(Union[int, str]), "nine"),
+    (TypeAdapter(List[Lesson]), [{"name": "Direction", "minutes": "4"}]),
+]
+
+for adapter, value in cases:
+    print("%-24r -> %r" % (value, adapter.validate_python(value)))
+```
+
+## The same errors you already know
+
+Paths, types and messages are identical to a model's, so one error handler covers both.
+
+```python-run
+from typing import List
+from pydantic import BaseModel, TypeAdapter, ValidationError
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+lessons = TypeAdapter(List[Lesson])
+
+try:
+    lessons.validate_python([
+        {"name": "Direction", "minutes": 4},
+        {"name": "Magnitude", "minutes": "soon"},
+        {"minutes": 5},
+    ])
+except ValidationError as e:
+    print("problems:", e.error_count())
+    for err in e.errors():
+        print("  %-22s %-16s %s" % (".".join(str(p) for p in err["loc"]),
+                                    err["type"], err["msg"]))
+```
+
+## Serialising and schemas too
+
+It is not only validation. An adapter dumps and generates a schema for the same annotation.
+
+```python-run
+import json
+from typing import List
+from pydantic import BaseModel, TypeAdapter
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+lessons = TypeAdapter(List[Lesson])
+data = lessons.validate_python([{"name": "Direction", "minutes": 4}])
+
+print("dump      :", lessons.dump_python(data))
+print("dump_json :", lessons.dump_json(data).decode())
+print()
+print("schema    :", json.dumps(lessons.json_schema(), indent=1)[:260], "...")
+```
+
+## Build it once
+
+Constructing an adapter compiles a schema. Doing that inside a loop is a real and easily missed cost.
+
+```python-run
+import time
+from typing import List
+from pydantic import TypeAdapter
+
+rows = [[1, 2, 3] for _ in range(300)]
+
+t = time.perf_counter()
+for row in rows:
+    TypeAdapter(List[int]).validate_python(row)     # rebuilt every time
+inside = time.perf_counter() - t
+
+adapter = TypeAdapter(List[int])                    # built once
+t = time.perf_counter()
+for row in rows:
+    adapter.validate_python(row)
+outside = time.perf_counter() - t
+
+print("rebuilt each time : %.4f s" % inside)
+print("built once        : %.4f s" % outside)
+print("ratio             : %.1fx" % (inside / outside))
+print()
+print("Module level is where an adapter belongs.")
+```
+
+## Validating a whole list in one call
+
+Letting the core do the looping beats a comprehension that crosses into Python for every item.
+
+```python-run
+import time
+from typing import List
+from pydantic import BaseModel, TypeAdapter
+
+class Lesson(BaseModel):
+    name: str
+    minutes: int
+
+rows = [{"name": "L%d" % i, "minutes": i % 30 + 1} for i in range(2000)]
+adapter = TypeAdapter(List[Lesson])
+
+t = time.perf_counter()
+one = [Lesson.model_validate(r) for r in rows]
+per_item = time.perf_counter() - t
+
+t = time.perf_counter()
+many = adapter.validate_python(rows)
+whole = time.perf_counter() - t
+
+print("per item  : %.4f s" % per_item)
+print("whole list: %.4f s" % whole)
+print("ratio     : %.1fx" % (per_item / whole))
+print("same result:", one == many)
+```
 ## The same surface as a model
 
 An adapter has the methods you already know, applied to the annotation instead of to a class:

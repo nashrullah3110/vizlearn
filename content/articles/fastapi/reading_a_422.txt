@@ -9,6 +9,197 @@ The `detail` array is essentially `e.errors()` from the Pydantic track, with one
 
 Everything the Pydantic track said about reading these applies directly. `loc` is a path. `type` is a stable machine code. `msg` is prose. `input` is what actually arrived. `ctx` carries the rule's parameters.
 
+
+## It is a Pydantic error in an HTTP envelope
+
+The <code>detail</code> list is essentially <code>e.errors()</code>, with one addition: <code>loc</code> starts with the part of the request.
+
+```python-run
+import json
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0)
+
+@app.post("/modules")
+def create(module: ModuleIn):
+    return {"ok": True}
+
+r = TestClient(app).post("/modules", json={"title": "no", "minutes": -1})
+print("status:", r.status_code)
+print(json.dumps(r.json(), indent=2))
+```
+
+## loc says which part of the request
+
+Path, query, header, body &mdash; the first element tells the caller where to look, which a bare field name cannot.
+
+```python-run
+from fastapi import FastAPI, Header
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Body(BaseModel):
+    minutes: int
+
+@app.post("/tracks/{track_id}/modules")
+def create(track_id: int, body: Body,
+           limit: int = 10, x_token: str = Header()):
+    return {"ok": True}
+
+client = TestClient(app)
+r = client.post("/tracks/abc/modules?limit=lots", json={"minutes": "soon"})
+
+for err in r.json()["detail"]:
+    print("%-10s %-14s %s" % (err["loc"][0], ".".join(str(p) for p in err["loc"][1:]),
+                              err["type"]))
+```
+
+## Every failure, in one response
+
+Validation does not stop at the first problem, so a caller can fix everything in one pass.
+
+```python-run
+from typing import List
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class Lesson(BaseModel):
+    name: str = Field(min_length=2)
+    minutes: int = Field(gt=0)
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+    lessons: List[Lesson]
+
+@app.post("/modules")
+def create(m: ModuleIn):
+    return {"ok": True}
+
+r = TestClient(app).post("/modules", json={
+    "title": "x",
+    "lessons": [{"name": "Direction", "minutes": 4},
+                {"name": "M", "minutes": -1},
+                {"minutes": 5}],
+})
+print("problems:", len(r.json()["detail"]))
+for err in r.json()["detail"]:
+    print("  ", ".".join(str(p) for p in err["loc"]), "->", err["type"])
+```
+
+## 422 is not the same as 400 or 404
+
+Validation produces a 422 automatically. Anything your own code decides is wrong is an <code>HTTPException</code> you raise.
+
+```python-run
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI()
+DB = {1: {"id": 1, "title": "Vectors"}}
+
+class ModuleIn(BaseModel):
+    title: str
+
+@app.get("/modules/{module_id}")
+def read(module_id: int):
+    if module_id not in DB:
+        raise HTTPException(status_code=404, detail="Module not found")
+    return DB[module_id]
+
+client = TestClient(app)
+print("found     :", client.get("/modules/1").status_code, client.get("/modules/1").json())
+r = client.get("/modules/99")
+print("missing   :", r.status_code, r.json())
+r = client.get("/modules/abc")
+print("malformed :", r.status_code, r.json()["detail"][0]["type"])
+print()
+print("404 is a fact about the world; 422 is a fact about the request.")
+```
+
+## Turning it into your own shape
+
+A custom handler for <code>RequestValidationError</code> lets you return the error format your clients already expect.
+
+```python-run
+import json
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+MESSAGES = {
+    "missing": "This field is required.",
+    "string_too_short": "Needs at least {min_length} characters.",
+    "greater_than": "Must be more than {gt}.",
+    "int_parsing": "Please enter a whole number.",
+}
+
+@app.exception_handler(RequestValidationError)
+async def tidy(request: Request, exc: RequestValidationError):
+    problems = {}
+    for err in exc.errors():
+        field = ".".join(str(p) for p in err["loc"][1:]) or "_body"
+        template = MESSAGES.get(err["type"])
+        msg = template.format(**err.get("ctx", {})) if template else err["msg"]
+        problems.setdefault(field, []).append(msg)
+    return JSONResponse(status_code=422, content={"errors": problems})
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0)
+
+@app.post("/modules")
+def create(m: ModuleIn):
+    return {"ok": True}
+
+r = TestClient(app).post("/modules", json={"title": "x", "minutes": 0})
+print(json.dumps(r.json(), indent=2))
+```
+
+## Testing that a request is rejected
+
+Assert on <code>loc</code> and <code>type</code>, never on the message &mdash; prose gets reworded.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0)
+
+@app.post("/modules")
+def create(m: ModuleIn):
+    return {"ok": True}
+
+client = TestClient(app)
+
+def problems(payload):
+    r = client.post("/modules", json=payload)
+    return r.status_code, {(tuple(e["loc"]), e["type"]) for e in r.json()["detail"]}
+
+status, found = problems({"title": "x", "minutes": 0})
+print("status:", status)
+for loc, kind in sorted(found):
+    print("  ", loc, kind)
+
+expected = {(("body", "title"), "string_too_short"),
+            (("body", "minutes"), "greater_than")}
+print()
+print("matches what we expected:", found == expected)
+```
 ## The first element is the useful addition
 
 `path`, `query`, `header`, `cookie` or `body`.

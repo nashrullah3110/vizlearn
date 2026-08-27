@@ -83,6 +83,22 @@
   // make a later one appear to work.
   var RUNNER_SRC = [
     'import ast, sys, traceback',
+    // The prelude is executed once and its namespace reused, rather than
+    // re-run on every Run. /fastapi/ pages import fastapi and starlette in
+    // theirs, and that first import is slow enough that paying it inside the
+    // run budget timed the editor out with "the code probably looped
+    // forever" - which was both wrong and unfixable by the reader.
+    '_viz_prelude_src = None',
+    '_viz_prelude_ns = {}',
+    'def _viz_prep(prelude):',
+    '    global _viz_prelude_src',
+    '    if not prelude or _viz_prelude_src == prelude:',
+    '        return',
+    '    ns = {"__name__": "__main__"}',
+    '    exec(compile(prelude, "<prelude>", "exec"), ns)',
+    '    _viz_prelude_ns.clear()',
+    '    _viz_prelude_ns.update(ns)',
+    '    _viz_prelude_src = prelude',
     'def _viz_run(code, prelude=""):',
     '    g = {"__name__": "__main__"}',
     // The prelude shares the namespace, so what it defines is simply there
@@ -90,7 +106,8 @@
     // not theirs: nothing they typed can be the cause.
     '    if prelude:',
     '        try:',
-    '            exec(compile(prelude, "<prelude>", "exec"), g)',
+    '            _viz_prep(prelude)',
+    '            g.update(_viz_prelude_ns)',
     '        except BaseException:',
     '            sys.stderr.write("The page setup for this editor failed:\\n")',
     '            sys.stderr.write(traceback.format_exc())',
@@ -159,6 +176,13 @@
       '    }).then(function () {\n' +
       '      for (var j = 0; j < need.length; j++) loaded[need[j]] = true;\n' +
       '      for (var k = 0; k < newWheels.length; k++) loaded[newWheels[k]] = true;\n' +
+      // Executing the prelude here keeps its cost - which for FastAPI is a
+      // multi-second first import - inside the load budget rather than the
+      // run one.
+      '      if (m.prelude) {\n' +
+      '        try { py.globals.set("__prelude__", m.prelude); py.runPython("_viz_prep(__prelude__)"); }\n' +
+      '        catch (err) { postMessage({ type: "err", text: String(err) }); }\n' +
+      '      }\n' +
       // "loaded" is what starts the run budget on the page. It has to be sent
       // after the wheels are in and before the first line executes, or a slow
       // library download is billed to the run timer and reported as an

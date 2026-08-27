@@ -15,6 +15,157 @@ def show_money(self, value: Decimal) -> str:
 
 The method takes `self` and the value, and returns whatever should appear.
 
+
+## A field serialiser
+
+<code>@field_serializer</code> replaces the output for one field. The input side is untouched.
+
+```python-run
+from decimal import Decimal
+from pydantic import BaseModel, field_serializer
+
+class Price(BaseModel):
+    amount: Decimal
+
+    @field_serializer("amount")
+    def show_money(self, value: Decimal) -> str:
+        return "£%.2f" % value
+
+p = Price(amount="12.5")
+
+print("on the object:", p.amount, "(a", type(p.amount).__name__ + ")")
+print("dumped       :", p.model_dump())
+print("as json      :", p.model_dump_json())
+```
+
+## Only the output changes
+
+Validation still produces the real type, so arithmetic and comparisons keep working. Serialisation is the last step, not a conversion.
+
+```python-run
+from decimal import Decimal
+from pydantic import BaseModel, field_serializer
+
+class Basket(BaseModel):
+    unit: Decimal
+    quantity: int
+
+    @field_serializer("unit")
+    def money(self, v: Decimal) -> str:
+        return "£%.2f" % v
+
+b = Basket(unit="4.25", quantity=3)
+
+print("still a Decimal:", b.unit * b.quantity)
+print("comparison     :", b.unit > Decimal("4"))
+print("but dumped     :", b.model_dump())
+```
+
+## Different output for JSON and Python
+
+<code>when_used</code> restricts a serialiser to one mode, so internal dumps keep the real object.
+
+```python-run
+from datetime import date
+from pydantic import BaseModel, field_serializer
+
+class Module(BaseModel):
+    title: str
+    published_on: date
+
+    @field_serializer("published_on", when_used="json")
+    def pretty(self, value: date) -> str:
+        return value.strftime("%d %B %Y")
+
+m = Module(title="Vectors", published_on="2026-08-26")
+
+print("mode=python:", m.model_dump())
+print("mode=json  :", m.model_dump(mode="json"))
+print("json string:", m.model_dump_json())
+print()
+print("The Python dump keeps a real date for code that needs one.")
+```
+
+## Serialising a whole model
+
+<code>@model_serializer</code> replaces the entire output, which is how you emit a shape that is not simply your fields.
+
+```python-run
+from pydantic import BaseModel, model_serializer
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    track: str
+
+    @model_serializer
+    def as_envelope(self) -> dict:
+        return {
+            "type": "module",
+            "id": self.title.lower().replace(" ", "-"),
+            "attributes": {"title": self.title,
+                           "minutes": self.minutes,
+                           "track": self.track},
+        }
+
+m = Module(title="Dot Product", minutes=11, track="maths")
+print(m.model_dump())
+print()
+print(m.model_dump_json(indent=2))
+```
+
+## Hiding a value instead of formatting it
+
+A serialiser is one way to redact. <code>SecretStr</code> and <code>Field(exclude=True)</code> are usually better, and the comparison is worth seeing.
+
+```python-run
+from pydantic import BaseModel, Field, SecretStr, field_serializer
+
+class User(BaseModel):
+    name: str
+    email: str
+    token_a: str                       # redacted by a serialiser
+    token_b: SecretStr                 # hidden by its type
+    token_c: str = Field(exclude=True)  # never serialised at all
+
+    @field_serializer("token_a")
+    def mask(self, v: str) -> str:
+        return v[:4] + "…" + v[-2:]
+
+u = User(name="Ada", email="ada@vizlearn.in",
+         token_a="tok_live_abcdef", token_b="tok_live_ghijkl",
+         token_c="tok_live_mnopqr")
+
+print("repr :", u)
+print()
+print("dump :", u.model_dump())
+```
+
+## When the default was already right
+
+Most custom serialisers are display formatting in the wrong layer. Compare what a consumer can do with each.
+
+```python-run
+from datetime import date
+from pydantic import BaseModel, field_serializer
+
+class Pretty(BaseModel):
+    on: date
+
+    @field_serializer("on")
+    def fmt(self, v: date) -> str:
+        return v.strftime("%d %B %Y")
+
+class Plain(BaseModel):
+    on: date
+
+d = date(2026, 8, 26)
+print("pretty:", Pretty(on=d).model_dump_json())
+print("plain :", Plain(on=d).model_dump_json())
+print()
+print("A client can sort, filter and localise the second.")
+print("The first has to be parsed back, and only by an English reader.")
+```
 ## Only the output changes
 
 This is the important property. A serialiser does not change validation, and does not change what the field holds.

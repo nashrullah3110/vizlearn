@@ -160,6 +160,28 @@
             font-family: var(--vz-mono); font-size: 0.85em;
             color: var(--accent-primary);
         }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
     </style>
 </head>
 <body class="flex flex-col min-h-screen light-mode">
@@ -209,329 +231,10 @@
                     <h3 id="vz-s-the-gap-between-what-you-wrote-and-what-runs">The gap between what you wrote and what runs</h3>
                     <p>Write a function like this and you have made a promise:</p><pre><code class="language-python">def modules_left(count: int) -&gt; str:
     return &quot;You have &quot; + str(count) + &quot; modules to go&quot;</code></pre><p>The promise is that <code>count</code> is a whole number. Python does not keep it. Annotations are stored on the function object and otherwise ignored at runtime &mdash; they exist for human readers, editors and type checkers like mypy, none of which are present when your program is actually running. Call <code>modules_left("twelve")</code> and Python does exactly what you asked: it concatenates strings and returns a sentence that reads fine.</p><p>That is a small problem when the wrong value is only printed. It becomes a real one the moment something arithmetic happens. A string that has been travelling through three function calls disguised as an integer fails at the point it is finally divided, and the traceback points at the division, not at the front door where the bad value walked in.</p><p>This is the gap Pydantic fills. It reads the annotations you already write and enforces them, at a moment you choose.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-validation-is-a-boundary-problem">Validation is a boundary problem</a></li><li><a href="#vz-s-coercion-the-part-people-do-not-expect">Coercion: the part people do not expect</a></li><li><a href="#vz-s-errors-that-are-worth-reading">Errors that are worth reading</a></li><li><a href="#vz-s-what-else-the-model-buys-you">What else the model buys you</a></li><li><a href="#vz-s-what-it-is-not">What it is not</a></li><li><a href="#vz-s-what-the-hand-written-version-looks-like">What the hand-written version looks like</a></li><li><a href="#vz-s-the-cost-and-when-it-matters">The cost, and when it matters</a></li><li><a href="#vz-s-where-it-came-from-and-why-v2-matters">Where it came from, and why v2 matters</a></li><li><a href="#vz-s-four-things-people-expect-it-to-be">Four things people expect it to be</a></li><li><a href="#vz-s-the-habit-worth-forming">The habit worth forming</a></li><li><a href="#vz-s-where-this-track-goes">Where this track goes</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-a-type-hint-is-only-a-note-to-the-reader">A type hint is only a note to the reader</a></li><li><a href="#vz-s-the-same-promise-enforced">The same promise, enforced</a></li><li><a href="#vz-s-it-converts-not-just-complains">It converts, not just complains</a></li><li><a href="#vz-s-errors-that-name-the-problem">Errors that name the problem</a></li><li><a href="#vz-s-where-a-model-belongs">Where a model belongs</a></li><li><a href="#vz-s-what-you-get-for-free">What you get for free</a></li><li><a href="#vz-s-validation-is-a-boundary-problem">Validation is a boundary problem</a></li><li><a href="#vz-s-coercion-the-part-people-do-not-expect">Coercion: the part people do not expect</a></li><li><a href="#vz-s-errors-that-are-worth-reading">Errors that are worth reading</a></li><li><a href="#vz-s-what-else-the-model-buys-you">What else the model buys you</a></li><li><a href="#vz-s-what-it-is-not">What it is not</a></li><li><a href="#vz-s-what-the-hand-written-version-looks-like">What the hand-written version looks like</a></li><li><a href="#vz-s-the-cost-and-when-it-matters">The cost, and when it matters</a></li><li><a href="#vz-s-where-it-came-from-and-why-v2-matters">Where it came from, and why v2 matters</a></li><li><a href="#vz-s-four-things-people-expect-it-to-be">Four things people expect it to be</a></li><li><a href="#vz-s-the-habit-worth-forming">The habit worth forming</a></li><li><a href="#vz-s-where-this-track-goes">Where this track goes</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
-            <div class="lg:col-span-7 space-y-6" data-vz-viz>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">01</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">A type hint is only a note to the reader</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Python does not check annotations at runtime. This function promises an <code>int</code> and is handed a string, and Python raises nothing at all &mdash; the failure arrives later, somewhere else, as something confusing.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src"># The annotation says int. Python does not care.
-def modules_left(count: int) -> str:
-    return "You have " + str(count) + " modules to go"
-
-print(modules_left(12))
-print(modules_left("twelve"))     # no error - the annotation is decoration
-print(modules_left(None))         # still no error
-
-# The damage shows up later, in arithmetic that should have worked:
-def halfway(count: int) -> float:
-    return count / 2
-
-print(halfway(12))
-try:
-    print(halfway("twelve"))
-except TypeError as e:
-    print("TypeError:", e)        # <- the real failure, far from the cause</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_01.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">02</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">The same promise, enforced</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">A Pydantic model reads the same annotations and actually applies them. Nothing about the type declarations changed &mdash; only who is reading them.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel, ValidationError
-
-class Reader(BaseModel):
-    name: str
-    modules_done: int
-
-ok = Reader(name="Ada", modules_done=12)
-print("valid  :", ok)
-
-try:
-    Reader(name="Ada", modules_done="twelve")
-except ValidationError as e:
-    print("caught :", e.errors()[0]["msg"])
-
-# The point: the failure happens here, at the moment the bad value arrives,
-# not three functions later when someone tries to divide by it.</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_02.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">03</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">It converts, not just complains</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Data arriving from JSON, a form or a query string is text. Pydantic converts what can be converted and rejects what cannot, so the rest of your program works with real types.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel
-
-class Module(BaseModel):
-    title: str
-    minutes: int
-    published: bool
-
-# Everything here arrives as a string, the way a web form would send it.
-m = Module(title="Vectors", minutes="9", published="true")
-
-print(m)
-print("minutes is  :", type(m.minutes).__name__, "->", m.minutes + 1)
-print("published is:", type(m.published).__name__, "->", not m.published)
-
-# Try changing "9" to "nine" and running this again.</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_03.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">04</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Errors that name the problem</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">When it does refuse, it refuses with detail: which field, what was wrong, and what it actually received. Every field is checked, so you get the whole list rather than the first failure.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel, ValidationError
-
-class Module(BaseModel):
-    title: str
-    minutes: int
-    published: bool
-
-try:
-    Module(title=None, minutes="nine", published="maybe")
-except ValidationError as e:
-    print("problems found:", e.error_count())
-    print()
-    for err in e.errors():
-        print("field :", err["loc"][0])
-        print("  said:", err["msg"])
-        print("  got :", repr(err["input"]))
-        print()</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_04.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">05</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">Where a model belongs</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Pydantic earns its place at the <strong>boundary</strong> &mdash; the line where data you did not write enters code you did. Validate once on the way in, and everything downstream can stop guessing.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">import json
-from pydantic import BaseModel, ValidationError
-
-# Pretend this arrived from an API, a file, or a form post.
-payload = '{"title": "Dot Product", "minutes": "11", "published": "yes"}'
-
-class Module(BaseModel):
-    title: str
-    minutes: int
-    published: bool
-
-module = Module.model_validate_json(payload)   # one line: parse AND check
-print("parsed  :", module)
-
-# From here on, minutes really is an int. No isinstance checks needed.
-def reading_time(m: Module) -> str:
-    return "about %d minutes" % round(m.minutes * 1.2)
-
-print("derived :", reading_time(module))
-
-bad = '{"title": "Norms", "minutes": "a while", "published": "yes"}'
-try:
-    Module.model_validate_json(bad)
-except ValidationError as e:
-    print("rejected:", e.errors()[0]["msg"])</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_05.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card-container">
-                <div class="card-header">
-                    <div class="vz-step-head">
-                        <span class="vz-step-n">06</span>
-                        <h2 class="font-bold text-lg" style="color: var(--text-main)">What you get for free</h2>
-                    </div>
-                </div>
-                <div class="p-4 md:p-5">
-                    <p class="vz-step-blurb">Because the model already describes the data precisely, it can also hand that description to other tools &mdash; as a dict, as JSON, or as a schema that documentation and API tooling can read.</p>
-                <div class="vz-py" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic">
-                    <script type="text/plain" class="py-src">from pydantic import BaseModel
-
-class Module(BaseModel):
-    title: str
-    minutes: int
-    published: bool
-
-m = Module(title="Eigenvalues", minutes=14, published=True)
-
-print("as a dict :", m.model_dump())
-print("as JSON   :", m.model_dump_json())
-print()
-print("the schema it generated:")
-schema = m.model_json_schema()
-for name, spec in schema["properties"].items():
-    print("  %-10s %s" % (name, spec.get("type")))
-print("  required:", schema["required"])</script>
-                    <div class="vz-code-bar">
-                        <span class="vz-code-dot"></span><span>step_06.py</span>
-                        <span class="vz-code-lang">Pydantic</span>
-                    </div>
-                    <div class="vz-code" data-vz-code="python">
-                        <div class="vz-code-gutter" aria-hidden="true"></div>
-                        <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
-                            <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
-                                      spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                        </div>
-                    </div>
-                    <div class="py-controls">
-                        <button type="button" class="py-run-btn">Run</button>
-                        <button type="button" class="py-reset-btn">Reset</button>
-                        <span class="py-status"></span>
-                    </div>
-                    <div class="vz-console">
-                        <div class="vz-console-bar">Output</div>
-                        <pre class="vz-console-body py-output" aria-live="polite"
-                             data-empty="Press Run to execute this code."></pre>
-                    </div>
-                </div>
-                </div>
-            </div>
-            </div>
-            <div class="lg:col-span-5 space-y-6">
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
                 <div class="card-container">
                     <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
                     <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
@@ -560,6 +263,131 @@ print("  required:", schema["required"])</script>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-a-type-hint-is-only-a-note-to-the-reader">A type hint is only a note to the reader</h3>
+                    <p>Python does not check annotations at runtime. This function promises an <code>int</code> and is handed a string, and Python raises nothing at all &mdash; the failure arrives later, somewhere else, as something confusing.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src"># The annotation says int. Python does not care.
+def modules_left(count: int) -> str:
+    return "You have " + str(count) + " modules to go"
+
+print(modules_left(12))
+print(modules_left("twelve"))     # no error - the annotation is decoration
+print(modules_left(None))         # still no error
+
+# The damage shows up later, in arithmetic that should have worked:
+def halfway(count: int) -> float:
+    return count / 2
+
+print(halfway(12))
+try:
+    print(halfway("twelve"))
+except TypeError as e:
+    print("TypeError:", e)        # <- the real failure, far from the cause</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-the-same-promise-enforced">The same promise, enforced</h3>
+                    <p>A Pydantic model reads the same annotations and actually applies them. Nothing about the type declarations changed &mdash; only who is reading them.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel, ValidationError
+
+class Reader(BaseModel):
+    name: str
+    modules_done: int
+
+ok = Reader(name="Ada", modules_done=12)
+print("valid  :", ok)
+
+try:
+    Reader(name="Ada", modules_done="twelve")
+except ValidationError as e:
+    print("caught :", e.errors()[0]["msg"])
+
+# The point: the failure happens here, at the moment the bad value arrives,
+# not three functions later when someone tries to divide by it.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-it-converts-not-just-complains">It converts, not just complains</h3>
+                    <p>Data arriving from JSON, a form or a query string is text. Pydantic converts what can be converted and rejects what cannot, so the rest of your program works with real types.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    published: bool
+
+# Everything here arrives as a string, the way a web form would send it.
+m = Module(title="Vectors", minutes="9", published="true")
+
+print(m)
+print("minutes is  :", type(m.minutes).__name__, "->", m.minutes + 1)
+print("published is:", type(m.published).__name__, "->", not m.published)
+
+# Try changing "9" to "nine" and running this again.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-errors-that-name-the-problem">Errors that name the problem</h3>
+                    <p>When it does refuse, it refuses with detail: which field, what was wrong, and what it actually received. Every field is checked, so you get the whole list rather than the first failure.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel, ValidationError
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    published: bool
+
+try:
+    Module(title=None, minutes="nine", published="maybe")
+except ValidationError as e:
+    print("problems found:", e.error_count())
+    print()
+    for err in e.errors():
+        print("field :", err["loc"][0])
+        print("  said:", err["msg"])
+        print("  got :", repr(err["input"]))
+        print()</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-where-a-model-belongs">Where a model belongs</h3>
+                    <p>Pydantic earns its place at the <strong>boundary</strong> &mdash; the line where data you did not write enters code you did. Validate once on the way in, and everything downstream can stop guessing.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">import json
+from pydantic import BaseModel, ValidationError
+
+# Pretend this arrived from an API, a file, or a form post.
+payload = '{"title": "Dot Product", "minutes": "11", "published": "yes"}'
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    published: bool
+
+module = Module.model_validate_json(payload)   # one line: parse AND check
+print("parsed  :", module)
+
+# From here on, minutes really is an int. No isinstance checks needed.
+def reading_time(m: Module) -> str:
+    return "about %d minutes" % round(m.minutes * 1.2)
+
+print("derived :", reading_time(module))
+
+bad = '{"title": "Norms", "minutes": "a while", "published": "yes"}'
+try:
+    Module.model_validate_json(bad)
+except ValidationError as e:
+    print("rejected:", e.errors()[0]["msg"])</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3 id="vz-s-what-you-get-for-free">What you get for free</h3>
+                    <p>Because the model already describes the data precisely, it can also hand that description to other tools &mdash; as a dict, as JSON, or as a schema that documentation and API tooling can read.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-label="Pydantic"><script type="text/plain" class="py-src">from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    published: bool
+
+m = Module(title="Eigenvalues", minutes=14, published=True)
+
+print("as a dict :", m.model_dump())
+print("as JSON   :", m.model_dump_json())
+print()
+print("the schema it generated:")
+schema = m.model_json_schema()
+for name, spec in schema["properties"].items():
+    print("  %-10s %s" % (name, spec.get("type")))
+print("  required:", schema["required"])</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">Pydantic</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-validation-is-a-boundary-problem">Validation is a boundary problem</h3>
                     <p>Almost no bad data originates inside your program. It arrives: from a JSON request body, a form post, a config file, a CSV, a database column that has been nullable since 2019, an environment variable, another team's API. Everything that crosses into your code from outside is, until proven otherwise, a guess.</p><p>The useful discipline is to check that data once, at the edge, and convert it into something trustworthy. After that line, every function downstream can assume the shape is right and stop defending itself. The alternative &mdash; an <code>isinstance</code> check at the top of every function, or worse, no check and a hope &mdash; spreads the same anxiety through the whole codebase.</p><p>A Pydantic model is that boundary written down. It is a class whose annotations describe what you require, and constructing one is the act of checking.</p><pre><code class="language-python">from pydantic import BaseModel
@@ -662,7 +490,7 @@ class Module(BaseModel):
 <script type="application/json" id="vz-lab-data">{"presets": [], "readouts": [], "viz": "", "keys": {"actions": [{"label": "Run", "sel": ".py-run-btn", "i": 0}, {"label": "Reset", "sel": ".py-reset-btn", "i": 0}, {"label": "Run", "sel": ".py-run-btn", "i": 1}, {"label": "Reset", "sel": ".py-reset-btn", "i": 1}, {"label": "Run", "sel": ".py-run-btn", "i": 2}, {"label": "Reset", "sel": ".py-reset-btn", "i": 2}, {"label": "Run", "sel": ".py-run-btn", "i": 3}, {"label": "Reset", "sel": ".py-reset-btn", "i": 3}]}}</script>
 <!-- VIZLEARN:LAB:END -->
 <!-- VIZLEARN:MODULE:BEGIN (generated by tools/build_module_ui.py) -->
-<div class="vz-extras"><section class="vz-cheatsheet" aria-labelledby="vz-cheat-h"><div class="vz-cheat-top"><span class="vz-cheat-label"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg> Cheat sheet</span><button type="button" class="vz-btn" data-vz-copy><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg> Copy</button></div><h2 class="vz-cheat-title" id="vz-cheat-h">What Pydantic Is For</h2><p class="vz-cheat-text">Python does not check annotations at runtime. This function promises an int and is handed a string, and Python raises nothing at all — the failure arrives later, somewhere else, as something confusing.</p><div class="vz-cheat-foot">PYDANTIC &middot; vizlearn.in/pydantic/what_is_pydantic.html</div></section><section class="vz-related" aria-labelledby="vz-rel-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><h2 id="vz-rel-h">More in Pydantic</h2><span class="vz-rule"></span></div><div class="vz-rail"><a class="vz-card" href="../pydantic/your_first_basemodel.html" data-vz-path="pydantic/your_first_basemodel.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="20" y="18" width="120" height="56" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="32" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">class Module(BaseModel):</text><text x="80" y="46" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">title: str</text><text x="80" y="60" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">minutes: int</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Your First BaseModel</span></span></a><a class="vz-card" href="../pydantic/types_and_coercion.html" data-vz-path="pydantic/types_and_coercion.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><text x="28" y="32" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">"9"</text><path d="M42 28 L66 28" stroke="var(--text-muted)" stroke-width="2"/><text x="84" y="32" fill="var(--accent-primary)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">9</text><text x="28" y="52" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">9.5</text><path d="M42 48 L66 48" stroke="var(--text-muted)" stroke-width="2"/><text x="88" y="52" fill="var(--accent-primary)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">error</text><text x="28" y="72" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">"nine"</text><path d="M48 68 L66 68" stroke="var(--text-muted)" stroke-width="2"/><text x="88" y="72" fill="var(--accent-primary)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">error</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Types and Coercion</span></span></a><a class="vz-card" href="../pydantic/required_optional_and_defaults.html" data-vz-path="pydantic/required_optional_and_defaults.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="10" y="26" width="44" height="38" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="32" y="42" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">missing</text><text x="32" y="55" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">raises</text><rect x="58" y="26" width="44" height="38" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="42" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">None</text><text x="80" y="55" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">allowed</text><rect x="106" y="26" width="44" height="38" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="128" y="42" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">default</text><text x="128" y="55" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">filled</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Required, Optional and Defaults</span></span></a><a class="vz-card" href="../pydantic/reading_a_validation_error.html" data-vz-path="pydantic/reading_a_validation_error.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="16" y="20" width="128" height="20" rx="3" fill="var(--bg-surface)" stroke="var(--accent-primary)" stroke-width="2"/><text x="80" y="33" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">3 validation errors</text><rect x="16" y="46" width="128" height="14" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="56" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">loc  -  where</text><rect x="16" y="62" width="128" height="14" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="72" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">type  -  which rule</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Reading a ValidationError</span></span></a></div></section><section class="vz-author" aria-labelledby="vz-author-h"><h2 id="vz-author-h" class="vz-author-h">About the author</h2><p class="vz-author-body"><strong>Ashish Jangra</strong> builds and maintains VizLearn. Every module here is written and the visualisation behind it hand-built, so the numbers in a readout come from the same code that draws the picture. Corrections are genuinely welcome and get priority over everything else &mdash; if a page states something wrong, or an animation misrepresents what the algorithm does, <a href="../contact.html">get in touch</a>.</p><p class="vz-author-links"><a href="../about.html">About VizLearn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://github.com/AshishJangra27" rel="noopener me">GitHub</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://www.linkedin.com/in/ashish-jangra/" rel="noopener me">LinkedIn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="../contact.html">Contact</a></p></section><nav class="vz-prevnext" aria-label="Module navigation"><a class="vz-pn vz-pn-next" href="../pydantic/your_first_basemodel.html" rel="next"><span class="vz-pn-text"><span class="vz-pn-label">Next</span><span class="vz-pn-title">Your First BaseModel</span></span><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a></nav></div>
+<div class="vz-extras"><section class="vz-cheatsheet" aria-labelledby="vz-cheat-h"><div class="vz-cheat-top"><span class="vz-cheat-label"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg> Cheat sheet</span><button type="button" class="vz-btn" data-vz-copy><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg> Copy</button></div><h2 class="vz-cheat-title" id="vz-cheat-h">What Pydantic Is For</h2><p class="vz-cheat-text">The promise is that count is a whole number. Python does not keep it. Annotations are stored on the function object and otherwise ignored at runtime — they exist for human readers, editors and type checkers like mypy, none of which are present when your program is actually running. Call modules_left(&quot;twelve&quot;) and Python does exactly what you asked: it concatenates strings and returns a sentence that reads fine.</p><div class="vz-cheat-foot">PYDANTIC &middot; vizlearn.in/pydantic/what_is_pydantic.html</div></section><section class="vz-related" aria-labelledby="vz-rel-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><h2 id="vz-rel-h">More in Pydantic</h2><span class="vz-rule"></span></div><div class="vz-rail"><a class="vz-card" href="../pydantic/your_first_basemodel.html" data-vz-path="pydantic/your_first_basemodel.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="20" y="18" width="120" height="56" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="32" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">class Module(BaseModel):</text><text x="80" y="46" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">title: str</text><text x="80" y="60" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">minutes: int</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Your First BaseModel</span></span></a><a class="vz-card" href="../pydantic/types_and_coercion.html" data-vz-path="pydantic/types_and_coercion.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><text x="28" y="32" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">"9"</text><path d="M42 28 L66 28" stroke="var(--text-muted)" stroke-width="2"/><text x="84" y="32" fill="var(--accent-primary)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">9</text><text x="28" y="52" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">9.5</text><path d="M42 48 L66 48" stroke="var(--text-muted)" stroke-width="2"/><text x="88" y="52" fill="var(--accent-primary)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">error</text><text x="28" y="72" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">"nine"</text><path d="M48 68 L66 68" stroke="var(--text-muted)" stroke-width="2"/><text x="88" y="72" fill="var(--accent-primary)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">error</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Types and Coercion</span></span></a><a class="vz-card" href="../pydantic/required_optional_and_defaults.html" data-vz-path="pydantic/required_optional_and_defaults.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="10" y="26" width="44" height="38" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="32" y="42" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">missing</text><text x="32" y="55" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">raises</text><rect x="58" y="26" width="44" height="38" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="42" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">None</text><text x="80" y="55" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">allowed</text><rect x="106" y="26" width="44" height="38" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="128" y="42" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">default</text><text x="128" y="55" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">filled</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Required, Optional and Defaults</span></span></a><a class="vz-card" href="../pydantic/reading_a_validation_error.html" data-vz-path="pydantic/reading_a_validation_error.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="16" y="20" width="128" height="20" rx="3" fill="var(--bg-surface)" stroke="var(--accent-primary)" stroke-width="2"/><text x="80" y="33" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">3 validation errors</text><rect x="16" y="46" width="128" height="14" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="56" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">loc  -  where</text><rect x="16" y="62" width="128" height="14" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="72" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">type  -  which rule</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Pydantic</span><span class="vz-card-title">Reading a ValidationError</span></span></a></div></section><section class="vz-author" aria-labelledby="vz-author-h"><h2 id="vz-author-h" class="vz-author-h">About the author</h2><p class="vz-author-body"><strong>Ashish Jangra</strong> builds and maintains VizLearn. Every module here is written and the visualisation behind it hand-built, so the numbers in a readout come from the same code that draws the picture. Corrections are genuinely welcome and get priority over everything else &mdash; if a page states something wrong, or an animation misrepresents what the algorithm does, <a href="../contact.html">get in touch</a>.</p><p class="vz-author-links"><a href="../about.html">About VizLearn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://github.com/AshishJangra27" rel="noopener me">GitHub</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://www.linkedin.com/in/ashish-jangra/" rel="noopener me">LinkedIn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="../contact.html">Contact</a></p></section><nav class="vz-prevnext" aria-label="Module navigation"><a class="vz-pn vz-pn-next" href="../pydantic/your_first_basemodel.html" rel="next"><span class="vz-pn-text"><span class="vz-pn-label">Next</span><span class="vz-pn-title">Your First BaseModel</span></span><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a></nav></div>
 <!-- VIZLEARN:MODULE:END -->
 <!-- VIZLEARN:AD-BOTTOM:BEGIN (generated by tools/build_ads.py) -->
         <!-- placement reserved; set AD_SLOTS['bottom'] in tools/build_seo.py to enable -->

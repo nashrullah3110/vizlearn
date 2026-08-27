@@ -19,6 +19,180 @@ class LessonPage(BaseModel):
 
 Identical apart from one type. A third resource means a third copy, and a change to pagination means editing all of them &mdash; or, more realistically, editing most of them.
 
+
+## The duplication a generic removes
+
+Two envelopes with identical structure and one differing field. A third resource means a third copy.
+
+```python-run
+from typing import List
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+
+class Lesson(BaseModel):
+    name: str
+
+class ModulePage(BaseModel):
+    items: List[Module]
+    total: int
+    page: int
+
+class LessonPage(BaseModel):          # the same class again
+    items: List[Lesson]
+    total: int
+    page: int
+
+print(ModulePage(items=[{"title": "Vectors"}], total=1, page=1))
+print(LessonPage(items=[{"name": "Direction"}], total=1, page=1))
+```
+
+## One envelope, parameterised
+
+Inherit from <code>Generic[T]</code> and the payload type becomes an argument. Validation applies to whatever you fill it with.
+
+```python-run
+from typing import Generic, List, TypeVar
+from pydantic import BaseModel
+
+T = TypeVar("T")
+
+class Page(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+    page: int = 1
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+class Lesson(BaseModel):
+    name: str
+
+mp = Page[Module](items=[{"title": "Vectors", "minutes": "8"}], total=1)
+lp = Page[Lesson](items=[{"name": "Direction"}], total=1)
+
+print("modules:", mp)
+print("lessons:", lp)
+print()
+print("inner type:", type(mp.items[0]).__name__, "| coerced:", mp.items[0].minutes)
+```
+
+## The parameter is validated
+
+A generic is not a free pass. The payload is checked against whatever type you supplied, with the usual errors and paths.
+
+```python-run
+from typing import Generic, List, TypeVar
+from pydantic import BaseModel, ValidationError
+
+T = TypeVar("T")
+
+class Page(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+try:
+    Page[Module](items=[{"title": "Vectors", "minutes": "soon"}], total=1)
+except ValidationError as e:
+    err = e.errors()[0]
+    print("path:", err["loc"])
+    print("said:", err["msg"])
+
+# And a plain type works just as well as a model:
+print()
+print("ints:", Page[int](items=["1", "2", "3"], total=3))
+```
+
+## Bounded and constrained parameters
+
+<code>TypeVar(bound=...)</code> restricts what the parameter may be, which keeps a generic honest about what it can hold.
+
+```python-run
+from typing import Generic, List, TypeVar
+from pydantic import BaseModel
+
+class Resource(BaseModel):
+    id: int
+
+TResource = TypeVar("TResource", bound=Resource)
+
+class Page(BaseModel, Generic[TResource]):
+    items: List[TResource]
+
+    def ids(self):
+        return [item.id for item in self.items]     # safe: bound guarantees .id
+
+class Module(Resource):
+    title: str
+
+p = Page[Module](items=[{"id": 1, "title": "Vectors"},
+                        {"id": 2, "title": "Norms"}])
+print(p)
+print("ids:", p.ids())
+```
+
+## Several parameters
+
+A generic can take more than one, which is how a result-or-error envelope gets written once.
+
+```python-run
+from typing import Generic, Optional, TypeVar
+from pydantic import BaseModel
+
+D = TypeVar("D")
+E = TypeVar("E")
+
+class Result(BaseModel, Generic[D, E]):
+    ok: bool
+    data: Optional[D] = None
+    error: Optional[E] = None
+
+class Module(BaseModel):
+    title: str
+
+class Problem(BaseModel):
+    code: str
+    detail: str
+
+good = Result[Module, Problem](ok=True, data={"title": "Vectors"})
+bad = Result[Module, Problem](ok=False,
+                              error={"code": "not_found", "detail": "no such module"})
+
+print("ok  :", good)
+print("bad :", bad)
+```
+
+## What the schema does with it
+
+Each parameterisation becomes its own definition, so a generated client gets a real named type rather than an untyped envelope.
+
+```python-run
+import json
+from typing import Generic, List, TypeVar
+from pydantic import BaseModel
+
+T = TypeVar("T")
+
+class Page(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+
+class Module(BaseModel):
+    title: str
+
+schema = Page[Module].model_json_schema()
+print("title :", schema["title"])
+print("props :", list(schema["properties"]))
+print("$defs :", list(schema.get("$defs", {})))
+print()
+print("items :", json.dumps(schema["properties"]["items"]))
+```
 ## The generic version
 
 ```python

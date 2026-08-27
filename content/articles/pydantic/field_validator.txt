@@ -9,6 +9,196 @@ They cannot check membership of a set that lives in a database. They cannot norm
 
 `field_validator` is where those live. It is a classmethod that receives one field's value, and either returns a value or raises.
 
+
+## A rule the annotation cannot hold
+
+Anything that is not a type, a bound or a pattern needs code. A validator receives the value after coercion and either returns it or raises.
+
+```python-run
+from pydantic import BaseModel, field_validator, ValidationError
+
+TRACKS = {"maths", "python", "dsa", "ml"}
+
+class Module(BaseModel):
+    title: str
+    track: str
+
+    @field_validator("track")
+    @classmethod
+    def known_track(cls, v: str) -> str:
+        if v not in TRACKS:
+            raise ValueError("unknown track %r; try one of %s"
+                             % (v, ", ".join(sorted(TRACKS))))
+        return v
+
+print(Module(title="Vectors", track="maths"))
+
+try:
+    Module(title="Vectors", track="astrology")
+except ValidationError as e:
+    err = e.errors()[0]
+    print()
+    print("type :", err["type"])
+    print("said :", err["msg"])
+```
+
+## Returning a changed value
+
+A validator is not only a check. Whatever it returns becomes the field, which makes it the right place for normalisation.
+
+```python-run
+from pydantic import BaseModel, field_validator
+
+class Module(BaseModel):
+    title: str
+    tags: list
+
+    @field_validator("title")
+    @classmethod
+    def tidy(cls, v: str) -> str:
+        return " ".join(v.split()).title()
+
+    @field_validator("tags")
+    @classmethod
+    def lower_unique(cls, v: list) -> list:
+        seen, out = set(), []
+        for tag in v:
+            t = tag.strip().lower()
+            if t and t not in seen:
+                seen.add(t)
+                out.append(t)
+        return out
+
+m = Module(title="  the   chain    RULE ", tags=[" Maths ", "maths", "CALCULUS", ""])
+print("title:", repr(m.title))
+print("tags :", m.tags)
+```
+
+## One validator, several fields
+
+Pass more than one name, or <code>"*"</code> for all of them. The field being validated is available through the info argument.
+
+```python-run
+from pydantic import BaseModel, field_validator, ValidationInfo, ValidationError
+
+class Module(BaseModel):
+    title: str
+    summary: str
+    track: str
+
+    @field_validator("title", "summary")
+    @classmethod
+    def not_blank(cls, v: str, info: ValidationInfo) -> str:
+        if not v.strip():
+            raise ValueError("%s cannot be blank" % info.field_name)
+        return v.strip()
+
+    @field_validator("*")
+    @classmethod
+    def no_control_chars(cls, v):
+        if isinstance(v, str) and any(ord(c) < 32 for c in v):
+            raise ValueError("contains a control character")
+        return v
+
+print(Module(title=" Vectors ", summary=" What they are ", track="maths"))
+
+try:
+    Module(title="   ", summary="x", track="maths")
+except ValidationError as e:
+    print()
+    print("blank:", e.errors()[0]["msg"])
+```
+
+## Seeing fields already validated
+
+<code>info.data</code> holds the fields validated <em>before</em> this one. Declaration order therefore decides what is visible.
+
+```python-run
+from pydantic import BaseModel, field_validator, ValidationInfo, ValidationError
+
+class Module(BaseModel):
+    minutes: int
+    lessons: int
+
+    @field_validator("lessons")
+    @classmethod
+    def enough_time(cls, v: int, info: ValidationInfo) -> int:
+        minutes = info.data.get("minutes")       # declared above, so present
+        if minutes is not None and v > minutes:
+            raise ValueError("%d lessons cannot fit in %d minutes" % (v, minutes))
+        return v
+
+print(Module(minutes=30, lessons=5))
+
+try:
+    Module(minutes=3, lessons=5)
+except ValidationError as e:
+    print("refused:", e.errors()[0]["msg"])
+
+# If an earlier field failed, it is simply absent from info.data:
+try:
+    Module(minutes="ages", lessons=5)
+except ValidationError as e:
+    print()
+    print("earlier failure:", [x["loc"][0] for x in e.errors()])
+```
+
+## Before and after coercion
+
+<code>mode="after"</code> is the default and sees the converted value. <code>mode="before"</code> sees the raw input, which is where you fix a shape rather than a value.
+
+```python-run
+from pydantic import BaseModel, field_validator
+
+class Module(BaseModel):
+    tags: list
+
+    # The wire sometimes sends "a,b,c" instead of a list. Fix the shape
+    # BEFORE Pydantic tries to validate it as a list.
+    @field_validator("tags", mode="before")
+    @classmethod
+    def split_csv(cls, v):
+        if isinstance(v, str):
+            return [part.strip() for part in v.split(",") if part.strip()]
+        return v
+
+    @field_validator("tags")            # mode="after" is the default
+    @classmethod
+    def lowercase(cls, v: list) -> list:
+        return [t.lower() for t in v]
+
+print("from a list  :", Module(tags=["Maths", "Vectors"]).tags)
+print("from a string:", Module(tags="Maths, Vectors, Norms").tags)
+```
+
+## Where a validator is the wrong tool
+
+If a constraint can express the rule, use the constraint &mdash; it appears in the schema and a validator does not.
+
+```python-run
+from pydantic import BaseModel, Field, field_validator
+
+class ByValidator(BaseModel):
+    minutes: int
+
+    @field_validator("minutes")
+    @classmethod
+    def positive(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("must be positive")
+        return v
+
+class ByConstraint(BaseModel):
+    minutes: int = Field(gt=0)
+
+for cls in (ByValidator, ByConstraint):
+    spec = cls.model_json_schema()["properties"]["minutes"]
+    print("%-13s schema: %s" % (cls.__name__, spec))
+
+print()
+print("Both reject -1. Only one told the documentation, the generated")
+print("client and the form builder that zero is the floor.")
+```
 ## The shape
 
 ```python

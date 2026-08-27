@@ -11,6 +11,180 @@ The obvious answer is a `@property`, and it is half right. A property computes f
 
 `@computed_field` closes the gap: the value is derived, and it appears in the output.
 
+
+## A property is invisible to serialisation
+
+An ordinary <code>@property</code> works on the object and does not appear in <code>model_dump()</code>. Often that is right &mdash; sometimes it is not.
+
+```python-run
+from pydantic import BaseModel
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    lessons: int
+
+    @property
+    def pace(self) -> float:
+        return round(self.minutes / self.lessons, 1)
+
+m = Module(title="Vectors", minutes=30, lessons=5)
+
+print("on the object :", m.pace)
+print("in the dump   :", m.model_dump())
+print("in the json   :", m.model_dump_json())
+```
+
+## computed_field puts it in the output
+
+Add the decorator and the value appears in every serialisation, while still being a normal property on the object.
+
+```python-run
+from pydantic import BaseModel, computed_field
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    lessons: int
+
+    @computed_field
+    @property
+    def pace(self) -> float:
+        return round(self.minutes / self.lessons, 1)
+
+m = Module(title="Vectors", minutes=30, lessons=5)
+
+print("on the object :", m.pace)
+print("in the dump   :", m.model_dump())
+print("in the json   :", m.model_dump_json())
+```
+
+## It is output only
+
+A computed field cannot be supplied. It is not an input, does not appear in the constructor, and is recomputed from the fields every time.
+
+```python-run
+from pydantic import BaseModel, computed_field, ValidationError
+
+class Module(BaseModel):
+    minutes: int
+    lessons: int
+
+    @computed_field
+    @property
+    def pace(self) -> float:
+        return round(self.minutes / self.lessons, 1)
+
+m = Module(minutes=30, lessons=5)
+print("computed:", m.pace)
+
+# Supplying it is ignored (or rejected, with extra="forbid"):
+m2 = Module(minutes=30, lessons=5, pace=999)
+print("supplied:", m2.pace, "<- ignored; it is derived, not stored")
+
+# It follows the fields:
+m3 = Module(minutes=60, lessons=5)
+print("recomputed:", m3.pace)
+```
+
+## Describing it properly
+
+The return annotation becomes its type in the schema. Add a description and it documents itself like any other field.
+
+```python-run
+import json
+from pydantic import BaseModel, computed_field
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+
+    @computed_field(description="Reading time with a 20% margin, in minutes.")
+    @property
+    def estimated_minutes(self) -> int:
+        return round(self.minutes * 1.2)
+
+m = Module(title="Vectors", minutes=10)
+print("value :", m.estimated_minutes)
+print("dump  :", m.model_dump())
+print()
+
+schema = m.model_json_schema(mode="serialization")
+print("in the serialization schema:")
+for name, spec in schema["properties"].items():
+    print("  %-20s %-8s %s" % (name, spec.get("type"), spec.get("description", "")))
+```
+
+## Excluding it when you do not want it
+
+It behaves like a field for <code>include</code> and <code>exclude</code>, so an internal calculation can be kept out of a public response.
+
+```python-run
+from pydantic import BaseModel, computed_field
+
+class Module(BaseModel):
+    title: str
+    minutes: int
+    cost_pence: int
+
+    @computed_field
+    @property
+    def hours(self) -> float:
+        return round(self.minutes / 60, 2)
+
+    @computed_field
+    @property
+    def margin(self) -> int:
+        return self.cost_pence * 3
+
+m = Module(title="Vectors", minutes=90, cost_pence=200)
+
+print("everything :", m.model_dump())
+print("public     :", m.model_dump(exclude={"cost_pence", "margin"}))
+print("just hours :", m.model_dump(include={"title": True, "hours": True}))
+```
+
+## Cost, and when not to use it
+
+It runs on every serialisation. That is fine for arithmetic and wrong for anything expensive &mdash; and it must never fail.
+
+```python-run
+from pydantic import BaseModel, computed_field
+
+calls = {"n": 0}
+
+class Module(BaseModel):
+    minutes: int
+    lessons: int
+
+    @computed_field
+    @property
+    def pace(self) -> float:
+        calls["n"] += 1
+        return round(self.minutes / self.lessons, 1)
+
+m = Module(minutes=30, lessons=5)
+m.model_dump(); m.model_dump(); m.model_dump_json()
+print("serialisations: 3, property calls:", calls["n"])
+
+# And the trap: a computed field that can raise breaks serialisation.
+class Risky(BaseModel):
+    minutes: int
+    lessons: int
+
+    @computed_field
+    @property
+    def pace(self) -> float:
+        return self.minutes / self.lessons      # lessons could be 0
+
+r = Risky(minutes=30, lessons=0)
+try:
+    r.model_dump()
+except ZeroDivisionError as e:
+    print()
+    print("dump failed:", type(e).__name__, "-", e)
+    print("A model that validated fine can no longer be serialised.")
+```
 ## The shape
 
 ```python
