@@ -1,0 +1,366 @@
+title: Router and Global Dependencies
+intro: Protecting a section without every endpoint repeating itself - and the endpoint that would otherwise be forgotten.
+
+## Three places to declare one
+
+A dependency can be attached at three levels, all with the same argument:
+
+```python
+FastAPI(dependencies=[Depends(fn)])                 # every route
+APIRouter(dependencies=[Depends(fn)])               # every route in it
+@app.get("/x", dependencies=[Depends(fn)])          # one route
+```
+
+They stack. All three run for a request that matches, outermost first, and each adds a rule rather than replacing one.
+
+
+## A dependency on the router
+
+Declared once, applied to every route in it. The value is not injected &mdash; it runs for its effect.
+
+```python-run
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
+
+def require_key(x_api_key: str = Header(default="")):
+    if x_api_key != "k-secret":
+        raise HTTPException(401, "Bad or missing key")
+    return x_api_key
+
+admin = APIRouter(prefix="/admin", dependencies=[Depends(require_key)])
+
+@admin.get("/stats")
+def stats(): return {"modules": 30}
+
+@admin.delete("/cache")
+def clear(): return {"cleared": True}
+
+app = FastAPI()
+app.include_router(admin)
+
+c = TestClient(app)
+good = {"x-api-key": "k-secret"}
+print("no key   :", c.get("/admin/stats").status_code)
+print("bad key  :", c.request("GET", "/admin/stats", headers={"x-api-key": "x"}).status_code)
+print("stats    :", c.request("GET", "/admin/stats", headers=good).json())
+print("cache    :", c.request("DELETE", "/admin/cache", headers=good).json())
+```
+
+## Application-wide
+
+The same list on <code>FastAPI()</code> applies to every route in the app, including ones added later.
+
+```python-run
+from fastapi import Depends, FastAPI, Header, HTTPException
+
+def require_key(x_api_key: str = Header(default="")):
+    if x_api_key != "k-secret":
+        raise HTTPException(401, "Bad or missing key")
+
+app = FastAPI(dependencies=[Depends(require_key)])
+
+@app.get("/a")
+def a(): return {"route": "a"}
+
+@app.get("/b")
+def b(): return {"route": "b"}
+
+c = TestClient(app)
+print("no key:", c.get("/a").status_code, c.get("/b").status_code)
+h = {"x-api-key": "k-secret"}
+print("keyed :", c.request("GET", "/a", headers=h).json(),
+      c.request("GET", "/b", headers=h).json())
+```
+
+## On a single route
+
+The decorator takes the same list, for a rule that applies to one endpoint and whose value the handler does not need.
+
+```python-run
+from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+audit = []
+
+def record(x_actor: str = Header(default="anonymous")):
+    audit.append(x_actor)
+
+@app.delete("/modules/{i}", dependencies=[Depends(record)])
+def remove(i: int):
+    return {"deleted": i}
+
+@app.get("/modules/{i}")
+def read(i: int):
+    return {"id": i}
+
+c = TestClient(app)
+c.request("DELETE", "/modules/1", headers={"x-actor": "ada"})
+c.request("DELETE", "/modules/2")
+c.get("/modules/3")
+print("audit trail:", audit, "<- reads are not recorded")
+```
+
+## The value is not passed
+
+That is the trade. A handler needing the user declares its own <code>Depends</code>, and the cache means it still runs once.
+
+```python-run
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
+
+calls = []
+
+def current_user(x_token: str = Header(default="")):
+    calls.append(x_token)
+    if x_token != "tok":
+        raise HTTPException(401, "Sign in")
+    return {"name": "ada"}
+
+router = APIRouter(dependencies=[Depends(current_user)])
+
+@router.get("/who")
+def who(user: dict = Depends(current_user)):     # declared again, to use it
+    return {"user": user["name"], "auth_calls": len(calls)}
+
+@router.get("/ping")
+def ping():                                      # protected, does not need it
+    return {"ok": True}
+
+app = FastAPI(); app.include_router(router)
+c = TestClient(app)
+h = {"x-token": "tok"}
+print(c.request("GET", "/who", headers=h).json())
+calls.clear()
+print(c.request("GET", "/ping", headers=h).json(), "| auth calls:", len(calls))
+```
+
+## They stack
+
+App, router and route dependencies all run, outermost first. Each layer adds a rule rather than replacing one.
+
+```python-run
+from fastapi import APIRouter, Depends, FastAPI
+
+order = []
+
+def app_level():    order.append("app")
+def router_level(): order.append("router")
+def route_level():  order.append("route")
+
+router = APIRouter(prefix="/x", dependencies=[Depends(router_level)])
+
+@router.get("/y", dependencies=[Depends(route_level)])
+def y():
+    order.append("handler")
+    return {"order": list(order)}
+
+app = FastAPI(dependencies=[Depends(app_level)])
+app.include_router(router)
+
+print(TestClient(app).get("/x/y").json())
+```
+
+## The endpoint that would have forgotten
+
+The argument for putting it on the router: a new route added later is protected without anyone remembering to protect it.
+
+```python-run
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
+
+def require_key(x_api_key: str = Header(default="")):
+    if x_api_key != "k":
+        raise HTTPException(401, "No key")
+
+# Protected as a group.
+grouped = APIRouter(prefix="/g", dependencies=[Depends(require_key)])
+@grouped.get("/one")
+def g1(): return {"r": 1}
+@grouped.get("/two")                      # added later; still protected
+def g2(): return {"r": 2}
+
+# Protected one at a time.
+each = APIRouter(prefix="/e")
+@each.get("/one", dependencies=[Depends(require_key)])
+def e1(): return {"r": 1}
+@each.get("/two")                         # somebody forgot
+def e2(): return {"r": 2}
+
+app = FastAPI(); app.include_router(grouped); app.include_router(each)
+c = TestClient(app)
+for p in ["/g/one", "/g/two", "/e/one", "/e/two"]:
+    print("%-7s no key -> %s" % (p, c.get(p).status_code))
+```
+## The value is not injected
+
+This is the difference from a parameter-level `Depends`, and the one thing to remember.
+
+A dependency declared this way runs for its **effect**. It can read headers, validate, raise, record an audit entry &mdash; but whatever it returns is discarded, because there is no parameter to receive it.
+
+So a handler that actually needs the user still declares it:
+
+```python
+router = APIRouter(dependencies=[Depends(current_user)])
+
+@router.get("/who")
+def who(user: User = Depends(current_user)):
+    ...
+```
+
+That looks like a duplicate and is not: per-request caching means the function runs **once**. The router-level declaration guarantees the check happens on every route; the parameter-level one gets the value where it is needed.
+
+## The argument for the router form
+
+It is not brevity. It is that a route added later is covered by default.
+
+Protecting endpoints one at a time works perfectly until somebody adds the fourteenth one and does not know the convention, or knows it and is in a hurry. That endpoint is then unprotected, nothing fails, no test covers it because nobody wrote a test for a route they did not know needed one, and the gap is found later by someone who was looking.
+
+The router form inverts that: forgetting is not possible, because the protection is a property of the section rather than of each endpoint. Adding a route to `/admin` makes it an admin route.
+
+The last editor above shows both arrangements side by side, with one endpoint in each. The grouped one is safe; the individual one has a hole.
+
+## When to use which level
+
+**Application-wide** for cross-cutting concerns that genuinely apply to everything: request identifiers, tracing, a global rate limit. Be careful &mdash; a health check that now requires an API key is a common self-inflicted outage, and public endpoints stop being public. If more than a couple of routes need an exemption, this is the wrong level.
+
+**Router-level** for a section with a shared rule. This is the sweet spot, and where most real use lives: `/admin` requires an admin, `/internal` requires a service token.
+
+**Route-level** for a rule genuinely specific to one endpoint whose value the handler does not need &mdash; recording an audit entry, checking a feature flag, enforcing an idempotency key.
+
+## What it does to the documentation
+
+Parameters declared by these dependencies still appear on every affected endpoint, because as far as a caller is concerned the endpoint requires them.
+
+So a router requiring an `x-api-key` header documents that header on all of its routes. That is right, and it is a small argument for the router form over middleware, which would enforce the same rule invisibly.
+
+The `responses=` argument pairs with this: a router that can 401 should say so once, at the router, rather than on each route.
+
+## Dependencies or middleware?
+
+Both can enforce something across many routes, and the choice comes up as soon as either does.
+
+**A dependency** knows about routing, so it applies to a chosen set. It can declare parameters, which appear in the schema. It integrates with the error handling you already have, and it can be overridden in tests. It runs after routing, so it knows which endpoint matched.
+
+**Middleware** runs on every request including unmatched ones, before routing. It cannot declare parameters and does not appear in the documentation.
+
+The rule that follows: if it is about *this endpoint* or *this section* &mdash; authentication, permissions, validation &mdash; it is a dependency. If it is about *every request regardless of route* &mdash; CORS, compression, a request id, timing &mdash; it is middleware.
+
+Reaching for middleware to do authentication is a common early choice and usually regretted, because the rule becomes invisible to the schema, awkward to exempt one route from, and hard to override in a test.
+
+## Testing them
+
+`dependency_overrides` works on these exactly as on parameter-level ones, which is the next module and is what makes a router-wide auth requirement pleasant rather than tiresome to test.
+
+
+## Mistakes people make
+
+**Application-wide authentication.** It catches the health check, the metrics endpoint and the docs, and the resulting outage is self-inflicted. If more than a couple of routes need an exemption, the level is wrong.
+
+**Expecting the value to be injected.** These run for their effect. A handler that needs the value declares its own `Depends`, and the cache means the function still runs once.
+
+**Using middleware for it instead.** Middleware runs before routing, cannot declare parameters, is invisible to the schema and is awkward to exempt one route from or override in a test.
+
+**Protecting routes one at a time.** It works until the fourteenth route is added by somebody who does not know the convention. Nothing fails and no test covers it.
+
+**Forgetting `responses=` on the router.** A section that can 401 should document it once, at the router, rather than on every route or nowhere.
+
+**Assuming order does not matter.** App, then router, then route. Each layer can rely on the ones outside it having passed, which is what makes layered rules safe.
+
+## Where the boundary sits
+
+The clean division, stated once:
+
+**Dependencies** are about endpoints. They know which route matched, declare parameters that reach the schema, integrate with your exception handlers, and can be overridden in tests. Authentication, permissions, request-scoped resources.
+
+**Middleware** is about requests. It runs on everything including unmatched paths, before routing, and knows nothing about your endpoints. CORS, compression, request identifiers, timing.
+
+Choosing by that question rather than by convenience keeps both simple.
+
+
+## Choosing the level, concretely
+
+A short decision procedure that avoids the common mistakes.
+
+**Does every route without exception need it, including health checks and docs?** Then application level. Very few things qualify - a request identifier, tracing.
+
+**Does a coherent section need it?** Router level. This is where most real use lives, and it is the level that survives a route being added later.
+
+**Does exactly one endpoint need it, and the handler does not want the value?** Route level.
+
+**Does the handler need the value?** A parameter, not any of these - and if the section also needs the guarantee, declare it in both places and let the cache make it one call.
+
+The mistake worth naming again is the first. An application-level authentication dependency reads as tidy and takes out `/health` with it, which is discovered by a load balancer at the worst possible moment.
+
+## Documenting a protected section
+
+Two arguments belong on the router beside the dependency.
+
+`responses={401: {"description": "Missing or invalid key"}}` documents the failure once for every route in the section.
+
+`tags=["admin"]` groups them, so a reader of the documentation sees the protected endpoints together rather than scattered among the public ones.
+
+Both are single arguments, and together they turn "these routes need a key" from something a caller discovers by being rejected into something the schema states.
+
+## Next
+
+Replacing a dependency for a test &mdash; the piece that makes all of this testable without a database, a token service or a network.
+
+
+## A note on ordering and errors
+
+Because the layers run outermost first, the error a caller sees is from the outermost layer that failed.
+
+That is usually right - a request with no API key should be told that, not told it lacks a permission it could not have been checked for. It does mean the layers should be ordered from most general to most specific, which the app/router/route nesting gives you for free.
+
+Within a single `dependencies=[...]` list, the entries run in order, so a cheap check should come before an expensive one. There is no point querying a permissions table for a request whose token is missing.
+
+## Documenting what a section requires
+
+Worth restating because it is the difference between a section a caller can use and one they have to reverse-engineer.
+
+A protected router should carry three things: the dependency that enforces the rule, a `responses` entry describing the failure, and a `tags` entry grouping the routes.
+
+With those, the generated documentation shows a labelled group of endpoints, each documenting the header it needs and the 401 it can return. Without them the endpoints still work and a caller discovers the requirement by being refused, which is a worse first experience than any amount of prose can make up for.
+
+
+## The decision in one line
+
+Put it on the router.
+
+Application-level catches the health check. Route-level is forgotten by whoever adds the fourteenth endpoint. The router is the level that matches how people actually think about an API - "everything under `/admin` needs an admin" - and it is the only one of the three where adding a route later cannot create a hole.
+
+Reach past it only when the rule genuinely applies to every request without exception, or genuinely applies to exactly one endpoint.
+
+## And the one to remember
+
+The return value is discarded. These run for their effect.
+
+When a handler needs the value as well, declare it again as a parameter and let the per-request cache collapse the two into one call. That looks redundant the first time you write it and is not: the router declaration guarantees the check on every route, and the parameter gets the value where it is used.
+
+## Summary
+
+`dependencies=[Depends(fn)]` attaches a dependency to one route, a router, or the whole application. They stack and run outermost first, and their return values are discarded - a handler needing the value declares its own, and the cache keeps it to one call.
+
+The router level is where most real use belongs, and the reason is not brevity: a route added later is protected without anyone remembering to protect it.
+
+Keep it out of the application level unless it genuinely applies to the health check too, and use a dependency rather than middleware whenever the rule is about endpoints rather than about every request.
+
+
+## Summary, in one line
+
+Put shared rules on the router, where a route added next year inherits them; declare the value again as a parameter when the handler needs it, and let the per-request cache make that one call rather than two.
+
+
+## Two rules
+
+**Prefer the router level.** It is the only one where a route added later cannot escape the rule.
+
+**Declare it again as a parameter when the handler needs the value.** The cache makes that one call, and the two declarations mean two different things: the section's guarantee, and this handler's need.
+
+
+## Where it sits in the tier
+
+The other modules make a dependency available to an endpoint that asks for it. This one makes it apply to endpoints that did not.
+
+That difference matters most for security, where the failure is silent: nobody notices an unprotected route until somebody is looking for one.
+
+## Next
+
+Replacing a dependency for a test - the piece that makes everything in this tier testable without a database, a token service or a network.

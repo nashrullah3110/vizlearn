@@ -1332,6 +1332,38 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Class Dependencies",
+  "path": "fastapi/class_dependencies.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Dependencies with yield",
+  "path": "fastapi/dependencies_with_yield.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Dependency Injection",
+  "path": "fastapi/dependency_injection.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Dependency Overrides",
+  "path": "fastapi/dependency_overrides.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Error Handling",
   "path": "fastapi/error_handling.html",
   "category": "FastAPI",
@@ -1404,8 +1436,24 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Router and Global Dependencies",
+  "path": "fastapi/router_and_global_dependencies.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Status Codes",
   "path": "fastapi/status_codes.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Sub-dependencies",
+  "path": "fastapi/sub_dependencies.html",
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",

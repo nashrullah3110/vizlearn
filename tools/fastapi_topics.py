@@ -5112,3 +5112,2530 @@ What FastAPI contributes is that following them costs almost nothing: a router i
          "why": "Moving three routes is trivial and moving eighty is a weekend - and by then something depends on the import layout."},
     ],
 )
+
+
+# ---------------------------------------------------------------------------
+# 14. Dependency injection
+# ---------------------------------------------------------------------------
+topic(
+    "dependency_injection",
+    "Dependency Injection",
+    "Dependencies",
+    "Depends: declaring what an endpoint needs and letting the framework supply "
+    "it - the feature that most distinguishes FastAPI.",
+    _svg(_box(14, 16, 132, 20, S) + _txt(80, 30, "def endpoint(user = Depends(current_user))", M, 7) +
+         _arrow(80, 40, 80, 50) +
+         _box(40, 52, 80, 22, S, A) + _txt(80, 67, "resolved, cached", A, 8)),
+    [
+        ("A dependency is just a function",
+         "Declare a parameter as <code>Depends(fn)</code> and FastAPI calls "
+         "<code>fn</code> and passes the result. Nothing is registered anywhere.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+
+def pagination(limit: int = 10, offset: int = 0):
+    return {"limit": min(limit, 100), "offset": offset}
+
+@app.get("/modules")
+def list_modules(page: dict = Depends(pagination)):
+    return {"page": page}
+
+@app.get("/tracks")
+def list_tracks(page: dict = Depends(pagination)):
+    return {"page": page}
+
+c = TestClient(app)
+print(c.get("/modules").json())
+print(c.get("/modules?limit=500&offset=20").json(), "<- capped by the dependency")
+print(c.get("/tracks?limit=3").json())'''),
+
+        ("Its parameters are the request, too",
+         "A dependency reads query parameters, headers and bodies exactly as a "
+         "handler does &mdash; and they appear in the documentation.",
+         '''import json
+from fastapi import Depends, FastAPI, Header, Query
+
+app = FastAPI()
+
+def search_filters(
+    q: str = Query(default="", max_length=50, description="Free-text search."),
+    track: str = Query(default=""),
+    x_locale: str = Header(default="en"),
+):
+    return {"q": q, "track": track, "locale": x_locale}
+
+@app.get("/search")
+def search(f: dict = Depends(search_filters)):
+    return f
+
+c = TestClient(app)
+print(c.get("/search?q=vectors&track=maths").json())
+print()
+params = app.openapi()["paths"]["/search"]["get"]["parameters"]
+for p in params:
+    print("%-9s in %-6s %s" % (p["name"], p["in"], p["schema"].get("type")))'''),
+
+        ("Raising from a dependency",
+         "A dependency that raises stops the request before the handler runs. That "
+         "is what makes it the right place for authentication.",
+         '''from fastapi import Depends, FastAPI, Header, HTTPException, status
+
+app = FastAPI()
+TOKENS = {"tok-ada": "ada", "tok-grace": "grace"}
+reached = []
+
+def current_user(authorization: str = Header(default="")):
+    token = authorization.replace("Bearer ", "")
+    if token not in TOKENS:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in first",
+                            headers={"WWW-Authenticate": "Bearer"})
+    return TOKENS[token]
+
+@app.get("/me")
+def me(user: str = Depends(current_user)):
+    reached.append(user)
+    return {"user": user}
+
+c = TestClient(app)
+def call(tok):
+    h = {"authorization": "Bearer " + tok} if tok else {}
+    r = c.request("GET", "/me", headers=h)
+    return r.status_code, r.json()
+
+print("no token :", call(None))
+print("bad token:", call("nope"))
+print("good     :", call("tok-ada"))
+print()
+print("handler ran for:", reached)'''),
+
+        ("Resolved once per request",
+         "Two parameters depending on the same function get one call, not two. The "
+         "result is cached for the life of the request.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+calls = []
+
+def expensive():
+    calls.append(1)
+    return {"value": len(calls)}
+
+def wrapper(e: dict = Depends(expensive)):
+    return {"wrapped": e}
+
+@app.get("/once")
+def once(a: dict = Depends(expensive), b: dict = Depends(wrapper)):
+    return {"a": a, "b": b, "calls_this_request": len(calls)}
+
+c = TestClient(app)
+print("request 1:", c.get("/once").json())
+calls.clear()
+print("request 2:", c.get("/once").json())
+print()
+print("Two references, one call. Caching is per request, not global.")'''),
+
+        ("Turning the cache off",
+         "<code>use_cache=False</code> forces a fresh call &mdash; for anything that "
+         "should differ per use, such as a generated identifier.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+counter = {"n": 0}
+
+def ticket():
+    counter["n"] += 1
+    return "T%03d" % counter["n"]
+
+@app.get("/cached")
+def cached(a: str = Depends(ticket), b: str = Depends(ticket)):
+    return {"a": a, "b": b}
+
+@app.get("/fresh")
+def fresh(a: str = Depends(ticket, use_cache=False),
+          b: str = Depends(ticket, use_cache=False)):
+    return {"a": a, "b": b}
+
+c = TestClient(app)
+print("cached:", c.get("/cached").json(), "<- one call, shared")
+counter["n"] = 0
+print("fresh :", c.get("/fresh").json(), "<- called twice")'''),
+
+        ("What it replaces",
+         "The same endpoint written both ways. The dependency version has the "
+         "requirement in the signature, where the documentation can see it.",
+         '''from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+TOKENS = {"tok-ada": "ada"}
+
+# Without: every handler repeats the check, and the docs know nothing.
+@app.get("/by-hand")
+def by_hand(authorization: str = Header(default="")):
+    token = authorization.replace("Bearer ", "")
+    if token not in TOKENS:
+        raise HTTPException(401, "Sign in first")
+    user = TOKENS[token]
+    return {"user": user}
+
+# With: stated once, declared in the signature.
+def current_user(authorization: str = Header(default="")):
+    token = authorization.replace("Bearer ", "")
+    if token not in TOKENS:
+        raise HTTPException(401, "Sign in first")
+    return TOKENS[token]
+
+@app.get("/declared")
+def declared(user: str = Depends(current_user)):
+    return {"user": user}
+
+c = TestClient(app)
+h = {"authorization": "Bearer tok-ada"}
+print("by hand :", c.request("GET", "/by-hand", headers=h).json())
+print("declared:", c.request("GET", "/declared", headers=h).json())
+print()
+print("Both document the header, because both declare it -")
+print("but only one states the requirement once for every endpoint.")'''),
+    ],
+    [
+        "A dependency is an ordinary function. <code>Depends(fn)</code> calls it and passes the result; there is no registry and no container.",
+        "Its own parameters are request parameters, so a dependency can read query values, headers and bodies &mdash; and they all appear in the schema.",
+        "Raising inside a dependency stops the request before the handler runs, which is why authentication belongs there.",
+        "Results are <strong>cached per request</strong>: two parameters depending on the same function produce one call.",
+        "<code>Depends(fn, use_cache=False)</code> forces a fresh call each time it is referenced.",
+        "The value is not the wiring &mdash; it is that the requirement is in the signature, where the documentation and the reader can both see it.",
+    ],
+    '''
+title: Dependency Injection
+intro: Declaring what an endpoint needs and letting the framework supply it.
+
+## The whole idea
+
+```python
+def pagination(limit: int = 10, offset: int = 0):
+    return {"limit": min(limit, 100), "offset": offset}
+
+@app.get("/modules")
+def list_modules(page: dict = Depends(pagination)):
+    ...
+```
+
+`Depends(fn)` means: call `fn`, and pass what it returns.
+
+There is no registry, no container, no configuration and no base class. A dependency is a function, and declaring one is a default value in a signature. That simplicity is why the feature is worth learning properly &mdash; it is much smaller than "dependency injection" usually implies.
+
+## Dependencies see the request
+
+The important second fact: a dependency's own parameters are request parameters. It can declare query values, headers, cookies, path parameters and a body, using exactly the syntax a handler uses.
+
+So `pagination` above does not receive the request and dig through it. It declares `limit` and `offset`, and FastAPI supplies them from the query string, converted and validated.
+
+That has a consequence people miss: **those parameters appear in the OpenAPI document**. An endpoint depending on `search_filters` documents `q`, `track` and `x-locale` as its own parameters, because as far as a caller is concerned they are. The abstraction does not hide anything from the contract.
+
+## Raising
+
+A dependency that raises stops the request. The handler never runs.
+
+That is what makes it the right home for authentication, authorisation and any precondition:
+
+```python
+def current_user(authorization: str = Header(default="")):
+    if token not in TOKENS:
+        raise HTTPException(401, "Sign in first")
+    return TOKENS[token]
+```
+
+Every endpoint that needs a user now writes one parameter. There is no possibility of an endpoint forgetting the check and no possibility of two endpoints checking differently &mdash; which is exactly the failure mode of doing it by hand.
+
+## Caching within a request
+
+If two parameters depend on the same function, it is called **once**. The result is cached for the duration of that request and shared.
+
+This matters more than it first appears, because dependencies compose. A handler might depend on `current_user`, and also on `permissions`, which itself depends on `current_user`. Without caching, the token would be decoded twice. With it, once.
+
+The cache is per request. Nothing is shared between requests, which is correct &mdash; a cached user leaking into the next request would be a serious bug rather than an optimisation.
+
+`Depends(fn, use_cache=False)` opts out, for anything that should genuinely differ per reference: a generated identifier, a fresh timestamp, a new random value.
+
+## What it replaces
+
+Compare the two versions in the last editor above. Both work. Both even document the header, because both declare it.
+
+The difference is where the requirement lives. In the hand-written version it is four lines at the top of a handler, repeated in every handler that needs it, and diverging quietly as they are edited. In the dependency version it is one function, and each endpoint declares a parameter.
+
+The scaling difference is the point. Ten endpoints needing a user means ten parameters and one function &mdash; not forty lines that must agree.
+
+## When something is not a dependency
+
+Two habits worth avoiding.
+
+**Wrapping something trivial.** `Depends` on a function that returns a constant is indirection with no benefit. Import the constant.
+
+**Putting business logic in one.** A dependency should produce something the handler needs &mdash; a user, a session, a validated set of filters. A dependency that performs the operation and returns a result has moved the endpoint's work into its signature, where it is harder to find and harder to test.
+
+The test: could you describe it as "this endpoint needs an X"? Then it is a dependency. If it is "this endpoint does Y", it is not.
+
+## Types and the return value
+
+`page: dict = Depends(pagination)` annotates the parameter, and that annotation is documentation for a reader rather than something enforced &mdash; the value is whatever the dependency returned.
+
+For anything real, return a model rather than a dict. `current_user` returning a `User` gives every handler attribute access and editor completion, and makes the dependency's contract explicit.
+
+There is a newer spelling using `Annotated` that is worth adopting:
+
+```python
+CurrentUser = Annotated[User, Depends(current_user)]
+
+def me(user: CurrentUser):
+    ...
+```
+
+The dependency becomes a named type, reusable across every endpoint, and the signature reads as ordinary Python. It is the same idea as the constrained types from the Pydantic track, applied here.
+
+## Where they live
+
+A `dependencies.py` beside your routers is the usual home, for the same reason a `types.py` is: several routers need the same ones, and a shared file is where they can be found.
+
+Reading that file should tell you what the application's endpoints are allowed to assume &mdash; a user, a database session, a tenant, a set of filters. That is a useful summary to have in one place.
+
+
+## Mistakes people make
+
+**Wrapping something trivial.** `Depends` on a function returning a constant is indirection with no benefit. Import the constant.
+
+**Putting the endpoint's work in a dependency.** A dependency supplies what the endpoint needs; it should not *be* what the endpoint does. The test: can you say "this endpoint needs an X"? Then it is a dependency. "This endpoint does Y" is not.
+
+**Returning a dict where a model belongs.** `user["name"]` has no completion and no checking. A dependency returning a model gives every handler attribute access and states its contract.
+
+**Assuming the cache is global.** It is per request. Nothing survives to the next one - which is correct, because a cached user leaking across requests would be a serious bug.
+
+**Expecting `Depends` to hide parameters.** Everything a dependency declares appears in the endpoint's documented parameters. That is a feature, and it means adding a required parameter to a shared dependency is a breaking change for every endpoint using it.
+
+**Doing slow work without noticing where.** A dependency runs on every request to every endpoint that declares it. A lookup that seemed cheap on one route is multiplied by everything that shares it.
+
+## The Annotated form
+
+Worth adopting early, because it changes how the signatures read:
+
+```python
+CurrentUser = Annotated[User, Depends(current_user)]
+
+@app.get("/me")
+def me(user: CurrentUser):
+    ...
+```
+
+The dependency becomes a named type. The signature is ordinary Python with no default-argument trick, the requirement is declared once and reused, and a reader sees a type rather than a call.
+
+It is the same idea as the constrained types from the Pydantic track, and for a codebase with several dependencies it is the tidier spelling.
+
+
+## What this replaces in other frameworks
+
+It is worth seeing what the same job looks like elsewhere, because it explains why the FastAPI version is so small.
+
+A **decorator** - `@login_required` - is the Flask-shaped answer. It works, and the requirement is invisible to the function's signature, so nothing documents it, the value has to be smuggled in through a global request object, and composing two decorators means caring about their order.
+
+A **container** - the Spring or .NET answer - registers implementations against interfaces and resolves them by type. Powerful, and it needs configuration, wiring and a mental model of its own.
+
+A **base class** - `class MyView(AuthenticatedView)` - ties the requirement to inheritance, so an endpoint needing two unrelated things needs multiple inheritance.
+
+FastAPI's version is a default argument. There is nothing to register, nothing to configure, no ordering to reason about, and the requirement is written where a reader and the schema generator both look. That is a genuinely good trade, and it is why the feature is worth using rather than routed around.
+
+## Testing an endpoint that has dependencies
+
+The payoff arrives in the test file, and it is worth previewing before the overrides module.
+
+An endpoint declaring `Depends(get_db)` and `Depends(current_user)` can be tested without a database and without a token, because both can be replaced at the app level. The handler is unchanged; only what it depends on moves.
+
+That is the practical argument for pushing requirements into dependencies rather than reaching for them inside handlers. A handler that calls `get_session()` directly cannot be tested without a session. One that declares it can.
+
+## Next
+
+Dependencies that need to clean up after themselves &mdash; a database session that must be closed whether or not the handler succeeded &mdash; which is what `yield` is for.
+
+
+## One habit worth forming
+
+When you find yourself writing the same four lines at the top of a second handler, that is the moment.
+
+Not the fifth handler, and not after a refactor - the second. Extracting it costs one function and one parameter, and every endpoint after that inherits the rule instead of copying it.
+
+The failure mode of waiting is not the duplication itself. It is that the copies drift: one checks the header case-insensitively, one strips whitespace, one returns a dict where the other returns a model. By the time somebody consolidates them there are four behaviours to reconcile and no way to know which was intended.
+
+## Summary
+
+`Depends(fn)` calls a function and passes the result. The function's own parameters are request parameters, so a dependency can read anything a handler can - and everything it declares appears in the endpoint's documented contract.
+
+Raising inside one stops the request before the handler runs, which is why authentication belongs there rather than in a body somebody can forget to write. Results are cached per request, so a dependency reached by several paths is called once.
+
+Prefer returning a model over a dict, adopt the `Annotated` spelling for anything reused, and keep dependencies to "this endpoint needs an X" rather than "this endpoint does Y".
+
+
+## Why it is the framework's best idea
+
+Of everything FastAPI adds on top of Starlette and Pydantic, this is the part with no equivalent elsewhere that is this small.
+
+A decorator hides the requirement from the signature. A container needs registration and configuration. A base class ties the requirement to inheritance. Middleware applies to everything and documents nothing.
+
+`Depends` is a default argument. It needs no setup, composes without ordering rules, works with any callable, appears in the generated schema, and can be replaced in a test with one dictionary assignment.
+
+The result is that "what does this endpoint need?" is answerable by reading its signature, and "what happens if it is not there?" is answerable by reading one function. Those two properties are most of what makes a large FastAPI application stay legible.
+
+
+## A closing thought
+
+The habit this module is really teaching is not `Depends`. It is declaring what you need instead of reaching for it.
+
+A handler that calls `get_session()` in its body has acquired something. A handler that declares `session: Session = Depends(get_session)` has stated a requirement and let something else satisfy it. The first cannot be tested without a database, documented, or reused; the second is all three.
+
+That distinction is older and larger than this framework. FastAPI's contribution is making the declaring version shorter than the acquiring one, which is the only reliable way to get people to prefer it.
+
+
+## Two rules
+
+**Extract on the second occurrence**, not the fifth. The cost is one function; the cost of waiting is four copies that have quietly diverged.
+
+**Dependencies supply, they do not perform.** "This endpoint needs an X" is a dependency; "this endpoint does Y" is the handler's job.
+
+## Next
+
+Dependencies that need to clean up after themselves - a session that must be closed whether the handler succeeded or raised - which is what `yield` is for, and where the transaction pattern comes from.
+''',
+    [
+        {"q": "What is a FastAPI dependency?",
+         "options": ["A registered class", "An ordinary function called by Depends", "A middleware", "A Pydantic model"],
+         "answer": 1,
+         "why": "No registry, no container, no base class. `Depends(fn)` calls the function and passes the result, and the function's own parameters are request parameters."},
+        {"q": "Two parameters depend on the same function. How many times is it called?",
+         "options": ["Twice", "Once - the result is cached for the request", "Once globally", "Depends on the type"],
+         "answer": 1,
+         "why": "Caching is per request, which matters because dependencies compose - a handler and a sub-dependency both needing `current_user` decode the token once, not twice."},
+        {"q": "Why is a dependency the right place for authentication?",
+         "options": ["It is faster", "Raising there stops the request before the handler runs, and the rule is stated once", "It is required", "It hides the header from the docs"],
+         "answer": 1,
+         "why": "No endpoint can forget the check and no two can check differently - and the header still appears in the schema, because the dependency declares it."},
+        {"q": "Do a dependency's parameters appear in the API documentation?",
+         "options": ["No, they are internal", "Yes - as the endpoint's own parameters", "Only headers do", "Only with a flag"],
+         "answer": 1,
+         "why": "As far as a caller is concerned they are the endpoint's parameters, so the abstraction hides nothing from the contract."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 15. Dependencies with yield
+# ---------------------------------------------------------------------------
+topic(
+    "dependencies_with_yield",
+    "Dependencies with yield",
+    "Dependencies",
+    "Setup before the handler, teardown after it - the shape a database session "
+    "needs.",
+    _svg(_box(20, 14, 120, 18, S) + _txt(80, 27, "open", A, 8) +
+         _arrow(80, 34, 80, 42) +
+         _box(20, 44, 120, 18, S) + _txt(80, 57, "handler runs", M, 8) +
+         _arrow(80, 64, 80, 72) +
+         _box(20, 74, 120, 16, S) + _txt(80, 86, "close", A, 8)),
+    [
+        ("yield splits it in two",
+         "Everything before the <code>yield</code> runs first, the handler gets the "
+         "yielded value, and everything after runs when the response is done.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+log = []
+
+def get_session():
+    log.append("open")
+    try:
+        yield {"id": len(log)}
+    finally:
+        log.append("close")
+
+@app.get("/modules")
+def list_modules(db: dict = Depends(get_session)):
+    log.append("handler")
+    return {"db": db}
+
+print(TestClient(app).get("/modules").json())
+print("order:", log)'''),
+
+        ("Teardown runs even on failure",
+         "That is the whole point. A session opened before the handler is closed "
+         "whether the handler returned or raised.",
+         '''from fastapi import Depends, FastAPI, HTTPException
+
+app = FastAPI()
+log = []
+
+def get_session():
+    log.append("open")
+    try:
+        yield "session"
+    finally:
+        log.append("close")
+
+@app.get("/ok")
+def ok(db: str = Depends(get_session)):
+    return {"ok": True}
+
+@app.get("/boom")
+def boom(db: str = Depends(get_session)):
+    raise HTTPException(404, "Not found")
+
+c = TestClient(app)
+c.get("/ok")
+print("success :", log)
+log.clear()
+r = c.get("/boom")
+print("failure :", log, "->", r.status_code)
+print()
+print("Both closed. Without try/finally the second would have leaked.")'''),
+
+        ("Commit on success, roll back on failure",
+         "The pattern this exists for: the teardown can see whether the handler "
+         "raised, and decide what to do about it.",
+         '''from fastapi import Depends, FastAPI, HTTPException
+
+app = FastAPI()
+events = []
+
+class Session:
+    def __init__(self): self.writes = []
+    def add(self, x): self.writes.append(x)
+    def commit(self): events.append("commit %s" % self.writes)
+    def rollback(self): events.append("rollback %s" % self.writes)
+    def close(self): events.append("close")
+
+def get_db():
+    db = Session()
+    try:
+        yield db
+        db.commit()             # only reached if the handler did not raise
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+@app.post("/good")
+def good(db: Session = Depends(get_db)):
+    db.add("module"); return {"ok": True}
+
+@app.post("/bad")
+def bad(db: Session = Depends(get_db)):
+    db.add("module"); raise HTTPException(400, "nope")
+
+c = TestClient(app)
+c.post("/good"); print("good:", events)
+events.clear()
+c.post("/bad");  print("bad :", events)'''),
+
+        ("Order with several of them",
+         "Teardowns run in reverse, like nested context managers &mdash; the last "
+         "thing opened is the first thing closed.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+log = []
+
+def outer():
+    log.append("outer open")
+    try: yield "outer"
+    finally: log.append("outer close")
+
+def inner(o: str = Depends(outer)):
+    log.append("inner open")
+    try: yield "inner(%s)" % o
+    finally: log.append("inner close")
+
+@app.get("/x")
+def x(v: str = Depends(inner)):
+    log.append("handler")
+    return {"v": v}
+
+print(TestClient(app).get("/x").json())
+print()
+for step in log:
+    print(" ", step)'''),
+
+        ("It is still cached per request",
+         "Two references to a yield dependency share one setup and one teardown, "
+         "the same as any other.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+log = []
+
+def session():
+    log.append("open")
+    try: yield "s%d" % log.count("open")
+    finally: log.append("close")
+
+def repo(s: str = Depends(session)):
+    return "repo(%s)" % s
+
+@app.get("/x")
+def x(a: str = Depends(session), b: str = Depends(repo)):
+    return {"a": a, "b": b}
+
+print(TestClient(app).get("/x").json())
+print("log:", log)
+print()
+print("One open, one close - even though two parameters wanted it.")'''),
+
+        ("What not to do in the teardown",
+         "Raising after the yield happens once the response is already being built, "
+         "so it cannot become a clean error for the caller.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+log = []
+
+def risky():
+    log.append("open")
+    try:
+        yield "value"
+    finally:
+        log.append("close")
+        # Anything that can fail here should be caught here.
+        try:
+            raise RuntimeError("cleanup failed")
+        except RuntimeError as e:
+            log.append("swallowed: %s" % e)
+
+@app.get("/x")
+def x(v: str = Depends(risky)):
+    return {"v": v}
+
+r = TestClient(app).get("/x")
+print("status:", r.status_code, r.json())
+print("log   :", log)
+print()
+print("The response was already decided. Log the failure; do not raise it.")'''),
+    ],
+    [
+        "Code before <code>yield</code> is setup, the yielded value is what the handler receives, and code after it is teardown.",
+        "Teardown runs whether the handler returned or raised, which is why <code>try/finally</code> belongs around the yield.",
+        "Putting <code>commit()</code> immediately after the yield and <code>rollback()</code> in an <code>except</code> gives the transaction pattern for free.",
+        "With several yield dependencies, teardowns run in reverse order &mdash; last opened, first closed.",
+        "They are cached per request like any dependency: two references share one setup and one teardown.",
+        "Do not raise in the teardown. The response is already being built, so the error cannot reach the caller cleanly &mdash; catch and log it instead.",
+    ],
+    '''
+title: Dependencies with yield
+intro: Setup before the handler, teardown after it, and the transaction pattern that falls out.
+
+## The shape
+
+```python
+def get_session():
+    db = Session()
+    try:
+        yield db
+    finally:
+        db.close()
+```
+
+Everything before the `yield` runs before the handler. The yielded value is what the handler receives. Everything after runs once the response has been produced.
+
+It is a generator, and it behaves like a context manager &mdash; which is exactly the point, because "acquire, use, release" is what a database session, a file handle, a lock or a temporary directory all need.
+
+## Teardown always runs
+
+The reason this exists rather than a plain dependency returning a session: cleanup must happen even when the handler fails.
+
+Without `try/finally`, a handler that raises a 404 would skip the close and leak the connection. With it, the session is returned to the pool either way. In an application handling real traffic, that difference is the gap between a pool that stays healthy and one that is exhausted an hour after deploy.
+
+The rule is simple: if a yield dependency acquires anything, the `yield` belongs inside a `try`, and the release belongs in `finally`.
+
+## The transaction pattern
+
+Because the teardown can observe whether the handler raised, the standard database shape falls out naturally:
+
+```python
+def get_db():
+    db = Session()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+```
+
+`commit()` sits immediately after the `yield`, so it only runs if the handler completed. Any exception &mdash; including an `HTTPException` &mdash; rolls back and re-raises. `close()` runs regardless.
+
+Three lines, and every endpoint using this dependency now has correct transaction handling without writing any. That is a large amount of correctness for very little code, and it is the single most common use of the feature.
+
+Note the `raise` in the `except`. Swallowing there would turn a failed request into a successful-looking one with a rolled-back transaction, which is worse than either outcome alone.
+
+## Nesting and order
+
+A yield dependency can depend on another. Setups run outermost first, teardowns run in reverse &mdash; the same discipline as nested `with` blocks, and for the same reason: the inner thing may need the outer one to still exist while it closes.
+
+The fourth editor above prints the whole sequence. It is worth running once, because the ordering is the sort of thing that is obvious when you see it and easy to get backwards when reasoning about it.
+
+## Caching applies
+
+A yield dependency is cached per request like any other. Two parameters wanting the same session get one session, opened once and closed once.
+
+That matters for correctness rather than just performance: two separate sessions in one request would mean two transactions, and a handler that read through one and wrote through the other would produce results nobody could explain.
+
+## What not to do in teardown
+
+**Do not raise.** By the time the teardown runs, the response has been decided and is being sent. An exception there cannot become a clean error for the caller, and depending on where it happens it may truncate the response or surface as a server error unrelated to anything the client did.
+
+If cleanup can fail, catch it and log it. The request already succeeded or failed on its own terms, and a cleanup problem is an operational issue rather than something the caller can act on.
+
+**Do not do slow work.** The teardown runs after the handler, and for a synchronous dependency it is on the request path. A long-running cleanup delays the response for no benefit to the caller. Anything genuinely slow belongs in a background task.
+
+**Do not rely on the exception being visible.** In older FastAPI versions the exception was not always available to the teardown in the way people expected. The `try/except/finally` shape above works because it wraps the `yield` directly rather than trying to inspect state.
+
+## Sync or async
+
+Both work. `def get_session()` runs in the threadpool; `async def get_session()` runs on the event loop.
+
+Use `async def` when the setup and teardown are themselves async &mdash; an async database driver, an async HTTP client. Use `def` when they are ordinary blocking calls, and let the framework keep them off the loop.
+
+Mixing is fine: an async handler can depend on a sync yield dependency and vice versa.
+
+## What belongs here
+
+Anything with a lifetime tied to the request: database sessions, transactions, file handles, temporary directories, locks, an HTTP client that should be closed.
+
+What does not: work that could be done once at startup. A connection *pool* is created at startup and lives for the process; a *session* is taken from it per request. Confusing the two produces either a pool rebuilt on every request or a session shared between them, and both are bad in different ways.
+
+That distinction is the lifespan module's subject.
+
+
+## Mistakes people make
+
+**No `try/finally`.** The single most consequential omission. A handler that raises then skips the cleanup, and a connection leaks on exactly the requests you most want to survive.
+
+**Committing in `finally`.** It runs on failure too, so a rolled-back-looking request quietly commits. Commit belongs immediately after the `yield`, where only success reaches it.
+
+**Swallowing the exception.** An `except` that rolls back and does not re-raise turns a failed request into one that looks successful with nothing written.
+
+**Raising in the teardown.** The response is already being built. The error cannot reach the caller cleanly and may truncate what was being sent.
+
+**Slow cleanup.** The teardown is on the request path. Anything genuinely slow belongs in a background task.
+
+**Creating the pool per request.** A pool is startup work with a process lifetime; a session is request work. Rebuilding the pool per request is catastrophic for throughput, and sharing a session across requests is catastrophic for correctness.
+
+## Sync or async
+
+Both forms work, and the choice follows the resource.
+
+`def get_session()` runs in the threadpool, which is right for a blocking driver - psycopg2, a synchronous HTTP client, a file.
+
+`async def get_session()` runs on the event loop, which is right for an async driver - asyncpg, httpx's async client.
+
+Mixing is allowed: an async handler may depend on a sync yield dependency and the other way round. What matters is that a blocking call is not made directly on the loop, which is the runtime tier's subject.
+
+
+## How it works underneath
+
+Knowing the mechanism removes most of the surprises.
+
+A `yield` dependency is a generator. FastAPI wraps it in a context manager and enters it before calling the handler, holding it open in an `AsyncExitStack` that lives for the request. When the response has been produced, the stack unwinds and every context manager exits in reverse order.
+
+That is why teardown ordering is reverse, why teardown runs on failure, and why raising in teardown is awkward: the stack is unwinding while the response is already on its way out.
+
+It also explains the lifetime precisely. The dependency is alive for the whole request, including while the response is being serialised - so a session yielded here is still usable by a response model reading lazy attributes, which is a common source of confusion when it is *not* the case in other frameworks.
+
+## Sync or async
+
+Both forms work, and the choice follows the resource.
+
+`def get_session()` runs in a threadpool, which is right for a blocking driver.
+
+`async def get_session()` runs on the event loop, which is right for an async one.
+
+Mixing is allowed in both directions. What matters is not making a blocking call directly on the loop, which the runtime tier covers.
+
+## A checklist
+
+Before shipping a yield dependency, four questions.
+
+Does it acquire something? Then the `yield` is inside a `try` and the release is in `finally`.
+
+Can the handler fail? Then anything conditional on success sits between the `yield` and the `except`.
+
+Can the cleanup fail? Then it is caught and logged, not raised.
+
+Is this per-request, or per-process? A session is per request; the pool it comes from is not.
+
+## Next
+
+Dependencies that depend on dependencies, and the tree FastAPI resolves before your handler runs.
+
+
+## One more thing to watch
+
+A subtle one, worth knowing before it bites.
+
+The dependency stays open while the **response is serialised**, not just while the handler runs. A session yielded here is still alive when a response model reads an attribute that triggers a lazy load.
+
+That is convenient, and it is also how a single serialisation quietly becomes fifty queries: the model touches a relationship, the session is still open, and the ORM obliges. The fix is on the query side - load what the response needs up front - but the reason it is possible at all is this lifetime.
+
+It is also why closing the session inside the handler is a mistake that appears to work. The handler returns fine; the serialiser then finds a closed session, and the error names neither.
+
+## Summary
+
+Code before the `yield` is setup, the yielded value is what the handler receives, and code after it runs once the response has been produced - on success and on failure alike.
+
+Wrap the `yield` in `try/finally` whenever anything is acquired. Put `commit()` immediately after it and `rollback()` in an `except` that re-raises, and the transaction pattern falls out in three lines.
+
+Teardowns run in reverse order, the per-request cache still applies, and nothing in the teardown should raise or be slow.
+
+
+## Summary, in one line
+
+Setup before the `yield`, teardown after it, `try/finally` around it whenever anything is acquired - and `commit()` immediately after the `yield` so that only a successful handler reaches it.
+
+Everything else in this module is a consequence of those four facts.
+
+
+## A closing thought
+
+Almost every resource bug in a web application is a lifetime bug: something opened and not closed, closed too early, or shared between requests that should not share it.
+
+`yield` dependencies exist to make the common lifetime - one request - the easy one to express. Setup, use, teardown, in one function, applied by declaring a parameter.
+
+The failure modes it removes are the ones that do not show up in development: a connection leaked on the error path, a transaction left open, a pool exhausted an hour after deploy under real traffic.
+
+
+## Two rules
+
+Everything here reduces to two.
+
+**Wrap the `yield` in `try/finally` whenever the dependency acquires anything.** That single line is the difference between a pool that survives a bad afternoon and one that does not.
+
+**Put success-only work between the `yield` and the `except`.** That is where `commit()` goes, and it is why the transaction pattern needs no flag, no inspection of the response, and no cooperation from the handler.
+
+
+## Where it sits in the tier
+
+Of the five modules here, this is the one whose absence causes production incidents rather than inconvenience.
+
+A missing `Depends` is a repeated four lines. A missing `try/finally` is a connection pool that empties under load on the error path, which is the path that gets busy exactly when everything else is going wrong.
+
+## Next
+
+Dependencies that depend on dependencies, the tree FastAPI resolves before your handler runs, and why a shared node in that tree is still only called once.
+''',
+    [
+        {"q": "When does the code after `yield` run?",
+         "options": ["Immediately", "After the response has been produced", "Only on success", "Never"],
+         "answer": 1,
+         "why": "Setup, then handler, then teardown - which is why it works for anything with a request-scoped lifetime."},
+        {"q": "A handler raises a 404. Does the teardown run?",
+         "options": ["No", "Yes, if the yield is inside a try/finally", "Only for 500s", "Only for async dependencies"],
+         "answer": 1,
+         "why": "That is the reason to use yield rather than a plain return. Without `try/finally` a failing handler skips the close and leaks the connection."},
+        {"q": "Where does `db.commit()` belong in the transaction pattern?",
+         "options": ["Before the yield", "Immediately after the yield", "In finally", "In the handler"],
+         "answer": 1,
+         "why": "It is only reached when the handler completed without raising. An `except` clause rolls back and re-raises; `finally` closes either way."},
+        {"q": "Cleanup itself fails. What should the teardown do?",
+         "options": ["Raise", "Catch and log it", "Return a 500", "Retry forever"],
+         "answer": 1,
+         "why": "The response is already decided and being sent, so an exception there cannot become a clean error - and may truncate the response instead."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 16. Sub-dependencies
+# ---------------------------------------------------------------------------
+topic(
+    "sub_dependencies",
+    "Sub-dependencies",
+    "Dependencies",
+    "Dependencies that depend on dependencies, and the tree FastAPI resolves "
+    "before your handler runs.",
+    _svg(_box(54, 12, 52, 18, S, A) + _txt(80, 25, "handler", A, 8) +
+         _arrow(70, 32, 42, 44) + _arrow(90, 32, 118, 44) +
+         _box(16, 46, 52, 18, S) + _txt(42, 59, "user", M, 8) +
+         _box(92, 46, 52, 18, S) + _txt(118, 59, "db", M, 8) +
+         _arrow(42, 66, 42, 76) + _txt(42, 88, "token", M, 7)),
+    [
+        ("A dependency can declare its own",
+         "Exactly the same syntax, one level down. FastAPI resolves the whole tree "
+         "before the handler is called.",
+         '''from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+USERS = {"tok-ada": {"name": "ada", "role": "admin"}}
+
+def token(authorization: str = Header(default="")):
+    return authorization.replace("Bearer ", "")
+
+def current_user(tok: str = Depends(token)):
+    if tok not in USERS:
+        raise HTTPException(401, "Sign in first")
+    return USERS[tok]
+
+def admin_only(user: dict = Depends(current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(403, "Admins only")
+    return user
+
+@app.delete("/modules/{i}")
+def remove(i: int, user: dict = Depends(admin_only)):
+    return {"deleted": i, "by": user["name"]}
+
+c = TestClient(app)
+print(c.request("DELETE", "/modules/7",
+                headers={"authorization": "Bearer tok-ada"}).json())
+print("no token:", c.request("DELETE", "/modules/7").status_code)'''),
+
+        ("The tree is resolved once",
+         "A shared sub-dependency deep in the tree is still called a single time per "
+         "request.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+calls = []
+
+def base():
+    calls.append("base")
+    return "B"
+
+def left(b: str = Depends(base)):  return "L(%s)" % b
+def right(b: str = Depends(base)): return "R(%s)" % b
+
+@app.get("/x")
+def x(l: str = Depends(left), r: str = Depends(right), b: str = Depends(base)):
+    return {"l": l, "r": r, "b": b, "base_calls": len(calls)}
+
+print(TestClient(app).get("/x").json())
+print()
+print("Three paths reach base; it ran once. That is why the cache matters.")'''),
+
+        ("Failures short-circuit the tree",
+         "If a sub-dependency raises, nothing below it or after it runs &mdash; "
+         "including the handler.",
+         '''from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+ran = []
+
+def token(authorization: str = Header(default="")):
+    ran.append("token")
+    tok = authorization.replace("Bearer ", "")
+    if not tok:
+        raise HTTPException(401, "No token")
+    return tok
+
+def profile(tok: str = Depends(token)):
+    ran.append("profile")
+    return {"tok": tok}
+
+@app.get("/me")
+def me(p: dict = Depends(profile)):
+    ran.append("handler")
+    return p
+
+c = TestClient(app)
+r = c.get("/me")
+print("no token:", r.status_code, "| ran:", ran)
+ran.clear()
+r = c.request("GET", "/me", headers={"authorization": "Bearer abc"})
+print("token   :", r.status_code, "| ran:", ran)'''),
+
+        ("Layering permissions",
+         "The natural use: each level adds one check, and an endpoint declares the "
+         "level it needs.",
+         '''from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+USERS = {"a": {"name": "ada", "role": "admin"},
+         "r": {"name": "rex", "role": "reader"}}
+
+def current_user(x_token: str = Header(default="")):
+    if x_token not in USERS:
+        raise HTTPException(401, "Sign in")
+    return USERS[x_token]
+
+def verified(user: dict = Depends(current_user)):
+    return user                      # a real one would check a flag
+
+def admin(user: dict = Depends(verified)):
+    if user["role"] != "admin":
+        raise HTTPException(403, "Admins only")
+    return user
+
+@app.get("/public")
+def public(): return {"level": "public"}
+
+@app.get("/account")
+def account(u: dict = Depends(verified)): return {"level": "verified", "you": u["name"]}
+
+@app.get("/admin")
+def admin_page(u: dict = Depends(admin)): return {"level": "admin", "you": u["name"]}
+
+c = TestClient(app)
+for path in ["/public", "/account", "/admin"]:
+    for tok in ["", "r", "a"]:
+        h = {"x-token": tok} if tok else {}
+        print("%-9s tok=%-2s -> %s" % (path, tok or "-",
+              c.request("GET", path, headers=h).status_code))'''),
+
+        ("Parameters gather from the whole tree",
+         "Every parameter any dependency declares becomes the endpoint's, and every "
+         "one is documented.",
+         '''from fastapi import Depends, FastAPI, Header, Query
+
+app = FastAPI()
+
+def paging(limit: int = Query(default=10, le=100)):
+    return limit
+
+def locale(x_locale: str = Header(default="en")):
+    return x_locale
+
+def context(limit: int = Depends(paging), loc: str = Depends(locale),
+            q: str = Query(default="")):
+    return {"limit": limit, "locale": loc, "q": q}
+
+@app.get("/search")
+def search(ctx: dict = Depends(context)):
+    return ctx
+
+c = TestClient(app)
+print(c.request("GET", "/search?q=vectors&limit=5",
+                headers={"x-locale": "fr"}).json())
+print()
+for p in app.openapi()["paths"]["/search"]["get"]["parameters"]:
+    print("  %-9s in %s" % (p["name"], p["in"]))'''),
+
+        ("Depth worth keeping",
+         "Three levels reads well. Beyond that the endpoint's signature stops "
+         "telling you what it actually needs.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+trace = []
+
+def a():                       trace.append("a"); return "a"
+def b(x: str = Depends(a)):    trace.append("b"); return x + "b"
+def c_(x: str = Depends(b)):   trace.append("c"); return x + "c"
+def d(x: str = Depends(c_)):   trace.append("d"); return x + "d"
+def e(x: str = Depends(d)):    trace.append("e"); return x + "e"
+
+@app.get("/deep")
+def deep(v: str = Depends(e)):
+    return {"value": v, "order": trace}
+
+print(TestClient(app).get("/deep").json())
+print()
+print("It works. But 'deep' declares one parameter and needs five functions,")
+print("and nothing in its signature says so.")'''),
+    ],
+    [
+        "A dependency declares its own dependencies with the same syntax. FastAPI resolves the whole tree before calling the handler.",
+        "The per-request cache covers the tree, so a shared node reached by several paths is still called once.",
+        "A raise anywhere in the tree short-circuits everything below and after it, including the handler.",
+        "Layered permission checks are the natural use: each level adds one rule and an endpoint declares the level it needs.",
+        "Every parameter declared anywhere in the tree becomes the endpoint's parameter, and appears in the documentation.",
+        "Keep the tree shallow. Three levels reads well; five means the signature no longer tells a reader what the endpoint needs.",
+    ],
+    '''
+title: Sub-dependencies
+intro: Dependencies that depend on dependencies, and the tree resolved before your handler runs.
+
+## The same syntax, one level down
+
+A dependency is a function whose parameters are request parameters &mdash; and `Depends` is a request parameter. So a dependency can depend on another:
+
+```python
+def token(authorization: str = Header(default="")):
+    return authorization.replace("Bearer ", "")
+
+def current_user(tok: str = Depends(token)):
+    ...
+
+def admin_only(user: dict = Depends(current_user)):
+    ...
+```
+
+There is no new mechanism here. FastAPI walks the tree from the handler's signature down, calls each function in dependency order, and passes the results up.
+
+## The cache covers the tree
+
+This is where per-request caching stops being an optimisation and becomes load-bearing.
+
+In a realistic application, `current_user` is depended on by `permissions`, which is depended on by `admin_only`, and the handler may declare two of those directly. Without caching the token would be decoded three or four times per request.
+
+With it, once. The second editor above makes that visible: three separate paths reach `base`, and it runs a single time.
+
+## Failures short-circuit
+
+If any dependency raises, everything below and after it is skipped, including the handler.
+
+That is what makes layered checks safe. `admin_only` can assume `current_user` succeeded, because it only runs if it did. There is no need to check for `None` or re-verify &mdash; the tree guarantees ordering.
+
+It is also why authentication as a dependency is genuinely safer than a check in the handler. A handler can forget to check. A signature cannot: if the endpoint declares `admin_only`, the check ran.
+
+## Layering permissions
+
+The pattern this shape is built for:
+
+`current_user` &mdash; who is this? 401 if unknown.
+`verified` &mdash; are they confirmed? 403 if not.
+`admin` &mdash; are they an admin? 403 if not.
+
+Each depends on the previous and adds exactly one rule. An endpoint then declares the level it needs, and the level is visible in its signature.
+
+The alternative &mdash; one `check_permissions(level="admin")` function with branching inside &mdash; works and hides the rules in a body rather than showing them in a chain. The layered version is easier to read and much easier to extend, because adding a level is a new function rather than a new branch.
+
+## Parameters gather upward
+
+Every parameter declared anywhere in the tree becomes a parameter of the endpoint.
+
+If `paging` declares `limit`, `locale` declares an `x-locale` header, and `context` declares `q` and depends on both, then an endpoint depending on `context` accepts all three &mdash; validated, converted, and documented.
+
+That is worth appreciating: the abstraction is not opaque. A caller reading your OpenAPI document sees every parameter the endpoint really takes, however deep in the tree it was declared. Nothing is hidden by the indirection.
+
+The corollary is that a dependency adding a parameter changes the public contract of every endpoint using it. Adding a *required* one is a breaking change for all of them at once, which is worth remembering before doing it casually.
+
+## How deep to go
+
+Three levels is comfortable and common. Five is not.
+
+The problem at depth is not correctness &mdash; the last editor above works fine. It is that the endpoint's signature stops being informative. `def deep(v: str = Depends(e))` tells a reader nothing about the five functions that must succeed, the parameters they collectively declare, or the errors they can raise.
+
+Two habits keep it readable.
+
+**Name for the guarantee, not the mechanism.** `admin_only` says what the endpoint gets; `check_role_after_verifying_token` describes plumbing.
+
+**Flatten when a chain has no branch.** If `a` is only ever used by `b` and `b` only by `c`, the three may be one function with a clear name. The chain earns its keep when levels are reused independently.
+
+## Debugging one
+
+When a dependency does not behave as expected, the useful question is *ordering*: what ran before it, and did anything above it raise?
+
+A `print` at the top of each function shows the resolution order immediately, and the order is deterministic &mdash; there is no concurrency within one request's tree.
+
+The other common surprise is caching: a dependency that appears to run once when you expected twice is the cache doing its job, and `use_cache=False` is the switch.
+
+
+## Mistakes people make
+
+**Building a deep chain because it composes.** It does compose, and five levels means the endpoint's signature no longer says what it needs. Three is comfortable.
+
+**Naming for the mechanism.** `check_role_after_verifying_token` describes plumbing; `admin_only` describes the guarantee the handler receives.
+
+**Flattening nothing.** If `a` is only used by `b` and `b` only by `c`, they are one function with a clear name. A chain earns its keep when the levels are reused independently.
+
+**Adding a required parameter to a shared dependency.** It becomes required on every endpoint in the tree at once - a breaking change for all of them, made in one line that mentions none of them.
+
+**Assuming order without checking.** The resolution order is deterministic, and a `print` at the top of each function shows it in seconds. That is faster than reasoning about it.
+
+**Forgetting the cache when debugging.** A dependency that appears to run once when you expected twice is the cache working. `use_cache=False` is the switch.
+
+## What the tree is really for
+
+The layered-permission shape is the case that justifies the feature.
+
+Each level answers one question and can assume the previous one passed, because a raise short-circuits everything after it. `admin` never has to check whether `current_user` returned `None`, because if it had raised, `admin` would not be running.
+
+That guarantee is what makes it safe to put security in the dependency tree rather than in handlers. A handler can forget a check. A signature cannot: if the endpoint declares `admin`, the whole chain above it ran and passed.
+
+
+## Reading a tree you did not write
+
+Arriving at an unfamiliar codebase, the dependency tree is one of the fastest ways to understand what the endpoints assume.
+
+Start at a handler's signature and follow the names down. Each level tells you one requirement, and the leaves are where the application touches the outside world - a header, a database, a clock, a configuration value.
+
+Two things that reading reveals quickly. Whether security is enforced consistently: if half the endpoints declare `current_user` and half read the header themselves, the second half are where the bugs are. And where the boundaries are: the leaves of the tree are the places to fake in tests, and if there are many, the application is entangled with more of the world than it needs.
+
+## Cost
+
+Every dependency in the tree is a function call per request, and the tree is resolved before the handler runs.
+
+For the ordinary case - a handful of small functions - the cost is nothing next to a single query. It becomes visible in two situations: a dependency doing real work, such as a lookup, that is now multiplied across every endpoint sharing it; and a very wide tree where the sheer number of calls adds up under load.
+
+Neither is a reason to avoid the feature. Both are reasons to know what is in the tree, because a slow dependency near the root is slow for everything, and its cost does not appear in any single endpoint's code.
+
+## Next
+
+Applying a dependency to a whole router or the whole application, so that a section is protected without every endpoint repeating the declaration.
+
+
+## A worked permission chain
+
+Written out in full, because this is the shape most applications converge on.
+
+```python
+def bearer_token(authorization: str = Header(default="")) -> str:
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Missing bearer token")
+    return authorization[7:]
+
+def current_user(token: str = Depends(bearer_token)) -> User:
+    user = decode(token)
+    if user is None:
+        raise HTTPException(401, "Invalid token")
+    return user
+
+def active_user(user: User = Depends(current_user)) -> User:
+    if user.disabled:
+        raise HTTPException(403, "Account disabled")
+    return user
+
+def admin(user: User = Depends(active_user)) -> User:
+    if not user.is_admin:
+        raise HTTPException(403, "Admins only")
+    return user
+```
+
+Four functions, four rules, each one line of logic. An endpoint declares the level it needs and gets everything below it.
+
+The properties worth noticing: each level has one reason to fail and one status; the token is decoded once however many levels are involved; and adding a rule - two-factor verified, subscription active - is a new function in the chain rather than a new branch inside an existing one.
+
+That is what the tree is for. Not composition for its own sake, but a set of requirements that can be stated separately, reused independently, and read from an endpoint's signature.
+
+
+## Cost and shape
+
+Every node in the tree is a function call per request, resolved before the handler runs.
+
+For a handful of small functions that is nothing beside a single query. It becomes visible in two situations worth watching: a dependency that does real work sitting near the root, where its cost is multiplied by every endpoint below it; and a very wide tree under load, where the call count itself adds up.
+
+Neither argues against the feature. Both argue for knowing what is in the tree, because a slow dependency high up is slow for everything and its cost appears in no single endpoint's code.
+
+## Reading an unfamiliar one
+
+The tree is also the fastest way into a codebase you did not write.
+
+Start at a handler's signature and follow the names down. Each level names one requirement; the leaves are where the application touches the outside world.
+
+Two things that reading reveals immediately. Whether security is applied consistently - if half the endpoints declare `current_user` and half read the header themselves, the second half is where the bugs live. And how entangled the application is - a wide set of leaves means many things must exist for any endpoint to run.
+
+## Summary
+
+A dependency declares its own dependencies with the same syntax, and FastAPI resolves the tree before the handler runs. The per-request cache covers the whole tree, so a shared node is called once however many paths reach it.
+
+A raise anywhere short-circuits everything after it, which is what lets each level assume the previous one passed - and what makes declaring a check in a signature safer than remembering it in a handler.
+
+Every parameter declared anywhere gathers upward into the endpoint's documented contract. Keep the tree about three levels deep, and name each level for the guarantee it provides.
+
+
+## Summary, in one line
+
+Dependencies compose with the same syntax, the tree resolves before the handler, a shared node runs once, a raise stops everything after it, and every parameter anywhere in the tree becomes part of the endpoint's public contract.
+
+
+## A closing thought
+
+A dependency tree is a description of what an endpoint assumes, written in a form the framework enforces.
+
+That is a stronger guarantee than documentation and a cheaper one than tests. If the endpoint declares `admin`, then a request that reaches the handler came from an authenticated, active administrator - not because somebody remembered to check, but because the handler could not have run otherwise.
+
+Keeping the tree shallow and naming each level for its guarantee is what keeps that description readable.
+
+
+## Two rules
+
+**Name each level for what it guarantees**, not for what it does. `admin` tells a reader what the handler receives; `check_role_after_token` describes the plumbing.
+
+**Stop at about three levels.** The tree stays useful while a signature still implies what the endpoint needs, and stops being useful the moment it does not.
+
+## Next
+
+Attaching a dependency to a router or an application rather than a parameter, which is how a section gets a rule that a new route cannot escape.
+
+A tree that reads well is one where each name is a noun or an adjective describing the caller - a user, an admin, an active account - rather than a verb describing the check. The handler is receiving a guarantee, not commissioning an inspection.
+''',
+    [
+        {"q": "A sub-dependency is reached by three different paths in one request. How many times does it run?",
+         "options": ["Three", "Once - the cache covers the whole tree", "Depends on order", "Once per path"],
+         "answer": 1,
+         "why": "In a real application `current_user` is reached several ways, and without the cache the token would be decoded repeatedly. This is where caching stops being an optimisation."},
+        {"q": "A dependency in the middle of the tree raises. What runs after it?",
+         "options": ["Everything else", "Nothing below or after it, including the handler", "Only the handler", "Only siblings"],
+         "answer": 1,
+         "why": "That short-circuit is what lets a later level assume an earlier one succeeded - and why declaring a check in the signature is safer than remembering it in a handler."},
+        {"q": "A dependency three levels down declares a `limit` query parameter. Does it appear in the docs?",
+         "options": ["No, it is internal", "Yes - as the endpoint's own parameter", "Only if re-declared", "Only headers appear"],
+         "answer": 1,
+         "why": "Parameters gather upward, so the indirection hides nothing from the contract - and adding a required one is a breaking change for every endpoint using that dependency."},
+        {"q": "What is the problem with a five-level dependency chain?",
+         "options": ["It is slow", "The endpoint's signature stops telling a reader what it needs", "It breaks caching", "It is not allowed"],
+         "answer": 1,
+         "why": "It works correctly. But one parameter standing for five functions, their parameters and their possible errors is no longer informative."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 17. Class dependencies
+# ---------------------------------------------------------------------------
+topic(
+    "class_dependencies",
+    "Class Dependencies",
+    "Dependencies",
+    "Anything callable works, which is how a dependency gets configuration of its "
+    "own.",
+    _svg(_box(14, 18, 60, 22, S) + _txt(44, 33, "Paginate(50)", M, 8) +
+         _arrow(78, 29, 92, 29) +
+         _box(96, 18, 50, 22, S, A) + _txt(121, 33, "Depends", A, 8) +
+         _txt(80, 64, "one class, many configurations", M, 8)),
+    [
+        ("A class with __init__ is a dependency",
+         "FastAPI reads <code>__init__</code>'s signature the way it reads a "
+         "function's, and gives the handler the instance.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+
+class Pagination:
+    def __init__(self, limit: int = 10, offset: int = 0):
+        self.limit = min(limit, 100)
+        self.offset = offset
+
+    def slice(self, rows):
+        return rows[self.offset:self.offset + self.limit]
+
+@app.get("/modules")
+def list_modules(page: Pagination = Depends(Pagination)):
+    rows = ["m%d" % i for i in range(20)]
+    return {"limit": page.limit, "offset": page.offset, "rows": page.slice(rows)}
+
+c = TestClient(app)
+print(c.get("/modules?limit=3").json())
+print(c.get("/modules?limit=3&offset=5").json())'''),
+
+        ("The shorthand",
+         "Because the class is both the type and the callable, "
+         "<code>Depends()</code> with no argument uses the annotation.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+
+class Pagination:
+    def __init__(self, limit: int = 10, offset: int = 0):
+        self.limit, self.offset = limit, offset
+
+@app.get("/long")
+def long_form(page: Pagination = Depends(Pagination)):
+    return {"limit": page.limit}
+
+@app.get("/short")
+def short_form(page: Pagination = Depends()):
+    return {"limit": page.limit}
+
+c = TestClient(app)
+print("long :", c.get("/long?limit=4").json())
+print("short:", c.get("/short?limit=4").json())
+print()
+print("Same thing. The annotation supplies the callable.")'''),
+
+        ("An instance is a configured dependency",
+         "Give the class a <code>__call__</code> and instances become dependencies "
+         "you can parameterise &mdash; one class, several rules.",
+         '''from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+USERS = {"a": "admin", "r": "reader"}
+
+class RequireRole:
+    def __init__(self, role: str):
+        self.role = role
+
+    def __call__(self, x_token: str = Header(default="")):
+        role = USERS.get(x_token)
+        if role is None:
+            raise HTTPException(401, "Sign in")
+        if role != self.role:
+            raise HTTPException(403, "Needs role %r" % self.role)
+        return role
+
+require_admin = RequireRole("admin")
+require_reader = RequireRole("reader")
+
+@app.get("/admin")
+def admin(role: str = Depends(require_admin)): return {"role": role}
+
+@app.get("/reading")
+def reading(role: str = Depends(require_reader)): return {"role": role}
+
+c = TestClient(app)
+for path in ["/admin", "/reading"]:
+    for tok in ["", "r", "a"]:
+        h = {"x-token": tok} if tok else {}
+        print("%-9s tok=%-2s -> %s" % (path, tok or "-",
+              c.request("GET", path, headers=h).status_code))'''),
+
+        ("A model as a dependency",
+         "The class can be a Pydantic model, which gives the filters validation, "
+         "constraints and a documented schema.",
+         '''import json
+from typing import Literal
+from fastapi import Depends, FastAPI, Query
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class Filters(BaseModel):
+    q: str = Field(default="", max_length=50)
+    limit: int = Field(default=10, ge=1, le=100)
+    sort: Literal["title", "minutes"] = "title"
+
+def filters(
+    q: str = Query(default="", max_length=50),
+    limit: int = Query(default=10, ge=1, le=100),
+    sort: Literal["title", "minutes"] = "title",
+) -> Filters:
+    return Filters(q=q, limit=limit, sort=sort)
+
+@app.get("/modules")
+def list_modules(f: Filters = Depends(filters)):
+    return f.model_dump()
+
+c = TestClient(app)
+print(c.get("/modules?q=vec&limit=5&sort=minutes").json())
+print("bad sort:", c.get("/modules?sort=colour").status_code)
+print()
+for p in app.openapi()["paths"]["/modules"]["get"]["parameters"]:
+    print("  %-6s %s" % (p["name"], json.dumps(p["schema"])[:60]))'''),
+
+        ("Configuration decided once",
+         "The instance is built at import, so its configuration is not per-request "
+         "work &mdash; only <code>__call__</code> runs each time.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+built = []
+
+class RateLimit:
+    def __init__(self, per_minute: int):
+        built.append(per_minute)           # runs once, at import
+        self.per_minute = per_minute
+        self.seen = 0
+
+    def __call__(self):
+        self.seen += 1
+        return {"limit": self.per_minute, "calls": self.seen}
+
+tight = RateLimit(5)
+loose = RateLimit(100)
+
+@app.get("/tight")
+def a(r: dict = Depends(tight)): return r
+
+@app.get("/loose")
+def b(r: dict = Depends(loose)): return r
+
+c = TestClient(app)
+print(c.get("/tight").json()); print(c.get("/tight").json())
+print(c.get("/loose").json())
+print()
+print("constructed:", built, "- twice, at import, not per request")'''),
+
+        ("When a function is enough",
+         "A class earns its place when there is configuration or state. Without "
+         "either, it is a function with extra ceremony.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+
+# No configuration, no state - a function says it more plainly.
+def pagination(limit: int = 10, offset: int = 0):
+    return {"limit": limit, "offset": offset}
+
+class PaginationClass:
+    def __init__(self, limit: int = 10, offset: int = 0):
+        self.limit, self.offset = limit, offset
+
+@app.get("/fn")
+def fn(p: dict = Depends(pagination)): return p
+
+@app.get("/cls")
+def cls(p: PaginationClass = Depends()): return {"limit": p.limit, "offset": p.offset}
+
+c = TestClient(app)
+print("function:", c.get("/fn?limit=3").json())
+print("class   :", c.get("/cls?limit=3").json())
+print()
+print("Identical behaviour. Reach for the class when it holds something.")'''),
+    ],
+    [
+        "Any callable works. A class is a dependency because calling it constructs an instance, and FastAPI reads <code>__init__</code>'s signature for parameters.",
+        "<code>Depends()</code> with no argument uses the parameter's annotation as the callable &mdash; the shorthand for a class dependency.",
+        "Give a class <code>__call__</code> and its <em>instances</em> become dependencies, which is how one class produces several configured rules.",
+        "The instance is built at import, so configuration is not per-request work; only <code>__call__</code> runs each time.",
+        "A dependency can return a Pydantic model, which gives the result validation, constraints and a documented schema.",
+        "Prefer a function when there is no configuration and no state. A class without either is ceremony.",
+    ],
+    '''
+title: Class Dependencies
+intro: Anything callable works, which is how a dependency gets configuration of its own.
+
+## Callables, not functions
+
+`Depends` takes a callable. A function is the obvious one; a class is a callable too, because calling it constructs an instance.
+
+```python
+class Pagination:
+    def __init__(self, limit: int = 10, offset: int = 0):
+        self.limit = min(limit, 100)
+        self.offset = offset
+
+def list_modules(page: Pagination = Depends(Pagination)):
+    ...
+```
+
+FastAPI reads `__init__`'s signature exactly as it reads a function's: `limit` and `offset` become query parameters, validated and documented. The handler receives the instance.
+
+Because the annotation and the callable are the same thing, there is a shorthand:
+
+```python
+def list_modules(page: Pagination = Depends()):
+```
+
+## What a class buys
+
+Two things a function cannot easily give you.
+
+**Methods.** The instance can carry behaviour, not just data. `page.slice(rows)` keeps the pagination logic with the pagination parameters, rather than repeating the arithmetic in every handler.
+
+**Configuration**, via `__call__`.
+
+## Configured instances
+
+This is the pattern worth knowing, and it is the main reason to reach for a class:
+
+```python
+class RequireRole:
+    def __init__(self, role: str):
+        self.role = role
+
+    def __call__(self, x_token: str = Header(default="")):
+        ...
+
+require_admin = RequireRole("admin")
+require_reader = RequireRole("reader")
+```
+
+Now `Depends(require_admin)` and `Depends(require_reader)` are two dependencies from one class. `__init__` takes your configuration; `__call__` takes the request parameters.
+
+The alternative with plain functions is a factory returning a closure, which works and reads less clearly:
+
+```python
+def require_role(role):
+    def dep(x_token: str = Header(default="")):
+        ...
+    return dep
+```
+
+Both are used in real code. The class version keeps the configuration visible as attributes and gives you somewhere to put related helpers.
+
+## When the construction happens
+
+Worth being precise about, because it affects what belongs where.
+
+`RequireRole("admin")` runs **at import**, once. `__call__` runs **per request**.
+
+So expensive setup belongs in `__init__` &mdash; compiling a regular expression, loading a rules table, reading configuration. Per-request work belongs in `__call__`.
+
+The instance is shared across requests, which means any state you keep on it is shared too. That is fine for configuration and a genuine hazard for anything mutable: a counter on the instance counts across all requests and all users, and in a multi-worker deployment counts per worker, which is almost never what someone wanted from a rate limiter.
+
+If a dependency needs per-request state, return it from `__call__` rather than storing it on `self`.
+
+## Returning a model
+
+A dependency's return value can be anything, and a Pydantic model is often the right choice for a group of filters:
+
+```python
+def filters(q: str = Query(default=""), limit: int = Query(default=10, le=100)) -> Filters:
+    return Filters(q=q, limit=limit)
+```
+
+The handler then gets attribute access, editor completion and a typed object rather than a dictionary. The parameters are still declared individually, so they still appear in the documentation as query parameters &mdash; which is what a caller needs to see.
+
+There is a temptation to annotate the parameter with the model directly and skip the function. Resist it: a model parameter means a request *body*, and on a GET that is not what you want.
+
+## Function or class?
+
+The question that settles it: **does it hold anything?**
+
+If the dependency is "read these parameters and hand them over", a function is plainer and shorter.
+
+If it has configuration decided at import, methods worth keeping beside the data, or a family of related variants, a class earns its keep.
+
+Most dependencies in most applications are functions. The class form is for the handful that are parameterised &mdash; permissions, rate limits, feature gates &mdash; and it is worth knowing precisely so you recognise the shape when you need it.
+
+## With Annotated
+
+Everything here composes with the `Annotated` spelling:
+
+```python
+AdminUser = Annotated[User, Depends(require_admin)]
+
+def remove(i: int, user: AdminUser):
+    ...
+```
+
+The dependency becomes a named type, the signature reads as ordinary Python, and the requirement is stated in one place that every endpoint can reuse. For a codebase with several permission levels this is the tidiest form available.
+
+
+## Mistakes people make
+
+**Keeping mutable state on the instance.** It is shared across every request, and in a multi-worker deployment it is per worker. A counter there counts something nobody wanted. Per-request state belongs in what `__call__` returns.
+
+**Expensive work in `__call__`.** That runs per request. Compiling a pattern or loading a table belongs in `__init__`, which runs once at import.
+
+**Annotating the parameter with a Pydantic model directly.** A model annotation means a request *body*. For query filters, declare the parameters in a function and construct the model inside it.
+
+**A class with no configuration and no state.** That is a function with extra ceremony. Reach for the class when it holds something.
+
+**Forgetting `__call__` and wondering why the instance is not a dependency.** `Depends(SomeClass)` calls the class; `Depends(some_instance)` calls the instance, and an instance is only callable if the class defines `__call__`.
+
+## Factory function or class?
+
+Both produce configured dependencies, and both appear in real code.
+
+A **closure factory** is shorter for one small rule:
+
+```python
+def require_role(role):
+    def dep(x_token: str = Header(default="")):
+        ...
+    return dep
+```
+
+A **class** keeps the configuration visible as attributes, gives related helpers somewhere to live, and is easier to inspect in a debugger.
+
+For one parameter and three lines, the closure. For a family of rules with shared helpers, the class.
+
+
+## A worked family
+
+The shape that justifies the class form, written out once.
+
+```python
+class RequireScope:
+    def __init__(self, *scopes):
+        self.scopes = set(scopes)
+
+    def __call__(self, user: User = Depends(current_user)):
+        missing = self.scopes - set(user.scopes)
+        if missing:
+            raise HTTPException(403, "Missing scope(s): %s" % ", ".join(sorted(missing)))
+        return user
+
+read_modules = RequireScope("modules:read")
+write_modules = RequireScope("modules:read", "modules:write")
+```
+
+One class, one rule, and as many configured dependencies as the application has permission levels. Each endpoint declares the one it needs, and the declaration is readable: `Depends(write_modules)` says what the endpoint requires without opening anything.
+
+Adding a scope is a new module-level name. Changing how scopes are checked is one method. Neither touches an endpoint.
+
+## Instances are shared
+
+Because `read_modules` is created at import, it is one object shared by every request that reaches an endpoint declaring it.
+
+That is what makes it cheap, and it is the constraint to respect: the instance may hold configuration, and it must not hold anything about a particular request. If you find yourself assigning to `self` inside `__call__`, the value belongs in the return instead.
+
+The same applies across workers. Each process has its own instance, so anything accumulated on `self` is per process rather than per application - which is why an instance attribute is the wrong place for a rate-limit counter, and a shared store is the right one.
+
+## Next
+
+Applying a dependency to every route in a router or an entire application, so a whole section is protected without each endpoint repeating the declaration.
+
+
+## Where the instance lives
+
+One more consequence of construction happening at import, because it decides where these belong in a project.
+
+`require_admin = RequireRole("admin")` is a module-level name. It is created when the module is imported, shared by every request, and referenced by every endpoint that needs it. That makes `dependencies.py` its natural home, beside the plain functions.
+
+Two practical effects follow.
+
+**Import order matters slightly.** Anything the constructor reads - a setting, an environment variable - must be available at import. If it is not, the failure is at startup rather than at request time, which is the better of the two, but it means configuration has to be loaded before dependencies are imported.
+
+**Reloading in development recreates them.** With `--reload`, saving a file rebuilds the instances and discards whatever they held. That is invisible for configuration and confusing for anything stateful, which is one more argument for keeping state off `self`.
+
+## When the parameters differ per endpoint
+
+A related pattern worth recognising: sometimes the configuration is not fixed at import but supplied per route.
+
+The class form handles it, because each endpoint can construct its own:
+
+```python
+@app.get("/small", dependencies=[Depends(RateLimit(5))])
+@app.get("/large", dependencies=[Depends(RateLimit(500))])
+```
+
+Each decorator builds an instance at import, one per route, which is exactly the same mechanism with a shorter lifetime for the name. It reads well for a rule that varies numerically across endpoints, and less well once the configuration is more than a value or two - at which point a named instance is clearer than an inline construction.
+
+
+## The three forms side by side
+
+All three produce a configured dependency. Choosing between them is mostly about how much the configuration carries.
+
+**A plain function**, when there is nothing to configure. `def pagination(limit: int = 10)` is the whole thing, and any other form is ceremony around it.
+
+**A closure factory**, when one small value varies. Short, and the configuration is a captured local nobody can inspect.
+
+**A class with `__call__`**, when the configuration is worth naming, several rules share helpers, or you want the instance to be inspectable. `RequireScope("modules:write").scopes` is readable in a debugger; a closure's captured variable is not.
+
+The progression is worth following in that order. Start with the function, reach for the factory when a value varies, and reach for the class when the factory starts growing a second function beside it.
+
+## What a class must not do
+
+One rule, stated plainly, because breaking it produces bugs that only appear under load.
+
+The instance is created once and shared by every request in that worker. Anything written to `self` during `__call__` is shared state across concurrent requests and separate state across workers.
+
+For configuration that is exactly right - it is read-only and identical everywhere. For anything per-request it is wrong twice over: two requests interleave, and two workers disagree.
+
+If `__call__` needs to produce something request-specific, it returns it. That is what the handler receives, and it is the only value with the right lifetime.
+
+## Summary
+
+`Depends` takes any callable, so a class is a dependency: FastAPI reads `__init__` for parameters and hands the handler the instance. `Depends()` with no argument uses the annotation.
+
+Give the class `__call__` and its instances become configured dependencies - one class, a family of rules, each declared by name at the endpoints that need it. `__init__` runs once at import; `__call__` runs per request, and nothing request-specific should be stored on `self`.
+
+Reach for a function when there is no configuration, no state and no behaviour to keep beside the data.
+
+
+## Summary, in one line
+
+Use a function until the dependency has configuration; then use a class whose `__init__` takes the configuration and whose `__call__` takes the request - remembering that the instance is built once and shared, so nothing about a single request may live on it.
+
+
+## A closing thought
+
+The class form is the least-used part of this tier and the one worth recognising rather than reaching for.
+
+Most dependencies are functions and should stay functions. But when an application grows several variants of one rule - three permission levels, four rate limits, five feature gates - writing five near-identical functions is worse than writing one class and five names.
+
+The signal is duplication with one value changed. That is what `__init__` is for.
+
+
+## Two rules
+
+**Configuration in `__init__`, request handling in `__call__`.** The first runs once at import; the second runs per request.
+
+**Nothing about a single request on `self`.** The instance is shared across every concurrent request in the worker and duplicated across workers, so anything stored there is both a race and a lie. Return it instead.
+
+
+## Where it sits in the tier
+
+This is the smallest module of the five, and deliberately so.
+
+Function dependencies cover the overwhelming majority of real use. Sub-dependencies handle composition. `yield` handles lifetime. Router-level handles scope. Overrides handle testing.
+
+The class form fills one specific gap: a rule that is the same shape at several settings. Recognising that gap - and not reaching for a class before you are in it - is the whole lesson.
+
+## Next
+
+Applying a dependency to a whole router or the entire application, so that a section is protected without every endpoint repeating the declaration - and without a route added later quietly missing it.
+''',
+    [
+        {"q": "Why is a class a valid dependency?",
+         "options": ["FastAPI special-cases classes", "Depends takes any callable, and calling a class constructs an instance", "Only Pydantic models work", "It is not"],
+         "answer": 1,
+         "why": "FastAPI reads `__init__`'s signature the way it reads a function's, so its parameters become request parameters and the handler receives the instance."},
+        {"q": "What does `Depends()` with no argument use?",
+         "options": ["The first dependency", "The parameter's type annotation as the callable", "Nothing", "The handler name"],
+         "answer": 1,
+         "why": "For a class dependency the annotation and the callable are the same thing, so the argument is redundant."},
+        {"q": "When does `RequireRole(\"admin\")` run?",
+         "options": ["Per request", "Once at import; only `__call__` runs per request", "Never", "Once per worker per request"],
+         "answer": 1,
+         "why": "Configuration belongs in `__init__` and per-request work in `__call__`. The instance is shared across requests, so mutable state on `self` is shared too."},
+        {"q": "When is a plain function the better choice?",
+         "options": ["Always", "When the dependency holds no configuration, state or methods", "Never", "Only for headers"],
+         "answer": 1,
+         "why": "Most dependencies just read parameters and hand them over. A class without configuration or behaviour is the same thing with more ceremony."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 18. Router and global dependencies
+# ---------------------------------------------------------------------------
+topic(
+    "router_and_global_dependencies",
+    "Router and Global Dependencies",
+    "Dependencies",
+    "Protecting a whole section without every endpoint repeating the declaration - "
+    "and the one endpoint that would otherwise forget.",
+    _svg(_box(20, 14, 120, 18, S, A) + _txt(80, 27, "APIRouter(dependencies=[...])", A, 7) +
+         _arrow(50, 34, 50, 44) + _arrow(110, 34, 110, 44) +
+         _box(18, 46, 60, 18, S) + _txt(48, 59, "/admin/stats", M, 7) +
+         _box(84, 46, 60, 18, S) + _txt(114, 59, "/admin/cache", M, 7)),
+    [
+        ("A dependency on the router",
+         "Declared once, applied to every route in it. The value is not injected &mdash; "
+         "it runs for its effect.",
+         '''from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
+
+def require_key(x_api_key: str = Header(default="")):
+    if x_api_key != "k-secret":
+        raise HTTPException(401, "Bad or missing key")
+    return x_api_key
+
+admin = APIRouter(prefix="/admin", dependencies=[Depends(require_key)])
+
+@admin.get("/stats")
+def stats(): return {"modules": 30}
+
+@admin.delete("/cache")
+def clear(): return {"cleared": True}
+
+app = FastAPI()
+app.include_router(admin)
+
+c = TestClient(app)
+good = {"x-api-key": "k-secret"}
+print("no key   :", c.get("/admin/stats").status_code)
+print("bad key  :", c.request("GET", "/admin/stats", headers={"x-api-key": "x"}).status_code)
+print("stats    :", c.request("GET", "/admin/stats", headers=good).json())
+print("cache    :", c.request("DELETE", "/admin/cache", headers=good).json())'''),
+
+        ("Application-wide",
+         "The same list on <code>FastAPI()</code> applies to every route in the app, "
+         "including ones added later.",
+         '''from fastapi import Depends, FastAPI, Header, HTTPException
+
+def require_key(x_api_key: str = Header(default="")):
+    if x_api_key != "k-secret":
+        raise HTTPException(401, "Bad or missing key")
+
+app = FastAPI(dependencies=[Depends(require_key)])
+
+@app.get("/a")
+def a(): return {"route": "a"}
+
+@app.get("/b")
+def b(): return {"route": "b"}
+
+c = TestClient(app)
+print("no key:", c.get("/a").status_code, c.get("/b").status_code)
+h = {"x-api-key": "k-secret"}
+print("keyed :", c.request("GET", "/a", headers=h).json(),
+      c.request("GET", "/b", headers=h).json())'''),
+
+        ("On a single route",
+         "The decorator takes the same list, for a rule that applies to one endpoint "
+         "and whose value the handler does not need.",
+         '''from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+audit = []
+
+def record(x_actor: str = Header(default="anonymous")):
+    audit.append(x_actor)
+
+@app.delete("/modules/{i}", dependencies=[Depends(record)])
+def remove(i: int):
+    return {"deleted": i}
+
+@app.get("/modules/{i}")
+def read(i: int):
+    return {"id": i}
+
+c = TestClient(app)
+c.request("DELETE", "/modules/1", headers={"x-actor": "ada"})
+c.request("DELETE", "/modules/2")
+c.get("/modules/3")
+print("audit trail:", audit, "<- reads are not recorded")'''),
+
+        ("The value is not passed",
+         "That is the trade. A handler needing the user declares its own "
+         "<code>Depends</code>, and the cache means it still runs once.",
+         '''from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
+
+calls = []
+
+def current_user(x_token: str = Header(default="")):
+    calls.append(x_token)
+    if x_token != "tok":
+        raise HTTPException(401, "Sign in")
+    return {"name": "ada"}
+
+router = APIRouter(dependencies=[Depends(current_user)])
+
+@router.get("/who")
+def who(user: dict = Depends(current_user)):     # declared again, to use it
+    return {"user": user["name"], "auth_calls": len(calls)}
+
+@router.get("/ping")
+def ping():                                      # protected, does not need it
+    return {"ok": True}
+
+app = FastAPI(); app.include_router(router)
+c = TestClient(app)
+h = {"x-token": "tok"}
+print(c.request("GET", "/who", headers=h).json())
+calls.clear()
+print(c.request("GET", "/ping", headers=h).json(), "| auth calls:", len(calls))'''),
+
+        ("They stack",
+         "App, router and route dependencies all run, outermost first. Each layer "
+         "adds a rule rather than replacing one.",
+         '''from fastapi import APIRouter, Depends, FastAPI
+
+order = []
+
+def app_level():    order.append("app")
+def router_level(): order.append("router")
+def route_level():  order.append("route")
+
+router = APIRouter(prefix="/x", dependencies=[Depends(router_level)])
+
+@router.get("/y", dependencies=[Depends(route_level)])
+def y():
+    order.append("handler")
+    return {"order": list(order)}
+
+app = FastAPI(dependencies=[Depends(app_level)])
+app.include_router(router)
+
+print(TestClient(app).get("/x/y").json())'''),
+
+        ("The endpoint that would have forgotten",
+         "The argument for putting it on the router: a new route added later is "
+         "protected without anyone remembering to protect it.",
+         '''from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
+
+def require_key(x_api_key: str = Header(default="")):
+    if x_api_key != "k":
+        raise HTTPException(401, "No key")
+
+# Protected as a group.
+grouped = APIRouter(prefix="/g", dependencies=[Depends(require_key)])
+@grouped.get("/one")
+def g1(): return {"r": 1}
+@grouped.get("/two")                      # added later; still protected
+def g2(): return {"r": 2}
+
+# Protected one at a time.
+each = APIRouter(prefix="/e")
+@each.get("/one", dependencies=[Depends(require_key)])
+def e1(): return {"r": 1}
+@each.get("/two")                         # somebody forgot
+def e2(): return {"r": 2}
+
+app = FastAPI(); app.include_router(grouped); app.include_router(each)
+c = TestClient(app)
+for p in ["/g/one", "/g/two", "/e/one", "/e/two"]:
+    print("%-7s no key -> %s" % (p, c.get(p).status_code))'''),
+    ],
+    [
+        "<code>dependencies=[Depends(fn)]</code> on an <code>APIRouter</code> applies to every route in it.",
+        "The same argument works on <code>FastAPI()</code> for the whole application, and on a route decorator for one endpoint.",
+        "The return value is <strong>not</strong> injected &mdash; these run for their effect. A handler that needs the value declares its own <code>Depends</code>.",
+        "Because of per-request caching, declaring it twice still calls the function once.",
+        "App, router and route dependencies stack and run outermost first. Each layer adds a rule.",
+        "The real argument for the router form: a route added six months later is protected without anyone remembering to protect it.",
+    ],
+    '''
+title: Router and Global Dependencies
+intro: Protecting a section without every endpoint repeating itself - and the endpoint that would otherwise be forgotten.
+
+## Three places to declare one
+
+A dependency can be attached at three levels, all with the same argument:
+
+```python
+FastAPI(dependencies=[Depends(fn)])                 # every route
+APIRouter(dependencies=[Depends(fn)])               # every route in it
+@app.get("/x", dependencies=[Depends(fn)])          # one route
+```
+
+They stack. All three run for a request that matches, outermost first, and each adds a rule rather than replacing one.
+
+## The value is not injected
+
+This is the difference from a parameter-level `Depends`, and the one thing to remember.
+
+A dependency declared this way runs for its **effect**. It can read headers, validate, raise, record an audit entry &mdash; but whatever it returns is discarded, because there is no parameter to receive it.
+
+So a handler that actually needs the user still declares it:
+
+```python
+router = APIRouter(dependencies=[Depends(current_user)])
+
+@router.get("/who")
+def who(user: User = Depends(current_user)):
+    ...
+```
+
+That looks like a duplicate and is not: per-request caching means the function runs **once**. The router-level declaration guarantees the check happens on every route; the parameter-level one gets the value where it is needed.
+
+## The argument for the router form
+
+It is not brevity. It is that a route added later is covered by default.
+
+Protecting endpoints one at a time works perfectly until somebody adds the fourteenth one and does not know the convention, or knows it and is in a hurry. That endpoint is then unprotected, nothing fails, no test covers it because nobody wrote a test for a route they did not know needed one, and the gap is found later by someone who was looking.
+
+The router form inverts that: forgetting is not possible, because the protection is a property of the section rather than of each endpoint. Adding a route to `/admin` makes it an admin route.
+
+The last editor above shows both arrangements side by side, with one endpoint in each. The grouped one is safe; the individual one has a hole.
+
+## When to use which level
+
+**Application-wide** for cross-cutting concerns that genuinely apply to everything: request identifiers, tracing, a global rate limit. Be careful &mdash; a health check that now requires an API key is a common self-inflicted outage, and public endpoints stop being public. If more than a couple of routes need an exemption, this is the wrong level.
+
+**Router-level** for a section with a shared rule. This is the sweet spot, and where most real use lives: `/admin` requires an admin, `/internal` requires a service token.
+
+**Route-level** for a rule genuinely specific to one endpoint whose value the handler does not need &mdash; recording an audit entry, checking a feature flag, enforcing an idempotency key.
+
+## What it does to the documentation
+
+Parameters declared by these dependencies still appear on every affected endpoint, because as far as a caller is concerned the endpoint requires them.
+
+So a router requiring an `x-api-key` header documents that header on all of its routes. That is right, and it is a small argument for the router form over middleware, which would enforce the same rule invisibly.
+
+The `responses=` argument pairs with this: a router that can 401 should say so once, at the router, rather than on each route.
+
+## Dependencies or middleware?
+
+Both can enforce something across many routes, and the choice comes up as soon as either does.
+
+**A dependency** knows about routing, so it applies to a chosen set. It can declare parameters, which appear in the schema. It integrates with the error handling you already have, and it can be overridden in tests. It runs after routing, so it knows which endpoint matched.
+
+**Middleware** runs on every request including unmatched ones, before routing. It cannot declare parameters and does not appear in the documentation.
+
+The rule that follows: if it is about *this endpoint* or *this section* &mdash; authentication, permissions, validation &mdash; it is a dependency. If it is about *every request regardless of route* &mdash; CORS, compression, a request id, timing &mdash; it is middleware.
+
+Reaching for middleware to do authentication is a common early choice and usually regretted, because the rule becomes invisible to the schema, awkward to exempt one route from, and hard to override in a test.
+
+## Testing them
+
+`dependency_overrides` works on these exactly as on parameter-level ones, which is the next module and is what makes a router-wide auth requirement pleasant rather than tiresome to test.
+
+
+## Mistakes people make
+
+**Application-wide authentication.** It catches the health check, the metrics endpoint and the docs, and the resulting outage is self-inflicted. If more than a couple of routes need an exemption, the level is wrong.
+
+**Expecting the value to be injected.** These run for their effect. A handler that needs the value declares its own `Depends`, and the cache means the function still runs once.
+
+**Using middleware for it instead.** Middleware runs before routing, cannot declare parameters, is invisible to the schema and is awkward to exempt one route from or override in a test.
+
+**Protecting routes one at a time.** It works until the fourteenth route is added by somebody who does not know the convention. Nothing fails and no test covers it.
+
+**Forgetting `responses=` on the router.** A section that can 401 should document it once, at the router, rather than on every route or nowhere.
+
+**Assuming order does not matter.** App, then router, then route. Each layer can rely on the ones outside it having passed, which is what makes layered rules safe.
+
+## Where the boundary sits
+
+The clean division, stated once:
+
+**Dependencies** are about endpoints. They know which route matched, declare parameters that reach the schema, integrate with your exception handlers, and can be overridden in tests. Authentication, permissions, request-scoped resources.
+
+**Middleware** is about requests. It runs on everything including unmatched paths, before routing, and knows nothing about your endpoints. CORS, compression, request identifiers, timing.
+
+Choosing by that question rather than by convenience keeps both simple.
+
+
+## Choosing the level, concretely
+
+A short decision procedure that avoids the common mistakes.
+
+**Does every route without exception need it, including health checks and docs?** Then application level. Very few things qualify - a request identifier, tracing.
+
+**Does a coherent section need it?** Router level. This is where most real use lives, and it is the level that survives a route being added later.
+
+**Does exactly one endpoint need it, and the handler does not want the value?** Route level.
+
+**Does the handler need the value?** A parameter, not any of these - and if the section also needs the guarantee, declare it in both places and let the cache make it one call.
+
+The mistake worth naming again is the first. An application-level authentication dependency reads as tidy and takes out `/health` with it, which is discovered by a load balancer at the worst possible moment.
+
+## Documenting a protected section
+
+Two arguments belong on the router beside the dependency.
+
+`responses={401: {"description": "Missing or invalid key"}}` documents the failure once for every route in the section.
+
+`tags=["admin"]` groups them, so a reader of the documentation sees the protected endpoints together rather than scattered among the public ones.
+
+Both are single arguments, and together they turn "these routes need a key" from something a caller discovers by being rejected into something the schema states.
+
+## Next
+
+Replacing a dependency for a test &mdash; the piece that makes all of this testable without a database, a token service or a network.
+
+
+## A note on ordering and errors
+
+Because the layers run outermost first, the error a caller sees is from the outermost layer that failed.
+
+That is usually right - a request with no API key should be told that, not told it lacks a permission it could not have been checked for. It does mean the layers should be ordered from most general to most specific, which the app/router/route nesting gives you for free.
+
+Within a single `dependencies=[...]` list, the entries run in order, so a cheap check should come before an expensive one. There is no point querying a permissions table for a request whose token is missing.
+
+## Documenting what a section requires
+
+Worth restating because it is the difference between a section a caller can use and one they have to reverse-engineer.
+
+A protected router should carry three things: the dependency that enforces the rule, a `responses` entry describing the failure, and a `tags` entry grouping the routes.
+
+With those, the generated documentation shows a labelled group of endpoints, each documenting the header it needs and the 401 it can return. Without them the endpoints still work and a caller discovers the requirement by being refused, which is a worse first experience than any amount of prose can make up for.
+
+
+## The decision in one line
+
+Put it on the router.
+
+Application-level catches the health check. Route-level is forgotten by whoever adds the fourteenth endpoint. The router is the level that matches how people actually think about an API - "everything under `/admin` needs an admin" - and it is the only one of the three where adding a route later cannot create a hole.
+
+Reach past it only when the rule genuinely applies to every request without exception, or genuinely applies to exactly one endpoint.
+
+## And the one to remember
+
+The return value is discarded. These run for their effect.
+
+When a handler needs the value as well, declare it again as a parameter and let the per-request cache collapse the two into one call. That looks redundant the first time you write it and is not: the router declaration guarantees the check on every route, and the parameter gets the value where it is used.
+
+## Summary
+
+`dependencies=[Depends(fn)]` attaches a dependency to one route, a router, or the whole application. They stack and run outermost first, and their return values are discarded - a handler needing the value declares its own, and the cache keeps it to one call.
+
+The router level is where most real use belongs, and the reason is not brevity: a route added later is protected without anyone remembering to protect it.
+
+Keep it out of the application level unless it genuinely applies to the health check too, and use a dependency rather than middleware whenever the rule is about endpoints rather than about every request.
+
+
+## Summary, in one line
+
+Put shared rules on the router, where a route added next year inherits them; declare the value again as a parameter when the handler needs it, and let the per-request cache make that one call rather than two.
+
+
+## Two rules
+
+**Prefer the router level.** It is the only one where a route added later cannot escape the rule.
+
+**Declare it again as a parameter when the handler needs the value.** The cache makes that one call, and the two declarations mean two different things: the section's guarantee, and this handler's need.
+
+
+## Where it sits in the tier
+
+The other modules make a dependency available to an endpoint that asks for it. This one makes it apply to endpoints that did not.
+
+That difference matters most for security, where the failure is silent: nobody notices an unprotected route until somebody is looking for one.
+
+## Next
+
+Replacing a dependency for a test - the piece that makes everything in this tier testable without a database, a token service or a network.
+''',
+    [
+        {"q": "What happens to the return value of a router-level dependency?",
+         "options": ["It is injected into every handler", "It is discarded - the dependency runs for its effect", "It becomes a header", "It is cached globally"],
+         "answer": 1,
+         "why": "There is no parameter to receive it. A handler needing the value declares its own Depends, and per-request caching means the function still runs once."},
+        {"q": "What is the main argument for a router-level dependency over per-route?",
+         "options": ["Performance", "A route added later is protected without anyone remembering", "Better docs", "It is required"],
+         "answer": 1,
+         "why": "Per-route protection works until somebody adds one and does not know the convention. Nothing fails, no test covers it, and the gap is found by someone looking."},
+        {"q": "In what order do app, router and route dependencies run?",
+         "options": ["Route first", "Outermost first - app, then router, then route", "Alphabetically", "Undefined"],
+         "answer": 1,
+         "why": "They stack rather than replace, so each layer adds a rule and can rely on the ones outside it having passed."},
+        {"q": "Authentication across a section: dependency or middleware?",
+         "options": ["Middleware - it is cross-cutting", "A dependency - it is about the endpoints, appears in the schema, and can be overridden in tests", "Either is equal", "Neither"],
+         "answer": 1,
+         "why": "Middleware runs before routing, cannot declare parameters, is invisible to the docs and is awkward to exempt or override. Reserve it for things that apply to every request regardless of route."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 19. Dependency overrides
+# ---------------------------------------------------------------------------
+topic(
+    "dependency_overrides",
+    "Dependency Overrides",
+    "Dependencies",
+    "Swapping a dependency for a test - the piece that makes the rest of this tier "
+    "testable without a database or a network.",
+    _svg(_box(12, 20, 56, 22, S) + _txt(40, 35, "real db", M, 8) +
+         _arrow(72, 31, 88, 31) +
+         _box(92, 20, 56, 22, S, A) + _txt(120, 35, "fake db", A, 8) +
+         _txt(80, 64, "app.dependency_overrides", M, 8)),
+    [
+        ("Replacing one for a test",
+         "<code>app.dependency_overrides</code> maps the real function to a stand-in. "
+         "Every endpoint using it gets the stand-in instead.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+
+def get_db():                       # the real one would open a connection
+    raise RuntimeError("no database here")
+
+@app.get("/modules")
+def list_modules(db=Depends(get_db)):
+    return {"rows": db["rows"]}
+
+def fake_db():
+    return {"rows": ["Vectors", "Norms"]}
+
+print("without an override:")
+try:
+    TestClient(app).get("/modules")
+except RuntimeError as e:
+    print("  ", e)
+
+app.dependency_overrides[get_db] = fake_db
+print("with one          :", TestClient(app).get("/modules").json())'''),
+
+        ("Overriding authentication",
+         "The common case: tests that exercise an endpoint's logic without "
+         "constructing a real token.",
+         '''from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+
+def current_user(x_token: str = Header(default="")):
+    if x_token != "a-real-token":
+        raise HTTPException(401, "Sign in")
+    return {"name": "ada", "role": "reader"}
+
+@app.get("/me")
+def me(user: dict = Depends(current_user)):
+    return user
+
+c = TestClient(app)
+print("no token   :", c.get("/me").status_code)
+
+app.dependency_overrides[current_user] = lambda: {"name": "test", "role": "admin"}
+print("overridden :", TestClient(app).get("/me").json())
+print()
+print("The endpoint is unchanged. Only what it depends on moved.")'''),
+
+        ("It reaches the whole tree",
+         "Overriding a sub-dependency changes every dependency built on it, without "
+         "touching them.",
+         '''from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+
+def token(x_token: str = Header(default="")):
+    if not x_token:
+        raise HTTPException(401, "No token")
+    return x_token
+
+def current_user(t: str = Depends(token)):
+    return {"name": t.upper()}
+
+def admin(user: dict = Depends(current_user)):
+    if user["name"] != "ADA":
+        raise HTTPException(403, "Admins only")
+    return user
+
+@app.get("/admin")
+def admin_page(u: dict = Depends(admin)):
+    return u
+
+c = TestClient(app)
+print("no token      :", c.get("/admin").status_code)
+
+app.dependency_overrides[token] = lambda: "ada"     # bottom of the tree
+print("token faked   :", TestClient(app).get("/admin").json())
+print()
+print("current_user and admin were never mentioned, and both changed.")'''),
+
+        ("Router-level dependencies too",
+         "An override replaces the function wherever it is declared, including on a "
+         "router.",
+         '''from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
+
+def require_key(x_api_key: str = Header(default="")):
+    if x_api_key != "k-secret":
+        raise HTTPException(401, "Bad key")
+
+router = APIRouter(prefix="/admin", dependencies=[Depends(require_key)])
+
+@router.get("/stats")
+def stats(): return {"modules": 30}
+
+app = FastAPI(); app.include_router(router)
+c = TestClient(app)
+print("locked  :", c.get("/admin/stats").status_code)
+
+app.dependency_overrides[require_key] = lambda: None
+print("unlocked:", TestClient(app).get("/admin/stats").json())'''),
+
+        ("Putting it back",
+         "Overrides live on the app, so a test that does not clear up leaks into "
+         "every test after it.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+
+def flag():
+    return {"mode": "real"}
+
+@app.get("/x")
+def x(f: dict = Depends(flag)):
+    return f
+
+c = TestClient(app)
+print("before  :", c.get("/x").json())
+
+app.dependency_overrides[flag] = lambda: {"mode": "fake"}
+print("during  :", TestClient(app).get("/x").json())
+
+app.dependency_overrides.clear()          # or del [flag]
+print("after   :", TestClient(app).get("/x").json())
+print()
+print("A test that forgets this makes the next one fail for no visible reason.")'''),
+
+        ("A yield dependency can be overridden too",
+         "Including with another yield dependency, so a fake session gets the same "
+         "setup and teardown.",
+         '''from fastapi import Depends, FastAPI
+
+app = FastAPI()
+log = []
+
+def get_db():
+    raise RuntimeError("no real database in a test")
+
+@app.get("/rows")
+def rows(db: list = Depends(get_db)):
+    return {"rows": db}
+
+def fake_db():
+    log.append("open")
+    try:
+        yield ["a", "b"]
+    finally:
+        log.append("close")
+
+app.dependency_overrides[get_db] = fake_db
+print(TestClient(app).get("/rows").json())
+print("lifecycle:", log)'''),
+    ],
+    [
+        "<code>app.dependency_overrides[real] = fake</code> replaces a dependency everywhere it is used.",
+        "The key is the <em>function object</em>, so it must be the same one the endpoints depend on &mdash; importing it twice by different paths is the usual reason an override appears not to work.",
+        "Overriding a sub-dependency changes everything built on it, without naming the intermediate ones.",
+        "It applies to router- and app-level dependencies as well as parameters.",
+        "Overrides live on the app, so clear them between tests &mdash; <code>app.dependency_overrides.clear()</code> &mdash; or one test quietly changes the next.",
+        "A yield dependency can be replaced by another, so a fake session still gets setup and teardown.",
+    ],
+    '''
+title: Dependency Overrides
+intro: Swapping a dependency for a test, and why that makes the whole tier practical.
+
+## The mechanism
+
+```python
+app.dependency_overrides[get_db] = fake_db
+```
+
+A dictionary on the app, mapping the real callable to a replacement. When FastAPI resolves a dependency it checks that dictionary first, and uses the stand-in if one is registered.
+
+That is the whole feature. It needs no test framework, no patching, and no change to the endpoints.
+
+## Why it matters
+
+Everything in this tier pushes requirements into dependencies: the database session, the current user, the permission check, the filters. That is good design and it would be a problem if those were hard to replace, because every test would then need a real database and a real token.
+
+Overrides are the release valve. The endpoint keeps declaring `Depends(get_db)`; the test decides what `get_db` means.
+
+Two consequences worth noticing. Tests get faster, because nothing real is constructed. And tests get *narrower* &mdash; a test for a handler's logic is not also a test of authentication, which means a broken token service does not fail two hundred unrelated tests.
+
+## The key is the function object
+
+This is the one thing that goes wrong, and the symptom is confusing: the override appears to be ignored.
+
+The dictionary is keyed by identity, so the object you use as the key must be the same object the endpoints depend on. If your test imports `get_db` from `app.db` and the router imported it from `.db`, and those resolve to two different module objects, you have two different functions and the override targets the wrong one.
+
+The fix is to be consistent about import paths. When an override silently does nothing, compare the two objects before looking anywhere else.
+
+## It reaches the whole tree
+
+Overriding a dependency replaces it wherever it appears, including deep inside a tree.
+
+So overriding `token` at the bottom changes `current_user` and `admin_only` above it, without either being mentioned. That is usually what you want: fake the one thing at the edge &mdash; the network call, the database, the clock &mdash; and let the real logic above it run unchanged.
+
+It is also the reason to fake as low as possible. Overriding `admin_only` skips the permission logic entirely; overriding `token` lets that logic actually be tested.
+
+## Router and app level too
+
+An override replaces the function wherever it is declared, which includes `dependencies=[...]` on a router or the app.
+
+That is what makes a router-wide authentication requirement pleasant to test. Without it, every test of every route under `/admin` would need a valid key.
+
+## Clean up
+
+Overrides live on the app object, which usually outlives a single test.
+
+A test that sets one and does not remove it changes every test that runs afterwards, and the failure appears somewhere unrelated with no obvious cause. In pytest the standard shape is a fixture that sets the override, yields, and clears it &mdash; the same setup/teardown discipline as a `yield` dependency, applied to the test.
+
+`app.dependency_overrides.clear()` removes everything; `del app.dependency_overrides[fn]` removes one.
+
+## Beyond tests
+
+Occasionally useful outside testing.
+
+A **local development** override can swap a real payment provider for a recording stub, or a real mailer for one that writes to a file.
+
+A **demo build** can replace a live data source with fixtures.
+
+Both are legitimate, and both deserve care: an override registered in production code is a piece of behaviour that does not appear in any endpoint's signature. If it is not a test, make it loud &mdash; guarded by an explicit setting, logged at startup, and impossible to enable by accident.
+
+## What this tier gives you
+
+Dependencies let an endpoint declare what it needs. Sub-dependencies let those requirements compose. `yield` gives them a lifetime. Router-level declarations apply them to a section. Overrides let all of it be replaced at the edges.
+
+Together that is most of what separates a FastAPI application that stays testable from one that does not &mdash; and none of it requires anything beyond functions and a default argument.
+
+
+## Mistakes people make
+
+**Two import paths for one function.** The dictionary is keyed by identity, so `from app.db import get_db` and `from .db import get_db` can be different objects. The override then targets a function nobody depends on, and does nothing, silently.
+
+**Not clearing between tests.** Overrides live on the app. One test that forgets makes a later, unrelated test fail with no visible cause.
+
+**Faking too high in the tree.** Overriding `admin_only` skips the permission logic you meant to test. Override the edge - the token, the database, the clock - and let the real logic run.
+
+**Using them in production without saying so.** An override is behaviour that appears in no endpoint signature. If it is not a test, gate it behind an explicit setting and log it at startup.
+
+**Forgetting they work on router-level dependencies.** They do, which is what makes a section-wide auth requirement testable.
+
+**Overriding instead of designing.** If a test needs six overrides, the endpoint probably depends on six things it should not.
+
+## The shape in pytest
+
+The standard arrangement is a fixture that sets, yields and clears - the same discipline as a `yield` dependency:
+
+```python
+@pytest.fixture
+def client():
+    app.dependency_overrides[get_db] = fake_db
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+```
+
+Every test using that fixture gets the fake, and no test can leak it into the next one. It is four lines, and it is the difference between a suite that is trustworthy and one that fails differently depending on ordering.
+
+
+## What good test structure looks like
+
+Overrides work best with a small amount of structure around them.
+
+**One fixture per fake.** A `fake_db` fixture, a `fake_user` fixture, each setting one override and clearing it. Tests then compose the ones they need rather than sharing a single do-everything client.
+
+**Fake at the edges.** Override the database, the clock, the HTTP client, the token decoder. Do not override the permission logic, the filters, or anything you are trying to test.
+
+**Prefer real objects to mocks.** A `fake_db` returning a dict or an in-memory list exercises more of the real code path than a mock that asserts it was called. The point of overriding is to remove the network, not the logic.
+
+**Keep one test with nothing overridden.** An integration test that exercises the real tree catches the case where the fakes have quietly diverged from what they stand in for - which is the failure mode of heavy faking.
+
+## The limits
+
+Overrides replace a dependency, and that is all they do.
+
+They cannot change what an endpoint declares, so an endpoint depending on something unnecessary still depends on it in tests. They do not apply to code called *inside* a handler - a handler that imports and calls `get_session()` directly is untouched by any override, which is the strongest practical argument for declaring dependencies rather than reaching for them.
+
+And they are per app object. Tests that construct their own `FastAPI()` per module get isolation for free; tests that share one imported app need the discipline of clearing.
+
+## Next
+
+The runtime: what actually happens when a request arrives, why an `async def` endpoint that blocks stalls everything, and the parts of the framework that need a real event loop.
+
+
+## Beyond the test suite
+
+Two uses outside testing are legitimate, and both deserve care.
+
+**Local development.** Swapping a payment provider for a recording stub, or a mailer for one that writes to a file, lets a developer run the whole application without credentials for anything external. It is genuinely useful and it is one setting away from being enabled somewhere it should not be.
+
+**Demonstrations.** Replacing a live data source with fixtures gives a stable demo that does not depend on the state of a shared environment.
+
+The rule for both: an override registered outside a test is behaviour that appears in no endpoint signature and no schema. Gate it behind an explicit setting, log it loudly at startup, and make the default off. A reader of the code should not have to know the overrides exist to understand what an endpoint does.
+
+## What it says about the design
+
+A final observation. If a test needs six overrides to run one endpoint, the overrides are not the problem - the endpoint is depending on six things.
+
+Overrides make dependencies replaceable; they do not make an over-connected endpoint simple. When the fixture list grows, the useful question is whether the handler is doing work that belongs in a service, or depending on things it does not actually need.
+
+Used that way the feature is also a design signal: the number of things you have to fake to test an endpoint is a fair measure of how entangled it is.
+
+
+## Why this closes the tier
+
+The five modules in this tier fit together, and overrides are what make the arrangement practical rather than merely elegant.
+
+Dependencies let an endpoint declare what it needs. Sub-dependencies let those requirements build on each other. `yield` gives them a lifetime. Router-level declarations apply them to a whole section.
+
+Every one of those pushes real things - a database, a token service, a clock - further from the handler and closer to the edge of the application. Without a way to replace them, that would make the endpoints harder to test rather than easier, and the whole approach would be a net loss.
+
+Overrides invert it. Because the edges are declared rather than reached for, they can be swapped, and a handler that depends on four external things can be tested with none of them present.
+
+That is the trade this tier is really about: declaring requirements instead of acquiring them. Everything else follows from it.
+
+## Summary
+
+`app.dependency_overrides[real] = fake` replaces a dependency everywhere it appears, including in a tree and on a router.
+
+The key is the function object, so inconsistent import paths are the usual reason an override silently does nothing. Overrides live on the app, so clear them between tests or one quietly changes the next.
+
+Fake at the edges - the database, the clock, the token - and let the real logic above run. Keep one test with nothing overridden, so the fakes cannot drift from what they stand in for without something failing.
+
+
+## Summary, in one line
+
+`app.dependency_overrides[real] = fake` swaps a dependency everywhere it appears - keyed by the function object, cleared between tests, and applied as low in the tree as possible so the logic above it still runs.
+
+
+## Two rules
+
+**Key on the same object the endpoints use.** Inconsistent imports are the reason an override silently does nothing.
+
+**Clear between tests.** A leaked override fails a later, unrelated test with no visible cause.
+
+
+## Where it sits in the tier
+
+Last of the five, and the one that justifies the other four.
+
+Pushing requirements into dependencies moves real things - databases, tokens, clocks - to the edge of the application. That would make testing harder if the edge could not be replaced. Overrides are what make it replaceable, and therefore what makes the whole approach pay.
+
+## Next
+
+The runtime: what actually happens when a request arrives, why an `async def` endpoint that makes a blocking call stalls every other request in the process, and the parts of the framework that need a real event loop.
+
+And the failure to watch for is silence: an override that targets a different object than the endpoints use does nothing at all, reports nothing, and leaves the test passing against the real dependency.
+''',
+    [
+        {"q": "What is `app.dependency_overrides` keyed by?",
+         "options": ["The dependency's name", "The function object itself", "The route path", "A string id"],
+         "answer": 1,
+         "why": "It is keyed by identity, so importing the same function by two different paths gives two objects and the override silently targets the wrong one."},
+        {"q": "You override a dependency at the bottom of a tree. What happens above it?",
+         "options": ["Nothing", "Everything built on it uses the replacement", "It raises", "Only direct users change"],
+         "answer": 1,
+         "why": "That is why you should fake as low as possible - overriding the top skips the logic you wanted to test, while overriding the edge lets it run."},
+        {"q": "Why clear overrides between tests?",
+         "options": ["Performance", "They live on the app, so one test silently changes every later one", "They leak memory", "They are read-only"],
+         "answer": 1,
+         "why": "The failure appears in an unrelated test with no obvious cause. A fixture that sets, yields and clears is the standard shape."},
+        {"q": "Can a router-level dependency be overridden?",
+         "options": ["No", "Yes - overrides replace the function wherever it is declared", "Only with middleware", "Only at app level"],
+         "answer": 1,
+         "why": "Which is what makes a router-wide auth requirement testable; otherwise every test of every route in that section would need a valid credential."},
+    ],
+)

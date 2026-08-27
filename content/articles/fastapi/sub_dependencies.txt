@@ -1,0 +1,398 @@
+title: Sub-dependencies
+intro: Dependencies that depend on dependencies, and the tree resolved before your handler runs.
+
+## The same syntax, one level down
+
+A dependency is a function whose parameters are request parameters &mdash; and `Depends` is a request parameter. So a dependency can depend on another:
+
+```python
+def token(authorization: str = Header(default="")):
+    return authorization.replace("Bearer ", "")
+
+def current_user(tok: str = Depends(token)):
+    ...
+
+def admin_only(user: dict = Depends(current_user)):
+    ...
+```
+
+There is no new mechanism here. FastAPI walks the tree from the handler's signature down, calls each function in dependency order, and passes the results up.
+
+
+## A dependency can declare its own
+
+Exactly the same syntax, one level down. FastAPI resolves the whole tree before the handler is called.
+
+```python-run
+from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+USERS = {"tok-ada": {"name": "ada", "role": "admin"}}
+
+def token(authorization: str = Header(default="")):
+    return authorization.replace("Bearer ", "")
+
+def current_user(tok: str = Depends(token)):
+    if tok not in USERS:
+        raise HTTPException(401, "Sign in first")
+    return USERS[tok]
+
+def admin_only(user: dict = Depends(current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(403, "Admins only")
+    return user
+
+@app.delete("/modules/{i}")
+def remove(i: int, user: dict = Depends(admin_only)):
+    return {"deleted": i, "by": user["name"]}
+
+c = TestClient(app)
+print(c.request("DELETE", "/modules/7",
+                headers={"authorization": "Bearer tok-ada"}).json())
+print("no token:", c.request("DELETE", "/modules/7").status_code)
+```
+
+## The tree is resolved once
+
+A shared sub-dependency deep in the tree is still called a single time per request.
+
+```python-run
+from fastapi import Depends, FastAPI
+
+app = FastAPI()
+calls = []
+
+def base():
+    calls.append("base")
+    return "B"
+
+def left(b: str = Depends(base)):  return "L(%s)" % b
+def right(b: str = Depends(base)): return "R(%s)" % b
+
+@app.get("/x")
+def x(l: str = Depends(left), r: str = Depends(right), b: str = Depends(base)):
+    return {"l": l, "r": r, "b": b, "base_calls": len(calls)}
+
+print(TestClient(app).get("/x").json())
+print()
+print("Three paths reach base; it ran once. That is why the cache matters.")
+```
+
+## Failures short-circuit the tree
+
+If a sub-dependency raises, nothing below it or after it runs &mdash; including the handler.
+
+```python-run
+from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+ran = []
+
+def token(authorization: str = Header(default="")):
+    ran.append("token")
+    tok = authorization.replace("Bearer ", "")
+    if not tok:
+        raise HTTPException(401, "No token")
+    return tok
+
+def profile(tok: str = Depends(token)):
+    ran.append("profile")
+    return {"tok": tok}
+
+@app.get("/me")
+def me(p: dict = Depends(profile)):
+    ran.append("handler")
+    return p
+
+c = TestClient(app)
+r = c.get("/me")
+print("no token:", r.status_code, "| ran:", ran)
+ran.clear()
+r = c.request("GET", "/me", headers={"authorization": "Bearer abc"})
+print("token   :", r.status_code, "| ran:", ran)
+```
+
+## Layering permissions
+
+The natural use: each level adds one check, and an endpoint declares the level it needs.
+
+```python-run
+from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+USERS = {"a": {"name": "ada", "role": "admin"},
+         "r": {"name": "rex", "role": "reader"}}
+
+def current_user(x_token: str = Header(default="")):
+    if x_token not in USERS:
+        raise HTTPException(401, "Sign in")
+    return USERS[x_token]
+
+def verified(user: dict = Depends(current_user)):
+    return user                      # a real one would check a flag
+
+def admin(user: dict = Depends(verified)):
+    if user["role"] != "admin":
+        raise HTTPException(403, "Admins only")
+    return user
+
+@app.get("/public")
+def public(): return {"level": "public"}
+
+@app.get("/account")
+def account(u: dict = Depends(verified)): return {"level": "verified", "you": u["name"]}
+
+@app.get("/admin")
+def admin_page(u: dict = Depends(admin)): return {"level": "admin", "you": u["name"]}
+
+c = TestClient(app)
+for path in ["/public", "/account", "/admin"]:
+    for tok in ["", "r", "a"]:
+        h = {"x-token": tok} if tok else {}
+        print("%-9s tok=%-2s -> %s" % (path, tok or "-",
+              c.request("GET", path, headers=h).status_code))
+```
+
+## Parameters gather from the whole tree
+
+Every parameter any dependency declares becomes the endpoint's, and every one is documented.
+
+```python-run
+from fastapi import Depends, FastAPI, Header, Query
+
+app = FastAPI()
+
+def paging(limit: int = Query(default=10, le=100)):
+    return limit
+
+def locale(x_locale: str = Header(default="en")):
+    return x_locale
+
+def context(limit: int = Depends(paging), loc: str = Depends(locale),
+            q: str = Query(default="")):
+    return {"limit": limit, "locale": loc, "q": q}
+
+@app.get("/search")
+def search(ctx: dict = Depends(context)):
+    return ctx
+
+c = TestClient(app)
+print(c.request("GET", "/search?q=vectors&limit=5",
+                headers={"x-locale": "fr"}).json())
+print()
+for p in app.openapi()["paths"]["/search"]["get"]["parameters"]:
+    print("  %-9s in %s" % (p["name"], p["in"]))
+```
+
+## Depth worth keeping
+
+Three levels reads well. Beyond that the endpoint's signature stops telling you what it actually needs.
+
+```python-run
+from fastapi import Depends, FastAPI
+
+app = FastAPI()
+trace = []
+
+def a():                       trace.append("a"); return "a"
+def b(x: str = Depends(a)):    trace.append("b"); return x + "b"
+def c_(x: str = Depends(b)):   trace.append("c"); return x + "c"
+def d(x: str = Depends(c_)):   trace.append("d"); return x + "d"
+def e(x: str = Depends(d)):    trace.append("e"); return x + "e"
+
+@app.get("/deep")
+def deep(v: str = Depends(e)):
+    return {"value": v, "order": trace}
+
+print(TestClient(app).get("/deep").json())
+print()
+print("It works. But 'deep' declares one parameter and needs five functions,")
+print("and nothing in its signature says so.")
+```
+## The cache covers the tree
+
+This is where per-request caching stops being an optimisation and becomes load-bearing.
+
+In a realistic application, `current_user` is depended on by `permissions`, which is depended on by `admin_only`, and the handler may declare two of those directly. Without caching the token would be decoded three or four times per request.
+
+With it, once. The second editor above makes that visible: three separate paths reach `base`, and it runs a single time.
+
+## Failures short-circuit
+
+If any dependency raises, everything below and after it is skipped, including the handler.
+
+That is what makes layered checks safe. `admin_only` can assume `current_user` succeeded, because it only runs if it did. There is no need to check for `None` or re-verify &mdash; the tree guarantees ordering.
+
+It is also why authentication as a dependency is genuinely safer than a check in the handler. A handler can forget to check. A signature cannot: if the endpoint declares `admin_only`, the check ran.
+
+## Layering permissions
+
+The pattern this shape is built for:
+
+`current_user` &mdash; who is this? 401 if unknown.
+`verified` &mdash; are they confirmed? 403 if not.
+`admin` &mdash; are they an admin? 403 if not.
+
+Each depends on the previous and adds exactly one rule. An endpoint then declares the level it needs, and the level is visible in its signature.
+
+The alternative &mdash; one `check_permissions(level="admin")` function with branching inside &mdash; works and hides the rules in a body rather than showing them in a chain. The layered version is easier to read and much easier to extend, because adding a level is a new function rather than a new branch.
+
+## Parameters gather upward
+
+Every parameter declared anywhere in the tree becomes a parameter of the endpoint.
+
+If `paging` declares `limit`, `locale` declares an `x-locale` header, and `context` declares `q` and depends on both, then an endpoint depending on `context` accepts all three &mdash; validated, converted, and documented.
+
+That is worth appreciating: the abstraction is not opaque. A caller reading your OpenAPI document sees every parameter the endpoint really takes, however deep in the tree it was declared. Nothing is hidden by the indirection.
+
+The corollary is that a dependency adding a parameter changes the public contract of every endpoint using it. Adding a *required* one is a breaking change for all of them at once, which is worth remembering before doing it casually.
+
+## How deep to go
+
+Three levels is comfortable and common. Five is not.
+
+The problem at depth is not correctness &mdash; the last editor above works fine. It is that the endpoint's signature stops being informative. `def deep(v: str = Depends(e))` tells a reader nothing about the five functions that must succeed, the parameters they collectively declare, or the errors they can raise.
+
+Two habits keep it readable.
+
+**Name for the guarantee, not the mechanism.** `admin_only` says what the endpoint gets; `check_role_after_verifying_token` describes plumbing.
+
+**Flatten when a chain has no branch.** If `a` is only ever used by `b` and `b` only by `c`, the three may be one function with a clear name. The chain earns its keep when levels are reused independently.
+
+## Debugging one
+
+When a dependency does not behave as expected, the useful question is *ordering*: what ran before it, and did anything above it raise?
+
+A `print` at the top of each function shows the resolution order immediately, and the order is deterministic &mdash; there is no concurrency within one request's tree.
+
+The other common surprise is caching: a dependency that appears to run once when you expected twice is the cache doing its job, and `use_cache=False` is the switch.
+
+
+## Mistakes people make
+
+**Building a deep chain because it composes.** It does compose, and five levels means the endpoint's signature no longer says what it needs. Three is comfortable.
+
+**Naming for the mechanism.** `check_role_after_verifying_token` describes plumbing; `admin_only` describes the guarantee the handler receives.
+
+**Flattening nothing.** If `a` is only used by `b` and `b` only by `c`, they are one function with a clear name. A chain earns its keep when the levels are reused independently.
+
+**Adding a required parameter to a shared dependency.** It becomes required on every endpoint in the tree at once - a breaking change for all of them, made in one line that mentions none of them.
+
+**Assuming order without checking.** The resolution order is deterministic, and a `print` at the top of each function shows it in seconds. That is faster than reasoning about it.
+
+**Forgetting the cache when debugging.** A dependency that appears to run once when you expected twice is the cache working. `use_cache=False` is the switch.
+
+## What the tree is really for
+
+The layered-permission shape is the case that justifies the feature.
+
+Each level answers one question and can assume the previous one passed, because a raise short-circuits everything after it. `admin` never has to check whether `current_user` returned `None`, because if it had raised, `admin` would not be running.
+
+That guarantee is what makes it safe to put security in the dependency tree rather than in handlers. A handler can forget a check. A signature cannot: if the endpoint declares `admin`, the whole chain above it ran and passed.
+
+
+## Reading a tree you did not write
+
+Arriving at an unfamiliar codebase, the dependency tree is one of the fastest ways to understand what the endpoints assume.
+
+Start at a handler's signature and follow the names down. Each level tells you one requirement, and the leaves are where the application touches the outside world - a header, a database, a clock, a configuration value.
+
+Two things that reading reveals quickly. Whether security is enforced consistently: if half the endpoints declare `current_user` and half read the header themselves, the second half are where the bugs are. And where the boundaries are: the leaves of the tree are the places to fake in tests, and if there are many, the application is entangled with more of the world than it needs.
+
+## Cost
+
+Every dependency in the tree is a function call per request, and the tree is resolved before the handler runs.
+
+For the ordinary case - a handful of small functions - the cost is nothing next to a single query. It becomes visible in two situations: a dependency doing real work, such as a lookup, that is now multiplied across every endpoint sharing it; and a very wide tree where the sheer number of calls adds up under load.
+
+Neither is a reason to avoid the feature. Both are reasons to know what is in the tree, because a slow dependency near the root is slow for everything, and its cost does not appear in any single endpoint's code.
+
+## Next
+
+Applying a dependency to a whole router or the whole application, so that a section is protected without every endpoint repeating the declaration.
+
+
+## A worked permission chain
+
+Written out in full, because this is the shape most applications converge on.
+
+```python
+def bearer_token(authorization: str = Header(default="")) -> str:
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Missing bearer token")
+    return authorization[7:]
+
+def current_user(token: str = Depends(bearer_token)) -> User:
+    user = decode(token)
+    if user is None:
+        raise HTTPException(401, "Invalid token")
+    return user
+
+def active_user(user: User = Depends(current_user)) -> User:
+    if user.disabled:
+        raise HTTPException(403, "Account disabled")
+    return user
+
+def admin(user: User = Depends(active_user)) -> User:
+    if not user.is_admin:
+        raise HTTPException(403, "Admins only")
+    return user
+```
+
+Four functions, four rules, each one line of logic. An endpoint declares the level it needs and gets everything below it.
+
+The properties worth noticing: each level has one reason to fail and one status; the token is decoded once however many levels are involved; and adding a rule - two-factor verified, subscription active - is a new function in the chain rather than a new branch inside an existing one.
+
+That is what the tree is for. Not composition for its own sake, but a set of requirements that can be stated separately, reused independently, and read from an endpoint's signature.
+
+
+## Cost and shape
+
+Every node in the tree is a function call per request, resolved before the handler runs.
+
+For a handful of small functions that is nothing beside a single query. It becomes visible in two situations worth watching: a dependency that does real work sitting near the root, where its cost is multiplied by every endpoint below it; and a very wide tree under load, where the call count itself adds up.
+
+Neither argues against the feature. Both argue for knowing what is in the tree, because a slow dependency high up is slow for everything and its cost appears in no single endpoint's code.
+
+## Reading an unfamiliar one
+
+The tree is also the fastest way into a codebase you did not write.
+
+Start at a handler's signature and follow the names down. Each level names one requirement; the leaves are where the application touches the outside world.
+
+Two things that reading reveals immediately. Whether security is applied consistently - if half the endpoints declare `current_user` and half read the header themselves, the second half is where the bugs live. And how entangled the application is - a wide set of leaves means many things must exist for any endpoint to run.
+
+## Summary
+
+A dependency declares its own dependencies with the same syntax, and FastAPI resolves the tree before the handler runs. The per-request cache covers the whole tree, so a shared node is called once however many paths reach it.
+
+A raise anywhere short-circuits everything after it, which is what lets each level assume the previous one passed - and what makes declaring a check in a signature safer than remembering it in a handler.
+
+Every parameter declared anywhere gathers upward into the endpoint's documented contract. Keep the tree about three levels deep, and name each level for the guarantee it provides.
+
+
+## Summary, in one line
+
+Dependencies compose with the same syntax, the tree resolves before the handler, a shared node runs once, a raise stops everything after it, and every parameter anywhere in the tree becomes part of the endpoint's public contract.
+
+
+## A closing thought
+
+A dependency tree is a description of what an endpoint assumes, written in a form the framework enforces.
+
+That is a stronger guarantee than documentation and a cheaper one than tests. If the endpoint declares `admin`, then a request that reaches the handler came from an authenticated, active administrator - not because somebody remembered to check, but because the handler could not have run otherwise.
+
+Keeping the tree shallow and naming each level for its guarantee is what keeps that description readable.
+
+
+## Two rules
+
+**Name each level for what it guarantees**, not for what it does. `admin` tells a reader what the handler receives; `check_role_after_token` describes the plumbing.
+
+**Stop at about three levels.** The tree stays useful while a signature still implies what the endpoint needs, and stops being useful the moment it does not.
+
+## Next
+
+Attaching a dependency to a router or an application rather than a parameter, which is how a section gets a rule that a new route cannot escape.
+
+A tree that reads well is one where each name is a noun or an adjective describing the caller - a user, an admin, an active account - rather than a verb describing the check. The handler is receiving a guarantee, not commissioning an inspection.

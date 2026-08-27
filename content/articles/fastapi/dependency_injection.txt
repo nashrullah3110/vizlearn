@@ -1,0 +1,383 @@
+title: Dependency Injection
+intro: Declaring what an endpoint needs and letting the framework supply it.
+
+## The whole idea
+
+```python
+def pagination(limit: int = 10, offset: int = 0):
+    return {"limit": min(limit, 100), "offset": offset}
+
+@app.get("/modules")
+def list_modules(page: dict = Depends(pagination)):
+    ...
+```
+
+`Depends(fn)` means: call `fn`, and pass what it returns.
+
+There is no registry, no container, no configuration and no base class. A dependency is a function, and declaring one is a default value in a signature. That simplicity is why the feature is worth learning properly &mdash; it is much smaller than "dependency injection" usually implies.
+
+
+## A dependency is just a function
+
+Declare a parameter as <code>Depends(fn)</code> and FastAPI calls <code>fn</code> and passes the result. Nothing is registered anywhere.
+
+```python-run
+from fastapi import Depends, FastAPI
+
+app = FastAPI()
+
+def pagination(limit: int = 10, offset: int = 0):
+    return {"limit": min(limit, 100), "offset": offset}
+
+@app.get("/modules")
+def list_modules(page: dict = Depends(pagination)):
+    return {"page": page}
+
+@app.get("/tracks")
+def list_tracks(page: dict = Depends(pagination)):
+    return {"page": page}
+
+c = TestClient(app)
+print(c.get("/modules").json())
+print(c.get("/modules?limit=500&offset=20").json(), "<- capped by the dependency")
+print(c.get("/tracks?limit=3").json())
+```
+
+## Its parameters are the request, too
+
+A dependency reads query parameters, headers and bodies exactly as a handler does &mdash; and they appear in the documentation.
+
+```python-run
+import json
+from fastapi import Depends, FastAPI, Header, Query
+
+app = FastAPI()
+
+def search_filters(
+    q: str = Query(default="", max_length=50, description="Free-text search."),
+    track: str = Query(default=""),
+    x_locale: str = Header(default="en"),
+):
+    return {"q": q, "track": track, "locale": x_locale}
+
+@app.get("/search")
+def search(f: dict = Depends(search_filters)):
+    return f
+
+c = TestClient(app)
+print(c.get("/search?q=vectors&track=maths").json())
+print()
+params = app.openapi()["paths"]["/search"]["get"]["parameters"]
+for p in params:
+    print("%-9s in %-6s %s" % (p["name"], p["in"], p["schema"].get("type")))
+```
+
+## Raising from a dependency
+
+A dependency that raises stops the request before the handler runs. That is what makes it the right place for authentication.
+
+```python-run
+from fastapi import Depends, FastAPI, Header, HTTPException, status
+
+app = FastAPI()
+TOKENS = {"tok-ada": "ada", "tok-grace": "grace"}
+reached = []
+
+def current_user(authorization: str = Header(default="")):
+    token = authorization.replace("Bearer ", "")
+    if token not in TOKENS:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in first",
+                            headers={"WWW-Authenticate": "Bearer"})
+    return TOKENS[token]
+
+@app.get("/me")
+def me(user: str = Depends(current_user)):
+    reached.append(user)
+    return {"user": user}
+
+c = TestClient(app)
+def call(tok):
+    h = {"authorization": "Bearer " + tok} if tok else {}
+    r = c.request("GET", "/me", headers=h)
+    return r.status_code, r.json()
+
+print("no token :", call(None))
+print("bad token:", call("nope"))
+print("good     :", call("tok-ada"))
+print()
+print("handler ran for:", reached)
+```
+
+## Resolved once per request
+
+Two parameters depending on the same function get one call, not two. The result is cached for the life of the request.
+
+```python-run
+from fastapi import Depends, FastAPI
+
+app = FastAPI()
+calls = []
+
+def expensive():
+    calls.append(1)
+    return {"value": len(calls)}
+
+def wrapper(e: dict = Depends(expensive)):
+    return {"wrapped": e}
+
+@app.get("/once")
+def once(a: dict = Depends(expensive), b: dict = Depends(wrapper)):
+    return {"a": a, "b": b, "calls_this_request": len(calls)}
+
+c = TestClient(app)
+print("request 1:", c.get("/once").json())
+calls.clear()
+print("request 2:", c.get("/once").json())
+print()
+print("Two references, one call. Caching is per request, not global.")
+```
+
+## Turning the cache off
+
+<code>use_cache=False</code> forces a fresh call &mdash; for anything that should differ per use, such as a generated identifier.
+
+```python-run
+from fastapi import Depends, FastAPI
+
+app = FastAPI()
+counter = {"n": 0}
+
+def ticket():
+    counter["n"] += 1
+    return "T%03d" % counter["n"]
+
+@app.get("/cached")
+def cached(a: str = Depends(ticket), b: str = Depends(ticket)):
+    return {"a": a, "b": b}
+
+@app.get("/fresh")
+def fresh(a: str = Depends(ticket, use_cache=False),
+          b: str = Depends(ticket, use_cache=False)):
+    return {"a": a, "b": b}
+
+c = TestClient(app)
+print("cached:", c.get("/cached").json(), "<- one call, shared")
+counter["n"] = 0
+print("fresh :", c.get("/fresh").json(), "<- called twice")
+```
+
+## What it replaces
+
+The same endpoint written both ways. The dependency version has the requirement in the signature, where the documentation can see it.
+
+```python-run
+from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+TOKENS = {"tok-ada": "ada"}
+
+# Without: every handler repeats the check, and the docs know nothing.
+@app.get("/by-hand")
+def by_hand(authorization: str = Header(default="")):
+    token = authorization.replace("Bearer ", "")
+    if token not in TOKENS:
+        raise HTTPException(401, "Sign in first")
+    user = TOKENS[token]
+    return {"user": user}
+
+# With: stated once, declared in the signature.
+def current_user(authorization: str = Header(default="")):
+    token = authorization.replace("Bearer ", "")
+    if token not in TOKENS:
+        raise HTTPException(401, "Sign in first")
+    return TOKENS[token]
+
+@app.get("/declared")
+def declared(user: str = Depends(current_user)):
+    return {"user": user}
+
+c = TestClient(app)
+h = {"authorization": "Bearer tok-ada"}
+print("by hand :", c.request("GET", "/by-hand", headers=h).json())
+print("declared:", c.request("GET", "/declared", headers=h).json())
+print()
+print("Both document the header, because both declare it -")
+print("but only one states the requirement once for every endpoint.")
+```
+## Dependencies see the request
+
+The important second fact: a dependency's own parameters are request parameters. It can declare query values, headers, cookies, path parameters and a body, using exactly the syntax a handler uses.
+
+So `pagination` above does not receive the request and dig through it. It declares `limit` and `offset`, and FastAPI supplies them from the query string, converted and validated.
+
+That has a consequence people miss: **those parameters appear in the OpenAPI document**. An endpoint depending on `search_filters` documents `q`, `track` and `x-locale` as its own parameters, because as far as a caller is concerned they are. The abstraction does not hide anything from the contract.
+
+## Raising
+
+A dependency that raises stops the request. The handler never runs.
+
+That is what makes it the right home for authentication, authorisation and any precondition:
+
+```python
+def current_user(authorization: str = Header(default="")):
+    if token not in TOKENS:
+        raise HTTPException(401, "Sign in first")
+    return TOKENS[token]
+```
+
+Every endpoint that needs a user now writes one parameter. There is no possibility of an endpoint forgetting the check and no possibility of two endpoints checking differently &mdash; which is exactly the failure mode of doing it by hand.
+
+## Caching within a request
+
+If two parameters depend on the same function, it is called **once**. The result is cached for the duration of that request and shared.
+
+This matters more than it first appears, because dependencies compose. A handler might depend on `current_user`, and also on `permissions`, which itself depends on `current_user`. Without caching, the token would be decoded twice. With it, once.
+
+The cache is per request. Nothing is shared between requests, which is correct &mdash; a cached user leaking into the next request would be a serious bug rather than an optimisation.
+
+`Depends(fn, use_cache=False)` opts out, for anything that should genuinely differ per reference: a generated identifier, a fresh timestamp, a new random value.
+
+## What it replaces
+
+Compare the two versions in the last editor above. Both work. Both even document the header, because both declare it.
+
+The difference is where the requirement lives. In the hand-written version it is four lines at the top of a handler, repeated in every handler that needs it, and diverging quietly as they are edited. In the dependency version it is one function, and each endpoint declares a parameter.
+
+The scaling difference is the point. Ten endpoints needing a user means ten parameters and one function &mdash; not forty lines that must agree.
+
+## When something is not a dependency
+
+Two habits worth avoiding.
+
+**Wrapping something trivial.** `Depends` on a function that returns a constant is indirection with no benefit. Import the constant.
+
+**Putting business logic in one.** A dependency should produce something the handler needs &mdash; a user, a session, a validated set of filters. A dependency that performs the operation and returns a result has moved the endpoint's work into its signature, where it is harder to find and harder to test.
+
+The test: could you describe it as "this endpoint needs an X"? Then it is a dependency. If it is "this endpoint does Y", it is not.
+
+## Types and the return value
+
+`page: dict = Depends(pagination)` annotates the parameter, and that annotation is documentation for a reader rather than something enforced &mdash; the value is whatever the dependency returned.
+
+For anything real, return a model rather than a dict. `current_user` returning a `User` gives every handler attribute access and editor completion, and makes the dependency's contract explicit.
+
+There is a newer spelling using `Annotated` that is worth adopting:
+
+```python
+CurrentUser = Annotated[User, Depends(current_user)]
+
+def me(user: CurrentUser):
+    ...
+```
+
+The dependency becomes a named type, reusable across every endpoint, and the signature reads as ordinary Python. It is the same idea as the constrained types from the Pydantic track, applied here.
+
+## Where they live
+
+A `dependencies.py` beside your routers is the usual home, for the same reason a `types.py` is: several routers need the same ones, and a shared file is where they can be found.
+
+Reading that file should tell you what the application's endpoints are allowed to assume &mdash; a user, a database session, a tenant, a set of filters. That is a useful summary to have in one place.
+
+
+## Mistakes people make
+
+**Wrapping something trivial.** `Depends` on a function returning a constant is indirection with no benefit. Import the constant.
+
+**Putting the endpoint's work in a dependency.** A dependency supplies what the endpoint needs; it should not *be* what the endpoint does. The test: can you say "this endpoint needs an X"? Then it is a dependency. "This endpoint does Y" is not.
+
+**Returning a dict where a model belongs.** `user["name"]` has no completion and no checking. A dependency returning a model gives every handler attribute access and states its contract.
+
+**Assuming the cache is global.** It is per request. Nothing survives to the next one - which is correct, because a cached user leaking across requests would be a serious bug.
+
+**Expecting `Depends` to hide parameters.** Everything a dependency declares appears in the endpoint's documented parameters. That is a feature, and it means adding a required parameter to a shared dependency is a breaking change for every endpoint using it.
+
+**Doing slow work without noticing where.** A dependency runs on every request to every endpoint that declares it. A lookup that seemed cheap on one route is multiplied by everything that shares it.
+
+## The Annotated form
+
+Worth adopting early, because it changes how the signatures read:
+
+```python
+CurrentUser = Annotated[User, Depends(current_user)]
+
+@app.get("/me")
+def me(user: CurrentUser):
+    ...
+```
+
+The dependency becomes a named type. The signature is ordinary Python with no default-argument trick, the requirement is declared once and reused, and a reader sees a type rather than a call.
+
+It is the same idea as the constrained types from the Pydantic track, and for a codebase with several dependencies it is the tidier spelling.
+
+
+## What this replaces in other frameworks
+
+It is worth seeing what the same job looks like elsewhere, because it explains why the FastAPI version is so small.
+
+A **decorator** - `@login_required` - is the Flask-shaped answer. It works, and the requirement is invisible to the function's signature, so nothing documents it, the value has to be smuggled in through a global request object, and composing two decorators means caring about their order.
+
+A **container** - the Spring or .NET answer - registers implementations against interfaces and resolves them by type. Powerful, and it needs configuration, wiring and a mental model of its own.
+
+A **base class** - `class MyView(AuthenticatedView)` - ties the requirement to inheritance, so an endpoint needing two unrelated things needs multiple inheritance.
+
+FastAPI's version is a default argument. There is nothing to register, nothing to configure, no ordering to reason about, and the requirement is written where a reader and the schema generator both look. That is a genuinely good trade, and it is why the feature is worth using rather than routed around.
+
+## Testing an endpoint that has dependencies
+
+The payoff arrives in the test file, and it is worth previewing before the overrides module.
+
+An endpoint declaring `Depends(get_db)` and `Depends(current_user)` can be tested without a database and without a token, because both can be replaced at the app level. The handler is unchanged; only what it depends on moves.
+
+That is the practical argument for pushing requirements into dependencies rather than reaching for them inside handlers. A handler that calls `get_session()` directly cannot be tested without a session. One that declares it can.
+
+## Next
+
+Dependencies that need to clean up after themselves &mdash; a database session that must be closed whether or not the handler succeeded &mdash; which is what `yield` is for.
+
+
+## One habit worth forming
+
+When you find yourself writing the same four lines at the top of a second handler, that is the moment.
+
+Not the fifth handler, and not after a refactor - the second. Extracting it costs one function and one parameter, and every endpoint after that inherits the rule instead of copying it.
+
+The failure mode of waiting is not the duplication itself. It is that the copies drift: one checks the header case-insensitively, one strips whitespace, one returns a dict where the other returns a model. By the time somebody consolidates them there are four behaviours to reconcile and no way to know which was intended.
+
+## Summary
+
+`Depends(fn)` calls a function and passes the result. The function's own parameters are request parameters, so a dependency can read anything a handler can - and everything it declares appears in the endpoint's documented contract.
+
+Raising inside one stops the request before the handler runs, which is why authentication belongs there rather than in a body somebody can forget to write. Results are cached per request, so a dependency reached by several paths is called once.
+
+Prefer returning a model over a dict, adopt the `Annotated` spelling for anything reused, and keep dependencies to "this endpoint needs an X" rather than "this endpoint does Y".
+
+
+## Why it is the framework's best idea
+
+Of everything FastAPI adds on top of Starlette and Pydantic, this is the part with no equivalent elsewhere that is this small.
+
+A decorator hides the requirement from the signature. A container needs registration and configuration. A base class ties the requirement to inheritance. Middleware applies to everything and documents nothing.
+
+`Depends` is a default argument. It needs no setup, composes without ordering rules, works with any callable, appears in the generated schema, and can be replaced in a test with one dictionary assignment.
+
+The result is that "what does this endpoint need?" is answerable by reading its signature, and "what happens if it is not there?" is answerable by reading one function. Those two properties are most of what makes a large FastAPI application stay legible.
+
+
+## A closing thought
+
+The habit this module is really teaching is not `Depends`. It is declaring what you need instead of reaching for it.
+
+A handler that calls `get_session()` in its body has acquired something. A handler that declares `session: Session = Depends(get_session)` has stated a requirement and let something else satisfy it. The first cannot be tested without a database, documented, or reused; the second is all three.
+
+That distinction is older and larger than this framework. FastAPI's contribution is making the declaring version shorter than the acquiring one, which is the only reliable way to get people to prefer it.
+
+
+## Two rules
+
+**Extract on the second occurrence**, not the fifth. The cost is one function; the cost of waiting is four copies that have quietly diverged.
+
+**Dependencies supply, they do not perform.** "This endpoint needs an X" is a dependency; "this endpoint does Y" is the handler's job.
+
+## Next
+
+Dependencies that need to clean up after themselves - a session that must be closed whether the handler succeeded or raised - which is what `yield` is for, and where the transaction pattern comes from.

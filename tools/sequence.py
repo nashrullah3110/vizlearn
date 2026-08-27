@@ -451,6 +451,12 @@ SEQUENCE = {
         "fastapi/status_codes.html",
         "fastapi/error_handling.html",
         "fastapi/apirouter.html",
+        "fastapi/dependency_injection.html",
+        "fastapi/dependencies_with_yield.html",
+        "fastapi/sub_dependencies.html",
+        "fastapi/class_dependencies.html",
+        "fastapi/router_and_global_dependencies.html",
+        "fastapi/dependency_overrides.html",
     ],
     "pydantic": [
         "pydantic/what_is_pydantic.html",

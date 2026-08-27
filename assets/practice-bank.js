@@ -5380,6 +5380,210 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "fastapi/class_dependencies.html",
+  "title": "Class Dependencies",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "Why is a class a valid dependency?",
+    "o": [
+     "FastAPI special-cases classes",
+     "Depends takes any callable, and calling a class constructs an instance",
+     "Only Pydantic models work",
+     "It is not"
+    ],
+    "a": 1,
+    "w": "FastAPI reads `__init__`'s signature the way it reads a function's, so its parameters become request parameters and the handler receives the instance."
+   },
+   {
+    "t": "What does `Depends()` with no argument use?",
+    "o": [
+     "The first dependency",
+     "The parameter's type annotation as the callable",
+     "Nothing",
+     "The handler name"
+    ],
+    "a": 1,
+    "w": "For a class dependency the annotation and the callable are the same thing, so the argument is redundant."
+   },
+   {
+    "t": "When does `RequireRole(\"admin\")` run?",
+    "o": [
+     "Per request",
+     "Once at import; only `__call__` runs per request",
+     "Never",
+     "Once per worker per request"
+    ],
+    "a": 1,
+    "w": "Configuration belongs in `__init__` and per-request work in `__call__`. The instance is shared across requests, so mutable state on `self` is shared too."
+   },
+   {
+    "t": "When is a plain function the better choice?",
+    "o": [
+     "Always",
+     "When the dependency holds no configuration, state or methods",
+     "Never",
+     "Only for headers"
+    ],
+    "a": 1,
+    "w": "Most dependencies just read parameters and hand them over. A class without configuration or behaviour is the same thing with more ceremony."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/dependencies_with_yield.html",
+  "title": "Dependencies with yield",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "When does the code after `yield` run?",
+    "o": [
+     "Immediately",
+     "After the response has been produced",
+     "Only on success",
+     "Never"
+    ],
+    "a": 1,
+    "w": "Setup, then handler, then teardown - which is why it works for anything with a request-scoped lifetime."
+   },
+   {
+    "t": "A handler raises a 404. Does the teardown run?",
+    "o": [
+     "No",
+     "Yes, if the yield is inside a try/finally",
+     "Only for 500s",
+     "Only for async dependencies"
+    ],
+    "a": 1,
+    "w": "That is the reason to use yield rather than a plain return. Without `try/finally` a failing handler skips the close and leaks the connection."
+   },
+   {
+    "t": "Where does `db.commit()` belong in the transaction pattern?",
+    "o": [
+     "Before the yield",
+     "Immediately after the yield",
+     "In finally",
+     "In the handler"
+    ],
+    "a": 1,
+    "w": "It is only reached when the handler completed without raising. An `except` clause rolls back and re-raises; `finally` closes either way."
+   },
+   {
+    "t": "Cleanup itself fails. What should the teardown do?",
+    "o": [
+     "Raise",
+     "Catch and log it",
+     "Return a 500",
+     "Retry forever"
+    ],
+    "a": 1,
+    "w": "The response is already decided and being sent, so an exception there cannot become a clean error - and may truncate the response instead."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/dependency_injection.html",
+  "title": "Dependency Injection",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "What is a FastAPI dependency?",
+    "o": [
+     "A registered class",
+     "An ordinary function called by Depends",
+     "A middleware",
+     "A Pydantic model"
+    ],
+    "a": 1,
+    "w": "No registry, no container, no base class. `Depends(fn)` calls the function and passes the result, and the function's own parameters are request parameters."
+   },
+   {
+    "t": "Two parameters depend on the same function. How many times is it called?",
+    "o": [
+     "Twice",
+     "Once - the result is cached for the request",
+     "Once globally",
+     "Depends on the type"
+    ],
+    "a": 1,
+    "w": "Caching is per request, which matters because dependencies compose - a handler and a sub-dependency both needing `current_user` decode the token once, not twice."
+   },
+   {
+    "t": "Why is a dependency the right place for authentication?",
+    "o": [
+     "It is faster",
+     "Raising there stops the request before the handler runs, and the rule is stated once",
+     "It is required",
+     "It hides the header from the docs"
+    ],
+    "a": 1,
+    "w": "No endpoint can forget the check and no two can check differently - and the header still appears in the schema, because the dependency declares it."
+   },
+   {
+    "t": "Do a dependency's parameters appear in the API documentation?",
+    "o": [
+     "No, they are internal",
+     "Yes - as the endpoint's own parameters",
+     "Only headers do",
+     "Only with a flag"
+    ],
+    "a": 1,
+    "w": "As far as a caller is concerned they are the endpoint's parameters, so the abstraction hides nothing from the contract."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/dependency_overrides.html",
+  "title": "Dependency Overrides",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "What is `app.dependency_overrides` keyed by?",
+    "o": [
+     "The dependency's name",
+     "The function object itself",
+     "The route path",
+     "A string id"
+    ],
+    "a": 1,
+    "w": "It is keyed by identity, so importing the same function by two different paths gives two objects and the override silently targets the wrong one."
+   },
+   {
+    "t": "You override a dependency at the bottom of a tree. What happens above it?",
+    "o": [
+     "Nothing",
+     "Everything built on it uses the replacement",
+     "It raises",
+     "Only direct users change"
+    ],
+    "a": 1,
+    "w": "That is why you should fake as low as possible - overriding the top skips the logic you wanted to test, while overriding the edge lets it run."
+   },
+   {
+    "t": "Why clear overrides between tests?",
+    "o": [
+     "Performance",
+     "They live on the app, so one test silently changes every later one",
+     "They leak memory",
+     "They are read-only"
+    ],
+    "a": 1,
+    "w": "The failure appears in an unrelated test with no obvious cause. A fixture that sets, yields and clears is the standard shape."
+   },
+   {
+    "t": "Can a router-level dependency be overridden?",
+    "o": [
+     "No",
+     "Yes - overrides replace the function wherever it is declared",
+     "Only with middleware",
+     "Only at app level"
+    ],
+    "a": 1,
+    "w": "Which is what makes a router-wide auth requirement testable; otherwise every test of every route in that section would need a valid credential."
+   }
+  ]
+ },
+ {
   "path": "fastapi/error_handling.html",
   "title": "Error Handling",
   "cat": "FastAPI",
@@ -5839,6 +6043,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "fastapi/router_and_global_dependencies.html",
+  "title": "Router and Global Dependencies",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "What happens to the return value of a router-level dependency?",
+    "o": [
+     "It is injected into every handler",
+     "It is discarded - the dependency runs for its effect",
+     "It becomes a header",
+     "It is cached globally"
+    ],
+    "a": 1,
+    "w": "There is no parameter to receive it. A handler needing the value declares its own Depends, and per-request caching means the function still runs once."
+   },
+   {
+    "t": "What is the main argument for a router-level dependency over per-route?",
+    "o": [
+     "Performance",
+     "A route added later is protected without anyone remembering",
+     "Better docs",
+     "It is required"
+    ],
+    "a": 1,
+    "w": "Per-route protection works until somebody adds one and does not know the convention. Nothing fails, no test covers it, and the gap is found by someone looking."
+   },
+   {
+    "t": "In what order do app, router and route dependencies run?",
+    "o": [
+     "Route first",
+     "Outermost first - app, then router, then route",
+     "Alphabetically",
+     "Undefined"
+    ],
+    "a": 1,
+    "w": "They stack rather than replace, so each layer adds a rule and can rely on the ones outside it having passed."
+   },
+   {
+    "t": "Authentication across a section: dependency or middleware?",
+    "o": [
+     "Middleware - it is cross-cutting",
+     "A dependency - it is about the endpoints, appears in the schema, and can be overridden in tests",
+     "Either is equal",
+     "Neither"
+    ],
+    "a": 1,
+    "w": "Middleware runs before routing, cannot declare parameters, is invisible to the docs and is awkward to exempt or override. Reserve it for things that apply to every request regardless of route."
+   }
+  ]
+ },
+ {
   "path": "fastapi/status_codes.html",
   "title": "Status Codes",
   "cat": "FastAPI",
@@ -5886,6 +6141,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 2,
     "w": "Nothing about the payload was malformed - the same body would have worked a minute earlier. That is a conflict with current state, which is 409."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/sub_dependencies.html",
+  "title": "Sub-dependencies",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "A sub-dependency is reached by three different paths in one request. How many times does it run?",
+    "o": [
+     "Three",
+     "Once - the cache covers the whole tree",
+     "Depends on order",
+     "Once per path"
+    ],
+    "a": 1,
+    "w": "In a real application `current_user` is reached several ways, and without the cache the token would be decoded repeatedly. This is where caching stops being an optimisation."
+   },
+   {
+    "t": "A dependency in the middle of the tree raises. What runs after it?",
+    "o": [
+     "Everything else",
+     "Nothing below or after it, including the handler",
+     "Only the handler",
+     "Only siblings"
+    ],
+    "a": 1,
+    "w": "That short-circuit is what lets a later level assume an earlier one succeeded - and why declaring a check in the signature is safer than remembering it in a handler."
+   },
+   {
+    "t": "A dependency three levels down declares a `limit` query parameter. Does it appear in the docs?",
+    "o": [
+     "No, it is internal",
+     "Yes - as the endpoint's own parameter",
+     "Only if re-declared",
+     "Only headers appear"
+    ],
+    "a": 1,
+    "w": "Parameters gather upward, so the indirection hides nothing from the contract - and adding a required one is a breaking change for every endpoint using that dependency."
+   },
+   {
+    "t": "What is the problem with a five-level dependency chain?",
+    "o": [
+     "It is slow",
+     "The endpoint's signature stops telling a reader what it needs",
+     "It breaks caching",
+     "It is not allowed"
+    ],
+    "a": 1,
+    "w": "It works correctly. But one parameter standing for five functions, their parameters and their possible errors is no longer informative."
    }
   ]
  },
