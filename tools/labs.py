@@ -2139,9 +2139,11 @@ LABS.update(_INTERVIEW_CHECKS)
 # from it.
 from python_topics import CHECKS as _PYTHON_CHECKS  # noqa: E402
 from pydantic_topics import CHECKS as _PYDANTIC_CHECKS  # noqa: E402
+from fastapi_topics import CHECKS as _FASTAPI_CHECKS  # noqa: E402
 
 LABS.update(_PYTHON_CHECKS)
 LABS.update(_PYDANTIC_CHECKS)
+LABS.update(_FASTAPI_CHECKS)
 
 # The generated classical image-processing modules do the same
 # (tools/cv_topics.py). A question there is written against the exact operation

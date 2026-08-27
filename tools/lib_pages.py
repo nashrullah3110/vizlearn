@@ -223,6 +223,27 @@ TOPICS = {
             "value is to hand it one and look.",
         ],
     },
+    "fastapi": {
+        "dir": "fastapi",
+        "title": "FastAPI",
+        "h1": "FastAPI, by Calling It",
+        "lead": "Routes, validation and documentation that come from the same "
+                "annotations - each one runnable on the page.",
+        "keywords": "fastapi tutorial, fastapi path parameters, fastapi dependencies, "
+                    "fastapi response model, python api framework, fastapi testing",
+        "intro": [
+            "FastAPI is a thin, well-chosen layer over two ideas you can learn "
+            "separately: ASGI, which is what a Python web application actually is, "
+            "and Pydantic, which turns your annotations into validation. Almost "
+            "everything that looks like framework magic is one of those two doing "
+            "its job.",
+            "This track works up from a first route to dependencies, middleware and "
+            "testing. There is no server on these pages - a browser tab cannot "
+            "listen on a port - so a test client calls the app the way a server "
+            "would, which means routing, validation, status codes and the generated "
+            "schema all behave exactly as they do in production.",
+        ],
+    },
     "interview": {
         "dir": "interview",
         "title": "Interview Questions",
@@ -249,7 +270,7 @@ TOPICS = {
 
 # Display order on the hub and in the footer.
 TOPIC_ORDER = ["maths", "ml", "dl", "dsa", "nlp", "computer-vision", "db",
-               "gen-ai", "python", "pydantic", "interview"]
+               "gen-ai", "python", "pydantic", "fastapi", "interview"]
 
 DIR_TO_TOPIC = {t["dir"]: k for k, t in TOPICS.items()}
 

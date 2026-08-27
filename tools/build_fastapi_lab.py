@@ -155,8 +155,15 @@ def _drive(coro):
         "browser sandbox cannot run. Remove the await and try again.")
 
 
-class Response:
-    """The part of httpx.Response that a FastAPI example actually touches."""
+class _ClientResponse:
+    """The part of httpx.Response that a FastAPI example actually touches.
+
+    Deliberately *not* called Response. FastAPI has its own Response class
+    that readers import and construct, and a test-client class sitting on
+    that name in their namespace is a trap - the failure is a confusing
+    AttributeError deep in starlette rather than anything that names the
+    collision.
+    """
 
     def __init__(self, status_code, headers, content):
         self.status_code = status_code
@@ -225,7 +232,7 @@ class TestClient:
                                for k, v in message.get("headers", [])}
             elif message["type"] == "http.response.body":
                 chunks += message.get("body", b"")
-        return Response(status, out_headers, chunks)
+        return _ClientResponse(status, out_headers, chunks)
 
     def get(self, url, **kw):
         return self.request("GET", url, **kw)

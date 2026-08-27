@@ -5329,6 +5329,363 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "fastapi/path_parameters.html",
+  "title": "Path Parameters",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "Can a path parameter be optional?",
+    "o": [
+     "Yes, with a default",
+     "No - it is part of the URL, so omitting it is a different URL",
+     "Only with Path()",
+     "Only if it is a string"
+    ],
+    "a": 1,
+    "w": "A request without the segment is a request to a different path. If you want both shapes, declare two routes."
+   },
+   {
+    "t": "What is `loc` for a failed path parameter?",
+    "o": [
+     "('body', 'module_id')",
+     "('path', 'module_id')",
+     "('module_id',)",
+     "()"
+    ],
+    "a": 1,
+    "w": "The first element names which part of the request failed - path, query, header or body - which is what lets a client point the user at the right thing."
+   },
+   {
+    "t": "Why annotate a path parameter as `Enum` rather than `str`?",
+    "o": [
+     "It is faster",
+     "Clear error listing the options, an enumeration in the schema, and checked comparisons in your handler",
+     "It is required",
+     "To allow slashes"
+    ],
+    "a": 1,
+    "w": "A `str` accepts anything and documents nothing. The enum gives the caller the permitted values and gives a generated client a real type."
+   },
+   {
+    "t": "What does `{full_path:path}` do that a plain parameter does not?",
+    "o": [
+     "Makes it optional",
+     "Matches across slashes",
+     "Validates it as a file",
+     "Makes it required"
+    ],
+    "a": 1,
+    "w": "A plain parameter stops at the next slash. Note that a `:path` value can contain `..`, so building a filesystem path from one without checking is a traversal vulnerability."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/query_parameters.html",
+  "title": "Query Parameters",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "How does FastAPI decide a parameter is a query parameter?",
+    "o": [
+     "It must be declared with Query()",
+     "By elimination - not in the path, not a model, not a dependency",
+     "By its type",
+     "It must have a default"
+    ],
+    "a": 1,
+    "w": "Query is the fallback classification, which is why `limit: int = 10` works with no ceremony. `Query()` is only needed to add constraints or to disambiguate a list."
+   },
+   {
+    "t": "Why does a list query parameter need `Query(default=[])` rather than `= []`?",
+    "o": [
+     "Style",
+     "Without the marker a list annotation is read as a request body",
+     "Lists are not supported otherwise",
+     "To make it required"
+    ],
+    "a": 1,
+    "w": "The explicit marker tells FastAPI where the value comes from. Without it, the list annotation is classified as a body."
+   },
+   {
+    "t": "What does `?on=false` give a `bool` parameter?",
+    "o": [
+     "True, because the string is non-empty",
+     "False",
+     "A 422",
+     "None"
+    ],
+    "a": 1,
+    "w": "Pydantic reads the word's meaning, not the container's emptiness - unlike `bool(\"false\")` in plain Python, which is True. That is what makes query flags work."
+   },
+   {
+    "t": "Why use `Literal` for a `sort` parameter instead of `str`?",
+    "o": [
+     "It is faster",
+     "An unrecognised value fails loudly instead of silently falling back to a default",
+     "It is required",
+     "To allow lists"
+    ],
+    "a": 1,
+    "w": "A plain `str` accepts `?sort=colour`, falls through to whatever your code does with an unknown key, and nobody is told. That is how results end up subtly wrong for weeks."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/reading_a_422.html",
+  "title": "Reading a 422",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "What is the first element of `loc` in a FastAPI validation error?",
+    "o": [
+     "The field name",
+     "The part of the request - path, query, header, cookie or body",
+     "The model name",
+     "The status code"
+    ],
+    "a": 1,
+    "w": "It tells the caller where to look. Code that reads `loc[0]` as a field name is wrong here in a way it was not in plain Pydantic."
+   },
+   {
+    "t": "A request for `/modules/99` is well-formed but no module 99 exists. What should it return?",
+    "o": [
+     "422",
+     "404",
+     "400",
+     "409"
+    ],
+    "a": 1,
+    "w": "The request fitted the declared shape perfectly. Nothing with that id exists, which is a fact about the world - so your code raises HTTPException(404)."
+   },
+   {
+    "t": "Why assert on `type` rather than `msg` in a test?",
+    "o": [
+     "type is shorter",
+     "Messages are prose and get reworded between releases",
+     "msg is always empty",
+     "No difference"
+    ],
+    "a": 1,
+    "w": "Type codes are stable identifiers. Matching on prose makes the suite fail on a wording change, which teaches a team to distrust it."
+   },
+   {
+    "t": "How do you return a different error envelope for validation failures?",
+    "o": [
+     "Change the model",
+     "An `@app.exception_handler(RequestValidationError)`",
+     "A middleware",
+     "You cannot"
+    ],
+    "a": 1,
+    "w": "The handler receives the exception and returns whatever JSON shape your clients expect - keeping the 422 status, and logging the original errors for diagnosis."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/request_bodies.html",
+  "title": "Request Bodies",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "How does FastAPI know a parameter is the request body?",
+    "o": [
+     "It must be called `body`",
+     "It is annotated with a Pydantic model",
+     "It uses Body()",
+     "It is the last parameter"
+    ],
+    "a": 1,
+    "w": "A model annotation is the signal. Path names come from the route, and anything else defaults to a query parameter."
+   },
+   {
+    "t": "What is `loc` for a bad field inside the second item of a list in the body?",
+    "o": [
+     "('minutes',)",
+     "('body', 'minutes')",
+     "('body', 'lessons', 1, 'minutes')",
+     "()"
+    ],
+    "a": 2,
+    "w": "The path names the source, the field, the index and the inner field - which for a large payload is the entire diagnosis."
+   },
+   {
+    "t": "A client sends `minuets` instead of `minutes`. What happens by default?",
+    "o": [
+     "422",
+     "The key is ignored and `minutes` takes its default",
+     "The value is stored anyway",
+     "A warning"
+    ],
+    "a": 1,
+    "w": "Pydantic ignores unknown keys unless told otherwise. `extra=\"forbid\"` makes it a 422 - usually right for an internal API, weighed against forward compatibility for a public one."
+   },
+   {
+    "t": "What distinguishes PUT from PATCH?",
+    "o": [
+     "Nothing",
+     "PUT replaces the whole resource; PATCH updates part of it",
+     "PUT is for creation",
+     "PATCH cannot take a body"
+    ],
+    "a": 1,
+    "w": "A PUT body should be complete, and an omitted field means clearing it. PATCH updates only what was sent, which is what `model_dump(exclude_unset=True)` is for."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/response_models.html",
+  "title": "Response Models",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "What happens without a `response_model`?",
+    "o": [
+     "Nothing is returned",
+     "Whatever the handler returns is serialised, including internal fields",
+     "A 500",
+     "Only declared fields are sent"
+    ],
+    "a": 1,
+    "w": "The framework sends what you gave it. That is how a column added to a table later silently starts appearing in an API response."
+   },
+   {
+    "t": "A handler returns `{\"id\": \"abc\"}` where the response model declares `id: int`. What does the caller get?",
+    "o": [
+     "The string",
+     "A 422",
+     "A 500",
+     "None"
+    ],
+    "a": 2,
+    "w": "The caller sent nothing wrong; your code broke its own contract, so it is a server error. Without a response model that malformed value would have shipped."
+   },
+   {
+    "t": "Why use separate Create and Out models?",
+    "o": [
+     "Performance",
+     "What a caller may send and what they may see are different questions",
+     "It is required",
+     "To avoid validation"
+    ],
+    "a": 1,
+    "w": "A single model with everything optional documents nothing - no client can tell what is guaranteed in either direction."
+   },
+   {
+    "t": "Your handler returns an ORM row and the response model raises. What is usually missing?",
+    "o": [
+     "response_model_exclude_none",
+     "`from_attributes=True` on the output model",
+     "A status code",
+     "An alias"
+    ],
+    "a": 1,
+    "w": "By default a model validates from a mapping. `from_attributes=True` - `orm_mode` in Pydantic v1 - lets it read attributes off an object instead."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/what_is_fastapi.html",
+  "title": "What FastAPI Is",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "Which library does FastAPI use for validation?",
+    "o": [
+     "Its own",
+     "Pydantic",
+     "Starlette",
+     "marshmallow"
+    ],
+    "a": 1,
+    "w": "FastAPI has no validation code of its own. It hands data to Pydantic and converts the resulting ValidationError into a 422, which is why everything you know about Pydantic applies directly."
+   },
+   {
+    "t": "What is an ASGI application?",
+    "o": [
+     "A web server",
+     "An async callable taking (scope, receive, send)",
+     "A Pydantic model",
+     "A router"
+    ],
+    "a": 1,
+    "w": "That is the entire interface. uvicorn translates sockets into those three arguments, which is also why an app can be called directly, with no network, for tests."
+   },
+   {
+    "t": "A request fails validation. Does your handler run?",
+    "o": [
+     "Yes, with None values",
+     "No - validation happens before it",
+     "Only for GET",
+     "It depends on the model"
+    ],
+    "a": 1,
+    "w": "The 422 is produced before the function is called. That is why handlers need no defensive type checking at the top."
+   },
+   {
+    "t": "Where does the interactive documentation come from?",
+    "o": [
+     "A separate file you write",
+     "The JSON Schema generated from your annotations",
+     "uvicorn",
+     "A decorator argument"
+    ],
+    "a": 1,
+    "w": "Your models generate schemas, FastAPI assembles them into an OpenAPI document, and the docs page renders it. Writing a field description is writing documentation."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/your_first_endpoint.html",
+  "title": "Your First Endpoint",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "What does `@app.get(\"/x\")` do to the function?",
+    "o": [
+     "Wraps it in a handler",
+     "Registers it as a route and returns it unchanged",
+     "Makes it async",
+     "Adds validation code to it"
+    ],
+    "a": 1,
+    "w": "The decorator records the path, method and signature in the routing table. The function itself is untouched and still callable directly."
+   },
+   {
+    "t": "Why is `/modules/latest` unreachable when declared after `/modules/{module_id}`?",
+    "o": [
+     "A bug",
+     "Routes match in registration order, first match wins",
+     "Fixed paths are lower priority",
+     "It needs a tag"
+    ],
+    "a": 1,
+    "w": "The variable route matches first, with module_id=\"latest\". Declare fixed paths before variable ones - and annotating the parameter `int` makes the failure loud rather than silent."
+   },
+   {
+    "t": "What must a 204 response contain?",
+    "o": [
+     "An empty dict",
+     "Nothing - no body at all",
+     "A message",
+     "The created object"
+    ],
+    "a": 1,
+    "w": "204 means success with nothing to say. Returning a value with status_code=204 produces a malformed response; return an explicit `Response(status_code=204)`."
+   },
+   {
+    "t": "Where does an endpoint's description in the docs come from?",
+    "o": [
+     "A separate file",
+     "The function's docstring, unless you pass `description`",
+     "The route path",
+     "The response model"
+    ],
+    "a": 1,
+    "w": "The docstring becomes the description and Markdown is rendered - so documentation written where a Python developer naturally writes it also reaches the API docs."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/ann_indexing_hnsw_and_ivf.html",
   "title": "ANN indexing: HNSW and IVF",
   "cat": "Gen AI",

@@ -1,0 +1,172 @@
+title: What FastAPI Is, and What It Is Not
+intro: A thin layer over two ideas you can learn separately - and almost nothing that looks like magic is anything else.
+
+## Two libraries wearing one name
+
+A great deal of what people call "FastAPI magic" is not FastAPI at all.
+
+**Pydantic** does the validation. FastAPI has no validation code of its own: it reads your annotations, hands the request body to a model, and converts the resulting `ValidationError` into a 422 response. Every coercion rule, every error `type`, every constraint you can write is Pydantic's.
+
+**Starlette** does the HTTP. Routing, requests, responses, middleware, background tasks and the ASGI plumbing are Starlette's, which FastAPI builds on rather than replaces.
+
+What FastAPI itself contributes is the join: reading a function's signature to work out which parameters come from the path, the query string, the body, a header or a dependency &mdash; and generating an OpenAPI document from the same information.
+
+That is a small amount of code doing something valuable, and knowing where the seams are makes both debugging and reading the source much easier. A 422 you disagree with is a Pydantic question. A route that does not match is a Starlette question. A parameter arriving from the wrong place is a FastAPI question.
+
+## Underneath: one async function
+
+An ASGI application is a callable:
+
+```python
+async def app(scope, receive, send):
+    ...
+```
+
+`scope` is a dictionary describing the request. `receive` is an awaitable that returns incoming messages. `send` is an awaitable that takes outgoing ones. That is the entire interface, and a FastAPI app satisfies it.
+
+uvicorn's job is to accept a TCP connection, parse HTTP, build that `scope`, call your app, and write the response messages back to the socket. It is a translator between sockets and function calls.
+
+The third editor above does the translation by hand: it builds a scope, calls the app, and prints the messages that come back. Two of them &mdash; `http.response.start` with the status and headers, `http.response.body` with the content &mdash; and that is a complete HTTP response.
+
+This matters practically. Because the interface is a plain function call, you can exercise an entire application without a network, which is what makes fast tests possible and what makes the editors on this page work at all.
+
+## The annotation is the contract
+
+```python
+@app.get("/modules/{module_id}")
+def read(module_id: int):
+    ...
+```
+
+The path says there is a `module_id` in the URL. The annotation says it is an integer. From those two facts FastAPI extracts the value, asks Pydantic to convert it, rejects the request with a 422 if it cannot, and records in the OpenAPI document that this endpoint takes an integer path parameter.
+
+Remove the annotation and you get a string, unvalidated and undocumented. The second editor above shows both side by side: `/untyped/42` gives you `"42"` and `/typed/42` gives you `42`.
+
+That single difference is most of the value proposition. You were going to write the annotation anyway; the framework decided to act on it.
+
+## Validation happens first
+
+A request that does not fit never reaches your function.
+
+This is worth stating plainly because it changes how handlers are written. There is no defensive checking at the top of the function, no `if not isinstance(...)`, no `try: int(...)`. By the time your code runs, every parameter is the type you declared and every constraint has passed.
+
+The fifth editor above demonstrates it by recording which requests reached the handler: the invalid one is simply absent.
+
+## What you get without asking
+
+Because the annotations describe the data precisely, several things follow for free.
+
+**Interactive documentation** at `/docs`, generated from the OpenAPI schema, with the descriptions and examples you wrote on your fields.
+
+**A machine-readable contract** at `/openapi.json`, from which clients can be generated in a dozen languages.
+
+**Editor support**, because your handler's parameters have real types.
+
+None of that is a separate feature you enable. It is a consequence of the schema, which is a consequence of the annotations.
+
+## What it is not
+
+**It is not async-only.** A `def` endpoint is fully supported and is often the right choice. The framework runs it in a threadpool so it cannot block the event loop.
+
+**It is not a full-stack framework.** There is no ORM, no admin, no template convention, no migrations. Django gives you all of that; FastAPI gives you an API layer and leaves the rest to you. That is a trade, not a ranking.
+
+**It is not fast because of its own code.** The speed comes from Starlette's ASGI design and from Pydantic v2's Rust core. FastAPI's contribution is not getting in the way.
+
+**It is not a replacement for understanding HTTP.** Status codes, methods, headers and caching are still yours to get right, and the framework will happily let you return 200 for a failure.
+
+## A note on these pages
+
+There is no server here, and there cannot be: a browser tab cannot listen on a port.
+
+What runs instead is the app itself, called through ASGI by a `client` defined before your code. That is the same interface uvicorn uses, so routing, validation, status codes, dependencies and the generated schema all behave exactly as they do in production &mdash; because they are the same code paths, with the network removed.
+
+Two things genuinely differ, and the modules that touch them say so. Streaming responses and middleware need a real event loop. And WebSockets need a real connection, which no amount of cleverness will conjure in a sandbox.
+
+Everything else on this track is the real thing.
+
+## How a request actually travels
+
+Tracing one request end to end makes the layers concrete.
+
+A client opens a TCP connection and sends bytes. **uvicorn** parses them into an HTTP request and builds a `scope` dictionary: method, path, query string, headers, client address.
+
+It calls your app with `(scope, receive, send)`. **Starlette's router** walks its route table in registration order, comparing the path and method, and finds a match &mdash; extracting any path parameters as strings along the way.
+
+**FastAPI's dependency resolution** then runs. It works out, from the handler's signature, where each parameter comes from: this one from the path, that one from the query string, this one is a body, that one is a dependency to call first. Anything needing conversion goes to **Pydantic**, and a failure here becomes a 422 without your function ever being called.
+
+Your handler runs, with real Python objects as arguments.
+
+The return value goes through the **response model** if you declared one, then is serialised to JSON, and Starlette sends `http.response.start` followed by `http.response.body`. uvicorn turns those back into bytes on the socket.
+
+Every step in that chain is ordinary Python. Nothing is hidden, and each layer can be exercised on its own &mdash; which is why testing a FastAPI app needs no server.
+
+## Why it is fast
+
+Three reasons, none of which is FastAPI's own code.
+
+**ASGI is asynchronous.** A WSGI server handles one request per worker thread while that request waits on a database. An ASGI server can have thousands of requests in flight, each parked at an `await`. For an API that spends most of its time waiting on I/O &mdash; which is most APIs &mdash; that is a large difference in how much hardware you need.
+
+**Pydantic v2 validates in Rust.** Validation used to be a measurable fraction of request time in v1. In v2 it usually is not.
+
+**Starlette is thin.** Its routing and request handling do very little per request.
+
+FastAPI's contribution is not adding overhead on top. That is a real achievement and it is worth being clear that the framework is not itself doing anything clever with speed.
+
+The caveat that matters: none of this helps if your handler blocks. An `async def` endpoint that makes a synchronous database call stops the entire event loop, and one slow query can stall every concurrent request in the process. That trap has a module of its own in the runtime tier, and it is the single most common way a fast framework is made slow.
+
+## What to read when something goes wrong
+
+Knowing the seams tells you where to look.
+
+A **404 you did not expect** is routing &mdash; check registration order and trailing slashes.
+
+A **422 you disagree with** is Pydantic &mdash; look at the model, not the endpoint.
+
+A **500 mentioning serialisation** is usually the response model, or a type your model does not know.
+
+A **parameter arriving as `None`** is FastAPI's signature analysis deciding it came from somewhere other than you assumed &mdash; commonly a body treated as a query parameter.
+
+**Nothing happening at all** is uvicorn, or a route registered on a router that was never included.
+
+That mapping saves more time than any amount of framework documentation, because it turns "FastAPI is broken" into a specific question about a specific library.
+
+
+## Mistakes people make
+
+**Blocking the event loop.** Writing `async def` and then making a synchronous database or HTTP call inside it. The whole process stalls, and the framework's headline benefit is gone. If a function does blocking work, declare it `def` and let FastAPI put it on a threadpool.
+
+**Assuming FastAPI validates.** It does not; Pydantic does. When a 422 surprises you, the model is the thing to read, and every rule from the Pydantic track applies unchanged.
+
+**Fighting the schema.** People sometimes work around the generated documentation instead of improving the annotations that produce it. A vague schema almost always means vague types &mdash; a `str` that should be a `Literal`, a missing constraint, an absent response model.
+
+**Treating it as a full-stack framework.** There is no ORM, no admin, no migrations. That is a deliberate scope, and expecting Django's batteries leads to a lot of disappointed searching.
+
+**Putting business logic in handlers.** A handler should translate between HTTP and your application. Logic inside one cannot be tested without building a request or reused from a background job.
+
+**Ignoring the seams.** Knowing that routing is Starlette, validation is Pydantic and signature analysis is FastAPI turns most debugging from guesswork into a specific question about a specific library.
+
+## Where to go next
+
+The next module builds a first endpoint properly and looks at what the decorator actually does. After that come the three places data arrives from &mdash; the path, the query string and the body &mdash; which between them account for most of what an API takes in.
+
+## Why the seams are worth knowing
+
+Most frameworks ask you to learn *the framework*. FastAPI is unusual in that most of what you learn transfers.
+
+Pydantic is used far beyond web APIs &mdash; configuration, LLM structured output, data pipelines, CLI arguments. Everything from the Pydantic track applies here unchanged, and everything you learn here about models applies back there.
+
+ASGI is a standard, not a FastAPI invention. Starlette, Django's async stack, Litestar and Quart all speak it, and an ASGI middleware written for one works with the others.
+
+So the framework-specific surface is genuinely small: the decorators, the way a signature is analysed, and `Depends`. Everything else is two libraries and a protocol you would benefit from knowing regardless.
+
+That is the argument for learning the layers rather than the recipes. A tutorial teaches you what to type; knowing which library owns which behaviour tells you what to do when the typing does not work.
+
+## In one paragraph
+
+FastAPI reads the annotations you were going to write anyway, uses Pydantic to enforce them, uses Starlette to move the bytes, and generates an OpenAPI document from the same information. The layer it adds is thin and mostly consists of working out where each of your function's parameters should come from. Learn the two libraries underneath and the framework itself takes an afternoon.
+
+## A closing thought
+
+The most useful thing to carry out of this module is not a fact about FastAPI but a habit of asking which layer you are in.
+
+Routing, validation, signature analysis, serialisation and transport are five different concerns owned by three different libraries. Nearly every confusing behaviour becomes obvious once you know which one is responsible, and nearly every search becomes productive once you search for that library instead of for the framework.

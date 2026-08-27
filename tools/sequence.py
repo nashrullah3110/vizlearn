@@ -437,6 +437,15 @@ SEQUENCE = {
     "interview": _INTERVIEW,
 
     # Run it first, then meet the pieces: the track teaches by execution.
+    "fastapi": [
+        "fastapi/what_is_fastapi.html",
+        "fastapi/your_first_endpoint.html",
+        "fastapi/path_parameters.html",
+        "fastapi/query_parameters.html",
+        "fastapi/request_bodies.html",
+        "fastapi/response_models.html",
+        "fastapi/reading_a_422.html",
+    ],
     "pydantic": [
         "pydantic/what_is_pydantic.html",
         "pydantic/your_first_basemodel.html",

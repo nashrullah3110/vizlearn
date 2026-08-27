@@ -1324,6 +1324,62 @@ window.VIZLEARN_MODULES = [
   "desc": "See what the numbers a network learns are actually for: weights scale each input, bias shifts where the neuron fires."
  },
  {
+  "title": "Path Parameters",
+  "path": "fastapi/path_parameters.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Query Parameters",
+  "path": "fastapi/query_parameters.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Reading a 422",
+  "path": "fastapi/reading_a_422.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Request Bodies",
+  "path": "fastapi/request_bodies.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Response Models",
+  "path": "fastapi/response_models.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "What FastAPI Is",
+  "path": "fastapi/what_is_fastapi.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Your First Endpoint",
+  "path": "fastapi/your_first_endpoint.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "ANN indexing: HNSW and IVF",
   "path": "gen_ai/ann_indexing_hnsw_and_ivf.html",
   "category": "Gen AI",

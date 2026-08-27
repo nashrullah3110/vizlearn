@@ -25,6 +25,7 @@ DIR_META = {
     "maths": ("Maths", "sigma"),
     "python": ("Python", "code"),
     "pydantic": ("Pydantic", "code"),
+    "fastapi": ("FastAPI", "code"),
     "interview": ("Interview", "interview"),
 }
 
