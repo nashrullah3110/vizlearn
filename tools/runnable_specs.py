@@ -27,6 +27,14 @@ SPECS = {
         "label": "Pydantic",
         "filename": "example_%02d.py",
     },
+    "interview": {
+        # Plain Python: no third-party imports anywhere in the track, so
+        # there is nothing to load and the first Run only waits for the
+        # interpreter.
+        "packages": "",
+        "label": "Python",
+        "filename": "%s",
+    },
     "fastapi": {
         "packages": "pydantic,ssl",
         "wheels": ",".join("../assets/wheels/" + w for w in [

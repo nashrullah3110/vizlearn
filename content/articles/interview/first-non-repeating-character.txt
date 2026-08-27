@@ -15,6 +15,59 @@ Return the index of the first character that appears exactly once. If there is n
 
 The naive approach checks each character against the whole string: O(n²). The expected solution is two passes and O(n).
 
+
+## Run it
+
+The two-pass version, then the same answer read straight out of the ordered dictionary, then the streaming variant that answers after every single character.
+
+```python-run
+# First non-repeating character: count, then find.
+from collections import Counter, deque
+
+def first_unique(s):
+    counts = Counter(s)                      # pass 1: nothing is decided here
+    for i, ch in enumerate(s):               # pass 2: order comes from the string
+        if counts[ch] == 1:
+            return i, ch
+    return -1, None
+
+
+def first_unique_via_dict(s):
+    """Same answer from the dictionary - insertion order is guaranteed >= 3.7."""
+    counts = Counter(s)
+    for ch, n in counts.items():
+        if n == 1:
+            return s.index(ch), ch
+    return -1, None
+
+
+for s in ("swiss", "aabbcc", "leetcode", "z"):
+    i, ch = first_unique(s)
+    j, ch2 = first_unique_via_dict(s)
+    agree = "" if (i, ch) == (j, ch2) else "   <-- DISAGREE"
+    print(f"{s!r:>10}: index {i:>2} {ch!r}{agree}")
+
+# --- the follow-up: a stream, answerable at any moment -----------------
+class Stream:
+    def __init__(self):
+        self.counts = Counter()
+        self.candidates = deque()
+
+    def add(self, ch):
+        self.counts[ch] += 1
+        self.candidates.append(ch)
+        # Drop from the front anything that is no longer unique.
+        while self.candidates and self.counts[self.candidates[0]] > 1:
+            self.candidates.popleft()
+        return self.candidates[0] if self.candidates else None
+
+
+print()
+stream = Stream()
+for ch in "swiss":
+    print(f"  after {ch!r}: first unique so far is {stream.add(ch)!r}")
+print("Each add is O(1) amortised - every character enters and leaves once.")
+```
 ## Two passes
 
 ```python

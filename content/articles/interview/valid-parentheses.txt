@@ -18,6 +18,61 @@ Given a string of brackets &mdash; `()`, `[]`, `{}` &mdash; determine whether th
 
 The fourth and fifth rows are what make this a stack problem rather than a counting problem, and they are the cases a weak solution gets wrong.
 
+
+## Run it
+
+The matcher with its stack printed at each step, run over inputs chosen so each of the three failure modes fires once, and a counter-based version that gets one of them wrong.
+
+```python-run
+# Balanced brackets: a stack, and the three ways it can fail.
+
+PAIRS = {")": "(", "]": "[", "}": "{"}
+
+def balanced(text, show=False):
+    stack = []
+    for ch in text:
+        if ch in "([{":
+            stack.append(ch)
+        elif ch in PAIRS:
+            if not stack:                       # failure 2: closer, nothing open
+                return False, "closer %r with an empty stack" % ch
+            if stack.pop() != PAIRS[ch]:        # failure 1: wrong opener
+                return False, "%r does not close what was open" % ch
+        if show:
+            print(f"  {ch}  stack={''.join(stack) or '-'}")
+    if stack:                                   # failure 3: never closed
+        return False, "%d opener(s) never closed" % len(stack)
+    return True, "balanced"
+
+
+print("{[()]}, step by step:")
+balanced("{[()]}", show=True)
+
+print()
+for text in ["{[()]}", "(]", ")(", "(((", "([)]", "", "()[]{}"]:
+    ok, why = balanced(text)
+    print(f"  {text!r:>10}: {str(ok):>5}  {why}")
+
+# --- why a counter is not enough ---------------------------------------
+def balanced_by_counting(text):
+    """Correct for ONE bracket type. Wrong the moment there are two."""
+    depth = 0
+    for ch in text:
+        if ch in "([{":
+            depth += 1
+        elif ch in PAIRS:
+            depth -= 1
+            if depth < 0:
+                return False
+    return depth == 0
+
+print()
+for text in ["([)]", "{[()]}", "(()"]:
+    print(f"  {text!r:>8}: stack={balanced(text)[0]!s:>5}  "
+          f"counter={balanced_by_counting(text)}")
+print("'([)]' has balanced counts and is not balanced. A counter cannot see")
+print("WHICH bracket is open, only how many.")
+```
 ## The solution
 
 ```python

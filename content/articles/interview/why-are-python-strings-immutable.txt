@@ -22,6 +22,61 @@ Four design reasons, and each has practical consequences.
 
 <strong>4. Thread safety.</strong> An immutable object needs no lock. Any number of threads can read a string concurrently with no coordination.
 
+
+## Run it
+
+Object identities before and after a "modification", then the cost of ignoring what that implies &mdash; measured at three sizes so the shape of the curve is visible rather than asserted.
+
+```python-run
+# Immutability, and the one place it costs you.
+import time
+
+s = "cat"
+t = s                       # a second NAME, not a second object
+print("s =", s, " id:", hex(id(s)))
+print("t =", t, " id:", hex(id(t)), " same object:", t is s)
+
+u = s.upper()               # a NEW object; s is untouched
+print("u =", u, " id:", hex(id(u)), " same object:", u is s)
+print("s is still:", s)
+
+try:
+    s[0] = "C"
+except TypeError as e:
+    print("s[0] = 'C' ->", e)
+
+# Hashability is the payoff: the value cannot change, so the hash cannot
+# go stale, so a string can be a dictionary key.
+print("hash stable:", hash("cat") == hash(s))
+try:
+    {["c", "a", "t"]: 1}
+except TypeError as e:
+    print("list as a key ->", e)
+
+# --- the cost, measured -------------------------------------------------
+class Buf:                  # an attribute, so CPython's in-place resize
+    def __init__(self):     # special case cannot fire and hide the cost
+        self.text = ""
+
+print()
+print(f"{'n':>7} {'+= in a loop':>14} {'list + join':>13} {'ratio':>7}")
+for n in (20_000, 40_000, 80_000):
+    b = Buf()
+    start = time.perf_counter()
+    for _ in range(n):
+        b.text += "x"
+    concat = time.perf_counter() - start
+
+    start = time.perf_counter()
+    parts = []
+    for _ in range(n):
+        parts.append("x")
+    joined_text = "".join(parts)
+    joined = time.perf_counter() - start
+    print(f"{n:>7} {concat:>13.4f}s {joined:>12.4f}s {concat / joined:>6.1f}x")
+
+print("Double n: join doubles, += quadruples. That is O(n) against O(n^2).")
+```
 ## The performance consequence
 
 The one real cost is building strings incrementally:

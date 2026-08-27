@@ -245,7 +245,7 @@ grid[0][0] = 1
 grid        # [[1, 0, 0], [1, 0, 0], [1, 0, 0]]</code></pre><p>One assignment changed all three rows. The reason is that <code>* 3</code> on a list <strong>copies references, not objects</strong> &mdash; so <code>grid</code> holds three pointers to the <em>same</em> inner list.</p><pre><code class="language-python">grid = [[0] * 3] * 3
 grid[0] is grid[1]        # True -- the same object
 id(grid[0]) == id(grid[1])  # True</code></pre><p>The inner <code>[0] * 3</code> is fine, because integers are immutable &mdash; there is nothing to share dangerously. The outer <code>* 3</code> is the problem, because a list is mutable and now has three names.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-the-fix">The fix</a></li><li><a href="#vz-s-the-same-mistake-other-costumes">The same mistake, other costumes</a></li><li><a href="#vz-s-what-multiplication-actually-does">What multiplication actually does</a></li><li><a href="#vz-s-the-same-idea-three-ways">The same idea, three ways</a></li><li><a href="#vz-s-how-to-spot-it-in-review">How to spot it in review</a></li><li><a href="#vz-s-copy-semantics-precisely">Copy semantics, precisely</a></li><li><a href="#vz-s-how-to-detect-it">How to detect it</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-run-it">Run it</a></li><li><a href="#vz-s-the-fix">The fix</a></li><li><a href="#vz-s-the-same-mistake-other-costumes">The same mistake, other costumes</a></li><li><a href="#vz-s-what-multiplication-actually-does">What multiplication actually does</a></li><li><a href="#vz-s-the-same-idea-three-ways">The same idea, three ways</a></li><li><a href="#vz-s-how-to-spot-it-in-review">How to spot it in review</a></li><li><a href="#vz-s-copy-semantics-precisely">Copy semantics, precisely</a></li><li><a href="#vz-s-how-to-detect-it">How to detect it</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
             <div class="vz-iq-tags"><span class="vz-iq-tag">Lists &amp; arrays</span><span class="vz-iq-tag">Conceptual</span><span class="vz-iq-tag">Medium</span></div>
         </div>
 
@@ -291,6 +291,60 @@ id(grid[0]) == id(grid[1])  # True</code></pre><p>The inner <code>[0] * 3</code>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-run-it">Run it</h3>
+                    <p>The broken grid and the correct one side by side with their row identities printed, then the three levels of copying, then the mutable-default-argument bug that has the same cause.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src"># Multiplying a list repeats the REFERENCE, not the object.
+import copy
+
+wrong = [[0] * 3] * 3
+right = [[0] * 3 for _ in range(3)]
+
+print("wrong row ids:", [hex(id(row)) for row in wrong])
+print("right row ids:", [hex(id(row)) for row in right])
+
+wrong[0][0] = 9
+right[0][0] = 9
+print()
+print("wrong after grid[0][0] = 9:", wrong, "  <- all three rows")
+print("right after grid[0][0] = 9:", right)
+
+# --- assignment, shallow copy, deep copy -------------------------------
+original = [[1, 2], [3, 4]]
+same = original                      # another NAME for the same list
+shallow = original[:]                # new outer list, SAME inner lists
+deep = copy.deepcopy(original)       # new objects all the way down
+
+original[0][0] = 99
+print()
+print("original:", original)
+print("same    :", same,    " (is original:", same is original, ")")
+print("shallow :", shallow, " <- the nested list was shared")
+print("deep    :", deep,    " <- fully independent")
+
+original.append([5, 6])
+print()
+print("after appending to original:")
+print("  shallow:", shallow, "<- the OUTER list was genuinely copied")
+
+# --- the same cause, wearing a different hat ---------------------------
+def broken(item, accumulated=[]):     # evaluated ONCE, at definition time
+    accumulated.append(item)
+    return accumulated
+
+
+def fixed(item, accumulated=None):
+    if accumulated is None:           # a fresh list per call
+        accumulated = []
+    accumulated.append(item)
+    return accumulated
+
+
+print()
+print("broken('a'):", broken("a"))
+print("broken('b'):", broken("b"), "<- 'a' is still there")
+print("fixed('a') :", fixed("a"))
+print("fixed('b') :", fixed("b"))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>1</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-the-fix">The fix</h3>
                     <pre><code class="language-python">grid = [[0] * 3 for _ in range(3)]      # a fresh list per row
@@ -364,57 +418,7 @@ len({id(row) for row in grid})  # 1 means every row is the same object</code></p
         </div>
     </section>
 
-<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">Run it in Python</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The broken grid and the correct one side by side with their row identities printed, then the three levels of copying, then the mutable-default-argument bug that has the same cause.</p><div class="vz-cl-grid"><div class="vz-py" data-vz-py><script type="text/plain" class="py-src"># Multiplying a list repeats the REFERENCE, not the object.
-import copy
-
-wrong = [[0] * 3] * 3
-right = [[0] * 3 for _ in range(3)]
-
-print("wrong row ids:", [hex(id(row)) for row in wrong])
-print("right row ids:", [hex(id(row)) for row in right])
-
-wrong[0][0] = 9
-right[0][0] = 9
-print()
-print("wrong after grid[0][0] = 9:", wrong, "  <- all three rows")
-print("right after grid[0][0] = 9:", right)
-
-# --- assignment, shallow copy, deep copy -------------------------------
-original = [[1, 2], [3, 4]]
-same = original                      # another NAME for the same list
-shallow = original[:]                # new outer list, SAME inner lists
-deep = copy.deepcopy(original)       # new objects all the way down
-
-original[0][0] = 99
-print()
-print("original:", original)
-print("same    :", same,    " (is original:", same is original, ")")
-print("shallow :", shallow, " <- the nested list was shared")
-print("deep    :", deep,    " <- fully independent")
-
-original.append([5, 6])
-print()
-print("after appending to original:")
-print("  shallow:", shallow, "<- the OUTER list was genuinely copied")
-
-# --- the same cause, wearing a different hat ---------------------------
-def broken(item, accumulated=[]):     # evaluated ONCE, at definition time
-    accumulated.append(item)
-    return accumulated
-
-
-def fixed(item, accumulated=None):
-    if accumulated is None:           # a fresh list per call
-        accumulated = []
-    accumulated.append(item)
-    return accumulated
-
-
-print()
-print("broken('a'):", broken("a"))
-print("broken('b'):", broken("b"), "<- 'a' is still there")
-print("fixed('a') :", fixed("a"))
-print("fixed('b') :", fixed("b"))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>aliasing.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">[hex(id(row)) for row in wrong]</code><span class="vz-cl-note">Three identical addresses. That single line is the whole explanation, and it is worth printing in an interview rather than describing.</span></li><li class="vz-cl-step"><code class="vz-cl-line">[[0] * 3 for _ in range(3)]</code><span class="vz-cl-note">The comprehension evaluates <code>[0] * 3</code> once per iteration, so each row is a separate object. <code>[0] * 3</code> itself is safe because integers cannot be mutated.</span></li><li class="vz-cl-step"><code class="vz-cl-line">shallow = original[:]</code><span class="vz-cl-note">A new outer list holding the <em>same</em> inner references. Appending to <code>original</code> does not affect it; mutating a nested list does. Both behaviours are shown.</span></li><li class="vz-cl-step"><code class="vz-cl-line">def broken(item, accumulated=[])</code><span class="vz-cl-note">The default is evaluated once, when the function is defined, so every call that omits the argument shares one list. Same cause: a mutable object created once and referenced many times.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Build the grid with <code>[[0] * 3] * 3</code> and only ever read from it. It looks completely correct &mdash; the bug needs a write.</li><li>Replace <code>deepcopy</code> with <code>copy.copy</code> and re-run. The nested mutation reappears, which is the difference between the two in one line.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">How the code works</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The broken grid and the correct one side by side with their row identities printed, then the three levels of copying, then the mutable-default-argument bug that has the same cause.</p><div class="vz-cl-grid"><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">[hex(id(row)) for row in wrong]</code><span class="vz-cl-note">Three identical addresses. That single line is the whole explanation, and it is worth printing in an interview rather than describing.</span></li><li class="vz-cl-step"><code class="vz-cl-line">[[0] * 3 for _ in range(3)]</code><span class="vz-cl-note">The comprehension evaluates <code>[0] * 3</code> once per iteration, so each row is a separate object. <code>[0] * 3</code> itself is safe because integers cannot be mutated.</span></li><li class="vz-cl-step"><code class="vz-cl-line">shallow = original[:]</code><span class="vz-cl-note">A new outer list holding the <em>same</em> inner references. Appending to <code>original</code> does not affect it; mutating a nested list does. Both behaviours are shown.</span></li><li class="vz-cl-step"><code class="vz-cl-line">def broken(item, accumulated=[])</code><span class="vz-cl-note">The default is evaluated once, when the function is defined, so every call that omits the argument shares one list. Same cause: a mutable object created once and referenced many times.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Build the grid with <code>[[0] * 3] * 3</code> and only ever read from it. It looks completely correct &mdash; the bug needs a write.</li><li>Replace <code>deepcopy</code> with <code>copy.copy</code> and re-run. The nested mutation reappears, which is the difference between the two in one line.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 
     <script>
         (function () {

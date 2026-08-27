@@ -33,6 +33,74 @@ All four are O(n). `Counter` is idiomatic, C-optimised for iterables, and comes 
 
 `defaultdict(int)` is right when counting happens as part of a larger loop that does other work. `dict.get` is right when you want a plain `dict` in the output &mdash; `Counter` and `defaultdict` are dict subclasses and mostly interchangeable, and they are not identical.
 
+
+## Run it
+
+The four idioms producing identical counts, the <code>defaultdict</code> read trap caught in the act, and top-k timed three ways on a large input.
+
+```python-run
+# Counting: four spellings of one loop, then top-k without sorting.
+from collections import Counter, defaultdict
+import heapq, random, time
+
+words = "the quick brown fox jumps over the lazy dog the fox".split()
+
+by_get = {}
+for w in words:
+    by_get[w] = by_get.get(w, 0) + 1
+
+by_setdefault = {}
+for w in words:
+    by_setdefault.setdefault(w, 0)
+    by_setdefault[w] += 1
+
+by_default = defaultdict(int)
+for w in words:
+    by_default[w] += 1
+
+by_counter = Counter(words)
+
+print("all four agree:",
+      by_get == by_setdefault == dict(by_default) == dict(by_counter))
+print("counts:", dict(sorted(by_counter.items(), key=lambda kv: -kv[1])))
+
+# --- the defaultdict read trap -----------------------------------------
+d = defaultdict(int)
+d["seen"] += 1
+print()
+print("before reading a missing key:", dict(d))
+if d["never_added"] > 5:              # a READ that inserts
+    pass
+print("after  reading a missing key:", dict(d), "<- it was created")
+
+c = Counter()
+c["seen"] += 1
+_ = c["never_added"]                  # a read that does NOT insert
+print("Counter after the same read :", dict(c))
+
+# --- top-k: sorting versus a heap --------------------------------------
+random.seed(7)
+big = [random.randint(0, 50_000) for _ in range(300_000)]
+counts = Counter(big)
+k = 10
+print()
+print(f"{len(big):,} items, {len(counts):,} distinct, k = {k}")
+
+start = time.perf_counter()
+by_sorting = sorted(counts.items(), key=lambda kv: -kv[1])[:k]
+sort_time = time.perf_counter() - start
+
+start = time.perf_counter()
+by_heap = heapq.nlargest(k, counts.items(), key=lambda kv: kv[1])
+heap_time = time.perf_counter() - start
+
+print(f"  sort everything : {sort_time:.4f}s   O(m log m)")
+print(f"  heap of size k  : {heap_time:.4f}s   O(m log k)")
+print(f"  same answer     : {[v for _, v in by_sorting] == [v for _, v in by_heap]}")
+print()
+print("At m = 50,000 the gap is small. At a billion distinct keys it is the")
+print("difference between a job that finishes and one that does not.")
+```
 ## What Counter adds
 
 ```python

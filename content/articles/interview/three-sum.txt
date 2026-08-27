@@ -11,6 +11,95 @@ Two words carry the difficulty. <strong>All</strong> means the answer is a list,
 
 The brute force is three nested loops: O(n³). The expected solution is O(n²).
 
+
+## Run it
+
+The two-pointer version against brute force with both operation counts, and the deduplication removed so you can see the duplicate triples it produces.
+
+```python-run
+# 3Sum: sort, fix one, two-pointer the rest.
+
+def three_sum(values):
+    values = sorted(values)
+    out, ops = [], 0
+    for i in range(len(values) - 2):
+        if values[i] > 0:
+            break                              # smallest triple already positive
+        if i and values[i] == values[i - 1]:
+            continue                           # skip a repeated fixed value
+        lo, hi = i + 1, len(values) - 1
+        while lo < hi:
+            ops += 1
+            total = values[i] + values[lo] + values[hi]
+            if total < 0:
+                lo += 1
+            elif total > 0:
+                hi -= 1
+            else:
+                out.append((values[i], values[lo], values[hi]))
+                lo, hi = lo + 1, hi - 1
+                while lo < hi and values[lo] == values[lo - 1]:
+                    lo += 1                    # and skip repeated pointer values
+                while lo < hi and values[hi] == values[hi + 1]:
+                    hi -= 1
+    return out, ops
+
+
+def no_dedup(values):
+    """The same scan without any of the skips."""
+    values = sorted(values)
+    out = []
+    for i in range(len(values) - 2):
+        lo, hi = i + 1, len(values) - 1
+        while lo < hi:
+            total = values[i] + values[lo] + values[hi]
+            if total < 0:
+                lo += 1
+            elif total > 0:
+                hi -= 1
+            else:
+                out.append((values[i], values[lo], values[hi]))
+                lo, hi = lo + 1, hi - 1
+    return out
+
+
+def brute_force(values):
+    out, ops = set(), 0
+    n = len(values)
+    for i in range(n):
+        for j in range(i + 1, n):
+            for k in range(j + 1, n):
+                ops += 1
+                if values[i] + values[j] + values[k] == 0:
+                    out.add(tuple(sorted((values[i], values[j], values[k]))))
+    return sorted(out), ops
+
+
+data = [-1, 0, 1, 2, -1, -4]
+triples, ops = three_sum(data)
+brute, brute_ops = brute_force(data)
+print("input :", data)
+print("triples:", triples, f"({ops} pointer steps)")
+print("brute  :", brute, f"({brute_ops} triples examined)")
+print("agree  :", sorted(triples) == brute)
+
+print()
+dupes = [-2, 0, 0, 2, 2, -2, 0]
+print("input with repeats :", dupes)
+print("with dedup         :", three_sum(dupes)[0])
+print("without dedup      :", no_dedup(dupes))
+print("The same triple comes out several times once the skips are gone.")
+
+# --- how the two costs diverge -----------------------------------------
+print()
+import random
+random.seed(4)
+for n in (60, 120, 240):
+    sample = [random.randint(-50, 50) for _ in range(n)]
+    _, fast_ops = three_sum(sample)
+    _, slow_ops = brute_force(sample)
+    print(f"  n={n:>3}: two pointers {fast_ops:>6,} steps   brute force {slow_ops:>9,}")
+```
 ## Sort, then fix one and two-pointer the rest
 
 ```python

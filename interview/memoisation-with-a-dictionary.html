@@ -245,7 +245,7 @@
 @lru_cache(maxsize=None)
 def fib(n):
     return n if n &lt; 2 else fib(n-1) + fib(n-2)</code></pre><p>O(n), and <code>fib(40)</code> returns instantly. One decorator.</p><div class="vz-table-wrap"><table><thead><tr><th>n</th><th>Naive calls</th><th>Memoised calls</th></tr></thead><tbody><tr><td>10</td><td>177</td><td>11</td></tr><tr><td>20</td><td>21,891</td><td>21</td></tr><tr><td>40</td><td>331,160,281</td><td>41</td></tr></tbody></table></div>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-the-manual-version-and-why-to-know-it">The manual version, and why to know it</a></li><li><a href="#vz-s-when-memoisation-applies">When memoisation applies</a></li><li><a href="#vz-s-why-it-works-at-all">Why it works at all</a></li><li><a href="#vz-s-the-two-conditions">The two conditions</a></li><li><a href="#vz-s-what-lru-cache-adds">What lru_cache adds</a></li><li><a href="#vz-s-lru-cache-in-practice">lru_cache in practice</a></li><li><a href="#vz-s-memoisation-against-tabulation">Memoisation against tabulation</a></li><li><a href="#vz-s-where-it-is-used-beyond-interviews">Where it is used beyond interviews</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-run-it">Run it</a></li><li><a href="#vz-s-the-manual-version-and-why-to-know-it">The manual version, and why to know it</a></li><li><a href="#vz-s-when-memoisation-applies">When memoisation applies</a></li><li><a href="#vz-s-why-it-works-at-all">Why it works at all</a></li><li><a href="#vz-s-the-two-conditions">The two conditions</a></li><li><a href="#vz-s-what-lru-cache-adds">What lru_cache adds</a></li><li><a href="#vz-s-lru-cache-in-practice">lru_cache in practice</a></li><li><a href="#vz-s-memoisation-against-tabulation">Memoisation against tabulation</a></li><li><a href="#vz-s-where-it-is-used-beyond-interviews">Where it is used beyond interviews</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
             <div class="vz-iq-tags"><span class="vz-iq-tag">Dicts, sets &amp; hashing</span><span class="vz-iq-tag">Coding problem</span><span class="vz-iq-tag">Medium</span></div>
         </div>
 
@@ -291,6 +291,74 @@ def fib(n):
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-run-it">Run it</h3>
+                    <p>The same recurrence three ways with call counts, then <code>cache_info()</code> showing the hit rate, then the two conditions broken on purpose &mdash; an impure function and an unhashable argument.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src"># Memoisation: a dictionary in front of a function.
+from functools import lru_cache
+import time
+
+calls = {"plain": 0, "manual": 0}
+
+def fib_plain(n):
+    calls["plain"] += 1
+    return n if n < 2 else fib_plain(n - 1) + fib_plain(n - 2)
+
+
+cache = {}
+def fib_manual(n):
+    calls["manual"] += 1
+    if n in cache:
+        return cache[n]                      # the whole optimisation
+    cache[n] = n if n < 2 else fib_manual(n - 1) + fib_manual(n - 2)
+    return cache[n]
+
+
+@lru_cache(maxsize=None)                     # the same thing, shipped
+def fib_cached(n):
+    return n if n < 2 else fib_cached(n - 1) + fib_cached(n - 2)
+
+
+for n in (10, 20, 28):
+    calls["plain"] = calls["manual"] = 0
+    cache.clear()
+    start = time.perf_counter()
+    fib_plain(n)
+    plain_time = time.perf_counter() - start
+    fib_manual(n)
+    print(f"fib({n:>2}): no cache {calls['plain']:>7,} calls ({plain_time:.3f}s)"
+          f"   memoised {calls['manual']:>3} calls")
+
+fib_cached.cache_clear()
+fib_cached(60)
+print()
+print("lru_cache after fib(60):", fib_cached.cache_info())
+print("fib(60) =", fib_cached(60), "- instant, and unreachable without a cache")
+
+# --- condition 1: the function must be pure ----------------------------
+counter = {"n": 0}
+
+@lru_cache(maxsize=None)
+def impure():
+    counter["n"] += 1
+    return counter["n"]
+
+print()
+print("impure() three times:", impure(), impure(), impure())
+print("It ran once and returned the same stale answer twice.")
+
+# --- condition 2: arguments must be hashable ---------------------------
+@lru_cache(maxsize=None)
+def total(numbers):
+    return sum(numbers)
+
+print()
+print("total((1, 2, 3)) ->", total((1, 2, 3)))
+try:
+    total([1, 2, 3])
+except TypeError as e:
+    print("total([1, 2, 3]) ->", e)
+print("Arguments become dict keys, so they have to be hashable.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>1</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-the-manual-version-and-why-to-know-it">The manual version, and why to know it</h3>
                     <pre><code class="language-python">def fib_manual(n, memo=None):
@@ -352,71 +420,7 @@ expensive.cache_clear()</code></pre><p><code>cache_info()</code> is the practica
         </div>
     </section>
 
-<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">Run it in Python</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The same recurrence three ways with call counts, then <code>cache_info()</code> showing the hit rate, then the two conditions broken on purpose &mdash; an impure function and an unhashable argument.</p><div class="vz-cl-grid"><div class="vz-py" data-vz-py><script type="text/plain" class="py-src"># Memoisation: a dictionary in front of a function.
-from functools import lru_cache
-import time
-
-calls = {"plain": 0, "manual": 0}
-
-def fib_plain(n):
-    calls["plain"] += 1
-    return n if n < 2 else fib_plain(n - 1) + fib_plain(n - 2)
-
-
-cache = {}
-def fib_manual(n):
-    calls["manual"] += 1
-    if n in cache:
-        return cache[n]                      # the whole optimisation
-    cache[n] = n if n < 2 else fib_manual(n - 1) + fib_manual(n - 2)
-    return cache[n]
-
-
-@lru_cache(maxsize=None)                     # the same thing, shipped
-def fib_cached(n):
-    return n if n < 2 else fib_cached(n - 1) + fib_cached(n - 2)
-
-
-for n in (10, 20, 28):
-    calls["plain"] = calls["manual"] = 0
-    cache.clear()
-    start = time.time()
-    fib_plain(n)
-    plain_time = time.time() - start
-    fib_manual(n)
-    print(f"fib({n:>2}): no cache {calls['plain']:>7,} calls ({plain_time:.3f}s)"
-          f"   memoised {calls['manual']:>3} calls")
-
-fib_cached.cache_clear()
-fib_cached(60)
-print()
-print("lru_cache after fib(60):", fib_cached.cache_info())
-print("fib(60) =", fib_cached(60), "- instant, and unreachable without a cache")
-
-# --- condition 1: the function must be pure ----------------------------
-counter = {"n": 0}
-
-@lru_cache(maxsize=None)
-def impure():
-    counter["n"] += 1
-    return counter["n"]
-
-print()
-print("impure() three times:", impure(), impure(), impure())
-print("It ran once and returned the same stale answer twice.")
-
-# --- condition 2: arguments must be hashable ---------------------------
-@lru_cache(maxsize=None)
-def total(numbers):
-    return sum(numbers)
-
-print()
-print("total((1, 2, 3)) ->", total((1, 2, 3)))
-try:
-    total([1, 2, 3])
-except TypeError as e:
-    print("total([1, 2, 3]) ->", e)
-print("Arguments become dict keys, so they have to be hashable.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>memoisation.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">if n in cache: return cache[n]</code><span class="vz-cl-note">The entire optimisation. The recurrence below it is untouched &mdash; memoisation does not make calls faster, it removes the repeated ones.</span></li><li class="vz-cl-step"><code class="vz-cl-line">@lru_cache(maxsize=None)</code><span class="vz-cl-note">Unbounded, which is what a recursion wants. A finite size evicts least-recently-used entries and is what you want when the key space is large enough to be a leak.</span></li><li class="vz-cl-step"><code class="vz-cl-line">impure()</code><span class="vz-cl-note">Cached once and stale forever. The failure looks like wrong data rather than a wrong cache, which is why purity is stated as a precondition rather than a nicety.</span></li><li class="vz-cl-step"><code class="vz-cl-line">total([1, 2, 3])</code><span class="vz-cl-note">A <code>TypeError</code>: arguments become dictionary keys. That is why cached functions so often take tuples &mdash; the constraint comes from the cache, not the algorithm.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Call <code>fib_plain(35)</code>. It is the same recurrence and it stops being a demonstration and starts being a wait.</li><li>Set <code>maxsize=2</code> on <code>fib_cached</code> and check <code>cache_info()</code>. Eviction destroys the benefit for a recursion that revisits old values.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">How the code works</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The same recurrence three ways with call counts, then <code>cache_info()</code> showing the hit rate, then the two conditions broken on purpose &mdash; an impure function and an unhashable argument.</p><div class="vz-cl-grid"><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">if n in cache: return cache[n]</code><span class="vz-cl-note">The entire optimisation. The recurrence below it is untouched &mdash; memoisation does not make calls faster, it removes the repeated ones.</span></li><li class="vz-cl-step"><code class="vz-cl-line">@lru_cache(maxsize=None)</code><span class="vz-cl-note">Unbounded, which is what a recursion wants. A finite size evicts least-recently-used entries and is what you want when the key space is large enough to be a leak.</span></li><li class="vz-cl-step"><code class="vz-cl-line">impure()</code><span class="vz-cl-note">Cached once and stale forever. The failure looks like wrong data rather than a wrong cache, which is why purity is stated as a precondition rather than a nicety.</span></li><li class="vz-cl-step"><code class="vz-cl-line">total([1, 2, 3])</code><span class="vz-cl-note">A <code>TypeError</code>: arguments become dictionary keys. That is why cached functions so often take tuples &mdash; the constraint comes from the cache, not the algorithm.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Call <code>fib_plain(35)</code>. It is the same recurrence and it stops being a demonstration and starts being a wait.</li><li>Set <code>maxsize=2</code> on <code>fib_cached</code> and check <code>cache_info()</code>. Eviction destroys the benefit for a recursion that revisits old values.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 
     <script>
         (function () {

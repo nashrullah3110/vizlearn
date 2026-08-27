@@ -20,6 +20,106 @@ Three details to pin down before writing anything:
 
 The brute force checks every substring: O(n²) substrings, each validated in O(m), so O(n²m). The answer is a sliding window in O(n + m).
 
+
+## Run it
+
+The window with each valid state printed, its operation count against a brute force over every substring, and the <code>&gt;=</code> variant of the counter update getting a duplicate case wrong.
+
+```python-run
+# Minimum window substring: grow right, shrink left, count what is missing.
+from collections import Counter
+
+def min_window(s, t, show=False):
+    if not s or not t or len(t) > len(s):
+        return "", 0
+    need = Counter(t)
+    have = {}
+    missing = len(need)                     # distinct chars not yet satisfied
+    lo = 0
+    best = (0, -1)                          # a sentinel shorter than any window
+    ops = 0
+
+    for hi, ch in enumerate(s):
+        ops += 1
+        if ch in need:
+            have[ch] = have.get(ch, 0) + 1
+            if have[ch] == need[ch]:        # == , not >= : only on crossing
+                missing -= 1
+
+        while missing == 0:                 # valid: record, then shrink
+            if best[1] < best[0] or hi - lo < best[1] - best[0]:
+                best = (lo, hi)
+            if show:
+                print(f"    valid window {s[lo:hi+1]!r}")
+            out_ch = s[lo]
+            if out_ch in need:
+                have[out_ch] -= 1
+                if have[out_ch] < need[out_ch]:
+                    missing += 1
+            lo += 1
+            ops += 1
+
+    return (s[best[0]:best[1] + 1] if best[1] >= best[0] else ""), ops
+
+
+def brute_force(s, t):
+    need = Counter(t)
+    best, ops = "", 0
+    for i in range(len(s)):
+        for j in range(i, len(s)):
+            ops += 1
+            window = s[i:j + 1]
+            if not (need - Counter(window)):
+                if not best or len(window) < len(best):
+                    best = window
+                break
+    return best, ops
+
+
+s, t = "ADOBECODEBANC", "ABC"
+print(f"s = {s!r}, t = {t!r}")
+answer, ops = min_window(s, t, show=True)
+brute, brute_ops = brute_force(s, t)
+print(f"  window: {answer!r}   ({ops} operations)")
+print(f"  brute : {brute!r}   ({brute_ops} substrings examined)")
+
+# --- duplicates in t ---------------------------------------------------
+print()
+for s2, t2 in [("AAABC", "AABC"), ("ADOBECODEBANC", "ABC"),
+               ("a", "aa"), ("", "a"), ("abc", "")]:
+    got = min_window(s2, t2)[0]
+    want = brute_force(s2, t2)[0] if s2 and t2 else ""
+    print(f"  s={s2!r:>16} t={t2!r:>6} -> {got!r:>8}  (brute force: {want!r})")
+
+# --- the counter update that looks equivalent and is not ---------------
+def min_window_ge(s, t):
+    need = Counter(t)
+    have = {}
+    missing = len(need)
+    lo, best = 0, (0, -1)
+    for hi, ch in enumerate(s):
+        if ch in need:
+            have[ch] = have.get(ch, 0) + 1
+            if have[ch] >= need[ch]:        # >= fires on every surplus copy
+                missing -= 1
+        while missing == 0:
+            if best[1] < best[0] or hi - lo < best[1] - best[0]:
+                best = (lo, hi)
+            out_ch = s[lo]
+            if out_ch in need:
+                have[out_ch] -= 1
+                if have[out_ch] < need[out_ch]:
+                    missing += 1
+            lo += 1
+    return s[best[0]:best[1] + 1] if best[1] >= best[0] else ""
+
+print()
+sample = "AAABC"
+print(f"s={sample!r} t='AABC':  with == -> {min_window(sample, 'AABC')[0]!r}"
+      f"   with >= -> {min_window_ge(sample, 'AABC')!r}")
+print("A surplus 'A' decrements the counter again, so the window is declared")
+print("valid before it actually is.")
+```
 ## The shape of the solution
 
 Expand the window's right edge until it is <em>valid</em> &mdash; contains everything needed. Then contract the left edge as far as possible while it stays valid, recording the best window seen. Repeat.

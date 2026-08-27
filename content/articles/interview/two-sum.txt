@@ -15,6 +15,84 @@ There are two versions, and interviewers use both:
 
 Knowing which applies is the first thing to establish, and asking "is the array sorted?" is a legitimate and expected clarifying question.
 
+
+## Run it
+
+All three approaches with their operation counts, then the self-pairing bug demonstrated by moving one line, and finally a size where the quadratic version stops being viable.
+
+```python-run
+# Two Sum: turn "search for a partner" into "look up a complement".
+import time
+
+def brute_force(values, target):
+    checks = 0
+    for i in range(len(values)):
+        for j in range(i + 1, len(values)):
+            checks += 1
+            if values[i] + values[j] == target:
+                return (i, j), checks
+    return None, checks
+
+
+def one_pass(values, target):
+    seen = {}                                  # value -> index
+    checks = 0
+    for i, v in enumerate(values):
+        checks += 1
+        if target - v in seen:                 # CHECK before you store
+            return (seen[target - v], i), checks
+        seen[v] = i
+    return None, checks
+
+
+def two_pointers(sorted_values, target):
+    """O(1) space - but only valid if the input is sorted."""
+    lo, hi, checks = 0, len(sorted_values) - 1, 0
+    while lo < hi:
+        checks += 1
+        total = sorted_values[lo] + sorted_values[hi]
+        if total == target:
+            return (lo, hi), checks
+        if total < target:
+            lo += 1
+        else:
+            hi -= 1
+    return None, checks
+
+
+values, target = [2, 7, 11, 15, 3], 18
+print("values:", values, " target:", target)
+for name, fn in (("brute force", brute_force), ("one pass  ", one_pass)):
+    pair, checks = fn(values, target)
+    print(f"  {name}: {pair}  ({checks} checks)")
+
+pair, checks = two_pointers(sorted(values), target)
+print(f"  two pointers (on the SORTED copy): {pair}  ({checks} checks)")
+print("  note the indices refer to the sorted list, not the original")
+
+# --- the ordering bug --------------------------------------------------
+def store_first(values, target):
+    seen = {}
+    for i, v in enumerate(values):
+        seen[v] = i                            # stored BEFORE the check
+        if target - v in seen:
+            return (seen[target - v], i)
+    return None
+
+print()
+print("[3] with target 6:")
+print("  check first:", one_pass([3], 6)[0], "  <- correct: no pair exists")
+print("  store first:", store_first([3], 6), "  <- WRONG: 3 paired with itself")
+
+# --- where the quadratic stops being viable ----------------------------
+big = list(range(1_800))
+print()
+for name, fn in (("brute force", brute_force), ("one pass", one_pass)):
+    start = time.perf_counter()
+    _, checks = fn(big, 3_597)                 # a pair near the very end
+    print(f"  {name:>11} on {len(big):,} items: {checks:>12,} checks "
+          f"in {time.perf_counter() - start:.3f}s")
+```
 ## The brute force, and why to mention it
 
 ```python

@@ -206,7 +206,11 @@ def page(q, track_key, directory, group_label=""):
         "tags": tags(q, group_label),
         "visual": visual(q),
         "article": article(q),
-        "code": codelab.section(q["code"], PREFIX, q["code"]["intro"]),
+        # The program itself is in the article now; this keeps the
+        # walkthrough and the edits to try, which sit alongside it.
+        "code": codelab.section(q["code"], PREFIX, q["code"]["intro"],
+                                heading="How the code works",
+                                include_editor=False),
     }
 
     # `iso` is read here rather than left to build_seo so a page that has not

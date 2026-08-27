@@ -15,6 +15,78 @@ Water at a position is held by the shorter of the two walls surrounding it, and 
 
 Getting that formula stated is 80% of the problem. Everything after it is about computing the two maxima efficiently.
 
+
+## Run it
+
+The two-pointer sweep against the precomputed-arrays version and a brute force, with the extra memory each one uses printed &mdash; all three agreeing on every test.
+
+```python-run
+# Trapping rain water: the shorter side is always the binding constraint.
+
+def brute_force(heights):
+    """For each bar, scan both ways for the tallest. O(n^2)."""
+    total = 0
+    for i in range(len(heights)):
+        left = max(heights[:i + 1])
+        right = max(heights[i:])
+        total += min(left, right) - heights[i]
+    return total
+
+
+def with_arrays(heights):
+    """Precompute both running maxima. O(n) time, O(n) space."""
+    n = len(heights)
+    if not n:
+        return 0, 0
+    left = [0] * n
+    right = [0] * n
+    left[0] = heights[0]
+    for i in range(1, n):
+        left[i] = max(left[i - 1], heights[i])
+    right[-1] = heights[-1]
+    for i in range(n - 2, -1, -1):
+        right[i] = max(right[i + 1], heights[i])
+    total = sum(min(left[i], right[i]) - heights[i] for i in range(n))
+    return total, 2 * n                       # extra values stored
+
+
+def two_pointers(heights):
+    """O(n) time, O(1) space. Move whichever side is shorter."""
+    lo, hi = 0, len(heights) - 1
+    left_max = right_max = total = 0
+    while lo < hi:
+        if heights[lo] < heights[hi]:
+            # The left is the smaller wall, so left_max alone decides this bar.
+            left_max = max(left_max, heights[lo])
+            total += left_max - heights[lo]
+            lo += 1
+        else:
+            right_max = max(right_max, heights[hi])
+            total += right_max - heights[hi]
+            hi -= 1
+    return total, 2                            # two running maxima
+
+
+data = [0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1]
+print("heights:", data)
+print()
+brute = brute_force(data)
+arrays, arr_mem = with_arrays(data)
+pointers, ptr_mem = two_pointers(data)
+print(f"  brute force  : {brute:>2}   O(n^2) time")
+print(f"  two arrays   : {arrays:>2}   O(n) time, {arr_mem} extra values stored")
+print(f"  two pointers : {pointers:>2}   O(n) time, {ptr_mem} extra values stored")
+print("  all agree    :", brute == arrays == pointers)
+
+print()
+for sample in ([4, 2, 0, 3, 2, 5], [3, 3, 3], [5], [], [2, 1]):
+    if not sample:
+        print(f"  {str(sample):>18}: 0 (empty)")
+        continue
+    print(f"  {str(sample):>18}: {two_pointers(sample)[0]}")
+print()
+print("A flat or descending profile traps nothing - there is no wall to hold it.")
+```
 ## The brute force, then the fix
 
 Scanning left and right from every position is O(n²):

@@ -18,6 +18,57 @@ intro: What is the complexity of `x in my_list`, and how do you make it faster?
 
 The list has no structure relating a value to a position, so there is nothing to exploit &mdash; it must look at everything.
 
+
+## Run it
+
+The same membership tests against a list and a set at two sizes, then the loop that turns the difference from a curiosity into a quadratic.
+
+```python-run
+# `in` on a list scans. `in` on a set computes. That is the whole story.
+import time
+
+for n in (50_000, 500_000):
+    as_list = list(range(n))
+    as_set = set(as_list)
+    probes = [0, n // 2, n - 1, -1]        # first, middle, last, missing
+
+    print(f"n = {n:,}")
+    for label, container in (("list", as_list), ("set ", as_set)):
+        start = time.perf_counter()
+        for _ in range(5):
+            for p in probes:
+                p in container
+        print(f"  {label}: {time.perf_counter() - start:.4f}s")
+
+# --- where it actually bites -------------------------------------------
+haystack = list(range(4_000))
+needles = list(range(0, 8_000, 2))
+
+start = time.perf_counter()
+found = [x for x in needles if x in haystack]          # O(n * m)
+slow = time.perf_counter() - start
+
+start = time.perf_counter()
+lookup = set(haystack)                                 # O(n), once
+found2 = [x for x in needles if x in lookup]           # O(m)
+fast = time.perf_counter() - start
+
+print()
+print(f"{len(needles):,} lookups against a {len(haystack):,}-item list:")
+print(f"  list  : {slow:.4f}s")
+if fast > 0:
+    print(f"  set   : {fast:.4f}s   ({slow / fast:.0f}x faster)")
+else:
+    print(f"  set   : too fast to measure separately")
+print(f"  same answer: {found == found2}")
+
+# --- a set loses order and duplicates; a dict keeps order --------------
+items = ["b", "a", "b", "c", "a"]
+print()
+print("original          :", items)
+print("set(items)        :", sorted(set(items)), "- order gone")
+print("dict.fromkeys(...):", list(dict.fromkeys(items)), "- deduped, order kept")
+```
 ## Why it matters: the accidental quadratic
 
 The cost only becomes visible when the membership test is inside a loop:

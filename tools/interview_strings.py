@@ -156,17 +156,17 @@ print()
 print(f"{'n':>7} {'+= in a loop':>14} {'list + join':>13} {'ratio':>7}")
 for n in (20_000, 40_000, 80_000):
     b = Buf()
-    start = time.time()
+    start = time.perf_counter()
     for _ in range(n):
         b.text += "x"
-    concat = time.time() - start
+    concat = time.perf_counter() - start
 
-    start = time.time()
+    start = time.perf_counter()
     parts = []
     for _ in range(n):
         parts.append("x")
     joined_text = "".join(parts)
-    joined = time.time() - start
+    joined = time.perf_counter() - start
     print(f"{n:>7} {concat:>13.4f}s {joined:>12.4f}s {concat / joined:>6.1f}x")
 
 print("Double n: join doubles, += quadruples. That is O(n) against O(n^2).")
@@ -339,13 +339,13 @@ print(f"{'n':>7} {'slicing':>12} {'indexing':>12} {'ratio':>8}")
 for n in (5_000, 10_000, 20_000):
     text = "x" * n
 
-    start = time.time()
+    start = time.perf_counter()
     peel_with_slices(text)
-    slicing = time.time() - start
+    slicing = time.perf_counter() - start
 
-    start = time.time()
+    start = time.perf_counter()
     walk_with_index(text)
-    indexing = time.time() - start
+    indexing = time.perf_counter() - start
 
     print(f"{n:>7} {slicing:>11.4f}s {indexing:>11.4f}s {slicing / indexing:>7.1f}x")
 
@@ -1606,9 +1606,9 @@ a = "abcdefghij" * 4000
 b = "jihgfedcba" * 4000
 print()
 for name, fn in (("sorting", by_sorting), ("counting", by_counting)):
-    start = time.time()
+    start = time.perf_counter()
     fn(a, b)
-    print(f"  {name:>8} on {len(a):,} chars: {time.time() - start:.4f}s")
+    print(f"  {name:>8} on {len(a):,} chars: {time.perf_counter() - start:.4f}s")
 
 # The fixed array assumes an alphabet. This is where that assumption dies.
 print()
@@ -2501,9 +2501,9 @@ print("'abc' is returned unchanged: 'a1b1c1' would be longer.")
 big = "".join(ch * 3 for ch in "abcdefghij" * 3000)
 print()
 for name, fn in (("list + join", compress), ("+= in a loop", compress_slow)):
-    start = time.time()
+    start = time.perf_counter()
     fn(big)
-    print(f"  {name:>13}: {time.time() - start:.4f}s on {len(big):,} chars")
+    print(f"  {name:>13}: {time.perf_counter() - start:.4f}s on {len(big):,} chars")
 
 # --- the in-place variant ----------------------------------------------
 def compress_in_place(chars):

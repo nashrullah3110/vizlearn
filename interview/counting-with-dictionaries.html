@@ -260,7 +260,7 @@ for w in words:
     if w not in counts:
         counts[w] = 0
     counts[w] += 1</code></pre><p>All four are O(n). <code>Counter</code> is idiomatic, C-optimised for iterables, and comes with <code>most_common</code>. Use it unless there is a reason not to.</p><p><code>defaultdict(int)</code> is right when counting happens as part of a larger loop that does other work. <code>dict.get</code> is right when you want a plain <code>dict</code> in the output &mdash; <code>Counter</code> and <code>defaultdict</code> are dict subclasses and mostly interchangeable, and they are not identical.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-what-counter-adds">What Counter adds</a></li><li><a href="#vz-s-the-everyday-patterns">The everyday patterns</a></li><li><a href="#vz-s-the-four-idioms">The four idioms</a></li><li><a href="#vz-s-one-trap-in-defaultdict">One trap in defaultdict</a></li><li><a href="#vz-s-top-k-without-sorting">Top-k without sorting</a></li><li><a href="#vz-s-grouping-the-sibling-problem">Grouping, the sibling problem</a></li><li><a href="#vz-s-counting-in-a-sliding-window">Counting in a sliding window</a></li><li><a href="#vz-s-edge-cases-and-gotchas">Edge cases and gotchas</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-run-it">Run it</a></li><li><a href="#vz-s-what-counter-adds">What Counter adds</a></li><li><a href="#vz-s-the-everyday-patterns">The everyday patterns</a></li><li><a href="#vz-s-the-four-idioms">The four idioms</a></li><li><a href="#vz-s-one-trap-in-defaultdict">One trap in defaultdict</a></li><li><a href="#vz-s-top-k-without-sorting">Top-k without sorting</a></li><li><a href="#vz-s-grouping-the-sibling-problem">Grouping, the sibling problem</a></li><li><a href="#vz-s-counting-in-a-sliding-window">Counting in a sliding window</a></li><li><a href="#vz-s-edge-cases-and-gotchas">Edge cases and gotchas</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
             <div class="vz-iq-tags"><span class="vz-iq-tag">Dicts, sets &amp; hashing</span><span class="vz-iq-tag">Coding problem</span><span class="vz-iq-tag">Easy</span></div>
         </div>
 
@@ -306,6 +306,70 @@ for w in words:
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-run-it">Run it</h3>
+                    <p>The four idioms producing identical counts, the <code>defaultdict</code> read trap caught in the act, and top-k timed three ways on a large input.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src"># Counting: four spellings of one loop, then top-k without sorting.
+from collections import Counter, defaultdict
+import heapq, random, time
+
+words = "the quick brown fox jumps over the lazy dog the fox".split()
+
+by_get = {}
+for w in words:
+    by_get[w] = by_get.get(w, 0) + 1
+
+by_setdefault = {}
+for w in words:
+    by_setdefault.setdefault(w, 0)
+    by_setdefault[w] += 1
+
+by_default = defaultdict(int)
+for w in words:
+    by_default[w] += 1
+
+by_counter = Counter(words)
+
+print("all four agree:",
+      by_get == by_setdefault == dict(by_default) == dict(by_counter))
+print("counts:", dict(sorted(by_counter.items(), key=lambda kv: -kv[1])))
+
+# --- the defaultdict read trap -----------------------------------------
+d = defaultdict(int)
+d["seen"] += 1
+print()
+print("before reading a missing key:", dict(d))
+if d["never_added"] > 5:              # a READ that inserts
+    pass
+print("after  reading a missing key:", dict(d), "<- it was created")
+
+c = Counter()
+c["seen"] += 1
+_ = c["never_added"]                  # a read that does NOT insert
+print("Counter after the same read :", dict(c))
+
+# --- top-k: sorting versus a heap --------------------------------------
+random.seed(7)
+big = [random.randint(0, 50_000) for _ in range(300_000)]
+counts = Counter(big)
+k = 10
+print()
+print(f"{len(big):,} items, {len(counts):,} distinct, k = {k}")
+
+start = time.perf_counter()
+by_sorting = sorted(counts.items(), key=lambda kv: -kv[1])[:k]
+sort_time = time.perf_counter() - start
+
+start = time.perf_counter()
+by_heap = heapq.nlargest(k, counts.items(), key=lambda kv: kv[1])
+heap_time = time.perf_counter() - start
+
+print(f"  sort everything : {sort_time:.4f}s   O(m log m)")
+print(f"  heap of size k  : {heap_time:.4f}s   O(m log k)")
+print(f"  same answer     : {[v for _, v in by_sorting] == [v for _, v in by_heap]}")
+print()
+print("At m = 50,000 the gap is small. At a billion distinct keys it is the")
+print("difference between a job that finishes and one that does not.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>1</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-what-counter-adds">What Counter adds</h3>
                     <pre><code class="language-python">c = Counter(&quot;mississippi&quot;)
@@ -384,67 +448,7 @@ for country, group in groupby(users, key=lambda u: u.country):
         </div>
     </section>
 
-<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">Run it in Python</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The four idioms producing identical counts, the <code>defaultdict</code> read trap caught in the act, and top-k timed three ways on a large input.</p><div class="vz-cl-grid"><div class="vz-py" data-vz-py><script type="text/plain" class="py-src"># Counting: four spellings of one loop, then top-k without sorting.
-from collections import Counter, defaultdict
-import heapq, random, time
-
-words = "the quick brown fox jumps over the lazy dog the fox".split()
-
-by_get = {}
-for w in words:
-    by_get[w] = by_get.get(w, 0) + 1
-
-by_setdefault = {}
-for w in words:
-    by_setdefault.setdefault(w, 0)
-    by_setdefault[w] += 1
-
-by_default = defaultdict(int)
-for w in words:
-    by_default[w] += 1
-
-by_counter = Counter(words)
-
-print("all four agree:",
-      by_get == by_setdefault == dict(by_default) == dict(by_counter))
-print("counts:", dict(sorted(by_counter.items(), key=lambda kv: -kv[1])))
-
-# --- the defaultdict read trap -----------------------------------------
-d = defaultdict(int)
-d["seen"] += 1
-print()
-print("before reading a missing key:", dict(d))
-if d["never_added"] > 5:              # a READ that inserts
-    pass
-print("after  reading a missing key:", dict(d), "<- it was created")
-
-c = Counter()
-c["seen"] += 1
-_ = c["never_added"]                  # a read that does NOT insert
-print("Counter after the same read :", dict(c))
-
-# --- top-k: sorting versus a heap --------------------------------------
-random.seed(7)
-big = [random.randint(0, 50_000) for _ in range(300_000)]
-counts = Counter(big)
-k = 10
-print()
-print(f"{len(big):,} items, {len(counts):,} distinct, k = {k}")
-
-start = time.time()
-by_sorting = sorted(counts.items(), key=lambda kv: -kv[1])[:k]
-sort_time = time.time() - start
-
-start = time.time()
-by_heap = heapq.nlargest(k, counts.items(), key=lambda kv: kv[1])
-heap_time = time.time() - start
-
-print(f"  sort everything : {sort_time:.4f}s   O(m log m)")
-print(f"  heap of size k  : {heap_time:.4f}s   O(m log k)")
-print(f"  same answer     : {[v for _, v in by_sorting] == [v for _, v in by_heap]}")
-print()
-print("At m = 50,000 the gap is small. At a billion distinct keys it is the")
-print("difference between a job that finishes and one that does not.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>counting.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">counts.get(x, 0) + 1</code><span class="vz-cl-note">The version to write when told not to import anything. The default removes the "first time?" branch without hiding what is happening.</span></li><li class="vz-cl-step"><code class="vz-cl-line">d[&quot;never_added&quot;] &gt; 5</code><span class="vz-cl-note">A read that inserts. <code>defaultdict</code> creates on any missing lookup, so a loop that only inspects can grow the dictionary silently.</span></li><li class="vz-cl-step"><code class="vz-cl-line">heapq.nlargest(k, ...)</code><span class="vz-cl-note">Keeps a heap of size k rather than sorting m items: O(m&nbsp;log&nbsp;k). <code>Counter.most_common(k)</code> does the same thing.</span></li><li class="vz-cl-step"><code class="vz-cl-line">Counter(big)</code><span class="vz-cl-note">One pass in C. The counting is never the bottleneck &mdash; the question is always what you do with the counts afterwards.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Raise the value range to 5,000,000 so nearly every item is distinct. The sort/heap gap widens as m grows.</li><li>Implement top-k with bucket sort by count. O(m) when counts are bounded, which beats both.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">How the code works</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The four idioms producing identical counts, the <code>defaultdict</code> read trap caught in the act, and top-k timed three ways on a large input.</p><div class="vz-cl-grid"><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">counts.get(x, 0) + 1</code><span class="vz-cl-note">The version to write when told not to import anything. The default removes the "first time?" branch without hiding what is happening.</span></li><li class="vz-cl-step"><code class="vz-cl-line">d[&quot;never_added&quot;] &gt; 5</code><span class="vz-cl-note">A read that inserts. <code>defaultdict</code> creates on any missing lookup, so a loop that only inspects can grow the dictionary silently.</span></li><li class="vz-cl-step"><code class="vz-cl-line">heapq.nlargest(k, ...)</code><span class="vz-cl-note">Keeps a heap of size k rather than sorting m items: O(m&nbsp;log&nbsp;k). <code>Counter.most_common(k)</code> does the same thing.</span></li><li class="vz-cl-step"><code class="vz-cl-line">Counter(big)</code><span class="vz-cl-note">One pass in C. The counting is never the bottleneck &mdash; the question is always what you do with the counts afterwards.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Raise the value range to 5,000,000 so nearly every item is distinct. The sort/heap gap widens as m grows.</li><li>Implement top-k with bucket sort by count. O(m) when counts are bounded, which beats both.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 
     <script>
         (function () {

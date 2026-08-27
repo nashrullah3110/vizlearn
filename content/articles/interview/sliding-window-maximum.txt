@@ -20,6 +20,73 @@ Output: `[3, 3, 5, 5, 6, 7]`.
 
 Recomputing `max()` per window is O(nk) &mdash; correct and, for large k, slow. The target is O(n), and the tool is a <strong>monotonic deque</strong>.
 
+
+## Run it
+
+The deque version with its total push and pop counts against the recompute-every-window version, on an input sized to make O(n) against O(n&middot;k) unmistakable.
+
+```python-run
+# Sliding window maximum: a deque of indices with decreasing values.
+from collections import deque
+import time
+
+def window_max(values, k, show=False):
+    dq = deque()                             # indices, values decreasing
+    out, pushes, pops = [], 0, 0
+    for i, v in enumerate(values):
+        while dq and values[dq[-1]] <= v:    # smaller behind: can never win
+            dq.pop()
+            pops += 1
+        dq.append(i)
+        pushes += 1
+        if dq[0] <= i - k:                   # the front has expired
+            dq.popleft()
+            pops += 1
+        if i >= k - 1:
+            out.append(values[dq[0]])        # the front IS the maximum
+            if show:
+                print(f"    window {values[i-k+1:i+1]} -> max {values[dq[0]]}")
+    return out, pushes, pops
+
+
+def recompute(values, k):
+    out, comparisons = [], 0
+    for i in range(len(values) - k + 1):
+        window = values[i:i + k]
+        comparisons += len(window)
+        out.append(max(window))
+    return out, comparisons
+
+
+values, k = [1, 3, -1, -3, 5, 3, 6, 7], 3
+print(f"values {values}, k={k}")
+answer, pushes, pops = window_max(values, k, show=True)
+print("  maxima:", answer)
+print(f"  {pushes} pushes, {pops} pops for {len(values)} elements")
+print("  recompute agrees:", recompute(values, k)[0] == answer)
+
+# --- how the two costs diverge as k grows ------------------------------
+import random
+random.seed(9)
+big = [random.randint(0, 1000) for _ in range(15_000)]
+print()
+print(f"n = {len(big):,}")
+for k in (10, 100, 400):
+    start = time.perf_counter()
+    a, pushes, pops = window_max(big, k)
+    deque_time = time.perf_counter() - start
+
+    start = time.perf_counter()
+    b, comparisons = recompute(big, k)
+    naive_time = time.perf_counter() - start
+
+    print(f"  k={k:>4}: deque {deque_time:.3f}s ({pushes + pops:,} ops)   "
+          f"recompute {naive_time:.3f}s ({comparisons:,} ops)   same: {a == b}")
+
+print()
+print("The deque's operation count barely moves with k. The naive one is")
+print("proportional to it, because every window is rebuilt from scratch.")
+```
 ## Why a heap is not quite enough
 
 The natural first thought is a max-heap. It gives the maximum in O(1), and removing the element that just left the window is the problem &mdash; a heap cannot delete an arbitrary element efficiently.

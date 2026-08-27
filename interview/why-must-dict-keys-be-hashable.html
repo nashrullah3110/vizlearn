@@ -244,7 +244,7 @@ d[&quot;text&quot;] = 1           # str - hashable
 d[(1, 2)] = 2           # tuple - hashable
 d[frozenset({1})] = 3   # frozenset - hashable
 d[[1, 2]] = 4           # TypeError: unhashable type: &#x27;list&#x27;</code></pre><p>The rule follows directly from how a dictionary works. The hash determines which slot an entry occupies. If a key's hash changed after insertion, the entry would sit in a slot the new hash does not point to &mdash; unreachable, and effectively lost.</p><p>So the requirement is not arbitrary strictness; it is what keeps the structure coherent.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-demonstrating-the-failure">Demonstrating the failure</a></li><li><a href="#vz-s-the-hash-equality-contract">The hash-equality contract</a></li><li><a href="#vz-s-the-invariant-being-protected">The invariant being protected</a></li><li><a href="#vz-s-it-goes-all-the-way-down">It goes all the way down</a></li><li><a href="#vz-s-custom-objects">Custom objects</a></li><li><a href="#vz-s-what-is-hashable-and-what-is-not">What is hashable, and what is not</a></li><li><a href="#vz-s-the-workarounds-when-a-key-is-mutable">The workarounds when a key is mutable</a></li><li><a href="#vz-s-why-this-appears-in-interviews">Why this appears in interviews</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-run-it">Run it</a></li><li><a href="#vz-s-demonstrating-the-failure">Demonstrating the failure</a></li><li><a href="#vz-s-the-hash-equality-contract">The hash-equality contract</a></li><li><a href="#vz-s-the-invariant-being-protected">The invariant being protected</a></li><li><a href="#vz-s-it-goes-all-the-way-down">It goes all the way down</a></li><li><a href="#vz-s-custom-objects">Custom objects</a></li><li><a href="#vz-s-what-is-hashable-and-what-is-not">What is hashable, and what is not</a></li><li><a href="#vz-s-the-workarounds-when-a-key-is-mutable">The workarounds when a key is mutable</a></li><li><a href="#vz-s-why-this-appears-in-interviews">Why this appears in interviews</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
             <div class="vz-iq-tags"><span class="vz-iq-tag">Dicts, sets &amp; hashing</span><span class="vz-iq-tag">Conceptual</span><span class="vz-iq-tag">Medium</span></div>
         </div>
 
@@ -290,6 +290,70 @@ d[[1, 2]] = 4           # TypeError: unhashable type: &#x27;list&#x27;</code></p
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-run-it">Run it</h3>
+                    <p>What is and is not hashable, then a class that breaks the contract on purpose &mdash; mutating a key after insertion and losing the entry, exactly as the visualisation describes.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src"># Keys must be hashable, because the hash is the address.
+from dataclasses import dataclass
+
+for value in [(1, 2), "abc", frozenset([1, 2]), 3.5, None]:
+    print(f"  hashable: {str(value):>18}  hash={hash(value) % 1000:>4}")
+
+print()
+for value in [[1, 2], {"a": 1}, {1, 2}, (1, [2])]:
+    try:
+        hash(value)
+    except TypeError as e:
+        print(f"  NOT hashable: {str(value):>14}  -> {e}")
+print("(1, [2]) fails because a tuple's hash comes from its contents.")
+
+# --- breaking the contract on purpose ----------------------------------
+class Sloppy:
+    """Hashes on a field it then allows you to change. Do not do this."""
+    def __init__(self, tag):
+        self.tag = tag
+
+    def __hash__(self):
+        return hash(self.tag)
+
+    def __eq__(self, other):
+        return isinstance(other, Sloppy) and self.tag == other.tag
+
+    def __repr__(self):
+        return f"Sloppy({self.tag!r})"
+
+
+key = Sloppy("a")
+d = {key: "stored under 'a'"}
+print()
+print("before mutation:", d[key])
+
+key.tag = "b"                        # the hash has now changed
+print("after  mutation:")
+try:
+    print("  d[key] ->", d[key])
+except KeyError as e:
+    print("  d[key] -> KeyError:", e)
+print("  but it is still in there:", list(d.items()))
+print("  the entry is unreachable by its own key - this is the whole reason")
+print("  mutable types are refused as keys.")
+
+# --- the correct way to make an object a key ---------------------------
+@dataclass(frozen=True)               # frozen: immutable AND hashable
+class Point:
+    x: int
+    y: int
+
+
+grid = {Point(0, 0): "origin", Point(1, 2): "somewhere"}
+print()
+print("frozen dataclass as a key:", grid[Point(1, 2)])
+print("equal points are the same key:", Point(1, 2) == Point(1, 2),
+      hash(Point(1, 2)) == hash(Point(1, 2)))
+try:
+    Point(1, 2).x = 5
+except Exception as e:
+    print("and it cannot be mutated:", type(e).__name__, "-", e)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>1</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-demonstrating-the-failure">Demonstrating the failure</h3>
                     <p>Python prevents this for built-in types, and a custom class can be made to break it:</p><pre><code class="language-python">class Sloppy:
@@ -355,67 +419,7 @@ hash((1, [2]))          # TypeError - contains a mutable object</code></pre><p>A
         </div>
     </section>
 
-<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">Run it in Python</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">What is and is not hashable, then a class that breaks the contract on purpose &mdash; mutating a key after insertion and losing the entry, exactly as the visualisation describes.</p><div class="vz-cl-grid"><div class="vz-py" data-vz-py><script type="text/plain" class="py-src"># Keys must be hashable, because the hash is the address.
-from dataclasses import dataclass
-
-for value in [(1, 2), "abc", frozenset([1, 2]), 3.5, None]:
-    print(f"  hashable: {str(value):>18}  hash={hash(value) % 1000:>4}")
-
-print()
-for value in [[1, 2], {"a": 1}, {1, 2}, (1, [2])]:
-    try:
-        hash(value)
-    except TypeError as e:
-        print(f"  NOT hashable: {str(value):>14}  -> {e}")
-print("(1, [2]) fails because a tuple's hash comes from its contents.")
-
-# --- breaking the contract on purpose ----------------------------------
-class Sloppy:
-    """Hashes on a field it then allows you to change. Do not do this."""
-    def __init__(self, tag):
-        self.tag = tag
-
-    def __hash__(self):
-        return hash(self.tag)
-
-    def __eq__(self, other):
-        return isinstance(other, Sloppy) and self.tag == other.tag
-
-    def __repr__(self):
-        return f"Sloppy({self.tag!r})"
-
-
-key = Sloppy("a")
-d = {key: "stored under 'a'"}
-print()
-print("before mutation:", d[key])
-
-key.tag = "b"                        # the hash has now changed
-print("after  mutation:")
-try:
-    print("  d[key] ->", d[key])
-except KeyError as e:
-    print("  d[key] -> KeyError:", e)
-print("  but it is still in there:", list(d.items()))
-print("  the entry is unreachable by its own key - this is the whole reason")
-print("  mutable types are refused as keys.")
-
-# --- the correct way to make an object a key ---------------------------
-@dataclass(frozen=True)               # frozen: immutable AND hashable
-class Point:
-    x: int
-    y: int
-
-
-grid = {Point(0, 0): "origin", Point(1, 2): "somewhere"}
-print()
-print("frozen dataclass as a key:", grid[Point(1, 2)])
-print("equal points are the same key:", Point(1, 2) == Point(1, 2),
-      hash(Point(1, 2)) == hash(Point(1, 2)))
-try:
-    Point(1, 2).x = 5
-except Exception as e:
-    print("and it cannot be mutated:", type(e).__name__, "-", e)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>hashable.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">hash((1, [2]))</code><span class="vz-cl-note">Fails, because a tuple's hash is computed from its contents. Immutability has to hold all the way down, not just at the top level.</span></li><li class="vz-cl-step"><code class="vz-cl-line">key.tag = &quot;b&quot;</code><span class="vz-cl-note">The contract broken deliberately. The entry stays in the slot chosen by the old hash while lookups go to the new one, so it is lost while still occupying memory.</span></li><li class="vz-cl-step"><code class="vz-cl-line">list(d.items())</code><span class="vz-cl-note">The entry is still there and still iterable &mdash; only lookup by key is broken. That is what makes this class of bug so hard to diagnose.</span></li><li class="vz-cl-step"><code class="vz-cl-line">@dataclass(frozen=True)</code><span class="vz-cl-note">Generates <code>__eq__</code> and <code>__hash__</code> over the same fields and blocks assignment. It is the correct way to make a value object usable as a key.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Define <code>__eq__</code> on a class without <code>__hash__</code> and try to use it as a key. Python sets the hash to None for you &mdash; deliberately.</li><li>Use a plain <code>@dataclass</code> instead of a frozen one. It is unhashable, for exactly the reason this page is about.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">How the code works</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">What is and is not hashable, then a class that breaks the contract on purpose &mdash; mutating a key after insertion and losing the entry, exactly as the visualisation describes.</p><div class="vz-cl-grid"><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">hash((1, [2]))</code><span class="vz-cl-note">Fails, because a tuple's hash is computed from its contents. Immutability has to hold all the way down, not just at the top level.</span></li><li class="vz-cl-step"><code class="vz-cl-line">key.tag = &quot;b&quot;</code><span class="vz-cl-note">The contract broken deliberately. The entry stays in the slot chosen by the old hash while lookups go to the new one, so it is lost while still occupying memory.</span></li><li class="vz-cl-step"><code class="vz-cl-line">list(d.items())</code><span class="vz-cl-note">The entry is still there and still iterable &mdash; only lookup by key is broken. That is what makes this class of bug so hard to diagnose.</span></li><li class="vz-cl-step"><code class="vz-cl-line">@dataclass(frozen=True)</code><span class="vz-cl-note">Generates <code>__eq__</code> and <code>__hash__</code> over the same fields and blocks assignment. It is the correct way to make a value object usable as a key.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Define <code>__eq__</code> on a class without <code>__hash__</code> and try to use it as a key. Python sets the hash to None for you &mdash; deliberately.</li><li>Use a plain <code>@dataclass</code> instead of a frozen one. It is unhashable, for exactly the reason this page is about.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 
     <script>
         (function () {

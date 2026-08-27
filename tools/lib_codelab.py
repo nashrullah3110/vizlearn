@@ -87,8 +87,15 @@ def aside(walk, tries, prefix, heading="How the code works"):
     return '<div class="vz-cl-aside">%s</div>' % "".join(blocks)
 
 
-def section(entry, prefix, intro, heading="Run it in Python"):
-    """A complete `Run it in Python` section: intro, editor, walkthrough."""
+def section(entry, prefix, intro, heading="Run it in Python",
+            include_editor=True):
+    """A complete `Run it in Python` section: intro, editor, walkthrough.
+
+    `include_editor=False` leaves the walkthrough and the edits to try, and
+    drops the editor. /interview/ uses that: its program now lives inside the
+    article, where the prose introduces it, and rendering it here as well
+    would put the same forty lines on the page twice.
+    """
     return (
         '<section class="vz-codelab" aria-labelledby="vz-codelab-h">'
         '<div class="vz-section-head">%(icon)s<h2 id="vz-codelab-h">%(heading)s</h2>'
@@ -100,6 +107,6 @@ def section(entry, prefix, intro, heading="Run it in Python"):
         "icon": ICON,
         "heading": html.escape(heading),
         "intro": intro,
-        "editor": editor(entry["code"], entry["file"]),
+        "editor": editor(entry["code"], entry["file"]) if include_editor else "",
         "aside": aside(entry["walk"], entry.get("try"), prefix),
     }

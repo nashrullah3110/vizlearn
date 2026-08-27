@@ -17,6 +17,74 @@ The rule follows directly from how a dictionary works. The hash determines which
 
 So the requirement is not arbitrary strictness; it is what keeps the structure coherent.
 
+
+## Run it
+
+What is and is not hashable, then a class that breaks the contract on purpose &mdash; mutating a key after insertion and losing the entry, exactly as the visualisation describes.
+
+```python-run
+# Keys must be hashable, because the hash is the address.
+from dataclasses import dataclass
+
+for value in [(1, 2), "abc", frozenset([1, 2]), 3.5, None]:
+    print(f"  hashable: {str(value):>18}  hash={hash(value) % 1000:>4}")
+
+print()
+for value in [[1, 2], {"a": 1}, {1, 2}, (1, [2])]:
+    try:
+        hash(value)
+    except TypeError as e:
+        print(f"  NOT hashable: {str(value):>14}  -> {e}")
+print("(1, [2]) fails because a tuple's hash comes from its contents.")
+
+# --- breaking the contract on purpose ----------------------------------
+class Sloppy:
+    """Hashes on a field it then allows you to change. Do not do this."""
+    def __init__(self, tag):
+        self.tag = tag
+
+    def __hash__(self):
+        return hash(self.tag)
+
+    def __eq__(self, other):
+        return isinstance(other, Sloppy) and self.tag == other.tag
+
+    def __repr__(self):
+        return f"Sloppy({self.tag!r})"
+
+
+key = Sloppy("a")
+d = {key: "stored under 'a'"}
+print()
+print("before mutation:", d[key])
+
+key.tag = "b"                        # the hash has now changed
+print("after  mutation:")
+try:
+    print("  d[key] ->", d[key])
+except KeyError as e:
+    print("  d[key] -> KeyError:", e)
+print("  but it is still in there:", list(d.items()))
+print("  the entry is unreachable by its own key - this is the whole reason")
+print("  mutable types are refused as keys.")
+
+# --- the correct way to make an object a key ---------------------------
+@dataclass(frozen=True)               # frozen: immutable AND hashable
+class Point:
+    x: int
+    y: int
+
+
+grid = {Point(0, 0): "origin", Point(1, 2): "somewhere"}
+print()
+print("frozen dataclass as a key:", grid[Point(1, 2)])
+print("equal points are the same key:", Point(1, 2) == Point(1, 2),
+      hash(Point(1, 2)) == hash(Point(1, 2)))
+try:
+    Point(1, 2).x = 5
+except Exception as e:
+    print("and it cannot be mutated:", type(e).__name__, "-", e)
+```
 ## Demonstrating the failure
 
 Python prevents this for built-in types, and a custom class can be made to break it:

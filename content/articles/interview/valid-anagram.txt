@@ -15,6 +15,72 @@ Two strings are anagrams if one is a rearrangement of the other &mdash; same cha
 
 The first thing to establish, and a legitimate clarifying question: <strong>is it case sensitive, and do spaces and punctuation count?</strong> "Dormitory" and "dirty room" are anagrams under one interpretation and not under another.
 
+
+## Run it
+
+Three implementations timed against each other on real words, so the O(n) against O(n&nbsp;log&nbsp;n) claim is measured rather than asserted &mdash; and a Unicode case that breaks the fixed-array version.
+
+```python-run
+# Anagram check: sorting, counting, and a fixed-size array.
+from collections import Counter
+import time
+
+def by_sorting(a, b):
+    return sorted(a) == sorted(b)                # O(n log n)
+
+
+def by_counting(a, b):
+    if len(a) != len(b):
+        return False                             # free rejection
+    counts = {}
+    for ch in a:
+        counts[ch] = counts.get(ch, 0) + 1
+    for ch in b:
+        if ch not in counts:
+            return False
+        counts[ch] -= 1
+        if counts[ch] == 0:
+            del counts[ch]                       # so "empty" means "cancelled"
+    return not counts
+
+
+def by_array(a, b):
+    """Only correct for lowercase a-z - state that assumption out loud."""
+    if len(a) != len(b):
+        return False
+    seen = [0] * 26
+    for ch in a:
+        seen[ord(ch) - ord("a")] += 1
+    for ch in b:
+        seen[ord(ch) - ord("a")] -= 1
+    return not any(seen)
+
+
+pairs_to_test = [("listen", "silent"), ("rat", "car"), ("aab", "abb"), ("", "")]
+for a, b in pairs_to_test:
+    print(f"{a!r:>9} vs {b!r:<9} sorting={by_sorting(a, b)!s:>5} "
+          f"counting={by_counting(a, b)!s:>5} array={by_array(a, b)}")
+
+print()
+print("Counter does it in one line:", Counter("listen") == Counter("silent"))
+
+# --- the cost, measured ------------------------------------------------
+a = "abcdefghij" * 4000
+b = "jihgfedcba" * 4000
+print()
+for name, fn in (("sorting", by_sorting), ("counting", by_counting)):
+    start = time.perf_counter()
+    fn(a, b)
+    print(f"  {name:>8} on {len(a):,} chars: {time.perf_counter() - start:.4f}s")
+
+# The fixed array assumes an alphabet. This is where that assumption dies.
+print()
+print("by_counting on 'café'/'éfac':", by_counting("café", "éfac"))
+try:
+    print("by_array   on 'café'/'éfac':", by_array("café", "éfac"))
+except IndexError as e:
+    print("by_array   on 'café'/'éfac': IndexError -", e)
+```
 ## Two solutions, and the trade between them
 
 <strong>Sorting:</strong>

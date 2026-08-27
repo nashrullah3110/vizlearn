@@ -11,6 +11,121 @@ The design has three parts, and stating them upfront is the expected opening:
 <strong>A hash function</strong> mapping keys to bucket indices.
 <strong>A collision strategy</strong> for when two keys land in the same bucket.
 
+
+## Run it
+
+A working hash map with chaining, its bucket distribution printed before and after a resize, and the tombstone problem demonstrated on a small open-addressing version.
+
+```python-run
+# A hash map, from scratch. Separate chaining.
+
+class HashMap:
+    def __init__(self, buckets=8):
+        self.buckets = [[] for _ in range(buckets)]
+        self.count = 0
+        self.resizes = 0
+
+    def _index(self, key):
+        return hash(key) % len(self.buckets)      # hash picks the bucket
+
+    def put(self, key, value):
+        bucket = self.buckets[self._index(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:                          # compare KEYS, not hashes
+                bucket[i] = (key, value)
+                return
+        bucket.append((key, value))
+        self.count += 1
+        if self.count / len(self.buckets) > 0.75:
+            self._resize()
+
+    def get(self, key, default=None):
+        for k, v in self.buckets[self._index(key)]:
+            if k == key:
+                return v
+        return default
+
+    def remove(self, key):
+        bucket = self.buckets[self._index(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:
+                bucket.pop(i)                     # trivial with chaining
+                self.count -= 1
+                return True
+        return False
+
+    def _resize(self):
+        old = self.buckets
+        self.buckets = [[] for _ in range(len(old) * 2)]
+        for bucket in old:
+            for k, v in bucket:                   # every key moves
+                self.buckets[self._index(k)].append((k, v))
+        self.resizes += 1
+
+    def spread(self):
+        sizes = [len(b) for b in self.buckets]
+        return f"{len(self.buckets)} buckets, longest chain {max(sizes)}, empty {sizes.count(0)}"
+
+
+m = HashMap()
+for i, word in enumerate("alpha bravo charlie delta echo foxtrot golf hotel".split()):
+    m.put(word, i)
+    if i in (3, 7):
+        print(f"after {i + 1} puts: {m.spread()}  (resizes so far: {m.resizes})")
+
+print()
+print("get('charlie') :", m.get("charlie"))
+print("get('missing') :", m.get("missing", "default"))
+print("remove('delta'):", m.remove("delta"), " get now:", m.get("delta", "gone"))
+
+# --- why open addressing needs tombstones ------------------------------
+print()
+class NaiveOpenAddressing:
+    """Deletes by blanking the slot. Watch what that does to a probe."""
+    def __init__(self, size=8):
+        self.slots = [None] * size
+
+    def _probe(self, key):
+        i = hash(key) % len(self.slots)
+        while self.slots[i] is not None and self.slots[i][0] != key:
+            i = (i + 1) % len(self.slots)         # linear probing
+        return i
+
+    def put(self, key, value):
+        self.slots[self._probe(key)] = (key, value)
+
+    def get(self, key):
+        i = hash(key) % len(self.slots)
+        while self.slots[i] is not None:
+            if self.slots[i][0] == key:
+                return self.slots[i][1]
+            i = (i + 1) % len(self.slots)
+        return "NOT FOUND"
+
+    def delete(self, key):
+        self.slots[self._probe(key)] = None       # a hole, not a tombstone
+
+
+# Force a collision by using keys we control the hash of.
+class Fixed:
+    def __init__(self, name, h):
+        self.name, self.h = name, h
+    def __hash__(self):
+        return self.h
+    def __eq__(self, other):
+        return isinstance(other, Fixed) and self.name == other.name
+    def __repr__(self):
+        return self.name
+
+a, b = Fixed("a", 1), Fixed("b", 1)               # same hash on purpose
+table = NaiveOpenAddressing()
+table.put(a, "first")
+table.put(b, "second")
+print("before delete: b ->", table.get(b))
+table.delete(a)
+print("after deleting a: b ->", table.get(b), " <- the probe stopped at the hole")
+print("A tombstone would let the probe continue past the deleted slot.")
+```
 ## Chaining: the straightforward answer
 
 Each bucket holds a list of key-value pairs. On collision, append.

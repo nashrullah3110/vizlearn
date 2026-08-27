@@ -544,13 +544,13 @@ k = 10
 print()
 print(f"{len(big):,} items, {len(counts):,} distinct, k = {k}")
 
-start = time.time()
+start = time.perf_counter()
 by_sorting = sorted(counts.items(), key=lambda kv: -kv[1])[:k]
-sort_time = time.time() - start
+sort_time = time.perf_counter() - start
 
-start = time.time()
+start = time.perf_counter()
 by_heap = heapq.nlargest(k, counts.items(), key=lambda kv: kv[1])
-heap_time = time.time() - start
+heap_time = time.perf_counter() - start
 
 print(f"  sort everything : {sort_time:.4f}s   O(m log m)")
 print(f"  heap of size k  : {heap_time:.4f}s   O(m log k)")
@@ -705,9 +705,9 @@ import time
 from collections import deque
 
 def timed(fn, *args):
-    start = time.time()
+    start = time.perf_counter()
     fn(*args)
-    return time.time() - start
+    return time.perf_counter() - start
 
 
 # --- 1. membership testing against a list ------------------------------
@@ -1597,18 +1597,21 @@ print("{'carol'} <= a         :", {"carol"} <= a)
 big_a = list(range(6_000))
 big_b = list(range(3_000, 9_000))
 
-start = time.time()
+start = time.perf_counter()
 loop = [x for x in big_a if x in big_b]            # O(n * m)
-loop_time = time.time() - start
+loop_time = time.perf_counter() - start
 
-start = time.time()
+start = time.perf_counter()
 operator = sorted(set(big_a) & set(big_b))         # O(n + m)
-op_time = time.time() - start
+op_time = time.perf_counter() - start
 
 print()
 print(f"intersection of two {len(big_a):,}-item collections:")
 print(f"  list comprehension : {loop_time:.4f}s")
-print(f"  set operator       : {op_time:.4f}s   ({loop_time / op_time:.0f}x faster)")
+if op_time > 0:
+    print(f"  set operator       : {op_time:.4f}s   ({loop_time / op_time:.0f}x faster)")
+else:
+    print(f"  set operator       : too fast to measure separately")
 print(f"  same answer        : {loop == operator}")
 ''',
         "walk": [
@@ -1987,9 +1990,9 @@ def fib_cached(n):
 for n in (10, 20, 28):
     calls["plain"] = calls["manual"] = 0
     cache.clear()
-    start = time.time()
+    start = time.perf_counter()
     fib_plain(n)
-    plain_time = time.time() - start
+    plain_time = time.perf_counter() - start
     fib_manual(n)
     print(f"fib({n:>2}): no cache {calls['plain']:>7,} calls ({plain_time:.3f}s)"
           f"   memoised {calls['manual']:>3} calls")

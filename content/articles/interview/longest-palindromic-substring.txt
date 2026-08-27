@@ -16,6 +16,72 @@ Find the longest contiguous substring that reads the same forwards and backwards
 
 The brute force checks every substring for palindromicity: O(n³). Two better approaches exist, and one of them is short enough to write confidently under pressure.
 
+
+## Run it
+
+Expansion from both kinds of centre with each one's result printed, then the odd-only version failing on an even-length palindrome, and a brute-force check for agreement.
+
+```python-run
+# Longest palindromic substring: expand around every centre.
+
+def expand(s, lo, hi):
+    """Grow outwards while the ends match. Returns the widest span found."""
+    while lo >= 0 and hi < len(s) and s[lo] == s[hi]:
+        lo -= 1
+        hi += 1
+    return lo + 1, hi - 1          # step back inside the last failed match
+
+
+def longest_palindrome(s):
+    if not s:
+        return ""
+    start, end = 0, 0
+    for centre in range(len(s)):
+        for lo, hi in ((centre, centre),        # odd length: centred on a char
+                       (centre, centre + 1)):   # even length: centred on a gap
+            a, b = expand(s, lo, hi)
+            if b - a > end - start:
+                start, end = a, b
+    return s[start:end + 1]
+
+
+def odd_centres_only(s):
+    """The version that forgets even-length palindromes."""
+    if not s:
+        return ""
+    start, end = 0, 0
+    for centre in range(len(s)):
+        a, b = expand(s, centre, centre)
+        if b - a > end - start:
+            start, end = a, b
+    return s[start:end + 1]
+
+
+def brute_force(s):
+    best = ""
+    for i in range(len(s)):
+        for j in range(i, len(s)):
+            part = s[i:j + 1]
+            if part == part[::-1] and len(part) > len(best):
+                best = part
+    return best
+
+
+for text in ["babad", "cbbd", "abba", "racecar", "a", ""]:
+    fast = longest_palindrome(text)
+    odd = odd_centres_only(text)
+    slow = brute_force(text)
+    flag = "   <-- odd-only is WRONG" if odd != slow else ""
+    print(f"{text!r:>10}: {fast!r:>9} (brute force agrees: {fast == slow}) "
+          f"odd-only={odd!r}{flag}")
+
+print()
+print(f"For a string of length n there are 2n-1 centres, not n:")
+for n in (1, 5, 10):
+    print(f"  n={n:>2} -> {2 * n - 1} centres")
+print()
+print("Time O(n^2), space O(1). The DP table is the same time and O(n^2) space.")
+```
 ## Expand around centres
 
 Every palindrome has a centre. There are 2n&minus;1 possible centres &mdash; n single characters for odd-length palindromes, and n&minus;1 gaps between characters for even-length ones. Expand outwards from each.

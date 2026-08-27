@@ -16,6 +16,66 @@ A palindrome reads the same forwards and backwards. The interview version usuall
 
 That last row is the trap most solutions fail: comparing character codes rather than checking alphanumeric status makes `'0'` and `'P'` appear related, because they differ by 32 in ASCII &mdash; the same gap as upper and lower case.
 
+
+## Run it
+
+Both approaches on the same inputs, with the comparison counts printed &mdash; which is where the two-pointer version's short-circuit shows up. The last section is the delete-one follow-up.
+
+```python-run
+# Palindrome check, ignoring punctuation and case.
+
+def is_palindrome_slice(s):
+    clean = "".join(c.lower() for c in s if c.isalnum())   # a full copy
+    return clean == clean[::-1]                            # and another
+
+
+def is_palindrome_two_pointers(s):
+    lo, hi = 0, len(s) - 1
+    compared = 0
+    while lo < hi:
+        while lo < hi and not s[lo].isalnum():     # the lo < hi guard matters
+            lo += 1
+        while lo < hi and not s[hi].isalnum():
+            hi -= 1
+        compared += 1
+        if s[lo].lower() != s[hi].lower():
+            return False, compared                 # stop at the first mismatch
+        lo, hi = lo + 1, hi - 1
+    return True, compared
+
+
+tests = ["A man, a plan, a canal: Panama", "race a car", "", ".,!?", "ab@ba"]
+for t in tests:
+    slice_answer = is_palindrome_slice(t)
+    ok, compared = is_palindrome_two_pointers(t)
+    agree = "" if ok == slice_answer else "   <-- DISAGREE"
+    print(f"{t!r:>32}: {str(ok):>5}  ({compared} comparisons){agree}")
+
+print()
+print("'race a car' fails on the first pair - the slice version still")
+print("builds and compares the whole cleaned string.")
+
+# --- the follow-up: allow one deletion ---------------------------------
+def valid_after_one_deletion(s):
+    def plain(lo, hi):
+        while lo < hi:
+            if s[lo] != s[hi]:
+                return False
+            lo, hi = lo + 1, hi - 1
+        return True
+
+    lo, hi = 0, len(s) - 1
+    while lo < hi:
+        if s[lo] != s[hi]:
+            # One chance: drop the left character or the right one.
+            return plain(lo + 1, hi) or plain(lo, hi - 1)
+        lo, hi = lo + 1, hi - 1
+    return True
+
+print()
+for t in ("abca", "abc", "deeee"):
+    print(f"  {t!r:>8} palindrome after one deletion: {valid_after_one_deletion(t)}")
+```
 ## The two solutions
 
 <strong>Filter and compare:</strong>

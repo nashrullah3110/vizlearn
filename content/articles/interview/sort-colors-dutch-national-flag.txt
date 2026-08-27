@@ -11,6 +11,83 @@ Two easy solutions are excluded by the constraints. <strong>Counting sort</stron
 
 The single-pass answer is the <strong>Dutch national flag</strong> partition, named for the three-striped flag.
 
+
+## Run it
+
+The three-way partition with its invariant asserted on every iteration, the buggy version that advances mid in both branches, and both checked against sorted() on random input.
+
+```python-run
+# Dutch national flag: three pointers, one pass, four regions.
+import random
+
+def sort_colors(values):
+    lo, mid, hi = 0, 0, len(values) - 1
+    while mid <= hi:
+        if values[mid] == 0:
+            values[lo], values[mid] = values[mid], values[lo]
+            lo += 1
+            mid += 1                 # what came back is a known 1 - safe to pass
+        elif values[mid] == 2:
+            values[mid], values[hi] = values[hi], values[mid]
+            hi -= 1                  # mid does NOT move: the new value is unseen
+        else:
+            mid += 1
+        # invariant: [0, lo) is 0s, [lo, mid) is 1s, (hi, end) is 2s
+        assert all(v == 0 for v in values[:lo])
+        assert all(v == 1 for v in values[lo:mid])
+        assert all(v == 2 for v in values[hi + 1:])
+    return values
+
+
+def sort_colors_buggy(values):
+    """Advances mid in both swap branches. Almost right."""
+    lo, mid, hi = 0, 0, len(values) - 1
+    while mid <= hi:
+        if values[mid] == 0:
+            values[lo], values[mid] = values[mid], values[lo]
+            lo += 1
+            mid += 1
+        elif values[mid] == 2:
+            values[mid], values[hi] = values[hi], values[mid]
+            hi -= 1
+            mid += 1                 # <- the bug
+        else:
+            mid += 1
+    return values
+
+
+def by_counting(values):
+    """Two passes, and it does not generalise to sorting objects by a key."""
+    counts = [0, 0, 0]
+    for v in values:
+        counts[v] += 1
+    out = []
+    for colour, n in enumerate(counts):
+        out.extend([colour] * n)
+    return out
+
+
+data = [2, 0, 2, 1, 1, 0]
+print("input       :", data)
+print("partitioned :", sort_colors(list(data)))
+print("by counting :", by_counting(data))
+
+print()
+random.seed(3)
+failures = 0
+for _ in range(200):
+    sample = [random.randint(0, 2) for _ in range(random.randint(0, 12))]
+    good = sort_colors(list(sample))
+    bad = sort_colors_buggy(list(sample))
+    if bad != sorted(sample):
+        failures += 1
+        if failures == 1:
+            print(f"first buggy case: {sample} -> {bad} (want {sorted(sample)})")
+    assert good == sorted(sample), sample
+
+print(f"correct version: 200/200 random cases pass")
+print(f"buggy version  : {failures}/200 cases wrong - it leaves stray 2s behind")
+```
 ## Three pointers, three regions
 
 ```python

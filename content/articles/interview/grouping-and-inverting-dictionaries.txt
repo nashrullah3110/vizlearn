@@ -28,6 +28,66 @@ for w in words:
 
 `setdefault` is the middle ground and works on a plain dict &mdash; `groups.setdefault(w[0], []).append(w)` &mdash; which is useful when the result must be a real `dict` rather than a `defaultdict`.
 
+
+## Run it
+
+The three grouping idioms agreeing, groupby getting it wrong on unsorted input, and both inversion failures caught in the act.
+
+```python-run
+# Grouping and inverting: one pass each, and two traps in the inversion.
+from collections import defaultdict
+from itertools import groupby
+
+people = [("ana", "eng"), ("bo", "sales"), ("cy", "eng"),
+          ("di", "sales"), ("ed", "eng")]
+
+by_setdefault = {}
+for name, team in people:
+    by_setdefault.setdefault(team, []).append(name)
+
+by_default = defaultdict(list)
+for name, team in people:
+    by_default[team].append(name)
+
+print("setdefault :", dict(by_setdefault))
+print("defaultdict:", dict(by_default))
+print("agree      :", by_setdefault == dict(by_default))
+
+# --- groupby groups CONSECUTIVE keys only ------------------------------
+unsorted_groups = {k: [n for n, _ in g] for k, g in
+                   groupby(people, key=lambda p: p[1])}
+sorted_groups = {k: [n for n, _ in g] for k, g in
+                 groupby(sorted(people, key=lambda p: p[1]), key=lambda p: p[1])}
+print()
+print("groupby, unsorted:", unsorted_groups, " <- 'eng' appears twice, last wins")
+print("groupby, sorted  :", sorted_groups)
+print("It is not SQL's GROUP BY. Sort by the same key first, or use a dict.")
+
+# --- inverting ---------------------------------------------------------
+capital = {"france": "paris", "japan": "tokyo", "italy": "rome"}
+print()
+print("inverted:", {v: k for k, v in capital.items()})
+
+# Trap 1: duplicate values collapse, silently.
+sizes = {"ana": "medium", "bo": "large", "cy": "medium"}
+naive = {v: k for k, v in sizes.items()}
+grouped = defaultdict(list)
+for k, v in sizes.items():
+    grouped[v].append(k)
+print()
+print("input          :", sizes)
+print("naive inversion:", naive, "  <- 'ana' vanished")
+print("inverted safely:", dict(grouped))
+
+# Trap 2: values that cannot be keys.
+scores = {"ana": [90, 80], "bo": [70]}
+try:
+    {v: k for k, v in scores.items()}
+except TypeError as e:
+    print()
+    print("inverting list values ->", e)
+print("A tuple would work:", {tuple(v): k for k, v in scores.items()})
+```
 ## The defaultdict trap
 
 A `defaultdict` <strong>creates entries on read</strong>. Merely looking a key up inserts it:

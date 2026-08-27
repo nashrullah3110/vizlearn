@@ -11,6 +11,78 @@ Compress a character array in place by replacing runs of the same character with
 
 Two details make it more than a formatting exercise. Counts of 1 are omitted, so `"ab"` does not become `"a1b1"`. And a count above 9 becomes <strong>several characters</strong> &mdash; 12 is `"1"` and `"2"` &mdash; which is where most implementations break.
 
+
+## Run it
+
+The list-and-join version against the <code>+=</code> version, timed on a long input so the quadratic is visible, plus the in-place variant on a character array.
+
+```python-run
+# Run-length compression, and the concatenation trap inside it.
+import time
+
+def compress(text):
+    if not text:
+        return text
+    parts = []                          # a list, joined once at the end
+    i = 0
+    while i < len(text):
+        j = i
+        while j < len(text) and text[j] == text[i]:
+            j += 1
+        parts.append(text[i])
+        parts.append(str(j - i))
+        i = j
+    out = "".join(parts)
+    return out if len(out) < len(text) else text        # only if it helps
+
+
+def compress_slow(text):
+    """Same algorithm, quadratic output building."""
+    out = ""
+    i = 0
+    while i < len(text):
+        j = i
+        while j < len(text) and text[j] == text[i]:
+            j += 1
+        out += text[i] + str(j - i)     # a new string every run
+        i = j
+    return out if len(out) < len(text) else text
+
+
+for text in ["aabcccccaaa", "abc", "aaaa", "", "a"]:
+    print(f"{text!r:>14} -> {compress(text)!r}")
+print("'abc' is returned unchanged: 'a1b1c1' would be longer.")
+
+# --- the cost of building with += --------------------------------------
+big = "".join(ch * 3 for ch in "abcdefghij" * 3000)
+print()
+for name, fn in (("list + join", compress), ("+= in a loop", compress_slow)):
+    start = time.perf_counter()
+    fn(big)
+    print(f"  {name:>13}: {time.perf_counter() - start:.4f}s on {len(big):,} chars")
+
+# --- the in-place variant ----------------------------------------------
+def compress_in_place(chars):
+    """Compress a character array in place. Returns the new length."""
+    write = read = 0
+    while read < len(chars):
+        ch, run = chars[read], 0
+        while read < len(chars) and chars[read] == ch:
+            read += 1
+            run += 1
+        chars[write] = ch
+        write += 1
+        if run > 1:
+            for digit in str(run):
+                chars[write] = digit
+                write += 1
+    return write
+
+chars = list("aabcccccaaa")
+n = compress_in_place(chars)
+print()
+print("in place:", "".join(chars[:n]), f"(new length {n}, nothing allocated)")
+```
 ## The solution
 
 ```python

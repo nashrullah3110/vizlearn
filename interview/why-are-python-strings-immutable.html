@@ -243,7 +243,7 @@
 s[0] = &quot;H&quot;          # TypeError: &#x27;str&#x27; object does not support item assignment
 s.upper()           # returns a NEW string
 s += &quot; world&quot;       # rebinds s to a new string; the old one is unchanged</code></pre><p>Four design reasons, and each has practical consequences.</p><p><strong>1. Hashability.</strong> A dictionary key's slot depends on its hash. If a string could change, its hash would change, and any dictionary entry keyed on it would become unreachable. Immutability is what makes strings usable as keys &mdash; and since attribute names, module names and keyword arguments are all dictionary keys, this is foundational rather than incidental.</p><p><strong>2. Safe sharing.</strong> Passing a string to a function cannot mutate the caller's copy, so no defensive copying is needed anywhere. Two names can point at the same string with no risk.</p><p><strong>3. Interning and caching.</strong> Identical short strings can share one object, saving memory. The interpreter also caches a string's hash after first computing it, which is only valid because the value cannot change.</p><p><strong>4. Thread safety.</strong> An immutable object needs no lock. Any number of threads can read a string concurrently with no coordination.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-the-performance-consequence">The performance consequence</a></li><li><a href="#vz-s-what-to-use-instead-when-mutation-is-needed">What to use instead when mutation is needed</a></li><li><a href="#vz-s-what-immutability-actually-means">What immutability actually means</a></li><li><a href="#vz-s-the-three-things-it-buys">The three things it buys</a></li><li><a href="#vz-s-what-it-costs-and-the-one-place-it-bites">What it costs, and the one place it bites</a></li><li><a href="#vz-s-the-follow-up-you-should-expect">The follow-up you should expect</a></li><li><a href="#vz-s-interning-and-the-is-trap">Interning and the is trap</a></li><li><a href="#vz-s-immutability-elsewhere-in-python">Immutability elsewhere in Python</a></li><li><a href="#vz-s-how-other-languages-compare">How other languages compare</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-run-it">Run it</a></li><li><a href="#vz-s-the-performance-consequence">The performance consequence</a></li><li><a href="#vz-s-what-to-use-instead-when-mutation-is-needed">What to use instead when mutation is needed</a></li><li><a href="#vz-s-what-immutability-actually-means">What immutability actually means</a></li><li><a href="#vz-s-the-three-things-it-buys">The three things it buys</a></li><li><a href="#vz-s-what-it-costs-and-the-one-place-it-bites">What it costs, and the one place it bites</a></li><li><a href="#vz-s-the-follow-up-you-should-expect">The follow-up you should expect</a></li><li><a href="#vz-s-interning-and-the-is-trap">Interning and the is trap</a></li><li><a href="#vz-s-immutability-elsewhere-in-python">Immutability elsewhere in Python</a></li><li><a href="#vz-s-how-other-languages-compare">How other languages compare</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
             <div class="vz-iq-tags"><span class="vz-iq-tag">Strings</span><span class="vz-iq-tag">Conceptual</span><span class="vz-iq-tag">Easy</span></div>
         </div>
 
@@ -289,6 +289,57 @@ s += &quot; world&quot;       # rebinds s to a new string; the old one is unchan
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-run-it">Run it</h3>
+                    <p>Object identities before and after a "modification", then the cost of ignoring what that implies &mdash; measured at three sizes so the shape of the curve is visible rather than asserted.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src"># Immutability, and the one place it costs you.
+import time
+
+s = "cat"
+t = s                       # a second NAME, not a second object
+print("s =", s, " id:", hex(id(s)))
+print("t =", t, " id:", hex(id(t)), " same object:", t is s)
+
+u = s.upper()               # a NEW object; s is untouched
+print("u =", u, " id:", hex(id(u)), " same object:", u is s)
+print("s is still:", s)
+
+try:
+    s[0] = "C"
+except TypeError as e:
+    print("s[0] = 'C' ->", e)
+
+# Hashability is the payoff: the value cannot change, so the hash cannot
+# go stale, so a string can be a dictionary key.
+print("hash stable:", hash("cat") == hash(s))
+try:
+    {["c", "a", "t"]: 1}
+except TypeError as e:
+    print("list as a key ->", e)
+
+# --- the cost, measured -------------------------------------------------
+class Buf:                  # an attribute, so CPython's in-place resize
+    def __init__(self):     # special case cannot fire and hide the cost
+        self.text = ""
+
+print()
+print(f"{'n':>7} {'+= in a loop':>14} {'list + join':>13} {'ratio':>7}")
+for n in (20_000, 40_000, 80_000):
+    b = Buf()
+    start = time.perf_counter()
+    for _ in range(n):
+        b.text += "x"
+    concat = time.perf_counter() - start
+
+    start = time.perf_counter()
+    parts = []
+    for _ in range(n):
+        parts.append("x")
+    joined_text = "".join(parts)
+    joined = time.perf_counter() - start
+    print(f"{n:>7} {concat:>13.4f}s {joined:>12.4f}s {concat / joined:>6.1f}x")
+
+print("Double n: join doubles, += quadruples. That is O(n) against O(n^2).")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>1</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-the-performance-consequence">The performance consequence</h3>
                     <p>The one real cost is building strings incrementally:</p><pre><code class="language-python"># O(n^2) - each += allocates a new string and copies everything so far
@@ -356,54 +407,7 @@ hash((1, [2]))        # TypeError - contains a mutable object</code></pre>
         </div>
     </section>
 
-<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">Run it in Python</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">Object identities before and after a "modification", then the cost of ignoring what that implies &mdash; measured at three sizes so the shape of the curve is visible rather than asserted.</p><div class="vz-cl-grid"><div class="vz-py" data-vz-py><script type="text/plain" class="py-src"># Immutability, and the one place it costs you.
-import time
-
-s = "cat"
-t = s                       # a second NAME, not a second object
-print("s =", s, " id:", hex(id(s)))
-print("t =", t, " id:", hex(id(t)), " same object:", t is s)
-
-u = s.upper()               # a NEW object; s is untouched
-print("u =", u, " id:", hex(id(u)), " same object:", u is s)
-print("s is still:", s)
-
-try:
-    s[0] = "C"
-except TypeError as e:
-    print("s[0] = 'C' ->", e)
-
-# Hashability is the payoff: the value cannot change, so the hash cannot
-# go stale, so a string can be a dictionary key.
-print("hash stable:", hash("cat") == hash(s))
-try:
-    {["c", "a", "t"]: 1}
-except TypeError as e:
-    print("list as a key ->", e)
-
-# --- the cost, measured -------------------------------------------------
-class Buf:                  # an attribute, so CPython's in-place resize
-    def __init__(self):     # special case cannot fire and hide the cost
-        self.text = ""
-
-print()
-print(f"{'n':>7} {'+= in a loop':>14} {'list + join':>13} {'ratio':>7}")
-for n in (20_000, 40_000, 80_000):
-    b = Buf()
-    start = time.time()
-    for _ in range(n):
-        b.text += "x"
-    concat = time.time() - start
-
-    start = time.time()
-    parts = []
-    for _ in range(n):
-        parts.append("x")
-    joined_text = "".join(parts)
-    joined = time.time() - start
-    print(f"{n:>7} {concat:>13.4f}s {joined:>12.4f}s {concat / joined:>6.1f}x")
-
-print("Double n: join doubles, += quadruples. That is O(n) against O(n^2).")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>immutable.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">t = s</code><span class="vz-cl-note">Binds a second name to the same object, which <code>t is s</code> confirms. No copy is made because none is needed &mdash; neither name can change the value.</span></li><li class="vz-cl-step"><code class="vz-cl-line">u = s.upper()</code><span class="vz-cl-note">A different id. Every string method returns a new object; none of them has a way to modify the receiver.</span></li><li class="vz-cl-step"><code class="vz-cl-line">hash(&quot;cat&quot;) == hash(s)</code><span class="vz-cl-note">The hash is a function of the value, and the value is frozen for the object's whole life. That is the precondition a dictionary key has to meet.</span></li><li class="vz-cl-step"><code class="vz-cl-line">self.text += &quot;x&quot;</code><span class="vz-cl-note">Accumulating into an attribute rather than a local is deliberate: CPython can resize a local string in place, which would hide the quadratic the table is there to show.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Add <code>v = "cat"</code> and check <code>v is s</code>. Short literals are interned, so it is often <code>True</code> &mdash; and relying on that is still a bug.</li><li>Swap <code>b.text</code> for a local variable and re-run. Whether the quadratic disappears depends on your interpreter, which is itself the argument for <code>join</code>.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">How the code works</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">Object identities before and after a "modification", then the cost of ignoring what that implies &mdash; measured at three sizes so the shape of the curve is visible rather than asserted.</p><div class="vz-cl-grid"><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">t = s</code><span class="vz-cl-note">Binds a second name to the same object, which <code>t is s</code> confirms. No copy is made because none is needed &mdash; neither name can change the value.</span></li><li class="vz-cl-step"><code class="vz-cl-line">u = s.upper()</code><span class="vz-cl-note">A different id. Every string method returns a new object; none of them has a way to modify the receiver.</span></li><li class="vz-cl-step"><code class="vz-cl-line">hash(&quot;cat&quot;) == hash(s)</code><span class="vz-cl-note">The hash is a function of the value, and the value is frozen for the object's whole life. That is the precondition a dictionary key has to meet.</span></li><li class="vz-cl-step"><code class="vz-cl-line">self.text += &quot;x&quot;</code><span class="vz-cl-note">Accumulating into an attribute rather than a local is deliberate: CPython can resize a local string in place, which would hide the quadratic the table is there to show.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Add <code>v = "cat"</code> and check <code>v is s</code>. Short literals are interned, so it is often <code>True</code> &mdash; and relying on that is still a bug.</li><li>Swap <code>b.text</code> for a local variable and re-run. Whether the quadratic disappears depends on your interpreter, which is itself the argument for <code>join</code>.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 
     <script>
         (function () {

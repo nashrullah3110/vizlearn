@@ -34,6 +34,65 @@ dedupe_by(users, key=lambda u: u.email)      # unique by email, order kept
 
 That last version is the one to reach for with objects, because it deduplicates by a chosen field while keeping the full object.
 
+
+## Run it
+
+The three deduplication idioms and what each does to order, the set operators against their loop equivalents, and the membership timing that motivates all of it.
+
+```python-run
+# Sets: O(1) membership, at the price of order and duplicates.
+import time
+
+items = ["b", "a", "c", "a", "b", "d"]
+print("original           :", items)
+print("set()              :", sorted(set(items)), "  order destroyed")
+print("sorted(set())      :", sorted(set(items)), "  sorted, not original order")
+print("dict.fromkeys()    :", list(dict.fromkeys(items)), "  first-seen order kept")
+
+# --- what a set refuses ------------------------------------------------
+print()
+try:
+    {[1, 2]}
+except TypeError as e:
+    print("a list in a set ->", e)
+print("a tuple in a set ->", {(1, 2)})
+try:
+    sorted(set(items))[0]
+    set(items)[0]
+except TypeError as e:
+    print("indexing a set  ->", e)
+
+# --- the operators, and the loops they replace -------------------------
+a = {"alice", "bob", "carol", "dave"}
+b = {"carol", "dave", "erin"}
+print()
+print("a & b (in both)        :", sorted(a & b))
+print("a | b (in either)      :", sorted(a | b))
+print("a - b (in a only)      :", sorted(a - b))
+print("a ^ b (in exactly one) :", sorted(a ^ b))
+print("{'carol'} <= a         :", {"carol"} <= a)
+
+# --- why it matters ----------------------------------------------------
+big_a = list(range(6_000))
+big_b = list(range(3_000, 9_000))
+
+start = time.perf_counter()
+loop = [x for x in big_a if x in big_b]            # O(n * m)
+loop_time = time.perf_counter() - start
+
+start = time.perf_counter()
+operator = sorted(set(big_a) & set(big_b))         # O(n + m)
+op_time = time.perf_counter() - start
+
+print()
+print(f"intersection of two {len(big_a):,}-item collections:")
+print(f"  list comprehension : {loop_time:.4f}s")
+if op_time > 0:
+    print(f"  set operator       : {op_time:.4f}s   ({loop_time / op_time:.0f}x faster)")
+else:
+    print(f"  set operator       : too fast to measure separately")
+print(f"  same answer        : {loop == operator}")
+```
 ## Why the set is fast
 
 A list must scan to know whether it already contains something &mdash; O(n) per check, so O(n²) to deduplicate by repeated scanning.

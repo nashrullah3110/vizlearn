@@ -19,6 +19,98 @@ Neither structure alone suffices. A hash table has no order; a linked list has n
 |Sorted structure|Reordering is O(log n), not O(1)|
 |Dict + doubly linked list|<strong>Both O(1)</strong>|
 
+
+## Run it
+
+The from-scratch version with sentinel nodes, the <code>OrderedDict</code> version, and both run through the same sequence of operations so their answers can be compared.
+
+```python-run
+# LRU cache: a hash map for lookup, a doubly linked list for order.
+from collections import OrderedDict
+
+class Node:
+    __slots__ = ("key", "value", "prev", "next")
+    def __init__(self, key=None, value=None):
+        self.key, self.value = key, value
+        self.prev = self.next = None
+
+
+class LRUCache:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.map = {}                        # key -> NODE, not key -> value
+        # Sentinels, so no insert or remove is ever a special case.
+        self.head, self.tail = Node(), Node()
+        self.head.next, self.tail.prev = self.tail, self.head
+        self.evictions = []
+
+    def _unlink(self, node):
+        node.prev.next, node.next.prev = node.next, node.prev
+
+    def _push_front(self, node):
+        node.next, node.prev = self.head.next, self.head
+        self.head.next.prev = self.head.next = node
+
+    def get(self, key):
+        node = self.map.get(key)
+        if node is None:
+            return -1
+        self._unlink(node)                   # a get CHANGES the order
+        self._push_front(node)
+        return node.value
+
+    def put(self, key, value):
+        node = self.map.get(key)
+        if node:
+            node.value = value
+            self._unlink(node)
+            self._push_front(node)
+            return
+        node = Node(key, value)
+        self.map[key] = node
+        self._push_front(node)
+        if len(self.map) > self.capacity:
+            oldest = self.tail.prev          # O(1): no scan needed
+            self._unlink(oldest)
+            del self.map[oldest.key]
+            self.evictions.append(oldest.key)
+
+
+class LRUOrderedDict:
+    """The same thing, using the structure the standard library already has."""
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.data = OrderedDict()
+        self.evictions = []
+
+    def get(self, key):
+        if key not in self.data:
+            return -1
+        self.data.move_to_end(key)
+        return self.data[key]
+
+    def put(self, key, value):
+        if key in self.data:
+            self.data.move_to_end(key)
+        self.data[key] = value
+        if len(self.data) > self.capacity:
+            self.evictions.append(self.data.popitem(last=False)[0])
+
+
+ops = [("put", "a", 1), ("put", "b", 2), ("get", "a", None),
+       ("put", "c", 3), ("get", "b", None), ("get", "c", None), ("get", "a", None)]
+
+for name, cls in (("from scratch", LRUCache), ("OrderedDict", LRUOrderedDict)):
+    cache = cls(2)
+    results = []
+    for op, key, value in ops:
+        results.append(cache.get(key) if op == "get" else (cache.put(key, value) or "-"))
+    print(f"{name:>13}: {results}  evicted {cache.evictions}")
+
+print()
+print("get('b') is -1: putting 'c' evicted it, because 'a' had just been read")
+print("and was therefore more recently used.")
+```
 ## The implementation
 
 ```python

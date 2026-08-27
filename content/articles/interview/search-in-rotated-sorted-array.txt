@@ -17,6 +17,86 @@ A sorted array has been rotated at an unknown pivot. Find a target in O(log n).
 
 O(log n) rules out a linear scan, so binary search must work despite the array not being globally sorted. The trick is that <strong>at least one half of any subarray is still sorted</strong>.
 
+
+## Run it
+
+The search with each decision printed, checked against a linear scan at every rotation of the same array, plus the duplicates variant and its O(n) case.
+
+```python-run
+# Search a rotated sorted array: one half is always in order.
+
+def search(values, target, show=False):
+    lo, hi = 0, len(values) - 1
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        if values[mid] == target:
+            return mid
+        if values[lo] <= values[mid]:                 # left half is sorted
+            if values[lo] <= target < values[mid]:
+                if show: print(f"    target in sorted left {values[lo:mid+1]}")
+                hi = mid - 1
+            else:
+                if show: print(f"    not in sorted left {values[lo:mid+1]}")
+                lo = mid + 1
+        else:                                          # right half is sorted
+            if values[mid] < target <= values[hi]:
+                if show: print(f"    target in sorted right {values[mid:hi+1]}")
+                lo = mid + 1
+            else:
+                if show: print(f"    not in sorted right {values[mid:hi+1]}")
+                hi = mid - 1
+    return -1
+
+
+data = [4, 5, 6, 7, 0, 1, 2]
+print("array:", data, " looking for 0")
+print("index:", search(data, 0, show=True))
+
+# Correct at every rotation, for every value, including absent ones.
+print()
+base = [0, 1, 2, 4, 5, 6, 7]
+failures = 0
+for r in range(len(base)):
+    rotated = base[r:] + base[:r]
+    for target in base + [3, 99]:
+        got = search(rotated, target)
+        want = rotated.index(target) if target in rotated else -1
+        if got != want:
+            failures += 1
+            print("  MISMATCH", rotated, target, got, want)
+print(f"all rotations x all targets: {failures} mismatches")
+
+# --- with duplicates, the guarantee weakens ----------------------------
+def search_with_duplicates(values, target):
+    lo, hi = 0, len(values) - 1
+    steps = 0
+    while lo <= hi:
+        steps += 1
+        mid = (lo + hi) // 2
+        if values[mid] == target:
+            return mid, steps
+        if values[lo] == values[mid] == values[hi]:
+            lo += 1                      # cannot tell which half is sorted
+            hi -= 1
+        elif values[lo] <= values[mid]:
+            if values[lo] <= target < values[mid]:
+                hi = mid - 1
+            else:
+                lo = mid + 1
+        else:
+            if values[mid] < target <= values[hi]:
+                lo = mid + 1
+            else:
+                hi = mid - 1
+    return -1, steps
+
+print()
+nasty = [2] * 12 + [1] + [2] * 12
+index, steps = search_with_duplicates(nasty, 1)
+print(f"25 elements, almost all equal: found at {index} after {steps} steps")
+print("That is O(n), not O(log n) - and it is a real lower bound, because")
+print("a[lo] == a[mid] == a[hi] tells you nothing about where the pivot is.")
+```
 ## The key property
 
 Split at the midpoint. The rotation point lies in one half or the other, so the <em>other</em> half is properly sorted. Comparing `nums[mid]` with `nums[left]` reveals which:

@@ -17,6 +17,67 @@ intro: When would you use a tuple instead of a list? What about deque or array?
 
 Two rows decide almost every real choice: <strong>`deque` is O(1) at both ends but O(n) to index</strong>, and <strong>`tuple` is hashable so it can be a dict key or a set member</strong>.
 
+
+## Run it
+
+The five containers measured rather than described: the operation each is fast at, the memory each uses for the same thousand integers, and the two errors that pick the container for you.
+
+```python-run
+# Choosing a container: measure the operation you actually repeat.
+import sys, time
+from array import array
+from collections import deque
+
+N = 30_000
+print(f"{'operation':>28} {'list':>10} {'deque':>10}")
+for label, action_list, action_deque in [
+    ("append at the end",  lambda c: c.append(1),   lambda c: c.append(1)),
+    ("insert at the front", lambda c: c.insert(0, 1), lambda c: c.appendleft(1)),
+]:
+    lst, dq = [], deque()
+    start = time.perf_counter(); [action_list(lst) for _ in range(N)]
+    list_time = time.perf_counter() - start
+    start = time.perf_counter(); [action_deque(dq) for _ in range(N)]
+    deque_time = time.perf_counter() - start
+    print(f"{label:>28} {list_time:>9.4f}s {deque_time:>9.4f}s")
+
+# Random access is the other direction.
+lst = list(range(N)); dq = deque(range(N))
+start = time.perf_counter(); [lst[N // 2] for _ in range(100_000)]
+print(f"{'index the middle':>28} {time.perf_counter() - start:>9.4f}s", end="")
+start = time.perf_counter(); [dq[N // 2] for _ in range(100_000)]
+print(f" {time.perf_counter() - start:>9.4f}s   <- deque loses here")
+
+# --- memory: references versus packed values ---------------------------
+numbers = list(range(1000))
+packed = array("i", range(1000))
+as_tuple = tuple(range(1000))
+print()
+print(f"list  of 1000 ints : {sys.getsizeof(numbers):>6} bytes (references)")
+print(f"tuple of 1000 ints : {sys.getsizeof(as_tuple):>6} bytes")
+print(f"array of 1000 ints : {sys.getsizeof(packed):>6} bytes (values, packed)")
+print("The list does not include the integer objects it points at.")
+
+# --- the two errors that decide it for you -----------------------------
+print()
+try:
+    {[1, 2]: "point"}
+except TypeError as e:
+    print("list as a dict key  ->", e)
+print("tuple as a dict key ->", {(1, 2): "point"})
+
+try:
+    (1, 2).append(3)
+except AttributeError as e:
+    print("tuple.append        ->", e)
+
+# --- deque with maxlen is a ring buffer --------------------------------
+print()
+recent = deque(maxlen=3)
+for event in "abcde":
+    recent.append(event)
+print("deque(maxlen=3) after abcde:", list(recent), "- oldest dropped for free")
+```
 ## When to use each
 
 <strong>`list`</strong> is the default. Random access, sorting, slicing, appending at the end &mdash; all good. Only reject it when you need something it cannot do.

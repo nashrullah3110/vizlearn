@@ -52,6 +52,71 @@ Which is far better, because the failure is loud. Dicts and sets track a version
 
 Note the dict wording: <em>size</em> change. Reassigning an existing key's value is allowed and safe; adding or deleting keys is not.
 
+
+## Run it
+
+The dict raising, the list silently skipping on the same logical operation, and the three fixes all producing the answer the broken loop was supposed to give.
+
+```python-run
+# Mutating while iterating: one raises, the other lies.
+
+# --- the dict: a loud failure ------------------------------------------
+d = {"a": 1, "b": 2, "c": 3, "d": 4}
+try:
+    for key in d:
+        if d[key] % 2 == 0:
+            del d[key]
+except RuntimeError as e:
+    print("dict  ->", e)
+
+# Assigning to an EXISTING key is fine - only the size is checked.
+d = {"a": 1, "b": 2}
+for key in d:
+    d[key] = 0
+print("assigning to existing keys is fine:", d)
+
+# --- the list: a silent one --------------------------------------------
+items = [1, 2, 4, 6, 7, 8, 9]
+broken = list(items)
+for x in broken:
+    if x % 2 == 0:
+        broken.remove(x)
+
+print()
+print("input          :", items)
+print("removing evens :", broken, " <- 6 survived, and no error was raised")
+print("expected       :", [x for x in items if x % 2])
+
+# 6 is skipped because removing 4 shifted it into the index just visited.
+
+# --- the three fixes ---------------------------------------------------
+print()
+rebuilt = [x for x in items if x % 2]                  # 1. build a new list
+print("comprehension  :", rebuilt)
+
+snapshot = list(items)
+for x in snapshot[:]:                                  # 2. iterate a copy
+    if x % 2 == 0:
+        snapshot.remove(x)
+print("iterate a copy :", snapshot)
+
+backwards = list(items)
+for i in range(len(backwards) - 1, -1, -1):            # 3. walk backwards
+    if backwards[i] % 2 == 0:
+        del backwards[i]
+print("backwards      :", backwards)
+
+print()
+counts = {"a": 0, "b": 3, "c": 0}
+cleaned = {k: v for k, v in counts.items() if v}       # the dict equivalent
+print("dict rebuilt   :", cleaned)
+
+# A change to a VALUE is not a change to the dict.
+nested = {"x": [1], "y": [2]}
+for key in nested:
+    nested[key].append(0)
+print("mutating values is legal:", nested)
+```
 ## The four correct approaches
 
 <strong>Build a new collection</strong> &mdash; clearest, and the default choice:

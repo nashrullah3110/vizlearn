@@ -253,7 +253,7 @@ sorted(set(items))               # [1, 2, 3] - sorted</code></pre><p>All three a
     return out
 
 dedupe_by(users, key=lambda u: u.email)      # unique by email, order kept</code></pre><p>That last version is the one to reach for with objects, because it deduplicates by a chosen field while keeping the full object.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-why-the-set-is-fast">Why the set is fast</a></li><li><a href="#vz-s-the-requirement-hashable-elements">The requirement: hashable elements</a></li><li><a href="#vz-s-what-you-gain-and-what-you-give-up">What you gain and what you give up</a></li><li><a href="#vz-s-deduplicating-three-ways">Deduplicating three ways</a></li><li><a href="#vz-s-the-operators-that-replace-loops">The operators that replace loops</a></li><li><a href="#vz-s-choosing-between-the-containers">Choosing between the containers</a></li><li><a href="#vz-s-where-deduplication-goes-wrong">Where deduplication goes wrong</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-run-it">Run it</a></li><li><a href="#vz-s-why-the-set-is-fast">Why the set is fast</a></li><li><a href="#vz-s-the-requirement-hashable-elements">The requirement: hashable elements</a></li><li><a href="#vz-s-what-you-gain-and-what-you-give-up">What you gain and what you give up</a></li><li><a href="#vz-s-deduplicating-three-ways">Deduplicating three ways</a></li><li><a href="#vz-s-the-operators-that-replace-loops">The operators that replace loops</a></li><li><a href="#vz-s-choosing-between-the-containers">Choosing between the containers</a></li><li><a href="#vz-s-where-deduplication-goes-wrong">Where deduplication goes wrong</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
             <div class="vz-iq-tags"><span class="vz-iq-tag">Dicts, sets &amp; hashing</span><span class="vz-iq-tag">Conceptual</span><span class="vz-iq-tag">Easy</span></div>
         </div>
 
@@ -299,6 +299,61 @@ dedupe_by(users, key=lambda u: u.email)      # unique by email, order kept</code
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-run-it">Run it</h3>
+                    <p>The three deduplication idioms and what each does to order, the set operators against their loop equivalents, and the membership timing that motivates all of it.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src"># Sets: O(1) membership, at the price of order and duplicates.
+import time
+
+items = ["b", "a", "c", "a", "b", "d"]
+print("original           :", items)
+print("set()              :", sorted(set(items)), "  order destroyed")
+print("sorted(set())      :", sorted(set(items)), "  sorted, not original order")
+print("dict.fromkeys()    :", list(dict.fromkeys(items)), "  first-seen order kept")
+
+# --- what a set refuses ------------------------------------------------
+print()
+try:
+    {[1, 2]}
+except TypeError as e:
+    print("a list in a set ->", e)
+print("a tuple in a set ->", {(1, 2)})
+try:
+    sorted(set(items))[0]
+    set(items)[0]
+except TypeError as e:
+    print("indexing a set  ->", e)
+
+# --- the operators, and the loops they replace -------------------------
+a = {"alice", "bob", "carol", "dave"}
+b = {"carol", "dave", "erin"}
+print()
+print("a & b (in both)        :", sorted(a & b))
+print("a | b (in either)      :", sorted(a | b))
+print("a - b (in a only)      :", sorted(a - b))
+print("a ^ b (in exactly one) :", sorted(a ^ b))
+print("{'carol'} <= a         :", {"carol"} <= a)
+
+# --- why it matters ----------------------------------------------------
+big_a = list(range(6_000))
+big_b = list(range(3_000, 9_000))
+
+start = time.perf_counter()
+loop = [x for x in big_a if x in big_b]            # O(n * m)
+loop_time = time.perf_counter() - start
+
+start = time.perf_counter()
+operator = sorted(set(big_a) & set(big_b))         # O(n + m)
+op_time = time.perf_counter() - start
+
+print()
+print(f"intersection of two {len(big_a):,}-item collections:")
+print(f"  list comprehension : {loop_time:.4f}s")
+if op_time > 0:
+    print(f"  set operator       : {op_time:.4f}s   ({loop_time / op_time:.0f}x faster)")
+else:
+    print(f"  set operator       : too fast to measure separately")
+print(f"  same answer        : {loop == operator}")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>1</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-why-the-set-is-fast">Why the set is fast</h3>
                     <p>A list must scan to know whether it already contains something &mdash; O(n) per check, so O(n²) to deduplicate by repeated scanning.</p><p>A set hashes the value and looks in one place &mdash; O(1) on average, so O(n) overall.</p><pre><code class="language-python"># O(n^2) - the membership test scans the growing list
@@ -358,55 +413,7 @@ a.isdisjoint(b)  # False      no overlap</code></pre><p>Those replace loops. "Wh
         </div>
     </section>
 
-<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">Run it in Python</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The three deduplication idioms and what each does to order, the set operators against their loop equivalents, and the membership timing that motivates all of it.</p><div class="vz-cl-grid"><div class="vz-py" data-vz-py><script type="text/plain" class="py-src"># Sets: O(1) membership, at the price of order and duplicates.
-import time
-
-items = ["b", "a", "c", "a", "b", "d"]
-print("original           :", items)
-print("set()              :", sorted(set(items)), "  order destroyed")
-print("sorted(set())      :", sorted(set(items)), "  sorted, not original order")
-print("dict.fromkeys()    :", list(dict.fromkeys(items)), "  first-seen order kept")
-
-# --- what a set refuses ------------------------------------------------
-print()
-try:
-    {[1, 2]}
-except TypeError as e:
-    print("a list in a set ->", e)
-print("a tuple in a set ->", {(1, 2)})
-try:
-    sorted(set(items))[0]
-    set(items)[0]
-except TypeError as e:
-    print("indexing a set  ->", e)
-
-# --- the operators, and the loops they replace -------------------------
-a = {"alice", "bob", "carol", "dave"}
-b = {"carol", "dave", "erin"}
-print()
-print("a & b (in both)        :", sorted(a & b))
-print("a | b (in either)      :", sorted(a | b))
-print("a - b (in a only)      :", sorted(a - b))
-print("a ^ b (in exactly one) :", sorted(a ^ b))
-print("{'carol'} <= a         :", {"carol"} <= a)
-
-# --- why it matters ----------------------------------------------------
-big_a = list(range(6_000))
-big_b = list(range(3_000, 9_000))
-
-start = time.time()
-loop = [x for x in big_a if x in big_b]            # O(n * m)
-loop_time = time.time() - start
-
-start = time.time()
-operator = sorted(set(big_a) & set(big_b))         # O(n + m)
-op_time = time.time() - start
-
-print()
-print(f"intersection of two {len(big_a):,}-item collections:")
-print(f"  list comprehension : {loop_time:.4f}s")
-print(f"  set operator       : {op_time:.4f}s   ({loop_time / op_time:.0f}x faster)")
-print(f"  same answer        : {loop == operator}")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>sets.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">list(dict.fromkeys(items))</code><span class="vz-cl-note">Deduplicates in first-seen order, in one pass. The idiom worth memorising, and a language guarantee rather than an implementation detail since 3.7.</span></li><li class="vz-cl-step"><code class="vz-cl-line">sorted(set(items))</code><span class="vz-cl-note">Deduplicated <em>and reordered</em>. It looks like a tidy version of the previous line and quietly changes the output order, which is a real bug when the order carried meaning.</span></li><li class="vz-cl-step"><code class="vz-cl-line">{[1, 2]}</code><span class="vz-cl-note">A <code>TypeError</code>: set elements must be hashable for the same reason dictionary keys must be. A tuple works.</span></li><li class="vz-cl-step"><code class="vz-cl-line">set(big_a) &amp; set(big_b)</code><span class="vz-cl-note">Two O(n) conversions and an O(min) intersection, against a comprehension that scans one list for every element of the other. The timing at the end is that difference.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Deduplicate a list of dictionaries. It raises &mdash; and the usual fix is to key on something hashable, such as an id or a tuple of fields.</li><li>Compare <code>a.isdisjoint(b)</code> with <code>not (a &amp; b)</code>. The first can stop at the first shared element instead of building the whole intersection.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">How the code works</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The three deduplication idioms and what each does to order, the set operators against their loop equivalents, and the membership timing that motivates all of it.</p><div class="vz-cl-grid"><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">list(dict.fromkeys(items))</code><span class="vz-cl-note">Deduplicates in first-seen order, in one pass. The idiom worth memorising, and a language guarantee rather than an implementation detail since 3.7.</span></li><li class="vz-cl-step"><code class="vz-cl-line">sorted(set(items))</code><span class="vz-cl-note">Deduplicated <em>and reordered</em>. It looks like a tidy version of the previous line and quietly changes the output order, which is a real bug when the order carried meaning.</span></li><li class="vz-cl-step"><code class="vz-cl-line">{[1, 2]}</code><span class="vz-cl-note">A <code>TypeError</code>: set elements must be hashable for the same reason dictionary keys must be. A tuple works.</span></li><li class="vz-cl-step"><code class="vz-cl-line">set(big_a) &amp; set(big_b)</code><span class="vz-cl-note">Two O(n) conversions and an O(min) intersection, against a comprehension that scans one list for every element of the other. The timing at the end is that difference.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Deduplicate a list of dictionaries. It raises &mdash; and the usual fix is to key on something hashable, such as an id or a tuple of fields.</li><li>Compare <code>a.isdisjoint(b)</code> with <code>not (a &amp; b)</code>. The first can stop at the first shared element instead of building the whole intersection.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 
     <script>
         (function () {

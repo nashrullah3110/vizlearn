@@ -244,7 +244,7 @@ s[0:5]        # &#x27;hello&#x27;  -- a new 5-character string
 s[:]          # returns s itself: an identical immutable object needs no copy
 s[::2]        # &#x27;hlowrd&#x27; -- a copy, with a step
 s[::-1]       # &#x27;dlrow olleh&#x27; -- reversal, O(n)</code></pre><p><code>s[:]</code> is the one exception, and it is an implementation optimisation rather than a rule to depend on: because the string is immutable, a full-slice copy can safely return the original object.</p><div class="vz-table-wrap"><table><thead><tr><th>Operation</th><th>Cost</th></tr></thead><tbody><tr><td><code>s[i]</code></td><td>O(1) &mdash; single character</td></tr><tr><td><code>s[a:b]</code></td><td>O(b &minus; a)</td></tr><tr><td><code>s[:]</code></td><td>O(1) in CPython &mdash; returns the same object</td></tr><tr><td><code>s[::-1]</code></td><td>O(n)</td></tr><tr><td><code>len(s)</code></td><td>O(1) &mdash; stored, not counted</td></tr><tr><td><code>s in t</code></td><td>O(n &middot; m) worst case</td></tr><tr><td><code>s + t</code></td><td>O(n + m) &mdash; a new string</td></tr></tbody></table></div>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-where-it-becomes-quadratic">Where it becomes quadratic</a></li><li><a href="#vz-s-copy-not-view">Copy, not view</a></li><li><a href="#vz-s-where-it-actually-hurts">Where it actually hurts</a></li><li><a href="#vz-s-what-to-do-instead">What to do instead</a></li><li><a href="#vz-s-avoiding-the-copy-entirely">Avoiding the copy entirely</a></li><li><a href="#vz-s-how-python-stores-strings">How Python stores strings</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-run-it">Run it</a></li><li><a href="#vz-s-where-it-becomes-quadratic">Where it becomes quadratic</a></li><li><a href="#vz-s-copy-not-view">Copy, not view</a></li><li><a href="#vz-s-where-it-actually-hurts">Where it actually hurts</a></li><li><a href="#vz-s-what-to-do-instead">What to do instead</a></li><li><a href="#vz-s-avoiding-the-copy-entirely">Avoiding the copy entirely</a></li><li><a href="#vz-s-how-python-stores-strings">How Python stores strings</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
             <div class="vz-iq-tags"><span class="vz-iq-tag">Strings</span><span class="vz-iq-tag">Conceptual</span><span class="vz-iq-tag">Easy</span></div>
         </div>
 
@@ -290,6 +290,60 @@ s[::-1]       # &#x27;dlrow olleh&#x27; -- reversal, O(n)</code></pre><p><code>s
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-run-it">Run it</h3>
+                    <p>The same scan written twice &mdash; once slicing on every iteration, once carrying indices &mdash; timed at three sizes so the quadratic separates from the linear in front of you.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src"># A slice is a copy. One is free; one per iteration is quadratic.
+import time
+
+s = "algorithms"
+part = s[2:6]
+print("s      :", s)
+print("s[2:6] :", part, " same object as s:", part is s)
+print("reversed:", s[::-1], "- a full copy, O(n) time and space")
+
+# --- the shape that goes quadratic --------------------------------------
+def peel_with_slices(text):
+    """Walk the string by chopping the front off. Copies the rest each time."""
+    n = 0
+    while text:
+        _first = text[0]
+        text = text[1:]          # copies len(text) - 1 characters. Every time.
+        n += 1
+    return n
+
+
+def walk_with_index(text):
+    """The same walk, carrying an index. Nothing is copied at all."""
+    n = 0
+    i = 0
+    while i < len(text):
+        _first = text[i]
+        i += 1
+        n += 1
+    return n
+
+
+print()
+print(f"{'n':>7} {'slicing':>12} {'indexing':>12} {'ratio':>8}")
+for n in (5_000, 10_000, 20_000):
+    text = "x" * n
+
+    start = time.perf_counter()
+    peel_with_slices(text)
+    slicing = time.perf_counter() - start
+
+    start = time.perf_counter()
+    walk_with_index(text)
+    indexing = time.perf_counter() - start
+
+    print(f"{n:>7} {slicing:>11.4f}s {indexing:>11.4f}s {slicing / indexing:>7.1f}x")
+
+print("Double n: indexing doubles, slicing quadruples.")
+print()
+print("memoryview really is a view - but only over bytes:")
+buf = memoryview(b"algorithms")
+print("  buf[2:6] ->", bytes(buf[2:6]), "- no copy of the underlying buffer")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>1</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-where-it-becomes-quadratic">Where it becomes quadratic</h3>
                     <p>The classic failure is slicing inside a loop:</p><pre><code class="language-python">def process_naive(s):
@@ -348,57 +402,7 @@ while (pos := s.find(&quot;,&quot;, pos)) != -1:     # no copies at all
         </div>
     </section>
 
-<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">Run it in Python</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The same scan written twice &mdash; once slicing on every iteration, once carrying indices &mdash; timed at three sizes so the quadratic separates from the linear in front of you.</p><div class="vz-cl-grid"><div class="vz-py" data-vz-py><script type="text/plain" class="py-src"># A slice is a copy. One is free; one per iteration is quadratic.
-import time
-
-s = "algorithms"
-part = s[2:6]
-print("s      :", s)
-print("s[2:6] :", part, " same object as s:", part is s)
-print("reversed:", s[::-1], "- a full copy, O(n) time and space")
-
-# --- the shape that goes quadratic --------------------------------------
-def peel_with_slices(text):
-    """Walk the string by chopping the front off. Copies the rest each time."""
-    n = 0
-    while text:
-        _first = text[0]
-        text = text[1:]          # copies len(text) - 1 characters. Every time.
-        n += 1
-    return n
-
-
-def walk_with_index(text):
-    """The same walk, carrying an index. Nothing is copied at all."""
-    n = 0
-    i = 0
-    while i < len(text):
-        _first = text[i]
-        i += 1
-        n += 1
-    return n
-
-
-print()
-print(f"{'n':>7} {'slicing':>12} {'indexing':>12} {'ratio':>8}")
-for n in (5_000, 10_000, 20_000):
-    text = "x" * n
-
-    start = time.time()
-    peel_with_slices(text)
-    slicing = time.time() - start
-
-    start = time.time()
-    walk_with_index(text)
-    indexing = time.time() - start
-
-    print(f"{n:>7} {slicing:>11.4f}s {indexing:>11.4f}s {slicing / indexing:>7.1f}x")
-
-print("Double n: indexing doubles, slicing quadruples.")
-print()
-print("memoryview really is a view - but only over bytes:")
-buf = memoryview(b"algorithms")
-print("  buf[2:6] ->", bytes(buf[2:6]), "- no copy of the underlying buffer")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>slicing.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">part is s</code><span class="vz-cl-note"><code>False</code>. The slice is a separate object holding its own four characters, which is the entire question.</span></li><li class="vz-cl-step"><code class="vz-cl-line">text = text[1:]</code><span class="vz-cl-note">Looks like advancing a pointer and is nothing of the sort: it allocates a string one shorter and copies into it. Doing that n times copies about n&sup2;/2 characters.</span></li><li class="vz-cl-step"><code class="vz-cl-line">i += 1</code><span class="vz-cl-note">The same traversal with no allocation at all. This is why every scanning algorithm here carries indices rather than slicing.</span></li><li class="vz-cl-step"><code class="vz-cl-line">memoryview(b&quot;algorithms&quot;)</code><span class="vz-cl-note">The zero-copy answer, and the reason to know the difference: slicing a memoryview is O(1) and shares memory. It works on <code>bytes</code>, not <code>str</code>.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Write the recursive version &mdash; <code>def walk(s): return 1 + walk(s[1:]) if s else 0</code>. Elegant, and quadratic for the same reason.</li><li>Raise n to 40,000 and watch the ratio roughly double again.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">How the code works</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The same scan written twice &mdash; once slicing on every iteration, once carrying indices &mdash; timed at three sizes so the quadratic separates from the linear in front of you.</p><div class="vz-cl-grid"><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">part is s</code><span class="vz-cl-note"><code>False</code>. The slice is a separate object holding its own four characters, which is the entire question.</span></li><li class="vz-cl-step"><code class="vz-cl-line">text = text[1:]</code><span class="vz-cl-note">Looks like advancing a pointer and is nothing of the sort: it allocates a string one shorter and copies into it. Doing that n times copies about n&sup2;/2 characters.</span></li><li class="vz-cl-step"><code class="vz-cl-line">i += 1</code><span class="vz-cl-note">The same traversal with no allocation at all. This is why every scanning algorithm here carries indices rather than slicing.</span></li><li class="vz-cl-step"><code class="vz-cl-line">memoryview(b&quot;algorithms&quot;)</code><span class="vz-cl-note">The zero-copy answer, and the reason to know the difference: slicing a memoryview is O(1) and shares memory. It works on <code>bytes</code>, not <code>str</code>.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Write the recursive version &mdash; <code>def walk(s): return 1 + walk(s[1:]) if s else 0</code>. Elegant, and quadratic for the same reason.</li><li>Raise n to 40,000 and watch the ratio roughly double again.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 
     <script>
         (function () {

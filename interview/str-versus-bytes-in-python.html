@@ -247,7 +247,7 @@ len(b)     # 5    bytes -- é needs two in UTF-8
 
 s[0]       # &#x27;c&#x27;  a one-character str
 b[0]       # 99   an INTEGER, not b&#x27;c&#x27;</code></pre><p>Two details catch people out immediately. Indexing <code>bytes</code> yields an <code>int</code>, not a one-byte <code>bytes</code> object &mdash; slicing does give <code>bytes</code>, so <code>b[0:1]</code> is <code>b'c'</code> while <code>b[0]</code> is <code>99</code>. And <code>len</code> differs between the two representations of the same text, which is the source of most truncation bugs.</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th><code>str</code></th><th><code>bytes</code></th></tr></thead><tbody><tr><td>Element</td><td>Unicode code point</td><td>Integer 0&ndash;255</td></tr><tr><td><code>x[0]</code> gives</td><td><code>str</code> of length 1</td><td><code>int</code></td></tr><tr><td>Literal</td><td><code>"text"</code></td><td><code>b"text"</code></td></tr><tr><td>Convert</td><td><code>.encode()</code></td><td><code>.decode()</code></td></tr><tr><td>Use for</td><td>Text you manipulate</td><td>I/O, network, files, crypto</td></tr><tr><td>Mutable version</td><td>None</td><td><code>bytearray</code></td></tr></tbody></table></div>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-encode-and-decode-in-the-right-direction">Encode and decode, in the right direction</a></li><li><a href="#vz-s-the-errors-that-appear-in-production">The errors that appear in production</a></li><li><a href="#vz-s-two-different-things-that-both-print-nicely">Two different things that both print nicely</a></li><li><a href="#vz-s-the-sandwich-rule">The sandwich rule</a></li><li><a href="#vz-s-where-it-actually-shows-up">Where it actually shows up</a></li><li><a href="#vz-s-where-the-boundary-sits-in-real-code">Where the boundary sits in real code</a></li><li><a href="#vz-s-bytearray-and-memoryview">bytearray and memoryview</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-run-it">Run it</a></li><li><a href="#vz-s-encode-and-decode-in-the-right-direction">Encode and decode, in the right direction</a></li><li><a href="#vz-s-the-errors-that-appear-in-production">The errors that appear in production</a></li><li><a href="#vz-s-two-different-things-that-both-print-nicely">Two different things that both print nicely</a></li><li><a href="#vz-s-the-sandwich-rule">The sandwich rule</a></li><li><a href="#vz-s-where-it-actually-shows-up">Where it actually shows up</a></li><li><a href="#vz-s-where-the-boundary-sits-in-real-code">Where the boundary sits in real code</a></li><li><a href="#vz-s-bytearray-and-memoryview">bytearray and memoryview</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
             <div class="vz-iq-tags"><span class="vz-iq-tag">Strings</span><span class="vz-iq-tag">Conceptual</span><span class="vz-iq-tag">Medium</span></div>
         </div>
 
@@ -293,6 +293,50 @@ b[0]       # 99   an INTEGER, not b&#x27;c&#x27;</code></pre><p>Two details catc
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-run-it">Run it</h3>
+                    <p>The same text as both types, with the ways they refuse to mix, and both Unicode errors triggered on purpose so you have seen the tracebacks before an interviewer describes one.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src"># str is text. bytes is data. encode/decode is the border crossing.
+
+s = "h\u00e9llo"                 # h, e-acute, l, l, o
+b = s.encode("utf-8")
+
+print("str   :", s, " len:", len(s), " type:", type(s).__name__)
+print("bytes :", b, " len:", len(b), " type:", type(b).__name__)
+print("equal :", s == b, "- they are never equal in Python 3")
+
+print()
+print("s[1] :", repr(s[1]), "-> a one-character str")
+print("b[1] :", repr(b[1]), "-> an int, not a character")
+print("round trip:", b.decode("utf-8") == s)
+
+# Slicing bytes can cut a character in half. Slicing str cannot.
+print()
+print("b[:2] :", b[:2])
+try:
+    print(b[:2].decode("utf-8"))
+except UnicodeDecodeError as e:
+    print("b[:2].decode() ->", e)
+
+# The other direction: a character the target encoding cannot represent.
+try:
+    s.encode("ascii")
+except UnicodeEncodeError as e:
+    print("s.encode('ascii') ->", e)
+
+# Same bytes, wrong encoding: no error, silently wrong text. This is worse.
+print()
+print("decoded as latin-1:", repr(b.decode("latin-1")))
+print("No exception, and the text is wrong. Mojibake is a decode with the")
+print("wrong encoding, not a corrupted file.")
+
+import hashlib
+print()
+try:
+    hashlib.sha256(s)
+except TypeError as e:
+    print("sha256(str) ->", e)
+print("sha256(bytes) ->", hashlib.sha256(b).hexdigest()[:16], "...")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>1</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-encode-and-decode-in-the-right-direction">Encode and decode, in the right direction</h3>
                     <p>This is the single most confused pair in Python, and there is a reliable way to remember it: <strong>encode goes to bytes; decode comes back to text.</strong></p><pre><code class="language-python">&quot;café&quot;.encode(&quot;utf-8&quot;)            # b&#x27;caf\xc3\xa9&#x27;   str -&gt; bytes
@@ -359,47 +403,7 @@ chunk = mv[0:5]               # zero-copy view</code></pre><p><code>bytearray</c
         </div>
     </section>
 
-<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">Run it in Python</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The same text as both types, with the ways they refuse to mix, and both Unicode errors triggered on purpose so you have seen the tracebacks before an interviewer describes one.</p><div class="vz-cl-grid"><div class="vz-py" data-vz-py><script type="text/plain" class="py-src"># str is text. bytes is data. encode/decode is the border crossing.
-
-s = "h\u00e9llo"                 # h, e-acute, l, l, o
-b = s.encode("utf-8")
-
-print("str   :", s, " len:", len(s), " type:", type(s).__name__)
-print("bytes :", b, " len:", len(b), " type:", type(b).__name__)
-print("equal :", s == b, "- they are never equal in Python 3")
-
-print()
-print("s[1] :", repr(s[1]), "-> a one-character str")
-print("b[1] :", repr(b[1]), "-> an int, not a character")
-print("round trip:", b.decode("utf-8") == s)
-
-# Slicing bytes can cut a character in half. Slicing str cannot.
-print()
-print("b[:2] :", b[:2])
-try:
-    print(b[:2].decode("utf-8"))
-except UnicodeDecodeError as e:
-    print("b[:2].decode() ->", e)
-
-# The other direction: a character the target encoding cannot represent.
-try:
-    s.encode("ascii")
-except UnicodeEncodeError as e:
-    print("s.encode('ascii') ->", e)
-
-# Same bytes, wrong encoding: no error, silently wrong text. This is worse.
-print()
-print("decoded as latin-1:", repr(b.decode("latin-1")))
-print("No exception, and the text is wrong. Mojibake is a decode with the")
-print("wrong encoding, not a corrupted file.")
-
-import hashlib
-print()
-try:
-    hashlib.sha256(s)
-except TypeError as e:
-    print("sha256(str) ->", e)
-print("sha256(bytes) ->", hashlib.sha256(b).hexdigest()[:16], "...")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>str_bytes.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">s.encode(&quot;utf-8&quot;)</code><span class="vz-cl-note">The encoding is an argument because a str genuinely does not have bytes until you choose. There is no default worth relying on.</span></li><li class="vz-cl-step"><code class="vz-cl-line">b[1] is an int</code><span class="vz-cl-note">Indexing bytes yields the numeric value, not a one-length bytes. It is the single most common surprise when code written for str is pointed at bytes.</span></li><li class="vz-cl-step"><code class="vz-cl-line">b[:2].decode(&quot;utf-8&quot;)</code><span class="vz-cl-note">Raises, because the slice split a two-byte character. Any code that chunks a byte stream has to respect character boundaries, which is why streaming decoders exist.</span></li><li class="vz-cl-step"><code class="vz-cl-line">b.decode(&quot;latin-1&quot;)</code><span class="vz-cl-note">The dangerous one: no exception, wrong text. latin-1 maps every byte to something, so it never fails and never warns. Mojibake is this, not a corrupted file.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Encode as <code>utf-16</code> and print the bytes. Note the byte-order mark at the front, and that the length roughly doubles.</li><li>Call <code>b.decode("utf-8", errors="replace")</code> on the broken slice. You get U+FFFD instead of an exception &mdash; useful for logs, wrong for data you intend to keep.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">How the code works</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The same text as both types, with the ways they refuse to mix, and both Unicode errors triggered on purpose so you have seen the tracebacks before an interviewer describes one.</p><div class="vz-cl-grid"><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">s.encode(&quot;utf-8&quot;)</code><span class="vz-cl-note">The encoding is an argument because a str genuinely does not have bytes until you choose. There is no default worth relying on.</span></li><li class="vz-cl-step"><code class="vz-cl-line">b[1] is an int</code><span class="vz-cl-note">Indexing bytes yields the numeric value, not a one-length bytes. It is the single most common surprise when code written for str is pointed at bytes.</span></li><li class="vz-cl-step"><code class="vz-cl-line">b[:2].decode(&quot;utf-8&quot;)</code><span class="vz-cl-note">Raises, because the slice split a two-byte character. Any code that chunks a byte stream has to respect character boundaries, which is why streaming decoders exist.</span></li><li class="vz-cl-step"><code class="vz-cl-line">b.decode(&quot;latin-1&quot;)</code><span class="vz-cl-note">The dangerous one: no exception, wrong text. latin-1 maps every byte to something, so it never fails and never warns. Mojibake is this, not a corrupted file.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Encode as <code>utf-16</code> and print the bytes. Note the byte-order mark at the front, and that the length roughly doubles.</li><li>Call <code>b.decode("utf-8", errors="replace")</code> on the broken slice. You get U+FFFD instead of an exception &mdash; useful for logs, wrong for data you intend to keep.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 
     <script>
         (function () {

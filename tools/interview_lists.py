@@ -144,10 +144,10 @@ for label, make, action in [
     ("deque.appendleft",    deque, lambda c: c.appendleft(1)),
 ]:
     container = make()
-    start = time.time()
+    start = time.perf_counter()
     for _ in range(N):
         action(container)
-    print(f"{label:>22} {time.time() - start:>9.4f}s")
+    print(f"{label:>22} {time.perf_counter() - start:>9.4f}s")
 
 print()
 print(f"Same {N:,} operations. insert(0, x) shifts every existing element,")
@@ -157,10 +157,10 @@ print("so it is O(n) each and O(n^2) overall. deque is O(1) at both ends.")
 small, big = list(range(10)), list(range(10_000_000))
 print()
 for name, data in (("10 items", small), ("10,000,000 items", big)):
-    start = time.time()
+    start = time.perf_counter()
     for _ in range(100_000):
         _ = data[len(data) // 2]
-    print(f"  100,000 index reads on {name:>18}: {time.time() - start:.4f}s")
+    print(f"  100,000 index reads on {name:>18}: {time.perf_counter() - start:.4f}s")
 print("Indexing is address arithmetic. The length never enters into it.")
 ''',
         "walk": [
@@ -485,29 +485,32 @@ for n in (50_000, 500_000):
 
     print(f"n = {n:,}")
     for label, container in (("list", as_list), ("set ", as_set)):
-        start = time.time()
+        start = time.perf_counter()
         for _ in range(5):
             for p in probes:
                 p in container
-        print(f"  {label}: {time.time() - start:.4f}s")
+        print(f"  {label}: {time.perf_counter() - start:.4f}s")
 
 # --- where it actually bites -------------------------------------------
 haystack = list(range(4_000))
 needles = list(range(0, 8_000, 2))
 
-start = time.time()
+start = time.perf_counter()
 found = [x for x in needles if x in haystack]          # O(n * m)
-slow = time.time() - start
+slow = time.perf_counter() - start
 
-start = time.time()
+start = time.perf_counter()
 lookup = set(haystack)                                 # O(n), once
 found2 = [x for x in needles if x in lookup]           # O(m)
-fast = time.time() - start
+fast = time.perf_counter() - start
 
 print()
 print(f"{len(needles):,} lookups against a {len(haystack):,}-item list:")
 print(f"  list  : {slow:.4f}s")
-print(f"  set   : {fast:.4f}s   ({slow / fast:.0f}x faster)")
+if fast > 0:
+    print(f"  set   : {fast:.4f}s   ({slow / fast:.0f}x faster)")
+else:
+    print(f"  set   : too fast to measure separately")
 print(f"  same answer: {found == found2}")
 
 # --- a set loses order and duplicates; a dict keeps order --------------
@@ -720,10 +723,10 @@ print("  store first:", store_first([3], 6), "  <- WRONG: 3 paired with itself")
 big = list(range(1_800))
 print()
 for name, fn in (("brute force", brute_force), ("one pass", one_pass)):
-    start = time.time()
+    start = time.perf_counter()
     _, checks = fn(big, 3_597)                 # a pair near the very end
     print(f"  {name:>11} on {len(big):,} items: {checks:>12,} checks "
-          f"in {time.time() - start:.3f}s")
+          f"in {time.perf_counter() - start:.3f}s")
 ''',
         "walk": [
             ("if target - v in seen:",
@@ -2096,9 +2099,9 @@ print(f"n = {len(big):,}, k = {k}")
 for name, fn in (("sorting", lambda: by_sorting(big, k)),
                  ("min-heap", lambda: by_heap(big, k)[0]),
                  ("quickselect", lambda: quickselect(big, k))):
-    start = time.time()
+    start = time.perf_counter()
     result = fn()
-    print(f"  {name:>12}: {result:>9}  in {time.time() - start:.3f}s")
+    print(f"  {name:>12}: {result:>9}  in {time.perf_counter() - start:.3f}s")
 
 print()
 print(f"The heap held {k} values the whole way. Sorting held {len(big):,},")
@@ -3145,13 +3148,13 @@ big = [random.randint(0, 1000) for _ in range(15_000)]
 print()
 print(f"n = {len(big):,}")
 for k in (10, 100, 400):
-    start = time.time()
+    start = time.perf_counter()
     a, pushes, pops = window_max(big, k)
-    deque_time = time.time() - start
+    deque_time = time.perf_counter() - start
 
-    start = time.time()
+    start = time.perf_counter()
     b, comparisons = recompute(big, k)
-    naive_time = time.time() - start
+    naive_time = time.perf_counter() - start
 
     print(f"  k={k:>4}: deque {deque_time:.3f}s ({pushes + pops:,} ops)   "
           f"recompute {naive_time:.3f}s ({comparisons:,} ops)   same: {a == b}")
@@ -3316,18 +3319,18 @@ for label, action_list, action_deque in [
     ("insert at the front", lambda c: c.insert(0, 1), lambda c: c.appendleft(1)),
 ]:
     lst, dq = [], deque()
-    start = time.time(); [action_list(lst) for _ in range(N)]
-    list_time = time.time() - start
-    start = time.time(); [action_deque(dq) for _ in range(N)]
-    deque_time = time.time() - start
+    start = time.perf_counter(); [action_list(lst) for _ in range(N)]
+    list_time = time.perf_counter() - start
+    start = time.perf_counter(); [action_deque(dq) for _ in range(N)]
+    deque_time = time.perf_counter() - start
     print(f"{label:>28} {list_time:>9.4f}s {deque_time:>9.4f}s")
 
 # Random access is the other direction.
 lst = list(range(N)); dq = deque(range(N))
-start = time.time(); [lst[N // 2] for _ in range(100_000)]
-print(f"{'index the middle':>28} {time.time() - start:>9.4f}s", end="")
-start = time.time(); [dq[N // 2] for _ in range(100_000)]
-print(f" {time.time() - start:>9.4f}s   <- deque loses here")
+start = time.perf_counter(); [lst[N // 2] for _ in range(100_000)]
+print(f"{'index the middle':>28} {time.perf_counter() - start:>9.4f}s", end="")
+start = time.perf_counter(); [dq[N // 2] for _ in range(100_000)]
+print(f" {time.perf_counter() - start:>9.4f}s   <- deque loses here")
 
 # --- memory: references versus packed values ---------------------------
 numbers = list(range(1000))

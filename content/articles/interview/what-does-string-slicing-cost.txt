@@ -27,6 +27,64 @@ s[::-1]       # 'dlrow olleh' -- reversal, O(n)
 |`s in t`|O(n &middot; m) worst case|
 |`s + t`|O(n + m) &mdash; a new string|
 
+
+## Run it
+
+The same scan written twice &mdash; once slicing on every iteration, once carrying indices &mdash; timed at three sizes so the quadratic separates from the linear in front of you.
+
+```python-run
+# A slice is a copy. One is free; one per iteration is quadratic.
+import time
+
+s = "algorithms"
+part = s[2:6]
+print("s      :", s)
+print("s[2:6] :", part, " same object as s:", part is s)
+print("reversed:", s[::-1], "- a full copy, O(n) time and space")
+
+# --- the shape that goes quadratic --------------------------------------
+def peel_with_slices(text):
+    """Walk the string by chopping the front off. Copies the rest each time."""
+    n = 0
+    while text:
+        _first = text[0]
+        text = text[1:]          # copies len(text) - 1 characters. Every time.
+        n += 1
+    return n
+
+
+def walk_with_index(text):
+    """The same walk, carrying an index. Nothing is copied at all."""
+    n = 0
+    i = 0
+    while i < len(text):
+        _first = text[i]
+        i += 1
+        n += 1
+    return n
+
+
+print()
+print(f"{'n':>7} {'slicing':>12} {'indexing':>12} {'ratio':>8}")
+for n in (5_000, 10_000, 20_000):
+    text = "x" * n
+
+    start = time.perf_counter()
+    peel_with_slices(text)
+    slicing = time.perf_counter() - start
+
+    start = time.perf_counter()
+    walk_with_index(text)
+    indexing = time.perf_counter() - start
+
+    print(f"{n:>7} {slicing:>11.4f}s {indexing:>11.4f}s {slicing / indexing:>7.1f}x")
+
+print("Double n: indexing doubles, slicing quadruples.")
+print()
+print("memoryview really is a view - but only over bytes:")
+buf = memoryview(b"algorithms")
+print("  buf[2:6] ->", bytes(buf[2:6]), "- no copy of the underlying buffer")
+```
 ## Where it becomes quadratic
 
 The classic failure is slicing inside a loop:

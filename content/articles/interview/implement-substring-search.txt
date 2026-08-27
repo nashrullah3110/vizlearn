@@ -17,6 +17,84 @@ In Python this is `text.find(pattern)`. The exercise is implementing it, and the
 
 The empty-pattern convention is worth confirming out loud: by convention it matches at index 0, and both `str.find` and the standard algorithms agree.
 
+
+## Run it
+
+Both searches with their comparisons counted, on ordinary text and then on the repetitive input designed to make naive matching look bad. The gap is the argument for the table.
+
+```python-run
+# Substring search: naive, then KMP.
+
+def build_lps(pattern):
+    """lps[i] = longest proper prefix of pattern[:i+1] that is also a suffix."""
+    lps = [0] * len(pattern)
+    length, i = 0, 1
+    while i < len(pattern):
+        if pattern[i] == pattern[length]:
+            length += 1
+            lps[i] = length
+            i += 1
+        elif length:
+            length = lps[length - 1]     # fall back, do NOT restart at zero
+        else:
+            lps[i] = 0
+            i += 1
+    return lps
+
+
+def naive_search(text, pattern):
+    comparisons = 0
+    for start in range(len(text) - len(pattern) + 1):
+        k = 0
+        while k < len(pattern):
+            comparisons += 1
+            if text[start + k] != pattern[k]:
+                break
+            k += 1
+        else:
+            return start, comparisons
+    return -1, comparisons
+
+
+def kmp_search(text, pattern):
+    lps = build_lps(pattern)
+    comparisons = 0
+    i = j = 0
+    while i < len(text):
+        comparisons += 1
+        if text[i] == pattern[j]:
+            i += 1
+            j += 1
+            if j == len(pattern):
+                return i - j, comparisons
+        elif j:
+            j = lps[j - 1]               # slide the pattern; i does not move
+        else:
+            i += 1
+    return -1, comparisons
+
+
+pattern = "abcabd"
+print("pattern:", " ".join(pattern))
+print("lps    :", " ".join(str(x) for x in build_lps(pattern)))
+print("lps[4]=2: 'abcab' starts and ends with 'ab'.")
+
+print()
+for text in ["abcabcabd", "hello world", "a" * 60 + "b"]:
+    pat = "aaab" if text.startswith("aaa") else pattern
+    n_at, n_cmp = naive_search(text, pat)
+    k_at, k_cmp = kmp_search(text, pat)
+    label = text if len(text) < 20 else text[:12] + "..."
+    print(f"{label:>16} looking for {pat!r:>8}: index {n_at:>3}  "
+          f"naive={n_cmp:>4} kmp={k_cmp:>4}")
+
+print()
+print("On repetitive input naive re-reads the same characters over and over.")
+print("KMP's i never moves backwards, which is the whole guarantee.")
+print()
+print("In production:", "abcabcabd".find("abcabd"),
+      "- CPython's find is a tuned Boyer-Moore hybrid.")
+```
 ## The naive approach, and its failure case
 
 ```python

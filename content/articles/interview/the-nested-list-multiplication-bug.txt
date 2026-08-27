@@ -20,6 +20,64 @@ id(grid[0]) == id(grid[1])  # True
 
 The inner `[0] * 3` is fine, because integers are immutable &mdash; there is nothing to share dangerously. The outer `* 3` is the problem, because a list is mutable and now has three names.
 
+
+## Run it
+
+The broken grid and the correct one side by side with their row identities printed, then the three levels of copying, then the mutable-default-argument bug that has the same cause.
+
+```python-run
+# Multiplying a list repeats the REFERENCE, not the object.
+import copy
+
+wrong = [[0] * 3] * 3
+right = [[0] * 3 for _ in range(3)]
+
+print("wrong row ids:", [hex(id(row)) for row in wrong])
+print("right row ids:", [hex(id(row)) for row in right])
+
+wrong[0][0] = 9
+right[0][0] = 9
+print()
+print("wrong after grid[0][0] = 9:", wrong, "  <- all three rows")
+print("right after grid[0][0] = 9:", right)
+
+# --- assignment, shallow copy, deep copy -------------------------------
+original = [[1, 2], [3, 4]]
+same = original                      # another NAME for the same list
+shallow = original[:]                # new outer list, SAME inner lists
+deep = copy.deepcopy(original)       # new objects all the way down
+
+original[0][0] = 99
+print()
+print("original:", original)
+print("same    :", same,    " (is original:", same is original, ")")
+print("shallow :", shallow, " <- the nested list was shared")
+print("deep    :", deep,    " <- fully independent")
+
+original.append([5, 6])
+print()
+print("after appending to original:")
+print("  shallow:", shallow, "<- the OUTER list was genuinely copied")
+
+# --- the same cause, wearing a different hat ---------------------------
+def broken(item, accumulated=[]):     # evaluated ONCE, at definition time
+    accumulated.append(item)
+    return accumulated
+
+
+def fixed(item, accumulated=None):
+    if accumulated is None:           # a fresh list per call
+        accumulated = []
+    accumulated.append(item)
+    return accumulated
+
+
+print()
+print("broken('a'):", broken("a"))
+print("broken('b'):", broken("b"), "<- 'a' is still there")
+print("fixed('a') :", fixed("a"))
+print("fixed('b') :", fixed("b"))
+```
 ## The fix
 
 ```python

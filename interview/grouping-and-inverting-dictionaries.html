@@ -251,7 +251,7 @@ for w in words:
     if w[0] not in groups:            # the boilerplate defaultdict removes
         groups[w[0]] = []
     groups[w[0]].append(w)</code></pre><p><code>setdefault</code> is the middle ground and works on a plain dict &mdash; <code>groups.setdefault(w[0], []).append(w)</code> &mdash; which is useful when the result must be a real <code>dict</code> rather than a <code>defaultdict</code>.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-the-defaultdict-trap">The defaultdict trap</a></li><li><a href="#vz-s-inverting-a-dictionary">Inverting a dictionary</a></li><li><a href="#vz-s-three-ways-to-group">Three ways to group</a></li><li><a href="#vz-s-two-ways-inversion-breaks">Two ways inversion breaks</a></li><li><a href="#vz-s-where-this-shows-up">Where this shows up</a></li><li><a href="#vz-s-itertools-groupby-and-why-it-surprises-people">itertools.groupby and why it surprises people</a></li><li><a href="#vz-s-the-grouping-patterns-worth-having-ready">The grouping patterns worth having ready</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-run-it">Run it</a></li><li><a href="#vz-s-the-defaultdict-trap">The defaultdict trap</a></li><li><a href="#vz-s-inverting-a-dictionary">Inverting a dictionary</a></li><li><a href="#vz-s-three-ways-to-group">Three ways to group</a></li><li><a href="#vz-s-two-ways-inversion-breaks">Two ways inversion breaks</a></li><li><a href="#vz-s-where-this-shows-up">Where this shows up</a></li><li><a href="#vz-s-itertools-groupby-and-why-it-surprises-people">itertools.groupby and why it surprises people</a></li><li><a href="#vz-s-the-grouping-patterns-worth-having-ready">The grouping patterns worth having ready</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask</a></li><li><a href="#vz-s-recap-in-one-screen">Recap in one screen</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
             <div class="vz-iq-tags"><span class="vz-iq-tag">Dicts, sets &amp; hashing</span><span class="vz-iq-tag">Coding problem</span><span class="vz-iq-tag">Easy</span></div>
         </div>
 
@@ -297,6 +297,62 @@ for w in words:
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <!-- VIZLEARN:LEDE:SLOT -->
+                <div>
+                    <h3 id="vz-s-run-it">Run it</h3>
+                    <p>The three grouping idioms agreeing, groupby getting it wrong on unsorted input, and both inversion failures caught in the act.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src"># Grouping and inverting: one pass each, and two traps in the inversion.
+from collections import defaultdict
+from itertools import groupby
+
+people = [("ana", "eng"), ("bo", "sales"), ("cy", "eng"),
+          ("di", "sales"), ("ed", "eng")]
+
+by_setdefault = {}
+for name, team in people:
+    by_setdefault.setdefault(team, []).append(name)
+
+by_default = defaultdict(list)
+for name, team in people:
+    by_default[team].append(name)
+
+print("setdefault :", dict(by_setdefault))
+print("defaultdict:", dict(by_default))
+print("agree      :", by_setdefault == dict(by_default))
+
+# --- groupby groups CONSECUTIVE keys only ------------------------------
+unsorted_groups = {k: [n for n, _ in g] for k, g in
+                   groupby(people, key=lambda p: p[1])}
+sorted_groups = {k: [n for n, _ in g] for k, g in
+                 groupby(sorted(people, key=lambda p: p[1]), key=lambda p: p[1])}
+print()
+print("groupby, unsorted:", unsorted_groups, " <- 'eng' appears twice, last wins")
+print("groupby, sorted  :", sorted_groups)
+print("It is not SQL's GROUP BY. Sort by the same key first, or use a dict.")
+
+# --- inverting ---------------------------------------------------------
+capital = {"france": "paris", "japan": "tokyo", "italy": "rome"}
+print()
+print("inverted:", {v: k for k, v in capital.items()})
+
+# Trap 1: duplicate values collapse, silently.
+sizes = {"ana": "medium", "bo": "large", "cy": "medium"}
+naive = {v: k for k, v in sizes.items()}
+grouped = defaultdict(list)
+for k, v in sizes.items():
+    grouped[v].append(k)
+print()
+print("input          :", sizes)
+print("naive inversion:", naive, "  <- 'ana' vanished")
+print("inverted safely:", dict(grouped))
+
+# Trap 2: values that cannot be keys.
+scores = {"ana": [90, 80], "bo": [70]}
+try:
+    {v: k for k, v in scores.items()}
+except TypeError as e:
+    print()
+    print("inverting list values ->", e)
+print("A tuple would work:", {tuple(v): k for k, v in scores.items()})</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>1</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
                 <div>
                     <h3 id="vz-s-the-defaultdict-trap">The defaultdict trap</h3>
                     <p>A <code>defaultdict</code> <strong>creates entries on read</strong>. Merely looking a key up inserts it:</p><pre><code class="language-python">d = defaultdict(list)
@@ -369,59 +425,7 @@ return list(groups.values())</code></pre><div class="vz-table-wrap"><table><thea
         </div>
     </section>
 
-<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">Run it in Python</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The three grouping idioms agreeing, groupby getting it wrong on unsorted input, and both inversion failures caught in the act.</p><div class="vz-cl-grid"><div class="vz-py" data-vz-py><script type="text/plain" class="py-src"># Grouping and inverting: one pass each, and two traps in the inversion.
-from collections import defaultdict
-from itertools import groupby
-
-people = [("ana", "eng"), ("bo", "sales"), ("cy", "eng"),
-          ("di", "sales"), ("ed", "eng")]
-
-by_setdefault = {}
-for name, team in people:
-    by_setdefault.setdefault(team, []).append(name)
-
-by_default = defaultdict(list)
-for name, team in people:
-    by_default[team].append(name)
-
-print("setdefault :", dict(by_setdefault))
-print("defaultdict:", dict(by_default))
-print("agree      :", by_setdefault == dict(by_default))
-
-# --- groupby groups CONSECUTIVE keys only ------------------------------
-unsorted_groups = {k: [n for n, _ in g] for k, g in
-                   groupby(people, key=lambda p: p[1])}
-sorted_groups = {k: [n for n, _ in g] for k, g in
-                 groupby(sorted(people, key=lambda p: p[1]), key=lambda p: p[1])}
-print()
-print("groupby, unsorted:", unsorted_groups, " <- 'eng' appears twice, last wins")
-print("groupby, sorted  :", sorted_groups)
-print("It is not SQL's GROUP BY. Sort by the same key first, or use a dict.")
-
-# --- inverting ---------------------------------------------------------
-capital = {"france": "paris", "japan": "tokyo", "italy": "rome"}
-print()
-print("inverted:", {v: k for k, v in capital.items()})
-
-# Trap 1: duplicate values collapse, silently.
-sizes = {"ana": "medium", "bo": "large", "cy": "medium"}
-naive = {v: k for k, v in sizes.items()}
-grouped = defaultdict(list)
-for k, v in sizes.items():
-    grouped[v].append(k)
-print()
-print("input          :", sizes)
-print("naive inversion:", naive, "  <- 'ana' vanished")
-print("inverted safely:", dict(grouped))
-
-# Trap 2: values that cannot be keys.
-scores = {"ana": [90, 80], "bo": [70]}
-try:
-    {v: k for k, v in scores.items()}
-except TypeError as e:
-    print()
-    print("inverting list values ->", e)
-print("A tuple would work:", {tuple(v): k for k, v in scores.items()})</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>grouping.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">setdefault(team, []).append(name)</code><span class="vz-cl-note">One lookup and one append per record. The alternative &mdash; scanning existing groups for a match &mdash; is the O(n&sup2;) this idiom exists to avoid.</span></li><li class="vz-cl-step"><code class="vz-cl-line">groupby(people, key=...)</code><span class="vz-cl-note">Groups only <em>consecutive</em> equal keys, so unsorted input produces a group per run and later runs overwrite earlier ones. Sorting first is mandatory.</span></li><li class="vz-cl-step"><code class="vz-cl-line">{v: k for k, v in sizes.items()}</code><span class="vz-cl-note">Silently loses <code>ana</code>, because two names share a size and the later key wins. No error, one entry gone.</span></li><li class="vz-cl-step"><code class="vz-cl-line">{v: k for k, v in scores.items()}</code><span class="vz-cl-note">A <code>TypeError</code>: the values are lists, and a key must be hashable. Converting to tuples is the usual fix.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Group by two fields at once using a tuple key. It works because tuples are hashable &mdash; the same reason they can be dict keys at all.</li><li>Read a missing key from the <code>defaultdict</code> and print it again. The read created an entry, which is the trap that idiom carries.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+<section class="vz-codelab" aria-labelledby="vz-codelab-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="M13 6l-2 12"/></svg><h2 id="vz-codelab-h">How the code works</h2><span class="vz-rule"></span></div><p class="vz-cl-intro">The three grouping idioms agreeing, groupby getting it wrong on unsorted input, and both inversion failures caught in the act.</p><div class="vz-cl-grid"><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">setdefault(team, []).append(name)</code><span class="vz-cl-note">One lookup and one append per record. The alternative &mdash; scanning existing groups for a match &mdash; is the O(n&sup2;) this idiom exists to avoid.</span></li><li class="vz-cl-step"><code class="vz-cl-line">groupby(people, key=...)</code><span class="vz-cl-note">Groups only <em>consecutive</em> equal keys, so unsorted input produces a group per run and later runs overwrite earlier ones. Sorting first is mandatory.</span></li><li class="vz-cl-step"><code class="vz-cl-line">{v: k for k, v in sizes.items()}</code><span class="vz-cl-note">Silently loses <code>ana</code>, because two names share a size and the later key wins. No error, one entry gone.</span></li><li class="vz-cl-step"><code class="vz-cl-line">{v: k for k, v in scores.items()}</code><span class="vz-cl-note">A <code>TypeError</code>: the values are lists, and a key must be hashable. Converting to tuples is the usual fix.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Group by two fields at once using a tuple key. It works because tuples are hashable &mdash; the same reason they can be dict keys at all.</li><li>Read a missing key from the <code>defaultdict</code> and print it again. The read created an entry, which is the trap that idiom carries.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 
     <script>
         (function () {

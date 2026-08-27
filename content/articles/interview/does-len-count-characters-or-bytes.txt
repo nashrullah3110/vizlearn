@@ -18,6 +18,52 @@ len("é")           # 1 or 2, depending on how it was written
 
 That last line is the interesting one, and the reason this question gets asked at all.
 
+
+## Run it
+
+The same visible text three ways, with all three counts printed for each. The two strings in the middle look identical in your browser and are not equal.
+
+```python-run
+# len() counts code points. That is not bytes, and not "characters".
+import unicodedata
+
+samples = {
+    "ascii":            "cafe",
+    "precomposed":      "caf\u00e9",        # e-acute as ONE code point
+    "decomposed":       "cafe\u0301",       # 'e' + combining acute: TWO
+    "emoji":            "\U0001f44d",       # thumbs up
+}
+
+print(f"{'name':>14} {'shown':>8} {'len':>5} {'utf-8':>6} {'utf-16':>7}")
+for name, s in samples.items():
+    print(f"{name:>14} {s:>8} {len(s):>5} "
+          f"{len(s.encode('utf-8')):>6} {len(s.encode('utf-16-le')):>7}")
+
+a, b = samples["precomposed"], samples["decomposed"]
+print()
+print("precomposed == decomposed :", a == b)
+print("they render the same, and len differs:", len(a), "vs", len(b))
+
+# Normalising collapses them to one form, which is what makes comparison work.
+na = unicodedata.normalize("NFC", a)
+nb = unicodedata.normalize("NFC", b)
+print("after NFC                 :", na == nb, " len:", len(na), len(nb))
+
+# Slicing by code point can cut a character in half.
+flag = "\U0001f1ee\U0001f1f3"        # regional indicators: one flag
+print()
+print("flag       :", flag, " len:", len(flag))
+print("flag[:1]   :", flag[:1], "- half a flag is not a flag")
+
+# The count a user would give needs grapheme clusters, which the standard
+# library does not provide. This approximates it by dropping combining marks.
+def graphemes(s):
+    return sum(1 for ch in unicodedata.normalize("NFC", s)
+               if not unicodedata.combining(ch))
+
+for name, s in samples.items():
+    print(f"{name:>14}: len={len(s)} approx graphemes={graphemes(s)}")
+```
 ## The same text, two lengths
 
 `"é"` has two valid Unicode representations:

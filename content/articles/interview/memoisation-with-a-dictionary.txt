@@ -30,6 +30,78 @@ O(n), and `fib(40)` returns instantly. One decorator.
 |20|21,891|21|
 |40|331,160,281|41|
 
+
+## Run it
+
+The same recurrence three ways with call counts, then <code>cache_info()</code> showing the hit rate, then the two conditions broken on purpose &mdash; an impure function and an unhashable argument.
+
+```python-run
+# Memoisation: a dictionary in front of a function.
+from functools import lru_cache
+import time
+
+calls = {"plain": 0, "manual": 0}
+
+def fib_plain(n):
+    calls["plain"] += 1
+    return n if n < 2 else fib_plain(n - 1) + fib_plain(n - 2)
+
+
+cache = {}
+def fib_manual(n):
+    calls["manual"] += 1
+    if n in cache:
+        return cache[n]                      # the whole optimisation
+    cache[n] = n if n < 2 else fib_manual(n - 1) + fib_manual(n - 2)
+    return cache[n]
+
+
+@lru_cache(maxsize=None)                     # the same thing, shipped
+def fib_cached(n):
+    return n if n < 2 else fib_cached(n - 1) + fib_cached(n - 2)
+
+
+for n in (10, 20, 28):
+    calls["plain"] = calls["manual"] = 0
+    cache.clear()
+    start = time.perf_counter()
+    fib_plain(n)
+    plain_time = time.perf_counter() - start
+    fib_manual(n)
+    print(f"fib({n:>2}): no cache {calls['plain']:>7,} calls ({plain_time:.3f}s)"
+          f"   memoised {calls['manual']:>3} calls")
+
+fib_cached.cache_clear()
+fib_cached(60)
+print()
+print("lru_cache after fib(60):", fib_cached.cache_info())
+print("fib(60) =", fib_cached(60), "- instant, and unreachable without a cache")
+
+# --- condition 1: the function must be pure ----------------------------
+counter = {"n": 0}
+
+@lru_cache(maxsize=None)
+def impure():
+    counter["n"] += 1
+    return counter["n"]
+
+print()
+print("impure() three times:", impure(), impure(), impure())
+print("It ran once and returned the same stale answer twice.")
+
+# --- condition 2: arguments must be hashable ---------------------------
+@lru_cache(maxsize=None)
+def total(numbers):
+    return sum(numbers)
+
+print()
+print("total((1, 2, 3)) ->", total((1, 2, 3)))
+try:
+    total([1, 2, 3])
+except TypeError as e:
+    print("total([1, 2, 3]) ->", e)
+print("Arguments become dict keys, so they have to be hashable.")
+```
 ## The manual version, and why to know it
 
 ```python

@@ -27,6 +27,54 @@ Two details catch people out immediately. Indexing `bytes` yields an `int`, not 
 |Use for|Text you manipulate|I/O, network, files, crypto|
 |Mutable version|None|`bytearray`|
 
+
+## Run it
+
+The same text as both types, with the ways they refuse to mix, and both Unicode errors triggered on purpose so you have seen the tracebacks before an interviewer describes one.
+
+```python-run
+# str is text. bytes is data. encode/decode is the border crossing.
+
+s = "h\u00e9llo"                 # h, e-acute, l, l, o
+b = s.encode("utf-8")
+
+print("str   :", s, " len:", len(s), " type:", type(s).__name__)
+print("bytes :", b, " len:", len(b), " type:", type(b).__name__)
+print("equal :", s == b, "- they are never equal in Python 3")
+
+print()
+print("s[1] :", repr(s[1]), "-> a one-character str")
+print("b[1] :", repr(b[1]), "-> an int, not a character")
+print("round trip:", b.decode("utf-8") == s)
+
+# Slicing bytes can cut a character in half. Slicing str cannot.
+print()
+print("b[:2] :", b[:2])
+try:
+    print(b[:2].decode("utf-8"))
+except UnicodeDecodeError as e:
+    print("b[:2].decode() ->", e)
+
+# The other direction: a character the target encoding cannot represent.
+try:
+    s.encode("ascii")
+except UnicodeEncodeError as e:
+    print("s.encode('ascii') ->", e)
+
+# Same bytes, wrong encoding: no error, silently wrong text. This is worse.
+print()
+print("decoded as latin-1:", repr(b.decode("latin-1")))
+print("No exception, and the text is wrong. Mojibake is a decode with the")
+print("wrong encoding, not a corrupted file.")
+
+import hashlib
+print()
+try:
+    hashlib.sha256(s)
+except TypeError as e:
+    print("sha256(str) ->", e)
+print("sha256(bytes) ->", hashlib.sha256(b).hexdigest()[:16], "...")
+```
 ## Encode and decode, in the right direction
 
 This is the single most confused pair in Python, and there is a reliable way to remember it: <strong>encode goes to bytes; decode comes back to text.</strong>

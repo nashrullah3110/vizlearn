@@ -11,6 +11,66 @@ Find the contiguous subarray with the largest sum.
 
 The brute force checks every subarray: O(n²) with running sums, O(n³) if the sum is recomputed each time. Kadane's algorithm does it in one pass.
 
+
+## Run it
+
+Kadane with the running values printed at each element, then the index-tracking version, then the zero-initialised variant getting an all-negative array wrong.
+
+```python-run
+# Kadane: extend the current run, or start again from here.
+
+def kadane(values, show=False):
+    best = current = values[0]            # NOT zero - see the last section
+    for v in values[1:]:
+        current = max(v, current + v)     # start fresh, or extend
+        best = max(best, current)
+        if show:
+            print(f"  saw {v:>3}: current={current:>4} best={best:>4}")
+    return best
+
+
+def kadane_with_indices(values):
+    best = current = values[0]
+    start = best_start = best_end = 0
+    for i in range(1, len(values)):
+        if current + values[i] < values[i]:
+            current, start = values[i], i     # restart: record the new start
+        else:
+            current += values[i]
+        if current > best:                    # improve: record the span
+            best, best_start, best_end = current, start, i
+    return best, (best_start, best_end)
+
+
+def kadane_from_zero(values):
+    """The version that assumes an empty subarray is allowed."""
+    best = current = 0
+    for v in values:
+        current = max(0, current + v)
+        best = max(best, current)
+    return best
+
+
+values = [-2, 1, -3, 4, -1, 2, 1, -5, 4]
+print("values:", values)
+print("max subarray sum:", kadane(values, show=True))
+
+total, (i, j) = kadane_with_indices(values)
+print()
+print(f"span: indices {i}..{j} = {values[i:j+1]} summing to {total}")
+
+# --- the all-negative case ---------------------------------------------
+print()
+for sample in ([-3, -1, -7], [-5], [1, 2, 3]):
+    proper = kadane(sample)
+    from_zero = kadane_from_zero(sample)
+    flag = "   <-- 0 is the EMPTY subarray" if proper != from_zero else ""
+    print(f"  {str(sample):>14}: kadane={proper:>3}  from-zero={from_zero:>3}{flag}")
+
+print()
+print("Ask whether the empty subarray counts. If it does not, initialise")
+print("from values[0]; if it does, zero is the right floor.")
+```
 ## Kadane's algorithm
 
 ```python

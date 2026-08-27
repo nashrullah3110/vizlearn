@@ -15,6 +15,89 @@ That is one arithmetic operation and one or two memory accesses, which is why lo
 
 The comparison in step 3 is necessary because two different keys can hash to the same slot. Hashes are checked first &mdash; comparing integers is cheap &mdash; and only if the hashes match are the keys compared with `==`.
 
+
+## Run it
+
+A miniature hash table built from a list of buckets so the slot arithmetic is visible, then the same keys with a deliberately terrible hash so you can watch O(1) become O(n).
+
+```python-run
+# A dictionary is a hash table. Here is one, small enough to read.
+
+class TinyDict:
+    def __init__(self, slots=8, hash_fn=hash):
+        self.buckets = [[] for _ in range(slots)]
+        self.slots = slots
+        self.count = 0
+        self.hash_fn = hash_fn
+        self.probes = 0
+
+    def _slot(self, key):
+        return self.hash_fn(key) % self.slots      # fold the hash into range
+
+    def put(self, key, value):
+        bucket = self.buckets[self._slot(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:
+                bucket[i] = (key, value)
+                return
+        bucket.append((key, value))
+        self.count += 1
+        if self.count / self.slots > 0.66:         # the load factor
+            self._resize()
+
+    def get(self, key):
+        for k, v in self.buckets[self._slot(key)]:
+            self.probes += 1                       # comparisons, not lookups
+            if k == key:
+                return v
+        raise KeyError(key)
+
+    def _resize(self):
+        old = self.buckets
+        self.slots *= 2
+        self.buckets = [[] for _ in range(self.slots)]
+        for bucket in old:
+            for k, v in bucket:                    # every key rehashed
+                self.buckets[self._slot(k)].append((k, v))
+        print(f"  ** resized to {self.slots} slots, rehashed {self.count} keys")
+
+    def show(self):
+        for i, bucket in enumerate(self.buckets):
+            if bucket:
+                print(f"    slot {i:>2}: {[k for k, _ in bucket]}")
+
+
+words = ["apple", "banana", "cherry", "date", "elderberry", "fig", "grape"]
+
+good = TinyDict()
+for w in words:
+    good.put(w, len(w))
+print("with a real hash:")
+good.show()
+for w in words:
+    good.get(w)
+print(f"  {good.probes} key comparisons for {len(words)} lookups")
+
+# --- the same keys, with a hash that spreads nothing --------------------
+bad = TinyDict(hash_fn=lambda k: 1)
+for w in words:
+    bad.put(w, len(w))
+print()
+print("with hash_fn = lambda k: 1:")
+bad.show()
+for w in words:
+    bad.get(w)
+print(f"  {bad.probes} key comparisons for the same {len(words)} lookups")
+print()
+print("Same structure, same answers, and every operation is now O(n).")
+print("O(1) was always conditional on the hash spreading keys out.")
+
+# --- hash randomisation -------------------------------------------------
+print()
+print("hash('apple') this run:", hash("apple"))
+print("Run this again and it changes: string hashes are salted per process,")
+print("which is what stops an attacker crafting colliding keys on purpose.")
+```
 ## Collisions and probing
 
 With a finite number of slots, collisions are inevitable. CPython uses <strong>open addressing</strong>: on a collision, probe for another slot using a sequence derived from the hash.
