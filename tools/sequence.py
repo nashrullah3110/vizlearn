@@ -445,6 +445,12 @@ SEQUENCE = {
         "fastapi/request_bodies.html",
         "fastapi/response_models.html",
         "fastapi/reading_a_422.html",
+        "fastapi/http_methods_and_routing.html",
+        "fastapi/headers_and_cookies.html",
+        "fastapi/form_data_and_files.html",
+        "fastapi/status_codes.html",
+        "fastapi/error_handling.html",
+        "fastapi/apirouter.html",
     ],
     "pydantic": [
         "pydantic/what_is_pydantic.html",

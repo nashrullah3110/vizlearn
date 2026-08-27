@@ -1,0 +1,298 @@
+title: Headers and Cookies
+intro: The parts of a request that are neither path, query nor body, and what each is properly for.
+
+## Reading a header
+
+```python
+def whoami(x_token: str = Header(default=None)):
+```
+
+FastAPI converts underscores to hyphens, so `x_token` reads the `x-token` header. That conversion exists because most header names contain hyphens and none of them are valid Python identifiers.
+
+If you need the literal name &mdash; a header that genuinely contains an underscore &mdash; `Header(convert_underscores=False)` turns it off.
+
+Header names are case-insensitive in HTTP, and the framework normalises them, so a client sending `X-Token`, `x-token` or `X-TOKEN` all reach the same parameter. That is worth knowing mainly so you do not write code trying to handle the variants.
+
+Everything from the query-parameter module applies: a default makes it optional, no default makes it required, and `Header()` carries the same constraints and metadata, which appear in the schema.
+
+
+## Header() reads one header
+
+Underscores in the parameter name become hyphens automatically, because <code>x-token</code> is not a valid Python identifier.
+
+```python-run
+from typing import Optional
+from fastapi import FastAPI, Header
+
+app = FastAPI()
+
+@app.get("/whoami")
+def whoami(x_token: Optional[str] = Header(default=None),
+           user_agent: Optional[str] = Header(default=None)):
+    return {"x_token": x_token, "user_agent": user_agent}
+
+c = TestClient(app)
+print("none    :", c.get("/whoami").json())
+print("supplied:", c.request("GET", "/whoami", headers={
+    "x-token": "abc123", "user-agent": "vizlearn-test/1.0"}).json())
+print()
+print("x_token became the header x-token, with no configuration.")
+```
+
+## Header names are case-insensitive
+
+HTTP says so, and the client normalises them. Your parameter matches whatever case arrived.
+
+```python-run
+from typing import Optional
+from fastapi import FastAPI, Header
+
+app = FastAPI()
+
+@app.get("/h")
+def h(x_token: Optional[str] = Header(default=None)):
+    return {"token": x_token}
+
+c = TestClient(app)
+for name in ["x-token", "X-Token", "X-TOKEN"]:
+    print("%-9s ->" % name, c.request("GET", "/h", headers={name: "abc"}).json())
+```
+
+## Required headers, and the 422
+
+A header with no default is required, and its failure reports <code>header</code> as the source.
+
+```python-run
+from fastapi import FastAPI, Header
+
+app = FastAPI()
+
+@app.get("/secure")
+def secure(x_api_key: str = Header()):
+    return {"key_len": len(x_api_key)}
+
+c = TestClient(app)
+print("with key:", c.request("GET", "/secure", headers={"x-api-key": "k-123"}).json())
+
+r = c.get("/secure")
+err = r.json()["detail"][0]
+print()
+print("without :", r.status_code)
+print("loc     :", err["loc"])
+print("type    :", err["type"])
+```
+
+## Cookies are read the same way
+
+<code>Cookie()</code> takes one by name. It is a header underneath, parsed for you.
+
+```python-run
+from typing import Optional
+from fastapi import FastAPI, Cookie
+
+app = FastAPI()
+
+@app.get("/session")
+def session(session_id: Optional[str] = Cookie(default=None),
+            theme: Optional[str] = Cookie(default="light")):
+    return {"session_id": session_id, "theme": theme}
+
+c = TestClient(app)
+print("none :", c.get("/session").json())
+print("some :", c.request("GET", "/session",
+                          headers={"cookie": "session_id=abc; theme=dark"}).json())
+```
+
+## Setting headers and cookies on the way out
+
+Declare a <code>Response</code> parameter and FastAPI hands you the one it is about to send.
+
+```python-run
+from fastapi import FastAPI, Response
+
+app = FastAPI()
+
+@app.post("/login")
+def login(response: Response):
+    response.set_cookie("session_id", "abc123", httponly=True, samesite="lax")
+    response.headers["X-Request-Id"] = "req-42"
+    return {"ok": True}
+
+c = TestClient(app)
+r = c.post("/login")
+print("body       :", r.json())
+print("x-request-id:", r.headers.get("x-request-id"))
+print("set-cookie :", r.headers.get("set-cookie"))
+print()
+print("httponly keeps JavaScript away from it; samesite limits cross-site sending.")
+```
+
+## Validating a header like anything else
+
+<code>Header()</code> carries the same constraints as <code>Query()</code>, so a malformed token fails at the door.
+
+```python-run
+from fastapi import FastAPI, Header
+
+app = FastAPI()
+
+@app.get("/v")
+def v(x_api_key: str = Header(min_length=8, pattern=r"^k-[a-z0-9]+$",
+                              description="Issued in the dashboard.")):
+    return {"ok": True}
+
+c = TestClient(app)
+print("good :", c.request("GET", "/v", headers={"x-api-key": "k-abc123"}).status_code)
+for bad in ["k-ab", "nope-abc123"]:
+    r = c.request("GET", "/v", headers={"x-api-key": bad})
+    print("%-12s %s %s" % (bad, r.status_code, r.json()["detail"][0]["type"]))
+
+print()
+print("documented as:", app.openapi()["paths"]["/v"]["get"]["parameters"][0]["name"])
+```
+## What headers are for
+
+Headers carry metadata about the request rather than the request's subject.
+
+Authentication (`Authorization`), content negotiation (`Accept`, `Content-Type`), caching (`If-None-Match`), tracing (`X-Request-Id`), and client identification (`User-Agent`) all belong here.
+
+What does not belong is data. A filter, an identifier, a search term &mdash; those are query parameters or a body. A header is invisible in a URL, so anything in one cannot be bookmarked, linked or shared, and callers will not think to look for it.
+
+The `X-` prefix for custom headers was formally deprecated years ago and remains near-universal in practice. Either convention is fine; consistency matters more than which.
+
+## Cookies
+
+`Cookie()` reads one by name. Underneath it is the `Cookie` header, parsed into pairs for you.
+
+Cookies are worth being careful with, because they are sent automatically by browsers on every matching request &mdash; which is what makes them convenient for sessions and what makes them a CSRF vector.
+
+Three flags matter when setting one:
+
+**`httponly=True`** stops page JavaScript reading it. For a session identifier this is close to mandatory; without it, any script that gets injected can read the session.
+
+**`samesite`** controls whether the browser sends it on cross-site requests. `"lax"` is a reasonable default and blocks the most common CSRF shapes; `"strict"` is safer and breaks arriving from an external link; `"none"` requires `secure=True`.
+
+**`secure=True`** sends it only over HTTPS. In production it should always be set.
+
+For an API consumed by a separate front end, tokens in an `Authorization` header are usually the simpler choice, because they are not sent automatically and so CSRF does not arise. Cookies earn their place when the browser is the client and you want the browser's session handling.
+
+## Setting things on the way out
+
+Declaring a `Response` parameter gives you the response object FastAPI is about to send:
+
+```python
+def login(response: Response):
+    response.set_cookie("session_id", "abc", httponly=True)
+    response.headers["X-Request-Id"] = "req-42"
+    return {"ok": True}
+```
+
+You still return your normal value, and the response model still applies. That is the useful part &mdash; you get header control without giving up serialisation and documentation the way returning a `Response` object does.
+
+## Auth belongs in a dependency
+
+Reading an `Authorization` header in every handler that needs it works and does not scale. The same four lines end up in thirty functions, and the thirty-first forgets them.
+
+That is what dependencies are for, and they are the next tier. A dependency reads the header, validates the token, raises 401 if it is wrong, and returns the user &mdash; and every endpoint that needs authentication declares one parameter.
+
+Worth knowing now so you do not build the habit of doing it by hand.
+
+## What not to do
+
+**Do not put secrets in a URL.** They end up in browser history, server logs, proxy logs and `Referer` headers. That is the argument for an `Authorization` header over an `api_key` query parameter, and it is a strong one.
+
+**Do not trust a client-supplied header for identity.** `X-User-Id` from a caller is a claim, not a fact. Behind a trusted proxy that sets it, it is a fact &mdash; but only if you have confirmed the proxy strips whatever the client sent.
+
+**Do not log headers indiscriminately.** `Authorization` and `Cookie` are exactly the two you least want in a log file, and they are in every request.
+
+
+## Mistakes people make
+
+**Putting data in a header.** A filter or an identifier in a header cannot be bookmarked, linked or shared, and no caller will think to look for it. Headers carry metadata about the request; the URL and body carry its subject.
+
+**Trusting a client-supplied identity header.** `X-User-Id` from a caller is a claim. It is a fact only behind a proxy that sets it *and* strips whatever the client sent - and you have to have checked the second half.
+
+**A secret in a query parameter.** It lands in browser history, server logs, proxy logs and `Referer` headers. That is the argument for `Authorization` over `?api_key=`, and it is a strong one.
+
+**Logging headers wholesale.** `Authorization` and `Cookie` are the two you least want persisted, and they are in every request.
+
+**A session cookie without `httponly`.** Any injected script can then read the session.
+
+**Reading auth headers in every handler.** The same four lines in thirty functions, and the thirty-first forgets them. That is what a dependency is for.
+
+## Cookies or tokens
+
+Worth being explicit, because it is a decision every API makes once.
+
+**Cookies** are sent automatically by the browser on every matching request. Convenient for a server-rendered app, and the reason CSRF exists - which `samesite` mitigates and a token approach avoids entirely.
+
+**Bearer tokens** in an `Authorization` header are not sent automatically, so CSRF does not arise. The client has to store the token somewhere, and `localStorage` is readable by scripts, which trades one risk for another.
+
+For an API consumed by a separate front end, tokens are usually simpler. For a browser-first application where the server manages the session, cookies with `httponly`, `secure` and `samesite` set are a good answer and a well-understood one.
+
+Neither is universally right. What is universally wrong is choosing without noticing there was a choice.
+
+
+## Content negotiation, briefly
+
+Two headers decide what format a request and response are in, and FastAPI handles both mostly invisibly.
+
+`Content-Type` on the request says what the body is. It is how the framework knows whether to parse JSON or a form, which is why declaring a model and a `Form()` field together is a contradiction - they imply different values for one header.
+
+`Accept` on the request says what the client would like back. FastAPI does not negotiate on it by default: an endpoint returns JSON regardless. If you need to serve more than one representation, you read the header yourself and return a different response class.
+
+That is a deliberate simplification rather than an omission. Genuine content negotiation is rarer than it looks, and an API that always returns JSON is easier to consume than one whose response shape depends on a header the caller may not have set.
+
+## Caching headers
+
+Worth knowing they exist, because a small amount of effort here removes a large amount of traffic.
+
+`ETag` and `If-None-Match` let a client ask "has this changed?" and receive a 304 with no body when it has not. `Cache-Control` tells intermediaries how long a response may be reused.
+
+Neither is automatic. Both are set through a `Response` parameter, and both only make sense on `GET` - which is another reason the safe-method rule matters, since a cached response to a mutating request would be a genuine problem.
+
+For a read-heavy API serving data that changes rarely, an ETag on the expensive endpoints is often the cheapest performance work available.
+
+## Trusting the proxy
+
+One more note, because it catches people deploying for the first time.
+
+Behind a load balancer or reverse proxy, the client address your app sees is the proxy's, not the caller's. The real one arrives in `X-Forwarded-For`, and the scheme in `X-Forwarded-Proto`.
+
+Those are headers like any other, which means a direct caller can set them to anything. They are trustworthy only if the proxy overwrites rather than appends, and only if nothing can reach your app without going through it.
+
+Getting that wrong is how rate limiting by IP becomes rate limiting by whatever the attacker chose to send.
+
+## Next
+
+The two content types a browser form actually sends, which are neither JSON nor query strings: form data and file uploads.
+
+
+## A note on CORS
+
+Headers are also where the browser's cross-origin rules live, and it is worth knowing where the boundary is.
+
+When a page on one origin calls an API on another, the browser decides whether the response may be read. That decision is made from response headers - `Access-Control-Allow-Origin` and its relatives - and for anything beyond a simple request the browser first sends an `OPTIONS` preflight asking what is permitted.
+
+The important part: CORS is enforced *by the browser*, for the browser's benefit. It is not a security control on your server. A non-browser client ignores it entirely, so a permissive CORS policy does not expose an API that was otherwise protected, and a strict one does not protect an API that has no authentication.
+
+FastAPI configures this with `CORSMiddleware`, which is the middleware module's subject. The habit to avoid is reaching for `allow_origins=["*"]` because something did not work - it usually does make the error go away, and it also means any page anywhere can call your API with whatever credentials the browser holds.
+
+
+## Where headers fit in the request
+
+It helps to hold the four sources in one picture, now that all of them have appeared.
+
+The **path** identifies a resource and is always required. The **query string** describes a view of it and is usually optional. The **body** carries the subject of a write. **Headers and cookies** carry everything about the exchange that is not about the resource at all - who is asking, in what format, on behalf of which session, with what caching state.
+
+FastAPI reads all four from one function signature, deciding by where a name appears and what marks it. That uniformity is the framework's main contribution, and it is why a handler taking a path parameter, two query filters, a body and an API key still reads as an ordinary Python function.
+
+The corollary is that putting a value in the wrong place is easy and produces a working endpoint that is awkward to use. An identifier in a header, a session token in the query string, a filter in the body of a GET - each works, and each will confuse whoever integrates with it.
+
+## Summary
+
+`Header()` reads one header, converting underscores to hyphens. `Cookie()` reads one cookie. Both behave like query parameters otherwise: a default makes them optional, constraints and descriptions reach the schema, and a failure reports `header` or `cookie` as the source.
+
+Headers carry metadata about a request - authentication, content negotiation, caching, tracing. Data belongs in the URL or the body, where it can be seen and shared.
+
+Set outgoing headers and cookies through a `Response` parameter, which keeps your response model. Use `httponly`, `secure` and `samesite` on anything that identifies a session, and move authentication into a dependency before the fourth endpoint needs it.

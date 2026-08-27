@@ -326,11 +326,55 @@ class TestClient:
         self.app = app
         self.base_url = base_url
 
-    def request(self, method, url, json=None, content=None, headers=None):
+    def request(self, method, url, json=None, content=None, data=None,
+                files=None, headers=None):
         path, _, query = url.partition("?")
         body = b""
         hdrs = [(b"host", b"testserver")]
-        if json is not None:
+        if files is not None:
+            # multipart, spelled the way httpx spells it: files={"f": (name,
+            # content, type)} with data={} for the ordinary fields alongside.
+            # Hand-building a multipart body in a lesson teaches the wire
+            # format instead of the endpoint, which is the wrong subject.
+            #
+            # Built with chr(13)+chr(10) and concatenation rather than escape
+            # sequences: this whole module is itself a Python string literal,
+            # so a backslash here has to survive two rounds of parsing and
+            # silently became a real newline the first time it was written.
+            boundary = "vizlearnboundary"
+            crlf = chr(13) + chr(10)
+            parts = []
+            for key, value in (data or {}).items():
+                head = "--" + boundary + crlf
+                head += 'Content-Disposition: form-data; name="' + key + '"'
+                head += crlf + crlf
+                parts.append((head + str(value) + crlf).encode())
+            for key, spec in files.items():
+                if isinstance(spec, (bytes, str)):
+                    filename, payload, ctype = key, spec, "application/octet-stream"
+                elif len(spec) == 2:
+                    filename, payload = spec
+                    ctype = "application/octet-stream"
+                else:
+                    filename, payload, ctype = spec
+                if isinstance(payload, str):
+                    payload = payload.encode()
+                head = "--" + boundary + crlf
+                head += ('Content-Disposition: form-data; name="' + key +
+                         '"; filename="' + filename + '"' + crlf)
+                head += "Content-Type: " + ctype + crlf + crlf
+                parts.append(head.encode() + payload + crlf.encode())
+            parts.append(("--" + boundary + "--" + crlf).encode())
+            body = b"".join(parts)
+            hdrs.append((b"content-type",
+                         ("multipart/form-data; boundary=" + boundary).encode()))
+        elif data is not None and isinstance(data, dict):
+            from urllib.parse import urlencode as _urlencode
+            body = _urlencode(data).encode()
+            hdrs.append((b"content-type", b"application/x-www-form-urlencoded"))
+        elif data is not None:
+            body = data if isinstance(data, bytes) else str(data).encode()
+        elif json is not None:
             body = _json.dumps(json).encode()
             hdrs.append((b"content-type", b"application/json"))
         elif content is not None:

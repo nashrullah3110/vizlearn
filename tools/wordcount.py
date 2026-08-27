@@ -18,11 +18,20 @@ from lib_catalog import ROOT
 TAGS = re.compile(r"<[^>]+>")
 TARGET = 2000
 
+# Code is not prose. The Pydantic and FastAPI articles carry their examples
+# inline - a runnable editor holds its program in a <script> and a static
+# block in a <pre> - and counting those made a 900-word article report as
+# 7,000, so both tracks silently vanished from this worklist.
+CODE = re.compile(
+    r"<pre\b.*?</pre>|<script\b.*?</script>|<textarea\b.*?</textarea>",
+    re.S | re.I)
+
 
 def count(entry):
     text = entry.get("intro", "")
     for heading, body in entry["sections"]:
         text += " " + heading + " " + body
+    text = CODE.sub(" ", text)
     return len(html.unescape(TAGS.sub(" ", text)).split())
 
 

@@ -34,6 +34,10 @@ SPECS = {
             "anyio-4.6.2.post1-py3-none-any.whl",
             "starlette-0.41.3-py3-none-any.whl",
             "fastapi-0.115.6-py3-none-any.whl",
+            # Form and file endpoints refuse to start without it, and the
+            # error names the package rather than the endpoint, so it is
+            # loaded for the whole track rather than one module.
+            "python_multipart-0.0.32-py3-none-any.whl",
         ]),
         "label": "FastAPI",
         "filename": "example_%02d.py",

@@ -1,0 +1,351 @@
+title: HTTP Methods and Routing
+intro: What each verb promises, and how the router decides which handler runs.
+
+## A resource is one name and several operations
+
+The same path with different methods is the central idea of an HTTP API. `/modules/7` names a thing; `GET`, `PUT` and `DELETE` are what you can do to it.
+
+FastAPI gives you a decorator per verb, and registering several against one path is normal rather than a special case.
+
+
+## One path, several methods
+
+The same URL can carry a different handler per verb. That is the shape of a resource: one name, several things you can do to it.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+DB = {1: {"id": 1, "title": "Vectors"}}
+
+class ModuleIn(BaseModel):
+    title: str
+
+@app.get("/modules/{i}")
+def read(i: int):
+    return DB.get(i, {"error": "missing"})
+
+@app.put("/modules/{i}")
+def replace(i: int, body: ModuleIn):
+    DB[i] = {"id": i, "title": body.title}
+    return DB[i]
+
+@app.delete("/modules/{i}", status_code=204)
+def remove(i: int):
+    DB.pop(i, None)
+    return None
+
+c = TestClient(app)
+print("get   :", c.get("/modules/1").json())
+print("put   :", c.put("/modules/1", json={"title": "Norms"}).json())
+print("delete:", c.delete("/modules/1").status_code)
+print("get   :", c.get("/modules/1").json())
+```
+
+## The wrong method is a 405
+
+A path that matches a route registered for another verb gives 405, not 404. The difference tells you the URL was right.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules")
+def read():
+    return []
+
+c = TestClient(app)
+print("GET    :", c.get("/modules").status_code)
+print("POST   :", c.post("/modules", json={}).status_code, "<- 405, path exists")
+print("GET /x :", c.get("/nope").status_code, "<- 404, path does not")
+print()
+print("405 means: right URL, wrong verb. Worth distinguishing when debugging.")
+```
+
+## Idempotency, demonstrated
+
+Sending the same request twice should mean something different for POST than for PUT. Here is that difference, counted.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+STORE = {}
+NEXT = {"id": 1}
+
+class ModuleIn(BaseModel):
+    title: str
+
+@app.post("/modules", status_code=201)
+def create(body: ModuleIn):
+    i = NEXT["id"]; NEXT["id"] += 1
+    STORE[i] = body.title
+    return {"id": i}
+
+@app.put("/modules/{i}")
+def replace(i: int, body: ModuleIn):
+    STORE[i] = body.title
+    return {"id": i}
+
+c = TestClient(app)
+c.post("/modules", json={"title": "Vectors"})
+c.post("/modules", json={"title": "Vectors"})
+print("after two POSTs:", STORE, "<- two records")
+
+STORE.clear()
+c.put("/modules/9", json={"title": "Norms"})
+c.put("/modules/9", json={"title": "Norms"})
+print("after two PUTs :", STORE, "<- one record")
+```
+
+## Registration order, and how to inspect it
+
+The router walks its table in order and takes the first match. You can print that table, which settles most routing arguments.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules/latest")
+def latest(): return {"route": "latest"}
+
+@app.get("/modules/{i}")
+def by_id(i: int): return {"route": "by_id", "i": i}
+
+@app.post("/modules")
+def create(): return {"route": "create"}
+
+print("the table, in match order:")
+for r in app.routes:
+    methods = getattr(r, "methods", None)
+    if methods:
+        print("  %-8s %s" % (",".join(sorted(methods)), r.path))
+
+c = TestClient(app)
+print()
+print("/modules/latest ->", c.get("/modules/latest").json())
+print("/modules/7      ->", c.get("/modules/7").json())
+```
+
+## Several methods on one function
+
+<code>api_route</code> registers one handler for a list of verbs, and <code>Request.method</code> tells you which arrived.
+
+```python-run
+from fastapi import FastAPI, Request
+
+app = FastAPI()
+
+@app.api_route("/ping", methods=["GET", "HEAD"])
+def ping(request: Request):
+    return {"method": request.method}
+
+c = TestClient(app)
+print("GET  :", c.get("/ping").json())
+print("HEAD :", c.request("HEAD", "/ping").status_code)
+print()
+print("Useful for health checks, and rarely the right tool otherwise -")
+print("two verbs usually want two functions.")
+```
+
+## A resource, end to end
+
+The five verbs on one collection, with the status codes each should return. This is the shape most CRUD endpoints converge on.
+
+```python-run
+from fastapi import FastAPI, HTTPException, status
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+DB, NEXT = {}, {"id": 1}
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+
+class ModuleOut(ModuleIn):
+    id: int
+
+@app.get("/modules", response_model=list[ModuleOut])
+def list_all():
+    return list(DB.values())
+
+@app.post("/modules", response_model=ModuleOut, status_code=201)
+def create(body: ModuleIn):
+    i = NEXT["id"]; NEXT["id"] += 1
+    DB[i] = {"id": i, **body.model_dump()}
+    return DB[i]
+
+@app.get("/modules/{i}", response_model=ModuleOut)
+def read(i: int):
+    if i not in DB:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Module not found")
+    return DB[i]
+
+@app.delete("/modules/{i}", status_code=204)
+def remove(i: int):
+    if i not in DB:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Module not found")
+    del DB[i]
+    return None
+
+c = TestClient(app)
+print("create :", c.post("/modules", json={"title": "Vectors"}).status_code)
+print("list   :", c.get("/modules").json())
+print("read   :", c.get("/modules/1").json())
+print("missing:", c.get("/modules/99").status_code)
+print("delete :", c.delete("/modules/1").status_code)
+print("list   :", c.get("/modules").json())
+```
+## The promises each verb makes
+
+These are not conventions you may ignore. Browsers, proxies, CDNs, load balancers and HTTP client libraries all act on them, and breaking one produces behaviour you did not write.
+
+**GET is safe.** It must not change anything. Browsers prefetch links, proxies cache responses, monitoring replays requests, and a "click here to delete" link behind a GET will eventually be followed by something that was not a person.
+
+**POST is not idempotent.** Sending it twice does it twice. That is correct for creating, and it is why a client that times out mid-POST genuinely does not know whether it succeeded.
+
+**PUT is idempotent.** It replaces a resource at a known URL, so repeating it leaves the same state. A client can retry it safely.
+
+**DELETE is idempotent.** Deleting twice leaves the thing deleted. The second call returning 404 is acceptable; many APIs return 204 both times, which is friendlier to a retrying client.
+
+**PATCH is not necessarily idempotent.** "Set the title to X" is; "increment the counter" is not.
+
+That retry property is the practical payoff. It is what lets a client library automatically retry a failed PUT and refuse to retry a POST, without knowing anything about your application.
+
+## 404 versus 405
+
+A path nothing matched is a 404. A path that matched a route registered for a different verb is a **405 Method Not Allowed**.
+
+The distinction is genuinely useful when debugging: a 405 means the URL is right and the method is wrong, which is usually a typo in the decorator or a client sending POST where PUT was meant. A 404 means the path never matched at all, which is a different search.
+
+## Order, and inspecting it
+
+Routes match in registration order and the first match wins &mdash; the rule from the first tier, and the reason a fixed path must be declared before a variable one that would also match.
+
+`app.routes` is worth knowing about, because it settles arguments. Printing the table shows exactly what the router will try and in what order, which is faster than reasoning about it.
+
+Routes registered through an `APIRouter` appear in the order the routers were included, which becomes relevant once an app is split up &mdash; a catch-all in an early router can shadow a specific route in a later one.
+
+## One function, several verbs
+
+`api_route` takes a list of methods:
+
+```python
+@app.api_route("/ping", methods=["GET", "HEAD"])
+```
+
+The honest use is a health check, where GET and HEAD should behave identically. Beyond that it is usually the wrong tool: two verbs mean two different operations with two different meanings, and one function containing `if request.method == "POST"` is two functions that have not been separated yet.
+
+## Designing the set
+
+Most collections end up with five endpoints, and there is little value in being creative about them.
+
+`GET /modules` lists. `POST /modules` creates and returns 201. `GET /modules/{id}` reads or 404s. `PUT` or `PATCH /modules/{id}` updates. `DELETE /modules/{id}` removes and returns 204.
+
+The temptation is to add verbs to paths for anything that does not fit &mdash; `/modules/{id}/publish`, `/modules/search`. Sometimes that is right: an action that is not a create, read, update or delete genuinely needs a name, and `POST /modules/{id}/publish` is clearer than inventing a field whose mutation has a side effect.
+
+What to avoid is the halfway house: `POST /getModules`, or `GET /modules/delete/{id}`. The first duplicates what the method already says; the second puts a destructive action behind a safe verb, which is the one mistake in this module with real consequences.
+
+## Trailing slashes, once more
+
+`/modules` and `/modules/` are different paths, and FastAPI redirects between them with a 307.
+
+That is mostly invisible. Where it bites is a POST: a 307 preserves the method and body in theory, and some clients drop the body in practice, producing a request that arrives empty for no reason the caller can see. Pick one convention across your API and hold it.
+
+
+## Mistakes people make
+
+**A mutating GET.** The one with real consequences. Browsers prefetch, proxies cache, monitoring replays, and link scanners follow. A "delete" behind a GET will eventually run without a person involved.
+
+**Using POST for everything.** It works, and it throws away idempotency. A client that times out on a PUT can safely retry; on a POST it genuinely cannot know whether the write landed. Choosing the verb correctly gives every HTTP library in the world useful information for free.
+
+**Verbs in paths.** `POST /createModule` duplicates what the method already says, and `GET /modules/delete/7` puts a destructive action behind a safe verb.
+
+**Assuming 404 means the route is wrong.** A 405 means the path matched and the method did not - usually a typo in the decorator or a client using POST where PUT was meant.
+
+**Registering a variable route before a fixed one.** Still the most common routing bug, and across routers it is harder to see because the two live in different files.
+
+**Inconsistent trailing slashes.** `/modules` and `/modules/` differ, and the 307 between them loses the body in some clients - producing a POST that arrives empty for no visible reason.
+
+## Idempotency in practice
+
+The property is worth one more paragraph because it is the one people skip.
+
+A network is unreliable in a specific way: a request can succeed while the response is lost. The client sees a timeout and has no idea whether the write happened.
+
+For a PUT or DELETE that does not matter - retry, and the end state is the same. For a POST it matters a great deal, and the standard answer is an idempotency key: the client generates one, sends it as a header, and the server records it alongside the result so a repeat returns the original response instead of creating a second record.
+
+Payment APIs all do this, for obvious reasons. Most other APIs should and do not, and it is much easier to add before the duplicates appear than after.
+
+
+## Designing a URL space
+
+Beyond individual routes, a few decisions shape how an API feels to use.
+
+**Nouns for resources, and plural.** `/modules`, not `/module` or `/getModules`. The method supplies the verb.
+
+**Nest only for ownership.** `/modules/{id}/lessons` is right when a lesson belongs to exactly one module and has no independent identity. When it does have one, `/lessons/{id}` alongside is kinder - deep nesting forces callers to know a parent id they may not have.
+
+**Actions that are not CRUD get a sub-resource.** `POST /modules/{id}/publish` is clearer than inventing a field whose mutation has side effects. Keep them few; an API that is mostly actions is an RPC interface wearing REST's clothes, and would be more honest as one.
+
+**Filters go in the query string.** `/modules?track=maths` narrows a set. `/tracks/maths/modules` claims a module is reachable only through one track.
+
+**Be consistent about case and separators.** Lower case, hyphens where a word break is needed. Paths are case-sensitive in the standard and inconsistently handled in practice, and consistency removes a class of bug that only appears on somebody else's server.
+
+## What the router does not do
+
+Two things worth knowing are absent.
+
+**No automatic redirect between methods.** A GET to a POST-only route is a 405, not a redirect to somewhere sensible.
+
+**No wildcard fallback by default.** An unmatched path is a 404 from the router with a generic body. If you want a catch-all - to serve a single-page app, say - you register one, and it must come last or it shadows everything after it.
+
+That last point is the ordering rule at its most severe: a catch-all in an early router makes every route in every later router unreachable, which is a confusing morning.
+
+## Next
+
+The parts of a request that are neither path, query nor body: headers and cookies, and what they are each properly for.
+
+
+## A closing thought
+
+The verbs are the oldest and best-specified part of an HTTP API, and the part most often treated as arbitrary.
+
+Choosing them correctly is not pedantry. It is what lets a client library retry safely, a proxy cache correctly, a monitoring system distinguish a failure from a rejection, and a newcomer guess what an endpoint does before reading its documentation.
+
+None of that requires anything from you except using the verb that matches what the endpoint actually does - which is information you already have.
+
+
+## The set worth memorising
+
+Five endpoints per collection, and there is little value in deviating.
+
+`GET /things` lists, with filters in the query string and a capped limit. `POST /things` creates, returns 201, and is not idempotent. `GET /things/{id}` reads or 404s. `PUT` or `PATCH /things/{id}` updates - the first replacing, the second partial. `DELETE /things/{id}` removes and returns 204.
+
+Anything that does not fit becomes a sub-resource with a name: `POST /things/{id}/publish`. Keep those few. An API that is mostly named actions is an RPC interface, and would be clearer written as one than disguised as REST.
+
+## Summary
+
+One path, a handler per verb. GET is safe and must change nothing. PUT and DELETE are idempotent, so a client can retry them after a timeout; POST is not, which is why idempotency keys exist.
+
+A known path with an unregistered method is 405, not 404, and the difference tells you the URL was right.
+
+Routes match in registration order and, across routers, in inclusion order. `app.routes` prints the table when something is not behaving.
+
+And design the URL space once: plural nouns, shallow nesting, filters in the query string, and no verbs in paths.
+
+## Next
+
+Headers and cookies come next - the parts of a request that describe the exchange rather than the resource - followed by the two body formats a browser form actually sends, the status codes that report what happened, the error handling that produces them, and the structure that keeps all of it navigable once there is more than one resource.
+
+## One more on safety
+
+The safe-method rule deserves restating because it is the only item here whose violation causes real damage rather than inconvenience.
+
+"Safe" does not mean "harmless to call once". It means the caller has not requested a change, so anything may call it, any number of times, without asking. Link previews in chat applications fetch URLs. Antivirus scanners fetch URLs. Browsers prefetch on hover. Corporate proxies fetch to inspect.
+
+Every one of those will eventually hit a destructive GET, and the resulting incident is difficult to explain because nobody clicked anything. Putting the action behind POST or DELETE removes the entire class.

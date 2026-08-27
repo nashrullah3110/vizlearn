@@ -5329,6 +5329,261 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "fastapi/apirouter.html",
+  "title": "APIRouter",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "What does `prefix` on an APIRouter do?",
+    "o": [
+     "Renames the router",
+     "Prepends to every path in it",
+     "Sets a tag",
+     "Adds a dependency"
+    ],
+    "a": 1,
+    "w": "It applies to every route in the router, so `@router.get(\"\")` with `prefix=\"/modules\"` becomes `/modules`. Tags, set the same way, group the routes in the docs."
+   },
+   {
+    "t": "Why can a fixed route in one router be unreachable?",
+    "o": [
+     "A bug",
+     "Inclusion order sets match order, so an earlier router's variable route shadows it",
+     "Routers are unordered",
+     "Prefixes conflict"
+    ],
+    "a": 1,
+    "w": "Across routers, inclusion order is match order - and the mistake is harder to spot because the two routes live in different files."
+   },
+   {
+    "t": "What does `dependencies=[...]` on a router do?",
+    "o": [
+     "Nothing",
+     "Applies to every route in it, running for its effect",
+     "Passes the value to each handler",
+     "Only documents them"
+    ],
+    "a": 1,
+    "w": "It runs for every route in the section. The return value is not injected; a handler that needs it declares its own Depends, and the result is cached within the request."
+   },
+   {
+    "t": "When should you create a routers/ directory?",
+    "o": [
+     "After 50 endpoints",
+     "On day one, even with two",
+     "Never",
+     "Only for large teams"
+    ],
+    "a": 1,
+    "w": "Moving three routes is trivial and moving eighty is a weekend - and by then something depends on the import layout."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/error_handling.html",
+  "title": "Error Handling",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "Where can `HTTPException` be raised?",
+    "o": [
+     "Only in the handler",
+     "Anywhere in the call stack",
+     "Only in dependencies",
+     "Only in middleware"
+    ],
+    "a": 1,
+    "w": "It is an exception, so it unwinds. A function five levels deep can refuse the request without every caller checking a return value."
+   },
+   {
+    "t": "Why raise `ModuleNotFound` in a service rather than `HTTPException(404)`?",
+    "o": [
+     "It is faster",
+     "The service may also be called from a job, a CLI or a test, none of which have a request to answer",
+     "HTTPException is deprecated",
+     "No reason"
+    ],
+    "a": 1,
+    "w": "Business logic that imports fastapi can only be used from a request. Mapping the domain error to a status at the edge keeps the service reusable and testable."
+   },
+   {
+    "t": "What should an `Exception` handler return to the client?",
+    "o": [
+     "The traceback",
+     "A generic message plus a correlation id",
+     "The exception type",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "A traceback names files, versions and sometimes values - an information leak. Log it, and give the caller an id they can quote."
+   },
+   {
+    "t": "You override the `HTTPException` handler. What is easy to forget?",
+    "o": [
+     "The status code and `exc.headers`",
+     "The detail",
+     "The path",
+     "Async"
+    ],
+    "a": 0,
+    "w": "Hard-coding a status breaks every non-404, and dropping `exc.headers` silently discards things like `Retry-After` and `WWW-Authenticate`."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/form_data_and_files.html",
+  "title": "Form Data and File Uploads",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "You declare `username: str` with no marker on a POST endpoint. Where does FastAPI look?",
+    "o": [
+     "The form body",
+     "The query string",
+     "A header",
+     "The JSON body"
+    ],
+    "a": 1,
+    "w": "A plain parameter defaults to a query parameter. `Form()` is what tells FastAPI the value is in a form-encoded body."
+   },
+   {
+    "t": "Why is `UploadFile` preferable to a `bytes` parameter?",
+    "o": [
+     "It is faster",
+     "Large uploads are spooled to disk instead of held in memory",
+     "It validates the content",
+     "It is required"
+    ],
+    "a": 1,
+    "w": "Reading a whole upload into RAM is fine for an avatar and a denial-of-service vector for anything larger."
+   },
+   {
+    "t": "Can you safely use `file.filename` to build a save path?",
+    "o": [
+     "Yes",
+     "No - it is attacker-controlled and can contain `..` or absolute paths",
+     "Only for images",
+     "Only if it is short"
+    ],
+    "a": 1,
+    "w": "It comes from the client and can say anything. Generate your own name and keep the original only as display metadata."
+   },
+   {
+    "t": "What does FastAPI do about upload size by default?",
+    "o": [
+     "Caps it at 1MB",
+     "Nothing - it is unlimited",
+     "Rejects over 10MB",
+     "Streams it away"
+    ],
+    "a": 1,
+    "w": "Nothing caps it. Read with a limit in the handler, and set one in whatever sits in front of the app, since the bytes arrive before your code runs."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/http_methods_and_routing.html",
+  "title": "HTTP Methods and Routing",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "A GET request is prefetched by a browser and your handler deletes something. Whose bug is it?",
+    "o": [
+     "The browser's",
+     "Yours - GET must be safe",
+     "Nobody's",
+     "The proxy's"
+    ],
+    "a": 1,
+    "w": "Browsers prefetch, proxies cache and monitoring replays, all on the assumption that GET changes nothing. A destructive GET will eventually be called by something that was not a person."
+   },
+   {
+    "t": "What does a 405 tell you that a 404 does not?",
+    "o": [
+     "Nothing",
+     "The path matched a route, but not for that method",
+     "The server is down",
+     "The body was invalid"
+    ],
+    "a": 1,
+    "w": "405 means the URL is right and the verb is wrong - usually a typo in the decorator or a client using the wrong method. A 404 means nothing matched at all."
+   },
+   {
+    "t": "Why can a client safely retry a failed PUT but not a failed POST?",
+    "o": [
+     "PUT is faster",
+     "PUT is idempotent - repeating it leaves the same state",
+     "POST has no body",
+     "It cannot"
+    ],
+    "a": 1,
+    "w": "A repeated PUT replaces the same resource with the same content. A repeated POST creates a second record, which is why a timed-out POST leaves a client genuinely uncertain."
+   },
+   {
+    "t": "Where do routes registered on an APIRouter sit in match order?",
+    "o": [
+     "Always first",
+     "In the order the routers were included",
+     "Alphabetically",
+     "Always last"
+    ],
+    "a": 1,
+    "w": "Inclusion order determines match order, so a catch-all in an early router can shadow a more specific route in a later one."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/headers_and_cookies.html",
+  "title": "Headers and Cookies",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "Why does `x_token: str = Header()` read the `x-token` header?",
+    "o": [
+     "Coincidence",
+     "Underscores are converted to hyphens, since header names are not valid identifiers",
+     "It reads `x_token` literally",
+     "Only with a config flag"
+    ],
+    "a": 1,
+    "w": "Most header names contain hyphens and none are valid Python identifiers, so the conversion is automatic. `convert_underscores=False` turns it off."
+   },
+   {
+    "t": "What belongs in a header rather than a query parameter?",
+    "o": [
+     "A search term",
+     "A filter",
+     "Metadata about the request, like auth or content negotiation",
+     "An identifier"
+    ],
+    "a": 2,
+    "w": "Headers carry metadata about the request. Data belongs where it can be seen, bookmarked and linked - the URL or the body."
+   },
+   {
+    "t": "Why set `httponly=True` on a session cookie?",
+    "o": [
+     "It is faster",
+     "Page JavaScript cannot read it, so an injected script cannot steal the session",
+     "It encrypts the value",
+     "It stops CSRF"
+    ],
+    "a": 1,
+    "w": "It keeps the value out of reach of scripts. CSRF is a different problem, addressed by `samesite`."
+   },
+   {
+    "t": "Where should reading an `Authorization` header live?",
+    "o": [
+     "In every handler",
+     "In a dependency",
+     "In middleware only",
+     "In the model"
+    ],
+    "a": 1,
+    "w": "Doing it per handler means the same four lines in thirty functions and the thirty-first forgetting. A dependency does it once and each endpoint declares one parameter."
+   }
+  ]
+ },
+ {
   "path": "fastapi/path_parameters.html",
   "title": "Path Parameters",
   "cat": "FastAPI",
@@ -5580,6 +5835,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "By default a model validates from a mapping. `from_attributes=True` - `orm_mode` in Pydantic v1 - lets it read attributes off an object instead."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/status_codes.html",
+  "title": "Status Codes",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "Why is returning 200 with an error body a problem?",
+    "o": [
+     "It is slower",
+     "Retries, caches, monitoring and client error handling all branch on the status class",
+     "It is invalid HTTP",
+     "It breaks JSON"
+    ],
+    "a": 1,
+    "w": "The first digit drives behaviour in code you did not write. A 200 means every caller must parse your body to learn something the protocol had a field for, and your error rate reads as zero."
+   },
+   {
+    "t": "What must a 204 response contain?",
+    "o": [
+     "An empty object",
+     "Nothing at all",
+     "A message",
+     "The deleted id"
+    ],
+    "a": 1,
+    "w": "Declare `status_code=204` and return None. A body makes the response malformed - some clients error, others silently ignore it, which is worse."
+   },
+   {
+    "t": "A signed-in reader tries an admin-only delete. Which code?",
+    "o": [
+     "401",
+     "403",
+     "422",
+     "404"
+    ],
+    "a": 1,
+    "w": "401 means unauthenticated - I do not know who you are. Here we do, and they are not allowed, which is 403. Collapsing the two makes clients loop on re-authentication."
+   },
+   {
+    "t": "A create request is valid but the slug already exists. Which code?",
+    "o": [
+     "422",
+     "400",
+     "409",
+     "404"
+    ],
+    "a": 2,
+    "w": "Nothing about the payload was malformed - the same body would have worked a minute earlier. That is a conflict with current state, which is 409."
    }
   ]
  },

@@ -1324,6 +1324,46 @@ window.VIZLEARN_MODULES = [
   "desc": "See what the numbers a network learns are actually for: weights scale each input, bias shifts where the neuron fires."
  },
  {
+  "title": "APIRouter",
+  "path": "fastapi/apirouter.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Error Handling",
+  "path": "fastapi/error_handling.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Form Data and File Uploads",
+  "path": "fastapi/form_data_and_files.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "HTTP Methods and Routing",
+  "path": "fastapi/http_methods_and_routing.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Headers and Cookies",
+  "path": "fastapi/headers_and_cookies.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Path Parameters",
   "path": "fastapi/path_parameters.html",
   "category": "FastAPI",
@@ -1358,6 +1398,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Response Models",
   "path": "fastapi/response_models.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Status Codes",
+  "path": "fastapi/status_codes.html",
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",

@@ -264,7 +264,7 @@
                 <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
                     <h3 id="vz-s-without-one-whatever-you-return-is-sent">Without one, whatever you return is sent</h3>
-                    <p>A handler returning an internal row sends every key in it, including the ones nobody outside should see.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
+                    <p>A handler returning an internal row sends every key in it, including the ones nobody outside should see.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl,../assets/wheels/python_multipart-0.0.32-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
 from contextlib import asynccontextmanager
 
 # Starlette hands a sync `def` endpoint to a threadpool. There are no threads
@@ -365,11 +365,55 @@ class TestClient:
         self.app = app
         self.base_url = base_url
 
-    def request(self, method, url, json=None, content=None, headers=None):
+    def request(self, method, url, json=None, content=None, data=None,
+                files=None, headers=None):
         path, _, query = url.partition("?")
         body = b""
         hdrs = [(b"host", b"testserver")]
-        if json is not None:
+        if files is not None:
+            # multipart, spelled the way httpx spells it: files={"f": (name,
+            # content, type)} with data={} for the ordinary fields alongside.
+            # Hand-building a multipart body in a lesson teaches the wire
+            # format instead of the endpoint, which is the wrong subject.
+            #
+            # Built with chr(13)+chr(10) and concatenation rather than escape
+            # sequences: this whole module is itself a Python string literal,
+            # so a backslash here has to survive two rounds of parsing and
+            # silently became a real newline the first time it was written.
+            boundary = "vizlearnboundary"
+            crlf = chr(13) + chr(10)
+            parts = []
+            for key, value in (data or {}).items():
+                head = "--" + boundary + crlf
+                head += 'Content-Disposition: form-data; name="' + key + '"'
+                head += crlf + crlf
+                parts.append((head + str(value) + crlf).encode())
+            for key, spec in files.items():
+                if isinstance(spec, (bytes, str)):
+                    filename, payload, ctype = key, spec, "application/octet-stream"
+                elif len(spec) == 2:
+                    filename, payload = spec
+                    ctype = "application/octet-stream"
+                else:
+                    filename, payload, ctype = spec
+                if isinstance(payload, str):
+                    payload = payload.encode()
+                head = "--" + boundary + crlf
+                head += ('Content-Disposition: form-data; name="' + key +
+                         '"; filename="' + filename + '"' + crlf)
+                head += "Content-Type: " + ctype + crlf + crlf
+                parts.append(head.encode() + payload + crlf.encode())
+            parts.append(("--" + boundary + "--" + crlf).encode())
+            body = b"".join(parts)
+            hdrs.append((b"content-type",
+                         ("multipart/form-data; boundary=" + boundary).encode()))
+        elif data is not None and isinstance(data, dict):
+            from urllib.parse import urlencode as _urlencode
+            body = _urlencode(data).encode()
+            hdrs.append((b"content-type", b"application/x-www-form-urlencoded"))
+        elif data is not None:
+            body = data if isinstance(data, bytes) else str(data).encode()
+        elif json is not None:
             body = _json.dumps(json).encode()
             hdrs.append((b"content-type", b"application/json"))
         elif content is not None:
@@ -448,7 +492,7 @@ print("Two fields there were never meant for a caller.")</script><div class="vz-
                 </div>
                 <div>
                     <h3 id="vz-s-response-model-decides-the-shape">response_model decides the shape</h3>
-                    <p>Declare it and the return value is filtered through the model. Anything not declared is dropped.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
+                    <p>Declare it and the return value is filtered through the model. Anything not declared is dropped.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl,../assets/wheels/python_multipart-0.0.32-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
 from contextlib import asynccontextmanager
 
 # Starlette hands a sync `def` endpoint to a threadpool. There are no threads
@@ -549,11 +593,55 @@ class TestClient:
         self.app = app
         self.base_url = base_url
 
-    def request(self, method, url, json=None, content=None, headers=None):
+    def request(self, method, url, json=None, content=None, data=None,
+                files=None, headers=None):
         path, _, query = url.partition("?")
         body = b""
         hdrs = [(b"host", b"testserver")]
-        if json is not None:
+        if files is not None:
+            # multipart, spelled the way httpx spells it: files={"f": (name,
+            # content, type)} with data={} for the ordinary fields alongside.
+            # Hand-building a multipart body in a lesson teaches the wire
+            # format instead of the endpoint, which is the wrong subject.
+            #
+            # Built with chr(13)+chr(10) and concatenation rather than escape
+            # sequences: this whole module is itself a Python string literal,
+            # so a backslash here has to survive two rounds of parsing and
+            # silently became a real newline the first time it was written.
+            boundary = "vizlearnboundary"
+            crlf = chr(13) + chr(10)
+            parts = []
+            for key, value in (data or {}).items():
+                head = "--" + boundary + crlf
+                head += 'Content-Disposition: form-data; name="' + key + '"'
+                head += crlf + crlf
+                parts.append((head + str(value) + crlf).encode())
+            for key, spec in files.items():
+                if isinstance(spec, (bytes, str)):
+                    filename, payload, ctype = key, spec, "application/octet-stream"
+                elif len(spec) == 2:
+                    filename, payload = spec
+                    ctype = "application/octet-stream"
+                else:
+                    filename, payload, ctype = spec
+                if isinstance(payload, str):
+                    payload = payload.encode()
+                head = "--" + boundary + crlf
+                head += ('Content-Disposition: form-data; name="' + key +
+                         '"; filename="' + filename + '"' + crlf)
+                head += "Content-Type: " + ctype + crlf + crlf
+                parts.append(head.encode() + payload + crlf.encode())
+            parts.append(("--" + boundary + "--" + crlf).encode())
+            body = b"".join(parts)
+            hdrs.append((b"content-type",
+                         ("multipart/form-data; boundary=" + boundary).encode()))
+        elif data is not None and isinstance(data, dict):
+            from urllib.parse import urlencode as _urlencode
+            body = _urlencode(data).encode()
+            hdrs.append((b"content-type", b"application/x-www-form-urlencoded"))
+        elif data is not None:
+            body = data if isinstance(data, bytes) else str(data).encode()
+        elif json is not None:
             body = _json.dumps(json).encode()
             hdrs.append((b"content-type", b"application/json"))
         elif content is not None:
@@ -638,7 +726,7 @@ print("The handler still returns the whole row. The model decides what leaves.")
                 </div>
                 <div>
                     <h3 id="vz-s-the-return-annotation-works-too">The return annotation works too</h3>
-                    <p>Annotating the return type does the same job and reads better. FastAPI treats it as the response model.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
+                    <p>Annotating the return type does the same job and reads better. FastAPI treats it as the response model.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl,../assets/wheels/python_multipart-0.0.32-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
 from contextlib import asynccontextmanager
 
 # Starlette hands a sync `def` endpoint to a threadpool. There are no threads
@@ -739,11 +827,55 @@ class TestClient:
         self.app = app
         self.base_url = base_url
 
-    def request(self, method, url, json=None, content=None, headers=None):
+    def request(self, method, url, json=None, content=None, data=None,
+                files=None, headers=None):
         path, _, query = url.partition("?")
         body = b""
         hdrs = [(b"host", b"testserver")]
-        if json is not None:
+        if files is not None:
+            # multipart, spelled the way httpx spells it: files={"f": (name,
+            # content, type)} with data={} for the ordinary fields alongside.
+            # Hand-building a multipart body in a lesson teaches the wire
+            # format instead of the endpoint, which is the wrong subject.
+            #
+            # Built with chr(13)+chr(10) and concatenation rather than escape
+            # sequences: this whole module is itself a Python string literal,
+            # so a backslash here has to survive two rounds of parsing and
+            # silently became a real newline the first time it was written.
+            boundary = "vizlearnboundary"
+            crlf = chr(13) + chr(10)
+            parts = []
+            for key, value in (data or {}).items():
+                head = "--" + boundary + crlf
+                head += 'Content-Disposition: form-data; name="' + key + '"'
+                head += crlf + crlf
+                parts.append((head + str(value) + crlf).encode())
+            for key, spec in files.items():
+                if isinstance(spec, (bytes, str)):
+                    filename, payload, ctype = key, spec, "application/octet-stream"
+                elif len(spec) == 2:
+                    filename, payload = spec
+                    ctype = "application/octet-stream"
+                else:
+                    filename, payload, ctype = spec
+                if isinstance(payload, str):
+                    payload = payload.encode()
+                head = "--" + boundary + crlf
+                head += ('Content-Disposition: form-data; name="' + key +
+                         '"; filename="' + filename + '"' + crlf)
+                head += "Content-Type: " + ctype + crlf + crlf
+                parts.append(head.encode() + payload + crlf.encode())
+            parts.append(("--" + boundary + "--" + crlf).encode())
+            body = b"".join(parts)
+            hdrs.append((b"content-type",
+                         ("multipart/form-data; boundary=" + boundary).encode()))
+        elif data is not None and isinstance(data, dict):
+            from urllib.parse import urlencode as _urlencode
+            body = _urlencode(data).encode()
+            hdrs.append((b"content-type", b"application/x-www-form-urlencoded"))
+        elif data is not None:
+            body = data if isinstance(data, bytes) else str(data).encode()
+        elif json is not None:
             body = _json.dumps(json).encode()
             hdrs.append((b"content-type", b"application/json"))
         elif content is not None:
@@ -828,7 +960,7 @@ print("A list works the same way, filtered item by item.")</script><div class="v
                 </div>
                 <div>
                     <h3 id="vz-s-it-validates-your-own-output">It validates your own output</h3>
-                    <p>The response is checked against the model. A handler that returns the wrong shape fails loudly instead of shipping it.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
+                    <p>The response is checked against the model. A handler that returns the wrong shape fails loudly instead of shipping it.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl,../assets/wheels/python_multipart-0.0.32-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
 from contextlib import asynccontextmanager
 
 # Starlette hands a sync `def` endpoint to a threadpool. There are no threads
@@ -929,11 +1061,55 @@ class TestClient:
         self.app = app
         self.base_url = base_url
 
-    def request(self, method, url, json=None, content=None, headers=None):
+    def request(self, method, url, json=None, content=None, data=None,
+                files=None, headers=None):
         path, _, query = url.partition("?")
         body = b""
         hdrs = [(b"host", b"testserver")]
-        if json is not None:
+        if files is not None:
+            # multipart, spelled the way httpx spells it: files={"f": (name,
+            # content, type)} with data={} for the ordinary fields alongside.
+            # Hand-building a multipart body in a lesson teaches the wire
+            # format instead of the endpoint, which is the wrong subject.
+            #
+            # Built with chr(13)+chr(10) and concatenation rather than escape
+            # sequences: this whole module is itself a Python string literal,
+            # so a backslash here has to survive two rounds of parsing and
+            # silently became a real newline the first time it was written.
+            boundary = "vizlearnboundary"
+            crlf = chr(13) + chr(10)
+            parts = []
+            for key, value in (data or {}).items():
+                head = "--" + boundary + crlf
+                head += 'Content-Disposition: form-data; name="' + key + '"'
+                head += crlf + crlf
+                parts.append((head + str(value) + crlf).encode())
+            for key, spec in files.items():
+                if isinstance(spec, (bytes, str)):
+                    filename, payload, ctype = key, spec, "application/octet-stream"
+                elif len(spec) == 2:
+                    filename, payload = spec
+                    ctype = "application/octet-stream"
+                else:
+                    filename, payload, ctype = spec
+                if isinstance(payload, str):
+                    payload = payload.encode()
+                head = "--" + boundary + crlf
+                head += ('Content-Disposition: form-data; name="' + key +
+                         '"; filename="' + filename + '"' + crlf)
+                head += "Content-Type: " + ctype + crlf + crlf
+                parts.append(head.encode() + payload + crlf.encode())
+            parts.append(("--" + boundary + "--" + crlf).encode())
+            body = b"".join(parts)
+            hdrs.append((b"content-type",
+                         ("multipart/form-data; boundary=" + boundary).encode()))
+        elif data is not None and isinstance(data, dict):
+            from urllib.parse import urlencode as _urlencode
+            body = _urlencode(data).encode()
+            hdrs.append((b"content-type", b"application/x-www-form-urlencoded"))
+        elif data is not None:
+            body = data if isinstance(data, bytes) else str(data).encode()
+        elif json is not None:
             body = _json.dumps(json).encode()
             hdrs.append((b"content-type", b"application/json"))
         elif content is not None:
@@ -1024,7 +1200,7 @@ print("A broken response is a 500 - your bug, not the caller's.")</script><div c
                 </div>
                 <div>
                     <h3 id="vz-s-dropping-unset-and-null-fields">Dropping unset and null fields</h3>
-                    <p><code>response_model_exclude_none</code> and its siblings trim the output without a second model.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
+                    <p><code>response_model_exclude_none</code> and its siblings trim the output without a second model.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl,../assets/wheels/python_multipart-0.0.32-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
 from contextlib import asynccontextmanager
 
 # Starlette hands a sync `def` endpoint to a threadpool. There are no threads
@@ -1125,11 +1301,55 @@ class TestClient:
         self.app = app
         self.base_url = base_url
 
-    def request(self, method, url, json=None, content=None, headers=None):
+    def request(self, method, url, json=None, content=None, data=None,
+                files=None, headers=None):
         path, _, query = url.partition("?")
         body = b""
         hdrs = [(b"host", b"testserver")]
-        if json is not None:
+        if files is not None:
+            # multipart, spelled the way httpx spells it: files={"f": (name,
+            # content, type)} with data={} for the ordinary fields alongside.
+            # Hand-building a multipart body in a lesson teaches the wire
+            # format instead of the endpoint, which is the wrong subject.
+            #
+            # Built with chr(13)+chr(10) and concatenation rather than escape
+            # sequences: this whole module is itself a Python string literal,
+            # so a backslash here has to survive two rounds of parsing and
+            # silently became a real newline the first time it was written.
+            boundary = "vizlearnboundary"
+            crlf = chr(13) + chr(10)
+            parts = []
+            for key, value in (data or {}).items():
+                head = "--" + boundary + crlf
+                head += 'Content-Disposition: form-data; name="' + key + '"'
+                head += crlf + crlf
+                parts.append((head + str(value) + crlf).encode())
+            for key, spec in files.items():
+                if isinstance(spec, (bytes, str)):
+                    filename, payload, ctype = key, spec, "application/octet-stream"
+                elif len(spec) == 2:
+                    filename, payload = spec
+                    ctype = "application/octet-stream"
+                else:
+                    filename, payload, ctype = spec
+                if isinstance(payload, str):
+                    payload = payload.encode()
+                head = "--" + boundary + crlf
+                head += ('Content-Disposition: form-data; name="' + key +
+                         '"; filename="' + filename + '"' + crlf)
+                head += "Content-Type: " + ctype + crlf + crlf
+                parts.append(head.encode() + payload + crlf.encode())
+            parts.append(("--" + boundary + "--" + crlf).encode())
+            body = b"".join(parts)
+            hdrs.append((b"content-type",
+                         ("multipart/form-data; boundary=" + boundary).encode()))
+        elif data is not None and isinstance(data, dict):
+            from urllib.parse import urlencode as _urlencode
+            body = _urlencode(data).encode()
+            hdrs.append((b"content-type", b"application/x-www-form-urlencoded"))
+        elif data is not None:
+            body = data if isinstance(data, bytes) else str(data).encode()
+        elif json is not None:
             body = _json.dumps(json).encode()
             hdrs.append((b"content-type", b"application/json"))
         elif content is not None:
@@ -1220,7 +1440,7 @@ print("unset :", client.get("/unset").json())</script><div class="vz-code-bar"><
                 </div>
                 <div>
                     <h3 id="vz-s-input-and-output-are-different-shapes">Input and output are different shapes</h3>
-                    <p>Separate models for what you accept and what you return &mdash; the pattern almost every real endpoint ends up with.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
+                    <p>Separate models for what you accept and what you return &mdash; the pattern almost every real endpoint ends up with.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pydantic,ssl" data-vz-wheels="../assets/wheels/sniffio-1.3.1-py3-none-any.whl,../assets/wheels/anyio-4.6.2.post1-py3-none-any.whl,../assets/wheels/starlette-0.41.3-py3-none-any.whl,../assets/wheels/fastapi-0.115.6-py3-none-any.whl,../assets/wheels/python_multipart-0.0.32-py3-none-any.whl" data-vz-label="FastAPI"><script type="text/plain" class="py-prelude">import json as _json
 from contextlib import asynccontextmanager
 
 # Starlette hands a sync `def` endpoint to a threadpool. There are no threads
@@ -1321,11 +1541,55 @@ class TestClient:
         self.app = app
         self.base_url = base_url
 
-    def request(self, method, url, json=None, content=None, headers=None):
+    def request(self, method, url, json=None, content=None, data=None,
+                files=None, headers=None):
         path, _, query = url.partition("?")
         body = b""
         hdrs = [(b"host", b"testserver")]
-        if json is not None:
+        if files is not None:
+            # multipart, spelled the way httpx spells it: files={"f": (name,
+            # content, type)} with data={} for the ordinary fields alongside.
+            # Hand-building a multipart body in a lesson teaches the wire
+            # format instead of the endpoint, which is the wrong subject.
+            #
+            # Built with chr(13)+chr(10) and concatenation rather than escape
+            # sequences: this whole module is itself a Python string literal,
+            # so a backslash here has to survive two rounds of parsing and
+            # silently became a real newline the first time it was written.
+            boundary = "vizlearnboundary"
+            crlf = chr(13) + chr(10)
+            parts = []
+            for key, value in (data or {}).items():
+                head = "--" + boundary + crlf
+                head += 'Content-Disposition: form-data; name="' + key + '"'
+                head += crlf + crlf
+                parts.append((head + str(value) + crlf).encode())
+            for key, spec in files.items():
+                if isinstance(spec, (bytes, str)):
+                    filename, payload, ctype = key, spec, "application/octet-stream"
+                elif len(spec) == 2:
+                    filename, payload = spec
+                    ctype = "application/octet-stream"
+                else:
+                    filename, payload, ctype = spec
+                if isinstance(payload, str):
+                    payload = payload.encode()
+                head = "--" + boundary + crlf
+                head += ('Content-Disposition: form-data; name="' + key +
+                         '"; filename="' + filename + '"' + crlf)
+                head += "Content-Type: " + ctype + crlf + crlf
+                parts.append(head.encode() + payload + crlf.encode())
+            parts.append(("--" + boundary + "--" + crlf).encode())
+            body = b"".join(parts)
+            hdrs.append((b"content-type",
+                         ("multipart/form-data; boundary=" + boundary).encode()))
+        elif data is not None and isinstance(data, dict):
+            from urllib.parse import urlencode as _urlencode
+            body = _urlencode(data).encode()
+            hdrs.append((b"content-type", b"application/x-www-form-urlencoded"))
+        elif data is not None:
+            body = data if isinstance(data, bytes) else str(data).encode()
+        elif json is not None:
             body = _json.dumps(json).encode()
             hdrs.append((b"content-type", b"application/json"))
         elif content is not None:
@@ -1538,7 +1802,7 @@ class ModuleOut(ModuleBase):
 <script type="application/json" id="vz-lab-data">{"presets": [], "readouts": [], "viz": "", "keys": {"actions": [{"label": "Run", "sel": ".py-run-btn", "i": 0}, {"label": "Reset", "sel": ".py-reset-btn", "i": 0}, {"label": "Run", "sel": ".py-run-btn", "i": 1}, {"label": "Reset", "sel": ".py-reset-btn", "i": 1}, {"label": "Run", "sel": ".py-run-btn", "i": 2}, {"label": "Reset", "sel": ".py-reset-btn", "i": 2}, {"label": "Run", "sel": ".py-run-btn", "i": 3}, {"label": "Reset", "sel": ".py-reset-btn", "i": 3}]}}</script>
 <!-- VIZLEARN:LAB:END -->
 <!-- VIZLEARN:MODULE:BEGIN (generated by tools/build_module_ui.py) -->
-<div class="vz-extras"><section class="vz-cheatsheet" aria-labelledby="vz-cheat-h"><div class="vz-cheat-top"><span class="vz-cheat-label"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg> Cheat sheet</span><button type="button" class="vz-btn" data-vz-copy><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg> Copy</button></div><h2 class="vz-cheat-title" id="vz-cheat-h">Response Models</h2><p class="vz-cheat-text">That is convenient and it is how data leaks. A handler that returns a database row returns *all* of it: internal notes, an email address, a password hash, a flag nobody outside should know exists. Nothing warns you, because from the framework&#x27;s point of view you asked for exactly that.</p><div class="vz-cheat-foot">FASTAPI &middot; vizlearn.in/fastapi/response_models.html</div></section><section class="vz-related" aria-labelledby="vz-rel-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><h2 id="vz-rel-h">More in FastAPI</h2><span class="vz-rule"></span></div><div class="vz-rail"><a class="vz-card" href="../fastapi/reading_a_422.html" data-vz-path="fastapi/reading_a_422.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="14" y="18" width="132" height="20" rx="3" fill="var(--bg-surface)" stroke="var(--accent-primary)" stroke-width="2"/><text x="80" y="32" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">422 Unprocessable Entity</text><rect x="14" y="44" width="132" height="14" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="54" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">loc  -  where in the request</text><rect x="14" y="60" width="132" height="14" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="70" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">type  -  which rule</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">FastAPI</span><span class="vz-card-title">Reading a 422</span></span></a><a class="vz-card" href="../fastapi/what_is_fastapi.html" data-vz-path="fastapi/what_is_fastapi.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="10" y="20" width="44" height="24" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="32" y="36" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">request</text><path d="M56 32 L70 32" stroke="var(--text-muted)" stroke-width="2"/><rect x="74" y="20" width="48" height="24" rx="3" fill="var(--bg-surface)" stroke="var(--accent-primary)" stroke-width="2"/><text x="98" y="36" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">FastAPI</text><path d="M98 48 L98 58" stroke="var(--text-muted)" stroke-width="2"/><text x="80" y="74" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">validate  -  route  -  document</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">FastAPI</span><span class="vz-card-title">What FastAPI Is</span></span></a><a class="vz-card" href="../fastapi/your_first_endpoint.html" data-vz-path="fastapi/your_first_endpoint.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="16" y="18" width="128" height="22" rx="3" fill="var(--bg-surface)" stroke="var(--accent-primary)" stroke-width="2"/><text x="80" y="32" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">@app.get("/modules")</text><path d="M80 44 L80 54" stroke="var(--text-muted)" stroke-width="2"/><rect x="16" y="56" width="128" height="22" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="70" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">def read_modules(): ...</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">FastAPI</span><span class="vz-card-title">Your First Endpoint</span></span></a><a class="vz-card" href="../fastapi/path_parameters.html" data-vz-path="fastapi/path_parameters.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><text x="80" y="26" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">/modules/{module_id}</text><path d="M80 36 L80 48" stroke="var(--text-muted)" stroke-width="2"/><rect x="30" y="50" width="100" height="24" rx="3" fill="var(--bg-surface)" stroke="var(--accent-primary)" stroke-width="2"/><text x="80" y="66" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">module_id: int</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">FastAPI</span><span class="vz-card-title">Path Parameters</span></span></a></div></section><section class="vz-author" aria-labelledby="vz-author-h"><h2 id="vz-author-h" class="vz-author-h">About the author</h2><p class="vz-author-body"><strong>Ashish Jangra</strong> builds and maintains VizLearn. Every module here is written and the visualisation behind it hand-built, so the numbers in a readout come from the same code that draws the picture. Corrections are genuinely welcome and get priority over everything else &mdash; if a page states something wrong, or an animation misrepresents what the algorithm does, <a href="../contact.html">get in touch</a>.</p><p class="vz-author-links"><a href="../about.html">About VizLearn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://github.com/AshishJangra27" rel="noopener me">GitHub</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://www.linkedin.com/in/ashish-jangra/" rel="noopener me">LinkedIn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="../contact.html">Contact</a></p></section><nav class="vz-prevnext" aria-label="Module navigation"><a class="vz-pn vz-pn-prev" href="../fastapi/request_bodies.html" rel="prev"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span class="vz-pn-text"><span class="vz-pn-label">Previous</span><span class="vz-pn-title">Request Bodies</span></span></a><a class="vz-pn vz-pn-next" href="../fastapi/reading_a_422.html" rel="next"><span class="vz-pn-text"><span class="vz-pn-label">Next</span><span class="vz-pn-title">Reading a 422</span></span><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a></nav></div>
+<div class="vz-extras"><section class="vz-cheatsheet" aria-labelledby="vz-cheat-h"><div class="vz-cheat-top"><span class="vz-cheat-label"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg> Cheat sheet</span><button type="button" class="vz-btn" data-vz-copy><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg> Copy</button></div><h2 class="vz-cheat-title" id="vz-cheat-h">Response Models</h2><p class="vz-cheat-text">That is convenient and it is how data leaks. A handler that returns a database row returns *all* of it: internal notes, an email address, a password hash, a flag nobody outside should know exists. Nothing warns you, because from the framework&#x27;s point of view you asked for exactly that.</p><div class="vz-cheat-foot">FASTAPI &middot; vizlearn.in/fastapi/response_models.html</div></section><section class="vz-related" aria-labelledby="vz-rel-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><h2 id="vz-rel-h">More in FastAPI</h2><span class="vz-rule"></span></div><div class="vz-rail"><a class="vz-card" href="../fastapi/reading_a_422.html" data-vz-path="fastapi/reading_a_422.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="14" y="18" width="132" height="20" rx="3" fill="var(--bg-surface)" stroke="var(--accent-primary)" stroke-width="2"/><text x="80" y="32" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">422 Unprocessable Entity</text><rect x="14" y="44" width="132" height="14" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="54" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">loc  -  where in the request</text><rect x="14" y="60" width="132" height="14" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="70" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">type  -  which rule</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">FastAPI</span><span class="vz-card-title">Reading a 422</span></span></a><a class="vz-card" href="../fastapi/http_methods_and_routing.html" data-vz-path="fastapi/http_methods_and_routing.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="12" y="16" width="60" height="18" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="42" y="29" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">GET  safe</text><rect x="12" y="38" width="60" height="18" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="42" y="51" fill="var(--text-muted)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">POST  once</text><rect x="88" y="16" width="60" height="18" rx="3" fill="var(--bg-surface)" stroke="var(--accent-primary)" stroke-width="2"/><text x="118" y="29" fill="var(--accent-primary)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">PUT  again</text><rect x="88" y="38" width="60" height="18" rx="3" fill="var(--bg-surface)" stroke="var(--accent-primary)" stroke-width="2"/><text x="118" y="51" fill="var(--accent-primary)" font-size="7" font-family="monospace" text-anchor="middle" font-weight="normal">DELETE  again</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">FastAPI</span><span class="vz-card-title">HTTP Methods and Routing</span></span></a><a class="vz-card" href="../fastapi/headers_and_cookies.html" data-vz-path="fastapi/headers_and_cookies.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="14" y="18" width="132" height="18" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="31" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">X-Token: abc</text><rect x="14" y="40" width="132" height="18" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="53" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">Cookie: session=xyz</text><path d="M80 62 L80 72" stroke="var(--text-muted)" stroke-width="2"/><text x="80" y="84" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">declared as parameters</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">FastAPI</span><span class="vz-card-title">Headers and Cookies</span></span></a><a class="vz-card" href="../fastapi/form_data_and_files.html" data-vz-path="fastapi/form_data_and_files.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="12" y="20" width="60" height="22" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="42" y="35" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">form fields</text><rect x="88" y="20" width="60" height="22" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="118" y="35" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">file parts</text><path d="M80 48 L80 58" stroke="var(--text-muted)" stroke-width="2"/><text x="80" y="74" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">multipart/form-data</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">FastAPI</span><span class="vz-card-title">Form Data and File Uploads</span></span></a></div></section><section class="vz-author" aria-labelledby="vz-author-h"><h2 id="vz-author-h" class="vz-author-h">About the author</h2><p class="vz-author-body"><strong>Ashish Jangra</strong> builds and maintains VizLearn. Every module here is written and the visualisation behind it hand-built, so the numbers in a readout come from the same code that draws the picture. Corrections are genuinely welcome and get priority over everything else &mdash; if a page states something wrong, or an animation misrepresents what the algorithm does, <a href="../contact.html">get in touch</a>.</p><p class="vz-author-links"><a href="../about.html">About VizLearn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://github.com/AshishJangra27" rel="noopener me">GitHub</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://www.linkedin.com/in/ashish-jangra/" rel="noopener me">LinkedIn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="../contact.html">Contact</a></p></section><nav class="vz-prevnext" aria-label="Module navigation"><a class="vz-pn vz-pn-prev" href="../fastapi/request_bodies.html" rel="prev"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span class="vz-pn-text"><span class="vz-pn-label">Previous</span><span class="vz-pn-title">Request Bodies</span></span></a><a class="vz-pn vz-pn-next" href="../fastapi/reading_a_422.html" rel="next"><span class="vz-pn-text"><span class="vz-pn-label">Next</span><span class="vz-pn-title">Reading a 422</span></span><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a></nav></div>
 <!-- VIZLEARN:MODULE:END -->
 <!-- VIZLEARN:AD-BOTTOM:BEGIN (generated by tools/build_ads.py) -->
         <!-- placement reserved; set AD_SLOTS['bottom'] in tools/build_seo.py to enable -->
