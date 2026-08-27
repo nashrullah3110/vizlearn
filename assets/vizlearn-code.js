@@ -246,6 +246,15 @@
         html: highlightHtml,
     };
 
+    // What Cmd+/ inserts, and what a newline should indent under.
+    var LINE_COMMENT = { python: '#', sql: '--', javascript: '//' };
+    var BLOCK_COMMENT = { html: ['<!--', '-->'] };
+    var OPENS_BLOCK = {
+        python: /:\s*$/,
+        javascript: /[{[(]\s*$/,
+        html: /<[a-zA-Z][^>]*>\s*$/,
+    };
+
     // ----------------------------------------------------------------- wiring
 
     function attach(wrap) {
@@ -323,14 +332,146 @@
         }, 250);
         window.addEventListener('pagehide', function () { clearInterval(timer); });
 
-        // Tab should indent, not leave the editor - it is a code box.
+        /* Editing keys.
+         *
+         * All of them live here rather than in the runners. They used to be
+         * split: this file handled Tab and each runner added its own Enter,
+         * both listening on the same textarea. preventDefault does not stop
+         * a sibling listener, so Tab inserted four spaces here and two more
+         * in the runner, and Enter ran twice.
+         *
+         * Running the program is still the runner's job, so Shift+Enter
+         * dispatches an event and whoever owns the block decides what it
+         * means.
+         */
+        var UNIT = '    ';
+
+        // Every mutation goes through this. Assigning .value resets the
+        // selection to the end of the text, which is why Enter used to leave
+        // the caret at the bottom of the editor: the old code read
+        // selectionStart *after* the assignment and added to a number that
+        // had already moved.
+        function edit(text, selStart, selEnd) {
+            ta.value = text;
+            ta.selectionStart = selStart;
+            ta.selectionEnd = selEnd === undefined ? selStart : selEnd;
+            render();
+            sync();
+        }
+
+        function lineBounds(value, from, to) {
+            var start = value.lastIndexOf('\n', from - 1) + 1;
+            var end = value.indexOf('\n', to);
+            return [start, end === -1 ? value.length : end];
+        }
+
+        function indent(s, t) {
+            var v = ta.value;
+            if (s === t) {                       // no selection: insert one unit
+                edit(v.slice(0, s) + UNIT + v.slice(t), s + UNIT.length);
+                return;
+            }
+            var b = lineBounds(v, s, t);         // selection: shift whole lines
+            var block = v.slice(b[0], b[1]);
+            var shifted = block.split('\n').map(function (l) { return UNIT + l; }).join('\n');
+            edit(v.slice(0, b[0]) + shifted + v.slice(b[1]),
+                 s + UNIT.length, t + (shifted.length - block.length));
+        }
+
+        function outdent(s, t) {
+            var v = ta.value;
+            var b = lineBounds(v, s, t);
+            var block = v.slice(b[0], b[1]);
+            var removedFirst = 0, removedTotal = 0;
+            var shifted = block.split('\n').map(function (l, i) {
+                var m = /^[ ]{1,4}|^\t/.exec(l);
+                if (!m) return l;
+                if (i === 0) removedFirst = m[0].length;
+                removedTotal += m[0].length;
+                return l.slice(m[0].length);
+            }).join('\n');
+            if (!removedTotal) return;
+            edit(v.slice(0, b[0]) + shifted + v.slice(b[1]),
+                 Math.max(b[0], s - removedFirst), t - removedTotal);
+        }
+
+        function newline(s) {
+            var v = ta.value;
+            var lineStart = v.lastIndexOf('\n', s - 1) + 1;
+            var line = v.slice(lineStart, s);
+            var ws = /^[ \t]*/.exec(line);
+            var padding = ws ? ws[0] : '';
+            // A line that opens a block indents the next one.
+            if (OPENS_BLOCK[lang] && OPENS_BLOCK[lang].test(line)) padding += UNIT;
+            var insert = '\n' + padding;
+            edit(v.slice(0, s) + insert + v.slice(ta.selectionEnd), s + insert.length);
+        }
+
+        function toggleComment(s, t) {
+            var token = LINE_COMMENT[lang];
+            var v = ta.value;
+            var b = lineBounds(v, s, t);
+            var block = v.slice(b[0], b[1]);
+            var rows = block.split('\n');
+            var real = rows.filter(function (l) { return l.trim(); });
+            if (!real.length) return;
+
+            if (token) {
+                var allOn = real.every(function (l) {
+                    return l.trim().indexOf(token) === 0;
+                });
+                var out = rows.map(function (l) {
+                    if (!l.trim()) return l;
+                    if (allOn) {
+                        return l.replace(
+                            new RegExp('^(\\s*)' + token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' ?'),
+                            '$1');
+                    }
+                    return l.replace(/^(\s*)/, '$1' + token + ' ');
+                }).join('\n');
+                edit(v.slice(0, b[0]) + out + v.slice(b[1]), b[0], b[0] + out.length);
+                return;
+            }
+            // No line comment for this language - wrap the block instead.
+            var wrap = BLOCK_COMMENT[lang];
+            if (!wrap) return;
+            var trimmed = block.trim();
+            var isOn = trimmed.indexOf(wrap[0]) === 0 &&
+                       trimmed.lastIndexOf(wrap[1]) === trimmed.length - wrap[1].length;
+            var body = isOn
+                ? block.replace(wrap[0], '').replace(new RegExp(wrap[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$'), '').trim()
+                : wrap[0] + ' ' + block.trim() + ' ' + wrap[1];
+            edit(v.slice(0, b[0]) + body + v.slice(b[1]), b[0], b[0] + body.length);
+        }
+
         ta.addEventListener('keydown', function (e) {
-            if (e.key !== 'Tab' || e.shiftKey) return;
-            e.preventDefault();
             var s = ta.selectionStart, t = ta.selectionEnd;
-            ta.value = ta.value.slice(0, s) + '    ' + ta.value.slice(t);
-            ta.selectionStart = ta.selectionEnd = s + 4;
-            render(); sync();
+            var mod = e.metaKey || e.ctrlKey;
+
+            // Shift+Enter and Cmd/Ctrl+Enter run. The editor does not know
+            // how, so it says so and the runner listens.
+            if (e.key === 'Enter' && (e.shiftKey || mod)) {
+                e.preventDefault();
+                wrap.dispatchEvent(new CustomEvent('vz-run', { bubbles: true }));
+                return;
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                newline(s);
+                return;
+            }
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                if (e.shiftKey) outdent(s, t); else indent(s, t);
+                return;
+            }
+            // Cmd/Ctrl + / toggles comments. Backslash is accepted too: it
+            // sits where / does on several layouts and people reach for it.
+            if (mod && (e.key === '/' || e.key === '\\')) {
+                e.preventDefault();
+                toggleComment(s, t);
+                return;
+            }
         });
 
         render();

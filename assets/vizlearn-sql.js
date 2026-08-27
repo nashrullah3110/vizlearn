@@ -217,9 +217,10 @@
         }
 
         runBtn.addEventListener('click', run);
-        editor.addEventListener('keydown', function (e) {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { run(); e.preventDefault(); }
-        });
+        // Shift+Enter and Cmd/Ctrl+Enter come from assets/vizlearn-code.js,
+        // which owns the editor and dispatches vz-run. Handling the key here
+        // as well meant two listeners on one textarea.
+        root.addEventListener('vz-run', run);
 
         if (resetBtn) {
             resetBtn.addEventListener('click', function () {

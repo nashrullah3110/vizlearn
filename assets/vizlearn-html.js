@@ -169,28 +169,6 @@
     parts.run.disabled = false;
   }
 
-  function indentOnEnter(editor) {
-    editor.addEventListener('keydown', function (e) {
-      if (e.key !== 'Enter') return;
-      var lineStart = editor.value.lastIndexOf('\n', editor.selectionStart - 1) + 1;
-      var line = editor.value.slice(lineStart, editor.selectionStart);
-      var ws = /^[ \t]*/.exec(line);
-      var padding = ws ? ws[0] : '';
-      // Keep a line whose open tag is unclosed indented one level deeper, and
-      // drop a level for a line that begins with a closing tag.
-      if (/<[^>]*(?:[^>]|$)$/.test(line) && !/<[^>]*\/\s*$/.test(line)) {
-        padding += '  ';
-      }
-      if (/^\s*<\//.test(line)) {
-        padding = padding.replace(/ {2}$/, '');
-      }
-      e.preventDefault();
-      editor.value = editor.value.slice(0, editor.selectionStart) +
-        '\n' + padding + editor.value.slice(editor.selectionEnd);
-      editor.selectionStart = editor.selectionEnd =
-        editor.selectionStart + 1 + padding.length;
-    });
-  }
 
   function srcText(block) {
     var s = els(block).src;
@@ -208,12 +186,13 @@
         if (parts.src) {
           parts.editor.value = srcText(block);
         }
-        indentOnEnter(parts.editor);
 
-        parts.run.addEventListener('click', function () {
+        var start = function () {
           if (parts.run.disabled) return;
           runBlock(block, parts.editor.value);
-        });
+        };
+        parts.run.addEventListener('click', start);
+        block.addEventListener('vz-run', start);   // Shift+Enter
 
         if (parts.reset) parts.reset.addEventListener('click', function () {
           if (parts.src) parts.editor.value = srcText(block);

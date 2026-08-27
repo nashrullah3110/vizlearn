@@ -379,13 +379,10 @@
     if (input && src) input.value = (src.textContent || '').replace(/^\n+|\s+$/g, '');
 
     if (input) {
-      input.addEventListener('keydown', function (e) {
-        // Shift+Enter runs the cell, as it does everywhere else notebooks exist.
-        if (e.key === 'Enter' && (e.shiftKey || e.ctrlKey || e.metaKey)) {
-          e.preventDefault();
-          runCell(nb, cell);
-        }
-      });
+      // Shift+Enter is handled by assets/vizlearn-code.js, which owns the
+      // editor and dispatches vz-run. Listening for the key here as well
+      // meant two handlers on one textarea and the cell running twice.
+      cell.addEventListener('vz-run', function () { runCell(nb, cell); });
       autoGrow(input);
     }
 

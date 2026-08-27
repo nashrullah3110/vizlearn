@@ -243,29 +243,11 @@
     };
   }
 
-  function indentOnTab(editor) {
-    editor.addEventListener('keydown', function (e) {
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        var start = editor.selectionStart;
-        var end = editor.selectionEnd;
-        editor.value = editor.value.slice(0, start) + '  ' + editor.value.slice(end);
-        editor.selectionStart = editor.selectionEnd = start + 2;
-      } else if (e.key === 'Enter') {
-        var lineStart = editor.value.lastIndexOf('\n', editor.selectionStart - 1) + 1;
-        var line = editor.value.slice(lineStart, editor.selectionStart);
-        var ws = /^[ \t]*/.exec(line);
-        var padding = ws ? ws[0] : '';
-        // Keep a colon-line indented one level deeper.
-        if (/:\s*$/.test(line)) padding += '  ';
-        e.preventDefault();
-        editor.value = editor.value.slice(0, editor.selectionStart) +
-          '\n' + padding + editor.value.slice(editor.selectionEnd);
-        editor.selectionStart = editor.selectionEnd =
-          editor.selectionStart + 1 + padding.length;
-      }
-    });
-  }
+  // Editing keys - Tab, Enter, Cmd+/ - belong to assets/vizlearn-code.js,
+  // which owns the editor. This file used to add its own Tab and Enter on the
+  // same textarea, so Tab inserted six spaces between them and Enter ran
+  // twice. What is left here is running the program, which the editor asks
+  // for with a vz-run event.
 
   function setStatus(block, text) {
     var s = els(block).status;
@@ -391,7 +373,6 @@
         if (parts.src) {
           parts.editor.value = (parts.src.textContent || '').replace(/^\n+|\s+$/g, '');
         }
-        indentOnTab(parts.editor);
 
         var list = function (attr) {
           return (block.getAttribute(attr) || '')
@@ -409,12 +390,15 @@
         var prelude = preludeEl ? preludeEl.textContent : '';
         var label = block.getAttribute('data-vz-label') || '';
 
-        parts.run.addEventListener('click', function () {
+        var start = function () {
           if (parts.run.disabled) return;
           runBlock(block, parts.editor.value, {
             packages: packages, wheels: wheels, prelude: prelude, label: label
           });
-        });
+        };
+        parts.run.addEventListener('click', start);
+        // Shift+Enter, from the editor.
+        block.addEventListener('vz-run', start);
 
         // Guarded: this used to be unconditional, so a block authored without
         // a Reset button would throw here and, because init() wires blocks in
