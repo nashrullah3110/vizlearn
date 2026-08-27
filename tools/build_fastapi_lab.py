@@ -85,6 +85,7 @@ CSS = """
 # can be while still letting the editor read like a test file.
 PRELUDE = '''
 import json as _json
+from contextlib import asynccontextmanager
 
 # Starlette hands a sync `def` endpoint to a threadpool. There are no threads
 # here, so run it inline. This is the one behaviour that differs from a real
@@ -92,10 +93,49 @@ import json as _json
 async def _inline(func, *args, **kwargs):
     return func(*args, **kwargs)
 
-import starlette.concurrency, fastapi.concurrency, fastapi.routing
-starlette.concurrency.run_in_threadpool = _inline
-fastapi.concurrency.run_in_threadpool = _inline
-fastapi.routing.run_in_threadpool = _inline
+# `from X import run_in_threadpool` binds the name at import time, so every
+# module that imported it needs patching - not just the one it came from.
+# Missing fastapi.dependencies.utils is why Depends used to fail here with
+# "can't start new thread": the dependency solver had its own bound copy.
+import starlette.concurrency, starlette.background, starlette.responses
+import starlette.routing
+import fastapi.concurrency, fastapi.routing
+import fastapi.dependencies.utils as _deps
+
+for _mod in (starlette.concurrency, starlette.background, starlette.routing,
+             fastapi.concurrency, fastapi.routing, _deps):
+    if hasattr(_mod, "run_in_threadpool"):
+        _mod.run_in_threadpool = _inline
+
+
+@asynccontextmanager
+async def _inline_cm(cm):
+    """Stands in for contextmanager_in_threadpool - runs a sync CM inline.
+
+    This is what makes a `yield` dependency work, teardown included.
+    """
+    value = cm.__enter__()
+    try:
+        yield value
+    except Exception as e:
+        if not cm.__exit__(type(e), e, e.__traceback__):
+            raise
+    else:
+        cm.__exit__(None, None, None)
+
+
+async def _inline_iter(it):
+    """Stands in for iterate_in_threadpool - drives a sync iterator inline."""
+    for item in it:
+        yield item
+
+
+for _mod in (fastapi.concurrency, _deps):
+    if hasattr(_mod, "contextmanager_in_threadpool"):
+        _mod.contextmanager_in_threadpool = _inline_cm
+for _mod in (starlette.concurrency, starlette.responses):
+    if hasattr(_mod, "iterate_in_threadpool"):
+        _mod.iterate_in_threadpool = _inline_iter
 
 
 def _drive(coro):
@@ -159,7 +199,15 @@ class TestClient:
             "client": ("testclient", 50000), "server": ("testserver", 80),
         }
 
+        # After the body, report a disconnect. A streaming response starts a
+        # listener that waits for one, and a receive() that never sends it
+        # spins forever - which used to hang the worker rather than fail.
+        state = {"delivered": False}
+
         async def receive():
+            if state["delivered"]:
+                return {"type": "http.disconnect"}
+            state["delivered"] = True
             return {"type": "http.request", "body": body, "more_body": False}
 
         messages = []

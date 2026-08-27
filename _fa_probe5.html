@@ -1,0 +1,28 @@
+<!doctype html><meta charset="utf-8"><title>fa probe5</title>
+<pre id="log" style="font:12px monospace;white-space:pre-wrap"></pre>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+window.OUT=""; window.R={}; window.DONE=false;
+const STEPS = {"yield_dependency": "\nfrom fastapi import FastAPI, Depends\napp = FastAPI(); log = []\ndef get_db():\n    log.append(\"open\")\n    try: yield \"session\"\n    finally: log.append(\"close\")\n@app.get(\"/dep\")\ndef dep(db: str = Depends(get_db)): return {\"db\": db}\nr = await TestClient(app).get(\"/dep\")\nprint(\"yield_dependency\", r.status_code, r.json(), log)\n", "background_tasks": "\nfrom fastapi import FastAPI, BackgroundTasks\napp = FastAPI(); done = []\n@app.post(\"/bg\")\ndef bg(tasks: BackgroundTasks):\n    tasks.add_task(done.append, \"ran\"); return {\"queued\": True}\nr = await TestClient(app).post(\"/bg\")\nprint(\"background_tasks\", r.status_code, r.json(), done)\n", "async_sleep": "\nimport asyncio\nfrom fastapi import FastAPI\napp = FastAPI()\n@app.get(\"/slow\")\nasync def slow():\n    await asyncio.sleep(0); return {\"ok\": True}\nr = await TestClient(app).get(\"/slow\")\nprint(\"async_sleep\", r.status_code, r.json())\n", "streaming": "\nfrom fastapi import FastAPI\nfrom fastapi.responses import StreamingResponse\napp = FastAPI()\n@app.get(\"/s\")\ndef s():\n    def gen():\n        for i in range(3): yield (\"c%d \" % i).encode()\n    return StreamingResponse(gen(), media_type=\"text/plain\")\nr = await TestClient(app).get(\"/s\")\nprint(\"streaming\", r.status_code, repr(r.text))\n", "middleware": "\nfrom fastapi import FastAPI\nfrom starlette.middleware.base import BaseHTTPMiddleware\napp = FastAPI()\nclass Stamp(BaseHTTPMiddleware):\n    async def dispatch(self, request, call_next):\n        resp = await call_next(request); resp.headers[\"x-stamp\"] = \"seen\"; return resp\napp.add_middleware(Stamp)\n@app.get(\"/m\")\ndef m(): return {\"ok\": True}\nr = await TestClient(app).get(\"/m\")\nprint(\"middleware\", r.status_code, r.headers.get(\"x-stamp\"))\n"};
+const WHEELS = ["/assets/wheels/sniffio-1.3.1-py3-none-any.whl",
+ "/assets/wheels/anyio-4.6.2.post1-py3-none-any.whl",
+ "/assets/wheels/starlette-0.41.3-py3-none-any.whl",
+ "/assets/wheels/fastapi-0.115.6-py3-none-any.whl"];
+const log = s => { window.OUT += s + "\n"; document.getElementById('log').textContent += s + "\n"; };
+function withTimeout(p, ms, label){
+  return Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error("TIMEOUT "+label)), ms))]);
+}
+(async()=>{
+  const py=await loadPyodide({indexURL:"https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"});
+  await py.loadPackage(["pydantic","ssl","micropip"]);
+  py.setStdout({batched:log}); py.setStderr({batched:s=>log("ERR "+s)});
+  py.globals.set("__w__", WHEELS.map(w=>new URL(w, location.href).href));
+  await py.runPythonAsync("import micropip\nawait micropip.install(list(__w__))");
+  await py.runPythonAsync("import micropip\nawait micropip.install(list(__w__))");
+  for (const [name, code] of Object.entries(STEPS)) {
+    try { await withTimeout(py.runPythonAsync(code), 8000, name); window.R[name]="ok"; }
+    catch(e){ window.R[name]="FAIL "+String(e).slice(0,140); log("FAIL "+name+" "+String(e).slice(0,140)); }
+  }
+  window.DONE=true; log("--- finished ---");
+})();
+</script>
