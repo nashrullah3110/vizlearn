@@ -1332,6 +1332,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Background Tasks",
+  "path": "fastapi/background_tasks.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Class Dependencies",
   "path": "fastapi/class_dependencies.html",
   "category": "FastAPI",
@@ -1396,8 +1404,32 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Lifespan Events",
+  "path": "fastapi/lifespan_events.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "OpenAPI and the Docs",
+  "path": "fastapi/openapi_and_docs.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Path Parameters",
   "path": "fastapi/path_parameters.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Project Structure",
+  "path": "fastapi/project_structure.html",
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
@@ -1444,6 +1476,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Security Basics",
+  "path": "fastapi/security_basics.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Status Codes",
   "path": "fastapi/status_codes.html",
   "category": "FastAPI",
@@ -1460,6 +1500,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Testing",
+  "path": "fastapi/testing_fastapi.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "What FastAPI Is",
   "path": "fastapi/what_is_fastapi.html",
   "category": "FastAPI",
@@ -1470,6 +1518,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Your First Endpoint",
   "path": "fastapi/your_first_endpoint.html",
+  "category": "FastAPI",
+  "topic": "fastapi",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "async def or def",
+  "path": "fastapi/async_vs_sync_endpoints.html",
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",

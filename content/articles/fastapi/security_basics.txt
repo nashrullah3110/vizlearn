@@ -1,0 +1,391 @@
+title: Security Basics
+intro: Authentication as a dependency, what a token actually is, and the mistakes that matter most.
+
+## Authentication is a dependency
+
+Everything from the dependencies tier applies here, and this is the case that justifies it.
+
+```python
+def current_user(authorization: str = Header(default="")) -> User:
+    ...
+    raise HTTPException(401, "Invalid token")
+```
+
+Stated once. Every endpoint that needs a user declares one parameter, and one that does not, does not. An endpoint cannot forget the check, because if it declares `current_user` then the check ran &mdash; the request could not have reached the handler otherwise.
+
+A section is protected by putting it on the router, so a route added next year inherits it rather than needing somebody to remember.
+
+
+## Reading a bearer token
+
+The header, parsed in one dependency. Every endpoint that needs a user declares one parameter.
+
+```python-run
+from fastapi import Depends, FastAPI, Header, HTTPException, status
+
+app = FastAPI()
+TOKENS = {"tok-ada": {"name": "ada", "scopes": ["modules:read"]}}
+
+def current_user(authorization: str = Header(default="")):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing bearer token",
+                            headers={"WWW-Authenticate": "Bearer"})
+    user = TOKENS.get(authorization[7:])
+    if user is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token",
+                            headers={"WWW-Authenticate": "Bearer"})
+    return user
+
+@app.get("/me")
+def me(user: dict = Depends(current_user)):
+    return user
+
+c = TestClient(app)
+print("none  :", c.get("/me").status_code)
+print("wrong :", c.request("GET", "/me", headers={"authorization": "Bearer x"}).status_code)
+print("ok    :", c.request("GET", "/me",
+                           headers={"authorization": "Bearer tok-ada"}).json())
+```
+
+## What a signed token actually is
+
+Payload plus a signature made with a secret. Anyone can read it; only the holder of the secret can produce one.
+
+```python-run
+import base64, hashlib, hmac, json
+
+SECRET = b"a-server-side-secret"
+
+def b64(raw):  return base64.urlsafe_b64encode(raw).rstrip(b"=")
+def unb64(s):  return base64.urlsafe_b64decode(s + b"=" * (-len(s) % 4))
+
+def sign(payload: dict) -> bytes:
+    body = b64(json.dumps(payload, separators=(",", ":")).encode())
+    mac = hmac.new(SECRET, body, hashlib.sha256).digest()
+    return body + b"." + b64(mac)
+
+def verify(token: bytes):
+    body, _, given = token.partition(b".")
+    expected = b64(hmac.new(SECRET, body, hashlib.sha256).digest())
+    if not hmac.compare_digest(given, expected):     # constant time
+        return None
+    return json.loads(unb64(body))
+
+tok = sign({"sub": "ada", "scopes": ["modules:read"]})
+print("token   :", tok.decode()[:52], "...")
+print("readable:", json.loads(unb64(tok.split(b".")[0])))
+print("verified:", verify(tok))
+print("tampered:", verify(b"eyJzdWIiOiJyb290In0.abc"))
+print()
+print("Signed, not encrypted. Never put a secret in the payload.")
+```
+
+## Expiry has to be checked
+
+A signature says the token is genuine. It says nothing about whether it is still valid.
+
+```python-run
+import time
+from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+ISSUED = {"tok-fresh": {"sub": "ada", "exp": time.time() + 3600},
+          "tok-stale": {"sub": "ada", "exp": time.time() - 1}}
+
+def current_user(authorization: str = Header(default="")):
+    claims = ISSUED.get(authorization.replace("Bearer ", ""))
+    if claims is None:
+        raise HTTPException(401, "Invalid token")
+    if claims["exp"] < time.time():
+        raise HTTPException(401, "Token expired")
+    return {"name": claims["sub"]}
+
+@app.get("/me")
+def me(user: dict = Depends(current_user)):
+    return user
+
+c = TestClient(app)
+for tok in ["tok-fresh", "tok-stale"]:
+    r = c.request("GET", "/me", headers={"authorization": "Bearer " + tok})
+    print("%-10s %s %s" % (tok, r.status_code, r.json()))
+```
+
+## Scopes, layered as dependencies
+
+Authentication answers who; authorisation answers whether. They are different questions and different status codes.
+
+```python-run
+from fastapi import Depends, FastAPI, Header, HTTPException, status
+
+app = FastAPI()
+TOKENS = {"reader": ["modules:read"], "editor": ["modules:read", "modules:write"]}
+
+def current_user(x_token: str = Header(default="")):
+    if x_token not in TOKENS:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in")
+    return {"name": x_token, "scopes": TOKENS[x_token]}
+
+class RequireScope:
+    def __init__(self, *scopes): self.scopes = set(scopes)
+    def __call__(self, user: dict = Depends(current_user)):
+        missing = self.scopes - set(user["scopes"])
+        if missing:
+            raise HTTPException(status.HTTP_403_FORBIDDEN,
+                                "Missing scope: %s" % ", ".join(sorted(missing)))
+        return user
+
+can_read = RequireScope("modules:read")
+can_write = RequireScope("modules:write")
+
+@app.get("/modules")
+def read(u: dict = Depends(can_read)): return {"ok": u["name"]}
+
+@app.post("/modules")
+def write(u: dict = Depends(can_write)): return {"ok": u["name"]}
+
+c = TestClient(app)
+for tok in ["", "reader", "editor"]:
+    h = {"x-token": tok} if tok else {}
+    print("%-7s GET %s  POST %s" % (tok or "-",
+          c.request("GET", "/modules", headers=h).status_code,
+          c.request("POST", "/modules", headers=h).status_code))
+```
+
+## Not leaking which one was wrong
+
+A login that says “no such user” tells an attacker which names exist. Say the same thing either way.
+
+```python-run
+import hashlib, hmac
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI()
+
+def digest(password: str, salt: bytes) -> bytes:
+    # Illustrative only. A real system uses bcrypt, scrypt or argon2 through
+    # a library: those are deliberately SLOW, which is the property that
+    # matters and the one a plain hash does not have.
+    return hmac.new(salt, password.encode(), hashlib.sha256).digest()
+
+SALT = b"per-user-salt"
+USERS = {"ada": digest("correct-horse", SALT)}
+
+class Login(BaseModel):
+    username: str
+    password: str
+
+@app.post("/login")
+def login(body: Login):
+    stored = USERS.get(body.username)
+    candidate = digest(body.password, SALT)
+    # Compare even when the user is unknown, and say one thing either way.
+    if stored is None or not hmac.compare_digest(stored, candidate):
+        raise HTTPException(401, "Incorrect username or password")
+    return {"token": "tok-" + body.username}
+
+c = TestClient(app)
+for u, p in [("ada", "correct-horse"), ("ada", "wrong"), ("nobody", "wrong")]:
+    r = c.post("/login", json={"username": u, "password": p})
+    print("%-8s %-14s %s %s" % (u, p, r.status_code, r.json()))
+```
+
+## Keeping secrets out of the response
+
+The response model is the last line of defence, and the one that cannot be forgotten by a future handler.
+
+```python-run
+from fastapi import FastAPI
+from pydantic import BaseModel, Field, SecretStr
+
+app = FastAPI()
+
+ROW = {"id": 1, "name": "ada", "email": "ada@vizlearn.in",
+       "password_hash": "$2b$12$abcdef", "api_token": "tok_live_123"}
+
+class UserOut(BaseModel):
+    id: int
+    name: str                       # email and secrets simply absent
+
+@app.get("/users/1", response_model=UserOut)
+def read():
+    return ROW
+
+class UserInternal(BaseModel):
+    name: str
+    password_hash: str = Field(exclude=True)
+    api_token: SecretStr
+
+u = UserInternal(name="ada", password_hash="$2b$12$abcdef", api_token="tok_live_123")
+
+print("public response :", TestClient(app).get("/users/1").json())
+print("internal repr   :", u)
+print("internal dump   :", u.model_dump())
+```
+## 401 and 403
+
+Worth restating because collapsing them is so common.
+
+**401 Unauthorized** actually means *unauthenticated*: I do not know who you are. It should carry a `WWW-Authenticate` header naming the scheme.
+
+**403 Forbidden** means: I know who you are, and no.
+
+A client seeing 401 should obtain credentials or refresh a token. One seeing 403 should not, because retrying as the same person will fail again. Merging them produces a login loop where there should be a message.
+
+Layering them as separate dependencies &mdash; `current_user` raising 401, `require_scope` raising 403 &mdash; makes the distinction structural rather than something each handler decides.
+
+## What a token is
+
+A signed token is a payload plus a signature computed with a server-side secret.
+
+The property that matters, and that people get wrong: **it is signed, not encrypted**. Anyone holding the token can decode and read the payload. The signature proves it was issued by someone with the secret and has not been altered &mdash; nothing more.
+
+So the payload may contain a user id, an expiry, a set of scopes. It must never contain a password, a card number, or anything else that should not be read by whoever holds the token &mdash; which includes anyone who obtains it from a log, a browser's storage, or a proxy.
+
+The second editor above builds and verifies one with nothing but the standard library, because the mechanism is worth seeing once. In production, use a library &mdash; PyJWT or Authlib &mdash; which handles the algorithm choices, the claim conventions and the parsing edge cases that a hand-rolled version gets wrong.
+
+## A signature is not validity
+
+A token can be perfectly signed and still unacceptable.
+
+**Expiry** must be checked explicitly. A signature has no opinion about time.
+
+**Revocation** is harder, and it is the honest weakness of stateless tokens: a signed token stays valid until it expires, so logging out or disabling an account does not stop it. The usual answers are short lifetimes plus refresh tokens, or a denylist &mdash; which reintroduces the state that stateless tokens were meant to avoid.
+
+Pick a short expiry. Fifteen minutes with a refresh flow is a common shape; a token valid for a year is a credential you cannot withdraw.
+
+## Comparing secrets
+
+Use `hmac.compare_digest`, not `==`.
+
+A normal string comparison returns as soon as it finds a difference, so the time it takes reveals how many leading characters were correct. Over enough attempts that is enough to reconstruct a secret. `compare_digest` takes the same time regardless.
+
+This applies to tokens, signatures, API keys and password hashes &mdash; anything an attacker can submit repeatedly.
+
+## Not leaking who exists
+
+A login that returns "no such user" for one input and "wrong password" for another lets anyone enumerate accounts.
+
+Return the same message either way, and perform the hash comparison even when the username is unknown &mdash; otherwise the *timing* difference says what the message did not.
+
+The same reasoning applies to 404 versus 403 on a resource that exists but is not yours: returning 403 confirms it exists. For anything sensitive, 404 for both, consistently.
+
+## Passwords
+
+Two rules, and the second is not optional.
+
+**Never store a password.** Store a hash.
+
+**Never hash it with SHA-256 alone.** General-purpose hashes are designed to be fast, which is exactly the wrong property. Use a deliberately slow, salted algorithm designed for passwords: bcrypt, scrypt or argon2, through a library like `passlib`.
+
+The editor above uses PBKDF2 from the standard library to show the shape without pulling in a dependency. It is better than a bare SHA-256 and it is not what you should ship; the real answer is a library that keeps its parameters current as hardware gets faster.
+
+## Keeping secrets out of responses
+
+The last line of defence, and the one that survives a future handler being careless.
+
+A `response_model` listing only what may be seen cannot leak a field added to the table later. `Field(exclude=True)` keeps a value out of every dump. `SecretStr` keeps it out of `repr`, logs and tracebacks.
+
+Use all three where they fit, and prefer the separate output model, because it is the only one that cannot be forgotten by somebody editing a different file.
+
+## What this module does not cover
+
+Enough to be worth naming: CSRF for cookie-based sessions, CORS configuration, rate limiting, input sanitisation for anything rendered as HTML, dependency scanning, and secrets management.
+
+Each is a real subject. The point of this one is that the *shape* &mdash; authentication as a dependency, authorisation layered on top, secrets kept out of payloads and responses &mdash; is what the framework gives you, and getting that shape right is what makes the rest tractable.
+
+
+## Mistakes people make
+
+**Putting anything secret in a token payload.** It is signed, not encrypted. Anyone holding it reads it - including from a log, browser storage or a proxy.
+
+**Checking the signature and stopping.** Expiry is a separate check, and a signature has no opinion about whether an account was disabled.
+
+**Long-lived tokens.** A stateless token is valid until it expires, so a year-long token is a credential you cannot withdraw.
+
+**Comparing with `==`.** The timing reveals how many leading characters matched. `hmac.compare_digest` does not.
+
+**Distinct login errors.** "No such user" enumerates accounts - and skipping the hash comparison for an unknown user leaks the same fact through timing.
+
+**Hashing passwords with SHA-256.** Fast is the wrong property. bcrypt, scrypt or argon2, through a library.
+
+**403 on a resource that exists but is not yours.** It confirms existence. For anything sensitive, 404 for both, consistently.
+
+**Trusting a client-supplied identity header.** `X-User-Id` is a claim unless a proxy sets it and strips whatever the client sent.
+
+## What this does not cover
+
+Worth naming so the gaps are known: CSRF for cookie sessions, CORS, rate limiting, sanitising anything rendered as HTML, dependency scanning, and secrets management.
+
+Each is a subject. What this module gives you is the shape - authentication as a dependency, authorisation layered above it, secrets out of payloads and out of responses - and that shape is what makes the rest tractable rather than scattered.
+
+## Next
+
+How the pieces are arranged once the application is more than one file.
+
+
+## Where to be careful
+
+Three habits that prevent most of what goes wrong, beyond anything in the editors above.
+
+**Never log credentials.** `Authorization` and `Cookie` are in every request and are the two headers you least want persisted. A logging middleware that dumps headers is a breach waiting for a log aggregator.
+
+**Never put secrets in a URL.** They land in browser history, server logs, proxy logs and `Referer` headers. That is the argument for `Authorization` over `?api_key=`.
+
+**Fail closed.** A permission check that errors should deny, not allow. Code shaped `if not allowed: raise` denies on an exception; code shaped `if denied: raise` permits when the check itself breaks.
+
+## What to reach for
+
+For anything real, use libraries rather than the primitives shown here.
+
+Tokens: PyJWT or Authlib, which handle algorithm choice, claim conventions and the parsing edge cases a hand-rolled version gets wrong - including the `alg: none` family of attacks.
+
+Passwords: passlib with bcrypt or argon2, which keeps its parameters current as hardware gets faster.
+
+OAuth2 and OpenID Connect: FastAPI ships `OAuth2PasswordBearer` and friends, which integrate with the docs so the interactive page can authenticate.
+
+The editors here build things from `hmac` and `hashlib` to show what is underneath. That is worth seeing once and is not what you should ship.
+
+## Summary
+
+Authentication belongs in a dependency: stated once, impossible for an endpoint to forget, and visible in the schema. Authorisation layers above it, and the two produce different status codes for different questions.
+
+A signed token is readable by anyone holding it, so nothing secret goes in the payload. A valid signature is not a valid token - expiry is a separate check and revocation needs state.
+
+Compare secrets in constant time, say the same thing for an unknown user as for a wrong password, hash passwords with something deliberately slow, and let a response model decide what may leave.
+
+## Next
+
+How the pieces are arranged once the application is more than one file: routers per resource, services that know nothing about HTTP, schemas separated by direction, and an assembly file short enough to read at a glance.
+
+
+## The shape to take away
+
+Authentication is a dependency. Authorisation is a dependency that depends on it. Both raise, so neither can be forgotten by an endpoint that declares them, and both appear in the schema.
+
+Everything else in this module is a detail hung on that frame: what goes in a token, how to compare a secret, what a login should say, what a response model must not contain.
+
+The frame is what the framework gives you. The details are what a review should check before anything real depends on them.
+
+
+## A closing thought
+
+The most useful thing in this module is not any individual rule. It is that authentication has one place to live.
+
+An application where every endpoint checks a header its own way has as many security models as it has endpoints, and no way to review them. One where every endpoint declares `Depends(current_user)` has one, written down, that a reviewer can read in a minute.
+
+That does not make it correct. It makes it *reviewable*, which is the precondition for it becoming correct.
+
+## A closing note
+
+Security is the area where the framework helps most with shape and least with substance.
+
+`Depends` makes authentication impossible for an endpoint to forget, gives it one place to live, and puts it in the schema. That is genuinely valuable and it is structural - it says nothing about whether your token lifetime is sensible, your hashing is current, or your permission model matches what the business intended.
+
+Those are decisions, and they need review by someone who does this for a living before anything real depends on them. What this module offers is the arrangement that makes such a review possible: rules in one place, expressed once, visible in the signature of every endpoint that relies on them.
+
+## In one line
+
+Authentication is a dependency and authorisation depends on it; a signed token is readable, a valid signature is not a valid token, secrets compare in constant time, logins say one thing either way, and a response model decides what leaves.
+
+And for anything real, use libraries rather than the primitives shown here: they exist because the edge cases are numerous and the consequences of missing one are not proportionate to the effort saved.

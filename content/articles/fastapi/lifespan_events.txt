@@ -1,0 +1,418 @@
+title: Lifespan Events
+intro: Work that happens once per process rather than once per request, and where a connection pool belongs.
+
+## Two lifetimes
+
+Almost everything in this track has been per request: a body, a session, a user, a background task.
+
+Some things are not. A database connection **pool** is created once and used by every request. So is an HTTP client, a machine-learning model, a cache client, a loaded configuration.
+
+Creating those per request would be absurdly wasteful; creating them at import has its own problems. Lifespan is the third option, and the correct one.
+
+
+## The lifespan protocol, driven by hand
+
+A server sends the app a startup message before serving and a shutdown message after. This is that, without the server.
+
+```python-run
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+events = []
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    events.append("startup")
+    yield                       # the application serves requests here
+    events.append("shutdown")
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/x")
+def x():
+    return {"events": list(events)}
+
+def run_lifespan(app, phase):
+    """Send one lifespan message, the way uvicorn would."""
+    msgs = []
+    async def receive(): return {"type": "lifespan." + phase}
+    async def send(m):   msgs.append(m["type"])
+    drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+    return msgs
+
+print("startup :", run_lifespan(app, "startup"), events)
+print("request :", TestClient(app).get("/x").json())
+print("shutdown:", run_lifespan(app, "shutdown"), events)
+```
+
+## Sharing state with the handlers
+
+Anything created at startup is put where handlers can reach it &mdash; <code>app.state</code> is the conventional place.
+
+```python-run
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request
+
+opened = []
+
+class Pool:
+    def __init__(self): opened.append("pool"); self.n = 0
+    def query(self): self.n += 1; return "rows(%d)" % self.n
+    def close(self): opened.append("closed")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.pool = Pool()
+    yield
+    app.state.pool.close()
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/rows")
+def rows(request: Request):
+    return {"rows": request.app.state.pool.query()}
+
+def cycle(app, phase):
+    async def receive(): return {"type": "lifespan." + phase}
+    async def send(m): pass
+    drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+
+cycle(app, "startup")
+c = TestClient(app)
+print(c.get("/rows").json())
+print(c.get("/rows").json(), "<- same pool, second query")
+cycle(app, "shutdown")
+print("lifecycle:", opened)
+```
+
+## A dependency hands it to the handler
+
+Reaching through <code>request.app.state</code> works and reads poorly. A dependency gives the handler the thing itself.
+
+```python-run
+from contextlib import asynccontextmanager
+from fastapi import Depends, FastAPI, Request
+
+class Pool:
+    def query(self): return ["Vectors", "Norms"]
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.pool = Pool()
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+def get_pool(request: Request) -> Pool:
+    return request.app.state.pool
+
+@app.get("/modules")
+def modules(pool: Pool = Depends(get_pool)):
+    return {"rows": pool.query()}
+
+async def receive(): return {"type": "lifespan.startup"}
+async def send(m): pass
+drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+
+print(TestClient(app).get("/modules").json())
+print()
+print("The handler never mentions app.state, so it is trivial to override.")
+```
+
+## Per process, not per request
+
+The startup body runs once however many requests arrive. That is the distinction that decides what belongs here.
+
+```python-run
+from contextlib import asynccontextmanager
+from fastapi import Depends, FastAPI, Request
+
+built = []
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    built.append("pool")                 # once
+    app.state.pool = {"id": len(built)}
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+def session(request: Request):
+    return {"pool": request.app.state.pool, "session": "fresh"}
+
+@app.get("/x")
+def x(s: dict = Depends(session)):
+    return s
+
+async def receive(): return {"type": "lifespan.startup"}
+async def send(m): pass
+drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+
+c = TestClient(app)
+for _ in range(3):
+    print(c.get("/x").json())
+print("pools built:", len(built), "<- one, for three requests")
+```
+
+## Failing at startup
+
+An exception before the yield stops the application coming up, which is the right moment to discover a missing setting.
+
+```python-run
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+SETTINGS = {}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if "database_url" not in SETTINGS:
+        raise RuntimeError("database_url is not configured")
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+async def receive(): return {"type": "lifespan.startup"}
+async def send(m): pass
+
+try:
+    drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+except RuntimeError as e:
+    print("refused to start:", e)
+
+SETTINGS["database_url"] = "postgres://..."
+drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+print("started once configured")
+```
+
+## Startup or import?
+
+Work at import runs whenever the module is imported &mdash; including by a test collector. Startup runs when the application actually starts.
+
+```python-run
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+log = []
+
+# At import: happens the moment this module is loaded, by anyone.
+log.append("import-time work")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    log.append("startup work")
+    yield
+    log.append("shutdown work")
+
+app = FastAPI(lifespan=lifespan)
+
+print("after import  :", log)
+
+async def receive(): return {"type": "lifespan.startup"}
+async def send(m): pass
+drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+print("after startup :", log)
+print()
+print("A test that merely imports the module paid for the first line only.")
+```
+## The shape
+
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.pool = await create_pool()
+    yield
+    await app.state.pool.close()
+
+app = FastAPI(lifespan=lifespan)
+```
+
+An async context manager. Everything before the `yield` runs when the application starts; everything after runs when it stops. In between, it serves requests.
+
+The shape is deliberately the same as a `yield` dependency, with a different lifetime: that one is per request, this one is per process.
+
+## What the server actually does
+
+Before serving anything, uvicorn sends the application a `lifespan.startup` message and waits for it to complete. After the last request, it sends `lifespan.shutdown`.
+
+That is a real protocol, not a framework convention, which is why the editors above can drive it by hand: build the scope, send the message, and watch the same code run that uvicorn would have triggered.
+
+## Once per process, and per worker
+
+The startup body runs **once**, however many requests arrive. That is the distinction that decides what belongs in it.
+
+Worth being precise about the plural: production usually runs several worker processes, and each is a separate process with its own lifespan. Four workers means four pools, four model loads, four caches. Anything expensive is paid for four times, and anything that must be unique across the application &mdash; a scheduler, a migration, a leader election &mdash; must not be in a lifespan, because it will run once per worker rather than once.
+
+That last point catches people. A migration in startup runs concurrently in four processes on the first deploy.
+
+## Getting at it from a handler
+
+What startup creates has to be reachable. The convention is `app.state`:
+
+```python
+app.state.pool = pool
+```
+
+and in a handler, `request.app.state.pool`.
+
+That works and reads badly, and it couples every handler to the storage location. A dependency fixes both:
+
+```python
+def get_pool(request: Request) -> Pool:
+    return request.app.state.pool
+
+def modules(pool: Pool = Depends(get_pool)):
+    ...
+```
+
+Now the handler receives a `Pool`, knows nothing about `app.state`, and can be tested by overriding one dependency. That is the shape worth using.
+
+## Failing loudly
+
+An exception before the `yield` prevents the application from starting.
+
+That is the right behaviour and the right moment. A missing database URL, an unreachable dependency, an invalid configuration &mdash; all are better as a process that refuses to start than as an application that accepts traffic and fails every request.
+
+Validating settings in the lifespan, or importing a settings model that validates itself, turns a class of runtime mystery into a startup error with a message.
+
+## Startup or import time?
+
+Module-level code runs when the module is imported. That sounds equivalent and is not.
+
+A test collector imports your application module to find the app object. So does a documentation generator, a linter with type checking, and anything that inspects routes. If connecting to a database happens at import, all of those need a database.
+
+Startup runs when the application actually starts &mdash; which a test can choose to do, or not.
+
+The practical rule: define things at import, *create* them at startup. `pool = None` at module level and the real construction in the lifespan.
+
+## Shutdown is not guaranteed
+
+Worth knowing before relying on it.
+
+Graceful shutdown runs the code after the `yield`. A `SIGKILL`, a container OOM, or a hardware failure does not. Anything whose absence would corrupt state must not depend on shutdown running.
+
+In practice: close connections there because it is tidy, and do not *rely* on it for correctness. Anything that must be consistent should be consistent at every moment, not reconciled on the way out.
+
+## The older spelling
+
+You will see this in existing code:
+
+```python
+@app.on_event("startup")
+async def startup(): ...
+```
+
+It works and is deprecated. The lifespan context manager replaced it because it keeps setup and teardown in one function, where the relationship between them is visible, and because it can hold state in local variables rather than globals.
+
+New code should use `lifespan`. Old code is worth migrating when touched.
+
+
+## Mistakes people make
+
+**Connecting at import.** Every test collector, linter and documentation generator then needs a live database. Define at import; create at startup.
+
+**Assuming it runs once per application.** It runs once per **worker**. Four workers means four pools and four model loads - and a migration placed there runs four times concurrently on first deploy.
+
+**Relying on shutdown.** A SIGKILL, an OOM or a hardware failure skips it. Close things there for tidiness; do not depend on it for correctness.
+
+**Reaching for `request.app.state` in every handler.** It couples each one to where the object is stored. A dependency hands over the object itself and can be overridden in a test.
+
+**Swallowing startup failures.** A missing setting should stop the process, not produce an application that accepts traffic and fails every request.
+
+**Using `@app.on_event`.** Deprecated. The lifespan context manager keeps setup and teardown in one function where their relationship is visible.
+
+## In tests
+
+`TestClient(app)` does **not** run the lifespan. Used as a context manager it does:
+
+```python
+with TestClient(app) as client:
+    ...
+```
+
+Both are useful. An isolated unit test with dependencies overridden is faster and cleaner without startup; an integration test that should exercise the real wiring needs it.
+
+Knowing the difference explains the common confusion of a test failing because `app.state.pool` does not exist - the startup that would have created it never ran.
+
+## Next
+
+Testing what you have built &mdash; the client, the overrides, and what a good FastAPI test suite actually asserts.
+
+
+## What belongs in it
+
+A short list, because the boundary is what the module is really about.
+
+**Yes**: connection pools, HTTP clients, loaded models, caches, warmed configuration, anything expensive with a process lifetime.
+
+**No**: anything per request - a session, a transaction, a user. Those are dependencies.
+
+**Definitely not**: anything that must happen exactly once for the whole application. Migrations, scheduled job registration, leader election. With four workers those run four times, concurrently, on every deploy.
+
+That last category is the one that causes incidents, and the fix is not FastAPI's: it belongs in a deployment step that runs once, before the workers start.
+
+## Testing around it
+
+Because the lifespan is opt-in for `TestClient`, most unit tests skip it and are better for skipping it - dependencies are overridden anyway, so the pool never needed to exist.
+
+Where it matters is the integration test that should prove the wiring works: that startup succeeds with real settings, that what it creates is reachable, and that shutdown does not raise. One such test per application is usually enough, and it catches the class of failure where everything passes and the process will not boot.
+
+## Summary
+
+A lifespan is an async context manager: before the `yield` is startup, after it is shutdown, and in between the application serves requests.
+
+It runs once per process - which means once per worker, so four workers build four of everything and anything that must happen exactly once does not belong there.
+
+Create expensive, long-lived things there rather than at import, so a test collector does not need a database. Put them on `app.state` and hand them to handlers through a dependency, so the handlers stay unaware and overridable.
+
+Fail loudly before the `yield` when configuration is missing, and do not depend on shutdown running - a killed process never reaches it.
+
+## Two lifetimes, restated
+
+Almost everything in this track has been per request. This module is the exception, and holding the two apart is what the module is for.
+
+**Per process**: the connection pool, the HTTP client, the loaded model, the cache client, the parsed configuration. Expensive, reusable, created once.
+
+**Per request**: the session taken from that pool, the transaction, the user, the filters. Cheap, disposable, created and released for each caller.
+
+Confusing them produces two distinct failures. A pool created per request is catastrophic for throughput - every caller pays connection setup. A session shared across requests is catastrophic for correctness - two callers inside one transaction, seeing each other's uncommitted work.
+
+The lifespan owns the first category and dependencies own the second, and the `yield` in each has the same shape for the same reason: acquire, use, release.
+
+
+## Reading a startup that fails
+
+When an application will not boot, the lifespan is usually where to look, and the failure modes are few.
+
+**A missing setting** raises before the `yield`, and the message names the field if configuration is a validated model. This is the good case: loud, early, and specific.
+
+**An unreachable dependency** - a database that is not up yet - raises a connection error. In an orchestrated deployment this is often a race rather than a fault, and the fix is a readiness probe or a retry with backoff rather than removing the check.
+
+**A blocking call in an async lifespan** hangs rather than failing, which is the confusing one. The process starts, never becomes ready, and nothing is logged. The rule from the async module applies here too.
+
+**Work that should have run once** - a migration - appears to succeed on one worker and deadlock on the others.
+
+Knowing that list turns "it will not start" into four things to check in order.
+
+## One habit
+
+Put a log line at the end of startup naming what was created and the settings that matter. It costs nothing and it turns every future boot problem into a question of which line was the last one printed.
+
+
+## A closing thought
+
+The lifespan is the only place in a FastAPI application that knows about the process rather than the request, and that makes it the natural home for a specific kind of mistake: doing something once that should happen once *per application*.
+
+Four workers is the default shape of a production deployment, and every one of them runs this code. A pool per worker is correct and intended. A migration per worker is a race. A scheduled job registered per worker is four schedulers.
+
+The distinction is not obvious from inside the function, because nothing about `async def lifespan(app)` suggests it will run four times. Knowing that it will is most of using it correctly.
+
+## Next
+
+Testing what has been built - the client that needs no server, the overrides that remove the database, and what a suite should actually assert.
+
+## In one line
+
+Startup and shutdown run once per worker, not once per application - so create expensive long-lived things there, hand them over through a dependency, fail loudly if configuration is missing, and put anything that must happen exactly once somewhere that runs exactly once.
+
+One log line at the end of startup, naming what was created, turns every future boot problem into a question of which line was the last one printed.

@@ -1,0 +1,380 @@
+title: OpenAPI and the Docs
+intro: The document your annotations generate, and how much of an API's usability is decided by it.
+
+## What is generated
+
+`app.openapi()` returns one OpenAPI document describing every route: paths, methods, parameters, request bodies, response shapes, status codes, descriptions and examples.
+
+It is assembled from things you already wrote &mdash; the path in the decorator, the parameters in the signature, the models, the constraints, the docstrings. There is no separate specification to maintain and no way for it to drift, because it *is* the code.
+
+FastAPI serves it at `/openapi.json`, renders it at `/docs` (Swagger UI) and `/redoc` (ReDoc).
+
+
+## The document, and where it comes from
+
+<code>app.openapi()</code> assembles one OpenAPI document from every model and signature. Nothing else was written to produce it.
+
+```python-run
+import json
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="VizLearn API", version="2.1.0",
+              description="Runnable explainers, as an API.")
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str = Field(description="Shown as the page heading.")
+
+@app.get("/modules/{i}", response_model=ModuleOut, tags=["modules"])
+def read(i: int):
+    """Return one module by id."""
+    return {"id": i, "title": "Vectors"}
+
+spec = app.openapi()
+print("openapi :", spec["openapi"])
+print("info    :", spec["info"]["title"], spec["info"]["version"])
+print("paths   :", list(spec["paths"]))
+op = spec["paths"]["/modules/{i}"]["get"]
+print("summary :", op["summary"])
+print("desc    :", op["description"].strip())
+print("tags    :", op["tags"])
+```
+
+## Tags organise it
+
+Tags group endpoints into sections, and metadata on the app gives each section a description.
+
+```python-run
+from fastapi import APIRouter, FastAPI
+
+tags_meta = [
+    {"name": "modules", "description": "Individual explainers."},
+    {"name": "tracks", "description": "Ordered collections of modules."},
+]
+
+app = FastAPI(openapi_tags=tags_meta)
+
+modules = APIRouter(prefix="/modules", tags=["modules"])
+tracks = APIRouter(prefix="/tracks", tags=["tracks"])
+
+@modules.get("")
+def list_modules(): return []
+
+@tracks.get("")
+def list_tracks(): return []
+
+app.include_router(modules)
+app.include_router(tracks)
+
+spec = app.openapi()
+for t in spec["tags"]:
+    print("%-8s %s" % (t["name"], t["description"]))
+print()
+for path, ops in spec["paths"].items():
+    for method, op in ops.items():
+        print("  %-6s %-10s %s" % (method.upper(), path, op["tags"]))
+```
+
+## Examples fill the Try it out form
+
+The single highest-value thing you can add: a caller gets a working request instead of an empty box.
+
+```python-run
+import json
+from fastapi import FastAPI
+from pydantic import BaseModel, ConfigDict, Field
+
+app = FastAPI()
+
+class ModuleIn(BaseModel):
+    model_config = ConfigDict(json_schema_extra={
+        "examples": [{"title": "Dot Product", "minutes": 11}]})
+
+    title: str = Field(min_length=3, description="Shown as the page heading.",
+                       examples=["Dot Product"])
+    minutes: int = Field(default=10, gt=0, le=180,
+                         description="Estimated reading time.")
+
+@app.post("/modules", status_code=201)
+def create(body: ModuleIn):
+    return body
+
+schema = app.openapi()["components"]["schemas"]["ModuleIn"]
+print(json.dumps(schema, indent=2))
+```
+
+## Documenting the failures
+
+<code>responses=</code> puts the error shapes in the document, so a generated client can type them.
+
+```python-run
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class ModuleOut(BaseModel):
+    id: int
+
+class Problem(BaseModel):
+    detail: str
+
+@app.get("/modules/{i}", response_model=ModuleOut,
+         responses={404: {"model": Problem, "description": "No such module"},
+                    409: {"model": Problem, "description": "Withdrawn"}})
+def read(i: int):
+    if i != 1:
+        raise HTTPException(404, "No such module")
+    return {"id": 1}
+
+op = app.openapi()["paths"]["/modules/{i}"]["get"]
+for code, spec in sorted(op["responses"].items()):
+    print("%-4s %s" % (code, spec.get("description")))
+```
+
+## Hiding what should not be published
+
+<code>include_in_schema=False</code> keeps an internal endpoint out of the document while leaving it working.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules")
+def public(): return []
+
+@app.get("/internal/flush", include_in_schema=False)
+def internal(): return {"flushed": True}
+
+@app.get("/legacy", deprecated=True)
+def legacy(): return {"old": True}
+
+spec = app.openapi()
+print("documented :", sorted(spec["paths"]))
+print("still works:", TestClient(app).get("/internal/flush").json())
+print("deprecated :", spec["paths"]["/legacy"]["get"].get("deprecated"))
+print()
+print("Undocumented is not the same as protected - it is only invisible.")
+```
+
+## Reading it as a review
+
+One line, and you see what a consumer sees. It is the fastest review available for an API model.
+
+```python-run
+from fastapi import FastAPI, Query
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Thing(BaseModel):
+    id: int
+    weight: float                 # of what? in what unit?
+
+@app.get("/things", response_model=list[Thing])
+def things(sort: str = Query(default="id")):   # str, so anything goes
+    return []
+
+spec = app.openapi()
+props = spec["components"]["schemas"]["Thing"]["properties"]
+params = spec["paths"]["/things"]["get"]["parameters"]
+
+print("fields without a description:")
+for name, p in props.items():
+    if "description" not in p:
+        print("   ", name, p.get("type"))
+print()
+print("parameters with no constrained set:")
+for p in params:
+    if p["schema"].get("type") == "string" and "enum" not in p["schema"]:
+        print("   ", p["name"], "- a Literal would document the options")
+```
+## The header
+
+`FastAPI(title=..., version=..., description=...)` becomes the top of the document and the top of the docs page.
+
+The `description` supports Markdown and is the one piece of genuine prose in the whole thing. It is worth writing: what the API is for, how authentication works, what the rate limits are, where to get a key. That is the first thing a new consumer reads, and the alternative is that they read nothing.
+
+`version` should be your API's version, not your library's. Consumers pin against it.
+
+## Tags
+
+Tags group endpoints into sections. On a router, `tags=["modules"]` applies to every route in it.
+
+`openapi_tags` on the app gives each tag a description, which becomes a paragraph above that section in the docs.
+
+For an API past a dozen routes this is the difference between a navigable document and a flat alphabetical list. It costs one argument per router.
+
+## Examples are the highest-value addition
+
+Everything else in this module is worth doing. This is the one that changes whether people succeed.
+
+A `Field(examples=[...])` or a model-level `json_schema_extra={"examples": [...]}` pre-fills the interactive form. A developer opens `/docs`, presses **Try it out**, and gets a request that works &mdash; instead of an empty box they have to guess at, with a 422 for their first three attempts.
+
+That difference is measurable in how many integrations get finished.
+
+Write examples that are realistic rather than minimal. `"title": "string"` is what the generator produces without you; `"title": "Dot Product"` shows what the field is actually for.
+
+## Documenting failures
+
+`response_model` covers the success case. Everything else is undocumented unless you say so:
+
+```python
+responses={404: {"model": Problem, "description": "No such module"}}
+```
+
+Worth doing for the failures a caller is expected to handle. A generated client can then type its errors, and a human reading the docs knows what a rejection looks like before causing one.
+
+## Hiding endpoints
+
+`include_in_schema=False` keeps a route out of the document. Useful for internal endpoints, legacy paths kept for one client, and health checks that would only clutter the page.
+
+One warning worth being explicit about: **this is not access control.** The endpoint still works, still accepts requests, and is exactly as reachable as before. It is invisible, not protected. If it should not be called, it needs a dependency, not a flag.
+
+`deprecated=True` is the other half of retiring something: the endpoint keeps working and the docs show it as deprecated, which gives consumers a signal without breaking them.
+
+## Reading it as a review
+
+The most practical use of this module. One line:
+
+```python
+print(json.dumps(app.openapi(), indent=2))
+```
+
+and you see exactly what your consumers see.
+
+What it reliably surfaces: fields whose names are not self-explanatory and have no description; a `str` parameter where a `Literal` would have given clients a set of options; a rule enforced by a validator that appears nowhere; a required field you meant to default; an endpoint with no example.
+
+The last editor above automates two of those checks. It is worth running over a real model, because the results are usually uncomfortable and always cheap to fix.
+
+## What it feeds
+
+The document is read by more than the docs page, which is why its quality compounds.
+
+**Client generators** produce typed clients in a dozen languages from it. A vague schema produces a vague client, and every consumer then writes their own guesses.
+
+**Contract tests** can assert that a change did not break the published shape.
+
+**API gateways** can validate requests before they reach you.
+
+**LLM tooling** increasingly reads schemas to decide how to call an API.
+
+None of those read your source. All of them read this.
+
+## The limits
+
+Some things cannot be expressed, and pretending otherwise misleads consumers.
+
+Validator logic, cross-field rules, anything requiring a lookup &mdash; none has a JSON Schema equivalent. Where a rule matters and cannot be declared, put it in the docstring or the model's description, so at least a human reading the documentation learns about it.
+
+An endpoint whose real constraints live in code the schema cannot see is an endpoint whose documentation is quietly incomplete.
+
+
+## Mistakes people make
+
+**Treating `include_in_schema=False` as security.** The endpoint still works and is exactly as reachable. Invisible is not protected.
+
+**Leaving fields undescribed.** `weight` needs a description - of what, in what unit. A name that is not self-explanatory and has no description produces documentation that technically exists.
+
+**No examples.** The generated placeholder is `"string"`. A caller's first three attempts then return 422, and some of them stop there.
+
+**Documenting only success.** An endpoint that can 404 should say so, or a generated client has no type for failure.
+
+**Using `str` where a `Literal` belongs.** The schema then offers no options, so no client can render a choice and no consumer knows what is valid.
+
+**Never looking at it.** It is one line, and it is the only view of your model that matches what consumers receive.
+
+**Versioning it with the library version.** Consumers pin against your API's version, not your package's.
+
+## The review worth doing
+
+Print the document for a model you have just written and read it as a stranger.
+
+What it surfaces: required fields you meant to default, patterns that should have been enumerations, rules that live in validators and appear nowhere, endpoints with no summary, and fields whose names carry meaning only to whoever wrote them.
+
+Every one of those is cheap to fix at that moment and expensive once clients exist, because by then the shape is a contract.
+
+## Next
+
+Putting the pieces together: how a FastAPI project is laid out once it is more than one file.
+
+
+## What it costs to skip
+
+An API without a good document still works, and the cost is paid by everyone else.
+
+Every consumer writes their own guesses about shapes. Every generated client is untyped. Every question that could have been answered by reading becomes a message to whoever wrote it. And every change is potentially breaking, because nobody wrote down what the contract was.
+
+The work to avoid that is small and front-loaded: a description on the app, tags on the routers, descriptions on the fields whose names are not obvious, one example per body model, and `responses=` on the failures a caller is expected to handle.
+
+An hour, once, and it is read by every person and tool that touches the API afterwards.
+
+## The chain it feeds
+
+Worth holding in mind, because it explains why small omissions matter.
+
+Your models generate schemas. FastAPI assembles them into one document. That document is read by the interactive docs, by client generators in several languages, by API gateways, by contract-testing tools, and increasingly by LLM tooling deciding how to call you.
+
+A missing description is missing in all of them. So is a `str` that should have been a `Literal`. None of those tools read your source code, and none of them can ask.
+
+## Summary
+
+The document is generated from your models, signatures, decorators and docstrings, and served at `/openapi.json`, `/docs` and `/redoc`.
+
+Give the app a title, version and description; group routes with tags and describe the groups with `openapi_tags`; document failures with `responses=`; and write examples, which are the single highest-value addition because they turn a caller's first attempt from a guess into a working request.
+
+`include_in_schema=False` hides without protecting. And the fastest review available for any API model is printing the document and reading it as a stranger would.
+
+## The limits, stated plainly
+
+Some things cannot be expressed, and knowing which keeps the documentation honest.
+
+**Validator logic** has no schema equivalent. A rule enforced by a `field_validator` is invisible to every consumer.
+
+**Cross-field rules** likewise. "End date must be after start date" appears nowhere.
+
+**Anything needing a lookup** - does this reference exist, is this name taken - is not expressible and should not be attempted.
+
+**Custom serialisation** changes output without changing the schema unless `return_type` is set, which is how a document quietly starts describing something the endpoint no longer returns.
+
+Where a rule matters and cannot be declared, put it in the model's docstring or the field's description. It will not be machine-readable, and a human reading the documentation will at least learn it exists rather than discovering it through a rejection.
+
+
+## Who reads it
+
+Worth being concrete, because the audience is larger than the docs page.
+
+**A developer integrating with you** opens `/docs`, presses Try it out, and either gets a working request or does not. That first minute decides how the rest goes.
+
+**A client generator** turns the document into a typed library. Its quality is entirely your schema's quality.
+
+**A gateway** may validate requests against it before they reach your process.
+
+**A contract test** can assert that today's document is compatible with yesterday's.
+
+**An LLM** increasingly reads it to decide how to call you, and reads only what is written.
+
+None of them can ask a question, and none of them read your source. Everything they know is in the document, which is why the descriptions and examples are not decoration.
+
+
+## A closing thought
+
+The generated document is the closest thing an API has to a public interface definition, and it is produced entirely as a side effect of writing types.
+
+That is unusual and worth appreciating. In most stacks the specification is a separate artefact that somebody maintains, and it drifts from the implementation immediately because nothing forces them together.
+
+Here it cannot drift, because there is only one source. What varies is how much you put into that source - and the difference between a document consumers can build against and one they have to guess at is a handful of descriptions, one example per model, and a `Literal` where a `str` would have done.
+
+## Next
+
+Authentication and authorisation - as dependencies, which is where the previous tier was heading all along.
+
+## In one line
+
+Your annotations already wrote your API documentation; the only question is how much you put into them, and the answer is decided by a handful of descriptions, one example per body model, and a `Literal` wherever a `str` would have left a consumer guessing.
+
+And the cheapest habit available is to print the document once for every model you write. Five minutes, no tooling, and it shows you the API as a stranger receives it rather than as its author remembers it.
+
+One more habit worth the minute it costs: after adding an endpoint, open `/docs` and try it as a stranger would. If your own first attempt returns a 422, so will everybody else's, and you are the only person who can still fix it cheaply.

@@ -5380,6 +5380,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "fastapi/background_tasks.html",
+  "title": "Background Tasks",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "When does a background task run?",
+    "o": [
+     "Before the handler",
+     "Concurrently with the handler",
+     "After the response has been produced",
+     "On the next request"
+    ],
+    "a": 2,
+    "w": "That ordering is the point - the caller is answered without waiting for the slow, inessential part."
+   },
+   {
+    "t": "The process restarts with tasks queued. What happens to them?",
+    "o": [
+     "They are retried",
+     "They are lost, with no record",
+     "They move to another worker",
+     "They run at startup"
+    ],
+    "a": 1,
+    "w": "Tasks live in memory in the serving process. That is why anything whose loss would be a bug belongs in a durable queue instead."
+   },
+   {
+    "t": "A background task raises. What does the caller see?",
+    "o": [
+     "A 500",
+     "Nothing - the response was already sent",
+     "A retry",
+     "A 202"
+    ],
+    "a": 1,
+    "w": "The failure cannot reach them, so it is silent by construction unless the task catches and logs it deliberately."
+   },
+   {
+    "t": "Which status code best fits an endpoint that queues work?",
+    "o": [
+     "200",
+     "201",
+     "202 Accepted",
+     "204"
+    ],
+    "a": 2,
+    "w": "202 says the request was accepted and is not finished. Returning 201 for something not yet created is a small lie a client may act on."
+   }
+  ]
+ },
+ {
   "path": "fastapi/class_dependencies.html",
   "title": "Class Dependencies",
   "cat": "FastAPI",
@@ -5788,6 +5839,108 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "fastapi/lifespan_events.html",
+  "title": "Lifespan Events",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "How often does a lifespan startup body run?",
+    "o": [
+     "Per request",
+     "Once per process - and so once per worker",
+     "Once per route",
+     "Once globally"
+    ],
+    "a": 1,
+    "w": "Four workers means four pools and four model loads. It also means a migration in startup runs four times concurrently on first deploy, which is why that does not belong there."
+   },
+   {
+    "t": "Why prefer startup over import-time work?",
+    "o": [
+     "It is faster",
+     "An import happens whenever anything loads the module, including a test collector",
+     "Imports are deprecated",
+     "No difference"
+    ],
+    "a": 1,
+    "w": "Connecting at import means every test run, linter and documentation generator needs a live database. Define at import, create at startup."
+   },
+   {
+    "t": "How should a handler get at a pool created in the lifespan?",
+    "o": [
+     "request.app.state.pool directly",
+     "Through a dependency that reads app.state",
+     "A global",
+     "It cannot"
+    ],
+    "a": 1,
+    "w": "The dependency gives the handler the object itself, keeps it unaware of where it is stored, and makes it replaceable with one override in a test."
+   },
+   {
+    "t": "Can you rely on shutdown code always running?",
+    "o": [
+     "Yes, always",
+     "No - SIGKILL, an OOM or a hardware failure skips it",
+     "Only in production",
+     "Only for async apps"
+    ],
+    "a": 1,
+    "w": "Close things there because it is tidy, but anything whose absence would corrupt state must be consistent at every moment rather than reconciled on the way out."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/openapi_and_docs.html",
+  "title": "OpenAPI and the Docs",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "Where does the OpenAPI document come from?",
+    "o": [
+     "A YAML file you maintain",
+     "Your models, signatures, decorators and docstrings",
+     "uvicorn",
+     "A plugin"
+    ],
+    "a": 1,
+    "w": "It is assembled from code you already wrote, which is why it cannot drift from the implementation - it is the implementation."
+   },
+   {
+    "t": "What does `include_in_schema=False` do?",
+    "o": [
+     "Blocks the endpoint",
+     "Hides it from the document; it still works and is still reachable",
+     "Requires auth",
+     "Deletes the route"
+    ],
+    "a": 1,
+    "w": "Undocumented is not protected. If an endpoint should not be called, it needs a dependency, not a visibility flag."
+   },
+   {
+    "t": "Which addition most improves a first-time caller's experience?",
+    "o": [
+     "A longer description",
+     "Examples, which pre-fill the Try it out form with a working request",
+     "More tags",
+     "A version bump"
+    ],
+    "a": 1,
+    "w": "The alternative is an empty box and a 422 on their first three attempts. Realistic examples change whether integrations get finished."
+   },
+   {
+    "t": "A rule lives in a `field_validator`. What does the schema say about it?",
+    "o": [
+     "It appears as a constraint",
+     "Nothing - validator logic has no schema equivalent",
+     "It becomes a description",
+     "It raises at startup"
+    ],
+    "a": 1,
+    "w": "Which is why constraints are preferred where they can express the rule, and why anything left in code should be mentioned in a docstring or description."
+   }
+  ]
+ },
+ {
   "path": "fastapi/path_parameters.html",
   "title": "Path Parameters",
   "cat": "FastAPI",
@@ -5835,6 +5988,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "A plain parameter stops at the next slash. Note that a `:path` value can contain `..`, so building a filesystem path from one without checking is a traversal vulnerability."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/project_structure.html",
+  "title": "Project Structure",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "What should `main.py` contain?",
+    "o": [
+     "The endpoints",
+     "Create the app, register handlers, include routers, add middleware",
+     "Business logic",
+     "The models"
+    ],
+    "a": 1,
+    "w": "If it fits on a screen it answers \"what does this application consist of?\". Growing logic there destroys that."
+   },
+   {
+    "t": "How do you tell whether the service boundary is right?",
+    "o": [
+     "By file size",
+     "Whether the service imports fastapi",
+     "By the number of functions",
+     "By naming"
+    ],
+    "a": 1,
+    "w": "A service raising HTTPException can only run inside a request. One raising a domain exception works from a job, a CLI or a test, with one handler mapping it at the edge."
+   },
+   {
+    "t": "Why put settings in one validated model?",
+    "o": [
+     "Style",
+     "A bad value fails at startup with a named field, and the model lists everything the app needs",
+     "It is faster",
+     "It is required"
+    ],
+    "a": 1,
+    "w": "Scattered `os.getenv` fails at request time inside a handler, and leaves no single place that says what the application needs to run."
+   },
+   {
+    "t": "When should you create a routers/ directory?",
+    "o": [
+     "At 50 endpoints",
+     "On day one, with two",
+     "Never",
+     "When tests get slow"
+    ],
+    "a": 1,
+    "w": "Moving three routes is trivial and moving eighty is a rewrite that does not happen - so the file keeps growing instead."
    }
   ]
  },
@@ -6094,6 +6298,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "fastapi/security_basics.html",
+  "title": "Security Basics",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "Is a signed token encrypted?",
+    "o": [
+     "Yes",
+     "No - anyone holding it can read the payload",
+     "Only with HTTPS",
+     "Only the header"
+    ],
+    "a": 1,
+    "w": "The signature proves origin and integrity, not confidentiality. Nothing secret belongs in the payload, because logs, browser storage and proxies all see it."
+   },
+   {
+    "t": "Why use `hmac.compare_digest` instead of `==`?",
+    "o": [
+     "It is faster",
+     "`==` returns early, so its timing reveals how many characters were correct",
+     "It handles bytes",
+     "No reason"
+    ],
+    "a": 1,
+    "w": "Over enough attempts, a timing difference is enough to reconstruct a secret. compare_digest takes constant time."
+   },
+   {
+    "t": "A login where the username does not exist. What should it return?",
+    "o": [
+     "\"No such user\"",
+     "The same message as a wrong password, after doing the comparison anyway",
+     "A 404",
+     "A 403"
+    ],
+    "a": 1,
+    "w": "Different messages enumerate accounts - and skipping the hash comparison leaks the same fact through timing even when the message does not."
+   },
+   {
+    "t": "A signed token has a valid signature. Is it acceptable?",
+    "o": [
+     "Yes",
+     "Not necessarily - expiry and revocation are separate checks",
+     "Only if fresh",
+     "Only with scopes"
+    ],
+    "a": 1,
+    "w": "A signature has no opinion about time or about whether the account was disabled. That is the honest weakness of stateless tokens, which short lifetimes mitigate."
+   }
+  ]
+ },
+ {
   "path": "fastapi/status_codes.html",
   "title": "Status Codes",
   "cat": "FastAPI",
@@ -6196,6 +6451,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "fastapi/testing_fastapi.html",
+  "title": "Testing",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "What does TestClient actually do?",
+    "o": [
+     "Starts a server on a port",
+     "Builds the ASGI scope and calls the app directly",
+     "Mocks the framework",
+     "Runs uvicorn"
+    ],
+    "a": 1,
+    "w": "No socket, no process, no waiting for anything to come up - which is why hundreds of endpoint tests run in seconds."
+   },
+   {
+    "t": "Why assert on the status code before the body?",
+    "o": [
+     "It is faster",
+     "A body-only test keeps passing when a 200 becomes a 500 carrying a similar key",
+     "Bodies are unstable",
+     "It is required"
+    ],
+    "a": 1,
+    "w": "The status is the contract every client branches on. Checking only the body leaves the most important change undetected."
+   },
+   {
+    "t": "Your test fails because `app.state.pool` is missing. What is likely wrong?",
+    "o": [
+     "The pool is broken",
+     "The lifespan never ran - TestClient only runs it when used as a context manager",
+     "A missing override",
+     "A bad route"
+    ],
+    "a": 1,
+    "w": "`with TestClient(app) as client:` runs startup and shutdown. Plain construction does not, which is often what you want for an isolated unit test."
+   },
+   {
+    "t": "Which breaking change would a normal functional test miss?",
+    "o": [
+     "A 500",
+     "Removing a response_model, so extra fields start leaking",
+     "A wrong status",
+     "A validation failure"
+    ],
+    "a": 1,
+    "w": "A test checking `r.json()[\"id\"]` passes happily when the payload also gained `password_hash`. Assert on what should be absent, and on the schema."
+   }
+  ]
+ },
+ {
   "path": "fastapi/what_is_fastapi.html",
   "title": "What FastAPI Is",
   "cat": "FastAPI",
@@ -6294,6 +6600,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "The docstring becomes the description and Markdown is rendered - so documentation written where a Python developer naturally writes it also reaches the API docs."
+   }
+  ]
+ },
+ {
+  "path": "fastapi/async_vs_sync_endpoints.html",
+  "title": "async def or def",
+  "cat": "FastAPI",
+  "q": [
+   {
+    "t": "Where does a `def` endpoint run?",
+    "o": [
+     "On the event loop",
+     "In a threadpool",
+     "In a subprocess",
+     "It is rejected"
+    ],
+    "a": 1,
+    "w": "Starlette moves it off the loop, which is why a blocking call inside a sync handler cannot stall other requests."
+   },
+   {
+    "t": "What happens with `async def` plus a blocking database call?",
+    "o": [
+     "An error",
+     "Nothing errors - the loop stalls and every other request waits",
+     "It runs in a thread anyway",
+     "It is faster"
+    ],
+    "a": 1,
+    "w": "The most common performance bug in FastAPI applications. It returns correctly and only fails under concurrency, where the symptom points nowhere useful."
+   },
+   {
+    "t": "Your handler makes no I/O calls at all. Which should you write?",
+    "o": [
+     "async def, it is more modern",
+     "def - a blocking call added later cannot stall the loop",
+     "Either, it never matters",
+     "Neither"
+    ],
+    "a": 1,
+    "w": "`async` is faster when it awaits. With nothing to await it gains nothing and leaves a trap for whoever adds a blocking call next."
+   },
+   {
+    "t": "An async handler depends on a `def` dependency. What happens?",
+    "o": [
+     "An error",
+     "The dependency runs in the threadpool; the handler stays on the loop",
+     "Both run on the loop",
+     "Both run in threads"
+    ],
+    "a": 1,
+    "w": "Each is placed by its own definition, so mixing is normal - and a dependency using a blocking driver should be `def` regardless of the handler."
    }
   ]
  },

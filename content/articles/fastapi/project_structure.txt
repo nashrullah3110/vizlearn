@@ -1,0 +1,470 @@
+title: Project Structure
+intro: How the pieces are arranged once the application is more than one file.
+
+## The layout
+
+Nothing here is clever, and that is the point.
+
+```
+app/
+  main.py            # create the app, register handlers, include routers
+  settings.py        # one validated model
+  dependencies.py    # what several routers share
+  routers/
+    modules.py
+    tracks.py
+  schemas/
+    modules.py       # ModuleCreate, ModuleUpdate, ModuleOut
+  services/
+    modules.py       # the work; imports nothing from fastapi
+```
+
+The test of a layout is whether somebody asked to add a field can guess which files to open. If the answer is "search for the word", the structure has stopped helping.
+
+
+## A router per resource
+
+The unit that scales. Each file owns one resource's paths and nothing else.
+
+```python-run
+from fastapi import APIRouter, FastAPI
+
+# routers/modules.py
+modules = APIRouter(prefix="/modules", tags=["modules"])
+
+@modules.get("")
+def list_modules(): return ["Vectors"]
+
+@modules.get("/{i}")
+def read(i: int): return {"id": i}
+
+# routers/tracks.py
+tracks = APIRouter(prefix="/tracks", tags=["tracks"])
+
+@tracks.get("")
+def list_tracks(): return ["maths"]
+
+# main.py - assembly, and nothing else
+app = FastAPI(title="VizLearn API", version="1.0.0")
+app.include_router(modules)
+app.include_router(tracks)
+
+c = TestClient(app)
+print(c.get("/modules").json(), c.get("/modules/7").json(), c.get("/tracks").json())
+print()
+for r in app.routes:
+    if getattr(r, "methods", None):
+        print("  %-6s %s" % (",".join(sorted(r.methods)), r.path))
+```
+
+## Handlers stay thin
+
+The handler translates HTTP; the service does the work and imports nothing from the framework.
+
+```python-run
+from fastapi import APIRouter, FastAPI, HTTPException
+from pydantic import BaseModel, Field
+
+# services/modules.py - no fastapi import anywhere in here
+class ModuleNotFound(Exception):
+    def __init__(self, i): self.i = i
+
+DB = {1: {"id": 1, "title": "Vectors"}}
+
+def get_module(i: int) -> dict:
+    if i not in DB:
+        raise ModuleNotFound(i)
+    return DB[i]
+
+def create_module(title: str) -> dict:
+    i = max(DB) + 1
+    DB[i] = {"id": i, "title": title}
+    return DB[i]
+
+# schemas/modules.py
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+
+# routers/modules.py
+router = APIRouter(prefix="/modules", tags=["modules"])
+
+@router.get("/{i}", response_model=ModuleOut)
+def read(i: int):
+    try:
+        return get_module(i)
+    except ModuleNotFound:
+        raise HTTPException(404, "No module %d" % i)
+
+@router.post("", response_model=ModuleOut, status_code=201)
+def create(body: ModuleIn):
+    return create_module(body.title)
+
+app = FastAPI(); app.include_router(router)
+c = TestClient(app)
+print(c.post("/modules", json={"title": "Norms"}).json())
+print(c.get("/modules/1").json())
+print("missing:", c.get("/modules/99").status_code)
+```
+
+## Domain errors mapped in one place
+
+Better than the try/except above: the service raises, and one handler decides the status.
+
+```python-run
+from fastapi import APIRouter, FastAPI, Request
+from fastapi.responses import JSONResponse
+
+class ModuleNotFound(Exception):
+    def __init__(self, i): self.i = i
+
+class TitleTaken(Exception):
+    def __init__(self, t): self.t = t
+
+DB, TITLES = {1: "Vectors"}, {"Vectors"}
+
+def get_module(i):
+    if i not in DB: raise ModuleNotFound(i)
+    return {"id": i, "title": DB[i]}
+
+def create_module(title):
+    if title in TITLES: raise TitleTaken(title)
+    TITLES.add(title); return {"id": 2, "title": title}
+
+router = APIRouter(prefix="/modules")
+
+@router.get("/{i}")
+def read(i: int): return get_module(i)          # no try/except
+
+@router.post("")
+def create(title: str): return create_module(title)
+
+app = FastAPI()
+app.include_router(router)
+
+@app.exception_handler(ModuleNotFound)
+async def nf(r: Request, e: ModuleNotFound):
+    return JSONResponse(status_code=404, content={"detail": "No module %d" % e.i})
+
+@app.exception_handler(TitleTaken)
+async def tt(r: Request, e: TitleTaken):
+    return JSONResponse(status_code=409, content={"detail": "%r exists" % e.t})
+
+c = TestClient(app)
+print(c.get("/modules/1").json())
+print("missing  :", c.get("/modules/99").status_code, c.get("/modules/99").json())
+print("duplicate:", c.post("/modules?title=Vectors").status_code)
+```
+
+## Settings in one model
+
+Configuration read once and validated, rather than <code>os.getenv</code> scattered through the routers.
+
+```python-run
+import os
+from fastapi import FastAPI
+from pydantic import BaseModel, Field, ValidationError
+
+class Settings(BaseModel):
+    app_name: str = "VizLearn API"
+    page_size: int = Field(default=20, ge=1, le=100)
+    debug: bool = False
+
+def load_settings(env: dict) -> Settings:
+    return Settings(**{k[3:].lower(): v for k, v in env.items()
+                       if k.startswith("VZ_")})
+
+good = load_settings({"VZ_PAGE_SIZE": "50", "VZ_DEBUG": "yes"})
+print("loaded :", good.model_dump())
+
+try:
+    load_settings({"VZ_PAGE_SIZE": "5000"})
+except ValidationError as e:
+    print("refused:", e.errors()[0]["msg"])
+
+app = FastAPI(title=good.app_name)
+@app.get("/config")
+def config(): return good.model_dump()
+print("served :", TestClient(app).get("/config").json())
+```
+
+## Dependencies shared across routers
+
+One module holding what several routers need, so the same rule is not written twice.
+
+```python-run
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
+
+# dependencies.py
+def current_user(x_token: str = Header(default="")):
+    if x_token != "tok":
+        raise HTTPException(401, "Sign in")
+    return {"name": "ada"}
+
+def pagination(limit: int = 10, offset: int = 0):
+    return {"limit": min(limit, 100), "offset": offset}
+
+# routers/modules.py
+modules = APIRouter(prefix="/modules", tags=["modules"])
+
+@modules.get("")
+def list_modules(page: dict = Depends(pagination)):
+    return {"page": page}
+
+# routers/account.py
+account = APIRouter(prefix="/account", tags=["account"],
+                    dependencies=[Depends(current_user)])
+
+@account.get("")
+def me(user: dict = Depends(current_user)):
+    return user
+
+app = FastAPI()
+app.include_router(modules); app.include_router(account)
+
+c = TestClient(app)
+print(c.get("/modules?limit=500").json())
+print("locked:", c.get("/account").status_code)
+print("open  :", c.request("GET", "/account", headers={"x-token": "tok"}).json())
+```
+
+## The whole shape, assembled
+
+Everything in one place so the arrangement is visible: settings, dependencies, services, schemas, routers, handlers.
+
+```python-run
+from fastapi import APIRouter, Depends, FastAPI, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+# --- settings ------------------------------------------------------------
+class Settings(BaseModel):
+    page_size: int = Field(default=2, ge=1, le=100)
+settings = Settings()
+
+# --- domain --------------------------------------------------------------
+class NotFound(Exception): pass
+STORE = {1: "Vectors", 2: "Norms", 3: "Loops"}
+def list_modules(limit): return list(STORE.items())[:limit]
+def get_module(i):
+    if i not in STORE: raise NotFound()
+    return {"id": i, "title": STORE[i]}
+
+# --- schemas -------------------------------------------------------------
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+
+# --- dependencies --------------------------------------------------------
+def page_limit(limit: int = None):
+    return limit or settings.page_size
+
+# --- routers -------------------------------------------------------------
+router = APIRouter(prefix="/modules", tags=["modules"])
+
+@router.get("")
+def index(limit: int = Depends(page_limit)):
+    return [{"id": i, "title": t} for i, t in list_modules(limit)]
+
+@router.get("/{i}", response_model=ModuleOut)
+def read(i: int):
+    return get_module(i)
+
+# --- assembly ------------------------------------------------------------
+app = FastAPI(title="VizLearn API", version="1.0.0")
+app.include_router(router)
+
+@app.exception_handler(NotFound)
+async def nf(r: Request, e: NotFound):
+    return JSONResponse(status_code=404, content={"detail": "Not found"})
+
+c = TestClient(app)
+print(c.get("/modules").json())
+print(c.get("/modules?limit=3").json())
+print(c.get("/modules/2").json())
+print("missing:", c.get("/modules/99").status_code)
+```
+## main.py should be boring
+
+It does four things: create the `FastAPI` instance, register exception handlers, include routers, add middleware.
+
+If it fits on a screen, it is the one place to answer "what does this application consist of?". If it grows business logic, that answer disappears.
+
+Two things commonly end up there and should not. **Settings** belong in their own module, because scattering `os.getenv` makes it impossible to see what the application needs to run. And **startup work** belongs in a lifespan rather than at import, because work done at import happens when a test collector imports the module.
+
+## Group by resource, inside a shallow layer structure
+
+Both options look reasonable and one degrades.
+
+Grouping by **resource** &mdash; `routers/modules.py`, `services/modules.py`, `schemas/modules.py` &mdash; means a change to one concept touches files with the same name in different directories. Easy to find, easy to review.
+
+Grouping by **layer alone**, with every router in one file, means those files grow without bound and every change collides with every other.
+
+Resource-first inside a shallow layer structure is what stays navigable. Two levels is plenty; deep package trees make imports long and tell you nothing extra.
+
+## Handlers translate, services do
+
+The most valuable boundary in the whole layout.
+
+A handler's job is HTTP: take validated input, call something, turn the result into a response. Everything else belongs in a service that knows nothing about the framework.
+
+The test is whether the service imports `fastapi`. If it raises `HTTPException`, it can only be used from a request &mdash; not from a background job, a management command, a scheduled task or a test. If it raises `ModuleNotFound`, it can be used from all of them, and one exception handler maps that to a 404 at the edge.
+
+That mapping is worth doing early. Retrofitting it means finding every `HTTPException` scattered through service code and deciding what each should have been, usually while changing something else.
+
+## Schemas by direction
+
+From the response-model module, and it belongs in the layout too.
+
+`ModuleCreate` takes what a caller may supply. `ModuleUpdate` has everything optional. `ModuleOut` declares what may be seen. Three small classes in one file, rather than one clever class with everything optional that documents nothing.
+
+Keeping them beside each other makes the differences visible, which is when people notice that the output model still contains a field it should not.
+
+## Dependencies in one module
+
+Several routers need the same ones &mdash; the session, the current user, pagination. A shared `dependencies.py` is where they are found.
+
+Reading that file should tell you what the application's endpoints are allowed to assume. That is a genuinely useful summary, and it is the same argument as the `types.py` from the Pydantic track.
+
+## Settings in one model
+
+A Pydantic model, read once, validated at startup:
+
+```python
+class Settings(BaseModel):
+    page_size: int = Field(default=20, ge=1, le=100)
+    debug: bool = False
+```
+
+Two benefits over reading the environment where it is needed. A missing or invalid value fails at startup with a message naming the field, rather than at request time in a handler. And the model is a list of everything the application needs to run, in one place, which is what a deployment checklist wants to be generated from.
+
+`pydantic-settings` does the environment reading properly, including `.env` files and nested configuration.
+
+## When to split
+
+Earlier than feels necessary.
+
+Create `routers/` on day one, even with two endpoints. Moving three routes is trivial; moving eighty means untangling imports and moving tests, and by then it does not happen and the file keeps growing.
+
+The same applies to the service boundary. Extracting the first service when there is one function is a two-minute job. Extracting the twentieth from handlers that have grown around them is a rewrite.
+
+## What this buys
+
+Each piece testable on its own: a router included into a small app, a service called as a plain function, a schema validated against a payload, settings constructed from a dict.
+
+A suite that needs "the module under test" rather than "a database, Redis and three environment variables" is the practical difference, and it comes almost entirely from where things were put.
+
+
+## Mistakes people make
+
+**Waiting to split.** Moving three routes is trivial; moving eighty is a rewrite that does not happen, so the file keeps growing.
+
+**Business logic in routers.** A router importing your ORM works and stops being testable without a database.
+
+**`HTTPException` in services.** The service can then only run inside a request - not from a job, a CLI or a test.
+
+**`os.getenv` scattered about.** Nothing then says what the application needs to run, and a bad value fails at request time instead of at startup.
+
+**Startup work at import.** Every test collector and linter pays for it.
+
+**Deep package trees.** Two levels is plenty. Long import paths tell you nothing extra.
+
+**Grouping only by layer.** One file with every router grows without bound and every change collides with every other.
+
+## The test of a layout
+
+Ask somebody new to add a field to one resource and watch what they do.
+
+If they open `schemas/modules.py`, `services/modules.py` and `routers/modules.py`, the structure is working. If they search the codebase for a string, it is not.
+
+That test matters more than any particular arrangement. A layout is a guess about where people will look, and the only evidence is whether they find it.
+
+## Where the track leaves you
+
+Routing, every source of input, the response and its status, errors, structure, the whole dependency system, the runtime, testing, the generated documentation and the shape of authentication.
+
+That is enough to build and maintain a real API. What is left is mostly not FastAPI &mdash; databases, deployment, observability, the operational parts &mdash; and each of those is easier to learn once the application layer underneath it is arranged so that it can be reasoned about one piece at a time.
+
+
+## Growing into it
+
+No project should start with the full layout, and none should wait for it.
+
+**Day one**: `main.py` and `routers/`. Two files, one router, room to grow.
+
+**When a handler grows past a few lines**: extract the service. That is the boundary worth defending earliest, because everything else follows from it.
+
+**When two routers need the same thing**: `dependencies.py`.
+
+**When a model appears in two places**: `schemas/`.
+
+**When configuration appears in two places**: `settings.py`.
+
+Each step is prompted by something real rather than anticipated, and each takes minutes at the moment it is prompted. The alternative - deferring all of them until the file is unmanageable - means doing them all at once, in a diff nobody can review.
+
+## What the layout is for
+
+Not tidiness. Testability, and the ability for somebody new to guess where things are.
+
+Those two are related: code that can be tested in isolation is code whose pieces have clear boundaries, and clear boundaries are what make a layout guessable. A structure that scores well on one usually scores well on the other, which is a convenient property when deciding whether an arrangement is worth the move.
+
+## Summary
+
+One router per resource in its own file, created on day one. Handlers translate HTTP and call services that import nothing from the framework, raising domain exceptions that one handler maps to statuses.
+
+Schemas separated by direction. Shared dependencies in one module. Settings in one validated model read at startup. And a `main.py` short enough to read in a screen, doing nothing but assembly.
+
+The value is not tidiness - it is that each piece becomes testable on its own, so the suite needs the module under test rather than the whole world.
+
+## Where the track leaves you
+
+Routing and the methods. Every source of input a request has, and what each is properly for. The response, its shape and its status. Errors, both automatic and raised. Structure, once one file stops being enough.
+
+The whole dependency system - declaring what an endpoint needs, composing those requirements, giving them a lifetime, applying them to a section, and replacing them at the edges.
+
+The runtime: where a handler runs and why the wrong choice is expensive, work after the response, and work once per process.
+
+And the practices: a suite that runs in seconds, a generated document consumers can build against, and the shape of authentication.
+
+That is enough to build and maintain a real API. What is left is largely not FastAPI - databases, deployment, observability, the operational parts - and each is easier once the layer underneath is arranged so it can be reasoned about a piece at a time.
+
+
+## A note on imports
+
+One practical detail that decides whether a layout survives.
+
+Circular imports are the failure mode of splitting an application up, and they come from the same place every time: a service importing something from a router, or a schema importing a service.
+
+The dependency direction should be one way. Routers import schemas and services. Services import schemas. Schemas import nothing of yours. Dependencies import schemas and services.
+
+Follow that and cycles are impossible. Break it once - a service that raises `HTTPException`, a schema that calls a service to validate - and the cycle appears later, from a direction nobody expected, usually while adding something unrelated.
+
+The domain-exception pattern is not only about testability. It is also what keeps the arrow pointing one way.
+
+
+## A closing thought
+
+None of this layout is FastAPI-specific, and none of it is new. Grouping by resource, keeping handlers thin, separating configuration, and assembling in a boring file are practices older than the framework.
+
+What FastAPI contributes is that following them is nearly free. A router is four lines. Inclusion is one. The documentation reorganises itself around your tags without being asked. A dependency is a default argument.
+
+When good structure costs almost nothing, the reason not to have it stops being effort and starts being habit - which is why the advice throughout this module is to do each piece earlier than it feels necessary.
+
+## What was left out, and why
+
+Three subjects have no module here, deliberately.
+
+**Middleware** and **streaming responses** need a real event loop with anyio task groups, which these pages cannot provide. Writing them with code that cannot run would have broken the property every other page on this track has.
+
+**WebSockets** need a real connection, which no amount of cleverness conjures in a browser tab.
+
+They are real parts of the framework and worth learning from the official documentation. The rest of this track runs, which is the trade that was chosen.
+
+## In one line
+
+One router per resource, services that never import the framework, schemas by direction, settings in one validated model, and an assembly file short enough to read at a glance - each introduced the moment it is prompted rather than once the file has become unmanageable.
+
+The arrow points one way - routers to services to schemas - and keeping it pointing that way is what prevents the circular imports that otherwise arrive from a direction nobody expected.

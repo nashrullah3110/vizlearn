@@ -7639,3 +7639,2926 @@ And the failure to watch for is silence: an override that targets a different ob
          "why": "Which is what makes a router-wide auth requirement testable; otherwise every test of every route in that section would need a valid credential."},
     ],
 )
+
+
+# ---------------------------------------------------------------------------
+# 20. async vs sync endpoints
+# ---------------------------------------------------------------------------
+topic(
+    "async_vs_sync_endpoints",
+    "async def or def",
+    "The Runtime",
+    "Where your handler runs, and the one mistake that turns a fast framework "
+    "into a slow one.",
+    _svg(_box(10, 18, 62, 24, S, A) + _txt(41, 34, "async def", A, 8) +
+         _txt(41, 56, "the event loop", M, 7) +
+         _box(88, 18, 62, 24, S) + _txt(119, 34, "def", M, 8) +
+         _txt(119, 56, "a threadpool", M, 7)),
+    [
+        ("Both are ordinary endpoints",
+         "The framework accepts either, and a caller cannot tell which you wrote. "
+         "The difference is where the function runs.",
+         '''from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/sync")
+def sync_endpoint():
+    return {"style": "def"}
+
+@app.get("/async")
+async def async_endpoint():
+    return {"style": "async def"}
+
+c = TestClient(app)
+print("sync :", c.get("/sync").status_code, c.get("/sync").json())
+print("async:", c.get("/async").status_code, c.get("/async").json())
+print()
+print("Identical from outside. The choice is about what the body does.")'''),
+
+        ("A sync handler is moved off the loop",
+         "Starlette sends a <code>def</code> endpoint to a threadpool, so a blocking "
+         "call in it cannot stall the loop.",
+         '''import threading
+from fastapi import FastAPI
+
+app = FastAPI()
+where = {}
+
+@app.get("/sync")
+def sync_endpoint():
+    where["sync"] = threading.current_thread().name
+    return {"thread": where["sync"]}
+
+@app.get("/async")
+async def async_endpoint():
+    where["async"] = threading.current_thread().name
+    return {"thread": where["async"]}
+
+c = TestClient(app)
+print("sync :", c.get("/sync").json())
+print("async:", c.get("/async").json())
+print()
+print("In a real server these differ: the sync one runs on a worker thread,")
+print("the async one on the thread owning the event loop.")'''),
+
+        ("The mistake",
+         "<code>async def</code> plus a blocking call. Nothing errors, and every "
+         "other request in the process waits for it.",
+         '''from fastapi import FastAPI
+
+app = FastAPI()
+
+def slow_blocking_call():
+    total = 0
+    for i in range(200_000):        # stands in for a synchronous DB driver
+        total += i
+    return total
+
+@app.get("/wrong")
+async def wrong():                  # async, but blocks the loop
+    return {"total": slow_blocking_call()}
+
+@app.get("/right")
+def right():                        # sync, so it runs off the loop
+    return {"total": slow_blocking_call()}
+
+c = TestClient(app)
+print("both return the same thing:")
+print("  /wrong:", c.get("/wrong").json())
+print("  /right:", c.get("/right").json())
+print()
+print("Only one of them let the server keep serving while it worked.")'''),
+
+        ("Awaiting inside an async handler",
+         "An <code>async def</code> endpoint earns its keep when it awaits &mdash; "
+         "the loop runs something else while it waits.",
+         '''from fastapi import FastAPI
+
+app = FastAPI()
+order = []
+
+async def fetch(name):
+    order.append("start " + name)
+    value = await lookup(name)          # awaiting another coroutine
+    order.append("done " + name)
+    return value
+
+async def lookup(name):
+    return name.upper()
+
+@app.get("/chain")
+async def chain():
+    a = await fetch("a")
+    b = await fetch("b")
+    return {"results": [a, b], "order": list(order)}
+
+print(TestClient(app).get("/chain").json())
+print()
+print("An async handler awaiting async functions, all the way down.")
+print()
+print("Real interleaving - asyncio.gather over calls that actually wait -")
+print("needs a running event loop, which this page does not have. The")
+print("shape is the same; the concurrency is what a server adds.")'''),
+
+        ("Dependencies follow the same rule",
+         "A <code>def</code> dependency goes to the threadpool and an "
+         "<code>async def</code> one runs on the loop, independently of the handler.",
+         '''import threading
+from fastapi import Depends, FastAPI
+
+app = FastAPI()
+
+def sync_dep():
+    return {"dep": "sync", "thread": threading.current_thread().name}
+
+async def async_dep():
+    return {"dep": "async", "thread": threading.current_thread().name}
+
+@app.get("/mixed")
+async def mixed(a: dict = Depends(sync_dep), b: dict = Depends(async_dep)):
+    return {"a": a["dep"], "b": b["dep"]}
+
+print(TestClient(app).get("/mixed").json())
+print()
+print("An async handler may depend on a sync dependency and the reverse.")
+print("Each is placed by its own definition, not by the handler's.")'''),
+
+        ("Choosing, mechanically",
+         "One question decides it: does the body await anything?",
+         '''from fastapi import FastAPI
+
+app = FastAPI()
+
+# Awaits something -> async def.
+async def load():
+    return "loaded"
+
+@app.get("/awaits")
+async def awaits():
+    await load()
+    return {"rule": "awaits something -> async def"}
+
+# Blocks -> def, and let the threadpool have it.
+@app.get("/blocks")
+def blocks():
+    sum(range(50_000))
+    return {"rule": "blocking call -> def"}
+
+# Neither -> either works; def is the safer default.
+@app.get("/neither")
+def neither():
+    return {"rule": "pure computation, no I/O -> def is fine"}
+
+c = TestClient(app)
+for p in ["/awaits", "/blocks", "/neither"]:
+    print(c.get(p).json())'''),
+    ],
+    [
+        "A <code>def</code> endpoint runs in a threadpool; an <code>async def</code> one runs on the event loop. Callers cannot tell the difference.",
+        "The mistake is <code>async def</code> with a blocking call inside: nothing errors, and every other request in the process waits.",
+        "If a handler <strong>awaits</strong> something, write <code>async def</code>. If it makes a blocking call, write <code>def</code> and let the threadpool take it.",
+        "When it does neither, <code>def</code> is the safer default &mdash; a blocking call added later cannot stall the loop.",
+        "Dependencies are placed by their own definition, so an async handler can depend on a sync dependency and the reverse.",
+        "The threadpool is finite. A great many slow sync handlers exhaust it, which is a different limit from stalling the loop and looks similar from outside.",
+        "The editors here run without a live event loop, so an <code>await</code> that genuinely suspends &mdash; <code>asyncio.sleep</code>, a real network call &mdash; cannot be demonstrated. Awaiting coroutines that complete works, and is the same shape.",
+    ],
+    '''
+title: async def or def
+intro: Where your handler runs, and the one mistake that turns a fast framework into a slow one.
+
+## Two placements, one interface
+
+FastAPI accepts both:
+
+```python
+@app.get("/a")
+def handler(): ...
+
+@app.get("/b")
+async def handler(): ...
+```
+
+A caller cannot tell the difference. The response is the same, the documentation is the same, validation is the same.
+
+What differs is **where the function runs**. An `async def` endpoint is awaited directly on the event loop, in the same thread that is handling every other concurrent request. A `def` endpoint is handed to a threadpool, so the loop is free while it works.
+
+That single fact explains everything else in this module.
+
+## Why an event loop is fast
+
+An ASGI server handles many requests in one thread by never waiting. When a handler awaits a database query, the loop parks it and runs something else. Thousands of requests can be in flight with almost none of them consuming anything but memory.
+
+That works because awaiting yields control. It stops working the moment something does not.
+
+## The mistake
+
+```python
+@app.get("/users")
+async def users():
+    return db.query(User).all()      # a blocking driver
+```
+
+This looks modern and is the single most common performance bug in FastAPI applications.
+
+The function is `async`, so it runs on the loop. The query is synchronous, so it does not yield. For the entire duration of that query the loop is stuck: no other request progresses, no other handler runs, no keepalive is answered. One slow query has stopped the whole process.
+
+Nothing errors. The endpoint returns correctly. It is only under concurrency that the application turns out to handle one request at a time, and the symptom &mdash; everything is slow when the system is busy &mdash; points nowhere useful.
+
+The fix is one keyword:
+
+```python
+@app.get("/users")
+def users():
+    return db.query(User).all()
+```
+
+Now Starlette runs it in a threadpool and the loop keeps going.
+
+## The rule
+
+**Does the body await anything?**
+
+Yes &mdash; `async def`. An async database driver, an async HTTP client, `asyncio.sleep`, another async function.
+
+No, and it blocks &mdash; `def`. A synchronous driver, `requests`, file I/O, a CPU-bound computation.
+
+Neither &mdash; either works, and `def` is the safer default, because a blocking call added later cannot stall anything.
+
+The rule to distrust is "async is faster". Async is faster *when it awaits*. An async handler that blocks is slower than the sync version of the same code, because it takes the whole process with it.
+
+## Dependencies follow their own definition
+
+A dependency is placed by how *it* is written, not by the handler.
+
+So an `async def` handler can depend on a `def` dependency &mdash; the dependency goes to the threadpool, the handler stays on the loop &mdash; and the reverse works too. Mixing is normal and correct.
+
+The same rule applies to each: if the dependency opens a connection with a blocking driver, it should be `def`.
+
+## The threadpool is finite
+
+Sync handlers are safe for the loop and not free. Starlette's threadpool has a limited number of workers &mdash; a few dozen by default.
+
+If every request is a slow sync handler, those threads fill up and further requests queue waiting for one. The loop is healthy and the application is still stuck, which looks similar from outside and has a different cause.
+
+That is the real argument for async drivers under high concurrency: not that the syntax is better, but that awaiting costs a coroutine and blocking costs a thread, and there are far more coroutines available than threads.
+
+For most applications, the threadpool is entirely adequate and the simplicity of sync code is worth more than the ceiling.
+
+## Do not mix them badly
+
+Two specific things to avoid.
+
+**Calling a sync function that blocks from inside an async handler.** That is the mistake above wearing a different hat. If you must, `await run_in_threadpool(fn)` moves it off the loop explicitly.
+
+**Calling `asyncio.run()` inside a handler.** There is already a loop running; starting another raises. To call an async function from a sync handler, the honest answer is usually to make the handler async.
+
+## Being consistent
+
+An application that is mostly sync and mostly fast is a perfectly good application. So is one that is async throughout with async drivers.
+
+What causes trouble is a codebase where the choice was made per handler by whoever wrote it, without a rule &mdash; because then nobody can tell whether a given endpoint is safe to add a blocking call to, and eventually somebody adds one to the wrong sort.
+
+Pick a default, write it down, and make the exception deliberate.
+
+
+## Mistakes people make
+
+**`async def` with a blocking call.** The one that matters. Nothing errors and the whole process serves one request at a time under load, with a symptom - everything is slow when busy - that points nowhere useful.
+
+**Assuming async is faster.** Async is faster when it awaits. An async handler that blocks is worse than the sync version, because it takes every concurrent request with it.
+
+**`asyncio.run()` inside a handler.** There is already a loop; starting another raises. To call an async function from a sync handler, make the handler async.
+
+**Mixing drivers without noticing.** An async endpoint using a synchronous ORM is the same bug wearing different clothes. If the driver blocks, the endpoint should be `def`.
+
+**Ignoring the threadpool ceiling.** Sync handlers are safe for the loop and finite in number. Enough slow ones exhaust the pool, which looks the same from outside and has a different cause.
+
+**Choosing per handler with no rule.** Then nobody can tell whether a given endpoint is safe to add a blocking call to, and eventually somebody adds one to the wrong sort.
+
+## Diagnosing it
+
+Two symptoms distinguish the failures.
+
+**The loop is stalled**: latency rises across every endpoint at once, including trivial ones, and a health check that does nothing takes seconds. Something async is blocking.
+
+**The threadpool is full**: the fast endpoints stay fast while requests to slow sync ones queue. The loop is fine; the workers are all busy.
+
+The fix differs. The first needs the blocking call moved off the loop - change `async def` to `def`, or wrap it in `run_in_threadpool`. The second needs fewer slow synchronous operations, more workers, or async drivers.
+
+## Next
+
+Work that should happen after the response has been sent, which is what background tasks are for.
+
+## Being consistent
+
+An application that is mostly sync and mostly fast is a perfectly good application. So is one that is async throughout with async drivers. Both scale further than most services ever need.
+
+What causes trouble is a codebase where the choice was made per handler by whoever wrote it. Then nobody can look at an endpoint and tell whether adding a blocking call to it is safe, and eventually somebody adds one to the wrong sort.
+
+Pick a default, write it in the project's README, and make the exception deliberate. "Sync unless it awaits" is a fine rule. So is "async everywhere, and every driver must be async". The rule matters more than which one.
+
+
+## Where the ceilings are
+
+Two limits, and telling them apart is most of diagnosing a slow FastAPI service.
+
+**The loop** is stalled by any blocking call in an `async def` handler or dependency. One slow query stops every concurrent request in that process. The symptom is that everything gets slow at once, including endpoints that do nothing.
+
+**The threadpool** is exhausted by enough concurrent `def` handlers. The loop stays healthy and fast endpoints stay fast, while requests to slow ones queue for a worker.
+
+The first is a bug and the fix is free: move the blocking call off the loop. The second is a capacity limit, and the fixes are real - fewer slow synchronous operations, more workers, or async drivers so waiting costs a coroutine rather than a thread.
+
+Knowing which you have takes one observation: does a trivial endpoint also get slow? If yes, the loop. If no, the pool.
+
+## What async actually buys
+
+Worth stating plainly, because "async is faster" is both common and wrong.
+
+Async does not make any single request faster. A query takes as long either way.
+
+What it changes is how many requests one process can have **in flight** while waiting. With threads, waiting costs a thread and there are hundreds available. With coroutines, waiting costs a few kilobytes and there are hundreds of thousands available.
+
+For an API that spends most of its time waiting on other systems - which is most APIs - that is the difference between a machine handling a few hundred concurrent requests and one handling many thousands. It is a concurrency win, not a latency one, and only if the waiting is done by awaiting.
+
+## Summary
+
+`def` runs in a threadpool; `async def` runs on the event loop. Callers cannot tell.
+
+Write `async def` when the body awaits, `def` when it blocks, and `def` by default when it does neither - because a blocking call added later cannot then stall anything.
+
+Dependencies are placed by their own definition, so mixing is normal. And remember there are two ceilings: the loop, which one blocking call can stall, and the threadpool, which enough slow sync handlers can exhaust.
+
+## Next
+
+Work that should happen after the response has been sent - what background tasks are for, what they are not, and the point at which they need to become a real queue.
+
+
+## The rule, once more
+
+Awaits something, `async def`. Blocks, `def`. Neither, `def`.
+
+That covers essentially every case, and the reason the third clause defaults to `def` is that it is the only one that stays correct when somebody later adds a blocking call to a handler that used to do nothing much.
+
+
+## A closing thought
+
+This is the one place where FastAPI will let you write something that looks right, passes every test, and fails only under load.
+
+Nothing warns about `async def` around a blocking call. The endpoint is correct, the tests pass because they run one request at a time, and the problem appears in production as generalised slowness with no obvious cause.
+
+That asymmetry - easy to write, hard to notice, expensive to diagnose - is why it is worth knowing the rule properly rather than choosing by habit.
+
+## One more diagnostic
+
+If a service is slow and you are not sure which ceiling you have hit, the cheapest test is an endpoint that does nothing:
+
+```python
+@app.get("/ping")
+def ping():
+    return {"ok": True}
+```
+
+Under load, hit it. If it is fast while other endpoints crawl, the loop is healthy and the threadpool is saturated. If it is also slow, something is blocking the loop.
+
+That single observation separates a capacity problem from a bug, and the two have entirely different fixes.
+
+## In one line
+
+`async def` when the body awaits, `def` when it blocks, `def` by default when it does neither - because that is the only choice that stays correct when somebody adds a blocking call later.
+
+And if a service is slow and you cannot tell which ceiling you hit, hit an endpoint that does nothing: if it is fast, the pool is full; if it is slow, the loop is blocked.
+''',
+    [
+        {"q": "Where does a `def` endpoint run?",
+         "options": ["On the event loop", "In a threadpool", "In a subprocess", "It is rejected"],
+         "answer": 1,
+         "why": "Starlette moves it off the loop, which is why a blocking call inside a sync handler cannot stall other requests."},
+        {"q": "What happens with `async def` plus a blocking database call?",
+         "options": ["An error", "Nothing errors - the loop stalls and every other request waits", "It runs in a thread anyway", "It is faster"],
+         "answer": 1,
+         "why": "The most common performance bug in FastAPI applications. It returns correctly and only fails under concurrency, where the symptom points nowhere useful."},
+        {"q": "Your handler makes no I/O calls at all. Which should you write?",
+         "options": ["async def, it is more modern", "def - a blocking call added later cannot stall the loop", "Either, it never matters", "Neither"],
+         "answer": 1,
+         "why": "`async` is faster when it awaits. With nothing to await it gains nothing and leaves a trap for whoever adds a blocking call next."},
+        {"q": "An async handler depends on a `def` dependency. What happens?",
+         "options": ["An error", "The dependency runs in the threadpool; the handler stays on the loop", "Both run on the loop", "Both run in threads"],
+         "answer": 1,
+         "why": "Each is placed by its own definition, so mixing is normal - and a dependency using a blocking driver should be `def` regardless of the handler."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 21. Background tasks
+# ---------------------------------------------------------------------------
+topic(
+    "background_tasks",
+    "Background Tasks",
+    "The Runtime",
+    "Work that should happen after the response has gone - and the point at which "
+    "it needs a real queue instead.",
+    _svg(_box(12, 16, 60, 20, S) + _txt(42, 30, "handler", M, 8) +
+         _arrow(76, 26, 90, 26) + _box(94, 16, 54, 20, S, A) + _txt(121, 30, "response", A, 8) +
+         _arrow(42, 40, 42, 54) + _box(12, 56, 60, 20, S) + _txt(42, 70, "task runs", M, 8)),
+    [
+        ("Declare it and add to it",
+         "A <code>BackgroundTasks</code> parameter gives you something to schedule "
+         "on. The task runs after the response is produced.",
+         '''from fastapi import BackgroundTasks, FastAPI
+
+app = FastAPI()
+sent = []
+
+def send_welcome(email: str):
+    sent.append(email)
+
+@app.post("/signup", status_code=201)
+def signup(email: str, tasks: BackgroundTasks):
+    tasks.add_task(send_welcome, email)
+    return {"queued": True}
+
+c = TestClient(app)
+print("response:", c.post("/signup?email=ada@vizlearn.in").json())
+print("sent    :", sent)
+print()
+print("The caller got 201 without waiting for the mail to be handled.")'''),
+
+        ("The response goes first",
+         "Ordering is the whole point: the client is answered, then the task runs.",
+         '''from fastapi import BackgroundTasks, FastAPI
+
+app = FastAPI()
+order = []
+
+def after():
+    order.append("task")
+
+@app.get("/x")
+def x(tasks: BackgroundTasks):
+    order.append("handler")
+    tasks.add_task(after)
+    order.append("returning")
+    return {"order_so_far": list(order)}
+
+r = TestClient(app).get("/x")
+print("body seen by the client:", r.json())
+print("order after everything  :", order)'''),
+
+        ("Several tasks, in order",
+         "They run one after another, in the order added &mdash; not concurrently.",
+         '''from fastapi import BackgroundTasks, FastAPI
+
+app = FastAPI()
+log = []
+
+def step(name):
+    log.append(name)
+
+@app.post("/publish")
+def publish(tasks: BackgroundTasks):
+    tasks.add_task(step, "reindex")
+    tasks.add_task(step, "notify")
+    tasks.add_task(step, "audit")
+    return {"queued": 3}
+
+print(TestClient(app).post("/publish").json())
+print("ran:", log)
+print()
+print("Sequential. A slow first task delays the second.")'''),
+
+        ("Arguments are passed through",
+         "Positional and keyword arguments both work, and the values are captured "
+         "when the task is added.",
+         '''from fastapi import BackgroundTasks, FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+records = []
+
+def audit(action: str, module_id: int, actor: str = "system"):
+    records.append({"action": action, "module": module_id, "actor": actor})
+
+class ModuleIn(BaseModel):
+    title: str
+
+@app.post("/modules/{i}", status_code=201)
+def create(i: int, body: ModuleIn, tasks: BackgroundTasks):
+    tasks.add_task(audit, "create", i, actor="ada")
+    tasks.add_task(audit, "index", i)
+    return {"id": i, "title": body.title}
+
+print(TestClient(app).post("/modules/7", json={"title": "Vectors"}).json())
+for r in records:
+    print(" ", r)'''),
+
+        ("A task that raises",
+         "The response has already gone, so the failure cannot reach the caller. "
+         "Catch it inside the task.",
+         '''from fastapi import BackgroundTasks, FastAPI
+
+app = FastAPI()
+LOG = []
+
+def risky(name):
+    try:
+        raise RuntimeError("could not deliver to %s" % name)
+    except RuntimeError as e:
+        LOG.append("handled: %s" % e)      # log it; nobody is listening
+
+@app.post("/notify", status_code=202)
+def notify(tasks: BackgroundTasks):
+    tasks.add_task(risky, "ada")
+    return {"accepted": True}
+
+r = TestClient(app).post("/notify")
+print("client saw:", r.status_code, r.json())
+print("log       :", LOG)
+print()
+print("202 means accepted, not finished - which is the honest status here.")'''),
+
+        ("They can be added from a dependency",
+         "Anything with a <code>BackgroundTasks</code> parameter can schedule work, "
+         "so cross-cutting jobs need not touch the handler.",
+         '''from fastapi import BackgroundTasks, Depends, FastAPI, Header
+
+app = FastAPI()
+trail = []
+
+def record_request(tasks: BackgroundTasks, x_actor: str = Header(default="anon")):
+    tasks.add_task(trail.append, "seen %s" % x_actor)
+
+@app.get("/a", dependencies=[Depends(record_request)])
+def a(): return {"route": "a"}
+
+@app.get("/b", dependencies=[Depends(record_request)])
+def b(): return {"route": "b"}
+
+c = TestClient(app)
+c.request("GET", "/a", headers={"x-actor": "ada"})
+c.request("GET", "/b")
+print("trail:", trail)'''),
+    ],
+    [
+        "Declare a <code>BackgroundTasks</code> parameter and call <code>add_task(fn, *args, **kwargs)</code>. The task runs after the response is produced.",
+        "Tasks run <strong>in the same process</strong>, sequentially, in the order added &mdash; not concurrently and not on another machine.",
+        "A task that raises cannot tell the caller: the response has gone. Catch and log inside the task.",
+        "Dependencies can add tasks too, so cross-cutting work does not have to touch the handler.",
+        "Anything slow blocks a worker for its duration, and anything in flight is lost if the process restarts.",
+        "Use them for short, non-critical, fire-and-forget work. Anything that must not be lost belongs in a real queue.",
+    ],
+    '''
+title: Background Tasks
+intro: Work that should happen after the response has gone, and the point at which it needs a real queue instead.
+
+## The mechanism
+
+```python
+@app.post("/signup", status_code=201)
+def signup(email: str, tasks: BackgroundTasks):
+    tasks.add_task(send_welcome, email)
+    return {"queued": True}
+```
+
+Declare a `BackgroundTasks` parameter, add callables to it, and they run once the response has been produced.
+
+The caller is not waiting for the welcome email. That is the entire value: a request that must do something slow and inessential can answer immediately and do it afterwards.
+
+## Ordering, precisely
+
+The response is produced and sent, then the tasks run, in the order they were added, one after another.
+
+Not concurrently. A slow first task delays the second, and both delay nothing that the client can see &mdash; but they do occupy the worker.
+
+For a sync handler the tasks run in the threadpool; for an async one they run on the loop. The same rule as endpoints applies to a task's own body: a blocking task added by an async handler blocks the loop, after the response, which is easy to miss precisely because nothing appears slow to the caller.
+
+## What they are not
+
+This is the part that matters, and it is where people get hurt.
+
+**They are not durable.** Tasks live in memory in the current process. If the process restarts &mdash; a deploy, a crash, a scale-down &mdash; anything queued is gone, with no record that it existed.
+
+**They are not distributed.** They run in the process that served the request, on the same machine, consuming its capacity.
+
+**They are not retried.** A task that fails has failed. There is no backoff, no dead-letter queue, no visibility.
+
+**They are not observable.** Nothing tracks how many are pending or how long they take unless you build it.
+
+So the honest description is: a convenient way to do a *short, non-critical* piece of work after responding.
+
+## When to use a real queue
+
+Move to Celery, RQ, Dramatiq, or a cloud queue when any of these is true.
+
+The work **must not be lost** &mdash; a payment confirmation, an audit record, anything a user would notice the absence of.
+
+The work is **slow** &mdash; more than a second or two. A background task occupies a worker, and enough of them starve the pool exactly as slow handlers do.
+
+The work should be **retried** on failure.
+
+The work should **scale separately** from the web tier, or run on different hardware.
+
+You need to **see** the queue &mdash; depth, failures, latency.
+
+The rule of thumb: a background task is for work whose loss would be an inconvenience. Anything whose loss would be a bug belongs somewhere durable.
+
+Good uses: writing a log line, warming a cache, sending a non-critical notification, cleaning up a temporary file, firing an analytics event.
+
+## Failure
+
+A task that raises cannot report to the caller, because the caller already has their response. The exception surfaces in the server logs and nowhere else.
+
+So catch inside the task, and log deliberately. A bare exception in a background task is a silent failure by construction.
+
+If the work has a meaningful failure the client should learn about, it is not a background task &mdash; it is either part of the request, or a job with a status the client can poll.
+
+## The right status code
+
+An endpoint that queues work rather than completing it is a good candidate for **202 Accepted** rather than 200 or 201.
+
+202 says exactly what happened: the request was understood and accepted, and it is not finished. If there is anything to poll, the body should say where.
+
+Returning 201 for something that has not been created yet is a small lie that a client may act on.
+
+## From a dependency
+
+Any callable that can declare parameters can declare `BackgroundTasks`, which includes dependencies.
+
+That is a tidy way to attach cross-cutting after-the-fact work &mdash; an audit trail, a metrics event &mdash; to a whole router without touching a single handler. The dependency schedules; the handlers stay unaware.
+
+
+## Mistakes people make
+
+**Treating them as durable.** They live in memory in the serving process. A deploy discards everything queued, with no record it existed.
+
+**Putting something important in one.** A payment confirmation, an audit record, anything a user would notice missing. Loss is invisible and unrecoverable.
+
+**Long-running work.** A background task occupies a worker for its duration. Enough of them starve the pool exactly as slow handlers do.
+
+**Letting exceptions escape.** The response has gone, so the failure reaches the logs and nobody else. Catch and log inside the task.
+
+**Blocking the loop from an async handler.** A synchronous task added by an async endpoint runs on the loop after the response - stalling everything, while appearing fast to the caller who already left.
+
+**Returning 201 for queued work.** It says something was created. 202 says it was accepted and is not finished, which is what actually happened.
+
+## The line
+
+A background task is for work whose **loss would be an inconvenience**. Anything whose loss would be a bug belongs in a durable queue.
+
+Good: a log line, a cache warm, a non-critical notification, a temporary file cleaned up, an analytics event.
+
+Not: anything with money in it, anything a user is told happened, anything that must be retried, anything that takes more than a second or two.
+
+The upgrade path is Celery, RQ, Dramatiq or a cloud queue, and the moment to take it is when you first find yourself hoping a task did not get lost.
+
+## Next
+
+Work that happens once per process rather than once per request: startup and shutdown, and where a connection pool actually belongs.
+
+## Where it fits
+
+Background tasks sit between doing the work in the request and running a real queue, and the band they occupy is narrower than it first appears.
+
+Above them: anything durable, retried, observable, slow, or scaled separately. That is a queue, and reaching for one is not over-engineering once the work matters.
+
+Below them: anything the caller needs the result of. That belongs in the request, and if it is slow the honest answer is 202 with something to poll rather than a background task and a hopeful 200.
+
+What is left is genuinely useful - the log line, the cache warm, the notification nobody will chase - and for that they are exactly right, cost nothing to adopt, and need no infrastructure at all.
+
+
+## A worked upgrade path
+
+The moment to leave background tasks behind is recognisable, and the move is smaller than it looks.
+
+**Stage one** is what this module describes: `tasks.add_task(send_welcome, email)`. No infrastructure, no configuration, and the work is lost on restart.
+
+**Stage two** keeps the same call site and changes what it does. The task becomes `enqueue(send_welcome, email)`, writing a row to a jobs table or a message to a queue. The endpoint is unchanged; the durability arrives underneath it.
+
+**Stage three** is a worker process consuming that queue, with retries, backoff and a dead-letter path for what keeps failing.
+
+Writing stage one so the call site is a single function - not five lines of task construction inline - is what makes stage two a small change rather than a rewrite of every endpoint.
+
+## What the caller should be told
+
+An endpoint that queues work owes the caller two things.
+
+An honest status: **202 Accepted**, not 200 or 201, because nothing is finished.
+
+Somewhere to look, when there is anything to look at. A job id and a `GET /jobs/{id}` is the conventional shape, and it turns "we will get to it" into something a client can act on.
+
+Without those, the caller assumes completion. That assumption is fine for a log line and wrong for anything they will ask about later.
+
+## Summary
+
+Declare `BackgroundTasks`, call `add_task`, and the work happens after the response.
+
+They run in the same process, sequentially, without retries, and are lost on restart. Catch exceptions inside them because nobody is listening. Return 202 when queueing rather than completing. And move to a real queue the first time you find yourself hoping a task did not get lost.
+
+## Next
+
+Work that happens once per process rather than once per request: startup and shutdown, where a connection pool actually belongs, and why anything that must happen exactly once for the application does not belong there either.
+
+
+## The honest summary
+
+Background tasks are a small, sharp tool with a narrow band of good uses.
+
+They cost nothing to adopt, need no infrastructure, and remove genuinely inessential work from the request path. For a log line, a cache warm or a notification nobody will chase, they are exactly right.
+
+They are also in-memory, in-process, sequential, unretried, unobserved and lost on restart. Every one of those is fine for the uses above and disqualifying for anything else.
+
+The failure is not using them; it is using them for something that matters and discovering the properties afterwards, usually when somebody asks why a confirmation never arrived and there is no record that it was ever attempted.
+
+
+## A closing thought
+
+The value of background tasks is that they exist at all, for free, with no infrastructure.
+
+Most applications have a handful of things that genuinely should not delay a response and genuinely do not matter enough to build a queue for. Before this feature the choice was to do them in the request anyway, or to introduce a broker for something trivial.
+
+Knowing exactly what they guarantee - which is very little - is what makes them safe to use for that handful, and what stops them being reached for when the guarantee matters.
+
+## One more consideration
+
+Background tasks share the process with the requests they follow, which means they share its limits.
+
+A sync task added by a sync handler runs in the threadpool, occupying a worker that could have served a request. A sync task added by an *async* handler runs on the loop, after the response - stalling every other request in the process while appearing perfectly fast to the caller who has already left.
+
+That second case is worth watching for, because nothing about it looks slow from outside. The endpoint's latency is fine; everything else in the process degrades, and the cause is code that runs after the thing you were measuring.
+
+The rule from the async module applies unchanged: if the task blocks, it should not be running on the loop.
+
+## In one line
+
+A background task is in-memory, in-process, sequential, unretried and lost on restart - which makes it exactly right for the log line and exactly wrong for the confirmation email, and the whole skill is telling those apart before rather than after.
+
+The tell that you have crossed the line is simple: if you would be uncomfortable telling a user "we may have lost this and cannot check", the work does not belong in a background task. That sentence is precisely what the feature guarantees.
+
+A last practical note: write the call site as one function - `enqueue(fn, *args)` rather than task construction spread through the handler. If the work later needs a real queue, that is a one-line change in one place instead of an edit to every endpoint that scheduled anything.
+''',
+    [
+        {"q": "When does a background task run?",
+         "options": ["Before the handler", "Concurrently with the handler", "After the response has been produced", "On the next request"],
+         "answer": 2,
+         "why": "That ordering is the point - the caller is answered without waiting for the slow, inessential part."},
+        {"q": "The process restarts with tasks queued. What happens to them?",
+         "options": ["They are retried", "They are lost, with no record", "They move to another worker", "They run at startup"],
+         "answer": 1,
+         "why": "Tasks live in memory in the serving process. That is why anything whose loss would be a bug belongs in a durable queue instead."},
+        {"q": "A background task raises. What does the caller see?",
+         "options": ["A 500", "Nothing - the response was already sent", "A retry", "A 202"],
+         "answer": 1,
+         "why": "The failure cannot reach them, so it is silent by construction unless the task catches and logs it deliberately."},
+        {"q": "Which status code best fits an endpoint that queues work?",
+         "options": ["200", "201", "202 Accepted", "204"],
+         "answer": 2,
+         "why": "202 says the request was accepted and is not finished. Returning 201 for something not yet created is a small lie a client may act on."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 22. Lifespan events
+# ---------------------------------------------------------------------------
+topic(
+    "lifespan_events",
+    "Lifespan Events",
+    "The Runtime",
+    "Work that happens once per process rather than once per request - and where a "
+    "connection pool actually belongs.",
+    _svg(_box(20, 12, 120, 18, S, A) + _txt(80, 25, "startup", A, 8) +
+         _arrow(80, 32, 80, 42) +
+         _box(20, 44, 120, 18, S) + _txt(80, 57, "serving requests", M, 8) +
+         _arrow(80, 64, 80, 74) +
+         _box(20, 76, 120, 16, S, A) + _txt(80, 88, "shutdown", A, 8)),
+    [
+        ("The lifespan protocol, driven by hand",
+         "A server sends the app a startup message before serving and a shutdown "
+         "message after. This is that, without the server.",
+         '''from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+events = []
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    events.append("startup")
+    yield                       # the application serves requests here
+    events.append("shutdown")
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/x")
+def x():
+    return {"events": list(events)}
+
+def run_lifespan(app, phase):
+    """Send one lifespan message, the way uvicorn would."""
+    msgs = []
+    async def receive(): return {"type": "lifespan." + phase}
+    async def send(m):   msgs.append(m["type"])
+    drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+    return msgs
+
+print("startup :", run_lifespan(app, "startup"), events)
+print("request :", TestClient(app).get("/x").json())
+print("shutdown:", run_lifespan(app, "shutdown"), events)'''),
+
+        ("Sharing state with the handlers",
+         "Anything created at startup is put where handlers can reach it &mdash; "
+         "<code>app.state</code> is the conventional place.",
+         '''from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request
+
+opened = []
+
+class Pool:
+    def __init__(self): opened.append("pool"); self.n = 0
+    def query(self): self.n += 1; return "rows(%d)" % self.n
+    def close(self): opened.append("closed")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.pool = Pool()
+    yield
+    app.state.pool.close()
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/rows")
+def rows(request: Request):
+    return {"rows": request.app.state.pool.query()}
+
+def cycle(app, phase):
+    async def receive(): return {"type": "lifespan." + phase}
+    async def send(m): pass
+    drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+
+cycle(app, "startup")
+c = TestClient(app)
+print(c.get("/rows").json())
+print(c.get("/rows").json(), "<- same pool, second query")
+cycle(app, "shutdown")
+print("lifecycle:", opened)'''),
+
+        ("A dependency hands it to the handler",
+         "Reaching through <code>request.app.state</code> works and reads poorly. A "
+         "dependency gives the handler the thing itself.",
+         '''from contextlib import asynccontextmanager
+from fastapi import Depends, FastAPI, Request
+
+class Pool:
+    def query(self): return ["Vectors", "Norms"]
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.pool = Pool()
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+def get_pool(request: Request) -> Pool:
+    return request.app.state.pool
+
+@app.get("/modules")
+def modules(pool: Pool = Depends(get_pool)):
+    return {"rows": pool.query()}
+
+async def receive(): return {"type": "lifespan.startup"}
+async def send(m): pass
+drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+
+print(TestClient(app).get("/modules").json())
+print()
+print("The handler never mentions app.state, so it is trivial to override.")'''),
+
+        ("Per process, not per request",
+         "The startup body runs once however many requests arrive. That is the "
+         "distinction that decides what belongs here.",
+         '''from contextlib import asynccontextmanager
+from fastapi import Depends, FastAPI, Request
+
+built = []
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    built.append("pool")                 # once
+    app.state.pool = {"id": len(built)}
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+def session(request: Request):
+    return {"pool": request.app.state.pool, "session": "fresh"}
+
+@app.get("/x")
+def x(s: dict = Depends(session)):
+    return s
+
+async def receive(): return {"type": "lifespan.startup"}
+async def send(m): pass
+drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+
+c = TestClient(app)
+for _ in range(3):
+    print(c.get("/x").json())
+print("pools built:", len(built), "<- one, for three requests")'''),
+
+        ("Failing at startup",
+         "An exception before the yield stops the application coming up, which is "
+         "the right moment to discover a missing setting.",
+         '''from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+SETTINGS = {}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if "database_url" not in SETTINGS:
+        raise RuntimeError("database_url is not configured")
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+async def receive(): return {"type": "lifespan.startup"}
+async def send(m): pass
+
+try:
+    drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+except RuntimeError as e:
+    print("refused to start:", e)
+
+SETTINGS["database_url"] = "postgres://..."
+drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+print("started once configured")'''),
+
+        ("Startup or import?",
+         "Work at import runs whenever the module is imported &mdash; including by a "
+         "test collector. Startup runs when the application actually starts.",
+         '''from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+log = []
+
+# At import: happens the moment this module is loaded, by anyone.
+log.append("import-time work")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    log.append("startup work")
+    yield
+    log.append("shutdown work")
+
+app = FastAPI(lifespan=lifespan)
+
+print("after import  :", log)
+
+async def receive(): return {"type": "lifespan.startup"}
+async def send(m): pass
+drive(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))
+print("after startup :", log)
+print()
+print("A test that merely imports the module paid for the first line only.")'''),
+    ],
+    [
+        "A lifespan is an async context manager: everything before the <code>yield</code> runs at startup, everything after at shutdown.",
+        "It runs <strong>once per process</strong>, not per request &mdash; and once per worker, so four workers build four pools.",
+        "Put what it creates on <code>app.state</code>, and hand it to handlers through a dependency rather than reaching for <code>request.app.state</code> in each one.",
+        "Raising before the yield stops the application starting, which is the right moment to find a missing setting.",
+        "Prefer startup over import-time work: an import happens whenever anything loads the module, including a test collector.",
+        "<code>@app.on_event(\"startup\")</code> is the older spelling and is deprecated. The lifespan context manager replaced it.",
+    ],
+    '''
+title: Lifespan Events
+intro: Work that happens once per process rather than once per request, and where a connection pool belongs.
+
+## Two lifetimes
+
+Almost everything in this track has been per request: a body, a session, a user, a background task.
+
+Some things are not. A database connection **pool** is created once and used by every request. So is an HTTP client, a machine-learning model, a cache client, a loaded configuration.
+
+Creating those per request would be absurdly wasteful; creating them at import has its own problems. Lifespan is the third option, and the correct one.
+
+## The shape
+
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.pool = await create_pool()
+    yield
+    await app.state.pool.close()
+
+app = FastAPI(lifespan=lifespan)
+```
+
+An async context manager. Everything before the `yield` runs when the application starts; everything after runs when it stops. In between, it serves requests.
+
+The shape is deliberately the same as a `yield` dependency, with a different lifetime: that one is per request, this one is per process.
+
+## What the server actually does
+
+Before serving anything, uvicorn sends the application a `lifespan.startup` message and waits for it to complete. After the last request, it sends `lifespan.shutdown`.
+
+That is a real protocol, not a framework convention, which is why the editors above can drive it by hand: build the scope, send the message, and watch the same code run that uvicorn would have triggered.
+
+## Once per process, and per worker
+
+The startup body runs **once**, however many requests arrive. That is the distinction that decides what belongs in it.
+
+Worth being precise about the plural: production usually runs several worker processes, and each is a separate process with its own lifespan. Four workers means four pools, four model loads, four caches. Anything expensive is paid for four times, and anything that must be unique across the application &mdash; a scheduler, a migration, a leader election &mdash; must not be in a lifespan, because it will run once per worker rather than once.
+
+That last point catches people. A migration in startup runs concurrently in four processes on the first deploy.
+
+## Getting at it from a handler
+
+What startup creates has to be reachable. The convention is `app.state`:
+
+```python
+app.state.pool = pool
+```
+
+and in a handler, `request.app.state.pool`.
+
+That works and reads badly, and it couples every handler to the storage location. A dependency fixes both:
+
+```python
+def get_pool(request: Request) -> Pool:
+    return request.app.state.pool
+
+def modules(pool: Pool = Depends(get_pool)):
+    ...
+```
+
+Now the handler receives a `Pool`, knows nothing about `app.state`, and can be tested by overriding one dependency. That is the shape worth using.
+
+## Failing loudly
+
+An exception before the `yield` prevents the application from starting.
+
+That is the right behaviour and the right moment. A missing database URL, an unreachable dependency, an invalid configuration &mdash; all are better as a process that refuses to start than as an application that accepts traffic and fails every request.
+
+Validating settings in the lifespan, or importing a settings model that validates itself, turns a class of runtime mystery into a startup error with a message.
+
+## Startup or import time?
+
+Module-level code runs when the module is imported. That sounds equivalent and is not.
+
+A test collector imports your application module to find the app object. So does a documentation generator, a linter with type checking, and anything that inspects routes. If connecting to a database happens at import, all of those need a database.
+
+Startup runs when the application actually starts &mdash; which a test can choose to do, or not.
+
+The practical rule: define things at import, *create* them at startup. `pool = None` at module level and the real construction in the lifespan.
+
+## Shutdown is not guaranteed
+
+Worth knowing before relying on it.
+
+Graceful shutdown runs the code after the `yield`. A `SIGKILL`, a container OOM, or a hardware failure does not. Anything whose absence would corrupt state must not depend on shutdown running.
+
+In practice: close connections there because it is tidy, and do not *rely* on it for correctness. Anything that must be consistent should be consistent at every moment, not reconciled on the way out.
+
+## The older spelling
+
+You will see this in existing code:
+
+```python
+@app.on_event("startup")
+async def startup(): ...
+```
+
+It works and is deprecated. The lifespan context manager replaced it because it keeps setup and teardown in one function, where the relationship between them is visible, and because it can hold state in local variables rather than globals.
+
+New code should use `lifespan`. Old code is worth migrating when touched.
+
+
+## Mistakes people make
+
+**Connecting at import.** Every test collector, linter and documentation generator then needs a live database. Define at import; create at startup.
+
+**Assuming it runs once per application.** It runs once per **worker**. Four workers means four pools and four model loads - and a migration placed there runs four times concurrently on first deploy.
+
+**Relying on shutdown.** A SIGKILL, an OOM or a hardware failure skips it. Close things there for tidiness; do not depend on it for correctness.
+
+**Reaching for `request.app.state` in every handler.** It couples each one to where the object is stored. A dependency hands over the object itself and can be overridden in a test.
+
+**Swallowing startup failures.** A missing setting should stop the process, not produce an application that accepts traffic and fails every request.
+
+**Using `@app.on_event`.** Deprecated. The lifespan context manager keeps setup and teardown in one function where their relationship is visible.
+
+## In tests
+
+`TestClient(app)` does **not** run the lifespan. Used as a context manager it does:
+
+```python
+with TestClient(app) as client:
+    ...
+```
+
+Both are useful. An isolated unit test with dependencies overridden is faster and cleaner without startup; an integration test that should exercise the real wiring needs it.
+
+Knowing the difference explains the common confusion of a test failing because `app.state.pool` does not exist - the startup that would have created it never ran.
+
+## Next
+
+Testing what you have built &mdash; the client, the overrides, and what a good FastAPI test suite actually asserts.
+
+
+## What belongs in it
+
+A short list, because the boundary is what the module is really about.
+
+**Yes**: connection pools, HTTP clients, loaded models, caches, warmed configuration, anything expensive with a process lifetime.
+
+**No**: anything per request - a session, a transaction, a user. Those are dependencies.
+
+**Definitely not**: anything that must happen exactly once for the whole application. Migrations, scheduled job registration, leader election. With four workers those run four times, concurrently, on every deploy.
+
+That last category is the one that causes incidents, and the fix is not FastAPI's: it belongs in a deployment step that runs once, before the workers start.
+
+## Testing around it
+
+Because the lifespan is opt-in for `TestClient`, most unit tests skip it and are better for skipping it - dependencies are overridden anyway, so the pool never needed to exist.
+
+Where it matters is the integration test that should prove the wiring works: that startup succeeds with real settings, that what it creates is reachable, and that shutdown does not raise. One such test per application is usually enough, and it catches the class of failure where everything passes and the process will not boot.
+
+## Summary
+
+A lifespan is an async context manager: before the `yield` is startup, after it is shutdown, and in between the application serves requests.
+
+It runs once per process - which means once per worker, so four workers build four of everything and anything that must happen exactly once does not belong there.
+
+Create expensive, long-lived things there rather than at import, so a test collector does not need a database. Put them on `app.state` and hand them to handlers through a dependency, so the handlers stay unaware and overridable.
+
+Fail loudly before the `yield` when configuration is missing, and do not depend on shutdown running - a killed process never reaches it.
+
+## Two lifetimes, restated
+
+Almost everything in this track has been per request. This module is the exception, and holding the two apart is what the module is for.
+
+**Per process**: the connection pool, the HTTP client, the loaded model, the cache client, the parsed configuration. Expensive, reusable, created once.
+
+**Per request**: the session taken from that pool, the transaction, the user, the filters. Cheap, disposable, created and released for each caller.
+
+Confusing them produces two distinct failures. A pool created per request is catastrophic for throughput - every caller pays connection setup. A session shared across requests is catastrophic for correctness - two callers inside one transaction, seeing each other's uncommitted work.
+
+The lifespan owns the first category and dependencies own the second, and the `yield` in each has the same shape for the same reason: acquire, use, release.
+
+
+## Reading a startup that fails
+
+When an application will not boot, the lifespan is usually where to look, and the failure modes are few.
+
+**A missing setting** raises before the `yield`, and the message names the field if configuration is a validated model. This is the good case: loud, early, and specific.
+
+**An unreachable dependency** - a database that is not up yet - raises a connection error. In an orchestrated deployment this is often a race rather than a fault, and the fix is a readiness probe or a retry with backoff rather than removing the check.
+
+**A blocking call in an async lifespan** hangs rather than failing, which is the confusing one. The process starts, never becomes ready, and nothing is logged. The rule from the async module applies here too.
+
+**Work that should have run once** - a migration - appears to succeed on one worker and deadlock on the others.
+
+Knowing that list turns "it will not start" into four things to check in order.
+
+## One habit
+
+Put a log line at the end of startup naming what was created and the settings that matter. It costs nothing and it turns every future boot problem into a question of which line was the last one printed.
+
+
+## A closing thought
+
+The lifespan is the only place in a FastAPI application that knows about the process rather than the request, and that makes it the natural home for a specific kind of mistake: doing something once that should happen once *per application*.
+
+Four workers is the default shape of a production deployment, and every one of them runs this code. A pool per worker is correct and intended. A migration per worker is a race. A scheduled job registered per worker is four schedulers.
+
+The distinction is not obvious from inside the function, because nothing about `async def lifespan(app)` suggests it will run four times. Knowing that it will is most of using it correctly.
+
+## Next
+
+Testing what has been built - the client that needs no server, the overrides that remove the database, and what a suite should actually assert.
+
+## In one line
+
+Startup and shutdown run once per worker, not once per application - so create expensive long-lived things there, hand them over through a dependency, fail loudly if configuration is missing, and put anything that must happen exactly once somewhere that runs exactly once.
+
+One log line at the end of startup, naming what was created, turns every future boot problem into a question of which line was the last one printed.
+''',
+    [
+        {"q": "How often does a lifespan startup body run?",
+         "options": ["Per request", "Once per process - and so once per worker", "Once per route", "Once globally"],
+         "answer": 1,
+         "why": "Four workers means four pools and four model loads. It also means a migration in startup runs four times concurrently on first deploy, which is why that does not belong there."},
+        {"q": "Why prefer startup over import-time work?",
+         "options": ["It is faster", "An import happens whenever anything loads the module, including a test collector", "Imports are deprecated", "No difference"],
+         "answer": 1,
+         "why": "Connecting at import means every test run, linter and documentation generator needs a live database. Define at import, create at startup."},
+        {"q": "How should a handler get at a pool created in the lifespan?",
+         "options": ["request.app.state.pool directly", "Through a dependency that reads app.state", "A global", "It cannot"],
+         "answer": 1,
+         "why": "The dependency gives the handler the object itself, keeps it unaware of where it is stored, and makes it replaceable with one override in a test."},
+        {"q": "Can you rely on shutdown code always running?",
+         "options": ["Yes, always", "No - SIGKILL, an OOM or a hardware failure skips it", "Only in production", "Only for async apps"],
+         "answer": 1,
+         "why": "Close things there because it is tidy, but anything whose absence would corrupt state must be consistent at every moment rather than reconciled on the way out."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 23. Testing
+# ---------------------------------------------------------------------------
+topic(
+    "testing_fastapi",
+    "Testing",
+    "In Practice",
+    "A client that calls the app directly, no server, and what a good FastAPI test "
+    "suite actually asserts.",
+    _svg(_box(14, 20, 56, 24, S) + _txt(42, 36, "TestClient", M, 8) +
+         _arrow(74, 32, 90, 32) +
+         _box(94, 20, 52, 24, S, A) + _txt(120, 36, "app", A, 8) +
+         _txt(80, 64, "no socket, no port", M, 8)),
+    [
+        ("The client calls the app, not a server",
+         "There is no network. The client builds the ASGI scope and invokes the "
+         "application, which is why tests are fast and need no port.",
+         '''from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+DB = {}
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+
+@app.post("/modules", status_code=201)
+def create(body: ModuleIn):
+    i = len(DB) + 1
+    DB[i] = body.title
+    return {"id": i, "title": body.title}
+
+@app.get("/modules/{i}")
+def read(i: int):
+    return {"id": i, "title": DB[i]}
+
+client = TestClient(app)
+r = client.post("/modules", json={"title": "Vectors"})
+print("create:", r.status_code, r.json())
+print("read  :", client.get("/modules/1").json())'''),
+
+        ("Assert on status first, body second",
+         "The status is the contract; the body is the detail. A test that only "
+         "checks the body passes when the endpoint starts failing.",
+         '''from fastapi import FastAPI, HTTPException
+
+app = FastAPI()
+DB = {1: "Vectors"}
+
+@app.get("/modules/{i}")
+def read(i: int):
+    if i not in DB:
+        raise HTTPException(404, "Module not found")
+    return {"id": i, "title": DB[i]}
+
+client = TestClient(app)
+
+def check(path, expected_status):
+    r = client.get(path)
+    ok = r.status_code == expected_status
+    print("%-14s -> %s  %s" % (path, r.status_code, "ok" if ok else "MISMATCH"))
+    return r
+
+check("/modules/1", 200)
+check("/modules/99", 404)
+check("/modules/abc", 422)'''),
+
+        ("Testing validation properly",
+         "Assert on <code>loc</code> and <code>type</code>, never on the message "
+         "&mdash; prose gets reworded and the suite starts failing for nothing.",
+         '''from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+    minutes: int = Field(gt=0)
+
+@app.post("/modules")
+def create(body: ModuleIn):
+    return {"ok": True}
+
+client = TestClient(app)
+r = client.post("/modules", json={"title": "x", "minutes": 0})
+
+found = {(tuple(e["loc"]), e["type"]) for e in r.json()["detail"]}
+expected = {(("body", "title"), "string_too_short"),
+            (("body", "minutes"), "greater_than")}
+
+print("status  :", r.status_code)
+for loc, kind in sorted(found):
+    print("   ", loc, kind)
+print("matches :", found == expected)'''),
+
+        ("Overriding what the endpoint depends on",
+         "The point of declaring dependencies: a test replaces the database and the "
+         "user without touching the handler.",
+         '''from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+
+def get_db():
+    raise RuntimeError("no database in a test")
+
+def current_user(x_token: str = Header(default="")):
+    raise HTTPException(401, "Sign in")
+
+@app.get("/mine")
+def mine(db=Depends(get_db), user=Depends(current_user)):
+    return {"user": user["name"], "rows": db["rows"]}
+
+app.dependency_overrides[get_db] = lambda: {"rows": ["Vectors"]}
+app.dependency_overrides[current_user] = lambda: {"name": "test-user"}
+
+print(TestClient(app).get("/mine").json())
+app.dependency_overrides.clear()
+print("cleared, so the next test starts from the real thing")'''),
+
+        ("Testing one router alone",
+         "Include a router into a small app built for the test, and the rest of the "
+         "application is not involved.",
+         '''from fastapi import APIRouter, FastAPI
+
+# Somewhere in the application:
+modules = APIRouter(prefix="/modules", tags=["modules"])
+
+@modules.get("")
+def list_modules():
+    return ["Vectors", "Norms"]
+
+@modules.get("/{i}")
+def read(i: int):
+    return {"id": i}
+
+# In the test: an app containing only what is under test.
+app = FastAPI()
+app.include_router(modules)
+
+c = TestClient(app)
+print(c.get("/modules").json())
+print(c.get("/modules/7").json())
+print()
+print("No startup, no other routers, no unrelated dependencies.")'''),
+
+        ("Checking the contract itself",
+         "The schema is worth asserting on: a response model quietly removed is a "
+         "breaking change no functional test would catch.",
+         '''from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+
+@app.get("/modules/{i}", response_model=ModuleOut)
+def read(i: int):
+    return {"id": i, "title": "Vectors", "internal": "secret"}
+
+spec = app.openapi()
+schema = spec["components"]["schemas"]["ModuleOut"]
+
+print("documented fields:", sorted(schema["properties"]))
+print("required         :", sorted(schema["required"]))
+print()
+r = TestClient(app).get("/modules/1")
+print("response         :", r.json())
+print("no leak          :", "internal" not in r.json())'''),
+    ],
+    [
+        "<code>TestClient</code> builds the ASGI scope and calls the app directly. No server, no port, no network &mdash; which is why the tests are fast.",
+        "Assert the status code first. A test that only checks the body passes when the endpoint starts returning the wrong status.",
+        "For validation, assert on <code>loc</code> and <code>type</code>. Messages are prose and get reworded.",
+        "<code>dependency_overrides</code> is what makes an endpoint testable without a database or a token &mdash; and clearing it between tests is not optional.",
+        "A router can be included into a small app built for one test file, so the rest of the application is not involved.",
+        "Assert on the generated schema too: a removed <code>response_model</code> is a breaking change that no functional test notices.",
+    ],
+    '''
+title: Testing
+intro: A client that calls the app directly, and what a good FastAPI test suite actually asserts.
+
+## No server involved
+
+`TestClient` does not start anything. It builds the ASGI scope a server would build, calls your application, and turns the response messages back into an object with `.status_code` and `.json()`.
+
+That is why FastAPI tests are fast: no socket, no port, no process, no waiting for something to come up. A test suite of several hundred endpoint tests runs in seconds.
+
+It is also why the editors on these pages work at all &mdash; they use the same idea.
+
+In real code the import is `from fastapi.testclient import TestClient`, and it wraps httpx. It needs `httpx` installed, which is the usual reason a first test fails on a fresh environment.
+
+## What to assert
+
+**Status first.** It is the contract, and it is what every client branches on. A test that checks only the body will keep passing when a 200 quietly becomes a 500 with an error body that happens to contain the key you looked for.
+
+**Then the body**, on the fields that matter. Asserting the whole payload makes a test that fails every time an unrelated field is added &mdash; brittle in a way that teaches people to update tests without reading them.
+
+**For validation failures**, assert on `loc` and `type`. Never on `msg`: it is prose, it gets reworded between releases, and a suite that fails on wording is one people learn to ignore.
+
+## Overrides are the point
+
+Everything the dependencies tier argued for pays off here.
+
+An endpoint declaring `Depends(get_db)` and `Depends(current_user)` is tested with neither a database nor a token, because both are replaced at the app level. The handler is unchanged; only what it depends on moves.
+
+Two rules from that module apply directly. Fake at the **edges** &mdash; the database, the clock, the token decoder &mdash; so the real logic above them still runs. And **clear between tests**, or one test silently changes the next and the failure appears somewhere unrelated.
+
+In pytest the shape is a fixture that sets, yields and clears.
+
+## Testing a router alone
+
+A router can be included into an app built for a single test file:
+
+```python
+app = FastAPI()
+app.include_router(modules.router)
+client = TestClient(app)
+```
+
+That test exercises one resource, with no other routers, no startup work and no unrelated dependencies. It is the quiet benefit of splitting an application up, and it is the difference between "the tests need a database, Redis and three environment variables" and "the tests need the module under test".
+
+## Lifespan in tests
+
+`TestClient` does not run the lifespan unless you ask. Used as a context manager it does:
+
+```python
+with TestClient(app) as client:
+    ...
+```
+
+Which you want depends on the test. For a unit test of one endpoint with everything overridden, skipping startup is faster and more isolated. For an integration test that should exercise the real wiring, the context-manager form is correct.
+
+Knowing the difference explains a common confusion: a test that fails with `app.state.pool` missing is a test that never ran startup.
+
+## What functional tests miss
+
+Two things worth asserting separately.
+
+**The schema.** Removing a `response_model`, renaming a field, or loosening a type is a breaking change for consumers, and a functional test that checks `r.json()["id"]` will not notice. Asserting on `app.openapi()` &mdash; that a model has the fields it should, that an endpoint documents its 404 &mdash; catches contract changes.
+
+**What is not in the response.** A test that the payload contains `id` and `title` passes just as happily when it also contains `password_hash`. If an endpoint filters something out, assert that it is absent, not merely that the wanted fields are present.
+
+## A suite worth having
+
+For each endpoint: the success case with the values you expect, one validation failure asserting `loc` and `type`, and one domain failure &mdash; the 404 or the 409.
+
+Beyond that: one test per dependency that can reject, so the 401 and 403 paths are covered; and a small number of tests that assert on the schema for endpoints with consumers.
+
+That is a few short functions per endpoint, and between them they cover the branches most likely to be wrong. The parts people skip &mdash; the error paths &mdash; are the parts that get exercised most in production.
+
+
+## Mistakes people make
+
+**Asserting only on the body.** A 200 that becomes a 500 carrying a similar key keeps the test green. Status first.
+
+**Asserting on `msg`.** It is prose, it gets reworded, and a suite that fails on wording is one people stop reading. Use `loc` and `type`.
+
+**Asserting the whole payload.** Then every unrelated field addition breaks the test, which teaches people to update tests without reading them.
+
+**Forgetting to clear overrides.** One test changes the next, and the failure appears somewhere unrelated with no visible cause.
+
+**Faking too high.** Overriding the permission dependency skips the permission logic you meant to test. Fake the edges.
+
+**Never running the lifespan.** Then `app.state` is empty, and the error names neither the cause nor the fix.
+
+**Only testing the happy path.** The error branches are the ones exercised most in production and least in the suite.
+
+## What a suite should contain
+
+Per endpoint: the success case with the values you expect; one validation failure asserting `loc` and `type`; one domain failure - the 404 or the 409.
+
+Across the application: one test per dependency that can reject, so the 401 and 403 paths are covered; and a handful asserting on `app.openapi()` for endpoints with real consumers, since a removed `response_model` is a breaking change no functional test notices.
+
+That is a few short functions per endpoint, and it covers the branches most likely to be wrong.
+
+## Next
+
+The document all of this generates, and how much of your API's usability is decided by it.
+
+
+## Speed and what it buys
+
+A FastAPI suite is fast by default, and the speed is worth protecting because it changes how the tests get used.
+
+There is no server, so no startup cost per test. With dependencies overridden there is no database, so no fixtures to load or transactions to roll back. Several hundred endpoint tests running in a couple of seconds is normal.
+
+That matters because a suite people run constantly catches things a suite people run at the end does not. The moment it takes a minute, it stops being run between edits.
+
+Two things erode it. Real I/O creeping back in through a dependency somebody forgot to override, and integration tests that construct the whole application per test rather than per module.
+
+Both are worth watching, because the decline is gradual and the point where it stops being run is not announced.
+
+## The parts people skip
+
+Error paths, and they are the ones exercised most in production.
+
+A test that a missing resource gives 404, a duplicate gives 409, a bad payload gives 422 with the right `loc`, and an unauthenticated request gives 401 costs four short functions - and covers the branches most likely to be wrong, because they are the branches nobody exercises by hand.
+
+## Summary
+
+`TestClient` builds the ASGI scope and calls the app directly, so there is no server, no port and no waiting.
+
+Assert the status first and the body second. For validation, assert `loc` and `type` rather than the message. Override dependencies to remove the database and the token, fake at the edges, and clear between tests.
+
+Include a router into a small app to test one resource alone. Use the context-manager form when the test should exercise startup. And assert on the generated schema for anything with consumers, because a removed `response_model` is a breaking change nothing else catches.
+
+## What makes an endpoint hard to test
+
+Worth naming, because the answer is usually a design signal rather than a testing problem.
+
+**Work in the handler.** Logic that only exists inside a request can only be tested through one. Moving it to a service makes it a function call.
+
+**Reaching instead of declaring.** A handler calling `get_session()` in its body cannot be given a fake; one declaring `Depends(get_session)` can.
+
+**Too many dependencies.** If a test needs six overrides, the endpoint is entangled with six things - and the fixture count is a fair measure of that.
+
+**Import-time side effects.** If importing the module connects to something, every test pays, and the suite cannot run without the world being present.
+
+Each of those makes tests awkward and each is fixed by a change to the application rather than to the test. When a test is hard to write, the useful first question is what the endpoint is doing that it should not.
+
+
+## What to test, and what not to
+
+A suite is a set of choices about what is worth the maintenance, and two extremes are both wrong.
+
+**Testing every branch of every handler** produces a suite that breaks on every refactor and gets updated without being read.
+
+**Testing only the happy paths** leaves the branches that actually run in production - the 404, the 422, the 401 - entirely uncovered.
+
+The middle is per endpoint: the success case, one validation failure, one domain failure. Then, across the application, one test per dependency that can reject, and a few asserting on the schema for anything with consumers.
+
+That is small enough to keep and specific enough to be worth keeping. The measure is whether a failure tells you what broke without opening the test - and asserting on status, `loc` and `type` is what makes it do that.
+
+
+## A closing thought
+
+The reason FastAPI applications tend to be well tested is not discipline. It is that the framework removed the usual excuses.
+
+There is no server to start, so tests are fast. Dependencies are declared rather than reached for, so they can be replaced. Routers can be included one at a time, so a test can be narrow. Validation happens at the boundary, so handlers have less to test.
+
+What remains is writing the tests, and the shape is small: success, validation failure, domain failure, per endpoint.
+
+## Next
+
+The document all of this generates - and how much of an API's usability is decided by how carefully it was filled in.
+
+## In one line
+
+No server, no port, no network: assert the status first, `loc` and `type` for validation, override at the edges, clear between tests, and cover the error branches, because those are the ones production exercises most and suites cover least.
+
+The measure of a suite is whether a failure tells you what broke without opening the test file. Asserting on the status, the `loc` and the `type` is what makes it do that; asserting on prose and whole payloads is what stops it.
+
+And keep one test with nothing overridden, exercising the real dependency tree. Heavy faking has a failure mode of its own: the fakes quietly stop resembling what they stand in for, and every test keeps passing while the application stops working.
+''',
+    [
+        {"q": "What does TestClient actually do?",
+         "options": ["Starts a server on a port", "Builds the ASGI scope and calls the app directly", "Mocks the framework", "Runs uvicorn"],
+         "answer": 1,
+         "why": "No socket, no process, no waiting for anything to come up - which is why hundreds of endpoint tests run in seconds."},
+        {"q": "Why assert on the status code before the body?",
+         "options": ["It is faster", "A body-only test keeps passing when a 200 becomes a 500 carrying a similar key", "Bodies are unstable", "It is required"],
+         "answer": 1,
+         "why": "The status is the contract every client branches on. Checking only the body leaves the most important change undetected."},
+        {"q": "Your test fails because `app.state.pool` is missing. What is likely wrong?",
+         "options": ["The pool is broken", "The lifespan never ran - TestClient only runs it when used as a context manager", "A missing override", "A bad route"],
+         "answer": 1,
+         "why": "`with TestClient(app) as client:` runs startup and shutdown. Plain construction does not, which is often what you want for an isolated unit test."},
+        {"q": "Which breaking change would a normal functional test miss?",
+         "options": ["A 500", "Removing a response_model, so extra fields start leaking", "A wrong status", "A validation failure"],
+         "answer": 1,
+         "why": "A test checking `r.json()[\"id\"]` passes happily when the payload also gained `password_hash`. Assert on what should be absent, and on the schema."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 24. OpenAPI and the docs
+# ---------------------------------------------------------------------------
+topic(
+    "openapi_and_docs",
+    "OpenAPI and the Docs",
+    "In Practice",
+    "The document your annotations generate, and how much of an API's usability is "
+    "decided by it.",
+    _svg(_box(14, 18, 52, 22, S, A) + _txt(40, 33, "models", A, 8) +
+         _arrow(70, 29, 84, 29) +
+         _box(88, 18, 58, 22, S) + _txt(117, 33, "openapi.json", M, 7) +
+         _arrow(80, 46, 80, 58) + _txt(80, 74, "/docs  ·  clients  ·  tests", M, 7)),
+    [
+        ("The document, and where it comes from",
+         "<code>app.openapi()</code> assembles one OpenAPI document from every model "
+         "and signature. Nothing else was written to produce it.",
+         '''import json
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="VizLearn API", version="2.1.0",
+              description="Runnable explainers, as an API.")
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str = Field(description="Shown as the page heading.")
+
+@app.get("/modules/{i}", response_model=ModuleOut, tags=["modules"])
+def read(i: int):
+    """Return one module by id."""
+    return {"id": i, "title": "Vectors"}
+
+spec = app.openapi()
+print("openapi :", spec["openapi"])
+print("info    :", spec["info"]["title"], spec["info"]["version"])
+print("paths   :", list(spec["paths"]))
+op = spec["paths"]["/modules/{i}"]["get"]
+print("summary :", op["summary"])
+print("desc    :", op["description"].strip())
+print("tags    :", op["tags"])'''),
+
+        ("Tags organise it",
+         "Tags group endpoints into sections, and metadata on the app gives each "
+         "section a description.",
+         '''from fastapi import APIRouter, FastAPI
+
+tags_meta = [
+    {"name": "modules", "description": "Individual explainers."},
+    {"name": "tracks", "description": "Ordered collections of modules."},
+]
+
+app = FastAPI(openapi_tags=tags_meta)
+
+modules = APIRouter(prefix="/modules", tags=["modules"])
+tracks = APIRouter(prefix="/tracks", tags=["tracks"])
+
+@modules.get("")
+def list_modules(): return []
+
+@tracks.get("")
+def list_tracks(): return []
+
+app.include_router(modules)
+app.include_router(tracks)
+
+spec = app.openapi()
+for t in spec["tags"]:
+    print("%-8s %s" % (t["name"], t["description"]))
+print()
+for path, ops in spec["paths"].items():
+    for method, op in ops.items():
+        print("  %-6s %-10s %s" % (method.upper(), path, op["tags"]))'''),
+
+        ("Examples fill the Try it out form",
+         "The single highest-value thing you can add: a caller gets a working "
+         "request instead of an empty box.",
+         '''import json
+from fastapi import FastAPI
+from pydantic import BaseModel, ConfigDict, Field
+
+app = FastAPI()
+
+class ModuleIn(BaseModel):
+    model_config = ConfigDict(json_schema_extra={
+        "examples": [{"title": "Dot Product", "minutes": 11}]})
+
+    title: str = Field(min_length=3, description="Shown as the page heading.",
+                       examples=["Dot Product"])
+    minutes: int = Field(default=10, gt=0, le=180,
+                         description="Estimated reading time.")
+
+@app.post("/modules", status_code=201)
+def create(body: ModuleIn):
+    return body
+
+schema = app.openapi()["components"]["schemas"]["ModuleIn"]
+print(json.dumps(schema, indent=2))'''),
+
+        ("Documenting the failures",
+         "<code>responses=</code> puts the error shapes in the document, so a "
+         "generated client can type them.",
+         '''from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class ModuleOut(BaseModel):
+    id: int
+
+class Problem(BaseModel):
+    detail: str
+
+@app.get("/modules/{i}", response_model=ModuleOut,
+         responses={404: {"model": Problem, "description": "No such module"},
+                    409: {"model": Problem, "description": "Withdrawn"}})
+def read(i: int):
+    if i != 1:
+        raise HTTPException(404, "No such module")
+    return {"id": 1}
+
+op = app.openapi()["paths"]["/modules/{i}"]["get"]
+for code, spec in sorted(op["responses"].items()):
+    print("%-4s %s" % (code, spec.get("description")))'''),
+
+        ("Hiding what should not be published",
+         "<code>include_in_schema=False</code> keeps an internal endpoint out of the "
+         "document while leaving it working.",
+         '''from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/modules")
+def public(): return []
+
+@app.get("/internal/flush", include_in_schema=False)
+def internal(): return {"flushed": True}
+
+@app.get("/legacy", deprecated=True)
+def legacy(): return {"old": True}
+
+spec = app.openapi()
+print("documented :", sorted(spec["paths"]))
+print("still works:", TestClient(app).get("/internal/flush").json())
+print("deprecated :", spec["paths"]["/legacy"]["get"].get("deprecated"))
+print()
+print("Undocumented is not the same as protected - it is only invisible.")'''),
+
+        ("Reading it as a review",
+         "One line, and you see what a consumer sees. It is the fastest review "
+         "available for an API model.",
+         '''from fastapi import FastAPI, Query
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Thing(BaseModel):
+    id: int
+    weight: float                 # of what? in what unit?
+
+@app.get("/things", response_model=list[Thing])
+def things(sort: str = Query(default="id")):   # str, so anything goes
+    return []
+
+spec = app.openapi()
+props = spec["components"]["schemas"]["Thing"]["properties"]
+params = spec["paths"]["/things"]["get"]["parameters"]
+
+print("fields without a description:")
+for name, p in props.items():
+    if "description" not in p:
+        print("   ", name, p.get("type"))
+print()
+print("parameters with no constrained set:")
+for p in params:
+    if p["schema"].get("type") == "string" and "enum" not in p["schema"]:
+        print("   ", p["name"], "- a Literal would document the options")'''),
+    ],
+    [
+        "<code>app.openapi()</code> assembles the document from your models and signatures. The docs page at <code>/docs</code> renders it.",
+        "<code>title</code>, <code>version</code> and <code>description</code> on <code>FastAPI()</code> become the document's header; a function's docstring becomes an endpoint's description.",
+        "Tags group endpoints into sections, and <code>openapi_tags</code> gives each section a description.",
+        "<code>examples</code> pre-fill the interactive request form &mdash; the difference between a caller's first attempt working and being a guess.",
+        "<code>responses=</code> documents the failure shapes, which is what lets a generated client type its errors.",
+        "<code>include_in_schema=False</code> hides an endpoint from the document without protecting it. Undocumented is not private.",
+    ],
+    '''
+title: OpenAPI and the Docs
+intro: The document your annotations generate, and how much of an API's usability is decided by it.
+
+## What is generated
+
+`app.openapi()` returns one OpenAPI document describing every route: paths, methods, parameters, request bodies, response shapes, status codes, descriptions and examples.
+
+It is assembled from things you already wrote &mdash; the path in the decorator, the parameters in the signature, the models, the constraints, the docstrings. There is no separate specification to maintain and no way for it to drift, because it *is* the code.
+
+FastAPI serves it at `/openapi.json`, renders it at `/docs` (Swagger UI) and `/redoc` (ReDoc).
+
+## The header
+
+`FastAPI(title=..., version=..., description=...)` becomes the top of the document and the top of the docs page.
+
+The `description` supports Markdown and is the one piece of genuine prose in the whole thing. It is worth writing: what the API is for, how authentication works, what the rate limits are, where to get a key. That is the first thing a new consumer reads, and the alternative is that they read nothing.
+
+`version` should be your API's version, not your library's. Consumers pin against it.
+
+## Tags
+
+Tags group endpoints into sections. On a router, `tags=["modules"]` applies to every route in it.
+
+`openapi_tags` on the app gives each tag a description, which becomes a paragraph above that section in the docs.
+
+For an API past a dozen routes this is the difference between a navigable document and a flat alphabetical list. It costs one argument per router.
+
+## Examples are the highest-value addition
+
+Everything else in this module is worth doing. This is the one that changes whether people succeed.
+
+A `Field(examples=[...])` or a model-level `json_schema_extra={"examples": [...]}` pre-fills the interactive form. A developer opens `/docs`, presses **Try it out**, and gets a request that works &mdash; instead of an empty box they have to guess at, with a 422 for their first three attempts.
+
+That difference is measurable in how many integrations get finished.
+
+Write examples that are realistic rather than minimal. `"title": "string"` is what the generator produces without you; `"title": "Dot Product"` shows what the field is actually for.
+
+## Documenting failures
+
+`response_model` covers the success case. Everything else is undocumented unless you say so:
+
+```python
+responses={404: {"model": Problem, "description": "No such module"}}
+```
+
+Worth doing for the failures a caller is expected to handle. A generated client can then type its errors, and a human reading the docs knows what a rejection looks like before causing one.
+
+## Hiding endpoints
+
+`include_in_schema=False` keeps a route out of the document. Useful for internal endpoints, legacy paths kept for one client, and health checks that would only clutter the page.
+
+One warning worth being explicit about: **this is not access control.** The endpoint still works, still accepts requests, and is exactly as reachable as before. It is invisible, not protected. If it should not be called, it needs a dependency, not a flag.
+
+`deprecated=True` is the other half of retiring something: the endpoint keeps working and the docs show it as deprecated, which gives consumers a signal without breaking them.
+
+## Reading it as a review
+
+The most practical use of this module. One line:
+
+```python
+print(json.dumps(app.openapi(), indent=2))
+```
+
+and you see exactly what your consumers see.
+
+What it reliably surfaces: fields whose names are not self-explanatory and have no description; a `str` parameter where a `Literal` would have given clients a set of options; a rule enforced by a validator that appears nowhere; a required field you meant to default; an endpoint with no example.
+
+The last editor above automates two of those checks. It is worth running over a real model, because the results are usually uncomfortable and always cheap to fix.
+
+## What it feeds
+
+The document is read by more than the docs page, which is why its quality compounds.
+
+**Client generators** produce typed clients in a dozen languages from it. A vague schema produces a vague client, and every consumer then writes their own guesses.
+
+**Contract tests** can assert that a change did not break the published shape.
+
+**API gateways** can validate requests before they reach you.
+
+**LLM tooling** increasingly reads schemas to decide how to call an API.
+
+None of those read your source. All of them read this.
+
+## The limits
+
+Some things cannot be expressed, and pretending otherwise misleads consumers.
+
+Validator logic, cross-field rules, anything requiring a lookup &mdash; none has a JSON Schema equivalent. Where a rule matters and cannot be declared, put it in the docstring or the model's description, so at least a human reading the documentation learns about it.
+
+An endpoint whose real constraints live in code the schema cannot see is an endpoint whose documentation is quietly incomplete.
+
+
+## Mistakes people make
+
+**Treating `include_in_schema=False` as security.** The endpoint still works and is exactly as reachable. Invisible is not protected.
+
+**Leaving fields undescribed.** `weight` needs a description - of what, in what unit. A name that is not self-explanatory and has no description produces documentation that technically exists.
+
+**No examples.** The generated placeholder is `"string"`. A caller's first three attempts then return 422, and some of them stop there.
+
+**Documenting only success.** An endpoint that can 404 should say so, or a generated client has no type for failure.
+
+**Using `str` where a `Literal` belongs.** The schema then offers no options, so no client can render a choice and no consumer knows what is valid.
+
+**Never looking at it.** It is one line, and it is the only view of your model that matches what consumers receive.
+
+**Versioning it with the library version.** Consumers pin against your API's version, not your package's.
+
+## The review worth doing
+
+Print the document for a model you have just written and read it as a stranger.
+
+What it surfaces: required fields you meant to default, patterns that should have been enumerations, rules that live in validators and appear nowhere, endpoints with no summary, and fields whose names carry meaning only to whoever wrote them.
+
+Every one of those is cheap to fix at that moment and expensive once clients exist, because by then the shape is a contract.
+
+## Next
+
+Putting the pieces together: how a FastAPI project is laid out once it is more than one file.
+
+
+## What it costs to skip
+
+An API without a good document still works, and the cost is paid by everyone else.
+
+Every consumer writes their own guesses about shapes. Every generated client is untyped. Every question that could have been answered by reading becomes a message to whoever wrote it. And every change is potentially breaking, because nobody wrote down what the contract was.
+
+The work to avoid that is small and front-loaded: a description on the app, tags on the routers, descriptions on the fields whose names are not obvious, one example per body model, and `responses=` on the failures a caller is expected to handle.
+
+An hour, once, and it is read by every person and tool that touches the API afterwards.
+
+## The chain it feeds
+
+Worth holding in mind, because it explains why small omissions matter.
+
+Your models generate schemas. FastAPI assembles them into one document. That document is read by the interactive docs, by client generators in several languages, by API gateways, by contract-testing tools, and increasingly by LLM tooling deciding how to call you.
+
+A missing description is missing in all of them. So is a `str` that should have been a `Literal`. None of those tools read your source code, and none of them can ask.
+
+## Summary
+
+The document is generated from your models, signatures, decorators and docstrings, and served at `/openapi.json`, `/docs` and `/redoc`.
+
+Give the app a title, version and description; group routes with tags and describe the groups with `openapi_tags`; document failures with `responses=`; and write examples, which are the single highest-value addition because they turn a caller's first attempt from a guess into a working request.
+
+`include_in_schema=False` hides without protecting. And the fastest review available for any API model is printing the document and reading it as a stranger would.
+
+## The limits, stated plainly
+
+Some things cannot be expressed, and knowing which keeps the documentation honest.
+
+**Validator logic** has no schema equivalent. A rule enforced by a `field_validator` is invisible to every consumer.
+
+**Cross-field rules** likewise. "End date must be after start date" appears nowhere.
+
+**Anything needing a lookup** - does this reference exist, is this name taken - is not expressible and should not be attempted.
+
+**Custom serialisation** changes output without changing the schema unless `return_type` is set, which is how a document quietly starts describing something the endpoint no longer returns.
+
+Where a rule matters and cannot be declared, put it in the model's docstring or the field's description. It will not be machine-readable, and a human reading the documentation will at least learn it exists rather than discovering it through a rejection.
+
+
+## Who reads it
+
+Worth being concrete, because the audience is larger than the docs page.
+
+**A developer integrating with you** opens `/docs`, presses Try it out, and either gets a working request or does not. That first minute decides how the rest goes.
+
+**A client generator** turns the document into a typed library. Its quality is entirely your schema's quality.
+
+**A gateway** may validate requests against it before they reach your process.
+
+**A contract test** can assert that today's document is compatible with yesterday's.
+
+**An LLM** increasingly reads it to decide how to call you, and reads only what is written.
+
+None of them can ask a question, and none of them read your source. Everything they know is in the document, which is why the descriptions and examples are not decoration.
+
+
+## A closing thought
+
+The generated document is the closest thing an API has to a public interface definition, and it is produced entirely as a side effect of writing types.
+
+That is unusual and worth appreciating. In most stacks the specification is a separate artefact that somebody maintains, and it drifts from the implementation immediately because nothing forces them together.
+
+Here it cannot drift, because there is only one source. What varies is how much you put into that source - and the difference between a document consumers can build against and one they have to guess at is a handful of descriptions, one example per model, and a `Literal` where a `str` would have done.
+
+## Next
+
+Authentication and authorisation - as dependencies, which is where the previous tier was heading all along.
+
+## In one line
+
+Your annotations already wrote your API documentation; the only question is how much you put into them, and the answer is decided by a handful of descriptions, one example per body model, and a `Literal` wherever a `str` would have left a consumer guessing.
+
+And the cheapest habit available is to print the document once for every model you write. Five minutes, no tooling, and it shows you the API as a stranger receives it rather than as its author remembers it.
+
+One more habit worth the minute it costs: after adding an endpoint, open `/docs` and try it as a stranger would. If your own first attempt returns a 422, so will everybody else's, and you are the only person who can still fix it cheaply.
+''',
+    [
+        {"q": "Where does the OpenAPI document come from?",
+         "options": ["A YAML file you maintain", "Your models, signatures, decorators and docstrings", "uvicorn", "A plugin"],
+         "answer": 1,
+         "why": "It is assembled from code you already wrote, which is why it cannot drift from the implementation - it is the implementation."},
+        {"q": "What does `include_in_schema=False` do?",
+         "options": ["Blocks the endpoint", "Hides it from the document; it still works and is still reachable", "Requires auth", "Deletes the route"],
+         "answer": 1,
+         "why": "Undocumented is not protected. If an endpoint should not be called, it needs a dependency, not a visibility flag."},
+        {"q": "Which addition most improves a first-time caller's experience?",
+         "options": ["A longer description", "Examples, which pre-fill the Try it out form with a working request", "More tags", "A version bump"],
+         "answer": 1,
+         "why": "The alternative is an empty box and a 422 on their first three attempts. Realistic examples change whether integrations get finished."},
+        {"q": "A rule lives in a `field_validator`. What does the schema say about it?",
+         "options": ["It appears as a constraint", "Nothing - validator logic has no schema equivalent", "It becomes a description", "It raises at startup"],
+         "answer": 1,
+         "why": "Which is why constraints are preferred where they can express the rule, and why anything left in code should be mentioned in a docstring or description."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 25. Security basics
+# ---------------------------------------------------------------------------
+topic(
+    "security_basics",
+    "Security Basics",
+    "In Practice",
+    "Authentication as a dependency, what a token actually is, and the handful of "
+    "mistakes that matter most.",
+    _svg(_box(12, 18, 58, 22, S) + _txt(41, 33, "Authorization", M, 7) +
+         _arrow(72, 29, 86, 29) +
+         _box(90, 18, 56, 22, S, A) + _txt(118, 33, "current_user", A, 7) +
+         _txt(80, 64, "401 unknown  ·  403 not allowed", M, 7)),
+    [
+        ("Reading a bearer token",
+         "The header, parsed in one dependency. Every endpoint that needs a user "
+         "declares one parameter.",
+         '''from fastapi import Depends, FastAPI, Header, HTTPException, status
+
+app = FastAPI()
+TOKENS = {"tok-ada": {"name": "ada", "scopes": ["modules:read"]}}
+
+def current_user(authorization: str = Header(default="")):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing bearer token",
+                            headers={"WWW-Authenticate": "Bearer"})
+    user = TOKENS.get(authorization[7:])
+    if user is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token",
+                            headers={"WWW-Authenticate": "Bearer"})
+    return user
+
+@app.get("/me")
+def me(user: dict = Depends(current_user)):
+    return user
+
+c = TestClient(app)
+print("none  :", c.get("/me").status_code)
+print("wrong :", c.request("GET", "/me", headers={"authorization": "Bearer x"}).status_code)
+print("ok    :", c.request("GET", "/me",
+                           headers={"authorization": "Bearer tok-ada"}).json())'''),
+
+        ("What a signed token actually is",
+         "Payload plus a signature made with a secret. Anyone can read it; only the "
+         "holder of the secret can produce one.",
+         '''import base64, hashlib, hmac, json
+
+SECRET = b"a-server-side-secret"
+
+def b64(raw):  return base64.urlsafe_b64encode(raw).rstrip(b"=")
+def unb64(s):  return base64.urlsafe_b64decode(s + b"=" * (-len(s) % 4))
+
+def sign(payload: dict) -> bytes:
+    body = b64(json.dumps(payload, separators=(",", ":")).encode())
+    mac = hmac.new(SECRET, body, hashlib.sha256).digest()
+    return body + b"." + b64(mac)
+
+def verify(token: bytes):
+    body, _, given = token.partition(b".")
+    expected = b64(hmac.new(SECRET, body, hashlib.sha256).digest())
+    if not hmac.compare_digest(given, expected):     # constant time
+        return None
+    return json.loads(unb64(body))
+
+tok = sign({"sub": "ada", "scopes": ["modules:read"]})
+print("token   :", tok.decode()[:52], "...")
+print("readable:", json.loads(unb64(tok.split(b".")[0])))
+print("verified:", verify(tok))
+print("tampered:", verify(b"eyJzdWIiOiJyb290In0.abc"))
+print()
+print("Signed, not encrypted. Never put a secret in the payload.")'''),
+
+        ("Expiry has to be checked",
+         "A signature says the token is genuine. It says nothing about whether it is "
+         "still valid.",
+         '''import time
+from fastapi import Depends, FastAPI, Header, HTTPException
+
+app = FastAPI()
+ISSUED = {"tok-fresh": {"sub": "ada", "exp": time.time() + 3600},
+          "tok-stale": {"sub": "ada", "exp": time.time() - 1}}
+
+def current_user(authorization: str = Header(default="")):
+    claims = ISSUED.get(authorization.replace("Bearer ", ""))
+    if claims is None:
+        raise HTTPException(401, "Invalid token")
+    if claims["exp"] < time.time():
+        raise HTTPException(401, "Token expired")
+    return {"name": claims["sub"]}
+
+@app.get("/me")
+def me(user: dict = Depends(current_user)):
+    return user
+
+c = TestClient(app)
+for tok in ["tok-fresh", "tok-stale"]:
+    r = c.request("GET", "/me", headers={"authorization": "Bearer " + tok})
+    print("%-10s %s %s" % (tok, r.status_code, r.json()))'''),
+
+        ("Scopes, layered as dependencies",
+         "Authentication answers who; authorisation answers whether. They are "
+         "different questions and different status codes.",
+         '''from fastapi import Depends, FastAPI, Header, HTTPException, status
+
+app = FastAPI()
+TOKENS = {"reader": ["modules:read"], "editor": ["modules:read", "modules:write"]}
+
+def current_user(x_token: str = Header(default="")):
+    if x_token not in TOKENS:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in")
+    return {"name": x_token, "scopes": TOKENS[x_token]}
+
+class RequireScope:
+    def __init__(self, *scopes): self.scopes = set(scopes)
+    def __call__(self, user: dict = Depends(current_user)):
+        missing = self.scopes - set(user["scopes"])
+        if missing:
+            raise HTTPException(status.HTTP_403_FORBIDDEN,
+                                "Missing scope: %s" % ", ".join(sorted(missing)))
+        return user
+
+can_read = RequireScope("modules:read")
+can_write = RequireScope("modules:write")
+
+@app.get("/modules")
+def read(u: dict = Depends(can_read)): return {"ok": u["name"]}
+
+@app.post("/modules")
+def write(u: dict = Depends(can_write)): return {"ok": u["name"]}
+
+c = TestClient(app)
+for tok in ["", "reader", "editor"]:
+    h = {"x-token": tok} if tok else {}
+    print("%-7s GET %s  POST %s" % (tok or "-",
+          c.request("GET", "/modules", headers=h).status_code,
+          c.request("POST", "/modules", headers=h).status_code))'''),
+
+        ("Not leaking which one was wrong",
+         "A login that says “no such user” tells an attacker which names exist. Say "
+         "the same thing either way.",
+         '''import hashlib, hmac
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI()
+
+def digest(password: str, salt: bytes) -> bytes:
+    # Illustrative only. A real system uses bcrypt, scrypt or argon2 through
+    # a library: those are deliberately SLOW, which is the property that
+    # matters and the one a plain hash does not have.
+    return hmac.new(salt, password.encode(), hashlib.sha256).digest()
+
+SALT = b"per-user-salt"
+USERS = {"ada": digest("correct-horse", SALT)}
+
+class Login(BaseModel):
+    username: str
+    password: str
+
+@app.post("/login")
+def login(body: Login):
+    stored = USERS.get(body.username)
+    candidate = digest(body.password, SALT)
+    # Compare even when the user is unknown, and say one thing either way.
+    if stored is None or not hmac.compare_digest(stored, candidate):
+        raise HTTPException(401, "Incorrect username or password")
+    return {"token": "tok-" + body.username}
+
+c = TestClient(app)
+for u, p in [("ada", "correct-horse"), ("ada", "wrong"), ("nobody", "wrong")]:
+    r = c.post("/login", json={"username": u, "password": p})
+    print("%-8s %-14s %s %s" % (u, p, r.status_code, r.json()))'''),
+
+        ("Keeping secrets out of the response",
+         "The response model is the last line of defence, and the one that cannot be "
+         "forgotten by a future handler.",
+         '''from fastapi import FastAPI
+from pydantic import BaseModel, Field, SecretStr
+
+app = FastAPI()
+
+ROW = {"id": 1, "name": "ada", "email": "ada@vizlearn.in",
+       "password_hash": "$2b$12$abcdef", "api_token": "tok_live_123"}
+
+class UserOut(BaseModel):
+    id: int
+    name: str                       # email and secrets simply absent
+
+@app.get("/users/1", response_model=UserOut)
+def read():
+    return ROW
+
+class UserInternal(BaseModel):
+    name: str
+    password_hash: str = Field(exclude=True)
+    api_token: SecretStr
+
+u = UserInternal(name="ada", password_hash="$2b$12$abcdef", api_token="tok_live_123")
+
+print("public response :", TestClient(app).get("/users/1").json())
+print("internal repr   :", u)
+print("internal dump   :", u.model_dump())'''),
+    ],
+    [
+        "Authentication belongs in a dependency: stated once, impossible for an endpoint to forget, and it appears in the schema.",
+        "<strong>401</strong> means not authenticated and should carry <code>WWW-Authenticate</code>. <strong>403</strong> means authenticated and not allowed. They are different questions.",
+        "A signed token is <em>readable</em> by anyone &mdash; signing is not encryption. Never put anything secret in the payload.",
+        "A valid signature does not mean a valid token: expiry has to be checked separately, and revocation needs a store.",
+        "Compare secrets with <code>hmac.compare_digest</code>, not <code>==</code>, so the comparison does not leak by timing.",
+        "A login should say the same thing whether the user is unknown or the password is wrong, or it enumerates accounts.",
+    ],
+    '''
+title: Security Basics
+intro: Authentication as a dependency, what a token actually is, and the mistakes that matter most.
+
+## Authentication is a dependency
+
+Everything from the dependencies tier applies here, and this is the case that justifies it.
+
+```python
+def current_user(authorization: str = Header(default="")) -> User:
+    ...
+    raise HTTPException(401, "Invalid token")
+```
+
+Stated once. Every endpoint that needs a user declares one parameter, and one that does not, does not. An endpoint cannot forget the check, because if it declares `current_user` then the check ran &mdash; the request could not have reached the handler otherwise.
+
+A section is protected by putting it on the router, so a route added next year inherits it rather than needing somebody to remember.
+
+## 401 and 403
+
+Worth restating because collapsing them is so common.
+
+**401 Unauthorized** actually means *unauthenticated*: I do not know who you are. It should carry a `WWW-Authenticate` header naming the scheme.
+
+**403 Forbidden** means: I know who you are, and no.
+
+A client seeing 401 should obtain credentials or refresh a token. One seeing 403 should not, because retrying as the same person will fail again. Merging them produces a login loop where there should be a message.
+
+Layering them as separate dependencies &mdash; `current_user` raising 401, `require_scope` raising 403 &mdash; makes the distinction structural rather than something each handler decides.
+
+## What a token is
+
+A signed token is a payload plus a signature computed with a server-side secret.
+
+The property that matters, and that people get wrong: **it is signed, not encrypted**. Anyone holding the token can decode and read the payload. The signature proves it was issued by someone with the secret and has not been altered &mdash; nothing more.
+
+So the payload may contain a user id, an expiry, a set of scopes. It must never contain a password, a card number, or anything else that should not be read by whoever holds the token &mdash; which includes anyone who obtains it from a log, a browser's storage, or a proxy.
+
+The second editor above builds and verifies one with nothing but the standard library, because the mechanism is worth seeing once. In production, use a library &mdash; PyJWT or Authlib &mdash; which handles the algorithm choices, the claim conventions and the parsing edge cases that a hand-rolled version gets wrong.
+
+## A signature is not validity
+
+A token can be perfectly signed and still unacceptable.
+
+**Expiry** must be checked explicitly. A signature has no opinion about time.
+
+**Revocation** is harder, and it is the honest weakness of stateless tokens: a signed token stays valid until it expires, so logging out or disabling an account does not stop it. The usual answers are short lifetimes plus refresh tokens, or a denylist &mdash; which reintroduces the state that stateless tokens were meant to avoid.
+
+Pick a short expiry. Fifteen minutes with a refresh flow is a common shape; a token valid for a year is a credential you cannot withdraw.
+
+## Comparing secrets
+
+Use `hmac.compare_digest`, not `==`.
+
+A normal string comparison returns as soon as it finds a difference, so the time it takes reveals how many leading characters were correct. Over enough attempts that is enough to reconstruct a secret. `compare_digest` takes the same time regardless.
+
+This applies to tokens, signatures, API keys and password hashes &mdash; anything an attacker can submit repeatedly.
+
+## Not leaking who exists
+
+A login that returns "no such user" for one input and "wrong password" for another lets anyone enumerate accounts.
+
+Return the same message either way, and perform the hash comparison even when the username is unknown &mdash; otherwise the *timing* difference says what the message did not.
+
+The same reasoning applies to 404 versus 403 on a resource that exists but is not yours: returning 403 confirms it exists. For anything sensitive, 404 for both, consistently.
+
+## Passwords
+
+Two rules, and the second is not optional.
+
+**Never store a password.** Store a hash.
+
+**Never hash it with SHA-256 alone.** General-purpose hashes are designed to be fast, which is exactly the wrong property. Use a deliberately slow, salted algorithm designed for passwords: bcrypt, scrypt or argon2, through a library like `passlib`.
+
+The editor above uses PBKDF2 from the standard library to show the shape without pulling in a dependency. It is better than a bare SHA-256 and it is not what you should ship; the real answer is a library that keeps its parameters current as hardware gets faster.
+
+## Keeping secrets out of responses
+
+The last line of defence, and the one that survives a future handler being careless.
+
+A `response_model` listing only what may be seen cannot leak a field added to the table later. `Field(exclude=True)` keeps a value out of every dump. `SecretStr` keeps it out of `repr`, logs and tracebacks.
+
+Use all three where they fit, and prefer the separate output model, because it is the only one that cannot be forgotten by somebody editing a different file.
+
+## What this module does not cover
+
+Enough to be worth naming: CSRF for cookie-based sessions, CORS configuration, rate limiting, input sanitisation for anything rendered as HTML, dependency scanning, and secrets management.
+
+Each is a real subject. The point of this one is that the *shape* &mdash; authentication as a dependency, authorisation layered on top, secrets kept out of payloads and responses &mdash; is what the framework gives you, and getting that shape right is what makes the rest tractable.
+
+
+## Mistakes people make
+
+**Putting anything secret in a token payload.** It is signed, not encrypted. Anyone holding it reads it - including from a log, browser storage or a proxy.
+
+**Checking the signature and stopping.** Expiry is a separate check, and a signature has no opinion about whether an account was disabled.
+
+**Long-lived tokens.** A stateless token is valid until it expires, so a year-long token is a credential you cannot withdraw.
+
+**Comparing with `==`.** The timing reveals how many leading characters matched. `hmac.compare_digest` does not.
+
+**Distinct login errors.** "No such user" enumerates accounts - and skipping the hash comparison for an unknown user leaks the same fact through timing.
+
+**Hashing passwords with SHA-256.** Fast is the wrong property. bcrypt, scrypt or argon2, through a library.
+
+**403 on a resource that exists but is not yours.** It confirms existence. For anything sensitive, 404 for both, consistently.
+
+**Trusting a client-supplied identity header.** `X-User-Id` is a claim unless a proxy sets it and strips whatever the client sent.
+
+## What this does not cover
+
+Worth naming so the gaps are known: CSRF for cookie sessions, CORS, rate limiting, sanitising anything rendered as HTML, dependency scanning, and secrets management.
+
+Each is a subject. What this module gives you is the shape - authentication as a dependency, authorisation layered above it, secrets out of payloads and out of responses - and that shape is what makes the rest tractable rather than scattered.
+
+## Next
+
+How the pieces are arranged once the application is more than one file.
+
+
+## Where to be careful
+
+Three habits that prevent most of what goes wrong, beyond anything in the editors above.
+
+**Never log credentials.** `Authorization` and `Cookie` are in every request and are the two headers you least want persisted. A logging middleware that dumps headers is a breach waiting for a log aggregator.
+
+**Never put secrets in a URL.** They land in browser history, server logs, proxy logs and `Referer` headers. That is the argument for `Authorization` over `?api_key=`.
+
+**Fail closed.** A permission check that errors should deny, not allow. Code shaped `if not allowed: raise` denies on an exception; code shaped `if denied: raise` permits when the check itself breaks.
+
+## What to reach for
+
+For anything real, use libraries rather than the primitives shown here.
+
+Tokens: PyJWT or Authlib, which handle algorithm choice, claim conventions and the parsing edge cases a hand-rolled version gets wrong - including the `alg: none` family of attacks.
+
+Passwords: passlib with bcrypt or argon2, which keeps its parameters current as hardware gets faster.
+
+OAuth2 and OpenID Connect: FastAPI ships `OAuth2PasswordBearer` and friends, which integrate with the docs so the interactive page can authenticate.
+
+The editors here build things from `hmac` and `hashlib` to show what is underneath. That is worth seeing once and is not what you should ship.
+
+## Summary
+
+Authentication belongs in a dependency: stated once, impossible for an endpoint to forget, and visible in the schema. Authorisation layers above it, and the two produce different status codes for different questions.
+
+A signed token is readable by anyone holding it, so nothing secret goes in the payload. A valid signature is not a valid token - expiry is a separate check and revocation needs state.
+
+Compare secrets in constant time, say the same thing for an unknown user as for a wrong password, hash passwords with something deliberately slow, and let a response model decide what may leave.
+
+## Next
+
+How the pieces are arranged once the application is more than one file: routers per resource, services that know nothing about HTTP, schemas separated by direction, and an assembly file short enough to read at a glance.
+
+
+## The shape to take away
+
+Authentication is a dependency. Authorisation is a dependency that depends on it. Both raise, so neither can be forgotten by an endpoint that declares them, and both appear in the schema.
+
+Everything else in this module is a detail hung on that frame: what goes in a token, how to compare a secret, what a login should say, what a response model must not contain.
+
+The frame is what the framework gives you. The details are what a review should check before anything real depends on them.
+
+
+## A closing thought
+
+The most useful thing in this module is not any individual rule. It is that authentication has one place to live.
+
+An application where every endpoint checks a header its own way has as many security models as it has endpoints, and no way to review them. One where every endpoint declares `Depends(current_user)` has one, written down, that a reviewer can read in a minute.
+
+That does not make it correct. It makes it *reviewable*, which is the precondition for it becoming correct.
+
+## A closing note
+
+Security is the area where the framework helps most with shape and least with substance.
+
+`Depends` makes authentication impossible for an endpoint to forget, gives it one place to live, and puts it in the schema. That is genuinely valuable and it is structural - it says nothing about whether your token lifetime is sensible, your hashing is current, or your permission model matches what the business intended.
+
+Those are decisions, and they need review by someone who does this for a living before anything real depends on them. What this module offers is the arrangement that makes such a review possible: rules in one place, expressed once, visible in the signature of every endpoint that relies on them.
+
+## In one line
+
+Authentication is a dependency and authorisation depends on it; a signed token is readable, a valid signature is not a valid token, secrets compare in constant time, logins say one thing either way, and a response model decides what leaves.
+
+And for anything real, use libraries rather than the primitives shown here: they exist because the edge cases are numerous and the consequences of missing one are not proportionate to the effort saved.
+''',
+    [
+        {"q": "Is a signed token encrypted?",
+         "options": ["Yes", "No - anyone holding it can read the payload", "Only with HTTPS", "Only the header"],
+         "answer": 1,
+         "why": "The signature proves origin and integrity, not confidentiality. Nothing secret belongs in the payload, because logs, browser storage and proxies all see it."},
+        {"q": "Why use `hmac.compare_digest` instead of `==`?",
+         "options": ["It is faster", "`==` returns early, so its timing reveals how many characters were correct", "It handles bytes", "No reason"],
+         "answer": 1,
+         "why": "Over enough attempts, a timing difference is enough to reconstruct a secret. compare_digest takes constant time."},
+        {"q": "A login where the username does not exist. What should it return?",
+         "options": ["\"No such user\"", "The same message as a wrong password, after doing the comparison anyway", "A 404", "A 403"],
+         "answer": 1,
+         "why": "Different messages enumerate accounts - and skipping the hash comparison leaks the same fact through timing even when the message does not."},
+        {"q": "A signed token has a valid signature. Is it acceptable?",
+         "options": ["Yes", "Not necessarily - expiry and revocation are separate checks", "Only if fresh", "Only with scopes"],
+         "answer": 1,
+         "why": "A signature has no opinion about time or about whether the account was disabled. That is the honest weakness of stateless tokens, which short lifetimes mitigate."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 26. Project structure
+# ---------------------------------------------------------------------------
+topic(
+    "project_structure",
+    "Project Structure",
+    "In Practice",
+    "How the pieces are arranged once the application is more than one file - and "
+    "why the assembly file should be boring.",
+    _svg(_box(50, 10, 60, 16, S, A) + _txt(80, 22, "main.py", A, 8) +
+         _arrow(64, 28, 36, 40) + _arrow(96, 28, 124, 40) +
+         _box(10, 42, 52, 16, S) + _txt(36, 54, "routers", M, 7) +
+         _box(98, 42, 52, 16, S) + _txt(124, 54, "services", M, 7) +
+         _box(54, 66, 52, 16, S) + _txt(80, 78, "schemas", M, 7)),
+    [
+        ("A router per resource",
+         "The unit that scales. Each file owns one resource's paths and nothing "
+         "else.",
+         '''from fastapi import APIRouter, FastAPI
+
+# routers/modules.py
+modules = APIRouter(prefix="/modules", tags=["modules"])
+
+@modules.get("")
+def list_modules(): return ["Vectors"]
+
+@modules.get("/{i}")
+def read(i: int): return {"id": i}
+
+# routers/tracks.py
+tracks = APIRouter(prefix="/tracks", tags=["tracks"])
+
+@tracks.get("")
+def list_tracks(): return ["maths"]
+
+# main.py - assembly, and nothing else
+app = FastAPI(title="VizLearn API", version="1.0.0")
+app.include_router(modules)
+app.include_router(tracks)
+
+c = TestClient(app)
+print(c.get("/modules").json(), c.get("/modules/7").json(), c.get("/tracks").json())
+print()
+for r in app.routes:
+    if getattr(r, "methods", None):
+        print("  %-6s %s" % (",".join(sorted(r.methods)), r.path))'''),
+
+        ("Handlers stay thin",
+         "The handler translates HTTP; the service does the work and imports nothing "
+         "from the framework.",
+         '''from fastapi import APIRouter, FastAPI, HTTPException
+from pydantic import BaseModel, Field
+
+# services/modules.py - no fastapi import anywhere in here
+class ModuleNotFound(Exception):
+    def __init__(self, i): self.i = i
+
+DB = {1: {"id": 1, "title": "Vectors"}}
+
+def get_module(i: int) -> dict:
+    if i not in DB:
+        raise ModuleNotFound(i)
+    return DB[i]
+
+def create_module(title: str) -> dict:
+    i = max(DB) + 1
+    DB[i] = {"id": i, "title": title}
+    return DB[i]
+
+# schemas/modules.py
+class ModuleIn(BaseModel):
+    title: str = Field(min_length=3)
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+
+# routers/modules.py
+router = APIRouter(prefix="/modules", tags=["modules"])
+
+@router.get("/{i}", response_model=ModuleOut)
+def read(i: int):
+    try:
+        return get_module(i)
+    except ModuleNotFound:
+        raise HTTPException(404, "No module %d" % i)
+
+@router.post("", response_model=ModuleOut, status_code=201)
+def create(body: ModuleIn):
+    return create_module(body.title)
+
+app = FastAPI(); app.include_router(router)
+c = TestClient(app)
+print(c.post("/modules", json={"title": "Norms"}).json())
+print(c.get("/modules/1").json())
+print("missing:", c.get("/modules/99").status_code)'''),
+
+        ("Domain errors mapped in one place",
+         "Better than the try/except above: the service raises, and one handler "
+         "decides the status.",
+         '''from fastapi import APIRouter, FastAPI, Request
+from fastapi.responses import JSONResponse
+
+class ModuleNotFound(Exception):
+    def __init__(self, i): self.i = i
+
+class TitleTaken(Exception):
+    def __init__(self, t): self.t = t
+
+DB, TITLES = {1: "Vectors"}, {"Vectors"}
+
+def get_module(i):
+    if i not in DB: raise ModuleNotFound(i)
+    return {"id": i, "title": DB[i]}
+
+def create_module(title):
+    if title in TITLES: raise TitleTaken(title)
+    TITLES.add(title); return {"id": 2, "title": title}
+
+router = APIRouter(prefix="/modules")
+
+@router.get("/{i}")
+def read(i: int): return get_module(i)          # no try/except
+
+@router.post("")
+def create(title: str): return create_module(title)
+
+app = FastAPI()
+app.include_router(router)
+
+@app.exception_handler(ModuleNotFound)
+async def nf(r: Request, e: ModuleNotFound):
+    return JSONResponse(status_code=404, content={"detail": "No module %d" % e.i})
+
+@app.exception_handler(TitleTaken)
+async def tt(r: Request, e: TitleTaken):
+    return JSONResponse(status_code=409, content={"detail": "%r exists" % e.t})
+
+c = TestClient(app)
+print(c.get("/modules/1").json())
+print("missing  :", c.get("/modules/99").status_code, c.get("/modules/99").json())
+print("duplicate:", c.post("/modules?title=Vectors").status_code)'''),
+
+        ("Settings in one model",
+         "Configuration read once and validated, rather than <code>os.getenv</code> "
+         "scattered through the routers.",
+         '''import os
+from fastapi import FastAPI
+from pydantic import BaseModel, Field, ValidationError
+
+class Settings(BaseModel):
+    app_name: str = "VizLearn API"
+    page_size: int = Field(default=20, ge=1, le=100)
+    debug: bool = False
+
+def load_settings(env: dict) -> Settings:
+    return Settings(**{k[3:].lower(): v for k, v in env.items()
+                       if k.startswith("VZ_")})
+
+good = load_settings({"VZ_PAGE_SIZE": "50", "VZ_DEBUG": "yes"})
+print("loaded :", good.model_dump())
+
+try:
+    load_settings({"VZ_PAGE_SIZE": "5000"})
+except ValidationError as e:
+    print("refused:", e.errors()[0]["msg"])
+
+app = FastAPI(title=good.app_name)
+@app.get("/config")
+def config(): return good.model_dump()
+print("served :", TestClient(app).get("/config").json())'''),
+
+        ("Dependencies shared across routers",
+         "One module holding what several routers need, so the same rule is not "
+         "written twice.",
+         '''from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
+
+# dependencies.py
+def current_user(x_token: str = Header(default="")):
+    if x_token != "tok":
+        raise HTTPException(401, "Sign in")
+    return {"name": "ada"}
+
+def pagination(limit: int = 10, offset: int = 0):
+    return {"limit": min(limit, 100), "offset": offset}
+
+# routers/modules.py
+modules = APIRouter(prefix="/modules", tags=["modules"])
+
+@modules.get("")
+def list_modules(page: dict = Depends(pagination)):
+    return {"page": page}
+
+# routers/account.py
+account = APIRouter(prefix="/account", tags=["account"],
+                    dependencies=[Depends(current_user)])
+
+@account.get("")
+def me(user: dict = Depends(current_user)):
+    return user
+
+app = FastAPI()
+app.include_router(modules); app.include_router(account)
+
+c = TestClient(app)
+print(c.get("/modules?limit=500").json())
+print("locked:", c.get("/account").status_code)
+print("open  :", c.request("GET", "/account", headers={"x-token": "tok"}).json())'''),
+
+        ("The whole shape, assembled",
+         "Everything in one place so the arrangement is visible: settings, "
+         "dependencies, services, schemas, routers, handlers.",
+         '''from fastapi import APIRouter, Depends, FastAPI, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+# --- settings ------------------------------------------------------------
+class Settings(BaseModel):
+    page_size: int = Field(default=2, ge=1, le=100)
+settings = Settings()
+
+# --- domain --------------------------------------------------------------
+class NotFound(Exception): pass
+STORE = {1: "Vectors", 2: "Norms", 3: "Loops"}
+def list_modules(limit): return list(STORE.items())[:limit]
+def get_module(i):
+    if i not in STORE: raise NotFound()
+    return {"id": i, "title": STORE[i]}
+
+# --- schemas -------------------------------------------------------------
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+
+# --- dependencies --------------------------------------------------------
+def page_limit(limit: int = None):
+    return limit or settings.page_size
+
+# --- routers -------------------------------------------------------------
+router = APIRouter(prefix="/modules", tags=["modules"])
+
+@router.get("")
+def index(limit: int = Depends(page_limit)):
+    return [{"id": i, "title": t} for i, t in list_modules(limit)]
+
+@router.get("/{i}", response_model=ModuleOut)
+def read(i: int):
+    return get_module(i)
+
+# --- assembly ------------------------------------------------------------
+app = FastAPI(title="VizLearn API", version="1.0.0")
+app.include_router(router)
+
+@app.exception_handler(NotFound)
+async def nf(r: Request, e: NotFound):
+    return JSONResponse(status_code=404, content={"detail": "Not found"})
+
+c = TestClient(app)
+print(c.get("/modules").json())
+print(c.get("/modules?limit=3").json())
+print(c.get("/modules/2").json())
+print("missing:", c.get("/modules/99").status_code)'''),
+    ],
+    [
+        "One router per resource, in its own file. Create the directory on day one, not at the eightieth endpoint.",
+        "Handlers translate HTTP and call a service. The service imports nothing from FastAPI, so it works from a job, a CLI or a test.",
+        "Domain exceptions raised low and mapped to statuses by one handler keeps HTTP out of the business logic entirely.",
+        "Settings belong in one validated model read once, not <code>os.getenv</code> scattered through routers.",
+        "Shared dependencies live in one module, because several routers need the same ones.",
+        "<code>main.py</code> should be boring: create the app, register handlers, include routers, add middleware. Short enough to read in one screen.",
+    ],
+    '''
+title: Project Structure
+intro: How the pieces are arranged once the application is more than one file.
+
+## The layout
+
+Nothing here is clever, and that is the point.
+
+```
+app/
+  main.py            # create the app, register handlers, include routers
+  settings.py        # one validated model
+  dependencies.py    # what several routers share
+  routers/
+    modules.py
+    tracks.py
+  schemas/
+    modules.py       # ModuleCreate, ModuleUpdate, ModuleOut
+  services/
+    modules.py       # the work; imports nothing from fastapi
+```
+
+The test of a layout is whether somebody asked to add a field can guess which files to open. If the answer is "search for the word", the structure has stopped helping.
+
+## main.py should be boring
+
+It does four things: create the `FastAPI` instance, register exception handlers, include routers, add middleware.
+
+If it fits on a screen, it is the one place to answer "what does this application consist of?". If it grows business logic, that answer disappears.
+
+Two things commonly end up there and should not. **Settings** belong in their own module, because scattering `os.getenv` makes it impossible to see what the application needs to run. And **startup work** belongs in a lifespan rather than at import, because work done at import happens when a test collector imports the module.
+
+## Group by resource, inside a shallow layer structure
+
+Both options look reasonable and one degrades.
+
+Grouping by **resource** &mdash; `routers/modules.py`, `services/modules.py`, `schemas/modules.py` &mdash; means a change to one concept touches files with the same name in different directories. Easy to find, easy to review.
+
+Grouping by **layer alone**, with every router in one file, means those files grow without bound and every change collides with every other.
+
+Resource-first inside a shallow layer structure is what stays navigable. Two levels is plenty; deep package trees make imports long and tell you nothing extra.
+
+## Handlers translate, services do
+
+The most valuable boundary in the whole layout.
+
+A handler's job is HTTP: take validated input, call something, turn the result into a response. Everything else belongs in a service that knows nothing about the framework.
+
+The test is whether the service imports `fastapi`. If it raises `HTTPException`, it can only be used from a request &mdash; not from a background job, a management command, a scheduled task or a test. If it raises `ModuleNotFound`, it can be used from all of them, and one exception handler maps that to a 404 at the edge.
+
+That mapping is worth doing early. Retrofitting it means finding every `HTTPException` scattered through service code and deciding what each should have been, usually while changing something else.
+
+## Schemas by direction
+
+From the response-model module, and it belongs in the layout too.
+
+`ModuleCreate` takes what a caller may supply. `ModuleUpdate` has everything optional. `ModuleOut` declares what may be seen. Three small classes in one file, rather than one clever class with everything optional that documents nothing.
+
+Keeping them beside each other makes the differences visible, which is when people notice that the output model still contains a field it should not.
+
+## Dependencies in one module
+
+Several routers need the same ones &mdash; the session, the current user, pagination. A shared `dependencies.py` is where they are found.
+
+Reading that file should tell you what the application's endpoints are allowed to assume. That is a genuinely useful summary, and it is the same argument as the `types.py` from the Pydantic track.
+
+## Settings in one model
+
+A Pydantic model, read once, validated at startup:
+
+```python
+class Settings(BaseModel):
+    page_size: int = Field(default=20, ge=1, le=100)
+    debug: bool = False
+```
+
+Two benefits over reading the environment where it is needed. A missing or invalid value fails at startup with a message naming the field, rather than at request time in a handler. And the model is a list of everything the application needs to run, in one place, which is what a deployment checklist wants to be generated from.
+
+`pydantic-settings` does the environment reading properly, including `.env` files and nested configuration.
+
+## When to split
+
+Earlier than feels necessary.
+
+Create `routers/` on day one, even with two endpoints. Moving three routes is trivial; moving eighty means untangling imports and moving tests, and by then it does not happen and the file keeps growing.
+
+The same applies to the service boundary. Extracting the first service when there is one function is a two-minute job. Extracting the twentieth from handlers that have grown around them is a rewrite.
+
+## What this buys
+
+Each piece testable on its own: a router included into a small app, a service called as a plain function, a schema validated against a payload, settings constructed from a dict.
+
+A suite that needs "the module under test" rather than "a database, Redis and three environment variables" is the practical difference, and it comes almost entirely from where things were put.
+
+
+## Mistakes people make
+
+**Waiting to split.** Moving three routes is trivial; moving eighty is a rewrite that does not happen, so the file keeps growing.
+
+**Business logic in routers.** A router importing your ORM works and stops being testable without a database.
+
+**`HTTPException` in services.** The service can then only run inside a request - not from a job, a CLI or a test.
+
+**`os.getenv` scattered about.** Nothing then says what the application needs to run, and a bad value fails at request time instead of at startup.
+
+**Startup work at import.** Every test collector and linter pays for it.
+
+**Deep package trees.** Two levels is plenty. Long import paths tell you nothing extra.
+
+**Grouping only by layer.** One file with every router grows without bound and every change collides with every other.
+
+## The test of a layout
+
+Ask somebody new to add a field to one resource and watch what they do.
+
+If they open `schemas/modules.py`, `services/modules.py` and `routers/modules.py`, the structure is working. If they search the codebase for a string, it is not.
+
+That test matters more than any particular arrangement. A layout is a guess about where people will look, and the only evidence is whether they find it.
+
+## Where the track leaves you
+
+Routing, every source of input, the response and its status, errors, structure, the whole dependency system, the runtime, testing, the generated documentation and the shape of authentication.
+
+That is enough to build and maintain a real API. What is left is mostly not FastAPI &mdash; databases, deployment, observability, the operational parts &mdash; and each of those is easier to learn once the application layer underneath it is arranged so that it can be reasoned about one piece at a time.
+
+
+## Growing into it
+
+No project should start with the full layout, and none should wait for it.
+
+**Day one**: `main.py` and `routers/`. Two files, one router, room to grow.
+
+**When a handler grows past a few lines**: extract the service. That is the boundary worth defending earliest, because everything else follows from it.
+
+**When two routers need the same thing**: `dependencies.py`.
+
+**When a model appears in two places**: `schemas/`.
+
+**When configuration appears in two places**: `settings.py`.
+
+Each step is prompted by something real rather than anticipated, and each takes minutes at the moment it is prompted. The alternative - deferring all of them until the file is unmanageable - means doing them all at once, in a diff nobody can review.
+
+## What the layout is for
+
+Not tidiness. Testability, and the ability for somebody new to guess where things are.
+
+Those two are related: code that can be tested in isolation is code whose pieces have clear boundaries, and clear boundaries are what make a layout guessable. A structure that scores well on one usually scores well on the other, which is a convenient property when deciding whether an arrangement is worth the move.
+
+## Summary
+
+One router per resource in its own file, created on day one. Handlers translate HTTP and call services that import nothing from the framework, raising domain exceptions that one handler maps to statuses.
+
+Schemas separated by direction. Shared dependencies in one module. Settings in one validated model read at startup. And a `main.py` short enough to read in a screen, doing nothing but assembly.
+
+The value is not tidiness - it is that each piece becomes testable on its own, so the suite needs the module under test rather than the whole world.
+
+## Where the track leaves you
+
+Routing and the methods. Every source of input a request has, and what each is properly for. The response, its shape and its status. Errors, both automatic and raised. Structure, once one file stops being enough.
+
+The whole dependency system - declaring what an endpoint needs, composing those requirements, giving them a lifetime, applying them to a section, and replacing them at the edges.
+
+The runtime: where a handler runs and why the wrong choice is expensive, work after the response, and work once per process.
+
+And the practices: a suite that runs in seconds, a generated document consumers can build against, and the shape of authentication.
+
+That is enough to build and maintain a real API. What is left is largely not FastAPI - databases, deployment, observability, the operational parts - and each is easier once the layer underneath is arranged so it can be reasoned about a piece at a time.
+
+
+## A note on imports
+
+One practical detail that decides whether a layout survives.
+
+Circular imports are the failure mode of splitting an application up, and they come from the same place every time: a service importing something from a router, or a schema importing a service.
+
+The dependency direction should be one way. Routers import schemas and services. Services import schemas. Schemas import nothing of yours. Dependencies import schemas and services.
+
+Follow that and cycles are impossible. Break it once - a service that raises `HTTPException`, a schema that calls a service to validate - and the cycle appears later, from a direction nobody expected, usually while adding something unrelated.
+
+The domain-exception pattern is not only about testability. It is also what keeps the arrow pointing one way.
+
+
+## A closing thought
+
+None of this layout is FastAPI-specific, and none of it is new. Grouping by resource, keeping handlers thin, separating configuration, and assembling in a boring file are practices older than the framework.
+
+What FastAPI contributes is that following them is nearly free. A router is four lines. Inclusion is one. The documentation reorganises itself around your tags without being asked. A dependency is a default argument.
+
+When good structure costs almost nothing, the reason not to have it stops being effort and starts being habit - which is why the advice throughout this module is to do each piece earlier than it feels necessary.
+
+## What was left out, and why
+
+Three subjects have no module here, deliberately.
+
+**Middleware** and **streaming responses** need a real event loop with anyio task groups, which these pages cannot provide. Writing them with code that cannot run would have broken the property every other page on this track has.
+
+**WebSockets** need a real connection, which no amount of cleverness conjures in a browser tab.
+
+They are real parts of the framework and worth learning from the official documentation. The rest of this track runs, which is the trade that was chosen.
+
+## In one line
+
+One router per resource, services that never import the framework, schemas by direction, settings in one validated model, and an assembly file short enough to read at a glance - each introduced the moment it is prompted rather than once the file has become unmanageable.
+
+The arrow points one way - routers to services to schemas - and keeping it pointing that way is what prevents the circular imports that otherwise arrive from a direction nobody expected.
+''',
+    [
+        {"q": "What should `main.py` contain?",
+         "options": ["The endpoints", "Create the app, register handlers, include routers, add middleware", "Business logic", "The models"],
+         "answer": 1,
+         "why": "If it fits on a screen it answers \"what does this application consist of?\". Growing logic there destroys that."},
+        {"q": "How do you tell whether the service boundary is right?",
+         "options": ["By file size", "Whether the service imports fastapi", "By the number of functions", "By naming"],
+         "answer": 1,
+         "why": "A service raising HTTPException can only run inside a request. One raising a domain exception works from a job, a CLI or a test, with one handler mapping it at the edge."},
+        {"q": "Why put settings in one validated model?",
+         "options": ["Style", "A bad value fails at startup with a named field, and the model lists everything the app needs", "It is faster", "It is required"],
+         "answer": 1,
+         "why": "Scattered `os.getenv` fails at request time inside a handler, and leaves no single place that says what the application needs to run."},
+        {"q": "When should you create a routers/ directory?",
+         "options": ["At 50 endpoints", "On day one, with two", "Never", "When tests get slow"],
+         "answer": 1,
+         "why": "Moving three routes is trivial and moving eighty is a rewrite that does not happen - so the file keeps growing instead."},
+    ],
+)

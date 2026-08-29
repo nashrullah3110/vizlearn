@@ -457,6 +457,13 @@ SEQUENCE = {
         "fastapi/class_dependencies.html",
         "fastapi/router_and_global_dependencies.html",
         "fastapi/dependency_overrides.html",
+        "fastapi/async_vs_sync_endpoints.html",
+        "fastapi/background_tasks.html",
+        "fastapi/lifespan_events.html",
+        "fastapi/testing_fastapi.html",
+        "fastapi/openapi_and_docs.html",
+        "fastapi/security_basics.html",
+        "fastapi/project_structure.html",
     ],
     "pydantic": [
         "pydantic/what_is_pydantic.html",

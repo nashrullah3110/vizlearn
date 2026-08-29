@@ -1,0 +1,382 @@
+title: async def or def
+intro: Where your handler runs, and the one mistake that turns a fast framework into a slow one.
+
+## Two placements, one interface
+
+FastAPI accepts both:
+
+```python
+@app.get("/a")
+def handler(): ...
+
+@app.get("/b")
+async def handler(): ...
+```
+
+A caller cannot tell the difference. The response is the same, the documentation is the same, validation is the same.
+
+What differs is **where the function runs**. An `async def` endpoint is awaited directly on the event loop, in the same thread that is handling every other concurrent request. A `def` endpoint is handed to a threadpool, so the loop is free while it works.
+
+That single fact explains everything else in this module.
+
+
+## Both are ordinary endpoints
+
+The framework accepts either, and a caller cannot tell which you wrote. The difference is where the function runs.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/sync")
+def sync_endpoint():
+    return {"style": "def"}
+
+@app.get("/async")
+async def async_endpoint():
+    return {"style": "async def"}
+
+c = TestClient(app)
+print("sync :", c.get("/sync").status_code, c.get("/sync").json())
+print("async:", c.get("/async").status_code, c.get("/async").json())
+print()
+print("Identical from outside. The choice is about what the body does.")
+```
+
+## A sync handler is moved off the loop
+
+Starlette sends a <code>def</code> endpoint to a threadpool, so a blocking call in it cannot stall the loop.
+
+```python-run
+import threading
+from fastapi import FastAPI
+
+app = FastAPI()
+where = {}
+
+@app.get("/sync")
+def sync_endpoint():
+    where["sync"] = threading.current_thread().name
+    return {"thread": where["sync"]}
+
+@app.get("/async")
+async def async_endpoint():
+    where["async"] = threading.current_thread().name
+    return {"thread": where["async"]}
+
+c = TestClient(app)
+print("sync :", c.get("/sync").json())
+print("async:", c.get("/async").json())
+print()
+print("In a real server these differ: the sync one runs on a worker thread,")
+print("the async one on the thread owning the event loop.")
+```
+
+## The mistake
+
+<code>async def</code> plus a blocking call. Nothing errors, and every other request in the process waits for it.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+def slow_blocking_call():
+    total = 0
+    for i in range(200_000):        # stands in for a synchronous DB driver
+        total += i
+    return total
+
+@app.get("/wrong")
+async def wrong():                  # async, but blocks the loop
+    return {"total": slow_blocking_call()}
+
+@app.get("/right")
+def right():                        # sync, so it runs off the loop
+    return {"total": slow_blocking_call()}
+
+c = TestClient(app)
+print("both return the same thing:")
+print("  /wrong:", c.get("/wrong").json())
+print("  /right:", c.get("/right").json())
+print()
+print("Only one of them let the server keep serving while it worked.")
+```
+
+## Awaiting inside an async handler
+
+An <code>async def</code> endpoint earns its keep when it awaits &mdash; the loop runs something else while it waits.
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+order = []
+
+async def fetch(name):
+    order.append("start " + name)
+    value = await lookup(name)          # awaiting another coroutine
+    order.append("done " + name)
+    return value
+
+async def lookup(name):
+    return name.upper()
+
+@app.get("/chain")
+async def chain():
+    a = await fetch("a")
+    b = await fetch("b")
+    return {"results": [a, b], "order": list(order)}
+
+print(TestClient(app).get("/chain").json())
+print()
+print("An async handler awaiting async functions, all the way down.")
+print()
+print("Real interleaving - asyncio.gather over calls that actually wait -")
+print("needs a running event loop, which this page does not have. The")
+print("shape is the same; the concurrency is what a server adds.")
+```
+
+## Dependencies follow the same rule
+
+A <code>def</code> dependency goes to the threadpool and an <code>async def</code> one runs on the loop, independently of the handler.
+
+```python-run
+import threading
+from fastapi import Depends, FastAPI
+
+app = FastAPI()
+
+def sync_dep():
+    return {"dep": "sync", "thread": threading.current_thread().name}
+
+async def async_dep():
+    return {"dep": "async", "thread": threading.current_thread().name}
+
+@app.get("/mixed")
+async def mixed(a: dict = Depends(sync_dep), b: dict = Depends(async_dep)):
+    return {"a": a["dep"], "b": b["dep"]}
+
+print(TestClient(app).get("/mixed").json())
+print()
+print("An async handler may depend on a sync dependency and the reverse.")
+print("Each is placed by its own definition, not by the handler's.")
+```
+
+## Choosing, mechanically
+
+One question decides it: does the body await anything?
+
+```python-run
+from fastapi import FastAPI
+
+app = FastAPI()
+
+# Awaits something -> async def.
+async def load():
+    return "loaded"
+
+@app.get("/awaits")
+async def awaits():
+    await load()
+    return {"rule": "awaits something -> async def"}
+
+# Blocks -> def, and let the threadpool have it.
+@app.get("/blocks")
+def blocks():
+    sum(range(50_000))
+    return {"rule": "blocking call -> def"}
+
+# Neither -> either works; def is the safer default.
+@app.get("/neither")
+def neither():
+    return {"rule": "pure computation, no I/O -> def is fine"}
+
+c = TestClient(app)
+for p in ["/awaits", "/blocks", "/neither"]:
+    print(c.get(p).json())
+```
+## Why an event loop is fast
+
+An ASGI server handles many requests in one thread by never waiting. When a handler awaits a database query, the loop parks it and runs something else. Thousands of requests can be in flight with almost none of them consuming anything but memory.
+
+That works because awaiting yields control. It stops working the moment something does not.
+
+## The mistake
+
+```python
+@app.get("/users")
+async def users():
+    return db.query(User).all()      # a blocking driver
+```
+
+This looks modern and is the single most common performance bug in FastAPI applications.
+
+The function is `async`, so it runs on the loop. The query is synchronous, so it does not yield. For the entire duration of that query the loop is stuck: no other request progresses, no other handler runs, no keepalive is answered. One slow query has stopped the whole process.
+
+Nothing errors. The endpoint returns correctly. It is only under concurrency that the application turns out to handle one request at a time, and the symptom &mdash; everything is slow when the system is busy &mdash; points nowhere useful.
+
+The fix is one keyword:
+
+```python
+@app.get("/users")
+def users():
+    return db.query(User).all()
+```
+
+Now Starlette runs it in a threadpool and the loop keeps going.
+
+## The rule
+
+**Does the body await anything?**
+
+Yes &mdash; `async def`. An async database driver, an async HTTP client, `asyncio.sleep`, another async function.
+
+No, and it blocks &mdash; `def`. A synchronous driver, `requests`, file I/O, a CPU-bound computation.
+
+Neither &mdash; either works, and `def` is the safer default, because a blocking call added later cannot stall anything.
+
+The rule to distrust is "async is faster". Async is faster *when it awaits*. An async handler that blocks is slower than the sync version of the same code, because it takes the whole process with it.
+
+## Dependencies follow their own definition
+
+A dependency is placed by how *it* is written, not by the handler.
+
+So an `async def` handler can depend on a `def` dependency &mdash; the dependency goes to the threadpool, the handler stays on the loop &mdash; and the reverse works too. Mixing is normal and correct.
+
+The same rule applies to each: if the dependency opens a connection with a blocking driver, it should be `def`.
+
+## The threadpool is finite
+
+Sync handlers are safe for the loop and not free. Starlette's threadpool has a limited number of workers &mdash; a few dozen by default.
+
+If every request is a slow sync handler, those threads fill up and further requests queue waiting for one. The loop is healthy and the application is still stuck, which looks similar from outside and has a different cause.
+
+That is the real argument for async drivers under high concurrency: not that the syntax is better, but that awaiting costs a coroutine and blocking costs a thread, and there are far more coroutines available than threads.
+
+For most applications, the threadpool is entirely adequate and the simplicity of sync code is worth more than the ceiling.
+
+## Do not mix them badly
+
+Two specific things to avoid.
+
+**Calling a sync function that blocks from inside an async handler.** That is the mistake above wearing a different hat. If you must, `await run_in_threadpool(fn)` moves it off the loop explicitly.
+
+**Calling `asyncio.run()` inside a handler.** There is already a loop running; starting another raises. To call an async function from a sync handler, the honest answer is usually to make the handler async.
+
+## Being consistent
+
+An application that is mostly sync and mostly fast is a perfectly good application. So is one that is async throughout with async drivers.
+
+What causes trouble is a codebase where the choice was made per handler by whoever wrote it, without a rule &mdash; because then nobody can tell whether a given endpoint is safe to add a blocking call to, and eventually somebody adds one to the wrong sort.
+
+Pick a default, write it down, and make the exception deliberate.
+
+
+## Mistakes people make
+
+**`async def` with a blocking call.** The one that matters. Nothing errors and the whole process serves one request at a time under load, with a symptom - everything is slow when busy - that points nowhere useful.
+
+**Assuming async is faster.** Async is faster when it awaits. An async handler that blocks is worse than the sync version, because it takes every concurrent request with it.
+
+**`asyncio.run()` inside a handler.** There is already a loop; starting another raises. To call an async function from a sync handler, make the handler async.
+
+**Mixing drivers without noticing.** An async endpoint using a synchronous ORM is the same bug wearing different clothes. If the driver blocks, the endpoint should be `def`.
+
+**Ignoring the threadpool ceiling.** Sync handlers are safe for the loop and finite in number. Enough slow ones exhaust the pool, which looks the same from outside and has a different cause.
+
+**Choosing per handler with no rule.** Then nobody can tell whether a given endpoint is safe to add a blocking call to, and eventually somebody adds one to the wrong sort.
+
+## Diagnosing it
+
+Two symptoms distinguish the failures.
+
+**The loop is stalled**: latency rises across every endpoint at once, including trivial ones, and a health check that does nothing takes seconds. Something async is blocking.
+
+**The threadpool is full**: the fast endpoints stay fast while requests to slow sync ones queue. The loop is fine; the workers are all busy.
+
+The fix differs. The first needs the blocking call moved off the loop - change `async def` to `def`, or wrap it in `run_in_threadpool`. The second needs fewer slow synchronous operations, more workers, or async drivers.
+
+## Next
+
+Work that should happen after the response has been sent, which is what background tasks are for.
+
+## Being consistent
+
+An application that is mostly sync and mostly fast is a perfectly good application. So is one that is async throughout with async drivers. Both scale further than most services ever need.
+
+What causes trouble is a codebase where the choice was made per handler by whoever wrote it. Then nobody can look at an endpoint and tell whether adding a blocking call to it is safe, and eventually somebody adds one to the wrong sort.
+
+Pick a default, write it in the project's README, and make the exception deliberate. "Sync unless it awaits" is a fine rule. So is "async everywhere, and every driver must be async". The rule matters more than which one.
+
+
+## Where the ceilings are
+
+Two limits, and telling them apart is most of diagnosing a slow FastAPI service.
+
+**The loop** is stalled by any blocking call in an `async def` handler or dependency. One slow query stops every concurrent request in that process. The symptom is that everything gets slow at once, including endpoints that do nothing.
+
+**The threadpool** is exhausted by enough concurrent `def` handlers. The loop stays healthy and fast endpoints stay fast, while requests to slow ones queue for a worker.
+
+The first is a bug and the fix is free: move the blocking call off the loop. The second is a capacity limit, and the fixes are real - fewer slow synchronous operations, more workers, or async drivers so waiting costs a coroutine rather than a thread.
+
+Knowing which you have takes one observation: does a trivial endpoint also get slow? If yes, the loop. If no, the pool.
+
+## What async actually buys
+
+Worth stating plainly, because "async is faster" is both common and wrong.
+
+Async does not make any single request faster. A query takes as long either way.
+
+What it changes is how many requests one process can have **in flight** while waiting. With threads, waiting costs a thread and there are hundreds available. With coroutines, waiting costs a few kilobytes and there are hundreds of thousands available.
+
+For an API that spends most of its time waiting on other systems - which is most APIs - that is the difference between a machine handling a few hundred concurrent requests and one handling many thousands. It is a concurrency win, not a latency one, and only if the waiting is done by awaiting.
+
+## Summary
+
+`def` runs in a threadpool; `async def` runs on the event loop. Callers cannot tell.
+
+Write `async def` when the body awaits, `def` when it blocks, and `def` by default when it does neither - because a blocking call added later cannot then stall anything.
+
+Dependencies are placed by their own definition, so mixing is normal. And remember there are two ceilings: the loop, which one blocking call can stall, and the threadpool, which enough slow sync handlers can exhaust.
+
+## Next
+
+Work that should happen after the response has been sent - what background tasks are for, what they are not, and the point at which they need to become a real queue.
+
+
+## The rule, once more
+
+Awaits something, `async def`. Blocks, `def`. Neither, `def`.
+
+That covers essentially every case, and the reason the third clause defaults to `def` is that it is the only one that stays correct when somebody later adds a blocking call to a handler that used to do nothing much.
+
+
+## A closing thought
+
+This is the one place where FastAPI will let you write something that looks right, passes every test, and fails only under load.
+
+Nothing warns about `async def` around a blocking call. The endpoint is correct, the tests pass because they run one request at a time, and the problem appears in production as generalised slowness with no obvious cause.
+
+That asymmetry - easy to write, hard to notice, expensive to diagnose - is why it is worth knowing the rule properly rather than choosing by habit.
+
+## One more diagnostic
+
+If a service is slow and you are not sure which ceiling you have hit, the cheapest test is an endpoint that does nothing:
+
+```python
+@app.get("/ping")
+def ping():
+    return {"ok": True}
+```
+
+Under load, hit it. If it is fast while other endpoints crawl, the loop is healthy and the threadpool is saturated. If it is also slow, something is blocking the loop.
+
+That single observation separates a capacity problem from a bug, and the two have entirely different fixes.
+
+## In one line
+
+`async def` when the body awaits, `def` when it blocks, `def` by default when it does neither - because that is the only choice that stays correct when somebody adds a blocking call later.
+
+And if a service is slow and you cannot tell which ceiling you hit, hit an endpoint that does nothing: if it is fast, the pool is full; if it is slow, the loop is blocked.
