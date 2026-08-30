@@ -820,9 +820,20 @@ print("float32 halves the memory of float64 and keeps ~7 significant digits.")
 print("For image data and neural network weights that is usually plenty;")
 print("for accumulating a long sum it is not.")
 print()
-big = np.full(1_000_000, 1.0, dtype=np.float32)
-print("sum of 1e6 ones in float32:", float(big.sum()))
-print("with a float64 accumulator:", float(big.sum(dtype=np.float64)))'''),
+# float32 holds integers exactly only up to 2**24. Past that, the gap
+# between representable values is bigger than 1, so adding 1 does nothing.
+edge = np.float32(2 ** 24)
+print("2**24 in float32      :", float(edge))
+print("   + 1 changes nothing:", float(edge + np.float32(1)) == float(edge))
+print()
+# and a value that float32 cannot represent exactly accumulates error
+vals = np.full(1_000_000, 0.1, dtype=np.float32)
+f32 = float(vals.sum())
+f64 = float(vals.sum(dtype=np.float64))
+print("sum of 1e6 x 0.1")
+print("   float32 accumulator: %.6f" % f32)
+print("   float64 accumulator: %.6f" % f64)
+print("   difference         : %.6f" % abs(f32 - f64))'''),
     ],
     [
         "A dtype is a kind and a width. It is fixed when the array is created and applies to every element.",
@@ -1783,10 +1794,13 @@ print()
 print("The difference matters when something else holds a reference:")
 shared = np.zeros(3)
 alias = shared
-shared += 1
-print("   after +=  , alias:", alias)
-shared = shared + 1
-print("   after = + , alias:", alias, "<- left behind")'''),
+print("   start      shared:", shared, " alias:", alias)
+
+shared += 1                   # writes into the buffer both names see
+print("   after +=   shared:", shared, " alias:", alias, "<- followed")
+
+shared = shared + 1           # rebinds shared; alias still points at the old
+print("   after = +  shared:", shared, " alias:", alias, "<- left behind")'''),
 
         ("Where vectorisation is lost",
          "Two habits give the memory cost of arrays with the speed of lists.",
