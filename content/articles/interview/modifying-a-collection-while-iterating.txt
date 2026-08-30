@@ -5,21 +5,20 @@ intro: Why can&#x27;t you delete from a dict or a list while iterating it, and w
 
 Removing items from a list while looping over it <strong>silently skips elements</strong>. It does not raise, which is what makes it dangerous.
 
-```python
+```python-run
 nums = [1, 2, 3, 4, 5, 6]
 for n in nums:
     if n % 2 == 0:
         nums.remove(n)
 
-nums        # [1, 3, 5] -- looks correct
+print(nums)        # [1, 3, 5] -- looks correct
 
 nums = [1, 2, 2, 3]
 for n in nums:
     if n == 2:
         nums.remove(n)
-nums        # [1, 2, 3] -- one 2 SURVIVED
+print(nums)        # [1, 2, 3] -- one 2 SURVIVED
 ```
-
 The mechanism: list iteration is driven by an internal index. Removing element 1 shifts everything down one slot, and the index still advances &mdash; so the element that moved into the vacated position is never examined.
 
 |Step|Index|List|Sees|Action|
@@ -32,14 +31,16 @@ The list is now `[1, 2, 3]` and the loop is finished.
 
 <strong>Dictionaries and sets behave differently &mdash; they raise:</strong>
 
-```python
+```python-run
 d = {"a": 1, "b": 2}
-for k in d:
-    if d[k] == 1:
-        del d[k]
-# RuntimeError: dictionary changed size during iteration
+try:
+    for k in d:
+        if d[k] == 1:
+            del d[k]
+except RuntimeError as e:
+    print(type(e).__name__ + ":", e)
+print("dict is still:", d)
 ```
-
 Which is far better, because the failure is loud. Dicts and sets track a version counter and detect the change. Lists do not, so they fail quietly instead.
 
 |Collection|Mutating during iteration|
@@ -121,14 +122,22 @@ print("mutating values is legal:", nested)
 
 <strong>Build a new collection</strong> &mdash; clearest, and the default choice:
 
-```python
+```python-run
+nums = [1, 2, 3, 4, 5, 6]
+d = {"a": 1, "b": 2}
+
 nums = [n for n in nums if n % 2 != 0]
 d = {k: v for k, v in d.items() if v != 1}
-```
 
+print("nums:", nums)
+print("d   :", d)
+```
 <strong>Iterate over a copy</strong> when the original object must be mutated in place, because other references point at it:
 
-```python
+```python-run
+nums = [1, 2, 3, 4, 5, 6]
+d = {"a": 1, "b": 2}
+
 for n in nums[:]:              # a shallow copy
     if n % 2 == 0:
         nums.remove(n)
@@ -136,26 +145,40 @@ for n in nums[:]:              # a shallow copy
 for k in list(d):              # snapshot of the keys
     if d[k] == 1:
         del d[k]
-```
 
+print("nums:", nums)
+print("d   :", d)
+```
 `list(d)` is the idiom for dictionaries &mdash; it materialises the keys before the loop starts, so deletions during the loop cannot disturb it.
 
 <strong>Slice-assign</strong> to mutate in place with no copy semantics visible to callers:
 
-```python
-nums[:] = [n for n in nums if n % 2 != 0]
-```
+```python-run
+from collections import deque
+nums = [1, 2, 3, 4, 5, 6]
+items = [1, 2, 3]
+initial = [1, 2, 3]
 
+nums[:] = [n for n in nums if n % 2 != 0]
+
+print("rebound in place:", nums)
+```
 This is the underused one. It keeps the same list object &mdash; so aliases see the change &mdash; while doing the filtering safely.
 
 <strong>Iterate backwards</strong> when removing by index, since removals then only affect positions already visited:
 
-```python
+```python-run
+from collections import deque
+nums = [1, 2, 3, 4, 5, 6]
+items = [1, 2, 3]
+initial = [1, 2, 3]
+
 for i in range(len(nums) - 1, -1, -1):
     if nums[i] % 2 == 0:
         del nums[i]
-```
 
+print("removed backwards:", nums)
+```
 ## Two different failures
 
 A dictionary keeps a version counter and compares it on each step, so a size change during iteration is caught immediately and loudly. That is a feature: the alternative is undefined behaviour, because a resize can move every entry to a different slot.
@@ -189,61 +212,87 @@ Sets behave like dicts. <code>collections.deque</code> also raises. And modifyin
 
 The <strong>aliasing distinction</strong> is the one that causes real bugs:
 
-```python
+```python-run
 def remove_evens_wrong(nums):
     nums = [n for n in nums if n % 2]      # rebinds the LOCAL name only
                                             # caller's list is unchanged
 
 def remove_evens_right(nums):
     nums[:] = [n for n in nums if n % 2]   # mutates the caller's list
-```
 
+a = [1,2,3,4]
+b = [1,2,3,4]
+remove_evens_wrong(a); remove_evens_right(b)
+print("wrong:", a)
+print("right:", b)
+```
 If a function is documented as modifying its argument, the comprehension form silently does nothing from the caller's perspective. Slice assignment is what actually mutates.
 
 For the memory-bound case, <strong>two-pointer compaction</strong> filters in place with no second list:
 
-```python
+```python-run
+from collections import deque
+nums = [1, 2, 3, 4, 5, 6]
+items = [1, 2, 3]
+initial = [1, 2, 3]
+
 write = 0
 for read in range(len(nums)):
     if nums[read] % 2:
         nums[write] = nums[read]
         write += 1
 del nums[write:]
-```
 
+print("compacted:", nums[:write])
+```
 O(n) time, O(1) extra space &mdash; the same pattern as "remove duplicates in place".
 
 ## Adding during iteration
 
 Growing a list while iterating it does not raise either &mdash; and it can loop forever:
 
-```python
+```python-run
 items = [1, 2, 3]
 for x in items:
     if x < 5:
         items.append(x + 1)     # never terminates
-```
 
+print("items:", items)
+```
 The index keeps finding new elements. The fix is to accumulate separately:
 
-```python
+```python-run
+from collections import deque
+nums = [1, 2, 3, 4, 5, 6]
+items = [1, 2, 3]
+initial = [1, 2, 3]
+
 additions = []
 for x in items:
     if x < 5:
         additions.append(x + 1)
-items.extend(additions)
-```
+print(items.extend(additions))
 
+print("additions:", additions)
+```
 The same discipline applies to a worklist algorithm, where the natural structure is an explicit queue rather than a `for` loop:
 
-```python
+```python-run
 from collections import deque
+
+initial = [1, 2]
+def discover(item):
+    return [item * 10] if item < 10 else []
+
 work = deque(initial)
+seen = []
 while work:
     item = work.popleft()
+    seen.append(item)
     work.extend(discover(item))     # safe: not iterating a snapshot
-```
 
+print("processed:", seen)
+```
 That is the correct shape for BFS, dependency resolution and crawling &mdash; anything where processing an item produces more items.
 
 ## Questions people ask

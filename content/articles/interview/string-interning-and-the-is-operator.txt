@@ -5,18 +5,17 @@ intro: Why does &#x27;a&#x27; is &#x27;a&#x27; return True, and why should you n
 
 `==` compares <strong>values</strong>. `is` compares <strong>identity</strong> &mdash; whether two names refer to the same object in memory.
 
-```python
+```python-run
 a = "hello"
 b = "hello"
-a == b          # True  -- same characters
-a is b          # True  -- and, here, the same object
+print(a == b)          # True  -- same characters
+print(a is b)          # True  -- and, here, the same object
 
 x = "hello world!"
 y = "hello world!"
-x == y          # True
-x is y          # True or False, depending on how they were created
+print(x == y)          # True
+print(x is y)          # True or False, depending on how they were created
 ```
-
 That last pair is the whole problem: `is` on strings gives answers that depend on interpreter internals, so code relying on it works in testing and fails somewhere else.
 
 <strong>The rule is short: use `==` for values, and `is` only for `None`, `True`, `False`, and genuine identity checks.</strong>
@@ -76,29 +75,32 @@ Which strings get interned is an implementation detail, and roughly:
 |Read from a file or network|No|
 |Short: `""`, single characters|Yes|
 
-```python
+```python-run
+import sys
+x = None
+old_list = [1, 2, 3]
+new_list = old_list
+
 a = "hello"
 b = "hello"
-a is b                       # True -- literal, identifier-like
+print(a is b)                       # True -- literal, identifier-like
 
 c = "".join(["hel", "lo"])
-a is c                       # False -- built at runtime
-a == c                       # True  -- and equal, which is what matters
+print(a is c)                       # False -- built at runtime
+print(a == c)                       # True  -- and equal, which is what matters
 
-sys.intern(c) is a           # True -- forced into the table
+print(sys.intern(c) is a)           # True -- forced into the table
 ```
-
 The dangerous part is not that `is` returns False. It is that it returns <strong>True often enough to look correct</strong>. A test with short literals passes, and production data read from a socket fails the same check.
 
 The identical trap exists for small integers: CPython preallocates &minus;5 to 256, so `256 is 256` is True and `257 is 257` may be False. Same lesson, different type.
 
-```python
+```python-run
 a, b = 256, 256
-a is b          # True  -- cached
+print(a is b)          # True  -- cached
 a, b = 257, 257
-a is b          # False in many contexts
+print(a is b)          # False in many contexts
 ```
-
 Python emits a `SyntaxWarning` for `is` against a literal precisely because this is such a reliable source of bugs.
 
 ## Why it is a trap
@@ -119,29 +121,48 @@ Three legitimate uses, and they are the only ones worth defending in review:
 
 <strong>Singleton comparison.</strong> `None`, `True` and `False` are unique objects, so identity is exactly right &mdash; and `x is None` also cannot be fooled by a class that overrides `__eq__`:
 
-```python
-if x is None: ...
-if flag is True: ...          # when you mean the object, not truthiness
-```
+```python-run
+x, flag = None, True
 
+if x is None:
+    print("x is None      :", x is None)
+if flag is True:                  # when you mean the object, not truthiness
+    print("flag is True   :", flag is True)
+print("1 == True      :", 1 == True, "but 1 is True ->", 1 is True)
+```
 <strong>Sentinel values,</strong> where "not supplied" must be distinguishable from any legal value including `None`:
 
-```python
+```python-run
 _MISSING = object()
 
 def get(key, default=_MISSING):
+    store = {"a": 1}
+    if key in store:
+        return store[key]
     if default is _MISSING:       # only identity can test this
         raise KeyError(key)
     return default
-```
 
+print("present :", get("a"))
+print("default :", get("zzz", "fallback"))
+try:
+    get("zzz")
+except KeyError as e:
+    print("no default:", type(e).__name__ + ":", e)
+```
 <strong>Genuine identity questions</strong> &mdash; is this the same object, in caching, cycle detection, or checking whether a mutation aliased something:
 
-```python
+```python-run
+import sys
+x = None
+old_list = [1, 2, 3]
+new_list = old_list
+
 if new_list is old_list:
     print("same object; a mutation would affect both")
-```
 
+print("same object:", new_list is old_list)
+```
 Note that `is` is also the faster operator, since it compares pointers rather than contents. That is never a good enough reason to use it on values &mdash; the correctness risk dwarfs the nanoseconds.
 
 ## `==` has its own subtleties

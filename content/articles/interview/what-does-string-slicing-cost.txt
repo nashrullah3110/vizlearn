@@ -7,14 +7,13 @@ intro: What does s[2:6] cost, and is it a view or a copy?
 
 Python strings are immutable, and slicing does not create a lightweight view onto the original &mdash; it allocates a new object and copies the bytes. Understanding that is the difference between code that scales and code that quietly becomes quadratic.
 
-```python
+```python-run
 s = "hello world"
-s[0:5]        # 'hello'  -- a new 5-character string
-s[:]          # returns s itself: an identical immutable object needs no copy
-s[::2]        # 'hlowrd' -- a copy, with a step
-s[::-1]       # 'dlrow olleh' -- reversal, O(n)
+print(s[0:5])        # 'hello'  -- a new 5-character string
+print(s[:])          # returns s itself: an identical immutable object needs no copy
+print(s[::2])        # 'hlowrd' -- a copy, with a step
+print(s[::-1])       # 'dlrow olleh' -- reversal, O(n)
 ```
-
 `s[:]` is the one exception, and it is an implementation optimisation rather than a rule to depend on: because the string is immutable, a full-slice copy can safely return the original object.
 
 |Operation|Cost|
@@ -89,36 +88,39 @@ print("  buf[2:6] ->", bytes(buf[2:6]), "- no copy of the underlying buffer")
 
 The classic failure is slicing inside a loop:
 
-```python
+```python-run
 def process_naive(s):
     result = []
     while s:
         result.append(s[0])
         s = s[1:]              # copies the ENTIRE remainder, every time
     return result
-```
 
+print("naive done:", process_naive("abcabcabc"))
+```
 For a string of length n, the copies total n + (n&minus;1) + (n&minus;2) + … = <strong>O(n²)</strong>. On 100,000 characters that is five billion character copies, and it looks like a perfectly ordinary loop.
 
 The fix is to move an index rather than reslicing:
 
-```python
+```python-run
 def process_fast(s):
     return [s[i] for i in range(len(s))]      # or just list(s)
-```
 
+print("fast done:", process_fast("abcabcabc"))
+```
 The same trap appears in recursion, which is how it usually reaches production:
 
-```python
+```python-run
 def is_palindrome_slow(s):
     if len(s) <= 1:
         return True
     return s[0] == s[-1] and is_palindrome_slow(s[1:-1])   # O(n) copy per call
-```
 
+print(is_palindrome_slow("racecar"), is_palindrome_slow("hello"))
+```
 O(n²) because each of the n/2 recursive calls copies the string. Passing indices instead keeps it O(n):
 
-```python
+```python-run
 def is_palindrome_fast(s, lo=0, hi=None):
     hi = len(s) - 1 if hi is None else hi
     while lo < hi:
@@ -126,8 +128,9 @@ def is_palindrome_fast(s, lo=0, hi=None):
             return False
         lo, hi = lo + 1, hi - 1
     return True
-```
 
+print(is_palindrome_fast("racecar"), is_palindrome_fast("hello"))
+```
 |Pattern|Complexity|Fix|
 |---|---|---|
 |`s = s[1:]` in a loop|O(n&sup2;)|Move an index|
@@ -162,24 +165,26 @@ If you genuinely need a zero-copy view over a large buffer, that exists, but onl
 
 <strong>`memoryview`</strong> gives a genuine zero-copy view &mdash; over `bytes`, not `str`:
 
-```python
+```python-run
 data = b"hello world" * 1000
 view = memoryview(data)
 chunk = view[100:200]          # no copy: a view onto the same buffer
-bytes(chunk)                    # copies, only when you ask
+print(bytes(chunk))                    # copies, only when you ask
 ```
-
 This is why binary protocol parsers work on `bytes` rather than `str`: slicing a `memoryview` is O(1) regardless of size. There is no `str` equivalent, because Unicode strings may use variable-width internal representations, so a character offset is not always a fixed byte offset.
 
 <strong>`str.find` with a start offset</strong> searches a region without slicing it:
 
-```python
+```python-run
+s = "abcabcabcabc"
+
 pos = 0
 while (pos := s.find(",", pos)) != -1:     # no copies at all
     ...
     pos += 1
-```
 
+print("scanned to pos:", pos)
+```
 Compare with `s[pos:].find(",")`, which copies the remainder on every iteration &mdash; the same quadratic trap in a less obvious costume.
 
 <strong>`re` module functions</strong> accept `pos` and `endpos` on compiled patterns, so matching within a region needs no slice either.

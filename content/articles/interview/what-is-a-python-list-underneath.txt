@@ -97,12 +97,11 @@ The two O(n) rows at the front are the practical trap: `pop(0)` in a loop is O(n
 
 A list of a million small integers holds a million 8-byte pointers, and each integer is a separate heap object with a header &mdash; 28 bytes each in CPython.
 
-```python
+```python-run
 import sys
 lst = list(range(1_000_000))
-sys.getsizeof(lst)            # ~8 MB - the pointer array alone
+print(sys.getsizeof(lst))            # ~8 MB - the pointer array alone
 ```
-
 The total including the integer objects is far more &mdash; roughly 40MB.
 
 A NumPy array of the same data stores raw 64-bit values contiguously: <strong>8MB total</strong>, with no per-element objects. That is the memory argument, and there is a speed argument too: operations run in C over the whole array, and the data is cache-friendly because the values themselves are adjacent rather than scattered pointers.
@@ -140,34 +139,31 @@ Because the growth is geometric, the copies are rare enough that the cost spread
 
 Because a list holds references, copying has two levels &mdash; and this is where the bugs are.
 
-```python
+```python-run
 a = [1, 2, 3]
 b = a               # NOT a copy - another name for the same list
-b.append(4)
+print(b.append(4))
 print(a)            # [1, 2, 3, 4]
 
 c = a.copy()        # shallow: a new list, the SAME objects inside
 ```
-
 Shallow copying is enough for immutable contents and not for nested mutable ones:
 
-```python
+```python-run
 grid = [[0, 0], [0, 0]]
 flat = grid.copy()
-flat[0].append(9)
+print(flat[0].append(9))
 print(grid)         # [[0, 0, 9], [0, 0]] - inner lists are shared
 ```
-
 And the famous one:
 
-```python
+```python-run
 board = [[0] * 3] * 3        # three references to ONE row
 board[0][0] = 1
 print(board)                 # [[1,0,0], [1,0,0], [1,0,0]]
 
 board = [[0] * 3 for _ in range(3)]     # correct
 ```
-
 `[x] * n` repeats the reference n times. Harmless for immutable values, a bug for mutable ones. Understanding that a list holds pointers is exactly what makes this predictable rather than mysterious.
 
 ## Choosing another container

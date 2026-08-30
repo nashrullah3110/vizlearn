@@ -84,48 +84,60 @@ print("deque(maxlen=3) after abcde:", list(recent), "- oldest dropped for free")
 
 <strong>`tuple`</strong> when the sequence is a fixed record rather than a collection, or when it must be hashable:
 
-```python
+```python-run
+cache, seen = {}, set()
+user_id, date, result = 7, "2026-08-30", "cached value"
+
 point = (3, 4)                          # a record, not a collection
 cache[(user_id, date)] = result         # composite dict key
-seen.add((row, col))                    # set of coordinates
+seen.add((2, 5))                        # set of coordinates
 x, y = point                            # unpacking reads naturally
-```
 
+print("point   :", point, "-> x =", x, ", y =", y)
+print("cache   :", cache)
+print("seen    :", seen)
+```
 The hashability is the hard requirement &mdash; a list simply cannot be a dict key. The immutability is also a signal to the reader that the contents are not going to change, which is why returning a tuple from a function that produces a fixed set of values is idiomatic.
 
 <strong>`deque`</strong> when you add or remove at the front:
 
-```python
+```python-run
 from collections import deque
 
 queue = deque()
-queue.append(task)          # enqueue at the right
-queue.popleft()             # dequeue from the left -- O(1)
+queue.append("build")       # enqueue at the right
+print("dequeued:", queue.popleft())     # dequeue from the left -- O(1)
 
-window = deque(maxlen=100)  # a bounded buffer: old items fall off
-window.append(reading)      # never grows beyond 100
+window = deque(maxlen=3)    # a bounded buffer: old items fall off
+for reading in [10, 11, 12, 13, 14]:
+    window.append(reading)
+print("window  :", list(window), "- never grows beyond 3")
 ```
-
 <strong>`maxlen` is the underrated feature.</strong> A bounded deque discards from the opposite end automatically, which gives you a rolling window or a fixed-size log buffer with no bookkeeping at all.
 
 ## The performance trap that matters
 
 `list.pop(0)` and `list.insert(0, x)` are <strong>O(n)</strong>, because every remaining element shifts one position. Inside a loop, that makes the whole operation quadratic:
 
-```python
+```python-run
 queue = list(range(100_000))
 while queue:
     item = queue.pop(0)      # O(n) each time -> O(n^2) total
-```
 
+print("list pop(0) drained")
+```
 Roughly five billion element moves. Swapping in a deque makes it linear:
 
-```python
+```python-run
+from collections import deque
+result, task = [], "build"
+
 queue = deque(range(100_000))
 while queue:
     item = queue.popleft()   # O(1) each time -> O(n) total
-```
 
+print("deque popleft drained")
+```
 <strong>Any breadth-first search, task queue, or producer-consumer loop should use a `deque`.</strong> This is the single most common reason a straightforward-looking Python loop is slow, and it is invisible in small tests &mdash; a thousand elements finishes fine, and a hundred thousand does not.
 
 The mirror-image mistake also exists: reaching for a deque and then indexing it in a loop. `dq[i]` walks the internal block list, so a positional loop over a deque is O(n²). Use a list when you index, a deque when you push and pop at the ends.
@@ -150,37 +162,41 @@ For real numeric work the answer is <code>numpy</code>, which adds vectorised op
 
 ## Why tuples are smaller and faster
 
-```python
+```python-run
 import sys
-sys.getsizeof([1, 2, 3])     # 88 bytes
-sys.getsizeof((1, 2, 3))     # 64 bytes
+print(sys.getsizeof([1, 2, 3]))     # 88 bytes
+print(sys.getsizeof((1, 2, 3)))     # 64 bytes
 ```
-
 A list over-allocates so that `append` is amortised O(1), and it stores a capacity alongside its length. A tuple is fixed at creation, so it needs neither &mdash; less memory, one less indirection, and marginally faster iteration.
 
 CPython also <strong>caches small tuples</strong> for reuse, and constant tuples are built at compile time:
 
-```python
+```python-run
 import dis
-dis.dis("x = (1, 2, 3)")     # LOAD_CONST (1, 2, 3)  -- one instruction
-dis.dis("x = [1, 2, 3]")     # BUILD_LIST -- constructed at runtime
+print(dis.dis("x = (1, 2, 3)"))     # LOAD_CONST (1, 2, 3)  -- one instruction
+print(dis.dis("x = [1, 2, 3]"))     # BUILD_LIST -- constructed at runtime
 ```
-
 So `for x in (1, 2, 3)` is very slightly faster than the list version. This is a real but tiny effect, and <strong>not a reason to choose a tuple</strong> &mdash; choose based on mutability and hashability, and take the memory win as a side benefit.
 
 ## Immutability is shallow
 
 A tuple's immutability applies to its own slots, not to what they point at:
 
-```python
+```python-run
 t = ([1, 2], "fixed")
-t[0].append(3)              # allowed -- the LIST is mutable
-t                            # ([1, 2, 3], 'fixed')
-t[0] = []                    # TypeError -- the SLOT is not
+t[0].append(3)              # allowed -- the LIST inside is mutable
+print("after append:", t)
 
-hash(([1], 2))              # TypeError: unhashable type: 'list'
+try:
+    t[0] = []               # the SLOT is not
+except TypeError as e:
+    print("reassigning :", type(e).__name__ + ":", e)
+
+try:
+    hash(([1], 2))
+except TypeError as e:
+    print("hashing     :", type(e).__name__ + ":", e)
 ```
-
 The tuple guarantees its references will not change, and says nothing about the objects behind them. That is also why a tuple containing a list is unhashable: hashing recurses into the contents, so one mutable element makes the whole thing unhashable.
 
 The practical rule: <strong>a tuple is only usable as a dict key if everything inside it is hashable too.</strong> Convert nested lists to tuples, and sets to `frozenset`.
@@ -199,7 +215,7 @@ The practical rule: <strong>a tuple is only usable as a dict key if everything i
 
 <strong>`NamedTuple`</strong> is the natural upgrade once a tuple's positions acquire meaning. `point.x` beats `point[0]`, it stays a tuple, and it costs no extra memory:
 
-```python
+```python-run
 from typing import NamedTuple
 
 class Point(NamedTuple):
@@ -207,9 +223,8 @@ class Point(NamedTuple):
     y: int
 
 p = Point(3, 4)
-p.x, p[0]           # both work; still hashable and unpackable
+print(p.x, p[0])           # both work; still hashable and unpackable
 ```
-
 <strong>`deque` is thread-safe for `append` and `popleft`</strong> individually, because those are atomic at the C level. That does <em>not</em> make a check-then-pop sequence safe &mdash; use `queue.Queue` when several threads coordinate through it.
 
 ## Questions people ask

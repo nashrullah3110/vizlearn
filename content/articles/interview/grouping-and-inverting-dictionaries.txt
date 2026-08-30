@@ -5,7 +5,7 @@ intro: Group a list of records by a field. Then invert a dictionary so the value
 
 <strong>Grouping</strong> turns a flat sequence into a dictionary of lists, keyed on some property. <strong>Inverting</strong> swaps keys and values. Both are one-liners once the right tool is known, and both have a trap.
 
-```python
+```python-run
 words = ["apple", "avocado", "banana", "blueberry", "cherry"]
 
 # Grouping by first letter
@@ -14,18 +14,27 @@ groups = defaultdict(list)
 for w in words:
     groups[w[0]].append(w)
 # {'a': ['apple', 'avocado'], 'b': ['banana', 'blueberry'], 'c': ['cherry']}
-```
 
+print("grouped:", dict(groups))
+```
 `defaultdict(list)` is what makes this three lines instead of five. Without it, every append needs a guard:
 
-```python
+```python-run
+from collections import Counter, defaultdict
+from itertools import groupby
+
+words = ["apple", "avocado", "banana", "blueberry", "cherry"]
+ages  = {"alice": 30, "bob": 25, "carol": 30}
+sales = [("alice", 10), ("bob", 5), ("alice", 7)]
+
 groups = {}
 for w in words:
     if w[0] not in groups:            # the boilerplate defaultdict removes
         groups[w[0]] = []
     groups[w[0]].append(w)
-```
 
+print("grouped:", groups)
+```
 `setdefault` is the middle ground and works on a plain dict &mdash; `groups.setdefault(w[0], []).append(w)` &mdash; which is useful when the result must be a real `dict` rather than a `defaultdict`.
 
 
@@ -92,38 +101,54 @@ print("A tuple would work:", {tuple(v): k for k, v in scores.items()})
 
 A `defaultdict` <strong>creates entries on read</strong>. Merely looking a key up inserts it:
 
-```python
+```python-run
+from collections import Counter, defaultdict
+from itertools import groupby
+
+words = ["apple", "avocado", "banana", "blueberry", "cherry"]
+ages  = {"alice": 30, "bob": 25, "carol": 30}
+sales = [("alice", 10), ("bob", 5), ("alice", 7)]
+
 d = defaultdict(list)
 if d["missing"]:                      # this INSERTS 'missing': []
     ...
-len(d)                                # 1, not 0
-"missing" in d                        # True
-```
+print(len(d))                                # 1, not 0
+print("missing" in d)                        # True
 
+print("the lookup inserted a key, so len is", len(d))
+```
 That surprises people debugging a size or an iteration. Two ways to avoid it: use `d.get(key, [])` for reads, or convert to a plain dict once building is finished with `dict(d)`.
 
 The related habit worth having: <strong>never pass a `defaultdict` out of a function</strong> as a return value if callers will read arbitrary keys. Convert it first, and the mutation-on-read behaviour stays inside the code that wanted it.
 
 ## Inverting a dictionary
 
-```python
+```python-run
 ages = {"alice": 30, "bob": 25, "carol": 30}
 
 inverted = {v: k for k, v in ages.items()}
-# {30: 'carol', 25: 'bob'}   -- alice is GONE
+print("inverted:", inverted)
+print("alice is gone - carol overwrote her, because both are 30")
 ```
-
 <strong>Duplicate values collide,</strong> and the last one wins. `alice` and `carol` are both 30, so only `carol` survives. This is the single most common bug with inversion, and the fix is to invert into lists:
 
-```python
+```python-run
+from collections import Counter, defaultdict
+from itertools import groupby
+
+words = ["apple", "avocado", "banana", "blueberry", "cherry"]
+ages  = {"alice": 30, "bob": 25, "carol": 30}
+sales = [("alice", 10), ("bob", 5), ("alice", 7)]
+
 from collections import defaultdict
 
 inverted = defaultdict(list)
 for k, v in ages.items():
     inverted[v].append(k)
 # {30: ['alice', 'carol'], 25: ['bob']}
-```
 
+print("inverted:", dict(inverted))
+```
 Which is the same operation as grouping &mdash; grouping the keys by their value. The two topics are one topic.
 
 The other requirement: <strong>values must be hashable</strong> to become keys. Inverting `{"a": [1, 2]}` raises `TypeError`, and converting the list to a tuple first fixes it.
@@ -150,7 +175,7 @@ Grouping is the shape behind most "organise this data" questions: anagram groups
 
 The standard library has a `groupby`, and it does not do what the name suggests to anyone coming from SQL or pandas.
 
-```python
+```python-run
 from itertools import groupby
 
 words = ["apple", "banana", "avocado", "blueberry"]
@@ -161,14 +186,22 @@ for key, group in groupby(words, key=lambda w: w[0]):
 # a ['avocado']         <- 'a' appears TWICE
 # b ['blueberry']
 ```
-
 `itertools.groupby` groups <strong>consecutive</strong> runs only. It does not collect scattered items. To get SQL-like behaviour the input must be sorted by the same key first:
 
-```python
+```python-run
+from collections import Counter, defaultdict
+from itertools import groupby
+
+words = ["apple", "avocado", "banana", "blueberry", "cherry"]
+ages  = {"alice": 30, "bob": 25, "carol": 30}
+sales = [("alice", 10), ("bob", 5), ("alice", 7)]
+
 for key, group in groupby(sorted(words, key=lambda w: w[0]), key=lambda w: w[0]):
     ...
-```
 
+for key, group in groupby(sorted(words, key=lambda w: w[0]), key=lambda w: w[0]):
+    print(key, "->", list(group))
+```
 Which costs O(n log n), while the `defaultdict` version is O(n). <strong>Prefer `defaultdict`</strong> unless the data is already sorted or the runs themselves are what you want &mdash; compressing repeated values, detecting consecutive duplicates, run-length encoding.
 
 The other sharp edge: the group is an <em>iterator sharing the underlying stream</em>. It is exhausted as soon as you advance to the next group, so `list(group)` must happen before moving on. `groups = [(k, g) for k, g in groupby(x)]` yields empty groups for exactly this reason.
@@ -177,35 +210,65 @@ The other sharp edge: the group is an <em>iterator sharing the underlying stream
 
 <strong>Group by a computed key.</strong>
 
-```python
+```python-run
+from collections import Counter, defaultdict
+from itertools import groupby
+
+words = ["apple", "avocado", "banana", "blueberry", "cherry"]
+ages  = {"alice": 30, "bob": 25, "carol": 30}
+sales = [("alice", 10), ("bob", 5), ("alice", 7)]
+
 by_length = defaultdict(list)
 for w in words:
     by_length[len(w)].append(w)
-```
 
+print("by length:", dict(by_length))
+```
 <strong>Group by several keys</strong> &mdash; use a tuple:
 
-```python
+```python-run
+from collections import Counter, defaultdict
+from itertools import groupby
+
+words = ["apple", "avocado", "banana", "blueberry", "cherry"]
+ages  = {"alice": 30, "bob": 25, "carol": 30}
+sales = [("alice", 10), ("bob", 5), ("alice", 7)]
+
 by_both = defaultdict(list)
 for w in words:
     by_both[(w[0], len(w))].append(w)
-```
 
+print("by letter and length:", dict(by_both))
+```
 <strong>Count instead of collect</strong> &mdash; `Counter` is the specialised form:
 
-```python
-from collections import Counter
-Counter(w[0] for w in words)          # {'a': 2, 'b': 2, 'c': 1}
-```
+```python-run
+from collections import Counter, defaultdict
+from itertools import groupby
 
+words = ["apple", "avocado", "banana", "blueberry", "cherry"]
+ages  = {"alice": 30, "bob": 25, "carol": 30}
+sales = [("alice", 10), ("bob", 5), ("alice", 7)]
+
+from collections import Counter
+print(Counter(w[0] for w in words))          # {'a': 2, 'b': 2, 'c': 1}
+```
 <strong>Aggregate while grouping</strong> &mdash; `defaultdict(int)` for sums, `defaultdict(set)` for deduplicated members:
 
-```python
+```python-run
+from collections import Counter, defaultdict
+from itertools import groupby
+
+words = ["apple", "avocado", "banana", "blueberry", "cherry"]
+ages  = {"alice": 30, "bob": 25, "carol": 30}
+sales = [("alice", 10), ("bob", 5), ("alice", 7)]
+
 totals = defaultdict(int)
 for name, amount in sales:
     totals[name] += amount
-```
 
+print("totals:", dict(totals))
+```
 <strong>Group anagrams,</strong> the classic interview form &mdash; the key is a canonical form:
 
 ```python

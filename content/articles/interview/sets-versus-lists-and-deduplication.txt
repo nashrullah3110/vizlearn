@@ -3,14 +3,13 @@ intro: What does a set give you that a list does not, and how do you deduplicate
 
 ## Deduplicating, three ways
 
-```python
+```python-run
 items = [3, 1, 2, 3, 1]
 
-list(set(items))                 # [1, 2, 3] - order LOST
-list(dict.fromkeys(items))       # [3, 1, 2] - order PRESERVED
-sorted(set(items))               # [1, 2, 3] - sorted
+print(list(set(items)))                 # [1, 2, 3] - order LOST
+print(list(dict.fromkeys(items)))       # [3, 1, 2] - order PRESERVED
+print(sorted(set(items)))               # [1, 2, 3] - sorted
 ```
-
 All three are O(n). The difference is what happens to the order, and choosing wrongly produces a bug that appears only when the output order matters to someone downstream.
 
 <strong>`set`</strong> is the fastest and gives no order guarantee. It looks sorted for small integers because of how they hash, which is a coincidence and not a guarantee &mdash; that coincidence is responsible for a lot of misplaced confidence.
@@ -19,7 +18,13 @@ All three are O(n). The difference is what happens to the order, and choosing wr
 
 <strong>Manual</strong>, when a key function is needed:
 
-```python
+```python-run
+class User:
+    def __init__(self, email): self.email = email
+    def __repr__(self): return "User(%s)" % self.email
+
+users = [User("a@x.com"), User("b@x.com"), User("a@x.com")]
+
 def dedupe_by(items, key):
     seen, out = set(), []
     for x in items:
@@ -29,9 +34,8 @@ def dedupe_by(items, key):
             out.append(x)
     return out
 
-dedupe_by(users, key=lambda u: u.email)      # unique by email, order kept
+print(dedupe_by(users, key=lambda u: u.email))   # unique by email, order kept
 ```
-
 That last version is the one to reach for with objects, because it deduplicates by a chosen field while keeping the full object.
 
 
@@ -99,7 +103,10 @@ A list must scan to know whether it already contains something &mdash; O(n) per 
 
 A set hashes the value and looks in one place &mdash; O(1) on average, so O(n) overall.
 
-```python
+```python-run
+items = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3]
+users = ["ada", "bob", "ada", "cy"]
+
 # O(n^2) - the membership test scans the growing list
 out = []
 for x in items:
@@ -111,8 +118,9 @@ seen, out = set(), []
 for x in items:
     if x not in seen:
         seen.add(x); out.append(x)
-```
 
+print("deduped:", seen)
+```
 Both versions preserve order. The first is quadratic and is what people write before they think about it, and on 100,000 items it takes minutes rather than milliseconds.
 
 Keeping the list <em>and</em> a set alongside it is the standard pattern: the list holds the ordered output, the set answers the membership question.
@@ -121,11 +129,14 @@ Keeping the list <em>and</em> a set alongside it is the standard pattern: the li
 
 Sets and dictionaries need hashable elements, so deduplication by value fails on mutable ones:
 
-```python
-set([[1, 2], [1, 2]])              # TypeError: unhashable type: 'list'
-set([(1, 2), (1, 2)])              # {(1, 2)} - tuples are fine
-```
+```python-run
+try:
+    set([[1, 2], [1, 2]])
+except TypeError as e:
+    print("lists  :", type(e).__name__ + ":", e)
 
+print("tuples :", set([(1, 2), (1, 2)]), "- hashable, so deduped")
+```
 For unhashable items, convert to a hashable canonical form:
 
 |Item type|Canonical key|
@@ -180,17 +191,16 @@ The decision is usually straightforward:
 
 And the sets themselves support the operations that make them worth reaching for beyond deduplication:
 
-```python
+```python-run
 a, b = {1, 2, 3}, {2, 3, 4}
 
-a & b            # {2, 3}     intersection - in both
-a | b            # {1,2,3,4}  union
-a - b            # {1}        difference - in a only
-a ^ b            # {1, 4}     symmetric difference
-a <= b           # False      subset test
-a.isdisjoint(b)  # False      no overlap
+print(a & b)            # {2, 3}     intersection - in both
+print(a | b)            # {1,2,3,4}  union
+print(a - b)            # {1}        difference - in a only
+print(a ^ b)            # {1, 4}     symmetric difference
+print(a <= b)           # False      subset test
+print(a.isdisjoint(b))  # False      no overlap
 ```
-
 Those replace loops. "Which users are in both groups?" is `a & b`, not a nested loop &mdash; and it runs in C at O(min(len(a), len(b))).
 
 ## Where deduplication goes wrong

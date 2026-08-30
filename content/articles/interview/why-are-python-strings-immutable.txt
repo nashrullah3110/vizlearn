@@ -5,13 +5,18 @@ intro: Why are Python strings immutable, and what does that buy you?
 
 A Python string cannot be modified. Every operation that appears to change one produces a new object.
 
-```python
+```python-run
 s = "hello"
-s[0] = "H"          # TypeError: 'str' object does not support item assignment
-s.upper()           # returns a NEW string
-s += " world"       # rebinds s to a new string; the old one is unchanged
-```
 
+try:
+    s[0] = "H"
+except TypeError as e:
+    print("item assign:", type(e).__name__ + ":", e)
+
+print("upper()    :", s.upper(), "- a NEW string;", s, "is unchanged")
+s += " world"      # rebinds s; the old string is untouched
+print("after +=   :", s)
+```
 Four design reasons, and each has practical consequences.
 
 <strong>1. Hashability.</strong> A dictionary key's slot depends on its hash. If a string could change, its hash would change, and any dictionary entry keyed on it would become unreachable. Immutability is what makes strings usable as keys &mdash; and since attribute names, module names and keyword arguments are all dictionary keys, this is foundational rather than incidental.
@@ -81,16 +86,19 @@ print("Double n: join doubles, += quadruples. That is O(n) against O(n^2).")
 
 The one real cost is building strings incrementally:
 
-```python
+```python-run
+words = ["never", " ", "concatenate", " ", "in", " ", "a", " ", "loop"]
+
 # O(n^2) - each += allocates a new string and copies everything so far
 result = ""
 for word in words:
     result += word
+print("loop  :", repr(result))
 
 # O(n) - collect references, allocate once
 result = "".join(words)
+print("join  :", repr(result))
 ```
-
 At 10,000 words the first version performs roughly 50 million character copies. `join` computes the total length, allocates once, and copies each piece in.
 
 This is the most common Python performance mistake, and the reason it survives review is that the quadratic version is fine on ten words and catastrophic on ten thousand.
@@ -114,12 +122,11 @@ Two related points:
 
 `bytearray` is the genuinely mutable relative:
 
-```python
+```python-run
 b = bytearray(b"hello")
 b[0] = ord("H")            # works - bytearray IS mutable
-bytes(b)                    # b'Hello' - back to immutable
+print(bytes(b))                    # b'Hello' - back to immutable
 ```
-
 Note the pairing: `str` is immutable and `bytes` is immutable, while `bytearray` is the mutable byte sequence. There is no mutable `str` in Python, and a list of one-character strings is the usual stand-in.
 
 ## What immutability actually means
@@ -150,19 +157,18 @@ Each <code>+=</code> copies everything accumulated so far, so n appends copy 1 +
 
 Because strings are immutable, the interpreter may share one object for equal strings. That makes `is` behave unpredictably for strings:
 
-```python
+```python-run
 a = "hello"
 b = "hello"
-a is b              # True - both are the same interned literal
+print(a is b)              # True - both are the same interned literal
 
 c = "hello world"
 d = "hello world"
-c is d              # often True for literals, and NOT guaranteed
+print(c is d)              # often True for literals, and NOT guaranteed
 
 e = "".join(["hel", "lo"])
-e is a              # False - computed at runtime, not interned
+print(e is a)              # False - computed at runtime, not interned
 ```
-
 Short identifier-like literals are interned automatically at compile time. Strings built at runtime generally are not.
 
 The rule that follows: <strong>use `==` for string comparison, always.</strong> `is` asks whether two names refer to the same object, which is almost never the question. Relying on interning produces code that works in testing and fails on computed input.
@@ -186,11 +192,14 @@ The pattern is consistent: <strong>mutable types are unhashable</strong>, for ex
 
 The tuple row has a subtlety worth knowing: a tuple is immutable, and if it <em>contains</em> a list it is unhashable, because its hash would depend on something that can change.
 
-```python
-hash((1, 2))          # fine
-hash((1, [2]))        # TypeError - contains a mutable object
-```
+```python-run
+print("hash((1, 2)) :", hash((1, 2)), "- fine")
 
+try:
+    hash((1, [2]))
+except TypeError as e:
+    print("hash((1,[2])):", type(e).__name__ + ":", e)
+```
 ## How other languages compare
 
 <strong>Java</strong> strings are immutable, for the same reasons, with `StringBuilder` as the mutable builder &mdash; the direct analogue of using a list and joining.

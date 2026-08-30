@@ -5,17 +5,16 @@ intro: Is len(s) the number of characters or the number of bytes?
 
 For a `str`, `len` counts <strong>Unicode code points</strong>. For `bytes`, it counts <strong>bytes</strong>. Neither necessarily matches what a person would call a character.
 
-```python
-len("hello")      # 5
-len("café")       # 4  -- code points
-len("café".encode("utf-8"))   # 5  -- bytes; é takes two
+```python-run
+print(len("hello"))      # 5
+print(len("café"))       # 4  -- code points
+print(len("café".encode("utf-8")))   # 5  -- bytes; é takes two
 
-len("👍")          # 1  -- one code point
-len("👍".encode("utf-8"))      # 4  -- four bytes
+print(len("👍"))          # 1  -- one code point
+print(len("👍".encode("utf-8")))      # 4  -- four bytes
 
-len("é")           # 1 or 2, depending on how it was written
+print(len("é"))           # 1 or 2, depending on how it was written
 ```
-
 That last line is the interesting one, and the reason this question gets asked at all.
 
 
@@ -75,24 +74,26 @@ for name, s in samples.items():
 
 Both display identically. Both are "correct". They are not equal:
 
-```python
+```python-run
 a = "café"              # typed with a precomposed é
 b = "café"        # e followed by a combining accent
 
-a == b                  # False
-len(a), len(b)          # (4, 5)
+print(a == b)                  # False
+print(len(a), len(b))          # (4, 5)
 ```
-
 This is a real bug source, not a curiosity. macOS filesystems historically store filenames in NFD while Linux stores what it is given, so the same filename read from two systems compares unequal.
 
 The fix is <strong>normalisation</strong> before comparing:
 
-```python
+```python-run
+s = "h\u00e9llo w\u00f6rld"
+a = "caf\u00e9"                       # single code point for e-acute
+b = "cafe\u0301"                      # e + combining accent
+
 import unicodedata
 
-unicodedata.normalize("NFC", a) == unicodedata.normalize("NFC", b)   # True
+print(unicodedata.normalize("NFC", a) == unicodedata.normalize("NFC", b))   # True
 ```
-
 |Form|Does what|Use for|
 |---|---|---|
 |NFC|Compose &mdash; shortest form|<strong>Storage and comparison</strong>|
@@ -153,25 +154,32 @@ Use <code>len(s)</code> for indexing and slicing your own text. Use <code>len(s.
 
 Cutting text at a byte boundary can split a multi-byte character in half:
 
-```python
+```python-run
 s = "héllo wörld"
 b = s.encode("utf-8")
-b[:6].decode("utf-8")
+print(b[:6].decode("utf-8"))
 # UnicodeDecodeError: unexpected end of data
 ```
-
 The slice ends mid-character. Three ways out, in increasing correctness:
 
-```python
-b[:6].decode("utf-8", errors="ignore")     # drops the partial char
-```
+```python-run
+s = "h\u00e9llo w\u00f6rld"
+b = s.encode("utf-8")
 
+print("bytes        :", b)
+print("cut mid-char :", b[:6])
+print("ignoring it  :", repr(b[:6].decode("utf-8", errors="ignore")))
+print("             ^ the partial character is dropped rather than raising")
+```
 <strong>Truncate in `str` space, then encode</strong> &mdash; correct for code points:
 
-```python
-s[:6].encode("utf-8")
-```
+```python-run
+s = "h\u00e9llo w\u00f6rld"
+a = "caf\u00e9"                       # single code point for e-acute
+b = "cafe\u0301"                      # e + combining accent
 
+print(s[:6].encode("utf-8"))
+```
 <strong>Truncate by grapheme</strong> &mdash; correct for what the user sees, and the only version that will not cut an emoji family apart or orphan a combining accent.
 
 The database version of this bug is common: a `VARCHAR(10)` counts characters in PostgreSQL and bytes in some MySQL configurations, so ten emoji may or may not fit. Knowing which unit a storage layer counts in is part of the schema.

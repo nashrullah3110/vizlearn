@@ -5,14 +5,18 @@ intro: Why can a tuple be a dictionary key but a list cannot?
 
 A dictionary key must be <strong>hashable</strong>, which means two things: it has a `__hash__` method returning a stable integer, and it can be compared for equality.
 
-```python
+```python-run
 d = {}
 d["text"] = 1           # str - hashable
 d[(1, 2)] = 2           # tuple - hashable
 d[frozenset({1})] = 3   # frozenset - hashable
-d[[1, 2]] = 4           # TypeError: unhashable type: 'list'
-```
+print("stored:", d)
 
+try:
+    d[[1, 2]] = 4
+except TypeError as e:
+    print("list  :", type(e).__name__ + ":", e)
+```
 The rule follows directly from how a dictionary works. The hash determines which slot an entry occupies. If a key's hash changed after insertion, the entry would sit in a slot the new hash does not point to &mdash; unreachable, and effectively lost.
 
 So the requirement is not arbitrary strictness; it is what keeps the structure coherent.
@@ -89,7 +93,7 @@ except Exception as e:
 
 Python prevents this for built-in types, and a custom class can be made to break it:
 
-```python
+```python-run
 class Sloppy:
     def __init__(self, value):
         self.value = value
@@ -100,12 +104,15 @@ class Sloppy:
 
 k = Sloppy(1)
 d = {k: "stored"}
+print("found before:", d[k])
+
 k.value = 99                          # the hash has now changed
-
-d[k]                                  # KeyError - looks in the wrong slot
-list(d.keys())[0] is k                # True - the key IS in there
+print("dict still holds:", list(d.values()))
+try:
+    d[k]
+except KeyError:
+    print("lookup after mutation: KeyError - the key is lost in its own dict")
 ```
-
 The entry exists, the key object is the same object, and it cannot be found. The lookup computes the new hash, goes to a different slot, finds nothing, and raises.
 
 That is the concrete answer to "why?" &mdash; and being able to construct the failure demonstrates real understanding rather than recall.
@@ -120,7 +127,7 @@ Two rules govern the relationship, and violating the first is the more serious e
 
 Consequences for custom classes:
 
-```python
+```python-run
 class Point:
     def __init__(self, x, y):
         self.x, self.y = x, y
@@ -128,8 +135,11 @@ class Point:
         return isinstance(other, Point) and (self.x, self.y) == (other.x, other.y)
     def __hash__(self):
         return hash((self.x, self.y))      # the SAME fields as __eq__
-```
 
+p = Point(1, 2)
+d3 = {p: "origin-ish"}
+print("lookup:", d3[Point(1, 2)])
+```
 Hash exactly the fields that `__eq__` compares. Hashing more fields breaks the first rule; hashing fewer merely causes extra collisions, which is safe but slower.
 
 <strong>Defining `__eq__` without `__hash__` makes a class unhashable in Python 3.</strong> That is deliberate: the default `__hash__` is identity-based, which would contradict a value-based `__eq__`. Python removes it rather than let you violate the contract silently.
@@ -168,11 +178,14 @@ To make it usable as a key, define <code>__hash__</code> too, over the same fiel
 
 The tuple row is the subtle one:
 
-```python
-hash((1, 2))            # fine
-hash((1, [2]))          # TypeError - contains a mutable object
-```
+```python-run
+print("hash((1, 2)) :", hash((1, 2)), "- fine")
 
+try:
+    hash((1, [2]))
+except TypeError as e:
+    print("hash((1,[2])):", type(e).__name__ + ":", e)
+```
 A tuple's hash is derived from its contents, so a tuple containing something mutable cannot have a stable hash.
 
 The dataclass row is the practical shortcut: `@dataclass(frozen=True)` generates `__eq__` and `__hash__` consistently and makes the instance immutable, which is exactly what a value object used as a key should be.

@@ -5,17 +5,16 @@ intro: What is the difference between str and bytes, and when do you need encode
 
 `str` is a sequence of <strong>Unicode code points</strong> &mdash; abstract characters. `bytes` is a sequence of <strong>integers from 0 to 255</strong> &mdash; raw octets. Python 3 keeps them strictly separate, and the separation is the feature.
 
-```python
+```python-run
 s = "café"                 # str: 4 characters
 b = s.encode("utf-8")      # bytes: b'caf\xc3\xa9'  -- 5 bytes
 
-len(s)     # 4    characters
-len(b)     # 5    bytes -- é needs two in UTF-8
+print(len(s))     # 4    characters
+print(len(b))     # 5    bytes -- é needs two in UTF-8
 
-s[0]       # 'c'  a one-character str
-b[0]       # 99   an INTEGER, not b'c'
+print(s[0])       # 'c'  a one-character str
+print(b[0])       # 99   an INTEGER, not b'c'
 ```
-
 Two details catch people out immediately. Indexing `bytes` yields an `int`, not a one-byte `bytes` object &mdash; slicing does give `bytes`, so `b[0:1]` is `b'c'` while `b[0]` is `99`. And `len` differs between the two representations of the same text, which is the source of most truncation bugs.
 
 |&nbsp;|`str`|`bytes`|
@@ -79,35 +78,44 @@ print("sha256(bytes) ->", hashlib.sha256(b).hexdigest()[:16], "...")
 
 This is the single most confused pair in Python, and there is a reliable way to remember it: <strong>encode goes to bytes; decode comes back to text.</strong>
 
-```python
-"café".encode("utf-8")            # b'caf\xc3\xa9'   str -> bytes
-b'caf\xc3\xa9'.decode("utf-8")    # 'café'           bytes -> str
+```python-run
+print("café".encode("utf-8"))            # b'caf\xc3\xa9'   str -> bytes
+print(b'caf\xc3\xa9'.decode("utf-8"))    # 'café'           bytes -> str
 ```
-
 The mental model: <em>encoding</em> is what you do to send text somewhere, because wires and disks carry bytes. <em>Decoding</em> is what you do on receipt, to recover meaning.
 
 UTF-8 is the default for both, and it is nearly always the right choice. It is ASCII-compatible, so English text costs one byte per character, and it represents every Unicode character.
 
 <strong>Mixing the two types raises rather than coercing:</strong>
 
-```python
-"abc" + b"def"          # TypeError: can only concatenate str
-b"abc" == "abc"         # False -- no error, just never equal
-"a" in b"abc"           # TypeError
-```
+```python-run
+try:
+    "abc" + b"def"
+except TypeError as e:
+    print("concat  :", type(e).__name__ + ":", e)
 
+print("equality:", b"abc" == "abc", "- no error, just never equal")
+
+try:
+    "a" in b"abc"
+except TypeError as e:
+    print("membership:", type(e).__name__ + ":", e)
+```
 The `==` case is the dangerous one, because it fails silently. A dictionary keyed on `str` will never match a `bytes` lookup, and the result is a mysteriously empty response rather than an exception. This is the most common bug when reading a file in binary mode and comparing against string literals.
 
 ## The errors that appear in production
 
-```python
-b'\xff\xfe'.decode("utf-8")
-# UnicodeDecodeError: invalid start byte
+```python-run
+try:
+    b"\xff\xfe".decode("utf-8")
+except UnicodeDecodeError as e:
+    print("decode:", type(e).__name__ + ":", e)
 
-"café".encode("ascii")
-# UnicodeEncodeError: ordinal not in range(128)
+try:
+    "caf\u00e9".encode("ascii")
+except UnicodeEncodeError as e:
+    print("encode:", type(e).__name__ + ":", e)
 ```
-
 Both mean the same thing: the data does not fit the codec. The `errors` parameter decides what happens next.
 
 |Value|Behaviour|Use when|
@@ -144,22 +152,27 @@ Sockets, subprocess output, hashlib and most binary formats are bytes. <code>has
 
 The practical rule: <strong>decode at the edges, work in `str` in the middle, encode on the way out.</strong> Text processing should never happen on `bytes`.
 
-```python
-# Files: text mode decodes for you
+```python-run
+# Files: text mode decodes for you. This runs against an in-memory
+# filesystem, so the writes below are real but vanish with the page.
+with open("f.txt", "w", encoding="utf-8") as fh:
+    fh.write("h\u00e9llo")
+
 with open("f.txt", encoding="utf-8") as fh:      # ALWAYS pass encoding
     text = fh.read()                              # str
+print("text mode  :", repr(text), type(text).__name__)
+
+with open("f.bin", "wb") as fh:
+    fh.write("h\u00e9llo".encode("utf-8"))
 
 with open("f.bin", "rb") as fh:
     data = fh.read()                              # bytes
+print("binary mode:", data, type(data).__name__)
 
-# Network: sockets are always bytes
-sock.send("hello".encode())
-reply = sock.recv(1024).decode()
-
-# Subprocess: text=True decodes for you
-out = subprocess.run(["ls"], capture_output=True, text=True).stdout   # str
+# Network: sockets are always bytes - .encode() on the way out,
+# .decode() on the way back.
+print("to send    :", "hello".encode())
 ```
-
 <strong>Always pass `encoding=` explicitly when opening text files.</strong> Without it, Python uses the platform default, which is UTF-8 on Linux and macOS and historically a legacy code page on Windows &mdash; so the same code reads different characters on different machines. Python 3.15 makes UTF-8 the default everywhere, and being explicit remains the habit that survives version differences.
 
 Three things must stay in `bytes`:
@@ -170,16 +183,15 @@ Three things must stay in `bytes`:
 
 ## `bytearray` and `memoryview`
 
-```python
+```python-run
 ba = bytearray(b"hello")
 ba[0] = 72                    # mutable, unlike bytes
-ba.extend(b" world")
-bytes(ba)                     # b'Hello world'
+print(ba.extend(b" world"))
+print(bytes(ba))                     # b'Hello world'
 
 mv = memoryview(ba)
 chunk = mv[0:5]               # zero-copy view
 ```
-
 `bytearray` is the mutable counterpart, useful for building a buffer incrementally without repeated concatenation. `memoryview` slices without copying, which is what makes parsing large binary payloads efficient &mdash; and it has no `str` equivalent, because a character offset in a variable-width representation is not a fixed byte offset.
 
 ## Questions people ask

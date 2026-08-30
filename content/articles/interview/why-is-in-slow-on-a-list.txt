@@ -73,19 +73,25 @@ print("dict.fromkeys(...):", list(dict.fromkeys(items)), "- deduped, order kept"
 
 The cost only becomes visible when the membership test is inside a loop:
 
-```python
+```python-run
+items = list(range(500))
+other_list = list(range(250, 750))
+
 # O(n * m) - the membership test scans every time
+hits = 0
 for x in items:
     if x in other_list:
-        ...
+        hits += 1
+print("scanning a list:", hits, "hits")
 
 # O(n + m) - build the set once
 other = set(other_list)
+hits = 0
 for x in items:
     if x in other:
-        ...
+        hits += 1
+print("using a set    :", hits, "hits")
 ```
-
 With 10,000 items on each side that is 100 million comparisons against 20,000 operations. The first version takes seconds; the second is instant.
 
 This is the single most common performance bug in Python code, and it is dangerous precisely because <strong>both versions look correct and both are fast on small input</strong>. It passes review, it passes tests on a fixture of twenty records, and it becomes a production incident when the data grows.
@@ -104,15 +110,23 @@ Converting to a set is not free, and the trade is almost always worth it:
 
 <strong>Order:</strong> a set does not preserve it. If order matters, `dict.fromkeys()` deduplicates while keeping insertion order.
 
-```python
+```python-run
+class Row:
+    def __init__(self, id): self.id = id
+
+rows = [Row(1), Row(2), Row(1), Row(3)]
+processed = []
+def process(row): processed.append(row.id)
+
 seen = set()
 for row in rows:                    # a growing set is still O(1) per check
     if row.id in seen:
         continue
     seen.add(row.id)
     process(row)
-```
 
+print("processed:", processed)
+```
 That pattern &mdash; a set that grows as you scan &mdash; is the standard way to deduplicate a stream, and it stays constant-time per element throughout.
 
 ## The two mechanisms
@@ -151,11 +165,14 @@ The answer is not always "use a set". Lists are correct when:
 
 The practical guidance: keep the list as the primary data, and build a set alongside it for membership testing. They are not mutually exclusive.
 
-```python
-items = [...]                       # the ordered data
-index = set(items)                  # for O(1) membership
-```
+```python-run
+items = ["vectors", "norms", "basis"]     # the ordered data
+index = set(items)                        # for O(1) membership
 
+print("order kept   :", items)
+print("membership   :", "norms" in index)
+print("two structures, one source of truth - rebuild the set when items change")
+```
 If the collection changes, the set must be kept in sync &mdash; which is a real maintenance cost and the main argument against doing it prematurely.
 
 ## The related traps
@@ -179,14 +196,13 @@ Every row is a linear operation that reads as constant-time. Recognising the sha
 
 If asked to prove the difference, timing is more convincing than asserting:
 
-```python
+```python-run
 import timeit
 
 setup = "data = list(range(100_000)); s = set(data)"
-timeit.timeit("99_999 in data", setup, number=100)     # ~0.15s
-timeit.timeit("99_999 in s", setup, number=100)        # ~0.000005s
+print(timeit.timeit("99_999 in data", setup, number=100))     # ~0.15s
+print(timeit.timeit("99_999 in s", setup, number=100))        # ~0.000005s
 ```
-
 Roughly four orders of magnitude, and the gap grows with the collection.
 
 The other convincing demonstration is scaling: double the input and time it again. The list version takes twice as long per lookup; the set version does not change. That is what distinguishes O(n) from O(1) empirically, and it is the right way to answer "how do you know?"

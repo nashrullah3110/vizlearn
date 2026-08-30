@@ -3,21 +3,19 @@ intro: What does [[0] * 3] * 3 create, and why does writing to one row change al
 
 ## The bug
 
-```python
+```python-run
 grid = [[0] * 3] * 3
 grid[0][0] = 1
 
-grid        # [[1, 0, 0], [1, 0, 0], [1, 0, 0]]
+print(grid)        # [[1, 0, 0], [1, 0, 0], [1, 0, 0]]
 ```
-
 One assignment changed all three rows. The reason is that `* 3` on a list <strong>copies references, not objects</strong> &mdash; so `grid` holds three pointers to the <em>same</em> inner list.
 
-```python
+```python-run
 grid = [[0] * 3] * 3
-grid[0] is grid[1]        # True -- the same object
-id(grid[0]) == id(grid[1])  # True
+print(grid[0] is grid[1])        # True -- the same object
+print(id(grid[0]) == id(grid[1]))  # True
 ```
-
 The inner `[0] * 3` is fine, because integers are immutable &mdash; there is nothing to share dangerously. The outer `* 3` is the problem, because a list is mutable and now has three names.
 
 
@@ -80,12 +78,11 @@ print("fixed('b') :", fixed("b"))
 ```
 ## The fix
 
-```python
+```python-run
 grid = [[0] * 3 for _ in range(3)]      # a fresh list per row
 grid[0][0] = 1
-grid        # [[1, 0, 0], [0, 0, 0], [0, 0, 0]]
+print(grid)        # [[1, 0, 0], [0, 0, 0], [0, 0, 0]]
 ```
-
 The comprehension <em>evaluates</em> `[0] * 3` on every iteration, so each row is a distinct object.
 
 |Expression|Rows are|Safe to mutate|
@@ -103,59 +100,60 @@ The last row is why the bug is subtle: sharing immutable objects is harmless and
 
 <strong>Mutable default arguments</strong> &mdash; the most consequential version, because the sharing spans calls:
 
-```python
+```python-run
 def add(item, target=[]):        # created ONCE, at definition
     target.append(item)
     return target
 
-add(1)     # [1]
-add(2)     # [1, 2]  -- the same list, still there
+print(add(1))     # [1]
+print(add(2))     # [1, 2]  -- the same list, still there
 ```
-
-```python
+```python-run
 def add(item, target=None):      # the fix
     if target is None:
         target = []
     target.append(item)
     return target
-```
 
+print(add("x"), add("y"))
+```
 <strong>Class attributes</strong> &mdash; sharing across instances:
 
-```python
+```python-run
 class Basket:
     items = []                   # ONE list for the whole class
 
 a, b = Basket(), Basket()
-a.items.append("apple")
-b.items                          # ['apple']  -- shared
+print(a.items.append("apple"))
+print(b.items)                          # ['apple']  -- shared
 ```
-
-```python
+```python-run
 class Basket:
     def __init__(self):
         self.items = []          # per instance
-```
 
+a, b = Basket(), Basket()
+a.items.append("apple")
+print("a:", a.items)
+print("b:", b.items, "- separate lists, because __init__ runs per instance")
+```
 <strong>`dict.fromkeys` with a mutable default:</strong>
 
-```python
+```python-run
 d = dict.fromkeys(["a", "b"], [])
-d["a"].append(1)
-d                                 # {'a': [1], 'b': [1]}
+print(d["a"].append(1))
+print(d)                                 # {'a': [1], 'b': [1]}
 
 d = {k: [] for k in ["a", "b"]}  # the fix
 ```
-
 <strong>Shallow copies of nested structures:</strong>
 
-```python
+```python-run
 original = [[1, 2], [3, 4]]
 shallow = original[:]            # or list(original), or copy.copy
-shallow[0].append(99)
-original                         # [[1, 2, 99], [3, 4]]  -- inner lists shared
+print(shallow[0].append(99))
+print(original)                         # [[1, 2, 99], [3, 4]]  -- inner lists shared
 ```
-
 All four are the same rule: <strong>Python assigns and copies references. A copy of a container duplicates the pointers, not the objects behind them.</strong>
 
 ## What multiplication actually does
@@ -211,11 +209,14 @@ The lesson generalises: whenever a library offers cheap slicing, ask whether you
 
 <strong>`is` and `id`</strong> answer the question directly:
 
-```python
-grid[0] is grid[1]              # True means shared
-len({id(row) for row in grid})  # 1 means every row is the same object
-```
+```python-run
+grid = [[0] * 3] * 3
 
+print(grid[0] is grid[1])              # True means shared
+print(len({id(row) for row in grid}))  # 1 means every row is the same object
+
+print("rows share one list:", grid[0] is grid[1])
+```
 <strong>Mutate one element and look</strong> &mdash; the fastest check during debugging. Set `grid[0][0] = 1` and print the whole structure.
 
 <strong>Watch for `*` on a list of mutables,</strong> and for any default argument or class attribute that is a list, dict or set. Linters flag mutable defaults (`B006` in flake8-bugbear, `W0102` in pylint), and enabling that rule catches the most damaging variant automatically.
