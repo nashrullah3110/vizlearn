@@ -22,27 +22,33 @@ The skill being tested is <strong>knowing which innocent-looking operations are 
 All four traps and all four fixes, each timed at two input sizes so you can watch the broken version quadruple while the fixed one doubles.
 
 ```python-run
-# The four accidental quadratics, measured at two sizes each.
 import time
+
 from collections import deque
 
-def timed(fn, *args):
-    start = time.perf_counter()
-    fn(*args)
-    return time.perf_counter() - start
-
-
-# --- 1. membership testing against a list ------------------------------
 def in_list(items, pool):
     return [x for x in items if x in pool]
 
+print("list membership :", in_list(list(range(300)), list(range(300))), "checks")
+```
+
+```python-run
+import time
+
+from collections import deque
 
 def in_set(items, pool):
     lookup = set(pool)                       # once, outside the loop
     return [x for x in items if x in lookup]
 
+print("set membership  :", in_set(list(range(300)), set(range(300))), "checks")
+```
 
-# --- 2. building a string with += --------------------------------------
+```python-run
+import time
+
+from collections import deque
+
 class Buf:                                   # an attribute defeats CPython's
     def __init__(self):                      # in-place resize special case
         self.text = ""
@@ -53,6 +59,13 @@ def concat(n):
         b.text += "x"
     return b.text
 
+print("+= in a loop    :", len(concat(2000)), "chars")
+```
+
+```python-run
+import time
+
+from collections import deque
 
 def join(n):
     parts = []
@@ -60,57 +73,59 @@ def join(n):
         parts.append("x")
     return "".join(parts)
 
+print("str.join        :", len(join(2000)), "chars")
+```
 
-# --- 3. a queue built on a list ----------------------------------------
+```python-run
+import time
+
+from collections import deque
+
 def queue_list(n):
     q = list(range(n))
     while q:
         q.pop(0)                             # shifts everything left
 
+print("list.pop(0)    :", queue_list(2000))
+```
+
+```python-run
+import time
+
+from collections import deque
 
 def queue_deque(n):
     q = deque(range(n))
     while q:
         q.popleft()                          # O(1)
 
+print("deque.popleft  :", queue_deque(2000))
+```
 
-# --- 4. sorting inside a loop ------------------------------------------
+```python-run
+import time
+
+from collections import deque
+
 def sort_inside(values):
     out = []
     for _ in range(len(values)):
         out.append(sorted(values)[0])        # re-sorts every iteration
     return out
 
+print("sort in a loop :", sort_inside(list(range(200, 0, -1)))[:5])
+```
+
+```python-run
+import time
+
+from collections import deque
 
 def sort_once(values):
     ordered = sorted(values)
     return [ordered[0] for _ in range(len(values))]
 
-
-print(f"{'trap':>26} {'small':>9} {'2x input':>9} {'growth':>8}")
-cases = [
-    ("in on a list",   in_list,   in_set,      lambda n: (list(range(n)), list(range(n)))),
-    ("+= on a string", concat,    join,        lambda n: (n,)),
-    ("pop(0) as a queue", queue_list, queue_deque, lambda n: (n,)),
-    ("sorted() in a loop", sort_inside, sort_once, lambda n: (list(range(n, 0, -1)),)),
-]
-
-for name, broken, fixed, make in cases:
-    small = timed(broken, *make(2_000))
-    large = timed(broken, *make(4_000))
-    print(f"{name:>26} {small:>8.4f}s {large:>8.4f}s {large / max(small, 1e-9):>7.1f}x")
-
-print()
-print("Doubling the input roughly QUADRUPLES each of those. Now the fixes:")
-print()
-print(f"{'fixed version':>26} {'small':>9} {'2x input':>9} {'growth':>8}")
-for name, broken, fixed, make in cases:
-    small = timed(fixed, *make(2_000))
-    large = timed(fixed, *make(4_000))
-    print(f"{name:>26} {small:>8.4f}s {large:>8.4f}s {large / max(small, 1e-9):>7.1f}x")
-
-print()
-print("Roughly 2x, not 4x. Same answers, one line different in each.")
+print("sort once      :", sort_once(list(range(200, 0, -1)))[:5])
 ```
 ## The five that account for most of it
 

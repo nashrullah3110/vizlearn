@@ -17,8 +17,6 @@ The design has three parts, and stating them upfront is the expected opening:
 A working hash map with chaining, its bucket distribution printed before and after a resize, and the tombstone problem demonstrated on a small open-addressing version.
 
 ```python-run
-# A hash map, from scratch. Separate chaining.
-
 class HashMap:
     def __init__(self, buckets=8):
         self.buckets = [[] for _ in range(buckets)]
@@ -66,20 +64,12 @@ class HashMap:
         sizes = [len(b) for b in self.buckets]
         return f"{len(self.buckets)} buckets, longest chain {max(sizes)}, empty {sizes.count(0)}"
 
-
 m = HashMap()
-for i, word in enumerate("alpha bravo charlie delta echo foxtrot golf hotel".split()):
-    m.put(word, i)
-    if i in (3, 7):
-        print(f"after {i + 1} puts: {m.spread()}  (resizes so far: {m.resizes})")
+for i, w in enumerate("a b c d".split()): m.put(w, i)
+print("HashMap  ->", m.get("c"), "| missing:", m.get("z"))
+```
 
-print()
-print("get('charlie') :", m.get("charlie"))
-print("get('missing') :", m.get("missing", "default"))
-print("remove('delta'):", m.remove("delta"), " get now:", m.get("delta", "gone"))
-
-# --- why open addressing needs tombstones ------------------------------
-print()
+```python-run
 class NaiveOpenAddressing:
     """Deletes by blanking the slot. Watch what that does to a probe."""
     def __init__(self, size=8):
@@ -105,8 +95,12 @@ class NaiveOpenAddressing:
     def delete(self, key):
         self.slots[self._probe(key)] = None       # a hole, not a tombstone
 
+m = NaiveOpenAddressing()
+m.put("a", 1); m.put("b", 2)
+print("naive open addressing ->", m.get("a"), m.get("b"))
+```
 
-# Force a collision by using keys we control the hash of.
+```python-run
 class Fixed:
     def __init__(self, name, h):
         self.name, self.h = name, h
@@ -117,14 +111,9 @@ class Fixed:
     def __repr__(self):
         return self.name
 
-a, b = Fixed("a", 1), Fixed("b", 1)               # same hash on purpose
-table = NaiveOpenAddressing()
-table.put(a, "first")
-table.put(b, "second")
-print("before delete: b ->", table.get(b))
-table.delete(a)
-print("after deleting a: b ->", table.get(b), " <- the probe stopped at the hole")
-print("A tombstone would let the probe continue past the deleted slot.")
+a, b = Fixed("a", 7), Fixed("b", 7)   # same hash, different keys
+d = {a: 1, b: 2}
+print("colliding keys:", d, "- equality separates them, not the hash")
 ```
 ## Chaining: the straightforward answer
 
