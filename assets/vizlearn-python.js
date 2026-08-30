@@ -271,7 +271,24 @@
     out.scrollTop = out.scrollHeight;
   }
 
+  // One worker serves every block on the page, and it has a single
+  // onmessage slot. Starting a second run while one was in flight replaced
+  // the first block's handler, so its "done" never arrived: its output
+  // stayed empty and its Run button stayed disabled for good. Pages now
+  // carry seven to twelve editors, so two clicks in quick succession is
+  // ordinary rather than exotic.
+  //
+  // The Python side was never concurrent anyway - one interpreter, one
+  // thread - so runs are queued and played one at a time.
+  var queue = Promise.resolve();
+
   function runBlock(block, code, opts) {
+    queue = queue.then(function () { return runBlockNow(block, code, opts); },
+                       function () { return runBlockNow(block, code, opts); });
+    return queue;
+  }
+
+  function runBlockNow(block, code, opts) {
     opts = opts || {};
     var parts = els(block);
     var out = parts.output;
@@ -280,6 +297,8 @@
     setStatus(block, worker ? 'Running\u2026' : 'Loading Python\u2026');
 
     var timedOut = false;
+    var settle;
+    var finished = new Promise(function (r) { settle = r; });
 
     function giveUp(hint) {
       timedOut = true;
@@ -288,6 +307,7 @@
       appendOut(block, hint, 'py-out-hint');
       setStatus(block, 'Timed out');
       parts.run.disabled = false;
+      settle();
     }
 
     var timer = setTimeout(function () {
@@ -311,6 +331,7 @@
         if (timedOut) return;
         setStatus(block, '');
         parts.run.disabled = false;
+        settle();
       };
       worker.onmessage = function (e) {
         if (timedOut) return;
@@ -353,7 +374,10 @@
       appendOut(block, 'Check the connection and try again.', 'py-out-hint');
       setStatus(block, 'Offline?');
       parts.run.disabled = false;
+      settle();
     });
+
+    return finished;
   }
 
   function killWorker() {
