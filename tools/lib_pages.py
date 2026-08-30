@@ -244,6 +244,26 @@ TOPICS = {
             "schema all behave exactly as they do in production.",
         ],
     },
+    "numpy": {
+        "dir": "numpy",
+        "title": "NumPy",
+        "h1": "NumPy, by Running It",
+        "lead": "Arrays instead of loops - the shapes, the broadcasting rules, and "
+                "the views that catch everyone, each one runnable on the page.",
+        "keywords": "numpy tutorial, numpy broadcasting, numpy array indexing, "
+                    "numpy views vs copies, numpy axis, vectorisation python",
+        "intro": [
+            "A Python list holds pointers to objects scattered across memory. A "
+            "NumPy array holds numbers, of one type, laid out end to end. Almost "
+            "everything that makes NumPy fast, and everything that makes it "
+            "surprising, follows from that one difference.",
+            "This track works up from creating an array to broadcasting, views, "
+            "aggregation along an axis, and the linear algebra underneath every "
+            "machine learning library. Every idea arrives as a small program you "
+            "can run and edit here, because the fastest way to settle what a shape "
+            "will do is to print it.",
+        ],
+    },
     "interview": {
         "dir": "interview",
         "title": "Interview Questions",
@@ -270,7 +290,7 @@ TOPICS = {
 
 # Display order on the hub and in the footer.
 TOPIC_ORDER = ["maths", "ml", "dl", "dsa", "nlp", "computer-vision", "db",
-               "gen-ai", "python", "pydantic", "fastapi", "interview"]
+               "gen-ai", "python", "pydantic", "fastapi", "numpy", "interview"]
 
 DIR_TO_TOPIC = {t["dir"]: k for k, t in TOPICS.items()}
 

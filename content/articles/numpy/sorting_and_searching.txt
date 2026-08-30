@@ -1,0 +1,350 @@
+title: Sorting and Searching
+intro: sort, argsort and searchsorted, and why the argument version is usually the one you need.
+
+## Copy or in place
+
+`np.sort(a)` returns a new sorted array and leaves `a` alone. `a.sort()` sorts `a` itself and returns `None`.
+
+That is NumPy's general convention for operations that have both forms, and it is worth relying on: if you see a bare method call with no assignment, it is modifying something.
+
+There is no `reverse=` argument. Sort ascending and reverse with `[::-1]`, which is a free view.
+
+
+## sort copies, .sort() is in place
+
+NumPy's consistent convention: the function returns a new array, the method modifies.
+
+```python-run
+import numpy as np
+
+a = np.array([3, 1, 4, 1, 5])
+
+b = np.sort(a)
+print("np.sort(a):", b, " a unchanged:", a)
+
+a.sort()
+print("a.sort()  :", a, " <- a itself is now sorted")
+print()
+print("There is no reverse= argument. Sort, then flip:")
+c = np.array([3, 1, 4, 1, 5])
+print("   descending:", np.sort(c)[::-1])
+```
+
+## Sorting a 2-D array sorts each row separately
+
+By default it sorts along the last axis, which is almost never a whole-array sort.
+
+```python-run
+import numpy as np
+
+a = np.array([[7, 1, 9],
+              [3, 8, 2]])
+print("original:"); print(a)
+print()
+print("sort() -> along axis=-1, each ROW independently:")
+print(np.sort(a))
+print()
+print("sort(axis=0) -> each COLUMN independently:")
+print(np.sort(a, axis=0))
+print()
+print("sort(axis=None) -> flatten first, one global sort:")
+print(np.sort(a, axis=None))
+print()
+print("Note rows are sorted in isolation - they do not stay together.")
+```
+
+## argsort gives the order, not the values
+
+This is the one you want whenever other arrays must follow the sort.
+
+```python-run
+import numpy as np
+
+names = np.array(["ana", "raj", "kim", "lee"])
+score = np.array([72, 91, 58, 84])
+
+order = np.argsort(score)
+print("scores      :", score)
+print("argsort     :", order, "<- positions, in ascending order of score")
+print()
+print("apply it to BOTH arrays and they stay aligned:")
+print("   names :", names[order])
+print("   score :", score[order])
+print()
+print("descending is the same order reversed:")
+top = np.argsort(score)[::-1]
+print("   ranking:", list(zip(names[top].tolist(), score[top].tolist())))
+```
+
+## Sorting by several keys with lexsort
+
+The last key is the primary one, which reads backwards and catches everyone.
+
+```python-run
+import numpy as np
+
+dept = np.array(["b", "a", "b", "a"])
+sal  = np.array([50, 70, 40, 90])
+
+order = np.lexsort((sal, dept))     # dept first, then sal within it
+print("lexsort((sal, dept)) -> LAST argument is the primary key")
+for i in order:
+    print("   %s  %d" % (dept[i], sal[i]))
+print()
+print("swap them and salary becomes primary:")
+for i in np.lexsort((dept, sal)):
+    print("   %s  %d" % (dept[i], sal[i]))
+```
+
+## Partial sorting when you only need the top k
+
+<code>argpartition</code> is O(n) and does not bother ordering the rest.
+
+```python-run
+import numpy as np
+import time
+
+rng = np.random.default_rng(0)
+x = rng.random(200_000)
+
+t = time.perf_counter(); full = np.argsort(x)[-5:]; t1 = time.perf_counter() - t
+t = time.perf_counter(); part = np.argpartition(x, -5)[-5:]; t2 = time.perf_counter() - t
+
+print("full argsort  : %.4f s" % t1)
+print("argpartition  : %.4f s" % t2)
+print("same 5 values :", np.array_equal(np.sort(x[full]), np.sort(x[part])))
+print()
+print("argpartition guarantees the top 5 are in the last 5 slots,")
+print("but NOT that they are in order. Sort just those five if you care.")
+print("   ordered top 5:", np.round(np.sort(x[part])[::-1], 5))
+```
+
+## searchsorted finds insertion points in a sorted array
+
+Binary search, so it is fast, and it is how you bucket values.
+
+```python-run
+import numpy as np
+
+edges = np.array([0, 10, 20, 30])
+vals  = np.array([5, 10, 25, 99])
+
+print("insertion points (side='left') :", np.searchsorted(edges, vals))
+print("insertion points (side='right'):", np.searchsorted(edges, vals, side="right"))
+print("   the two differ only for exact matches - here, the 10")
+print()
+print("bucketing grades:")
+cuts = np.array([40, 60, 75, 90])
+labels = np.array(["F", "C", "B", "A", "A+"])
+marks = np.array([12, 55, 75, 88, 97])
+print("   ", dict(zip(marks.tolist(),
+                      labels[np.searchsorted(cuts, marks, side="right")].tolist())))
+print()
+print("np.isin answers membership without sorting:")
+print("   ", np.isin(np.array([1, 5, 9]), np.array([2, 5, 8])))
+```
+## The axis default
+
+On a 2-D array, `sort()` sorts along the **last axis** &mdash; each row independently.
+
+This is a genuinely dangerous default when the array is a table. Sorting a `(rows, columns)` array of records scrambles every row internally: the name column gets sorted, the salary column gets sorted, and the correspondence between them is destroyed.
+
+`sort(axis=None)` flattens and does one global sort. `sort(axis=0)` sorts each column independently, which has the same problem in the other direction.
+
+**None of these sort rows as units.** For that you need `argsort` on a key column and then fancy indexing.
+
+## argsort is the useful one
+
+`np.argsort(x)` returns the positions that would sort `x`.
+
+That indirection is the point. Apply the same index array to any number of parallel arrays and they stay aligned:
+
+```python
+order = np.argsort(score)
+names[order], score[order], dates[order]
+```
+
+This is how you sort a table by a column. It is also how you produce a ranking, take the top n, or reorder anything that travels alongside the sorted values.
+
+Descending is `np.argsort(x)[::-1]`.
+
+One subtlety: the default sort is **quicksort**, which is not stable. Equal elements can come out in any order. Pass `kind="stable"` when ties must preserve their original relative order &mdash; for instance when you are sorting by a second key after already sorting by a first.
+
+## Several keys
+
+`np.lexsort` sorts by multiple keys, and the argument order reads backwards: the **last** array is the primary key.
+
+`np.lexsort((salary, dept))` sorts by department, breaking ties by salary.
+
+Everyone gets this wrong the first time. The mnemonic that helps: the keys are applied in order from last to first, like a stable sort chain where the final pass dominates.
+
+## Only the top k
+
+Sorting 200,000 values to look at 5 of them is wasteful.
+
+`np.argpartition(x, -5)` rearranges so that the 5 largest occupy the last 5 slots, in linear time. It does **not** order them, and it does not order anything else &mdash; it only guarantees the partition boundary.
+
+If you need those five in order, sort just those five. That is five elements instead of two hundred thousand.
+
+The same trick works for the smallest k with a positive index, and for medians, which is what `np.median` uses internally.
+
+## searchsorted
+
+Given a sorted array, `np.searchsorted(edges, values)` returns where each value would be inserted to keep it sorted. It is a binary search, so it is fast even on large arrays.
+
+Two uses come up constantly.
+
+**Bucketing.** Given cut points, `searchsorted` gives the bucket index for each value directly, and indexing a label array with the result assigns categories in one line. `side="right"` versus `side="left"` decides which bucket an exact boundary value falls into &mdash; the only case where they differ.
+
+**Lookup.** Finding many values in a large sorted array is `O(m log n)` this way, against `O(mn)` for repeated comparisons.
+
+For pure membership testing where order does not matter, `np.isin` is simpler and does not require sorted input.
+
+## The mistakes
+
+**Sorting a table with `sort()`** and destroying the row correspondence. Use `argsort` on a key column.
+
+**Assuming stability.** The default is not stable; pass `kind="stable"` when it matters.
+
+**Getting `lexsort` backwards.** The last key is primary.
+
+**Full sorting for a top-n.** `argpartition` exists precisely for that.
+
+## The sort kinds
+
+`kind` selects the algorithm, and the choice occasionally matters.
+
+`"quicksort"` is the default, an introsort in practice. Fastest on average, not stable, and its worst case is handled by falling back to heapsort.
+
+`"stable"` guarantees that equal elements keep their original relative order. It is what you need when sorting by a second key after already sorting by a first, since an unstable sort would discard the first ordering.
+
+`"heapsort"` has a guaranteed worst case and uses no extra memory, which is occasionally the deciding factor.
+
+`"mergesort"` is an alias for `"stable"`.
+
+The performance difference is modest for most data. Stability is not a performance question, and when you need it, you need it.
+
+## Sorting records
+
+Structured arrays &mdash; arrays with named fields &mdash; can be sorted by field name:
+
+```python
+a.sort(order=["dept", "salary"])
+```
+
+This is the closest NumPy comes to sorting a table by columns, and it works because the structured dtype makes each row a single comparable item.
+
+For plain 2-D numeric arrays, there is no `order` argument, and the answer is the `argsort` idiom: sort the key column, apply the resulting index to the whole array with fancy indexing. `a[np.argsort(a[:, 2])]` sorts rows by the third column.
+
+For more than one key, `lexsort` produces the index and the same fancy-index application follows.
+
+## where, nonzero, and finding things
+
+`np.nonzero(mask)` returns the indices of True elements, as a tuple with one array per axis. `np.where(mask)` with a single argument is the same function.
+
+The tuple form is designed to be used as an index: `a[np.nonzero(mask)]` selects the matching elements. Unpacking it with `rows, cols = np.nonzero(mask)` gives coordinates.
+
+`np.flatnonzero(mask)` is the flat-index version, and is usually what you want for a 1-D array &mdash; it returns a plain array rather than a one-element tuple.
+
+For "the first element matching a condition", `np.argmax(mask)` is the fast answer, because it stops at the first True. It returns 0 when nothing matches, which is indistinguishable from a match at position zero, so check `mask.any()` first. There is no built-in "find first" that handles the empty case, and this two-step is the idiom.
+
+## searchsorted in more detail
+
+`searchsorted` requires its first argument to be **sorted**, and does not check. Passing unsorted data gives wrong answers silently, which is the main way it goes wrong.
+
+`side="left"` returns the first position where the value could be inserted; `side="right"` returns the last. They differ only for values that are already present, and the choice decides which bucket a boundary value falls into.
+
+For bucketing, `side="right"` with cut points means a value exactly on a boundary goes into the upper bucket, which matches the usual convention for grade boundaries and histogram bins.
+
+`sorter` lets you pass an `argsort` result so the lookup can be done against an unsorted array without sorting it first &mdash; useful when the array must keep its original order for other reasons.
+
+`np.digitize` is a related function with a `right` argument whose meaning is the reverse of what the name suggests in one of its branches. `searchsorted` is easier to reason about, and does the same job.
+
+## Ranking
+
+A ranking is `argsort` applied twice.
+
+`np.argsort(x)` gives the positions in sorted order. `np.argsort(np.argsort(x))` gives, for each element, its rank.
+
+That double application is unintuitive the first time and worth the moment it takes to see: the first argsort answers "which element belongs at each rank", and inverting that mapping answers "which rank does each element get".
+
+Ties get consecutive distinct ranks rather than being averaged, which is not what most statistical definitions of rank want. `scipy.stats.rankdata` handles tie-breaking properly, and is the right tool when the ranking is going into a statistic.
+
+## The performance summary
+
+Sorting is `O(n log n)`, and `argsort` costs slightly more than `sort` because it moves indices alongside comparisons.
+
+`argpartition` is `O(n)` and is the right choice for any top-k or bottom-k question. The saving is large: for the top 5 of 200,000 values it is roughly an order of magnitude.
+
+`searchsorted` is `O(log n)` per lookup against an already-sorted array, so `m` lookups cost `O(m log n)`. If you are searching the same array repeatedly, sorting it once and using `searchsorted` beats any linear scan.
+
+`np.isin` builds a sorted structure internally, so it is `O((n+m) log(n+m))` &mdash; better than the naive comparison, and worth knowing that it is not free either.
+
+## Sorting along an axis of a higher-dimensional array
+
+`sort` takes an `axis` like every other operation, and the default is `-1` &mdash; the last one.
+
+On a 3-D array that means each 1-D line along the last axis is sorted independently. That is rarely wrong but frequently not what was intended, and passing `axis` explicitly makes the intent visible.
+
+`argsort` on a multi-dimensional array returns indices **along that axis only**, not flat positions. Applying them requires `np.take_along_axis`:
+
+```python
+idx = np.argsort(scores, axis=1)
+ordered = np.take_along_axis(values, idx, axis=1)
+```
+
+That is the multi-dimensional version of the sort-by-key idiom, and it is the function people usually fail to find. `np.put_along_axis` is the assignment counterpart.
+
+## Descending, and the sign trick
+
+There is no `reverse=` argument anywhere in NumPy's sorting.
+
+`np.sort(a)[::-1]` reverses the result, and the slice is a free view.
+
+For `argpartition` and `argsort`, negating the values is often cleaner than reversing the result, because it keeps the index arithmetic straightforward: `np.argsort(-scores)` gives descending order directly.
+
+That works for numeric data. It does not work for unsigned integers, where negation wraps, and it is a subtle way to get a wrong answer on `uint8` image data.
+
+## Searching by value
+
+There is no `index()` method. Finding where a value occurs is a comparison followed by a search:
+
+`np.flatnonzero(a == value)` gives every position, as a plain array.
+
+`np.argmax(a == value)` gives the first, in one pass, with the caveat that it returns 0 when nothing matches.
+
+For a sorted array, `np.searchsorted` finds the position in logarithmic time, which is the right choice when searching repeatedly.
+
+For membership across two arrays, `np.isin` handles it in one call rather than a loop of comparisons.
+
+## The summary
+
+`np.sort` copies; `a.sort()` modifies. That distinction holds throughout NumPy.
+
+`argsort` is the one to use whenever anything else must follow the ordering, which in practice is most of the time.
+
+`kind="stable"` when ties must keep their original order, which includes any multi-pass sort by successive keys.
+
+`lexsort` for several keys, remembering that the **last** one is primary.
+
+`argpartition` for top-k, which is linear rather than `n log n`.
+
+`searchsorted` for insertion points and bucketing, on data that is genuinely sorted &mdash; it does not check.
+
+`take_along_axis` when applying `argsort` results on more than one dimension.
+
+Between them those cover essentially every ordering question, and the two that get used most are `argsort` and `argpartition`.
+
+## One more thing about stability
+
+Stability is not a performance setting, and it is worth one more paragraph because the cost of getting it wrong is invisible.
+
+An unstable sort is free to reorder equal elements arbitrarily. That means two runs on the same data can produce different output, and the difference only appears when there are ties. Code that sorts by a secondary key and then by a primary key relies entirely on the second sort preserving the first ordering, and with the default `kind` it does not.
+
+Whenever a sort follows another sort, or whenever the output order of tied records is observable, pass `kind="stable"`. The cost is small and the alternative is a bug that reproduces intermittently.
+
+## Where sorting fits
+
+Sorting is rarely the goal in itself. It is the step that makes something else possible: a ranking, a top-n, a binary search, a group-by on the boundaries where a key changes, a merge of two datasets.
+
+That framing helps when choosing. If the sorted array itself is not needed, `argsort` or `argpartition` usually is &mdash; and if you only need the order to apply it elsewhere, sorting the values was wasted work.

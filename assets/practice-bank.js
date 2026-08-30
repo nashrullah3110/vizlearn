@@ -13135,6 +13135,1026 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "numpy/aggregations_and_axis.html",
+  "title": "Aggregations and axis",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "On a (3,4) array, what does `a.sum(axis=0)` give?",
+    "o": [
+     "One value per row, shape (3,)",
+     "One value per column, shape (4,)",
+     "A single number",
+     "Shape (3,4)"
+    ],
+    "a": 1,
+    "w": "axis names the axis that disappears. Axis 0 is the rows, so they collapse and you get one value per column."
+   },
+   {
+    "t": "Why does `a - a.mean(axis=1)` fail on a (3,4) array?",
+    "o": [
+     "mean returns a scalar",
+     "The result is (3,), and broadcasting compares 4 with 3",
+     "You cannot subtract a mean",
+     "It does not fail"
+    ],
+    "a": 1,
+    "w": "Right-aligned broadcasting. `keepdims=True` gives (3,1), which stretches correctly - while centring by column needs no keepdims at all."
+   },
+   {
+    "t": "What does `argmax` return on a 2-D array with no axis?",
+    "o": [
+     "Coordinates",
+     "A flat index into the raveled array",
+     "The maximum value",
+     "One index per row"
+    ],
+    "a": 1,
+    "w": "Use `np.unravel_index(a.argmax(), a.shape)` to turn it into coordinates. Ties go to the first occurrence."
+   },
+   {
+    "t": "What does `axis=(1,2)` do on a (frames, rows, cols) array?",
+    "o": [
+     "Nothing",
+     "Collapses rows and columns, giving one value per frame",
+     "Collapses frames",
+     "Raises"
+    ],
+    "a": 1,
+    "w": "A tuple reduces several axes at once, which covers most of what people reach for loops to do with image or batch data."
+   }
+  ]
+ },
+ {
+  "path": "numpy/boolean_masking.html",
+  "title": "Boolean Masking",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "Why does `a[(a > 3) and (a < 8)]` raise?",
+    "o": [
+     "Wrong brackets",
+     "`and` needs one truth value and a mask has many",
+     "and is deprecated",
+     "It does not raise"
+    ],
+    "a": 1,
+    "w": "Use `&`, which is elementwise. NumPy refuses to guess whether you meant any() or all(), and the error message says so."
+   },
+   {
+    "t": "Why are the brackets in `(a > 3) & (a < 8)` required?",
+    "o": [
+     "Style",
+     "& binds tighter than >, so without them it parses as a > (3 & a) < 8",
+     "They are optional",
+     "To make a copy"
+    ],
+    "a": 1,
+    "w": "Python's precedence, not NumPy's. Without brackets the expression means something unrelated to what it looks like."
+   },
+   {
+    "t": "Does `a[mask]` give a view or a copy?",
+    "o": [
+     "A view",
+     "A copy - the selected elements have no stride pattern",
+     "Depends on the mask",
+     "An error"
+    ],
+    "a": 1,
+    "w": "Unlike a slice, no view can describe scattered elements. But `a[mask] = value` does write in place - the same syntax reads as a copy and writes as a view."
+   },
+   {
+    "t": "How do you filter out NaN values?",
+    "o": [
+     "a[a != np.nan]",
+     "a[~np.isnan(a)]",
+     "a[a is not np.nan]",
+     "a[a > np.nan]"
+    ],
+    "a": 1,
+    "w": "Every comparison with nan is False, including nan == nan, so `!=` keeps everything. Only isnan finds them."
+   }
+  ]
+ },
+ {
+  "path": "numpy/broadcasting.html",
+  "title": "Broadcasting",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "How are shapes compared?",
+    "o": [
+     "From the left",
+     "From the right",
+     "By total size",
+     "Alphabetically"
+    ],
+    "a": 1,
+    "w": "Right-aligned, pair by pair. That is why (3,4) and (3,) fail - 4 against 3 - even though the 3 looks like it should match the rows."
+   },
+   {
+    "t": "You have a (2,3) array and one value per row. What shape must that be?",
+    "o": [
+     "(2,)",
+     "(3,)",
+     "(2,1)",
+     "(1,2)"
+    ],
+    "a": 2,
+    "w": "A 1-D array aligns with the last axis, so (2,) fails. `v[:, None]` gives (2,1), which stretches across the columns."
+   },
+   {
+    "t": "What do shapes (10000,1) and (1,10000) broadcast to?",
+    "o": [
+     "(10000,)",
+     "(1,1)",
+     "(10000,10000) - about 800 MB in float64",
+     "It raises"
+    ],
+    "a": 2,
+    "w": "A column plus a row gives a full grid. Two 80 KB arrays produce a hundred million elements, with no warning."
+   },
+   {
+    "t": "Why is broadcasting itself cheap?",
+    "o": [
+     "It uses less precision",
+     "Nothing is copied - NumPy repeats values via stride bookkeeping",
+     "It runs on the GPU",
+     "It is not cheap"
+    ],
+    "a": 1,
+    "w": "The stretched array is never materialised. The cost is in the result, which is why an accidental grid is the thing to watch for."
+   }
+  ]
+ },
+ {
+  "path": "numpy/creating_arrays.html",
+  "title": "Creating Arrays",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "Why prefer `linspace` over `arange` for float steps?",
+    "o": [
+     "It is faster",
+     "arange's element count depends on floating-point accumulation and is unpredictable",
+     "arange cannot take floats",
+     "linspace is newer"
+    ],
+    "a": 1,
+    "w": "`np.arange(0, 1, 0.1)` may give ten or eleven elements depending on rounding. `linspace` gives exactly the count you asked for, endpoint included."
+   },
+   {
+    "t": "What does `np.empty((2,3))` contain?",
+    "o": [
+     "Zeros",
+     "Whatever was already in that memory",
+     "NaN",
+     "Ones"
+    ],
+    "a": 1,
+    "w": "It allocates without initialising. Only correct when you overwrite every element - otherwise it produces bugs that appear only sometimes."
+   },
+   {
+    "t": "`np.array([127], dtype=np.int8) + 1` gives what?",
+    "o": [
+     "128",
+     "-128, silently",
+     "An OverflowError",
+     "It promotes to int16"
+    ],
+    "a": 1,
+    "w": "NumPy integers wrap rather than promoting or raising. Python ints grow without limit, so code ported from lists can start producing wrong numbers instead of errors."
+   },
+   {
+    "t": "Why is `np.append` in a loop a mistake?",
+    "o": [
+     "It is deprecated",
+     "An array is a fixed block, so each call allocates a new one and copies everything",
+     "It only works on 1-D",
+     "It changes the dtype"
+    ],
+    "a": 1,
+    "w": "There is nowhere to append to. Allocate the result once and assign into it, or build it with a vectorised call."
+   }
+  ]
+ },
+ {
+  "path": "numpy/dtypes.html",
+  "title": "Dtypes",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "What does a NumPy int8 do at 127 + 1?",
+    "o": [
+     "Raises OverflowError",
+     "Wraps to -128 silently",
+     "Promotes to int16",
+     "Gives 128"
+    ],
+    "a": 1,
+    "w": "NumPy integers are fixed-width machine integers and wrap. Python ints grow instead, so ported code returns wrong numbers rather than failing."
+   },
+   {
+    "t": "What dtype results from `int64 + float32`?",
+    "o": [
+     "int64",
+     "float32",
+     "float64",
+     "It raises"
+    ],
+    "a": 2,
+    "w": "Neither input type. float32 cannot represent every int64 exactly, so NumPy promotes to a type that can - which is how a float32 pipeline quietly doubles its memory."
+   },
+   {
+    "t": "`ints = np.arange(5); ints[0] = 9.99`. What is stored?",
+    "o": [
+     "9.99",
+     "10",
+     "9",
+     "It raises"
+    ],
+    "a": 2,
+    "w": "Assignment converts to the array's dtype and truncates toward zero. It never widens the array."
+   },
+   {
+    "t": "Summing a million float32 ones does not give a million. Why?",
+    "o": [
+     "A bug",
+     "The running total grows until adding 1.0 no longer changes it",
+     "float32 cannot hold 1.0",
+     "The array is wrong"
+    ],
+    "a": 1,
+    "w": "float32 carries about seven significant digits. `sum(dtype=np.float64)` accumulates in double precision while keeping the array small."
+   }
+  ]
+ },
+ {
+  "path": "numpy/fancy_indexing.html",
+  "title": "Fancy Indexing",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "What does `a[[0, 2], [1, 3]]` select from a 2-D array?",
+    "o": [
+     "Rows 0,2 crossed with columns 1,3",
+     "The elements at (0,1) and (2,3)",
+     "The first two rows",
+     "An error"
+    ],
+    "a": 1,
+    "w": "Index arrays are matched elementwise into coordinate pairs, not crossed. Use `np.ix_(rows, cols)` for the rectangle."
+   },
+   {
+    "t": "Does fancy indexing return a view?",
+    "o": [
+     "Yes",
+     "No - arbitrary positions cannot be described by strides, so it copies",
+     "Only for 1-D",
+     "Only with take"
+    ],
+    "a": 1,
+    "w": "A view needs a start, shape and strides. Scattered positions have none, so the result is new memory - though assigning through the index still writes in place."
+   },
+   {
+    "t": "What does `b[[0,0,0]] += 1` do to b[0]?",
+    "o": [
+     "Adds 3",
+     "Adds 1",
+     "Raises",
+     "Adds 0"
+    ],
+    "a": 1,
+    "w": "It reads once, adds one, and writes back three times. `np.add.at` accumulates properly; `np.bincount` is faster for counting."
+   },
+   {
+    "t": "Why does `argsort` exist rather than just `sort`?",
+    "o": [
+     "It is faster",
+     "It returns positions, which can be applied to several parallel arrays to keep them aligned",
+     "It sorts in place",
+     "It handles NaN"
+    ],
+    "a": 1,
+    "w": "The permutation is reusable - sorting names by score and applying the same order to ages keeps the rows together."
+   }
+  ]
+ },
+ {
+  "path": "numpy/indexing_and_slicing.html",
+  "title": "Indexing and Slicing",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "You slice an array and modify the slice. What happens to the original?",
+    "o": [
+     "Nothing - slices copy",
+     "It changes too, because a slice is a view",
+     "It raises",
+     "Only for 1-D arrays"
+    ],
+    "a": 1,
+    "w": "This is where arrays differ from lists. Slicing costs nothing because nothing is copied - and a function that modifies a slice of its input alters the caller's data."
+   },
+   {
+    "t": "On a (3,4) array `a`, what does `a + a[:, 2]` do?",
+    "o": [
+     "Adds the column to every column",
+     "Raises - (3,4) against (3,) compares 4 with 3",
+     "Adds it to every row",
+     "Returns (3,3)"
+    ],
+    "a": 1,
+    "w": "Shapes align from the right, so a column taken with an integer index will not broadcast back against its own array. `a[:, 2:3]` keeps the axis and works."
+   },
+   {
+    "t": "What does `a[..., 0]` select?",
+    "o": [
+     "The first row",
+     "The first element along the last axis",
+     "The first element overall",
+     "Everything"
+    ],
+    "a": 1,
+    "w": "`...` stands for as many axes as needed, so this works regardless of how many leading dimensions the array has."
+   },
+   {
+    "t": "How do you slice without risking changes to the original?",
+    "o": [
+     "Use a tuple index",
+     "Call .copy() on the slice",
+     "Use flatten",
+     "Slices never affect the original"
+    ],
+    "a": 1,
+    "w": "`arr[1:4].copy()` gives independence. `np.shares_memory(a, b)` tells you what you actually have when you are unsure."
+   }
+  ]
+ },
+ {
+  "path": "numpy/linear_algebra.html",
+  "title": "Linear Algebra",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "What is the difference between `a * b` and `a @ b` for two 2x2 arrays?",
+    "o": [
+     "None",
+     "* is elementwise, @ is matrix multiplication",
+     "@ is elementwise",
+     "* raises"
+    ],
+    "a": 1,
+    "w": "Both are legal and give different answers of the same shape, with no warning. It is the most common linear algebra bug in NumPy code."
+   },
+   {
+    "t": "Why prefer `np.linalg.solve(A, b)` over `np.linalg.inv(A) @ b`?",
+    "o": [
+     "solve is newer",
+     "It is faster and numerically better - inv is roughly n solves plus extra rounding error",
+     "inv is deprecated",
+     "They differ in shape"
+    ],
+    "a": 1,
+    "w": "solve factors once and back-substitutes. On an ill-conditioned matrix the accuracy gap is the difference between an answer and noise."
+   },
+   {
+    "t": "How should you check whether a matrix is singular?",
+    "o": [
+     "det(A) == 0",
+     "np.linalg.matrix_rank or cond",
+     "A.sum() == 0",
+     "try/except only"
+    ],
+    "a": 1,
+    "w": "Floating-point determinants are almost never exactly zero, and a determinant can be tiny purely because the matrix is large."
+   },
+   {
+    "t": "Why use `eigvalsh` rather than `eig` for a symmetric matrix?",
+    "o": [
+     "No reason",
+     "It is faster, more accurate, and returns real eigenvalues in ascending order",
+     "eig does not work",
+     "It returns fewer values"
+    ],
+    "a": 1,
+    "w": "`eig` returns complex values in unspecified order, so any code indexing its output is relying on something not guaranteed."
+   }
+  ]
+ },
+ {
+  "path": "numpy/nan_and_missing_data.html",
+  "title": "NaN and Missing Data",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "Why does `arr == np.nan` never find anything?",
+    "o": [
+     "It is a syntax error",
+     "Every comparison with NaN is False, including equality with itself",
+     "np.nan is None",
+     "It only works on floats"
+    ],
+    "a": 1,
+    "w": "IEEE 754 defines NaN as the result of an undefined operation, and two undefined results have no reason to be equal. Use np.isnan."
+   },
+   {
+    "t": "What happens when you assign `np.nan` into an integer array?",
+    "o": [
+     "It works",
+     "It stores 0",
+     "It raises - there is no integer NaN",
+     "The array becomes float automatically"
+    ],
+    "a": 2,
+    "w": "No integer type has a bit pattern for NaN, which is why a column with one missing value becomes float and ids print as 1001.0"
+   },
+   {
+    "t": "What does `a.mean()` return if `a` contains one NaN?",
+    "o": [
+     "The mean of the rest",
+     "NaN",
+     "0",
+     "An error"
+    ],
+    "a": 1,
+    "w": "Correct but dangerous - the NaN flows onward and turns everything downstream into NaN, far from where it started. Use nanmean."
+   },
+   {
+    "t": "Which check catches both NaN and infinity?",
+    "o": [
+     "np.isnan",
+     "np.isinf",
+     "np.isfinite",
+     "np.isreal"
+    ],
+    "a": 2,
+    "w": "isnan misses inf and isinf misses NaN. isfinite is usually the one you want when validating data."
+   }
+  ]
+ },
+ {
+  "path": "numpy/performance_and_memory.html",
+  "title": "Performance and Memory",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "Why is `float32` often faster than `float64`, not just smaller?",
+    "o": [
+     "The arithmetic is simpler",
+     "Half as much data has to move, and memory bandwidth is usually the limit",
+     "It skips rounding",
+     "It is not faster"
+    ],
+    "a": 1,
+    "w": "Most array operations are bandwidth-bound rather than compute-bound, so halving the bytes roughly halves the time."
+   },
+   {
+    "t": "How many temporary arrays does `a * 2 + 1` allocate?",
+    "o": [
+     "None",
+     "One, for a*2, plus the result",
+     "Three",
+     "It depends on dtype"
+    ],
+    "a": 1,
+    "w": "On a million float64 elements that is 8 MB you never see. In-place operators or `out=` remove them - but only bother once you have measured that the line matters."
+   },
+   {
+    "t": "Copying an array and copying its transpose move the same bytes. Why is the transpose slower?",
+    "o": [
+     "Transposing itself is slow",
+     "It reads one value from each row in turn, so almost every read is a cache miss",
+     "It uses more memory",
+     "It is not slower"
+    ],
+    "a": 1,
+    "w": "Processors fetch cache lines, so consecutive reads are far cheaper than jumping. Reductions are a poor test of this - NumPy blocks them and both directions run at similar speed."
+   },
+   {
+    "t": "When timing an operation, should you take the mean or the minimum of several runs?",
+    "o": [
+     "Mean",
+     "Minimum",
+     "Maximum",
+     "A single run"
+    ],
+    "a": 1,
+    "w": "Slow runs measure interference from the rest of the machine. The fastest run is the closest estimate of the actual cost."
+   }
+  ]
+ },
+ {
+  "path": "numpy/random_numbers.html",
+  "title": "Random Numbers",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "Why is `default_rng` preferred over `np.random.seed`?",
+    "o": [
+     "It is faster",
+     "It gives an isolated generator instead of mutating one hidden global",
+     "It produces better randomness",
+     "seed is deprecated"
+    ],
+    "a": 1,
+    "w": "A global generator means an unrelated library drawing numbers changes your seeded results, and it cannot be used safely across threads."
+   },
+   {
+    "t": "What does `rng.integers(1, 3, size=8)` produce?",
+    "o": [
+     "Only 1s, 2s and 3s",
+     "Only 1s and 2s - high is excluded",
+     "Only 2s",
+     "Eight 3s"
+    ],
+    "a": 1,
+    "w": "Half-open like range and like slicing. The removed `random_integers` was inclusive, which is why the memory is unreliable."
+   },
+   {
+    "t": "What does `rng.shuffle(a)` do to a 2-D array?",
+    "o": [
+     "Shuffles every element",
+     "Shuffles whole rows along the first axis",
+     "Shuffles columns",
+     "Raises"
+    ],
+    "a": 1,
+    "w": "Row contents stay intact, which is what you want for a table of records."
+   },
+   {
+    "t": "What is wrong with drawing a train sample and then a test sample separately?",
+    "o": [
+     "It is slow",
+     "The two draws are independent, so the same row can land in both",
+     "It needs a seed",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "That leaks test data into training and inflates every score, with no sign in the code. Permute an index array once and slice it instead."
+   }
+  ]
+ },
+ {
+  "path": "numpy/saving_and_loading.html",
+  "title": "Saving and Loading Arrays",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "What does `.npy` preserve that a CSV does not?",
+    "o": [
+     "Nothing",
+     "The exact dtype and shape",
+     "The filename",
+     "Compression"
+    ],
+    "a": 1,
+    "w": "Text round-trips everything back as float64, whatever went in. An int8 array saved as text returns as float64."
+   },
+   {
+    "t": "Why does `np.load` default to `allow_pickle=False`?",
+    "o": [
+     "Pickle is slow",
+     "Unpickling executes code, so a malicious .npy file could run anything",
+     "It saves memory",
+     "Pickle is deprecated"
+    ],
+    "a": 1,
+    "w": "It is a deliberate protection. Enable it only for files you trust as much as you would trust an executable."
+   },
+   {
+    "t": "What is the difference between `loadtxt` and `genfromtxt`?",
+    "o": [
+     "None",
+     "loadtxt raises on missing fields; genfromtxt fills them with nan",
+     "genfromtxt is faster",
+     "loadtxt handles more formats"
+    ],
+    "a": 1,
+    "w": "loadtxt's strictness is a feature when data should be complete. genfromtxt also takes filling_values to choose the substitute."
+   },
+   {
+    "t": "What does `mmap_mode=\"r\"` give you?",
+    "o": [
+     "Faster full loads",
+     "An array backed by the file, so slices read only the pages they touch",
+     "Compression",
+     "A read-only copy in memory"
+    ],
+    "a": 1,
+    "w": "It lets you work with a file larger than RAM - but only helps for partial access, since a full reduction reads everything anyway."
+   }
+  ]
+ },
+ {
+  "path": "numpy/shape_and_reshape.html",
+  "title": "Shape and Reshape",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "Does `reshape` copy the data?",
+    "o": [
+     "Always",
+     "It returns a view when the layout allows, copying only when it cannot",
+     "Never",
+     "Only for 1-D"
+    ],
+    "a": 1,
+    "w": "The numbers do not move - only the description of how to walk them. Writing through the reshaped array changes the original."
+   },
+   {
+    "t": "What does `-1` mean in a reshape?",
+    "o": [
+     "Reverse the axis",
+     "Work this dimension out from the others and the total size",
+     "The last element",
+     "An error"
+    ],
+    "a": 1,
+    "w": "Only one axis may be -1, and the total must divide exactly. It keeps code working when the input length changes."
+   },
+   {
+    "t": "What is the difference between `ravel` and `flatten`?",
+    "o": [
+     "None",
+     "ravel returns a view when it can; flatten always copies",
+     "flatten is faster",
+     "ravel only works on 2-D"
+    ],
+    "a": 1,
+    "w": "So writing through a ravelled array can change the source. Use ravel to read, flatten when you need independence."
+   },
+   {
+    "t": "In default C order, which axis varies fastest?",
+    "o": [
+     "The first",
+     "The last",
+     "The longest",
+     "It is unspecified"
+    ],
+    "a": 1,
+    "w": "Row-major: the last axis varies fastest. That is what makes reshape and ravel results predictable."
+   }
+  ]
+ },
+ {
+  "path": "numpy/sorting_and_searching.html",
+  "title": "Sorting and Searching",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "What does `a.sort()` do on a 2-D array by default?",
+    "o": [
+     "Sorts the whole array",
+     "Sorts each row independently along the last axis",
+     "Sorts each column",
+     "Sorts rows as units"
+    ],
+    "a": 1,
+    "w": "On a table this destroys the correspondence between columns. To sort rows as units, argsort a key column and index with the result."
+   },
+   {
+    "t": "Why use `argsort` rather than `sort`?",
+    "o": [
+     "It is faster",
+     "It returns positions, so the same order can be applied to parallel arrays",
+     "It is stable",
+     "It sorts descending"
+    ],
+    "a": 1,
+    "w": "That indirection is the whole point - it is how you sort a table by a column and keep every other column aligned."
+   },
+   {
+    "t": "In `np.lexsort((salary, dept))`, which is the primary key?",
+    "o": [
+     "salary",
+     "dept - the last argument",
+     "Neither",
+     "Both equally"
+    ],
+    "a": 1,
+    "w": "The argument order reads backwards, and everyone gets it wrong the first time. The keys are applied last to first."
+   },
+   {
+    "t": "You need the 5 largest of 200,000 values. What is the right tool?",
+    "o": [
+     "np.sort then slice",
+     "np.argpartition(x, -5)[-5:]",
+     "np.max five times",
+     "np.searchsorted"
+    ],
+    "a": 1,
+    "w": "Linear time instead of n log n. It does not order the top 5 - sort just those five afterwards if you need them ranked."
+   }
+  ]
+ },
+ {
+  "path": "numpy/stacking_and_splitting.html",
+  "title": "Stacking and Splitting",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "What is the difference between `concatenate` and `stack`?",
+    "o": [
+     "None",
+     "concatenate joins along an existing axis; stack creates a new one",
+     "stack is faster",
+     "concatenate only works on 1-D"
+    ],
+    "a": 1,
+    "w": "Two (2,3) arrays give (4,3) concatenated and (2,2,3) stacked. Appending records is concatenation; collecting frames into a batch is stacking."
+   },
+   {
+    "t": "What does `np.hstack` do with two 1-D arrays of length 3?",
+    "o": [
+     "Gives (2,3)",
+     "Gives (3,2)",
+     "Gives (6,) - joined end to end",
+     "Raises"
+    ],
+    "a": 2,
+    "w": "Axis 1 does not exist for 1-D, so it falls back to axis 0. `column_stack` is the function that makes them columns."
+   },
+   {
+    "t": "How does `split` differ from `array_split`?",
+    "o": [
+     "No difference",
+     "split requires equal parts and raises otherwise",
+     "array_split is faster",
+     "split works on 2-D only"
+    ],
+    "a": 1,
+    "w": "That strictness is useful - an uneven split usually means something upstream is not the size you assumed."
+   },
+   {
+    "t": "Why not concatenate inside a loop?",
+    "o": [
+     "It is deprecated",
+     "Each call allocates a new array and copies everything so far, making it quadratic",
+     "It changes dtype",
+     "It only works twice"
+    ],
+    "a": 1,
+    "w": "Collect into a Python list and stack once at the end - or allocate with np.empty and assign into slices if you know the size."
+   }
+  ]
+ },
+ {
+  "path": "numpy/transpose_and_axes.html",
+  "title": "Transpose and Moving Axes",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "What does `.T` do to a 1-D array of shape (3,)?",
+    "o": [
+     "Makes it (1,3)",
+     "Makes it (3,1)",
+     "Nothing - it stays (3,)",
+     "Raises"
+    ],
+    "a": 2,
+    "w": "There is no second axis to swap, and NumPy does it silently rather than raising. Use `v[:, None]` for a column."
+   },
+   {
+    "t": "Why is transposing a 1 GB array instant?",
+    "o": [
+     "It is lazy",
+     "Only the shape and strides change; no data is copied",
+     "NumPy compresses it",
+     "It is not instant"
+    ],
+    "a": 1,
+    "w": "The strides simply swap. `np.shares_memory(a, a.T)` is True - it is a view over the same bytes."
+   },
+   {
+    "t": "You have an image array shaped (3, 64, 48) and need (64, 48, 3). What is the cleanest call?",
+    "o": [
+     "img.T",
+     "np.moveaxis(img, 0, -1)",
+     "img.reshape(64,48,3)",
+     "np.flipud(img)"
+    ],
+    "a": 1,
+    "w": "`.T` would give (48,64,3) by reversing everything, and reshape would scramble the data. moveaxis relocates one axis and slides the rest."
+   },
+   {
+    "t": "Why can `ravel()` on a transposed array return a copy?",
+    "o": [
+     "ravel always copies",
+     "The transposed view is no longer C-contiguous, so a flat buffer requires new memory",
+     "Transposes are copies",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "The same reason `reshape` returns a view only *usually*. Check with np.shares_memory, or use np.ascontiguousarray to make the copy explicit."
+   }
+  ]
+ },
+ {
+  "path": "numpy/unique_and_set_operations.html",
+  "title": "Unique Values and Set Operations",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "What order does `np.unique` return values in?",
+    "o": [
+     "First appearance",
+     "Sorted",
+     "Random",
+     "By frequency"
+    ],
+    "a": 1,
+    "w": "Always sorted, and it flattens the input unless you pass axis. For first-appearance order you need return_index and a sort of those indices."
+   },
+   {
+    "t": "What does `return_inverse` give you?",
+    "o": [
+     "The reversed array",
+     "For each input element, which unique value it is - so vals[inv] rebuilds the input",
+     "The counts",
+     "The first indices"
+    ],
+    "a": 1,
+    "w": "That is label encoding in one call: categories become small integers plus a lookup table."
+   },
+   {
+    "t": "You have a table of ids and a list of wanted ids, and need the matching rows. Which function?",
+    "o": [
+     "np.intersect1d",
+     "np.isin",
+     "np.union1d",
+     "np.unique"
+    ],
+    "a": 1,
+    "w": "isin returns a mask of the original shape, which you can index with. intersect1d reduces and throws away the positions you need."
+   },
+   {
+    "t": "What does `np.unique(rows, axis=0)` do?",
+    "o": [
+     "Sorts the rows",
+     "Removes duplicate rows, treating each row as one item",
+     "Returns all distinct values flattened",
+     "Raises"
+    ],
+    "a": 1,
+    "w": "Combined with return_counts it is a group-by for the case where the whole row is the key."
+   }
+  ]
+ },
+ {
+  "path": "numpy/vectorised_arithmetic.html",
+  "title": "Vectorised Arithmetic",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "What does `*` do between two arrays?",
+    "o": [
+     "Matrix multiplication",
+     "Elementwise multiplication",
+     "A dot product",
+     "It raises"
+    ],
+    "a": 1,
+    "w": "Matrix multiplication is `@`. Confusing them gives either a shape error or, worse, a plausible shape with wrong numbers."
+   },
+   {
+    "t": "What does float division by zero produce in NumPy?",
+    "o": [
+     "ZeroDivisionError",
+     "inf or nan, with a warning",
+     "Zero",
+     "None"
+    ],
+    "a": 1,
+    "w": "IEEE semantics: one bad element should not abort a whole computation. You check afterwards with isnan/isfinite rather than catching an exception."
+   },
+   {
+    "t": "How does `a += 1` differ from `a = a + 1`?",
+    "o": [
+     "They are identical",
+     "+= writes in place; = allocates a new array and rebinds the name",
+     "+= is slower",
+     "= works in place"
+    ],
+    "a": 1,
+    "w": "It matters for memory - the second allocates a temporary - and for aliasing: another reference to the array sees the in-place change but not the rebinding."
+   },
+   {
+    "t": "Why is looping over an array in Python slower than looping over a list?",
+    "o": [
+     "It is not",
+     "Each element access boxes the value into a Python object",
+     "Arrays are stored on disk",
+     "The loop is compiled"
+    ],
+    "a": 1,
+    "w": "You get the memory layout of an array and none of the speed. `np.vectorize` does not fix this - it still loops in Python."
+   }
+  ]
+ },
+ {
+  "path": "numpy/views_vs_copies.html",
+  "title": "Views versus Copies",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "Which of these returns a copy rather than a view?",
+    "o": [
+     "a[1:3]",
+     "a.T",
+     "a[a > 5]",
+     "a.reshape(4,3)"
+    ],
+    "a": 2,
+    "w": "A boolean mask selects scattered positions with no single step size, so no stride description can express it. Slicing, transposing and reshaping all can."
+   },
+   {
+    "t": "What is the reliable way to check whether two arrays share memory?",
+    "o": [
+     ".base is a",
+     "np.shares_memory(a, b)",
+     ".flags",
+     "np.may_share_memory"
+    ],
+    "a": 1,
+    "w": "`.base` can be a chain of views, and `may_share_memory` is conservative - it may say True when unsure. `shares_memory` gives the definite answer."
+   },
+   {
+    "t": "A function does `body = data[1:]` then `body -= body.min()`. What happens to the caller's array?",
+    "o": [
+     "Nothing",
+     "It is modified, because the slice is a view and -= writes in place",
+     "It raises",
+     "It is copied first"
+    ],
+    "a": 1,
+    "w": "Each step looks innocent and the combination silently mutates the input. Copy at the boundary, or make the in-place behaviour explicit in the name."
+   },
+   {
+    "t": "Why can holding a one-row view of a large array waste memory?",
+    "o": [
+     "Views are large",
+     "A view keeps a reference to its base, so the whole buffer stays alive",
+     "Views are slower",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "Slicing one row from an 8 MB array and keeping it keeps all 8 MB. `.copy()` releases the rest - the same problem as holding a slice of a huge string."
+   }
+  ]
+ },
+ {
+  "path": "numpy/what_is_numpy.html",
+  "title": "What NumPy Is For",
+  "cat": "NumPy",
+  "q": [
+   {
+    "t": "What is the fundamental difference between a list and an array?",
+    "o": [
+     "Arrays are shorter",
+     "A list holds pointers to objects; an array holds the numbers themselves, one dtype, contiguous",
+     "Arrays are immutable",
+     "Lists are typed"
+    ],
+    "a": 1,
+    "w": "Everything else - speed, dtype, views, broadcasting - follows from that memory layout."
+   },
+   {
+    "t": "What does `np.array([1, 2, \"three\"])` produce?",
+    "o": [
+     "A mixed array",
+     "An error",
+     "An array where every element is a string",
+     "An object array of ints and strings"
+    ],
+    "a": 2,
+    "w": "An array has one dtype, so everything is promoted to the type that fits all of it - here, text. It prints plausibly and does nothing useful arithmetically."
+   },
+   {
+    "t": "You assign `a[0] = 9.7` into an int64 array. What happens?",
+    "o": [
+     "The array becomes float64",
+     "It stores 9 - truncated",
+     "It raises",
+     "It stores 10"
+    ],
+    "a": 1,
+    "w": "The dtype was fixed when the array was created and assignment cannot change it, so the value is truncated silently."
+   },
+   {
+    "t": "Why are the timings on these pages not directly transferable?",
+    "o": [
+     "The code is different",
+     "They run CPython on WebAssembly, several times slower than native",
+     "NumPy is disabled",
+     "The arrays are too small"
+    ],
+    "a": 1,
+    "w": "The penalty falls mostly on the Python loop, so the ratio is roughly right and if anything flatters NumPy. Read the ratio, not the seconds."
+   }
+  ]
+ },
+ {
   "path": "pydantic/aliases.html",
   "title": "Aliases",
   "cat": "Pydantic",

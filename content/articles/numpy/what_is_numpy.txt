@@ -1,0 +1,289 @@
+title: What NumPy Is For
+intro: One type, laid out end to end, and why almost everything else follows from that.
+
+## Two ways to hold five numbers
+
+A Python list of five integers is five pointers, each to a full `PyObject` sitting somewhere else in memory. Each of those objects carries a type, a reference count and the value. Adding two lists elementwise means following every pointer, checking every type, and building a new object for every result.
+
+A NumPy array of five integers is forty bytes: five 64-bit numbers, one after another, with the type recorded once for the whole array.
+
+That single difference explains nearly everything else in this track. It is why arrays are fast, why they have a dtype, why they cannot hold mixed types, why slicing gives you a view instead of a copy, and why shapes matter so much.
+
+
+## A list of numbers is not a block of numbers
+
+A Python list holds pointers to objects scattered through memory. An array holds the numbers themselves, one type, end to end.
+
+```python-run
+import numpy as np
+import sys
+
+nums = [1, 2, 3, 4, 5]
+arr = np.array([1, 2, 3, 4, 5])
+
+print("list :", nums, type(nums).__name__)
+print("array:", arr, type(arr).__name__)
+print()
+print("every list element is a full Python object:")
+print("   one int  :", sys.getsizeof(1), "bytes")
+print("   the list :", sys.getsizeof(nums), "bytes of pointers alone")
+print()
+print("the array stores the numbers themselves:")
+print("   dtype    :", arr.dtype)
+print("   itemsize :", arr.itemsize, "bytes each")
+print("   nbytes   :", arr.nbytes, "bytes total")
+```
+
+## Arithmetic happens to the whole array
+
+No loop, no comprehension. The operation is described once and applied to every element by compiled code.
+
+```python-run
+import numpy as np
+
+nums = [1, 2, 3, 4, 5]
+arr = np.array([1, 2, 3, 4, 5])
+
+# Python: you write the loop
+doubled_list = [n * 2 for n in nums]
+
+# NumPy: you write the operation
+doubled_arr = arr * 2
+
+print("list  :", doubled_list)
+print("array :", doubled_arr)
+print()
+print("and + means something different for each:")
+print("   list  + list  :", nums + nums, "<- concatenation")
+print("   array + array :", arr + arr, "<- elementwise addition")
+```
+
+## One dtype, decided up front
+
+An array has a single type for every element. Mixing types does not make a mixed array &mdash; it promotes the whole thing.
+
+```python-run
+import numpy as np
+
+# NOTE: the default integer is platform-dependent. Most desktops give
+# int64; this page runs 32-bit WebAssembly, so it reports int32.
+print("ints        :", np.array([1, 2, 3]).dtype, "(platform default)")
+print("floats      :", np.array([1.0, 2.0]).dtype)
+print("one float   :", np.array([1, 2, 3.0]).dtype, "<- promoted the whole array")
+print("with a str  :", np.array([1, 2, "three"]).dtype, "<- everything became text")
+print("booleans    :", np.array([True, False]).dtype)
+print()
+a = np.array([1, 2, 3])
+print("assigning a float into an int array:")
+a[0] = 9.7
+print("   ", a, "<- truncated, because the dtype cannot change")
+```
+
+## How much faster, measured here
+
+The gap is real but this page runs on WebAssembly, so read the ratio and not the seconds.
+
+```python-run
+import numpy as np
+import time
+
+n = 200_000
+nums = list(range(n))
+# int64 explicitly: this page is 32-bit WebAssembly, where NumPy's default
+# integer is int32, and squaring values this large would silently overflow.
+arr = np.arange(n, dtype=np.int64)
+
+t = time.perf_counter()
+total_list = sum(x * x for x in nums)
+py = time.perf_counter() - t
+
+t = time.perf_counter()
+total_arr = int((arr * arr).sum())
+npy = time.perf_counter() - t
+
+print("python loop :  %.4f s" % py)
+print("numpy       :  %.4f s" % npy)
+print("ratio       :  %.1fx" % (py / npy))
+print("same answer :", total_list == total_arr)
+```
+
+## Shape is the other half
+
+An array is not just a list of numbers &mdash; it has a shape, and most of NumPy is about what shapes do together.
+
+```python-run
+import numpy as np
+
+a = np.array([1, 2, 3, 4, 5, 6])
+b = a.reshape(2, 3)
+
+print("flat   :", a, "shape", a.shape, "ndim", a.ndim)
+print()
+print("as 2x3 :")
+print(b)
+print("   shape:", b.shape, "ndim", b.ndim, "size", b.size)
+print()
+print("same numbers, same memory - only the shape changed:")
+print("   shares memory:", np.shares_memory(a, b))
+```
+
+## Where it sits in the stack
+
+pandas, scikit-learn, SciPy and every deep learning framework hold NumPy arrays or something modelled on them.
+
+```python-run
+import numpy as np
+
+# A tiny linear model, written the way every library underneath does it.
+X = np.array([[1.0, 2.0],
+              [1.0, 3.0],
+              [1.0, 4.0]])          # a bias column and one feature
+w = np.array([0.5, 2.0])            # parameters
+
+y_pred = X @ w                      # one matrix multiply, not a loop
+y_true = np.array([4.0, 6.5, 8.0])
+
+print("predictions :", y_pred)
+print("residuals   :", y_true - y_pred)
+print("mean sq err :", float(((y_true - y_pred) ** 2).mean()))
+print()
+print("This is the shape of every fit, forward pass and score you will meet.")
+```
+## Vectorisation
+
+Because the numbers are contiguous and all the same type, the loop can happen in compiled code:
+
+```python
+doubled = arr * 2
+```
+
+There is no Python-level iteration. NumPy hands the whole block to a C routine that walks it, and modern CPUs process several elements per instruction while it does.
+
+The mental shift is from *how do I loop over this* to *what operation am I applying*. That reads oddly at first and becomes the natural way to think within about a week.
+
+## `+` means two different things
+
+Worth stating early because it is the first thing that surprises people converting code:
+
+```python
+[1, 2] + [1, 2]                  # [1, 2, 1, 2]   - concatenation
+np.array([1, 2]) + np.array([1, 2])   # array([2, 4]) - addition
+```
+
+Lists concatenate. Arrays add. Neither is wrong; they are different types with different meanings for the same symbol, and code that assumes one while holding the other produces something plausible rather than an error.
+
+## One dtype, and it is decided for you
+
+Every element of an array has the same type, and NumPy picks the narrowest type that fits everything you gave it.
+
+`[1, 2, 3]` becomes the platform's default integer. On most desktop machines that is `int64`; on this page, which runs 32-bit WebAssembly, it is `int32`. That difference is not cosmetic &mdash; an `int32` overflows at about 2.1 billion, silently and without a warning &mdash; and it is the reason examples here that multiply large integers ask for `dtype=np.int64` explicitly. Add one float and the whole array becomes `float64` &mdash; not a mixture. Add a string and every element becomes a fixed-width string, including the numbers.
+
+That last case is worth watching for, because it produces an array that still looks reasonable when printed and does nothing you want arithmetically.
+
+There is a consequence people meet early: assigning into an array cannot change its dtype. Put `9.7` into an `int64` array and it truncates to `9`, silently. The array's type was fixed when it was created.
+
+## Speed, honestly
+
+The fourth editor above measures it. Expect a large ratio, and read the ratio rather than the seconds.
+
+These pages run CPython compiled to WebAssembly, which is several times slower than a native interpreter for the Python parts. That penalty falls mostly on the Python loop, so if anything the gap here flatters NumPy. The direction is right and the magnitude is roughly right; the absolute numbers do not transfer to your laptop.
+
+The speed also has limits worth knowing now. Arrays are fast for whole-array operations on numeric data. They are not fast if you loop over them in Python one element at a time &mdash; that is slower than a list, because each element has to be boxed into a Python object on the way out.
+
+## Shape
+
+An array carries a shape as well as contents, and most of the interesting behaviour in this library is about what shapes do when combined.
+
+`a.shape` is a tuple. `(6,)` is one-dimensional with six elements. `(2, 3)` is two rows of three. `(2, 3, 4)` is two blocks of three rows of four.
+
+Reshaping is usually free, because it changes how the same block of memory is interpreted rather than moving anything. The last editor shows `np.shares_memory` confirming that the reshaped array is the same numbers.
+
+## Where this sits
+
+Almost nothing in scientific Python reimplements arrays. pandas holds NumPy arrays under its columns. scikit-learn takes and returns them. SciPy builds on them. PyTorch and TensorFlow use their own tensor types deliberately modelled on the same interface, so that `@`, broadcasting and `.shape` mean what you already expect.
+
+Learning NumPy properly is therefore not one library. It is the vocabulary that the rest of the stack assumes you have.
+
+## What this track covers
+
+The array itself first: creating one, its dtype, its shape, and what indexing gives you. Then operating on arrays: elementwise arithmetic, broadcasting, boolean masks, aggregation along an axis. Then structure: views versus copies, stacking, transposing, sorting. Then the numerical end: random numbers, linear algebra, missing data, and the performance rules that follow from the memory layout.
+
+Every idea is a small program on the page. Change the numbers and press Run; a shape rule you have watched break is one you will remember.
+
+## Why the list is slow, concretely
+
+It is worth being precise about where the time goes, because "Python is slow" is not an explanation and does not tell you what to change.
+
+A Python list of five integers is an array of five **pointers**. Each pointer leads somewhere else in memory, to a `PyObject` that carries a reference count, a type pointer, and only then the actual value. A small integer occupies twenty-eight bytes and sits wherever the allocator put it.
+
+Adding two lists elementwise therefore means: follow a pointer, check the type, extract the value, follow another pointer, check that type, extract that value, perform the addition, allocate a new object for the result, and store a pointer to it. Ten times over for ten elements.
+
+The NumPy array is five integers, adjacent, with nothing between them. The addition is a loop in compiled C over contiguous memory, with the type checked once for the whole array rather than once per element.
+
+Two separate wins come out of that. The obvious one is skipping the interpreter. The less obvious one is **locality**: the processor fetches memory in blocks, so reading consecutive values costs a fraction of what chasing scattered pointers costs. On large arrays the second effect can matter as much as the first.
+
+This also explains the cases where NumPy does not help. If your data is a thousand elements and you touch it once, the interpreter overhead you avoided was small and the conversion cost was not. The wins scale with array size.
+
+## What NumPy deliberately does not do
+
+Knowing the boundaries saves a lot of fighting with it.
+
+**It does not grow.** There is no efficient append. The size is fixed at creation, and every function that appears to extend an array is allocating a new one and copying. This is not an oversight; it is the price of the contiguous block that makes everything else fast.
+
+**It does not mix types.** One dtype per array. A column of names and a column of ages are two arrays, or a structured dtype, or a pandas DataFrame &mdash; not one NumPy array of mixed values.
+
+**It handles strings poorly.** NumPy strings are fixed width, and assigning a longer value silently truncates it. Object arrays hold real Python strings but give up every performance benefit, since they are back to storing pointers.
+
+**It has no concept of missing data.** Floats can carry NaN, and integers cannot carry anything. There is no null.
+
+## When to use something else
+
+**Small data touched once.** A hundred values processed in a script: a list is simpler and the difference is unmeasurable.
+
+**Heterogeneous records with labels.** That is pandas. It is built on NumPy, so you lose nothing, and you gain named columns, mixed types per column and real handling of missing values.
+
+**Nested or ragged structure.** Lists of different lengths do not form an array. Forcing them into an object array gets you the syntax without the speed.
+
+**Data larger than memory.** NumPy assumes the array fits. Dask, Zarr and HDF5 exist for when it does not.
+
+## The model to carry forward
+
+Everything else in this track is a consequence of one idea: an array is a **flat block of identical values, plus a small description of how to read it** &mdash; the shape, the dtype, and the number of bytes to step for each axis.
+
+Reshaping changes the description and not the block. Transposing changes the description. Slicing changes the description. All of them are free.
+
+Masking and fancy indexing cannot be described that way, so they copy.
+
+Arithmetic runs over the block in compiled code. Broadcasting is a rule for pretending two descriptions are compatible without changing either block.
+
+Hold onto that and most of NumPy's behaviour stops being a set of rules to memorise and becomes something you can predict.
+
+## Questions people ask at this point
+
+**Does NumPy replace Python lists?**
+
+No. Lists are the right structure for heterogeneous, growing collections of arbitrary objects, and they remain the right answer for most ordinary Python. NumPy is for a specific shape of problem: many values of the same type, operated on together. Reaching for an array to hold three configuration values is worse than a list, not better.
+
+**Do I need to install it?**
+
+NumPy is not in the standard library. It is `pip install numpy`, and it is a dependency of nearly everything numerical, so it is usually already present in a scientific environment. It ships as a compiled wheel for every common platform, so installation does not require a compiler.
+
+**Why is it always imported as `np`?**
+
+Convention, and a strong one. Nearly all published code, documentation and examples use `import numpy as np`, so following it makes your code readable to anyone who has seen NumPy before. There is no technical reason, and no good reason to deviate.
+
+**Is NumPy still relevant with pandas and PyTorch around?**
+
+It is underneath both. A pandas Series wraps a NumPy array; PyTorch tensors follow the same shape and broadcasting rules and convert to arrays in one call. Everything in this track transfers, which is a large part of why it is worth learning properly rather than by copying snippets.
+
+**How much of it do I need?**
+
+Less than the documentation suggests. NumPy has hundreds of functions and a working knowledge of maybe thirty covers most real code. The concepts &mdash; shape, dtype, views, broadcasting &mdash; matter far more than the function list, because they let you predict behaviour instead of looking it up.
+
+## How to work through this track
+
+Each module has runnable editors above the text. They are not decoration: the fastest way to build an accurate mental model of shapes and dtypes is to change a number, run it, and see what happens.
+
+The parts worth slowing down on are the ones where NumPy's behaviour differs from Python's: integer overflow, views sharing memory, broadcasting shapes you did not intend, and NaN. Those four account for most of the surprises in real code, and each has a module.
+
+The parts you can skim on a first pass are the function inventories &mdash; the specific names in stacking, sorting and set operations. Knowing that a function exists is enough; the signature is a search away.

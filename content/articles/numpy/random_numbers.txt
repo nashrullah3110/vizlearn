@@ -1,0 +1,355 @@
+title: Random Numbers
+intro: The modern Generator API, and how to make results reproducible.
+
+## Two APIs, one of them legacy
+
+You will see both in the wild.
+
+`np.random.rand`, `np.random.randint`, `np.random.seed` are the **legacy** interface. They all operate on a single hidden global generator.
+
+`np.random.default_rng()` returns a **Generator** object with its own state. Every method lives on that object.
+
+The new one is preferred, and the reason is not cosmetic. A global generator means any library you import can consume from the same stream, so your seeded results change when an unrelated dependency starts drawing numbers. It also cannot be used safely from more than one thread, and it makes tests interfere with each other in ways that are hard to trace.
+
+An explicit generator is passed where it is needed, and nothing else can touch it. Create it once, near the top, and thread it through.
+
+The legacy functions are not deprecated and existing code does not need rewriting, but new code should use `default_rng`.
+
+
+## default_rng is the current API
+
+Create a generator, seed it once, and pass it around.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(42)
+
+print("uniform [0,1) :", np.round(rng.random(4), 4))
+print("integers 1-6  :", rng.integers(1, 7, size=6))
+print("normal mu=0   :", np.round(rng.normal(size=4), 3))
+print("choice        :", rng.choice(["a", "b", "c"], size=5))
+print()
+print("The legacy np.random.rand / np.random.seed still work, but they")
+print("share one hidden global generator, which makes code that uses")
+print("them impossible to isolate or test in parallel.")
+```
+
+## The same seed gives the same numbers
+
+That is what reproducibility means, and it is per generator.
+
+```python-run
+import numpy as np
+
+a = np.random.default_rng(7).random(3)
+b = np.random.default_rng(7).random(3)
+c = np.random.default_rng(8).random(3)
+
+print("seed 7 :", np.round(a, 5))
+print("seed 7 :", np.round(b, 5), " identical:", np.array_equal(a, b))
+print("seed 8 :", np.round(c, 5), " different:", not np.array_equal(a, c))
+print()
+print("A generator carries state, so consecutive draws differ:")
+rng = np.random.default_rng(7)
+print("   first :", np.round(rng.random(3), 5))
+print("   second:", np.round(rng.random(3), 5))
+```
+
+## Shapes, not loops
+
+Every method takes a size, so you draw the whole array at once.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+print("one value  :", round(float(rng.random()), 4))
+print("a vector   :", np.round(rng.random(3), 4))
+print("a matrix   :"); print(np.round(rng.random((2, 3)), 4))
+print()
+print("dice, 4 players x 3 rolls:")
+print(rng.integers(1, 7, size=(4, 3)))
+print()
+print("integers is HALF-OPEN like range: high is excluded.")
+print("   integers(1, 3, size=8):", rng.integers(1, 3, size=8), "<- no 3s")
+```
+
+## Sampling, with and without replacement
+
+<code>choice</code> covers both, plus weighted draws.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(3)
+pool = np.arange(10)
+
+print("with replacement    :", rng.choice(pool, size=6))
+print("without replacement :", rng.choice(pool, size=6, replace=False))
+print()
+w = np.array([0.7, 0.2, 0.1])
+draws = rng.choice(["common", "rare", "epic"], size=1000, p=w)
+vals, counts = np.unique(draws, return_counts=True)
+print("weighted, 1000 draws:")
+for v, c in zip(vals.tolist(), counts.tolist()):
+    print("   %-7s %.1f%%" % (v, 100 * c / 1000))
+print()
+print("p must sum to 1, and size must fit when replace=False.")
+```
+
+## Shuffling and permutations
+
+<code>shuffle</code> modifies in place; <code>permutation</code> returns a new array.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(5)
+
+a = np.arange(8)
+rng.shuffle(a)
+print("shuffle (in place) :", a)
+
+b = np.arange(8)
+print("permutation        :", rng.permutation(b), " b unchanged:", b)
+print()
+print("On a 2-D array, shuffle moves whole ROWS:")
+t = np.arange(12).reshape(4, 3)
+rng.shuffle(t)
+print(t)
+print()
+print("To shuffle two arrays together, permute an index array:")
+idx = rng.permutation(4)
+print("   apply", idx, "to both and they stay aligned")
+```
+
+## A train/test split, correctly
+
+Permute indices once, then slice - never sample twice.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(1)
+n = 20
+X = np.arange(n) * 10
+y = np.arange(n) % 2
+
+idx = rng.permutation(n)
+cut = int(0.75 * n)
+train, test = idx[:cut], idx[cut:]
+
+print("train size:", len(train), " test size:", len(test))
+print("overlap   :", len(np.intersect1d(train, test)), "<- must be 0")
+print()
+print("X_train:", X[train][:6], "...")
+print("y_train:", y[train][:6], "...")
+print()
+print("Drawing two independent samples would let rows appear in both,")
+print("which quietly inflates every score you measure afterwards.")
+```
+## Seeding
+
+`default_rng(42)` gives a generator whose sequence is fully determined. Two generators created with the same seed produce identical output.
+
+The generator is stateful: each call advances it, so consecutive draws from the same generator differ. That is the point &mdash; you seed once, not before every call.
+
+Seeding inside a loop is a common bug. It produces the same "random" value every iteration, and the symptom is data that looks suspiciously uniform.
+
+For genuinely unpredictable values, call `default_rng()` with no argument; it seeds from the operating system.
+
+## Shapes
+
+Every method takes `size`, and it accepts a tuple.
+
+`rng.random((3, 4))` gives a `(3, 4)` array in one call. There is never a reason to loop.
+
+`rng.integers(low, high)` is **half-open**, like `range` and like slicing: `high` is excluded. The legacy `randint` behaved the same way, but `random_integers`, now removed, did not &mdash; which is why the memory is unreliable and worth checking.
+
+## The distributions
+
+`random` for uniform `[0, 1)`. `integers` for uniform integers. `normal(loc, scale)` for Gaussian. `uniform(low, high)` for a uniform range other than the unit interval.
+
+Beyond those there are dozens &mdash; `poisson`, `exponential`, `binomial`, `multivariate_normal` &mdash; all following the same `size` convention.
+
+## choice
+
+`rng.choice(pool, size=n)` samples with replacement by default.
+
+`replace=False` samples without, and raises if `size` exceeds the pool. That is the right behaviour: silently returning duplicates when you asked for distinct items would be worse.
+
+`p=weights` gives a weighted draw. The weights must sum to 1 and have one entry per element of the pool.
+
+`choice` also accepts an integer instead of an array, meaning "choose from `arange(n)`", which is often what you want when you are really choosing indices.
+
+## Shuffling
+
+`rng.shuffle(a)` modifies in place and returns `None`. `rng.permutation(a)` returns a shuffled copy.
+
+On a 2-D array, both operate on the **first axis** &mdash; whole rows move, and their contents stay intact. That is almost always what you want for a table of records, and it is worth knowing rather than assuming it shuffles every element.
+
+## Splitting data
+
+The correct pattern is one permutation, then slicing:
+
+```python
+idx = rng.permutation(n)
+train, test = idx[:cut], idx[cut:]
+```
+
+The tempting alternative &mdash; drawing a training sample and then a test sample &mdash; allows the same row into both, because the two draws know nothing about each other. That leaks test data into training and inflates every score you measure afterwards, sometimes dramatically, and the code gives no sign anything is wrong.
+
+Permuting once makes the disjointness structural rather than probabilistic. The same index array applied to `X` and `y` keeps them aligned.
+
+## Reproducibility in practice
+
+Seed at the entry point, not scattered through the code. Record the seed alongside results. Pass the generator explicitly into any function that needs randomness, so it can be tested with a fixed one.
+
+And be clear about what a seed guarantees: identical results for the same NumPy version and the same sequence of calls. Change the order of operations and the numbers change, even with the seed unchanged.
+
+## What is underneath a Generator
+
+`default_rng` returns a `Generator` wrapping a **bit generator**, which is the thing that actually produces random bits. The default is PCG64.
+
+The split matters because the two layers have different jobs. The bit generator produces a stream of uniform bits; the Generator turns those into distributions. Swapping the bit generator &mdash; `default_rng(np.random.MT19937(seed))` for the old Mersenne Twister, or `Philox` for a counter-based one &mdash; changes the stream without changing the interface.
+
+PCG64 was chosen as the default because it is fast, has good statistical properties, and supports cheap independent streams. Mersenne Twister, the legacy default, is slower and has a much larger state.
+
+None of these are cryptographically secure. For tokens, passwords or anything an adversary should not predict, use the `secrets` module, not NumPy.
+
+## Independent streams
+
+Running the same simulation in parallel needs each worker to draw different numbers, and seeding each with a different arbitrary integer is not a reliable way to get that &mdash; nearby seeds can produce overlapping streams.
+
+`SeedSequence` is the supported answer:
+
+```python
+ss = np.random.SeedSequence(12345)
+children = ss.spawn(4)
+rngs = [np.random.default_rng(c) for c in children]
+```
+
+Each child produces a stream that is statistically independent of the others, and the whole set is reproducible from the single parent seed.
+
+`rng.spawn(n)` on a Generator does the same thing more directly in recent NumPy versions.
+
+This is the right way to seed workers in a multiprocessing pool, and it means one recorded seed reproduces the entire parallel run.
+
+## The legacy interface, and when you need it
+
+`np.random.RandomState` is the old object-oriented interface, and the global functions like `np.random.rand` are methods on a hidden instance of it.
+
+It is frozen for backwards compatibility: its stream is guaranteed never to change across NumPy versions. `Generator` carries no such guarantee, and its output can change between versions if an algorithm is improved.
+
+That makes `RandomState` the correct choice in exactly one situation: reproducing results from older code or published work where the exact numbers matter.
+
+For everything else, `Generator` is faster, has better distributions, and does not share state with every other piece of code in the process.
+
+## Choosing a distribution
+
+The ones that come up most, and what they model:
+
+`uniform(low, high)` &mdash; no information beyond a range.
+
+`normal(loc, scale)` &mdash; measurements with symmetric error, sums of many small independent effects.
+
+`lognormal` &mdash; quantities that cannot be negative and are multiplicative: incomes, file sizes, response times.
+
+`poisson(lam)` &mdash; counts of independent events in a fixed interval: arrivals, defects, requests per second.
+
+`exponential(scale)` &mdash; waiting times between Poisson events.
+
+`binomial(n, p)` &mdash; successes out of n trials.
+
+Using `normal` for a quantity that cannot be negative is a common modelling error, and it shows up as negative durations or negative counts in generated test data. `lognormal` or a truncated distribution is usually what was meant.
+
+## Generating realistic test data
+
+A few patterns worth having.
+
+**Correlated variables**: `rng.multivariate_normal(mean, cov, size=n)` draws from a specified covariance structure, which is how you produce test data where the relationships are known.
+
+**Categorical with known proportions**: `rng.choice(categories, size=n, p=weights)`.
+
+**Sorted timestamps**: draw uniformly and sort, or accumulate exponential gaps with `cumsum` for a Poisson process.
+
+**Reproducible shuffling of an existing dataset**: `rng.permutation(len(data))` applied as an index, never two independent draws.
+
+## Reproducibility, honestly
+
+A seed guarantees the same numbers for the same NumPy version, the same generator, and the **same sequence of calls**.
+
+Change the order of operations and the numbers change. Add a draw in the middle and everything after it shifts. Parallelise differently and the assignment of numbers to workers changes.
+
+This means a seed reproduces a run, not a result. Code that draws different amounts of randomness depending on the data will not reproduce across changes to that data, even with the seed fixed.
+
+The practical discipline: seed once at the entry point, record the seed alongside the output, pass the generator explicitly into anything that needs it, and use `SeedSequence` for parallel work. Those four habits cover almost every reproducibility problem people actually hit.
+
+## Passing the generator around
+
+The habit that makes randomness testable is to accept a generator as an argument rather than creating one inside a function.
+
+```python
+def make_sample(n, rng):
+    return rng.normal(size=n)
+```
+
+The caller decides the seed, so the same function serves production &mdash; where the generator is seeded from the operating system &mdash; and tests, where a fixed seed makes assertions possible.
+
+A default of `rng=None` with `rng = np.random.default_rng(rng)` inside is a useful pattern: `default_rng` accepts a Generator, an integer seed, a SeedSequence or None, and returns a Generator in every case. That gives callers all four options with one line.
+
+The alternative &mdash; calling `np.random.seed` somewhere and hoping &mdash; is what makes randomised code untestable and non-reproducible, because any other code drawing from the same global stream changes the results.
+
+## Randomness in tests
+
+A test that uses random data and a fixed seed is testing one sample. That is usually fine, and it is better than a test with hard-coded magic numbers.
+
+The failure mode to avoid is a test that passes for most seeds and fails for some. If a test is checking a statistical property &mdash; that a mean is near zero, that a split is roughly balanced &mdash; the tolerance has to be wide enough for the distribution, not tuned until the current seed passes.
+
+`np.allclose` with an explicit tolerance expresses that far better than exact comparison, and stating the tolerance forces the question of how much variation is acceptable.
+
+For anything where the property should hold for all inputs rather than one sample, property-based testing with several seeds is the honest version.
+
+## Common mistakes
+
+**Seeding inside a loop.** Produces the same value every iteration. The symptom is suspiciously uniform data.
+
+**Using `np.random.seed` in a library.** It mutates global state that belongs to the application, not to you.
+
+**Sampling twice for a train/test split.** The two draws are independent, so rows can appear in both. Permute once.
+
+**Using `normal` for a non-negative quantity.** Produces negative durations and negative counts. `lognormal` or a truncated distribution is usually what was meant.
+
+**Expecting `shuffle` to return something.** It modifies in place and returns None, so `a = rng.shuffle(a)` sets `a` to None. `permutation` is the returning version.
+
+**Assuming a seed reproduces a result rather than a run.** Change the order of draws and the numbers change, seed or no seed.
+
+## The summary
+
+Create one generator with `default_rng(seed)` at the entry point.
+
+Pass it explicitly to anything that needs randomness.
+
+Use `SeedSequence` or `spawn` for parallel workers, never nearby integer seeds.
+
+Draw whole arrays with `size` rather than looping.
+
+Permute an index array once when splitting or shuffling aligned data.
+
+Record the seed with the results, and remember that it reproduces the sequence of calls, not the conclusion.
+
+## A closing note
+
+Randomness is one of the few areas where the convenient API and the correct API differ, and where the convenient one has been the default for long enough that most examples still use it.
+
+`np.random.seed` and its companions are not broken, and existing code using them does not need rewriting. But new code has a better option, and the reasons &mdash; isolation, thread safety, reproducible parallelism &mdash; are the kind that only matter once, catastrophically, at the point where results cannot be reproduced.
+
+One generator, created explicitly, passed where it is needed. That single habit covers almost everything.
+
+## One last habit
+
+Record the seed with the output, not just in the code.
+
+A seed that lives only in a source file is lost the moment the file changes, and the results it produced become unreproducible without a git archaeology session. Writing it into the output &mdash; a filename, a metadata field, a log line &mdash; costs nothing and is the difference between results that can be regenerated and results that can only be trusted.

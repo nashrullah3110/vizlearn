@@ -1,0 +1,318 @@
+title: Vectorised Arithmetic
+intro: Describing the operation instead of writing the loop, and the two habits that undo the benefit.
+
+## Operators apply to every element
+
+`a + b` adds the arrays elementwise. So do `-`, `*`, `/`, `//`, `%` and `**`. A scalar applies to every element: `a * 10` scales the whole array.
+
+The one to be careful with is `*`. On arrays it is **elementwise multiplication**, not matrix multiplication. Matrix multiplication is `@`, and confusing the two produces an array of the wrong shape or, worse, the right shape and the wrong numbers. That has its own module later.
+
+Comparisons work the same way and give a boolean array: `a > 2` is `[False, False, True, True]`, not a single answer. Using that in an `if` raises, because NumPy refuses to guess whether you meant "any" or "all".
+
+
+## Every operator works elementwise
+
+The arithmetic you already know, applied to whole arrays at once.
+
+```python-run
+import numpy as np
+
+a = np.array([1, 2, 3, 4])
+b = np.array([10, 20, 30, 40])
+
+print("a + b :", a + b)
+print("b - a :", b - a)
+print("a * b :", a * b, "<- elementwise, NOT a dot product")
+print("b / a :", b / a, "<- always float")
+print("b // a:", b // a)
+print("b % a :", b % a)
+print("a ** 2:", a ** 2)
+print()
+print("and with a scalar, which applies to every element:")
+print("a * 10:", a * 10)
+print("a > 2 :", a > 2, "<- comparisons give a boolean array")
+```
+
+## ufuncs: the same idea for functions
+
+<code>np.sqrt</code>, <code>np.exp</code> and the rest apply elementwise too. Python's <code>math</code> module does not.
+
+```python-run
+import numpy as np
+import math
+
+a = np.array([1.0, 4.0, 9.0, 16.0])
+
+print("np.sqrt :", np.sqrt(a))
+print("np.exp  :", np.exp(np.array([0.0, 1.0])))
+print("np.log  :", np.log(np.array([1.0, math.e])))
+print("np.sin  :", np.round(np.sin(np.array([0.0, math.pi / 2])), 6))
+
+print()
+try:
+    math.sqrt(a)
+except TypeError as e:
+    print("math.sqrt on an array:", type(e).__name__)
+    print("   ", e)
+print("   math works on one number; np works on the whole array.")
+```
+
+## Division by zero warns, it does not raise
+
+Floating point has infinities and NaN, so NumPy produces them and carries on. That is a decision you should know about.
+
+```python-run
+import numpy as np
+
+a = np.array([1.0, 0.0, -1.0])
+
+with np.errstate(divide="ignore", invalid="ignore"):
+    r = a / 0.0
+print("a / 0     :", r, "<- inf, nan, -inf")
+print()
+print("0/0 is nan, x/0 is signed infinity, and nothing raised.")
+print()
+print("Integer division by zero is different:")
+i = np.array([1, 0], dtype=np.int64)
+with np.errstate(divide="ignore"):
+    print("   int  a // 0:", i // 0, "<- zero, with a RuntimeWarning")
+print()
+print("Python would have raised ZeroDivisionError for both.")
+```
+
+## In-place operations avoid a temporary
+
+<code>a += 1</code> writes into the existing array; <code>a = a + 1</code> builds a new one. On large arrays that is the difference.
+
+```python-run
+import numpy as np
+
+a = np.arange(5)
+before = a
+a += 10                       # in place: same array
+print("a += 10 :", a, "| same object:", a is before)
+
+b = np.arange(5)
+before_b = b
+b = b + 10                    # new array, name rebound
+print("b = b+10:", b, "| same object:", b is before_b)
+
+print()
+print("The difference matters when something else holds a reference:")
+shared = np.zeros(3)
+alias = shared
+shared += 1
+print("   after +=  , alias:", alias)
+shared = shared + 1
+print("   after = + , alias:", alias, "<- left behind")
+```
+
+## Where vectorisation is lost
+
+Two habits give the memory cost of arrays with the speed of lists.
+
+```python-run
+import numpy as np
+import time
+
+n = 60_000
+a = np.arange(n, dtype=np.float64)
+
+t = time.perf_counter()
+out = np.empty(n)
+for i in range(n):
+    out[i] = a[i] * 2 + 1          # element access from Python
+loop = time.perf_counter() - t
+
+t = time.perf_counter()
+out2 = a * 2 + 1                   # one expression
+vec = time.perf_counter() - t
+
+print("python loop over an array : %.4f s" % loop)
+print("one vectorised expression : %.4f s" % vec)
+print("ratio                     : %.0fx" % (loop / vec))
+print("same result               :", np.array_equal(out, out2))
+print()
+print("Indexing an array from Python boxes each value into an object.")
+print("That is slower than the same loop over a list.")
+```
+
+## A worked replacement
+
+Turning a loop with a condition into array expressions &mdash; the shape most real conversions take.
+
+```python-run
+import numpy as np
+
+temps = np.array([12.0, 18.5, 24.0, 31.2, 8.4, 27.9])
+
+# The loop version.
+out = []
+for t in temps:
+    f = t * 9 / 5 + 32
+    out.append(f if t > 15 else 0.0)
+loop_result = np.array(out)
+
+# The array version: compute both, then choose.
+fahrenheit = temps * 9 / 5 + 32
+vec_result = np.where(temps > 15, fahrenheit, 0.0)
+
+print("temps  :", temps)
+print("loop   :", loop_result)
+print("arrays :", vec_result)
+print("equal  :", np.allclose(loop_result, vec_result))
+print()
+print("np.where picks elementwise between two arrays using a mask -")
+print("the vectorised form of if/else, and the subject of a later module.")
+```
+## ufuncs
+
+The mathematical functions come in array form: `np.sqrt`, `np.exp`, `np.log`, `np.sin`, `np.abs`. These are called universal functions, and they apply elementwise to a whole array in compiled code.
+
+Python's `math` module does not. `math.sqrt` takes one number and raises on an array. Reaching for `math` inside a loop over an array is one of the two common ways to lose everything NumPy offers.
+
+## Division by zero does not raise
+
+This surprises people coming from plain Python.
+
+Float division by zero produces `inf`, `-inf` or `nan` and emits a RuntimeWarning. It does not stop. That follows the IEEE floating-point standard, and it is the right default for array work &mdash; one bad element in a million should not abort the whole computation.
+
+The consequence is that you must look for those values afterwards rather than relying on an exception. `np.isnan` and `np.isfinite` are how, and there is a module on missing data later.
+
+`np.errstate` controls the warnings when you are producing them deliberately, which is what the third editor uses to keep its output readable.
+
+## In place or not
+
+`a += 1` modifies the existing array. `a = a + 1` builds a new array and rebinds the name.
+
+Two reasons to care.
+
+**Memory.** The second form allocates a full-size temporary. In a chain like `a = a * 2 + b * 3`, several temporaries exist at once, which matters when arrays are large.
+
+**Aliasing.** If something else holds a reference to the same array &mdash; another variable, a list, a caller's data &mdash; the in-place form changes what they see and the rebinding form does not. The fourth editor shows an alias tracking one and being left behind by the other.
+
+Neither is right in general. In-place is cheaper and can surprise; allocation is safer and costs memory. What matters is knowing which one you wrote.
+
+## The two ways to lose the benefit
+
+**Looping over an array in Python.** This is the big one. Reading `a[i]` from Python boxes that value into a Python object, and doing that in a loop is slower than the same loop over a list &mdash; you get the memory layout of an array and none of the speed. The fifth editor measures it.
+
+**Calling scalar functions per element.** `math.sqrt(a[i])` in a loop, or a Python function applied one value at a time. `np.vectorize` looks like a fix and is not: it is a convenience wrapper that still loops in Python, and its own documentation says so.
+
+If you find yourself indexing an array inside a `for`, the useful question is what whole-array expression would produce the same result.
+
+## Converting a loop
+
+The common shape is a loop with a condition, and it converts in two steps.
+
+Compute the branches for the **whole** array, then combine them with a mask. `np.where(condition, if_true, if_false)` chooses elementwise.
+
+That does more arithmetic than the loop &mdash; it evaluates both branches everywhere &mdash; and is still dramatically faster, because the arithmetic happens in compiled code and the loop does not.
+
+It also reads better once you are used to it: the condition and the two outcomes are each one expression, rather than being distributed across a loop body.
+
+Where both branches are expensive, or one is invalid for some inputs, masking gets more careful &mdash; and that is the boolean-masking module.
+
+## The ufunc machinery
+
+A ufunc is not just a function that happens to work elementwise. It is an object with methods, and three of them are worth knowing.
+
+`np.add.reduce(a)` is `a.sum()`. Every binary ufunc has a `reduce`, so `np.multiply.reduce` gives a product, `np.maximum.reduce` gives a maximum, and `np.logical_and.reduce` gives an all.
+
+`np.add.accumulate(a)` is `a.cumsum()`. The same generalisation: a running application of the operation.
+
+`np.add.outer(a, b)` applies the operation to every pair, giving a matrix from two vectors. `np.multiply.outer` is the outer product; `np.subtract.outer` gives a difference matrix, which is a one-line distance calculation.
+
+These matter because they cover operations with no dedicated function. There is no `np.cummax`, but `np.maximum.accumulate` is exactly that, and it is the standard way to compute a running high-water mark.
+
+Ufuncs also accept `where=`, which applies the operation only where a mask is True and leaves the rest of the output untouched. Combined with `out=`, that is conditional arithmetic without a branch or an intermediate array.
+
+## Comparison and logic are ufuncs too
+
+`a > b` is `np.greater(a, b)`. `a == b` is `np.equal`. They broadcast, they take `out=`, they have `reduce`.
+
+That last one is useful: `np.logical_or.reduce(masks)` combines a list of masks, which is cleaner than chaining `|` when the number of conditions is not known in advance.
+
+The bitwise operators `&`, `|` and `~` are the array versions of `and`, `or` and `not`, and the Python keywords do not work on arrays at all &mdash; they raise, because Python needs a single truth value and an array has many. That error message, "the truth value of an array with more than one element is ambiguous", is one of the most frequently seen in NumPy, and it always means the same thing: replace `and` with `&`, and add parentheses.
+
+## Controlling floating-point warnings
+
+`np.errstate` is a context manager that decides what happens on division by zero, overflow, underflow and invalid operations.
+
+The options are `"warn"` (the default for most), `"ignore"`, `"raise"` and `"call"`.
+
+Two settings are worth knowing about. `np.errstate(all="raise")` turns silent NaN production into an exception, which is invaluable when hunting a NaN that appears somewhere in a long pipeline &mdash; it stops at the operation that created it rather than at the point where you noticed.
+
+`np.errstate(divide="ignore", invalid="ignore")` suppresses the warnings when the behaviour is intentional, which keeps genuine warnings visible instead of drowning in expected ones.
+
+`np.seterr` sets the same options globally, which is convenient in a notebook and inadvisable in a library, since it changes behaviour for everyone else's code too.
+
+## When a loop is still the right answer
+
+Vectorisation is the default, not a rule.
+
+**When each step depends on the last.** Simulations, iterative solvers, anything where element `n` needs the computed value of element `n-1`. Some of these have array formulations &mdash; a cumulative sum, an exponential moving average via `lfilter` &mdash; but many genuinely do not.
+
+**When the array is small.** Under a few hundred elements, the per-call overhead of NumPy dominates and a list comprehension can be faster. Measure before assuming.
+
+**When the vectorised version is unreadable.** A three-line loop that a colleague understands is often better than a one-line expression with four `newaxis` insertions that nobody can modify safely. This is a real engineering trade-off, not a failure of nerve.
+
+**When it would allocate too much.** Some vectorised formulations build a large intermediate &mdash; the classic being an n-by-n distance matrix for large n. A loop over chunks can be the only version that fits in memory.
+
+The honest framing: reach for vectorisation first, because it is usually shorter and much faster. Fall back to a loop when the problem is sequential, the data is small, or the vectorised form costs more in clarity or memory than it returns in speed.
+
+## np.vectorize is not vectorisation
+
+The name is misleading enough to be worth a warning.
+
+`np.vectorize(f)` wraps a scalar function so it accepts arrays. It handles broadcasting and dtype for you, and it is genuinely convenient.
+
+It is **a loop underneath**. The documentation says so. It provides the interface of a ufunc without the speed, and code that uses it expecting a performance gain gets none.
+
+Its real use is convenience: applying an existing scalar function to an array without rewriting it, where the array is small enough that speed does not matter. For anything in a hot path, the function needs to be rewritten in terms of array operations, or compiled with something like Numba.
+
+## Integer division and the modulo operator
+
+`//` and `%` work elementwise like everything else, and both have an edge worth knowing.
+
+Integer division by zero does not produce infinity, because integers have no infinity. It produces 0 and a warning, which is arguably worse than a NaN because it looks like a legitimate answer.
+
+`%` follows Python's sign convention rather than C's: the result takes the sign of the divisor, so `-7 % 3` is 2, not -1. That matches plain Python and differs from many other languages, which matters when porting an algorithm.
+
+`np.divmod` returns both at once and is faster than computing them separately.
+
+## Power, and the integer surprise
+
+`a ** 2` on an integer array stays integer, and can overflow exactly as multiplication does.
+
+`a ** -1` on an integer array **raises**, because a negative power of an integer is not an integer. This is a deliberate change from older NumPy, which returned nonsense. Convert to float first.
+
+`np.sqrt` of a negative float gives NaN with a warning, not a complex number. If complex results are wanted, the input must already be complex: `np.sqrt(np.array([-1+0j]))` gives `1j`. NumPy will not silently promote a real array to complex, because doing so would change the dtype of everything downstream.
+
+## Rounding, and the rule that surprises people
+
+`np.round` uses **banker's rounding**: exact halves round to the nearest even number. `np.round(0.5)` is 0 and `np.round(1.5)` is 2.
+
+This is deliberate. Always rounding halves upward introduces a systematic upward bias when averaging many rounded values; rounding to even cancels it out.
+
+It is also not what most people expect, and it is worth knowing before writing a test that asserts `round(0.5) == 1`.
+
+`np.floor`, `np.ceil` and `np.trunc` have no such subtlety. Note that `trunc` and `floor` differ for negatives: `floor(-1.5)` is -2, `trunc(-1.5)` is -1.
+
+Converting to integer with `astype(int)` truncates toward zero, which is `trunc`, not `round`. That difference produces off-by-one results in exactly the places that are hardest to notice.
+
+## A checklist for converting a loop
+
+When replacing a Python loop with array operations, the questions in order:
+
+**Does each iteration depend on the previous one?** If yes, it may not vectorise. Check whether it is a cumulative operation in disguise &mdash; `cumsum`, `cumprod`, `maximum.accumulate` cover more cases than people expect.
+
+**Is there a conditional inside?** `np.where` for two branches, `np.select` for more, or a boolean mask if the operation applies to a subset.
+
+**Is it building a list?** Preallocate the output array and assign into it, or express the whole thing as one expression.
+
+**Is it combining every pair?** That is broadcasting with a `None` insertion, and it is worth checking the resulting size before running it.
+
+**Is it a reduction?** `sum`, `max`, `any` with the right `axis`, rather than accumulating in a Python variable.
+
+Most loops in numerical code fall into one of those five. The ones that do not are usually genuinely sequential, and are the right place for a loop &mdash; or for Numba, if the loop is the bottleneck.

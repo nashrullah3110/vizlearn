@@ -1,0 +1,284 @@
+title: Shape and Reshape
+intro: The same numbers read a different way, and why it usually costs nothing.
+
+## Three numbers
+
+`shape` is a tuple describing the extent of each axis. `ndim` is how many axes there are, which is just `len(shape)`. `size` is the total number of elements, which is the product of the shape.
+
+When an operation complains about shapes, printing all three of these for both operands answers the question most of the time. It is worth making that reflex.
+
+The empty tuple is a valid shape: `np.array(5).shape` is `()`, a zero-dimensional array holding one value. That comes up when an aggregation reduces everything away.
+
+
+## shape, ndim and size
+
+Three numbers describe the layout. They are the first things to print when something does not fit.
+
+```python-run
+import numpy as np
+
+for a in [np.arange(6),
+          np.arange(6).reshape(2, 3),
+          np.arange(24).reshape(2, 3, 4)]:
+    print("shape %-12s ndim %d  size %2d  itemsize %d  nbytes %d"
+          % (str(a.shape), a.ndim, a.size, a.itemsize, a.nbytes))
+
+print()
+print("size is the product of the shape:")
+a = np.arange(24).reshape(2, 3, 4)
+print("   2 * 3 * 4 =", 2 * 3 * 4, "==", a.size)
+```
+
+## Reshaping does not move anything
+
+The numbers stay where they are. Only the description of how to walk them changes &mdash; which is why it is effectively free.
+
+```python-run
+import numpy as np
+
+a = np.arange(12)
+b = a.reshape(3, 4)
+
+print("flat:", a)
+print("as 3x4:")
+print(b)
+print()
+print("shares memory :", np.shares_memory(a, b))
+print("b.base is a   :", b.base is a)
+print()
+b[0, 0] = 99
+print("changing b[0,0] changed a:", a[:4])
+```
+
+## -1 means work it out
+
+One dimension can be left to NumPy. It is the difference between code that survives a change in length and code that does not.
+
+```python-run
+import numpy as np
+
+a = np.arange(12)
+
+print("reshape(3, 4)  :", a.reshape(3, 4).shape)
+print("reshape(3, -1) :", a.reshape(3, -1).shape)
+print("reshape(-1, 2) :", a.reshape(-1, 2).shape)
+print("reshape(-1)    :", a.reshape(-1).shape, "<- back to flat")
+
+try:
+    a.reshape(5, -1)
+except ValueError as e:
+    print()
+    print("12 does not divide by 5:", type(e).__name__)
+    print("  ", e)
+```
+
+## Row-major order is the default
+
+The last axis varies fastest. Knowing that makes reshape results predictable instead of surprising.
+
+```python-run
+import numpy as np
+
+a = np.arange(6)
+print("flat        :", a)
+print()
+print("C order (default) - fill rows first:")
+print(a.reshape(2, 3))
+print()
+print("F order (Fortran) - fill columns first:")
+print(a.reshape(2, 3, order="F"))
+print()
+print("ravel reads back in the same order it filled:")
+m = a.reshape(2, 3)
+print("   ravel()        :", m.ravel())
+print("   ravel(order=F) :", m.ravel(order="F"))
+```
+
+## ravel, flatten and the difference
+
+Both give you 1-D. One is a view when it can be, the other always copies.
+
+```python-run
+import numpy as np
+
+m = np.arange(6).reshape(2, 3)
+
+r = m.ravel()
+f = m.flatten()
+
+print("ravel   shares memory:", np.shares_memory(m, r))
+print("flatten shares memory:", np.shares_memory(m, f))
+
+r[0] = 99
+print()
+print("after r[0] = 99:")
+print("   m[0,0]:", m[0, 0], "<- ravel wrote through")
+f[1] = 77
+print("   m[0,1]:", m[0, 1], "<- flatten did not")
+print()
+print("Use ravel when you only read, flatten when you need an independent copy.")
+```
+
+## Adding and removing length-1 axes
+
+Most shape errors in real code are an axis of size one in the wrong place. These are the tools for fixing that.
+
+```python-run
+import numpy as np
+
+a = np.arange(3)
+print("a           :", a.shape)
+
+col = a.reshape(-1, 1)
+row = a.reshape(1, -1)
+print("as a column :", col.shape)
+print(col)
+print("as a row    :", row.shape, row)
+
+print()
+print("newaxis does the same thing, more readably:")
+print("   a[:, np.newaxis].shape :", a[:, np.newaxis].shape)
+print("   a[np.newaxis, :].shape :", a[np.newaxis, :].shape)
+
+print()
+print("squeeze removes every length-1 axis:")
+odd = np.arange(3).reshape(1, 3, 1)
+print("   before:", odd.shape, " after:", odd.squeeze().shape)
+```
+## Reshaping is free
+
+An array is a flat block of memory plus a description of how to walk it. `reshape` changes the description and leaves the memory alone.
+
+That means it returns a **view**, not a copy. Writing through the reshaped array changes the original, because there is only one set of numbers. `np.shares_memory` confirms it, and the second editor demonstrates the write going both ways.
+
+This is the first appearance of a theme that runs through the whole track, and which has a module of its own: many NumPy operations give you a different window onto the same data rather than new data.
+
+Reshape can only return a view when the result can be described by regular strides. If it cannot &mdash; usually after a transpose &mdash; NumPy copies instead, silently. If you need to know which happened, check `.base` or `np.shares_memory`.
+
+## -1
+
+One dimension can be `-1`, meaning "work this one out from the others and the total size".
+
+`a.reshape(3, -1)` says three rows, however many columns that takes. It is better than hard-coding the second number, because it keeps working when the input length changes.
+
+Only one axis can be `-1` &mdash; two would be ambiguous. And the total must divide exactly: reshaping twelve elements into rows of five raises, which is the correct behaviour and a useful early warning that an upstream length is not what you assumed.
+
+## Row-major order
+
+NumPy walks the **last axis fastest** by default, which is called C order or row-major. Filling a `(2, 3)` array from `[0, 1, 2, 3, 4, 5]` gives rows `[0, 1, 2]` and `[3, 4, 5]`.
+
+Fortran order fills the first axis fastest, giving columns instead. `reshape` and `ravel` both take an `order` argument.
+
+You mostly do not need to think about this until you do: interfacing with code that expects column-major layout, reading a binary file written by something else, or debugging a reshape that produced a transposed-looking result. Knowing that the default is "last axis fastest" makes those predictable rather than mysterious.
+
+## ravel and flatten
+
+Both return a 1-D version. The difference is copying.
+
+`ravel` returns a view when the layout permits, and a copy when it does not. `flatten` always copies.
+
+So `ravel` is cheaper and shares memory; `flatten` is safe and independent. Use `ravel` when you are only reading, and `flatten` when you intend to modify the result without touching the original &mdash; or when you want a guarantee rather than a maybe.
+
+The fifth editor shows the difference directly: writing through the ravelled array changes the source, writing through the flattened one does not.
+
+## Length-1 axes
+
+A large share of real shape errors are an axis of size one in the wrong position, usually when a column of data needs to be a column rather than a flat sequence.
+
+`a.reshape(-1, 1)` makes a column, `a.reshape(1, -1)` makes a row. `np.newaxis` in an index does the same thing and reads better in place: `a[:, np.newaxis]` says clearly that a new axis is being inserted at the end.
+
+`squeeze` goes the other way, removing every axis of length one. That is useful for cleaning up after an operation that kept dimensions you no longer need &mdash; and mildly dangerous in library code, because it removes axes you might have been relying on when a dimension happens to be one.
+
+Getting these right matters most for broadcasting, which is the next module but one, and where the difference between shape `(3,)` and shape `(3, 1)` decides whether you get the answer you wanted or a much larger array you did not.
+
+## The invariant
+
+`a.size` is the product of `a.shape`, always. Every reshape must preserve it, which is why an impossible reshape raises rather than truncating or padding.
+
+That single constraint answers most "will this work" questions before you run anything. A 24-element array can become `(2,12)`, `(3,8)`, `(2,3,4)` or `(24,)`. It cannot become `(5,5)`.
+
+`a.ndim` is `len(a.shape)`, and is worth checking when writing functions that accept either a single sample or a batch of them.
+
+## When reshape has to copy
+
+`reshape` returns a view when the requested shape can be expressed as a stride pattern over the existing memory, and a copy when it cannot.
+
+For a freshly created contiguous array, it is always a view.
+
+After a transpose, it usually is not. The transposed array reads the buffer column-first, and flattening it in row-major order means gathering scattered values &mdash; which requires new memory.
+
+NumPy does not tell you which happened. `np.shares_memory(a, b)` does.
+
+If you need a guarantee in the other direction, `a.shape = (3, 4)` assigns the shape in place and **raises** if a view is impossible. That is a useful assertion: it fails loudly rather than silently copying, which is exactly what you want in code where an accidental copy of a large array would be a performance bug.
+
+## Row-major, column-major, and order=
+
+C order, the default, means the **last** axis varies fastest. Reading `a.ravel()` on a `(2,3)` array gives the first row then the second.
+
+Fortran order means the first axis varies fastest, and reading gives the first column then the second.
+
+`reshape` and `ravel` both take `order="F"` to work column-first without changing the underlying data's actual layout, which is occasionally the clearest way to express an operation.
+
+Genuine Fortran-ordered arrays &mdash; created with `np.asfortranarray` or `order="F"` &mdash; matter mainly when interfacing with Fortran or MATLAB-derived libraries, and some LAPACK routines are faster on them because they avoid an internal transpose.
+
+For everyday work, staying in C order and not thinking about it is the right default. The time to care is when `flags` tells you an array is not contiguous and something downstream is copying.
+
+## reshape versus resize
+
+They sound like a pair and are not.
+
+`np.reshape` returns a new view or copy with a different shape, leaving the original alone. The size must match.
+
+`a.resize(shape)` modifies the array **in place** and can change the size, padding with zeros or truncating. It also refuses to run if the array shares memory with anything else, which is a sensible protection and an occasional annoyance.
+
+`np.resize(a, shape)` &mdash; the function, not the method &mdash; is different again: it repeats the data cyclically to fill the new shape.
+
+Three similarly named operations with three different behaviours. In practice `reshape` covers nearly everything, and the other two are worth recognising when you meet them rather than reaching for.
+
+## Length-1 axes, and why they keep appearing
+
+`np.newaxis` (which is just `None`) inserts an axis of length 1. `np.expand_dims` does the same thing as a function call. `np.squeeze` removes every length-1 axis, or a named one.
+
+These exist almost entirely to serve broadcasting. A length-1 axis is the one broadcasting will stretch, so inserting one is how you say "align this against that axis".
+
+They also appear at the boundaries of libraries. A model that expects a batch gets a single sample wrapped with `x[None]`. A result that comes back as `(n, 1)` gets squeezed to `(n,)` before being handed to something expecting a vector.
+
+A caution on `squeeze` with no arguments: it removes *all* length-1 axes, which means a batch of one sample loses its batch dimension too. In code that handles variable batch sizes, that turns into an intermittent bug that only appears when the batch happens to contain one item. Naming the axis &mdash; `squeeze(axis=1)` &mdash; makes it safe.
+
+## Debugging shape errors
+
+Shape errors are the most common failure in array code, and they are also the easiest to diagnose, because the error message contains both shapes.
+
+The routine that resolves nearly all of them:
+
+Print the shapes of the inputs. Not the arrays &mdash; the shapes. Most of the time the mismatch is immediately visible and the fix is obvious.
+
+Ask which axis each one is supposed to represent. Shape errors are usually a semantic mistake &mdash; samples and features swapped, a batch axis missing &mdash; rather than an arithmetic one.
+
+Check whether a reduction removed an axis you needed. `keepdims=True` is the fix when the answer is yes.
+
+And check `ndim` when a function accepts both single items and batches. A great many "this worked yesterday" bugs are a `(3,)` arriving where a `(1, 3)` was expected.
+
+## Common shape mistakes
+
+**Assuming `reshape` reorders.** It does not rearrange values, only how they are grouped. If the values come out in an unexpected arrangement, the data was in a different order than assumed, and reshaping again will not fix it &mdash; a transpose might.
+
+**Using `reshape` to transpose.** `a.reshape(4, 3)` on a `(3, 4)` array is not `a.T`. Both give a `(4, 3)` result and they contain different values in different places. This is a genuinely common bug because the shapes match and nothing raises.
+
+**`squeeze()` with no argument** in code that handles variable batch sizes. It removes every length-1 axis, so a single-item batch loses its batch dimension.
+
+**Relying on `reshape` returning a view.** It usually does and sometimes does not. `np.shares_memory` answers it; assigning to `.shape` enforces it.
+
+**Losing an axis to an integer index** and then being surprised when broadcasting fails. `a[:, 0]` gives `(3,)`; `a[:, 0:1]` gives `(3, 1)`.
+
+## Reading a shape error
+
+The error message contains everything needed, and reading it beats guessing.
+
+"operands could not be broadcast together with shapes (3,4) (3,)" names both shapes. Align them from the right: 4 against 3. They are not equal and neither is 1, so it fails. The fix is either `keepdims=True` on whatever produced the `(3,)`, or an explicit `[:, None]`.
+
+"cannot reshape array of size 12 into shape (5,5)" is an arithmetic statement: 12 is not 25. Something upstream produced a different amount of data than expected, and the reshape is reporting it rather than causing it.
+
+"matmul: Input operand 1 has a mismatch in its core dimension" means the inner dimensions of a matrix product do not agree. Print both shapes and check which axis is meant to be the shared one.
+
+In every case the productive move is the same: print the shapes of the inputs, decide what each axis is supposed to mean, and fix the one that is wrong. Shape errors are almost always semantic &mdash; a transposed input, a missing batch axis, a reduction that removed something &mdash; rather than arithmetic.

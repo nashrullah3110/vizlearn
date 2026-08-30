@@ -22,6 +22,12 @@ def _fastapi_prelude():
 
 
 SPECS = {
+    "numpy": {
+        # numpy ships with Pyodide, so this is a CDN fetch rather than a wheel.
+        "packages": "numpy",
+        "label": "NumPy",
+        "filename": "example_%02d.py",
+    },
     "pydantic": {
         "packages": "pydantic,ssl",
         "label": "Pydantic",

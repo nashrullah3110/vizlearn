@@ -1,0 +1,343 @@
+title: Linear Algebra
+intro: Matrix multiplication, solving systems, and why you should almost never invert a matrix.
+
+## @ versus *
+
+`*` is elementwise. `@` is matrix multiplication.
+
+Both are valid on two square matrices of the same size, and they give completely different answers. Nothing raises, nothing warns, and the result of the wrong one is a plausible-looking matrix of the right shape.
+
+This is the most common linear algebra bug in NumPy code, and it survives review easily because both lines look correct.
+
+`np.matmul` is the function form of `@`, and `np.dot` agrees with it for 2-D. They diverge for higher dimensions &mdash; `matmul` broadcasts the leading axes and treats the last two as matrices, `dot` does something different and rarely what you want. Prefer `@` or `matmul`.
+
+
+## @ is matrix multiplication, * is not
+
+The single most common confusion, and both are legal so nothing warns you.
+
+```python-run
+import numpy as np
+
+a = np.array([[1, 2],
+              [3, 4]])
+b = np.array([[5, 6],
+              [7, 8]])
+
+print("a * b  (elementwise):"); print(a * b)
+print()
+print("a @ b  (matrix product):"); print(a @ b)
+print()
+print("np.matmul and np.dot agree with @ for 2-D:")
+print("   matmul same:", np.array_equal(a @ b, np.matmul(a, b)))
+print()
+print("Order matters - matrix multiplication is not commutative:")
+print("   a@b == b@a :", np.array_equal(a @ b, b @ a))
+```
+
+## Shapes must line up in the middle
+
+(m,k) @ (k,n) -> (m,n). The inner dimensions cancel.
+
+```python-run
+import numpy as np
+
+a = np.ones((2, 3))
+b = np.ones((3, 4))
+print("(2,3) @ (3,4) ->", (a @ b).shape, " the 3s cancel")
+
+try:
+    a @ np.ones((2, 4))
+except ValueError as e:
+    print("(2,3) @ (2,4) -> ValueError")
+    print("   ", str(e)[:88])
+
+print()
+print("A 1-D array is treated as whichever vector makes the shapes work:")
+v = np.array([1, 1, 1])
+print("   (2,3) @ (3,)  ->", (a @ v).shape, "matrix times column vector")
+print("   (3,)  @ (3,4) ->", (v @ b).shape, "row vector times matrix")
+```
+
+## Solving a system: A x = b
+
+<code>solve</code> is the answer. Not <code>inv</code>.
+
+```python-run
+import numpy as np
+
+# 2x + y = 11
+#  x + 3y = 18
+A = np.array([[2.0, 1.0],
+              [1.0, 3.0]])
+b = np.array([11.0, 18.0])
+
+x = np.linalg.solve(A, b)
+print("solution x, y :", np.round(x, 6))
+print("check A @ x   :", np.round(A @ x, 6), "== b")
+print()
+print("the inverse route gives the same answer here:")
+print("   inv(A) @ b :", np.round(np.linalg.inv(A) @ b, 6))
+print()
+print("but solve is faster and numerically better - see the next step.")
+```
+
+## Why inverting is the wrong habit
+
+It costs more and loses precision, and on a near-singular matrix it loses a lot.
+
+```python-run
+import numpy as np
+
+# A Hilbert matrix: famously ill-conditioned, and we know the true answer.
+n = 12
+H = 1.0 / (np.arange(n)[:, None] + np.arange(n)[None, :] + 1)
+x_true = np.ones(n)
+b = H @ x_true
+
+x1 = np.linalg.solve(H, b)
+x2 = np.linalg.inv(H) @ b
+
+e1 = float(np.abs(x1 - x_true).max())
+e2 = float(np.abs(x2 - x_true).max())
+print("condition number : %.2e  <- badly conditioned" % np.linalg.cond(H))
+print()
+print("error with solve : %.3e" % e1)
+print("error with inv   : %.3e" % e2)
+print("inv is %.0fx worse" % (e2 / e1))
+print()
+print("Both answers should be all ones. Neither is, because the problem")
+print("itself is unstable - but inv throws away noticeably more.")
+print("Rule: if you are about to write inv(A) @ b, write solve(A, b).")
+```
+
+## Determinant, rank and singular matrices
+
+How to tell whether a system has a unique solution before you trust one.
+
+```python-run
+import numpy as np
+
+good = np.array([[2.0, 1.0], [1.0, 3.0]])
+bad  = np.array([[1.0, 2.0], [2.0, 4.0]])     # row 2 = 2 x row 1
+
+for name, M in [("good", good), ("singular", bad)]:
+    print("%-9s det=%8.4f  rank=%d" % (name, np.linalg.det(M),
+                                       np.linalg.matrix_rank(M)))
+
+print()
+try:
+    np.linalg.solve(bad, np.array([1.0, 2.0]))
+except np.linalg.LinAlgError as e:
+    print("solve(singular) ->", type(e).__name__, ":", e)
+print()
+print("But a determinant test is unreliable. This matrix is perfectly")
+print("well behaved, and its determinant is nearly zero purely because")
+print("the entries are small:")
+tiny = 0.001 * np.eye(4)
+print("   det  = %.1e  <- looks singular" % np.linalg.det(tiny))
+print("   rank = %d of 4   <- it is not" % np.linalg.matrix_rank(tiny))
+print("   cond = %.2f      <- and it is beautifully conditioned"
+      % np.linalg.cond(tiny))
+print()
+print("Use matrix_rank to ask 'solvable?' and cond to ask 'trustworthy?'")
+```
+
+## Norms, eigenvalues and least squares
+
+The three other things people actually reach for.
+
+```python-run
+import numpy as np
+
+v = np.array([3.0, 4.0])
+print("norm (length)    :", float(np.linalg.norm(v)))
+print("distance a to b  :", float(np.linalg.norm(np.array([1.0, 1.0]) - v)))
+
+S = np.array([[2.0, 1.0],
+              [1.0, 2.0]])
+print()
+print("symmetric matrix -> eigvalsh, ascending and real:")
+print("   eigenvalues:", np.round(np.linalg.eigvalsh(S), 6))
+
+print()
+print("least squares fit of y = m x + c:")
+x = np.array([0.0, 1.0, 2.0, 3.0])
+y = np.array([1.0, 3.1, 4.9, 7.0])
+M = np.column_stack([x, np.ones_like(x)])
+sol = np.linalg.lstsq(M, y, rcond=None)[0]
+print("   slope %.4f  intercept %.4f" % (sol[0], sol[1]))
+```
+## Shapes
+
+`(m, k) @ (k, n)` gives `(m, n)`. The inner dimensions must match and they cancel.
+
+A 1-D array is special-cased: it is promoted to whichever orientation makes the multiplication valid, and then the added dimension is removed from the result. `(2,3) @ (3,)` gives `(2,)`, treating the vector as a column; `(3,) @ (3,4)` gives `(4,)`, treating it as a row.
+
+That convenience means you rarely need to reshape vectors, but it also means a shape error can come from a vector being the wrong length rather than the wrong orientation. The error message names both shapes, which is usually enough.
+
+## Solving systems
+
+To solve `Ax = b`, use `np.linalg.solve(A, b)`.
+
+The obvious alternative, `np.linalg.inv(A) @ b`, gives the same answer on well-behaved problems and is wrong as a habit for two reasons.
+
+**Cost.** Computing an inverse is roughly the work of solving the system `n` times. `solve` factors the matrix once and does one back-substitution.
+
+**Accuracy.** The inverse introduces rounding error, and then multiplying by it introduces more. `solve` avoids forming the inverse at all. On a well-conditioned matrix the difference is small; on an ill-conditioned one it is the difference between a usable answer and noise.
+
+The rule is simple enough to apply without thinking: if you are about to write `inv(A) @ b`, write `solve(A, b)`.
+
+Genuine uses for `inv` exist &mdash; you need the inverse itself, for a covariance matrix or an analytical derivation &mdash; but they are rarer than the code you will see suggests.
+
+## Is it solvable?
+
+A singular matrix has no unique solution, and `solve` raises `LinAlgError`.
+
+The instinct is to check `det(A) == 0` first. Do not. Determinants of floating-point matrices are almost never exactly zero, and the determinant scales badly &mdash; a well-conditioned matrix can have a tiny determinant simply because it is large.
+
+`np.linalg.matrix_rank(A)` answers the question directly: full rank means solvable.
+
+`np.linalg.cond(A)` measures how much the answer amplifies input error. A condition number near 1 is excellent; anything above roughly `1e10` means you should not trust the low-order digits of the result, whichever method produced it.
+
+## Norms
+
+`np.linalg.norm(v)` gives the Euclidean length of a vector, and `norm(a - b)` the distance between two points.
+
+It takes an `axis`, so `norm(X, axis=1)` gives the length of every row at once &mdash; the usual way to compute distances for a whole dataset without looping.
+
+Other norms are available via `ord`: `ord=1` for the sum of absolute values, `ord=np.inf` for the maximum.
+
+## Eigenvalues
+
+`np.linalg.eig` works on any square matrix and returns complex results in unspecified order.
+
+For a **symmetric** matrix &mdash; which covers most cases that arise in practice, since covariance and Gram matrices are symmetric &mdash; use `eigh` or `eigvalsh`. They exploit the symmetry, are faster and more accurate, and return real eigenvalues in ascending order.
+
+That determinism matters: code that indexes into the output of `eig` and assumes an order is relying on something not guaranteed.
+
+## Least squares
+
+`np.linalg.lstsq(M, y, rcond=None)` fits an overdetermined system &mdash; more equations than unknowns &mdash; by minimising squared error.
+
+Building the design matrix with `column_stack` is the whole setup. For a straight line, the columns are `x` and a column of ones; the solution is slope and intercept.
+
+Pass `rcond=None` explicitly to get the current behaviour and silence the future-warning about the old default.
+
+## Batched matrix multiplication
+
+`matmul` treats the **last two** axes as the matrix and broadcasts everything before them.
+
+That makes `(batch, n, k) @ (batch, k, m)` a batch of matrix products, computed in one call with no loop. `(batch, n, k) @ (k, m)` also works, applying the same matrix to every item in the batch.
+
+This is why the batch axis goes first by convention: it puts the matrix axes where `matmul` expects them, and the whole thing composes without transposes.
+
+`np.dot` does not do this. On arrays with more than two dimensions it follows an older rule that is rarely what anyone wants. `@` and `matmul` are the ones to use.
+
+Most of `np.linalg` also broadcasts over leading axes: `solve`, `inv`, `det` and the decompositions all accept a stack of matrices and return a stack of results.
+
+## solve versus lstsq
+
+`solve` requires a square matrix and gives the exact solution when one exists. It raises on a singular matrix.
+
+`lstsq` handles rectangular systems and finds the solution minimising squared error. It also handles rank-deficient systems by returning the minimum-norm solution rather than raising.
+
+For an overdetermined system &mdash; more equations than unknowns, which is what fitting a model to data looks like &mdash; `lstsq` is the right tool.
+
+The tempting alternative is the normal equations: `solve(A.T @ A, A.T @ b)`. It gives the same answer in exact arithmetic and is numerically worse, because forming `A.T @ A` squares the condition number. A problem that was marginally conditioned becomes badly conditioned. `lstsq` uses an SVD-based approach that avoids this.
+
+## SVD, and what it is for
+
+`np.linalg.svd` factors any matrix into `U @ diag(s) @ Vt`.
+
+The singular values `s` are the useful part for most practical purposes.
+
+**Rank.** The number of singular values meaningfully above zero. This is what `matrix_rank` computes internally, and it is why rank is a more reliable singularity test than a determinant.
+
+**Conditioning.** The ratio of largest to smallest singular value is the condition number.
+
+**Dimensionality reduction.** Keeping the largest k singular values and their vectors gives the best rank-k approximation of the matrix. That is what PCA is, and truncated SVD is how it is computed.
+
+**Pseudo-inverse.** `np.linalg.pinv` uses SVD to invert what can be inverted and ignore what cannot, which is how least squares handles rank deficiency.
+
+`svd(a, full_matrices=False)` returns the economy version, which is smaller and usually what you want for a tall matrix.
+
+## Other decompositions
+
+`np.linalg.qr` factors into an orthogonal and an upper-triangular matrix. It is the numerically sound way to solve least squares by hand, and it is what many algorithms use internally.
+
+`np.linalg.cholesky` factors a symmetric positive-definite matrix into a lower triangular factor times its transpose. It is roughly twice as fast as a general factorisation and is the standard tool for covariance matrices &mdash; sampling from a multivariate normal, or evaluating a Gaussian likelihood.
+
+Cholesky **raises** if the matrix is not positive definite, which is a useful diagnostic in itself: a covariance matrix that fails Cholesky is telling you something is wrong with how it was estimated.
+
+## Conditioning in practice
+
+The condition number is the amplification factor from input error to output error.
+
+A condition number of 10 means roughly one decimal digit lost. `1e8` means about eight, which on `float64`'s sixteen leaves eight. `1e16` means all of them, and the answer is noise regardless of the algorithm.
+
+Two things follow.
+
+**Check `cond` before trusting a solution** from a matrix built out of measured data. Nothing warns you.
+
+**Ill-conditioning is a property of the problem, not the code.** No solver rescues a condition number of `1e16`. The fix is upstream: rescale variables so their magnitudes are comparable, remove collinear columns, or add regularisation &mdash; which is exactly what ridge regression does, and why it works.
+
+Scaling is the most commonly overlooked of those. A design matrix with one column in metres and another in nanometres is badly conditioned for no reason other than units.
+
+## What to reach for
+
+**`@`** for products, including batched.
+
+**`solve`** for square systems, never `inv`.
+
+**`lstsq`** for fitting and overdetermined systems, never the normal equations.
+
+**`eigvalsh` / `eigh`** for symmetric matrices, because `eig` returns complex values in unspecified order.
+
+**`cholesky`** for covariance matrices.
+
+**`svd`** when you need rank, conditioning, or a low-rank approximation.
+
+**`cond` and `matrix_rank`** before believing any of it.
+
+And for anything beyond this &mdash; sparse matrices, iterative solvers, specialised decompositions &mdash; SciPy's `scipy.linalg` and `scipy.sparse` extend the same interface and are where the rest of the toolkit lives.
+
+## Common mistakes
+
+**Using `*` where `@` was meant.** Both are legal on square matrices and give different answers of the same shape. Nothing warns. This is the most frequent linear algebra bug in NumPy code.
+
+**Writing `inv(A) @ b`.** Slower and less accurate than `solve(A, b)`, for no benefit.
+
+**Using the normal equations for least squares.** `solve(A.T @ A, A.T @ b)` squares the condition number. `lstsq` does not.
+
+**Testing `det(A) == 0`.** Floating-point determinants are almost never exactly zero, and the determinant scales with the matrix. `matrix_rank` answers the question directly.
+
+**Indexing into `eig` output assuming an order.** There is none. `eigh` and `eigvalsh` return ascending real values for symmetric matrices, which is what most code actually needs.
+
+**Expecting `.T` to make a column vector.** On a 1-D array it does nothing. `v[:, None]`.
+
+**Using `np.dot` on more than two dimensions.** It follows an older rule that is rarely what anyone wants. `@` or `matmul` broadcast the leading axes properly.
+
+## Reading the shapes in an error
+
+`matmul` errors name the "core dimensions", which are the last two axes.
+
+"Input operand 1 has a mismatch in its core dimension 0" means the first of the last two axes of the second operand does not match what the first operand's last axis requires &mdash; the `k` in `(m,k) @ (k,n)`.
+
+The diagnosis is to print both shapes and check which axis is supposed to be shared. Nearly always one of the two arrays is transposed relative to the intent, and the fix is a `.T` on the correct side rather than a reshape.
+
+For a 1-D operand, remember it is promoted to whichever orientation makes the multiplication valid, so a shape error involving one usually means the wrong length rather than the wrong orientation.
+
+## Where SciPy takes over
+
+`np.linalg` covers the dense, general cases well. Several things sit just outside it.
+
+**Sparse matrices.** `scipy.sparse` stores only nonzeros and has its own solvers. For a matrix that is mostly zeros &mdash; graphs, finite-element meshes, term-document matrices &mdash; the difference is not a constant factor but the difference between fitting in memory and not.
+
+**Iterative solvers.** For very large systems, `scipy.sparse.linalg` offers methods that approximate a solution without factoring the matrix.
+
+**More decompositions.** `scipy.linalg` has LU, Schur, banded and triangular solvers, and generally more options on the ones NumPy also provides.
+
+**Matrix functions.** `expm` for the matrix exponential and friends live in SciPy.
+
+The interfaces are deliberately similar, so moving across is usually a change of import rather than a change of approach.

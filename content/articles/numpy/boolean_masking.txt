@@ -1,0 +1,342 @@
+title: Boolean Masking
+intro: A comparison gives an array of True and False - and that array is an index.
+
+## A comparison is elementwise
+
+`a > 5` does not give one answer. It gives a boolean array with one entry per element.
+
+That is the whole idea. The mask has the same shape as the data, so it can be used to select from it, to count, or to decide where to write.
+
+It also explains an error people meet early: putting an array in an `if` raises, because Python needs one truth value and NumPy refuses to guess whether you meant `any` or `all`.
+
+
+## A comparison gives an array
+
+Not one answer, one per element. That array is the mask.
+
+```python-run
+import numpy as np
+
+a = np.array([3, 8, 1, 9, 4, 7])
+
+print("a       :", a)
+print("a > 5   :", a > 5, "<- one bool per element")
+print("dtype   :", (a > 5).dtype)
+print()
+print("using it as an index keeps the True positions:")
+print("a[a > 5]:", a[a > 5])
+print()
+print("count and proportion come free, because True is 1:")
+print("   how many :", int((a > 5).sum()))
+print("   fraction :", float((a > 5).mean()))
+```
+
+## Combining conditions
+
+Use <code>&amp;</code>, <code>|</code> and <code>~</code> with brackets. <code>and</code> and <code>or</code> do not work, and the error explains why.
+
+```python-run
+import numpy as np
+
+a = np.array([3, 8, 1, 9, 4, 7])
+
+print("between 3 and 8 :", a[(a > 3) & (a < 8)])
+print("outside that    :", a[(a <= 3) | (a >= 8)])
+print("not > 5         :", a[~(a > 5)])
+
+print()
+try:
+    a[(a > 3) and (a < 8)]
+except ValueError as e:
+    print("using `and`:", type(e).__name__)
+    print("   ", str(e)[:78])
+    print("   `and` wants one True/False; the mask has six.")
+
+print()
+print("The brackets are required: & binds tighter than > in Python.")
+```
+
+## any, all and where
+
+Reducing a mask to one answer, or finding the positions that are True.
+
+```python-run
+import numpy as np
+
+a = np.array([3, 8, 1, 9, 4, 7])
+mask = a > 5
+
+print("mask      :", mask)
+print("any       :", bool(mask.any()))
+print("all       :", bool(mask.all()))
+print("count     :", int(mask.sum()))
+print()
+idx = np.where(mask)[0]
+print("np.where  :", idx, "<- the INDICES where it is True")
+print("a[idx]    :", a[idx])
+print()
+print("np.where with three arguments chooses elementwise instead:")
+print("   ", np.where(mask, a, 0))
+```
+
+## Assigning through a mask
+
+The mask selects where to write. This is how you clip, clean or replace without a loop.
+
+```python-run
+import numpy as np
+
+a = np.array([3.0, -1.0, 8.0, -4.0, 5.0])
+print("before      :", a)
+
+a[a < 0] = 0
+print("negatives→0 :", a)
+
+a[a > 5] = 5
+print("clipped at 5:", a)
+
+print()
+b = np.array([1.0, 2.0, 3.0, 4.0])
+b[b % 2 == 0] *= 10
+print("even *= 10  :", b)
+
+print()
+print("np.clip does the two-sided version in one call:")
+print("   ", np.clip(np.array([-3.0, 2.0, 9.0]), 0, 5))
+```
+
+## A mask index COPIES
+
+Unlike a slice, selecting with a mask makes a new array. Writing to the result does not reach the original.
+
+```python-run
+import numpy as np
+
+a = np.arange(6)
+
+sliced = a[1:4]          # a view
+picked = a[a > 2]        # a copy
+
+print("slice shares memory:", np.shares_memory(a, sliced))
+print("mask  shares memory:", np.shares_memory(a, picked))
+
+picked[0] = 99
+print()
+print("after writing to the mask result:")
+print("   a      :", a, "<- untouched")
+print("   picked :", picked)
+print()
+print("But assigning THROUGH the mask does write in place:")
+a[a > 2] = -1
+print("   a      :", a)
+```
+
+## A realistic clean-up
+
+Masks compose, which is what makes them the normal way to filter a dataset.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+temps = rng.normal(20, 8, 12).round(1)
+temps[3] = np.nan
+temps[7] = -99.0                       # a sentinel for "missing"
+
+print("raw        :", temps)
+
+valid = ~np.isnan(temps) & (temps > -50)
+print("valid mask :", valid)
+print("kept       :", temps[valid])
+print()
+print("count  :", int(valid.sum()), "of", temps.size)
+print("mean   :", round(float(temps[valid].mean()), 2))
+print("warm   :", temps[valid & (temps > 20)])
+print()
+print("nan needs isnan - comparisons with nan are always False:")
+print("   np.nan > -50 :", np.nan > -50)
+```
+## Selecting
+
+`a[mask]` returns the elements where the mask is True, as a 1-D array.
+
+The result is 1-D even when the input is not, because the True positions are not generally rectangular. If you need to keep the shape, `np.where(mask, a, fill)` replaces rather than removes.
+
+## Counting for free
+
+A boolean array is numeric: `True` is 1.
+
+So `mask.sum()` counts matches and `mask.mean()` gives the proportion. That reads oddly for about a day and then becomes the obvious way to answer "how many rows satisfy this" without a loop or a length check.
+
+## Combining conditions
+
+Use `&` for and, `|` for or, `~` for not &mdash; and bracket each condition.
+
+The brackets are not optional. In Python `&` binds more tightly than `>`, so `a > 3 & a < 8` parses as `a > (3 & a) < 8` and does something unrelated. Writing `(a > 3) & (a < 8)` is not a style preference; it is what makes the expression mean what it looks like.
+
+`and` and `or` cannot be used at all. They call `bool()` on their operands, which is exactly the error above. The error message is unusually good &mdash; it names `any()` and `all()` &mdash; and is worth reading rather than pattern-matching past.
+
+## Assigning through a mask
+
+`a[a < 0] = 0` sets every negative element to zero, in place. The mask picks where to write.
+
+The right-hand side can be a scalar, or an array with as many elements as the mask has True values. Augmented assignment works too: `b[b % 2 == 0] *= 10`.
+
+This is the vectorised form of a loop with an `if` inside, and it is usually clearer than the loop as well as faster.
+
+For the specific case of bounding values, `np.clip(a, low, high)` does both sides in one call and says what it means.
+
+## Masking copies, assigning does not
+
+This trips people who have just learned that slices are views.
+
+`a[mask]` **copies**. It has to: the selected elements are not evenly spaced, so there is no stride pattern that describes them, and no view is possible. Writing to the result does not affect the original.
+
+`a[mask] = value` **writes in place**. The mask is being used to locate elements in the original array, not to build a new one.
+
+So the same syntax reads as a copy and writes as a view. Both are correct and the distinction is worth holding.
+
+## nan does not compare
+
+The one genuine trap in filtering real data.
+
+Every comparison involving `nan` is False &mdash; including `nan == nan`. So `a[a != np.nan]` keeps everything, and `a > 0` silently drops the NaNs into the False bucket whether or not you thought about them.
+
+Use `np.isnan` to find them and `~np.isnan(a)` to exclude them. There is a module on missing data later; for now, remember that a comparison will never find a NaN for you.
+
+## The shape of real filtering
+
+Build the mask in pieces, combine it, then apply it once:
+
+```python
+valid = ~np.isnan(temps) & (temps > -50)
+clean = temps[valid]
+```
+
+Named masks read well, compose, and can be counted and inspected before you commit to them. `valid.sum()` before filtering tells you how much data survives, which is usually worth knowing.
+
+## where, in its three-argument form
+
+`np.where(cond)` returns the positions where the condition is true.
+
+`np.where(cond, a, b)` is something else entirely: a vectorised conditional, choosing elementwise from `a` where the condition holds and `b` where it does not.
+
+That second form is the array equivalent of a ternary expression, and it replaces a great many loops. `np.where(x < 0, 0, x)` clamps negatives to zero. `np.where(np.isnan(x), fill, x)` fills missing values.
+
+All three arguments broadcast, so `a` and `b` can be scalars, or arrays of a compatible shape, or one of each.
+
+The one thing to watch: **both branches are evaluated in full**. `np.where(x != 0, 1/x, 0)` still computes `1/x` for every element, including the zeros, and emits a division warning even though those results are discarded. The correct form uses `out=` and `where=` on the division itself, or suppresses the warning deliberately with `errstate`.
+
+For more than two branches, `np.select(conditions, choices, default=...)` takes a list of each and applies the first matching condition, which is cleaner than nesting `where` calls three deep.
+
+## The parenthesis rule
+
+`a > 2 & a < 5` does not do what it looks like.
+
+`&` binds tighter than `>` in Python, so this parses as `a > (2 & a) < 5`, which is a bitwise and on the values followed by a chained comparison. The result is either an error or, worse, a plausible-looking wrong answer.
+
+Every condition in a compound mask needs parentheses: `(a > 2) & (a < 5)`.
+
+There is no way to make this less error-prone within Python's grammar, and it is the single most common syntactic mistake in NumPy code. Parenthesise by reflex.
+
+The related error is using `and` instead of `&`. Python's `and` requires a single truth value, and an array has many, so it raises "the truth value of an array with more than one element is ambiguous". That message always means the same thing.
+
+## Counting
+
+`mask.sum()` counts True values, because booleans promote to integers.
+
+`np.count_nonzero(mask)` does the same thing and is usually faster, since it does not build an integer intermediate. On a large mask the difference is measurable, and it is the better habit for that reason alone.
+
+`mask.any()` and `mask.all()` short-circuit conceptually but not in practice &mdash; NumPy evaluates the whole array. For an early exit on a huge array, `np.argmax(mask)` finds the first True in one pass and stops there.
+
+That last trick is worth remembering: `argmax` on a boolean array returns the index of the first True, because True is 1 and ties go to the first occurrence. If no element is True it returns 0, which is indistinguishable from a match at position zero &mdash; so check `mask.any()` first.
+
+## Masked arrays
+
+NumPy has a whole submodule, `np.ma`, for arrays that carry a mask of invalid entries alongside the data.
+
+`np.ma.masked_array(data, mask)` produces an array where masked elements are excluded from every operation. The mean skips them, the sum skips them, and the mask propagates through arithmetic.
+
+It solves a real problem &mdash; missing data in integer arrays, where NaN cannot help &mdash; and it is genuinely useful in domains like climate and oceanography where it is well established.
+
+It is also comparatively slow, less widely supported by other libraries, and easy to lose track of when a masked array passes through a function that returns a plain one. Most code handles missing values with NaN and the `nan*` functions, or moves to pandas, rather than adopting `np.ma`.
+
+Worth knowing it exists; worth a deliberate decision before building on it.
+
+## What masking costs
+
+A boolean mask is one byte per element, so masking a million-element array allocates a megabyte for the mask.
+
+`a[mask]` then allocates the result, whose size depends on how many elements matched. Chaining several masked selections allocates at each step.
+
+Two ways to reduce that when it matters.
+
+**Combine conditions before selecting.** `a[(a > 2) & (a < 5)]` allocates one result; `a[a > 2][lambda r: r < 5]` allocates two.
+
+**Use the mask directly when you do not need the values.** Counting, summing or averaging matched elements can be done without extracting them: `a[mask].mean()` builds an intermediate array, while `a.sum(where=mask) / np.count_nonzero(mask)` does not.
+
+For most work this is irrelevant and the readable form wins. It becomes worth attention in a loop over large arrays, which is exactly where the intermediate allocations compound.
+
+## Masks as first-class values
+
+A mask is an array, which means it can be stored, named, combined and passed around like any other value.
+
+That is worth using. A filtering condition assembled from several parts is far more readable as named masks than as one long expression:
+
+```python
+is_adult = age >= 18
+is_active = status == 1
+recent = days_since < 30
+
+selected = data[is_adult & is_active & recent]
+```
+
+Each name documents a condition, each can be counted independently while debugging, and the combination reads as the sentence it represents.
+
+`is_adult.sum()` at any point tells you how many passed that one filter, which is how you find out which condition is unexpectedly excluding everything.
+
+## Masks and NaN
+
+Comparisons involving NaN are all False, which has a specific consequence for filtering: **NaN values fail every condition**.
+
+`a[a > 0]` silently excludes NaNs. So does `a[a <= 0]`. A value that is neither greater than nor less than zero disappears from both halves of what looks like an exhaustive split.
+
+That is occasionally the desired behaviour and frequently a source of quietly lost rows. If NaNs should be handled rather than dropped, they need an explicit branch:
+
+```python
+positive = a > 0
+missing = np.isnan(a)
+other = ~positive & ~missing
+```
+
+Three groups that actually cover everything, rather than two that appear to.
+
+## Assignment through a mask, and its limits
+
+`a[a < 0] = 0` modifies in place and is the standard way to clamp.
+
+The value assigned must be a scalar or must match the number of selected elements. `a[mask] = replacements` requires `len(replacements) == mask.sum()`, which is fine when the replacements were computed from the same mask and an error waiting to happen otherwise.
+
+`np.where(mask, new, a)` is the non-mutating equivalent, and returns a new array rather than modifying the original. It is the safer default in a function that should not modify its argument.
+
+`np.putmask` and `np.copyto` with a `where` argument cover the more specialised in-place cases.
+
+## Where masking fits among the alternatives
+
+`np.clip(a, lo, hi)` replaces the common two-sided clamp and is clearer than two masked assignments.
+
+`np.where` handles the two-branch conditional without extracting anything.
+
+`np.select` handles several branches in order.
+
+Masking proper is for when you want the **subset** &mdash; the values themselves, in a smaller array &mdash; rather than a transformed version of the whole.
+
+Recognising which of those four you actually want removes a surprising amount of code. A great many hand-written mask-and-assign sequences are a `clip` or a `where` written the long way.
+
+And the one rule that applies throughout: parenthesise every condition in a compound mask. `(a > 2) & (a < 5)`, always. The operator precedence will not do what you want otherwise, and it may not tell you.
+
+## A closing note
+
+Masking is the most-used feature in this track after arithmetic, and it is also where the syntax is least forgiving.
+
+Two habits cover nearly all of it: parenthesise every condition in a compound expression, and name intermediate masks rather than building one long chain. The first prevents a precedence bug that does not always announce itself; the second makes it possible to count how many rows each condition removed, which is how you find out that one of them is excluding everything.

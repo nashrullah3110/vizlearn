@@ -1,0 +1,307 @@
+title: NaN and Missing Data
+intro: The value that is not equal to itself, and the functions that exist because of it.
+
+## Not equal to itself
+
+`np.nan` is a floating-point value defined by the IEEE 754 standard to represent "not a number". Its defining property is that **every comparison involving it is False**, including equality with itself.
+
+`nan == nan` is False. `nan < 1` is False. `nan > 1` is False. The only comparison that returns True is `!=`, and only because it is the negation of a False.
+
+The immediate practical consequence: `arr == np.nan` gives an all-False mask, no matter how many NaNs the array contains. It fails silently, which is the worst way to fail.
+
+`np.isnan(arr)` is the correct test, and it returns a proper boolean mask.
+
+The rule is not a NumPy quirk. It falls out of NaN meaning "the result of an undefined operation" &mdash; two undefined results have no reason to be the same thing.
+
+
+## NaN is a float, and it is not equal to itself
+
+Every comparison with NaN is False, including <code>nan == nan</code>.
+
+```python-run
+import numpy as np
+
+x = np.nan
+print("np.nan is a", type(x).__name__)
+print("nan == nan :", x == x, "<- False. This is the IEEE 754 rule.")
+print("nan != nan :", x != x, "<- the only True comparison")
+print("nan <  1   :", x < 1)
+print("nan >  1   :", x > 1)
+print()
+print("So `arr == np.nan` never finds anything:")
+a = np.array([1.0, np.nan, 3.0])
+print("   a == np.nan :", a == np.nan)
+print("   np.isnan(a) :", np.isnan(a), "<- use this")
+```
+
+## NaN needs a float dtype
+
+There is no integer NaN, so introducing one promotes the whole array.
+
+```python-run
+import numpy as np
+
+a = np.array([1, 2, 3])
+print("int array dtype:", a.dtype)
+try:
+    a[0] = np.nan
+except ValueError as e:
+    print("assigning nan ->", type(e).__name__, ":", str(e)[:52])
+
+print()
+b = a.astype(float)
+b[0] = np.nan
+print("after astype(float):", b, b.dtype)
+print()
+print("np.array([1, 2, np.nan]) is float from the start:")
+print("   ", np.array([1, 2, np.nan]).dtype)
+print()
+print("This is why a column with one missing value becomes float,")
+print("and why ids can end up printed as 1001.0")
+```
+
+## One NaN poisons a whole reduction
+
+Silently, and the result still looks like a number.
+
+```python-run
+import numpy as np
+
+a = np.array([2.0, 4.0, np.nan, 8.0])
+
+print("sum  :", float(a.sum()))
+print("mean :", float(a.mean()))
+print("max  :", float(a.max()))
+print("   all nan - one missing value takes the lot")
+print()
+print("the nan-aware family ignores them instead:")
+print("nansum  :", float(np.nansum(a)))
+print("nanmean :", float(np.nanmean(a)))
+print("nanmax  :", float(np.nanmax(a)))
+print("nanstd  :", round(float(np.nanstd(a)), 4))
+print()
+print("nanmean divides by the count of REAL values, here 3 not 4.")
+```
+
+## Finding and counting
+
+<code>isnan</code> gives a mask, and everything you already know about masks applies.
+
+```python-run
+import numpy as np
+
+a = np.array([[1.0, np.nan, 3.0],
+              [np.nan, np.nan, 6.0],
+              [7.0, 8.0, 9.0]])
+
+print("total missing :", int(np.isnan(a).sum()))
+print("per column    :", np.isnan(a).sum(axis=0))
+print("per row       :", np.isnan(a).sum(axis=1))
+print()
+print("rows with no missing values:")
+clean = a[~np.isnan(a).any(axis=1)]
+print(clean, " shape", clean.shape)
+print()
+print("positions of the missing values:")
+print("   ", list(zip(*[c.tolist() for c in np.where(np.isnan(a))])))
+```
+
+## Filling: drop, constant, or interpolate
+
+Three strategies, and the choice matters more than the code.
+
+```python-run
+import numpy as np
+
+a = np.array([1.0, np.nan, np.nan, 4.0, 5.0])
+
+print("original     :", a)
+print("drop         :", a[~np.isnan(a)])
+print("fill 0       :", np.nan_to_num(a))
+print("fill mean    :", np.where(np.isnan(a), np.nanmean(a), a))
+
+idx = np.arange(len(a))
+good = ~np.isnan(a)
+print("interpolate  :", np.round(np.interp(idx, idx[good], a[good]), 4))
+print()
+print("Filling with 0 changes the mean. Filling with the mean keeps it")
+print("but shrinks the variance. Neither is neutral - pick deliberately.")
+```
+
+## inf is a separate thing
+
+Division by zero gives infinity and a warning, not an exception.
+
+```python-run
+import numpy as np
+
+a = np.array([1.0, 0.0, -1.0])
+
+with np.errstate(divide="ignore", invalid="ignore"):
+    r = a / 0.0
+print("a / 0 :", r, "<- inf, nan, -inf")
+print()
+print("isnan  :", np.isnan(r))
+print("isinf  :", np.isinf(r))
+print("isfinite:", np.isfinite(r), "<- the one that catches both")
+print()
+print("0/0 gives nan; 1/0 gives inf. They are different failures.")
+print()
+print("nan_to_num handles all three at once:")
+print("   ", np.nan_to_num(r, nan=0.0, posinf=999.0, neginf=-999.0))
+```
+## NaN is a float
+
+There is no integer NaN. The integer types have no bit pattern reserved for it.
+
+So assigning `np.nan` into an integer array raises, and any array literal containing `np.nan` comes out as float.
+
+This is why a table column with one missing value silently becomes float, and why identifiers end up displayed as `1001.0` instead of `1001`. There is no way around it within a plain NumPy integer array; the options are to accept float, to use a sentinel value like `-1` and document it, or to carry a separate boolean mask alongside the data.
+
+Pandas addresses this with nullable integer types. Plain NumPy does not have them.
+
+## One NaN poisons everything
+
+`a.sum()` on an array containing a single NaN returns NaN. So does `mean`, `max`, `min`, `std` and every other reduction.
+
+This is correct &mdash; the sum genuinely is unknown &mdash; but it is dangerous, because the result is still a number-shaped thing that flows onward through the pipeline and turns everything downstream into NaN too. By the time you notice, the origin can be far away.
+
+The `nan*` family exists for this: `nansum`, `nanmean`, `nanmax`, `nanmin`, `nanstd`, `nanmedian`, `nanpercentile`. Each ignores missing values rather than propagating them.
+
+Note what `nanmean` does: it divides by the count of **real** values. On four elements with one NaN, it divides by three. That is usually right, and it is worth being explicit that it is a decision rather than a technicality &mdash; you are asserting that the missing value is missing at random.
+
+`nansum` of an all-NaN array returns 0, while `nanmean` of one returns NaN with a warning. Those are different and defensible choices, and both are worth knowing before you rely on either.
+
+## Finding them
+
+`np.isnan(a)` gives a mask, and everything from the masking module applies.
+
+`np.isnan(a).sum()` counts them. With `axis`, it counts per row or per column, which is the first thing to look at when data arrives.
+
+`np.isnan(a).any(axis=1)` flags rows containing any missing value, and `~` inverts it to keep the complete ones. That is listwise deletion in one line.
+
+`np.where(np.isnan(a))` gives the coordinates, which is what you want when you need to know *where* rather than *how many*.
+
+## Filling
+
+Three broad strategies, and the choice is a statistical decision rather than a coding one.
+
+**Drop.** `a[~np.isnan(a)]` for a vector, or the row-wise version above for a table. Simple and unbiased if the data really is missing at random; throws away potentially a lot if it is not.
+
+**Constant.** `np.nan_to_num(a)` replaces with zero; `np.where(np.isnan(a), value, a)` with anything else. Filling with zero shifts the mean. Filling with the mean preserves the mean but shrinks the variance, which quietly misleads anything downstream that cares about spread.
+
+**Interpolate.** `np.interp` fills from neighbouring values, which is the right choice for ordered data like a time series where adjacency is meaningful.
+
+None of these is neutral. Every one of them puts numbers into your data that were not measured, and the honest thing is to record which you used.
+
+## inf is different
+
+Dividing by zero does not raise in NumPy. It produces `inf`, `-inf` or `nan`, and emits a RuntimeWarning.
+
+`1/0` gives `inf`. `0/0` gives `nan`. They come from different failures and are worth distinguishing.
+
+`np.isnan` does not catch `inf`. `np.isinf` does not catch NaN. `np.isfinite` catches both, and is usually the check you actually want when validating data.
+
+`np.errstate` is the context manager for suppressing the warnings when the behaviour is intentional. `np.nan_to_num` replaces NaN and both infinities in one call, with separate arguments for each.
+
+## Three ways to represent missing, and their costs
+
+**NaN.** Works only for floats. Propagates automatically through arithmetic, which is both the safety feature and the hazard. Supported by the whole `nan*` family and understood by every library.
+
+**A sentinel value.** `-1` for a count, `-999` for a measurement. Works for integers, costs nothing, and is entirely a convention &mdash; nothing stops the sentinel being treated as data by code that does not know about it. Every such bug is silent and produces plausible numbers.
+
+**A separate boolean mask.** Explicit, works for any dtype, and never gets mistaken for data. Costs a byte per element and requires every operation to be written mask-aware, which is the reason it is not more common.
+
+`np.ma` packages the third option, and pandas' nullable dtypes package a version of it with better ergonomics.
+
+For plain NumPy, NaN is the default answer for floats, and a documented sentinel is the pragmatic answer for integers when converting to float is not acceptable. The important part is documenting it &mdash; a sentinel that is not written down anywhere is a bug waiting for a new maintainer.
+
+## Comparing arrays that contain NaN
+
+`np.array_equal(a, b)` returns False if either contains NaN, because NaN never equals anything &mdash; including the NaN in the same position of the other array.
+
+That makes it useless for checking that a computation reproduced a result, which is exactly when you want it.
+
+`np.array_equal(a, b, equal_nan=True)` treats NaNs in matching positions as equal.
+
+`np.allclose(a, b, equal_nan=True)` does the same with a tolerance, and is what belongs in a test comparing floating-point results.
+
+Both are worth reaching for by default in test code, because a NaN appearing in both arrays is usually the expected outcome rather than a failure.
+
+## NaN in sorting and extremes
+
+`np.sort` places NaN at the **end**, on the grounds that it compares greater than everything. That is a convention rather than a consequence, since NaN comparisons are all False.
+
+`np.argmax` and `np.max` return NaN if any element is NaN, which is consistent with the reductions but means a single missing value hides the real maximum. `np.nanargmax` and `np.nanmax` skip them.
+
+`np.nanargmax` **raises** on an all-NaN slice rather than returning something meaningless, which is the right behaviour and worth catching in code that reduces over groups that might be entirely missing.
+
+`np.median` propagates NaN; `np.nanmedian` does not.
+
+The pattern is consistent: the plain function propagates, the `nan` version skips, and the `nan` version has an opinion about the all-missing case.
+
+## Tracking a NaN back to its source
+
+The hard part of NaN debugging is that the value flows a long way from where it was created.
+
+The single most effective tool is `np.errstate(all="raise")`, which converts the operation that *produces* an invalid result into an exception. The traceback then points at the division by zero or the square root of a negative number, rather than at the reduction three functions later that returned NaN.
+
+Failing that, bisect: check `np.isfinite(x).all()` at a few points in the pipeline and narrow down where it first goes false.
+
+The usual origins are worth knowing, because one of them is almost always it: division by zero, `log` of zero or a negative, `sqrt` of a negative, `0 * inf`, `inf - inf`, and an out-of-domain trigonometric inverse where a value drifted just past 1 through rounding. That last one is a classic &mdash; a cosine similarity computed as 1.0000000002 and passed to `arccos` gives NaN, and `np.clip(x, -1, 1)` is the fix.
+
+## Deciding what to do about missing data
+
+The code is easy; the decision is not, and it is a decision about the data rather than about NumPy.
+
+**Why is it missing?** Missing at random can be dropped or imputed without bias. Missing because of the value itself &mdash; a sensor that fails at extremes, a survey question people skip when the answer is embarrassing &mdash; cannot. Dropping those rows biases the result, and imputing them with a mean biases it differently.
+
+**How much is missing?** A handful of rows out of a hundred thousand can be dropped without much thought. Thirty percent cannot, and the choice of imputation becomes a modelling decision that should be stated.
+
+**What does downstream care about?** A mean is robust to mean-imputation by construction. A variance is not &mdash; filling with the mean shrinks it, and anything relying on spread will be quietly wrong.
+
+**Is the missingness itself informative?** Often it is, and adding a boolean "was missing" column preserves that information rather than discarding it.
+
+Whatever you choose, count them first and record what you did. `np.isnan(a).sum(axis=0)` at the point data arrives takes one line and prevents a surprising number of downstream mysteries.
+
+## Validating data as it arrives
+
+The cheapest defence against NaN problems is checking at the boundary, where the data enters the program.
+
+`np.isfinite(a).all()` answers "is any of this NaN or infinite" in one call, and is the right single check because it catches both.
+
+`np.isnan(a).sum(axis=0)` gives the count per column, which turns "there is missing data somewhere" into "column 3 is 40% empty" &mdash; a far more actionable statement.
+
+Doing this at load time, and failing or logging rather than proceeding silently, converts a class of mysterious downstream results into an immediate, located error. It costs one line.
+
+## NaN and boolean logic
+
+`np.isnan` requires a float dtype. Calling it on an integer or string array raises a TypeError rather than returning all-False, which surprises people writing generic code.
+
+`np.isnan(a)` on an **object** array also fails, because the elements may not be numbers at all.
+
+For code that must handle any dtype, guard with `np.issubdtype(a.dtype, np.floating)` first, or use `pd.isna` from pandas, which handles every case including None and NaT.
+
+## Comparisons involving NaN, in filtering
+
+Because every comparison with NaN is False, NaN values fail every condition &mdash; including the negation of a condition.
+
+`a[a > 0]` excludes them. `a[a <= 0]` also excludes them. Two filters that look like an exhaustive partition silently drop rows.
+
+Any place where a dataset is split into groups by a numeric condition is a place to ask what happens to the missing values, and to add an explicit `np.isnan` branch if they should be handled rather than lost.
+
+## The summary
+
+`np.isnan` to find them, never `== np.nan`.
+
+`np.isfinite` to validate, because it catches infinities too.
+
+The `nan*` family to reduce over them, remembering that skipping is a decision about the data.
+
+`np.errstate(all="raise")` to find where one was created, which is the single most effective debugging tool here.
+
+`equal_nan=True` on `allclose` and `array_equal` when comparing results that legitimately contain them.
+
+`np.clip` before `arccos` and similar, to stop rounding drift producing NaN from valid data.
+
+And at the start of everything: count them, record what you did about them, and prefer being explicit over letting a fill value pass silently into an analysis that assumes it was measured.

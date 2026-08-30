@@ -3308,6 +3308,166 @@ window.VIZLEARN_MODULES = [
   "desc": "Paste any text and watch a word cloud size each term by how often it appears, exposing what a document is really about."
  },
  {
+  "title": "Aggregations and axis",
+  "path": "numpy/aggregations_and_axis.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Boolean Masking",
+  "path": "numpy/boolean_masking.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Broadcasting",
+  "path": "numpy/broadcasting.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Creating Arrays",
+  "path": "numpy/creating_arrays.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Dtypes",
+  "path": "numpy/dtypes.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Fancy Indexing",
+  "path": "numpy/fancy_indexing.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Indexing and Slicing",
+  "path": "numpy/indexing_and_slicing.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Linear Algebra",
+  "path": "numpy/linear_algebra.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "NaN and Missing Data",
+  "path": "numpy/nan_and_missing_data.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Performance and Memory",
+  "path": "numpy/performance_and_memory.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Random Numbers",
+  "path": "numpy/random_numbers.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Saving and Loading Arrays",
+  "path": "numpy/saving_and_loading.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Shape and Reshape",
+  "path": "numpy/shape_and_reshape.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Sorting and Searching",
+  "path": "numpy/sorting_and_searching.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Stacking and Splitting",
+  "path": "numpy/stacking_and_splitting.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Transpose and Moving Axes",
+  "path": "numpy/transpose_and_axes.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Unique Values and Set Operations",
+  "path": "numpy/unique_and_set_operations.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Vectorised Arithmetic",
+  "path": "numpy/vectorised_arithmetic.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Views versus Copies",
+  "path": "numpy/views_vs_copies.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "What NumPy Is For",
+  "path": "numpy/what_is_numpy.html",
+  "category": "NumPy",
+  "topic": "numpy",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "Aliases",
   "path": "pydantic/aliases.html",
   "category": "Pydantic",
