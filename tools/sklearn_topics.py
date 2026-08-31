@@ -1131,6 +1131,12 @@ The practical version: look at the residuals for a pattern. A pattern means a mi
 
 <strong>Does it need scaled features?</strong> Plain linear regression does not - the fit is identical either way. Ridge, Lasso and ElasticNet do, because their penalty is on coefficient size.
 
+<strong>Why does fitting take no iterations?</strong> Ordinary least squares has a closed-form solution, so the answer is computed directly rather than searched for. That is why there is no `max_iter` and no convergence warning on this estimator.
+
+<strong>What is `positive=True` for?</strong> It constrains every coefficient to be non-negative, which is occasionally what physics or accounting requires - mixing proportions, for instance, where a negative contribution is meaningless.
+
+<strong>Can it handle missing values?</strong> No. It raises on `NaN`, which is why imputation comes earlier in a pipeline than the model does.
+
 ## Things to try
 
 1. <strong>Add an outlier.</strong> In the first editor, change one price to 400 and watch the slope move. Squared errors mean one bad point has a large vote.
