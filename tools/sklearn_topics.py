@@ -3954,3 +3954,286 @@ The failure that improves your metrics. Cross-validation cannot see it, a good s
          "why": "Target leakage is a fact about what a column means and when it is written, so it needs domain knowledge rather than code."},
     ],
 )
+
+
+# ---------------------------------------------------------------------------
+# 14. Missing values
+# ---------------------------------------------------------------------------
+topic(
+    "missing_values",
+    "Missing Values",
+    "Preparing Data",
+    "Most estimators refuse to fit with a gap in the data. Filling it is easy; "
+    "filling it without throwing away what the gap was telling you is the "
+    "part worth learning.",
+    _svg(_grid(30, 24, 4, 4, 13, S) +
+         _box(56, 37, 13, 13, S, A, 2, 0) + _txt(62, 47, "?", A, 9) +
+         _box(43, 50, 13, 13, S, A, 2, 0) + _txt(49, 60, "?", A, 9) +
+         _txt(80, 84, "absence is often information", M, 7)),
+    [
+        ("Most estimators simply refuse",
+         "And one family does not, which is worth knowing before reaching for "
+         "an imputer at all.",
+         '''from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import HistGradientBoostingClassifier
+import numpy as np
+
+X = np.array([[1.0, 2.0], [np.nan, 3.0], [3.0, 4.0], [4.0, 5.0]])
+y = np.array([0, 0, 1, 1])
+
+try:
+    LogisticRegression().fit(X, y)
+except ValueError as e:
+    print("LogisticRegression:", str(e).split("\\n")[0][:80])
+
+HistGradientBoostingClassifier(max_iter=10).fit(X, y)
+print()
+print("HistGradientBoosting: fitted, NaN handled natively")
+'''),
+
+        ("The four simple strategies",
+         "Note what the outlier does to the mean, and what it does not do to "
+         "the median.",
+         '''from sklearn.impute import SimpleImputer
+import numpy as np
+
+X = np.array([[1.0], [2.0], [100.0], [np.nan]])
+
+for strategy in ("mean", "median", "most_frequent", "constant"):
+    imp = SimpleImputer(strategy=strategy, fill_value=-1)
+    out = imp.fit_transform(X).ravel()
+    print("%-14s filled with %8.2f  ->  %s" % (strategy, out[-1], out))
+'''),
+
+        ("Keeping the fact that it was missing",
+         "add_indicator appends a column recording where the gaps were.",
+         '''from sklearn.impute import SimpleImputer
+import numpy as np
+
+X = np.array([[1.0], [2.0], [np.nan], [4.0]])
+
+imp = SimpleImputer(strategy="mean", add_indicator=True)
+out = imp.fit_transform(X)
+
+print("columns out:", out.shape[1], "- the value, and a was-it-missing flag")
+print(out)
+print()
+print("the flag lets the model use the fact of absence, which is often")
+print("informative in its own right.")
+'''),
+
+        ("The fill value is learned, so it obeys the split",
+         "The test rows get the training median, not their own.",
+         '''from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+rng = np.random.RandomState(0)
+X = rng.normal(loc=10.0, size=(200, 1))
+X[rng.rand(200) < 0.2] = np.nan
+X_tr, X_te = train_test_split(X, test_size=0.5, random_state=0)
+
+imp = SimpleImputer(strategy="median").fit(X_tr)
+
+print("median learned from the training half:", round(imp.statistics_[0], 4))
+print("median of the test half (not used)   :",
+      round(float(np.nanmedian(X_te)), 4))
+print()
+print("the test rows are filled with the training median, because that")
+print("is the number that would be available in production.")
+'''),
+
+        ("Using the other columns to guess",
+         "When features are correlated, the column mean is a poor guess and "
+         "the neighbouring rows are a good one.",
+         '''from sklearn.impute import SimpleImputer, KNNImputer
+import numpy as np
+
+# Two correlated columns; the second is missing on one row.
+X = np.array([[1.0, 2.0], [2.0, 4.0], [3.0, 6.0], [4.0, np.nan], [5.0, 10.0]])
+
+simple = SimpleImputer(strategy="mean").fit_transform(X)
+knn = KNNImputer(n_neighbors=2).fit_transform(X)
+
+print("true value would be about 8.0")
+print("SimpleImputer (column mean):", round(simple[3, 1], 3))
+print("KNNImputer (similar rows)  :", round(knn[3, 1], 3))
+'''),
+
+        ("When the gap is the signal",
+         "The value is missing precisely when the answer is yes. Imputing it "
+         "away destroys the most useful feature in the data.",
+         '''from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+rng = np.random.RandomState(0)
+n = 600
+X = rng.normal(size=(n, 3))
+y = (X[:, 0] > 0).astype(int)
+
+# Missing NOT at random: the value is absent mostly when y is 1.
+Xm = X.copy()
+Xm[(y == 1) & (rng.rand(n) < 0.7), 0] = np.nan
+
+plain = make_pipeline(SimpleImputer(), LogisticRegression())
+flagged = make_pipeline(SimpleImputer(add_indicator=True), LogisticRegression())
+
+print("impute only        :", round(cross_val_score(plain, Xm, y, cv=5).mean(), 3))
+print("impute + indicator :", round(cross_val_score(flagged, Xm, y, cv=5).mean(), 3))
+print()
+print("when absence itself carries the signal, throwing it away costs you.")
+'''),
+    ],
+    [
+        "Most estimators raise on <code class='mono-font'>NaN</code>; the "
+        "<code class='mono-font'>HistGradientBoosting</code> pair handle it "
+        "natively and often better than any imputation.",
+        "<code class='mono-font'>SimpleImputer</code> learns one number per "
+        "column - <code class='mono-font'>statistics_</code> - so it must be "
+        "fitted on the training data only.",
+        "<strong>median</strong> over <strong>mean</strong> for anything skewed "
+        "or with outliers; <strong>most_frequent</strong> or a constant for "
+        "categorical columns.",
+        "<code class='mono-font'>add_indicator=True</code> keeps a flag for "
+        "where the value was missing, which is free and frequently the most "
+        "useful feature added.",
+        "<code class='mono-font'>KNNImputer</code> and "
+        "<code class='mono-font'>IterativeImputer</code> use the other columns, "
+        "which beats a column constant when features are correlated.",
+        "Dropping rows is only safe when values are missing at random and there "
+        "are few of them - otherwise it biases the data.",
+    ],
+    """title: Missing Values: A Practical Guide
+intro: A gap in the data is two problems: the estimator will not run, and the gap itself may have been telling you something.
+
+## Why it has to be handled
+
+Almost every estimator in scikit-learn raises `ValueError: Input X contains NaN` rather than guessing. That refusal is deliberate &mdash; there is no universally correct fill, and silently choosing one would hide a decision that changes the model.
+
+The exceptions are worth knowing before you reach for an imputer at all. `HistGradientBoostingClassifier` and its regressor sibling handle missing values natively: at each split, the tree learns which side the missing rows should go, which is a genuinely better answer than filling in a number, because it lets the missingness itself influence the prediction without inventing data. On tabular problems with gaps, starting there and skipping imputation entirely is often the right move.
+
+For everything else, something has to fill the gap.
+
+## The simple strategies, and choosing between them
+
+`SimpleImputer` replaces missing values with one number per column, learned during `fit` and stored in `statistics_`.
+
+**mean** is the default and the wrong default for most real data. The editor above shows why: with values of 1, 2 and 100, the mean is 34.33 &mdash; a number nothing like any of the observations. Any skew or outlier drags it.
+
+**median** is the safer choice for numeric columns and should probably be your habit. It is unaffected by the tail and always lands on a plausible value.
+
+**most_frequent** works for categorical columns and for numeric ones with few distinct values.
+
+**constant** fills with `fill_value` &mdash; useful when there is a meaningful default, and useful with a sentinel like -1 when you want the model to be able to see the imputed rows. For categorical data, `fill_value="missing"` makes absence an explicit category, which is often exactly right.
+
+## The fill value is learned
+
+This is the part that connects back to the rest of the track: `statistics_` is computed from data, so an imputer fitted on everything has seen the test set.
+
+The effect is usually small &mdash; a median shifts a little &mdash; but the principle is the same as everywhere else, and there is a stronger practical reason. In production, the median of the future data is not available. The model has to fill gaps with a number computed at training time, so that is the number the evaluation should use.
+
+The editor above shows the training median and the test median differing in the third decimal. The test rows get the training one, which is correct.
+
+`SimpleImputer` inside a `Pipeline` handles this automatically, refitting on each training fold. As with scaling, there is no good reason to do it by hand.
+
+## Missingness is information
+
+The most common mistake is not choosing the wrong fill value. It is discarding the fact that a value was missing.
+
+Data is rarely missing at random. A blank income field on a loan application, an absent test result, an unrecorded satisfaction score &mdash; in each case the absence usually correlates with something. People decline to answer questions for reasons, tests are not ordered for reasons, and fields go unfilled for reasons.
+
+`add_indicator=True` appends a binary column marking where each gap was. It costs one column per affected feature and it hands the model the pattern of absence as a feature in its own right.
+
+The last editor makes the size of the effect concrete. With a value missing mostly when the answer is yes, imputing alone scores 0.77; imputing with an indicator scores 0.987. The imputer filled in a plausible number and erased the most informative thing in the dataset; the indicator put it back.
+
+The taxonomy is worth knowing by name. **Missing completely at random** &mdash; the gap has no relationship to anything &mdash; is the only case where plain imputation loses nothing, and it is the rarest. **Missing at random**, where the gap depends on other observed features, is common and partly recoverable by a model-based imputer. **Missing not at random**, where the gap depends on the unobserved value itself, is both the most common and the one where the indicator matters most.
+
+## Using the other columns
+
+When features are correlated, a column constant is a poor guess. Two better options use the rest of the row.
+
+`KNNImputer` finds the most similar complete rows and averages their values for the missing feature. The editor above shows it recovering 8.0 where the column mean gives 5.5, because the two columns move together and the neighbours know it. It needs the features scaled, since it measures distance, and it is expensive on large data because it searches for neighbours.
+
+`IterativeImputer` models each column with missing values as a function of the others, in rounds, until the estimates settle. It is the most capable of the three and the slowest, and it is still marked experimental &mdash; importing it requires `from sklearn.experimental import enable_iterative_imputer` first, which catches everyone once.
+
+Both are worth trying when imputation quality matters. Neither is worth the complexity when the missingness is light and the model is a gradient booster that could have handled it natively.
+
+## Dropping, and when it is allowed
+
+`dropna()` is the tempting one-liner and it is only safe under conditions worth checking.
+
+Dropping rows is defensible when the values are genuinely missing at random and the affected rows are few. It is a mistake when the missingness is informative, because you are deleting exactly the rows that carry the pattern &mdash; and the bias it introduces is invisible in every subsequent metric.
+
+Dropping a column is defensible when most of it is missing and no indicator would help. A column that is 95% empty rarely carries enough to be worth imputing, though the 5% pattern occasionally does &mdash; which is what the indicator would tell you.
+
+The asymmetry to remember: you can drop rows from the training data, but you cannot drop them at prediction time. A model that has never seen a missing value in a column will still be handed one eventually, and something has to happen. Deciding what, during training, is the whole point of having an imputer in the pipeline.
+
+## Categorical columns need a different answer
+
+Everything above assumes numeric data. Text columns have gaps too, and the arithmetic strategies do not apply.
+
+`SimpleImputer(strategy="most_frequent")` works and quietly asserts that the missing rows are like the majority, which is often exactly the claim that is false. `strategy="constant", fill_value="missing"` is usually better: it creates an explicit category, the encoder gives it its own column, and the model can learn whatever that column is worth. Absence becomes a value rather than a guess.
+
+`OneHotEncoder` also handles `NaN` directly, treating it as its own category without any imputation step, which is the shortest route to the same result.
+
+The reason the explicit category usually wins is the same as for the indicator: in real data, "not stated" is a fact about the record rather than a hole where a fact should be. A blank employer field, an unselected optional dropdown, a survey question skipped &mdash; each tells you something, and folding it into the most common value asserts the opposite.
+
+## How much is too much
+
+A quick rule for triage, applied per column rather than to the dataset as a whole.
+
+**Under about 5% missing.** Almost any reasonable imputation works and the choice barely matters. Use the median, add the indicator, move on.
+
+**Between 5% and 30%.** The choice starts to matter. Compare a couple of strategies by cross-validation, and treat the indicator as compulsory rather than optional.
+
+**Over 30%.** The column is mostly absent, and imputing it means most of it is invented. Consider keeping only the indicator and discarding the values, which sometimes performs better than either the column or its removal.
+
+**Over 80%.** Usually drop the column, unless the small present portion is known to be highly informative.
+
+These are rules of thumb rather than thresholds, and the honest way to settle any of them is to try both inside a pipeline and compare cross-validated scores. That takes two lines, which is less effort than arguing about it.
+
+## Things to try
+
+1. <strong>Compare the strategies.</strong> In the second editor, note that mean fills 34.33 into a column whose other values are 1, 2 and 100.
+2. <strong>Recover the correlation.</strong> The fifth editor has KNNImputer land on 8.0 exactly. Change the neighbours to 1 and see what happens.
+3. <strong>Turn the indicator off.</strong> The last editor drops from 0.987 to 0.77. That gap is the value of one extra column.
+4. <strong>Skip imputation entirely.</strong> Replace the pipeline in the last editor with `HistGradientBoostingClassifier()` on the raw data with gaps.
+
+## Where this leaves you
+
+Median rather than mean for numeric columns, an explicit category for categorical ones, `add_indicator=True` almost always, the imputer inside a pipeline so the fill value obeys the split, and a check of whether a gradient booster could have handled the gaps without any of it.
+""",
+    [
+        {"q": "What does SimpleImputer learn during fit?",
+         "options": ["Which rows to drop",
+                     "One fill value per column, stored in statistics_",
+                     "A model of each column",
+                     "Nothing - it fills at transform time"],
+         "answer": 1,
+         "why": "One number per column, computed from the data it was fitted on - which is why it must be fitted on the training half only."},
+        {"q": "Why prefer median over mean for numeric columns?",
+         "options": ["It is faster",
+                     "It is unaffected by outliers and always lands on a plausible value",
+                     "It handles categories",
+                     "It is the default"],
+         "answer": 1,
+         "why": "With values of 1, 2 and 100 the mean is 34.33 - a number nothing like any observation. The median is 2."},
+        {"q": "What does add_indicator=True do?",
+         "options": ["Marks the imputer as fitted",
+                     "Appends a column recording where values were missing",
+                     "Raises if too much is missing",
+                     "Drops rows with gaps"],
+         "answer": 1,
+         "why": "It preserves the fact of absence, which is frequently informative. In the last editor it took the score from 0.77 to 0.987."},
+        {"q": "Which estimator handles NaN without an imputer?",
+         "options": ["LogisticRegression",
+                     "HistGradientBoostingClassifier",
+                     "KNeighborsClassifier",
+                     "RandomForestClassifier"],
+         "answer": 1,
+         "why": "It learns which side of each split the missing rows belong on, which uses the missingness rather than filling over it."},
+    ],
+)
