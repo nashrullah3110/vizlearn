@@ -3562,6 +3562,26 @@ The rule that keeps a custom step honest is the same as for the built-in ones: e
 
 <strong>Can I add a step to a fitted pipeline?</strong> You can modify `pipe.steps`, and the result is unfitted from that point on. Building a new pipeline is clearer.
 
+## Reading a pipeline someone else wrote
+
+An unfamiliar pipeline is quicker to understand than an unfamiliar script, because the steps are the structure and they are listed in order.
+
+Three questions cover it. **What are the steps?** `[name for name, _ in pipe.steps]` prints the sequence, and the order is the order data flows through. **What does each one learn?** Every step's fitted attributes end in an underscore, so `pipe["scale"].mean_` and `pipe["encode"].categories_` say what it took from the data. **What comes out?** `pipe[:-1].transform(X).shape` tells you how many features the model is actually seeing, which is often surprising after one-hot encoding.
+
+The display helps too. Printing a pipeline in a notebook renders a diagram of the steps, and `sklearn.set_config(display="diagram")` makes that the default. In a plain terminal, `print(pipe)` gives the nested repr, which is dense but complete &mdash; every step and every non-default hyperparameter.
+
+What to look for when reviewing one: whether anything that learns from data sits *outside* it. A script that scales, imputes or selects features before building the pipeline has moved that step out of the folds, and the pipeline's presence gives a false impression of safety. The pipeline only protects what is inside it.
+
+## The order of the steps, again
+
+Steps run in the order given, and some orders are wrong.
+
+Imputation before scaling, because a scaler cannot compute a mean across missing values. Encoding before scaling, because a scaler cannot subtract a mean from a string. Both before feature selection, because the selector needs numeric, complete columns to score. And selection before the model, so the model sees what was chosen.
+
+The sequence that covers most tabular problems is: impute, encode, transform any skew, scale, select, fit. Not every problem needs all six, and the relative order of the ones you use should follow that list.
+
+Getting it wrong usually raises, which is fortunate. The exception is putting selection before scaling when the selector's criterion is scale-sensitive &mdash; that runs, and quietly selects the columns with the largest units.
+
 ## Things to try
 
 1. <strong>Confirm the interface.</strong> In the first editor, note that a pipeline has `fit` and `predict` &mdash; it is an estimator, not a wrapper you unwrap.
